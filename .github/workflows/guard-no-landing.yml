@@ -1,0 +1,15 @@
+name: Guard — No Landing Changes
+on:
+  pull_request:
+    branches: [ "**" ]
+jobs:
+  no-landing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if landing modified
+        run: |
+          if git diff --name-only origin/${{ github.base_ref }}... | grep -E '^(apps/landing|www/|site/)' ; then
+            echo "::error title=Landing modifiée::La landing ne doit pas être modifiée par cette PR."
+            exit 1
+          fi
