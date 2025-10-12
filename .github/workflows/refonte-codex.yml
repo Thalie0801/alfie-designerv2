@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: read
 
 concurrency:
   group: refonte-codex-${{ github.ref }}
@@ -24,15 +25,11 @@ jobs:
            github.actor != 'lovable-dev[bot]' &&
            !startsWith(github.event.head_commit.message, 'Reverted to commit') }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Paths filter
         id: filter
         uses: dorny/paths-filter@v3
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           filters: |
             landing:
               - 'www/**'
@@ -63,6 +60,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: read
     # même filtre d’évitement de boucles ici
     if: ${{ !startsWith(github.event.head_commit.message, 'Codex:') &&
            !contains(github.event.head_commit.message, '[skip ci]') &&
