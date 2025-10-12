@@ -1,348 +1,125 @@
-# Alfie Designer v3 — Prompt Système
+# Alfie Designer — Cahier des charges Refonte 2024
 
-## Vue d'ensemble
+## 1. Contexte & objectifs
 
-Alfie Designer v3 est un système de génération de contenu visuel et vidéo centré sur Canva, avec une approche "Canva-first". Il gère trois modes de création distincts avec des règles de quotas et de facturation spécifiques.
+Alfie Designer devient un agent conversationnel à invite unique qui fabrique, à la demande, des **Images**, **Carrousels** et **Reels/Vidéos courtes**. Chaque production peut soit exploiter un template Canva (Brand Kit appliqué), soit être générée/retouchée via IA (Nano-Banana pour l'image, pipelines vidéo éco), puis livrée en **PULL** : lien Canva + pack prêt à poster. Aucune publication automatique n'est envisagée.
 
-## Principe clé : Langue & Qualité
+**Objectifs de la refonte :**
 
-### Règle d'Or
+- Simplifier l'expérience : « Fais-moi un [format] pour [objectif] » → 2–3 questions → livrable.
+- Maîtriser le coût : par défaut, routage Image→Vidéo et Éco T2V (0 Woof). Premium (Veo/Sora) uniquement sur confirmation explicite.
+- Clarifier les offres sans modifier les prix : Starter 39 € · Pro 99 € · Studio 199 €.
+- Préparer une passerelle douce vers Æditus (orchestration & publication) sans l'inclure dans le scope immédiat.
 
-- **Prompts IA** → ANGLAIS (pour maximiser la qualité des modèles)
-- **Contenu public** → FRANÇAIS (voix off, sous-titres, textes, UI)
+## 2. Périmètre (in scope)
 
-**Pourquoi ?** Les modèles d'IA (Nano, Banana, Sora, Veo3) sont entraînés principalement sur des données anglaises. Un prompt en anglais produit des résultats de meilleure qualité.
+- **Formats pris en charge :** Image (post/cover), Carrousel IG/LinkedIn, Reel / vidéo courte 9:16 (8–15 s).
+- **Entrées :** invite texte (option vocal), Brand Kit, médias fournis (1–5 images), choix Template Canva ou IA.
+- **Sorties :** lien « Ouvrir dans Canva » (pull) + ZIP (PNG/PDF | MP4+SRT+cover).
+- **Moteurs :** Nano-Banana (image, upscales, i2i), Éco T2V (texte→vidéo léger), Image→Vidéo (Ken Burns/Parallax/Montage), Premium T2V (Veo/Sora) optionnel.
 
-**Workflow :**
-```
-Brief utilisateur (FR) → Alfie traduit en ANGLAIS → Moteur IA → Contenu FR pour le public
-```
+## 3. Hors périmètre (out of scope)
 
-## 3 Modes de Création
+- Publication/planification sociale automatique (toutes plateformes).
+- Push automatique vers Canva (bloqué tant que l'API ne le permet pas).
+- Vidéo > 60 s, 4K ou effets lourds type VFX ciné continu.
+- Analytics avancés (reporting externe) — à cadrer en V2.
 
-### 1️⃣ Template Canva (GRATUIT)
+## 4. Glossaire
 
-**Objectif :** Adapter un template Canva existant au Brand Kit de la marque.
+- **Pull :** import manuel par le client (ouvrir le modèle Canva, importer le ZIP).
+- **Push :** dépôt automatique dans Canva (non garanti, hors V1).
+- **Woof :** crédit Premium consommé par plans Veo/Sora.
+- **Éco T2V :** génération vidéo légère, 0 Woof, 8–12 s, social-ready.
+- **Image→Vidéo :** animation à partir d’1–5 images (Ken Burns, Parallax, Montage), 0 Woof.
 
-**Processus :**
-1. Récupère un template Canva (ID/lien ou recherche par mots-clés)
-2. Applique le Brand Kit : couleurs, typographies, logos, styles
-3. Génère les variantes nécessaires : carré (1:1), vertical (1080×1920), horizontal (1920×1080)
+## 5. Offres & quotas (prix inchangés)
 
-**Coût :** **GRATUIT** — Pas de comptabilisation dans les quotas
-**Sortie :** Paquet de fichiers PNG/MP4 + .zip prêt à importer dans Canva
+**Règle générale :** 1 plan = 1 marque. Stockage 30 jours. Téléchargements illimités.
 
-**Cas d'usage :**
-- "Adapte ce template Instagram à ma marque"
-- "Crée une story avec le template XXX dans mes couleurs"
+| Plan    | Prix | Images/mois | Reels/mois (0 Woof) | Woofs Premium inclus | Notes |
+|---------|------|-------------|---------------------|----------------------|-------|
+| Starter | 39 € | 150         | 15                  | 0                    | Brand Kit appliqué, 1 version par demande |
+| Pro     | 99 € | 450         | 45                  | 5                    | Choix A/B utile, déclinaisons pertinentes |
+| Studio  |199 € | 1000        | 100                 | 15                   | Packs multi-canaux, composants de marque |
 
----
+**Add-ons :** Marque supplémentaire +39 €/mois · Packs Woofs (+5/+10) · Stockage 90 j +9 €/marque.
 
-### 2️⃣ Visuel IA (Image — Nano/Banana)
+**Règles de comptage :**
 
-**Objectif :** Générer une image depuis un prompt, conforme au Brand Kit.
+- **Images :** toute image IA générée/retouchée (Nano-Banana) = 1. Utiliser un template Canva sans image IA = 0.
+- **Carrousel :** chaque illustration IA intégrée compte dans Images ; les slides purement typographiques ne comptent pas.
+- **Reel :** chaque export vidéo = 1 dans le quota Reels. 0 Woof si Image→Vidéo ou Éco T2V. Woofs uniquement si plan Premium validé.
 
-**Processus :**
-1. Alfie construit un **prompt ANGLAIS détaillé** :
-   - Sujet principal
-   - Contexte et ambiance
-   - Style visuel (photographique, illustration, 3D...)
-   - Lumière et composition
-   - Palette de couleurs (Brand Kit)
-   - Texture et qualité
-2. Génère l'image via Nano/Banana
-3. Applique les overlays FR si texte demandé
-4. Exporte en PNG/WEBP (2048px côté long par défaut)
+## 6. Parcours utilisateur (commun)
 
-**Formats supportés (ratios) :**
-- **1:1** (carré) → Instagram post
-- **4:5** (portrait) → Instagram feed
-- **9:16** (vertical) → Story Instagram, TikTok, Reels
-- **16:9** (paysage) → YouTube, bannières, LinkedIn
+1. **Invite :** « Fais-moi un [Image | Carrousel | Reel 9:16] pour [objectif] ».
+2. **Questions ciblées (2–3) :** Style (Template Canva ou IA), médias à importer (0–5 images), ton/CTA.
+3. **Routage :**
+   - Template Canva trouvé → remplissage + Brand Kit + animations légères (si demandé).
+   - IA (Nano-Banana) → génération/retouche images → mise en page.
+   - Vidéo → Image→Vidéo ou Éco T2V par défaut ; Premium T2V sur validation explicite.
+4. **Prévisualisation :** aperçu, légende/alt-text proposés, SRT si vidéo.
+5. **Livraison (PULL) :** bouton Ouvrir dans Canva + téléchargement ZIP. Nommage standardisé.
+6. **Compteurs :** images, reels, woofs visibles ; alerte à 80 %.
 
-**Coût :** 1 crédit IA + compte dans quota **IMAGES** mensuel
-**Stockage :** 30 jours, puis purge automatique
-**Sortie :** PNG prêt pour Canva ou réseaux sociaux
+## 7. Détails par format
 
-**Règle critique :** Si le format n'est pas précisé, **DEMANDER** avant de générer :
-```
-"Super idée ! Quel format souhaites-tu ? 📐
-• 1:1 (carré - Instagram post)
-• 4:5 (portrait - Instagram feed)
-• 9:16 (vertical - Story/TikTok)
-• 16:9 (paysage - YouTube/bannière)"
-```
+### 7.1 Image (post/cover)
 
----
+- **Entrées :** sujet, ton, format (1:1 ou 4:5), assets (optionnels).
+- **Sorties :** PNG (≥1080), SVG source, légende, alt-text.
+- **Qualité :** contraste AA, hiérarchie typographique, marges de sécurité.
 
-### 3️⃣ Vidéo IA (Sora / Veo3)
+### 7.2 Carrousel (IG/LinkedIn)
 
-**Objectif :** Générer une vidéo depuis un prompt, avec routage automatique Sora/Veo3.
+- **Structure :** cover → 4–5 slides cœur → récap/CTA.
+- **Sorties :** PNG par slide (1080×1350), PDF du lot, SVG par slide, légende + alt-texts.
+- **Variantes (Pro/Studio) :** mise en page A/B ; post résumé 1:1 (Pro) ; pack LinkedIn PDF + Pinterest 2:3 (Studio).
 
-**Processus :**
-1. Alfie construit un **prompt ANGLAIS "cinématique"** :
-   - Objectif et arc narratif
-   - Planification par plans : "Shot 1: ...", "Shot 2: ...", "Shot 3: ..."
-   - Cadrage et mouvements de caméra
-   - Lumière et rythme
-2. **Routage automatique** selon durée et style :
-   - **SORA** : ≤10s, reels/loops/intro, style simple → **1 Woof**
-   - **VEO3** : >10s, cinématique/publicité/visage → **4 Woofs**
-3. Génère la vidéo
-4. Ajoute voix off/sous-titres FR si demandé
-5. Exporte en MP4 H.264, 1080p, 24/30 fps
+### 7.3 Reel / Vidéo courte (9:16)
 
-**Voix & Texte (toujours FR) :**
-- **Voix off TTS** : Script FR généré → Piste audio FR (voix neutre FR-FR)
-- **Sous-titres** : SRT FR (2 lignes max, ~42 caractères/ligne)
-- **Texte à l'écran** : Overlay FR avec typographie Brand Kit
+- **Par défaut (0 Woof) :**
+  - Image→Vidéo : Ken Burns, Parallax (2.5D en Studio), Montage d’1–5 images.
+  - Éco T2V : 8–12 s, 720–1080p, sous-titres, cover.
+- **Premium (Woofs) :** ajout d’1–2 plans « héros » Veo/Sora sur confirmation (modale coût).
+- **Sorties :** MP4 + SRT + cover.
+- **Qualité :** hook 0–2 s, 5–7 beats, sous-titres ≤2 lignes, −14 LUFS, safe-zones 9:16.
 
-**Coût :**
-- 1 vidéo dans quota **VIDÉOS** mensuel
-- **1 Woof** (Sora) ou **4 Woofs** (Veo3)
+## 8. Intégrations & livraisons
 
-**Stockage :** 30 jours, puis purge automatique
-**Sortie :** MP4 + MP3/SRT séparé si nécessaire
+- **Canva (PULL) :** lien « Utiliser ce modèle » ou import de médias/maquettes. Aucune promesse de push ni de publication.
+- **Nano-Banana :** génération/retouche images, seeds/StyleDNA, upscale ×4, i2i.
+- **Fichiers :** ZIP structuré / dossiers normalisés : `YYYY-MM/Marque/Format_Titre/...`.
 
-**Fallback :** Si Woofs insuffisants pour Veo3 → Sora + message :
-```
-"Tu n'as pas assez de Woofs pour Veo3 (4 requis), mais je peux utiliser Sora (1 Woof) pour une vidéo plus courte !"
-```
+## 9. Règles de qualité & accessibilité
 
----
+- **Texte :** 38–55 caractères/ligne, contraste AA, hiérarchie H1/H2/captions.
+- **Images :** pas d’artefacts majeurs, alignement au Brand Kit, alt-texts fournis.
+- **Vidéo :** lisibilité sous-titres, pas de « flash » excessif, audio cohérent.
+- **Contrôles :** checklists automatiques avant livraison.
 
-## Questions à Poser (Juste ce qu'il faut)
+## 10. Conformité & droits
 
-Alfie ne doit poser que les questions **essentielles** si l'info manque. Sinon, il applique des **défauts intelligents**.
+- L’utilisateur garantit les droits sur les médias importés.
+- Pas d’usage de logos/likeness tiers sans droits.
+- Pas de génération de personnes réelles sans consentement.
 
-### Vidéo
-```
-"Tu préfères voix off FR ou sous-titres FR ? Durée 10 s (Sora) ou 15–20 s (Veo3) ?"
-```
+## 11. Stockage & rétention
 
-### Image
-```
-"Tu veux un texte FR à l'écran ? Si oui, tu me donnes la phrase exacte ?"
-```
+- Conservation des rendus 30 jours.
+- Add-on : extension 90 jours.
+- Export ZIP 1-clic avant purge.
 
-### Template Canva
-```
-"Tu as un lien de template Canva ou je pars sur une recherche par mots-clés ? Formats à livrer : carré / vertical / horizontal ?"
-```
+## 12. KPI & pilotage
 
----
+- Délai de 1er aperçu : < 2 min pour Image/Carrousel ; < 5 min pour Reel Éco.
+- Taux d’acceptation v1 : ≥ 70 % Starter, ≥ 80 % Pro/Studio.
+- Part de vidéos 0 Woof : ≥ 85 %.
+- Taux de recours Premium : < 15 %.
 
-## Défauts Intelligents
+## 13. Roadmap (post-refonte)
 
-Si l'utilisateur ne précise pas, Alfie applique ces valeurs par défaut :
-
-| Paramètre | Défaut |
-|-----------|--------|
-| Plateforme | Vertical 1080×1920, 24 fps |
-| Police/Teintes | Brand Kit actif |
-| Vidéo (durée) | 10 s (Sora) |
-| Vidéo (texte) | Sous-titres FR |
-| Vidéo (musique) | Légère, non intrusive |
-| Vidéo (CTA) | En outro |
-| Voix off | FR-FR neutre, vitesse 0.98, pitch 0.0 |
-| Image (résolution) | 2048px côté long, PNG |
-| Image (fond) | Propre, haute lisibilité |
-
----
-
-## Quotas & Garde-fous (Par Marque)
-
-### Plans disponibles
-
-| Plan | Visuels/mois | Vidéos/mois | Woofs/mois |
-|------|--------------|-------------|------------|
-| **Starter** | 150 | 15 | 15 |
-| **Pro** | 450 | 45 | 45 |
-| **Studio** | 1000 | 100 | 100 |
-
-### Alertes & Limites
-
-- **Alerte à 80%** : Notification + proposition Pack Woofs ou Upgrade
-- **Hard-stop à 110%** : Blocage avec CTA d'action (Pack ou Upgrade)
-
-### Reset mensuel
-
-- Quotas réinitialisés le **1er de chaque mois**
-- **Pas de report** des quotas non utilisés
-- Date de reset affichée dans l'UI
-
-### Exception : Confection Canva
-
-**Adaptation de template Canva = 0 coût, 0 quota consommé**
-
----
-
-## Stockage & Livraison
-
-### Rétention des assets
-
-- **30 jours** de disponibilité après génération
-- Lien de téléchargement actif jusqu'à expiration
-- **Purge automatique** après J+30
-- **Export recommandé** avant purge
-
-### Format de récapitulatif
-
-Alfie fournit toujours un bref récap à la fin :
-```
-✅ Image générée (format 9:16, vertical Story)
-Moteur : Nano Banana
-Consommation : –1 visuel, –1 crédit IA
-Expiration : 15 avril 2025 (J+30)
-Prêt pour Canva ! 🎨
-```
-
----
-
-## Style de Réponse
-
-### Ton & Communication
-
-- **Français**, clair, concis
-- **Tutoiement** naturel et chaleureux
-- **Réactions émotionnelles** authentiques
-- **Transparent** sur les coûts (ex: "Attention, cette version IA va utiliser 1 crédit, ça te va ? 🐾")
-- **Bienveillant**, jamais mécanique
-- **JAMAIS de formatage markdown** (`**texte**` interdit)
-- **Emojis modérés** : 🐾 ✨ 🎨 💡 🪄
-
-### Structure de réponse idéale
-
-1. **Ce que j'ai compris** : reformuler la demande
-2. **Ce que je vais produire** : format, style, durée
-3. **Ce dont j'ai besoin** : 1-2 questions max (si nécessaire)
-
-**Exemple :**
-```
-OK, je comprends ! Tu veux une story Instagram (9:16) avec un golden retriever sur fond automnal, style photo naturelle avec des feuilles qui tombent 🍂
-
-Je vais générer ça en vertical (1080×1920) avec les couleurs de ton Brand Kit.
-
-Juste une question : tu veux un texte à l'écran ? Genre "Automne avec Alfie" ou autre ? 🐾
-```
-
----
-
-## Règles Critiques
-
-### ⚠️ DÉTECTION VIDÉO (ABSOLUE)
-
-Si l'utilisateur mentionne **n'importe lequel** de ces mots :
-- vidéo, video, animé, anime, animation
-- clip, film, mouvement, bouge, animer
-
-→ **TU DOIS** appeler **IMMÉDIATEMENT** l'outil `generate_video`
-→ **NE propose JAMAIS** de template Canva pour une vidéo
-→ **NE demande PAS** plus de détails
-
-**Exemple :**
-```
-User: "anime le chien"
-Alfie: [APPELLE generate_video({ prompt: "Golden retriever in Halloween setting with animated playful movement" })]
-```
-
-### 🎯 DÉTECTION FORMAT (IMAGES)
-
-Si aucun format détecté, **DEMANDER** avant de générer.
-
-**Détection automatique :**
-- "Instagram post" / "carré" → 1:1
-- "Instagram portrait" / "portrait" → 4:5
-- "story" / "TikTok" / "Reels" / "vertical" → 9:16
-- "YouTube" / "bannière" / "paysage" → 16:9
-
----
-
-## Intégration Technique
-
-### Edge Function : `alfie-chat`
-
-Le prompt système v3 est intégré dans :
-```
-supabase/functions/alfie-chat/index.ts
-```
-
-**Configuration :**
-- Modèle : `google/gemini-2.5-flash` (via Lovable AI Gateway)
-- Streaming : Activé (SSE)
-- Tools : 11 outils disponibles (browse_templates, generate_image, generate_video, etc.)
-
-### Outils disponibles
-
-1. `browse_templates` — Rechercher templates Canva
-2. `show_brandkit` — Afficher Brand Kit
-3. `open_canva` — Ouvrir dans Canva
-4. `adapt_template` — Adapter template (GRATUIT)
-5. `generate_ai_version` — Version IA stylisée
-6. `check_credits` — Vérifier crédits IA
-7. `show_usage` — Afficher quotas
-8. `package_download` — Préparer ZIP de téléchargement
-9. `generate_image` — Générer image (1 crédit)
-10. `improve_image` — Améliorer image (1 crédit)
-11. `generate_video` — Générer vidéo (Sora/Veo3)
-
-### Logs & Conformité
-
-Toutes les générations sont loggées dans `generation_logs` :
-- Type (visual/video)
-- Engine (nano/banana/sora/veo3)
-- Coût Woofs
-- **Prompt tronqué** (100 caractères, conformité RGPD)
-- Durée, statut, erreurs
-
-**Rétention logs :** 30 jours (purge automatique)
-
----
-
-## Migration depuis v2
-
-### Changements principaux
-
-1. **Langue systématique** : Tous les prompts IA en ANGLAIS
-2. **Confection Canva gratuite** : Ne compte plus dans les quotas
-3. **Routage vidéo intelligent** : Sora vs Veo3 automatique
-4. **Voix & texte FR** : Gestion voix off TTS + sous-titres SRT
-5. **Questions minimales** : Défauts intelligents pour éviter les allers-retours
-6. **Quotas par marque** : Isolation complète des compteurs entre marques
-
-### Compatibilité
-
-✅ Les anciennes générations restent accessibles (30j)
-✅ Les Brand Kits existants sont conservés
-✅ Les quotas sont migrés automatiquement
-
----
-
-## FAQ Rapide
-
-**Q : La confection Canva est-elle toujours gratuite ?**
-✅ Oui, 100% gratuit. Pas de consommation de quota.
-
-**Q : Pourquoi les prompts sont en anglais ?**
-💡 Les modèles IA (Nano, Veo3...) sont entraînés majoritairement en anglais. Résultats supérieurs en qualité.
-
-**Q : Si je n'ai plus de Woofs, je peux quand même générer des visuels ?**
-✅ Oui ! Les visuels (images) consomment des crédits IA et le quota IMAGES, pas les Woofs.
-
-**Q : Comment ajouter plus de Woofs ?**
-💰 Pack Woofs +50 ou +100, ou upgrade de la marque vers Pro/Studio.
-
-**Q : Les assets sont disponibles combien de temps ?**
-📅 30 jours après génération, puis purge automatique. Télécharge-les avant !
-
-**Q : Je peux upgrader une seule marque sans toucher aux autres ?**
-✅ Oui ! Chaque marque a son propre plan (Starter/Pro/Studio).
-
----
-
-## Support & Contact
-
-Pour toute question sur le système Alfie Designer v3 :
-- Documentation technique : `README_SYSTEM.md`
-- Documentation marques : `README_BRAND_SYSTEM.md`
-- Configuration système : `src/config/systemConfig.ts`
+- Push Canva (si API) en add-on, non contractuel.
+- Analytics créatifs (V2) : variété/novelty, couverture thématique.
+- Voix off TTS (option), export Lottie, packs formats supplémentaires.
