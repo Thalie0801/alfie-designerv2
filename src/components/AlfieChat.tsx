@@ -482,16 +482,16 @@ export function AlfieChat() {
           // Créer l'asset en DB (status processing) — 2 Woofs / vidéo
           const { data: asset, error: assetError } = await supabase
             .from('media_generations')
-            .insert([{
+            .insert({
               user_id: user.id,
               brand_id: activeBrandId,
               type: 'video',
-              engine: provider as 'sora',
+              engine: provider,
               status: 'processing',
               prompt: args.prompt,
-              woofs: 2,
+              woofs: 2, // ← coût fixe demandé
               output_url: '',
-              job_id: null,
+              job_id: null, // HOTFIX: éviter tout cast UUID pendant la migration
               metadata: {
                 predictionId,
                 provider: providerRaw ?? provider,
@@ -501,7 +501,7 @@ export function AlfieChat() {
                 aspectRatio: args.aspectRatio || '16:9',
                 woofCost: 2
               }
-            }])
+            })
             .select()
             .single();
 

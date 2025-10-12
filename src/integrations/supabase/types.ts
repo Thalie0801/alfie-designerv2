@@ -482,38 +482,6 @@ export type Database = {
         }
         Relationships: []
       }
-      counters_monthly: {
-        Row: {
-          brand_id: string
-          images_used: number
-          period_yyyymm: number
-          reels_used: number
-          woofs_used: number
-        }
-        Insert: {
-          brand_id: string
-          images_used?: number
-          period_yyyymm: number
-          reels_used?: number
-          woofs_used?: number
-        }
-        Update: {
-          brand_id?: string
-          images_used?: number
-          period_yyyymm?: number
-          reels_used?: number
-          woofs_used?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "counters_monthly_brand_id_fkey"
-            columns: ["brand_id"]
-            isOneToOne: false
-            referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       credit_packs: {
         Row: {
           created_at: string | null
@@ -575,59 +543,6 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      deliverable: {
-        Row: {
-          brand_id: string
-          canva_link: string | null
-          created_at: string
-          format: string
-          id: string
-          metadata: Json | null
-          objective: string | null
-          preview_url: string | null
-          status: string
-          style_choice: string | null
-          updated_at: string | null
-          zip_url: string | null
-        }
-        Insert: {
-          brand_id: string
-          canva_link?: string | null
-          created_at?: string
-          format: string
-          id?: string
-          metadata?: Json | null
-          objective?: string | null
-          preview_url?: string | null
-          status?: string
-          style_choice?: string | null
-          updated_at?: string | null
-          zip_url?: string | null
-        }
-        Update: {
-          brand_id?: string
-          canva_link?: string | null
-          created_at?: string
-          format?: string
-          id?: string
-          metadata?: Json | null
-          objective?: string | null
-          preview_url?: string | null
-          status?: string
-          style_choice?: string | null
-          updated_at?: string | null
-          zip_url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "deliverable_brand_id_fkey"
-            columns: ["brand_id"]
-            isOneToOne: false
-            referencedRelation: "brands"
             referencedColumns: ["id"]
           },
         ]
@@ -738,7 +653,7 @@ export type Database = {
           brand_id: string | null
           created_at: string | null
           duration_seconds: number | null
-          engine: Database["public"]["Enums"]["video_engine"] | null
+          engine: string | null
           expires_at: string | null
           file_size_bytes: number | null
           id: string
@@ -759,7 +674,7 @@ export type Database = {
           brand_id?: string | null
           created_at?: string | null
           duration_seconds?: number | null
-          engine?: Database["public"]["Enums"]["video_engine"] | null
+          engine?: string | null
           expires_at?: string | null
           file_size_bytes?: number | null
           id?: string
@@ -780,7 +695,7 @@ export type Database = {
           brand_id?: string | null
           created_at?: string | null
           duration_seconds?: number | null
-          engine?: Database["public"]["Enums"]["video_engine"] | null
+          engine?: string | null
           expires_at?: string | null
           file_size_bytes?: number | null
           id?: string
@@ -803,13 +718,6 @@ export type Database = {
             columns: ["brand_id"]
             isOneToOne: false
             referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "media_generations_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
         ]
@@ -1002,48 +910,6 @@ export type Database = {
         }
         Relationships: []
       }
-      usage_event: {
-        Row: {
-          brand_id: string
-          created_at: string
-          deliverable_id: string | null
-          id: string
-          kind: string
-          meta: Json | null
-        }
-        Insert: {
-          brand_id: string
-          created_at?: string
-          deliverable_id?: string | null
-          id?: string
-          kind: string
-          meta?: Json | null
-        }
-        Update: {
-          brand_id?: string
-          created_at?: string
-          deliverable_id?: string | null
-          id?: string
-          kind?: string
-          meta?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "usage_event_brand_id_fkey"
-            columns: ["brand_id"]
-            isOneToOne: false
-            referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "usage_event_deliverable_id_fkey"
-            columns: ["deliverable_id"]
-            isOneToOne: false
-            referencedRelation: "deliverable"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -1134,16 +1000,6 @@ export type Database = {
       increment_alfie_requests: {
         Args: { user_id_param: string }
         Returns: number
-      }
-      increment_monthly_counters: {
-        Args: {
-          p_brand_id: string
-          p_images?: number
-          p_period_yyyymm: number
-          p_reels?: number
-          p_woofs?: number
-        }
-        Returns: undefined
       }
       update_affiliate_status: {
         Args: { affiliate_id_param: string }

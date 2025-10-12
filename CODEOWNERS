@@ -1,7 +1,0 @@
-# Exiger revue des owners pour tout changement de la landing
-apps/landing/   @your-org/website-owners
-www/            @your-org/website-owners
-site/           @your-org/website-owners
-
-# Exemple: protéger docs refonte par la core team
-docs/REFONTE-2025/ @your-org/core
