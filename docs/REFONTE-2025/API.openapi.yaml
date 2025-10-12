@@ -1,0 +1,49 @@
+openapi: 3.1.0
+info:
+  title: Alfie Designer API (Refonte V1)
+  version: 1.0.0
+paths:
+  /v1/creations:
+    post:
+      summary: Créer un livrable via invite unique
+      description: >
+        Crée un livrable (Image | Carrousel | Reel 9:16) en choisissant Template Canva ou IA.
+        Par défaut, vidéo utilise Image→Vidéo ou Éco T2V (0 Woof). Premium T2V requiert confirmation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                format: { type: string, enum: [image, carousel, reel] }
+                objective: { type: string }
+                styleChoice: { type: string, enum: [template_canva, ia] }
+                brandId: { type: string }
+                brandKitId: { type: string }
+                assets: 
+                  type: array
+                  items: { type: string, format: uri }
+                premiumT2VRequested: { type: boolean, default: false }
+              required: [format, objective, styleChoice, brandId]
+      responses:
+        '201':
+          description: Création acceptée
+  /v1/creations/{id}/preview:
+    get:
+      summary: Obtenir la prévisualisation
+      responses: { '200': { description: OK } }
+  /v1/creations/{id}/confirm-premium:
+    post:
+      summary: Confirmer l’usage Premium (consomme des Woofs)
+      responses: { '200': { description: OK } }
+  /v1/creations/{id}/deliver:
+    get:
+      summary: Lien Canva (PULL) + URL de téléchargement ZIP
+      responses:
+        '200':
+          description: Lien Canva + ZIP
+  /v1/counters:
+    get:
+      summary: Lire les compteurs (images, reels, woofs) + seuil 80%
+      responses: { '200': { description: OK } }
