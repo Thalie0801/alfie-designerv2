@@ -1395,7 +1395,7 @@ export function AlfieChat() {
         woofsRequired={PREMIUM_WOOFS_COST}
         woofsAvailable={premiumModalState.woofsAvailable}
         onConfirm={handleConfirmPremium}
-        brandName={brandKit?.name ?? 'ta marque'}
+        brandName={brandKit?.name || 'ta marque'}
       />
     </>
   );

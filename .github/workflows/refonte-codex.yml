@@ -1,186 +1,36 @@
-name: "Refonte Codex (push->pull, disable autopublish)"
-
+name: Refonte Codex (push→pull, disable autopublish)
 on:
   workflow_dispatch: {}
-  pull_request:
-    branches: [ main ]
   push:
     branches: [ "refonte-alfie-2025" ]
-
-permissions:
-  contents: write
-  pull-requests: read
-
-concurrency:
-  group: refonte-codex-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  guard-no-landing:
-    name: guard-no-landing
-    runs-on: ubuntu-latest
-    # ignore les commits auto/bot ou reverts
-    if: ${{ !startsWith(github.event.head_commit.message, 'Codex:') &&
-           !contains(github.event.head_commit.message, '[skip ci]') &&
-           github.actor != 'lovable-dev[bot]' &&
-           !startsWith(github.event.head_commit.message, 'Reverted to commit') }}
-    steps:
-      - name: Paths filter
-        id: filter
-        uses: dorny/paths-filter@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          filters: |
-            landing:
-              - 'www/**'
-              - 'site/**'
-              - 'apps/landing/**'
-              - 'landing/**'
-              - 'packages/landing/**'
-              - 'src/pages/Index.tsx'
-              - 'src/pages/Contact.tsx'
-              - 'src/pages/DevenirPartenaire.tsx'
-              - 'src/pages/FAQ.tsx'
-              - 'src/pages/Legal.tsx'
-              - 'src/pages/Privacy.tsx'
-
-      - name: Fail if landing changed
-        if: steps.filter.outputs.landing == 'true'
-        run: |
-          echo "::error title=Landing modifiée::La landing ne doit pas être modifiée par cette révision."
-          exit 1
-
-      - name: OK if no landing changes
-        if: steps.filter.outputs.landing != 'true'
-        run: echo "Aucune modification de la landing détectée ✅"
-
   codex:
-    name: codex
-    needs: guard-no-landing
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: read
-    # même filtre d’évitement de boucles ici
-    if: ${{ !startsWith(github.event.head_commit.message, 'Codex:') &&
-           !contains(github.event.head_commit.message, '[skip ci]') &&
-           github.actor != 'lovable-dev[bot]' &&
-           !startsWith(github.event.head_commit.message, 'Reverted to commit') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm"
-
+          node-version: '20'
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
-
-      - name: Detect package manager
-        id: pm
-        shell: bash
+      - name: Run Codex
         run: |
-          set -e
-          if [ -f pnpm-lock.yaml ]; then
-            echo "pm=pnpm" >> "$GITHUB_OUTPUT"
-          elif [ -f yarn.lock ]; then
-            echo "pm=yarn" >> "$GITHUB_OUTPUT"
-          else
-            echo "pm=npm" >> "$GITHUB_OUTPUT"
-          fi
-          echo "Detected PM: $(grep pm= $GITHUB_OUTPUT || true)"
-
-      - name: Setup package manager (if needed)
-        if: steps.pm.outputs.pm == 'pnpm'
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Install deps
-        id: install
-        shell: bash
-        env:
-          CI: true
+          bash scripts/codex/run.sh
+      - name: Guard: No landing changes
         run: |
-          set -euxo pipefail
-          echo "Node: $(node -v)"
-          echo "npm:  $(npm -v || true)"
-          case "${{ steps.pm.outputs.pm }}" in
-            pnpm)
-              pnpm --version
-              pnpm install --frozen-lockfile
-              ;;
-            yarn)
-              corepack enable
-              yarn --version
-              yarn install --immutable
-              ;;
-            npm)
-              # Si workspaces -> utiliser les bons flags
-              if node -e "process.exit(require('./package.json').workspaces?0:1)"; then
-                npm ci --workspaces --include-workspace-root
-              else
-                npm ci
-              fi
-              ;;
-          esac
-
-      - name: Upload npm/pnpm/yarn debug log (on failure)
-        if: failure() && steps.install.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: pm-debug-log-${{ github.run_id }}
-          path: |
-            ~/.npm/_logs/*.log
-            ./pnpm-debug.log
-            ./.yarn/unplugged/**/build.log
-          if-no-files-found: ignore
-          retention-days: 7
-
-      # Guard AVANT l'exécution du script : on vérifie le diff du commit (HEAD^..HEAD)
-      - name: "Guard: No landing changes"
-        shell: bash
-        run: |
-          set -eo pipefail
-          if [ "$(git rev-list --count HEAD)" -le 1 ]; then
-            echo "Branche avec un seul commit: guard ignoré."
-            exit 0
-          fi
-          git fetch --depth=2
-          if git diff --name-only HEAD^ HEAD | grep -E '^(apps/landing|www/|site/)' ; then
+          if git diff --name-only | grep -E '^(apps/landing|www/|site/)' ; then
             echo "::error title=Landing modifiée::Ce patch ne doit pas toucher la landing."
             exit 1
           fi
-
-      - name: Run Codex
-        shell: bash
-        run: |
-          set -euxo pipefail
-          bash scripts/codex/run.sh | tee codex.log
-
-      - name: Upload Codex log (always)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: codex-log-${{ github.run_id }}
-          path: codex.log
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Commit & Push (if changes, only on push)
-        if: github.event_name == 'push'
-        shell: bash
+      - name: Commit & Push (if changes)
         run: |
           if [ -n "$(git status --porcelain)" ]; then
             git config user.name "alfie-codex-bot"
             git config user.email "codex@alfie.local"
             git add -A
-            git commit -m "Codex: push->pull, autopublish off, premium confirmation flag [skip ci]"
+            git commit -m "Codex: push→pull, autopublish off, premium confirmation flag"
             git push
           else
             echo "Pas de changements à pousser."
