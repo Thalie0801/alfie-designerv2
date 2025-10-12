@@ -16,8 +16,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { detectIntent, canHandleLocally, generateLocalResponse } from '@/utils/alfieIntentDetector';
 import { getQuotaStatus, consumeQuota, canGenerateVideo, checkQuotaAlert, formatExpirationMessage } from '@/utils/quotaManager';
 import { JobPlaceholder, JobStatus } from '@/components/chat/JobPlaceholder';
-import ChatGeneratorCard from '@/components/chat/ChatGeneratorCard';
-import { PremiumConfirmationModal } from '@/components/PremiumConfirmationModal';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -69,13 +67,6 @@ export function AlfieChat() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<{ type: string; message: string } | null>(null);
   const [selectedDuration, setSelectedDuration] = useState<'short' | 'medium' | 'long'>('short');
-  const [lastDeliverableId, setLastDeliverableId] = useState<string | null>(null);
-  const [premiumModalState, setPremiumModalState] = useState<{ open: boolean; deliverableId: string | null; woofsAvailable: number }>({
-    open: false,
-    deliverableId: null,
-    woofsAvailable: 0
-  });
-  const [premiumConfirming, setPremiumConfirming] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -91,143 +82,6 @@ export function AlfieChat() {
     quota,
     quotaPercentage
   } = useAlfieOptimizations();
-
-  const PREMIUM_WOOFS_COST = 4;
-
-  const pushAssistantMessage = async (content: string) => {
-    const createdAt = new Date().toISOString();
-    setMessages(prev => [...prev, { role: 'assistant', content, created_at: createdAt }]);
-
-    if (conversationId) {
-      try {
-        await supabase.from('alfie_messages').insert({
-          conversation_id: conversationId,
-          role: 'assistant',
-          content
-        });
-        await supabase
-          .from('alfie_conversations')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', conversationId);
-      } catch (error) {
-        console.error('Persist assistant message error:', error);
-      }
-    }
-  };
-
-  const openPremiumModal = async (deliverableId: string) => {
-    if (!activeBrandId) {
-      toast.error('Sélectionne une marque active pour confirmer la vidéo premium.');
-      return;
-    }
-
-    try {
-      const status = await getQuotaStatus(activeBrandId);
-      if (!status) {
-        toast.error('Impossible de récupérer les Woofs disponibles pour cette marque.');
-        return;
-      }
-
-      setPremiumModalState({
-        open: true,
-        deliverableId,
-        woofsAvailable: status.woofs.remaining
-      });
-    } catch (error) {
-      console.error('openPremiumModal error:', error);
-      toast.error('Impossible d’ouvrir la confirmation premium.');
-    }
-  };
-
-  const handleConfirmPremium = async () => {
-    if (premiumConfirming || !premiumModalState.deliverableId) return;
-
-    setPremiumConfirming(true);
-    try {
-      const res = await fetch(`/api/v1/creations/${premiumModalState.deliverableId}/confirm-premium`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' }
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (res.status === 402 && typeof data?.woofsAvailable === 'number') {
-          setPremiumModalState(prev => ({ ...prev, woofsAvailable: data.woofsAvailable }));
-        }
-        throw new Error(data?.error || 'confirm_failed');
-      }
-
-      toast.success('Vidéo Premium T2V lancée !');
-      setPremiumModalState({ open: false, deliverableId: null, woofsAvailable: 0 });
-      await pushAssistantMessage('C’est validé ! Je lance la vidéo Premium T2V. 🚀');
-    } catch (error: any) {
-      console.error('confirmPremium error:', error);
-      toast.error(error?.message || 'Impossible de confirmer la vidéo Premium.');
-    } finally {
-      setPremiumConfirming(false);
-    }
-  };
-
-  const handleDeliverRequest = async () => {
-    if (!lastDeliverableId) {
-      await pushAssistantMessage('Je n’ai pas de livrable récent à livrer. Lance une génération avant de demander la livraison 🐾');
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/v1/creations/${lastDeliverableId}/deliver`);
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (res.status === 400 && data?.status) {
-          throw new Error(`Le livrable est encore ${data.status === 'processing' ? 'en cours de préparation' : 'en attente'}. Réessaie dans quelques instants 🐾`);
-        }
-        if (res.status === 404) {
-          setLastDeliverableId(null);
-          throw new Error('Je ne retrouve pas ce livrable. Relance une génération pour que je puisse le livrer.');
-        }
-        throw new Error(data?.error || 'deliver_failed');
-      }
-
-      if (typeof window !== 'undefined') {
-        if (data?.canva_link) {
-          window.open(data.canva_link, '_blank', 'noopener,noreferrer');
-        }
-        if (data?.download_url) {
-          window.open(data.download_url, '_blank', 'noopener,noreferrer');
-        }
-      }
-
-      const responseLines: string[] = [];
-      if (data?.canva_link) {
-        responseLines.push('Canva est ouvert dans un nouvel onglet 🚀');
-      }
-      if (data?.download_url) {
-        responseLines.push(`Télécharge le ZIP : ${data.download_url}`);
-      }
-      if (!responseLines.length) {
-        responseLines.push('Le livrable est prêt !');
-      }
-
-      await pushAssistantMessage(responseLines.join('\n'));
-    } catch (error: any) {
-      console.error('deliverRequest error:', error);
-      const errorMessage = error?.message || 'Livraison impossible pour le moment.';
-      toast.error(errorMessage);
-      await pushAssistantMessage(errorMessage);
-    }
-  };
-
-  const handleCreationSuccess = async (resp: { id: string; status: string; requiresPremiumConfirmation?: boolean }) => {
-    setLastDeliverableId(resp.id);
-
-    await pushAssistantMessage('Parfait, je lance la création et je te préviens dès que c’est prêt ✨');
-
-    toast.success('Création lancée !');
-    if (resp.requiresPremiumConfirmation) {
-      void openPremiumModal(resp.id);
-    }
-  };
 
   useEffect(() => {
     const init = async () => {
@@ -1020,15 +874,6 @@ export function AlfieChat() {
       console.error('Persist user message error:', e);
     }
 
-    const normalizedMessage = userMessage.toLowerCase();
-    const wantsDelivery = ['livre', 'livrer', 'livraison', 'ouvrir canva', 'ouvre canva', 'open canva', 'zip'].some(keyword =>
-      normalizedMessage.includes(keyword)
-    );
-    if (wantsDelivery) {
-      await handleDeliverRequest();
-      return;
-    }
-
     // 1. Détection d'intent rapide (évite appel IA si possible)
     const intent = detectIntent(userMessage);
     console.log('🔍 Intent détecté:', intent);
@@ -1114,11 +959,10 @@ export function AlfieChat() {
   };
 
   return (
-    <>
-      <div className="flex flex-col h-[calc(100vh-180px)]">
-        {/* Chat Messages - scroll area qui prend tout l'espace */}
-        <ScrollArea className="flex-1 pr-4" ref={scrollRef}>
-          <div className="space-y-4 pb-4 px-4 min-h-[200px]">
+    <div className="flex flex-col h-[calc(100vh-180px)]">
+      {/* Chat Messages - scroll area qui prend tout l'espace */}
+      <ScrollArea className="flex-1 pr-4" ref={scrollRef}>
+        <div className="space-y-4 pb-4 px-4 min-h-[200px]">
           {messages.map((message, index) => (
             <div
               key={index}
@@ -1192,17 +1036,6 @@ export function AlfieChat() {
                     </div>
                   )}
                   <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                  {message.role === 'assistant' &&
-                    message.content.includes('Tu veux générer quelque chose ?') &&
-                    activeBrandId && (
-                      <div className="mt-4">
-                        <ChatGeneratorCard
-                          brandId={activeBrandId}
-                          onCreated={handleCreationSuccess}
-                          onError={(msg) => toast.error(msg)}
-                        />
-                      </div>
-                    )}
                   {message.created_at && (
                     <p className="text-xs opacity-60 mt-2">
                       {new Date(message.created_at).toLocaleDateString('fr-FR', {
@@ -1383,20 +1216,6 @@ export function AlfieChat() {
           </Button>
         </div>
       </div>
-      <PremiumConfirmationModal
-        open={premiumModalState.open}
-        onOpenChange={(open) =>
-          setPremiumModalState(prev => ({
-            open,
-            deliverableId: open ? prev.deliverableId : null,
-            woofsAvailable: open ? prev.woofsAvailable : 0
-          }))
-        }
-        woofsRequired={PREMIUM_WOOFS_COST}
-        woofsAvailable={premiumModalState.woofsAvailable}
-        onConfirm={handleConfirmPremium}
-        brandName={brandKit?.name || 'ta marque'}
-      />
-    </>
+    </div>
   );
 }
