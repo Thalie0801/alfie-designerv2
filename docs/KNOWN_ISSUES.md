@@ -34,7 +34,7 @@ The error was caused by the project inheriting a non-public npm registry configu
 ### Hardening the repository
 
 - `.npmrc` at the repository root now pins the default registry to `https://registry.npmjs.org/` and disables `always-auth` so anonymous reads succeed.
-- `scripts/codex/run.sh` now runs `npx -y jscodeshift@0.15.2` without attempting to install dependencies and ignores landing/docs directories.
+- `scripts/codex/run.sh` now runs `npx -y jscodeshift@0.15.2` without attempting to install dependencies and skips the landing pages in `src/pages` alongside the docs directories.
 - The root `package.json` pins `jscodeshift` to the exact version `0.15.2`, avoiding accidental upgrades that could disappear from caches.
 - In CI, prefer running `npm ci` (with the registry explicitly set) to guarantee a clean, reproducible install.
 

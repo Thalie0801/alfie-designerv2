@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Refonte V1 — Runner Codex (no-install)
-# - Exécute le codemod en excluant la landing (PULL-only)
+# - Exécute le codemod en excluant la landing (pages publiques dans src/pages)
 # - N’effectue AUCUNE installation npm (évite l’erreur 403)
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo ".")"
@@ -10,7 +10,7 @@ cd "$ROOT"
 
 command -v npx >/dev/null 2>&1 || { echo "node/npm requis. Abandon."; exit 1; }
 
-# Cibles (TS/TSX/JS/JSX) hors landing/docs
+# Cibles (TS/TSX/JS/JSX) hors landing (src/pages) / docs
 TARGETS=(
   "apps/**/*.{ts,tsx,js,jsx}"
   "packages/**/*.{ts,tsx,js,jsx}"
@@ -18,7 +18,12 @@ TARGETS=(
 )
 
 IGNORE_PATTERNS=(
-  "apps/landing"
+  "src/pages/Index.tsx"
+  "src/pages/Contact.tsx"
+  "src/pages/DevenirPartenaire.tsx"
+  "src/pages/FAQ.tsx"
+  "src/pages/Legal.tsx"
+  "src/pages/Privacy.tsx"
   "www"
   "site"
   "node_modules"
