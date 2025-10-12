@@ -2,10 +2,11 @@ name: "Refonte Codex (push->pull, disable autopublish)"
 
 on:
   workflow_dispatch: {}
+  pull_request:
+    branches: [ main ]
   push:
-    branches: ["refonte-alfie-2025"]
+    branches: [ "refonte-alfie-2025" ]
 
-# Autorise le job à pousser des commits
 permissions:
   contents: write
 
@@ -14,11 +15,59 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  codex:
-    # Évite une boucle CI si le commit précédent a été créé par ce job
-    if: ${{ github.event_name != 'push' || (!startsWith(github.event.head_commit.message, 'Codex:') && !contains(github.event.head_commit.message, '[skip ci]')) }}
+  guard-no-landing:
+    name: guard-no-landing
     runs-on: ubuntu-latest
+    # ignore les commits auto/bot ou reverts
+    if: ${{ !startsWith(github.event.head_commit.message, 'Codex:') &&
+           !contains(github.event.head_commit.message, '[skip ci]') &&
+           github.actor != 'lovable-dev[bot]' &&
+           !startsWith(github.event.head_commit.message, 'Reverted to commit') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
+      - name: Paths filter
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            landing:
+              - 'www/**'
+              - 'site/**'
+              - 'apps/landing/**'
+              - 'landing/**'
+              - 'packages/landing/**'
+              - 'src/pages/Index.tsx'
+              - 'src/pages/Contact.tsx'
+              - 'src/pages/DevenirPartenaire.tsx'
+              - 'src/pages/FAQ.tsx'
+              - 'src/pages/Legal.tsx'
+              - 'src/pages/Privacy.tsx'
+
+      - name: Fail if landing changed
+        if: steps.filter.outputs.landing == 'true'
+        run: |
+          echo "::error title=Landing modifiée::La landing ne doit pas être modifiée par cette révision."
+          exit 1
+
+      - name: OK if no landing changes
+        if: steps.filter.outputs.landing != 'true'
+        run: echo "Aucune modification de la landing détectée ✅"
+
+  codex:
+    name: codex
+    needs: guard-no-landing
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # même filtre d’évitement de boucles ici
+    if: ${{ !startsWith(github.event.head_commit.message, 'Codex:') &&
+           !contains(github.event.head_commit.message, '[skip ci]') &&
+           github.actor != 'lovable-dev[bot]' &&
+           !startsWith(github.event.head_commit.message, 'Reverted to commit') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,22 +78,25 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
 
       - name: Force public npm registry
-        shell: bash
         run: npm config set registry https://registry.npmjs.org/
+
+      - name: Install deps
+        env:
+          CI: true
+        run: npm ci
 
       # Guard AVANT l'exécution du script : on vérifie le diff du commit (HEAD^..HEAD)
       - name: "Guard: No landing changes"
         shell: bash
         run: |
           set -eo pipefail
-          # Si la branche n'a qu'un seul commit, on ne peut pas diff HEAD^..HEAD
           if [ "$(git rev-list --count HEAD)" -le 1 ]; then
             echo "Branche avec un seul commit: guard ignoré."
             exit 0
           fi
-
           git fetch --depth=2
           if git diff --name-only HEAD^ HEAD | grep -E '^(apps/landing|www/|site/)' ; then
             echo "::error title=Landing modifiée::Ce patch ne doit pas toucher la landing."
@@ -54,9 +106,20 @@ jobs:
       - name: Run Codex
         shell: bash
         run: |
-          bash scripts/codex/run.sh
+          set -euxo pipefail
+          bash scripts/codex/run.sh | tee codex.log
 
-      - name: Commit & Push (if changes)
+      - name: Upload Codex log (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-log-${{ github.run_id }}
+          path: codex.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Commit & Push (if changes, only on push)
+        if: github.event_name == 'push'
         shell: bash
         run: |
           if [ -n "$(git status --porcelain)" ]; then
@@ -68,4 +131,3 @@ jobs:
           else
             echo "Pas de changements à pousser."
           fi
-       
