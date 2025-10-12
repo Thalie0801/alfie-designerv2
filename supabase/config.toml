@@ -3,9 +3,6 @@ project_id = "itsjonazifiiikozengd"
 [functions.creations-api]
 verify_jwt = true
 
-[functions.generate-structured-zip]
-verify_jwt = true
-
 [functions.alfie-generate]
 verify_jwt = false
 
