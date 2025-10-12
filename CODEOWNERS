@@ -1,12 +1,7 @@
 # Exiger revue des owners pour tout changement de la landing
-src/pages/Index.tsx                 @your-org/website-owners
-src/pages/Contact.tsx               @your-org/website-owners
-src/pages/DevenirPartenaire.tsx     @your-org/website-owners
-src/pages/FAQ.tsx                   @your-org/website-owners
-src/pages/Legal.tsx                 @your-org/website-owners
-src/pages/Privacy.tsx               @your-org/website-owners
-www/                                @your-org/website-owners
-site/                               @your-org/website-owners
+apps/landing/   @your-org/website-owners
+www/            @your-org/website-owners
+site/           @your-org/website-owners
 
 # Exemple: protéger docs refonte par la core team
 docs/REFONTE-2025/ @your-org/core

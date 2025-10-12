@@ -2,7 +2,7 @@
 set -euo pipefail
 
 echo "Checking for landing/site modifications..."
-if git diff --name-only ${1:-HEAD} | grep -E '^(src/pages/(Index|Contact|DevenirPartenaire|FAQ|Legal|Privacy)\\.tsx|www/|site/)' > /dev/null; then
+if git diff --name-only ${1:-HEAD} | grep -E '^(apps/landing/|www/|site/)' > /dev/null; then
   echo "Error: landing or site files modified." >&2
   exit 1
 fi
