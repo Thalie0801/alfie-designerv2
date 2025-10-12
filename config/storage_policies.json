@@ -1,0 +1,13 @@
+{
+  "default_retention_days": 30,
+  "addons": {
+    "retention_90d_per_brand_eur": 9
+  },
+  "naming": "YYYY-MM/Marque/Format_Titre/…",
+  "zip_structure": [
+    "assets/",
+    "exports/",
+    "metadata/alt_texts.json",
+    "metadata/captions.json"
+  ]
+}
