@@ -54,7 +54,8 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error('Error in creations-api:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -287,28 +288,19 @@ async function handleDeliver(id: string, supabase: any) {
     );
   }
 
-  // Si pas encore de ZIP, le générer
-  if (!deliverable.zip_url) {
-    const { data: zipData } = await supabase.functions.invoke('generate-structured-zip', {
-      body: { deliverableId: id },
-    });
-
-    if (zipData?.zip_url) {
-      await supabase
-        .from('deliverable')
-        .update({ zip_url: zipData.zip_url })
-        .eq('id', id);
-
-      deliverable.zip_url = zipData.zip_url;
-    }
-  }
-
+  // Livraison PULL : Canva link + download URL direct
   return new Response(
     JSON.stringify({
       canva_link: deliverable.canva_link,
-      zip_url: deliverable.zip_url,
+      download_url: deliverable.preview_url, // Téléchargement direct de l'asset
       preview_url: deliverable.preview_url,
+      format: deliverable.format,
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      metadata: {
+        objective: deliverable.objective,
+        style_choice: deliverable.style_choice,
+        created_at: deliverable.created_at,
+      },
     }),
     {
       status: 200,
