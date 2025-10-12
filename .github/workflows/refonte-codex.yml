@@ -63,5 +63,87 @@ jobs:
       - name: Install deps
         run: npm ci
 
+   name: Refonte Codex
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  guard-no-landing:
+    name: guard-no-landing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Paths filter
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            landing:
+              - 'www/**'
+              - 'site/**'
+              - 'apps/landing/**'
+              - 'landing/**'
+              - 'packages/landing/**'
+              - 'src/pages/Index.tsx'
+              - 'src/pages/Contact.tsx'
+              - 'src/pages/DevenirPartenaire.tsx'
+              - 'src/pages/FAQ.tsx'
+              - 'src/pages/Legal.tsx'
+              - 'src/pages/Privacy.tsx'
+
+      - name: Fail if landing changed
+        if: steps.filter.outputs.landing == 'true'
+        run: |
+          echo "::error title=Landing modifiée::La landing ne doit pas être modifiée par cette PR."
+          exit 1
+
+      - name: OK if no landing changes
+        if: steps.filter.outputs.landing != 'true'
+        run: echo "Aucune modification de la landing détectée ✅"
+
+  codex:
+    name: codex
+    needs: guard-no-landing
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # requis pour commit & push
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Force public npm registry
+        run: npm config set registry https://registry.npmjs.org/
+
+      - name: Install deps
+        run: npm ci
+
       - name: Run Codex
         run: bash scripts/codex/run.sh
+
+      - name: Commit & Push (if changes, only on push)
+        if: github.event_name == 'push'
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "alfie-codex-bot"
+            git config user.email "codex@alfie.local"
+            git add -A
+            git commit -m "Codex: push→pull, autopublish off, premium confirmation flag"
+            git push
+          else
+            echo "Pas de changements à pousser."
+          fi
+

@@ -27,7 +27,25 @@ jobs:
               - 'www/**'
               - 'site/**'
 
-      - name: Fail if landing modified
+            - name: Paths filter
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            landing:
+              - 'apps/landing/**'
+              - 'landing/**'
+              - 'packages/landing/**'
+              - 'www/**'
+              - 'site/**'
+              - 'src/pages/Index.tsx'
+              - 'src/pages/Contact.tsx'
+              - 'src/pages/DevenirPartenaire.tsx'
+              - 'src/pages/FAQ.tsx'
+              - 'src/pages/Legal.tsx'
+              - 'src/pages/Privacy.tsx'
+
+      - name: Fail if landing changed
         if: steps.filter.outputs.landing == 'true'
         run: |
           echo "::error title=Landing modifiée::La landing ne doit pas être modifiée par cette PR."
@@ -36,3 +54,4 @@ jobs:
       - name: OK if no landing changes
         if: steps.filter.outputs.landing != 'true'
         run: echo "Aucune modification de la landing détectée ✅"
+
