@@ -81,10 +81,66 @@ jobs:
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
 
+      - name: Detect package manager
+        id: pm
+        shell: bash
+        run: |
+          set -e
+          if [ -f pnpm-lock.yaml ]; then
+            echo "pm=pnpm" >> "$GITHUB_OUTPUT"
+          elif [ -f yarn.lock ]; then
+            echo "pm=yarn" >> "$GITHUB_OUTPUT"
+          else
+            echo "pm=npm" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Detected PM: $(grep pm= $GITHUB_OUTPUT || true)"
+
+      - name: Setup package manager (if needed)
+        if: steps.pm.outputs.pm == 'pnpm'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Install deps
+        id: install
+        shell: bash
         env:
           CI: true
-        run: npm ci
+        run: |
+          set -euxo pipefail
+          echo "Node: $(node -v)"
+          echo "npm:  $(npm -v || true)"
+          case "${{ steps.pm.outputs.pm }}" in
+            pnpm)
+              pnpm --version
+              pnpm install --frozen-lockfile
+              ;;
+            yarn)
+              corepack enable
+              yarn --version
+              yarn install --immutable
+              ;;
+            npm)
+              # Si workspaces -> utiliser les bons flags
+              if node -e "process.exit(require('./package.json').workspaces?0:1)"; then
+                npm ci --workspaces --include-workspace-root
+              else
+                npm ci
+              fi
+              ;;
+          esac
+
+      - name: Upload npm/pnpm/yarn debug log (on failure)
+        if: failure() && steps.install.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pm-debug-log-${{ github.run_id }}
+          path: |
+            ~/.npm/_logs/*.log
+            ./pnpm-debug.log
+            ./.yarn/unplugged/**/build.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       # Guard AVANT l'exécution du script : on vérifie le diff du commit (HEAD^..HEAD)
       - name: "Guard: No landing changes"
