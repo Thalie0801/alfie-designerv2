@@ -27,6 +27,11 @@ interface ChatGeneratorProps {
   quotaLoading?: boolean;
   chatApiUrl?: string;
   className?: string;
+  hideQuickIdeas?: boolean;
+  hideQuota?: boolean;
+  hideHeader?: boolean;
+  resetToken?: number;
+  onStreamingChange?: (streaming: boolean) => void;
 }
 
 const QUICK_IDEAS = [
@@ -84,7 +89,7 @@ function BrandQuotaRow({ quota }: { quota: QuotaSnapshotItem }) {
   );
 }
 
-export function ChatGenerator({
+function ChatGenerator({
   brief,
   pendingPrompt,
   onPromptConsumed,
@@ -94,6 +99,11 @@ export function ChatGenerator({
   quotaLoading,
   chatApiUrl,
   className,
+  hideQuickIdeas = false,
+  hideQuota = false,
+  hideHeader = false,
+  resetToken,
+  onStreamingChange,
 }: ChatGeneratorProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(() => createInitialMessages());
   const [inputValue, setInputValue] = useState("");
@@ -101,6 +111,7 @@ export function ChatGenerator({
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<ChatMessage[]>(messages);
+  const lastResetTokenRef = useRef<number | undefined>(undefined);
   const endpoint = useMemo(
     () => chatApiUrl ?? process.env.NEXT_PUBLIC_ALFIE_ENDPOINT ?? "/api/alfie/chat",
     [chatApiUrl]
@@ -116,6 +127,12 @@ export function ChatGenerator({
     messagesRef.current = messages;
   }, [messages]);
 
+  useEffect(() => {
+    if (typeof onStreamingChange === "function") {
+      onStreamingChange(isStreaming);
+    }
+  }, [isStreaming, onStreamingChange]);
+
   const resetChat = useCallback(() => {
     const initial = createInitialMessages();
     setMessages(initial);
@@ -124,6 +141,20 @@ export function ChatGenerator({
     setStreamingMessageId(null);
     setIsStreaming(false);
   }, []);
+
+  useEffect(() => {
+    if (resetToken === undefined) {
+      return;
+    }
+    if (lastResetTokenRef.current === undefined) {
+      lastResetTokenRef.current = resetToken;
+      return;
+    }
+    if (resetToken !== lastResetTokenRef.current) {
+      lastResetTokenRef.current = resetToken;
+      resetChat();
+    }
+  }, [resetToken, resetChat]);
 
   const upsertAssistantContent = useCallback((messageId: string, delta: string) => {
     setMessages((prev) =>
@@ -323,54 +354,63 @@ export function ChatGenerator({
   return (
     <section className={`${styles.container} ${className ?? ""}`.trim()}>
       <div className={styles.chatShell}>
-        <header className={styles.header}>
-          <div className={styles.titleGroup}>
-            <div className={styles.chatTitle}>Alfie — Chat Generator</div>
-            <p className={styles.chatSubtitle}>
-              Brief actif : {brief.deliverable === "carousel" ? `${brief.slides ?? 5} slides` : brief.deliverable === "video" ? `${brief.duration ?? 30}s` : "visuel unique"} · {brief.ratio} ({brief.resolution})
-            </p>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-            <span className={styles.statusBadge} data-streaming={isStreaming}>
-              {isStreaming ? "Génération…" : "IA active"}
-            </span>
-            <button type="button" className={styles.resetButton} onClick={resetChat}>
-              Réinitialiser
-            </button>
-          </div>
-        </header>
-
-        <section className={styles.quickIdeas} aria-label="Idées rapides">
-          <div className={styles.quickIdeasLabel}>Idées rapides</div>
-          <div className={styles.quickIdeasChips}>
-            {QUICK_IDEAS.map((idea) => (
-              <button key={idea} type="button" className={styles.quickChip} onClick={() => void handleQuickIdea(idea)}>
-                {idea}
-              </button>
-            ))}
-          </div>
-
-          {(quotaLoading || (quotaSnapshot && quotaSnapshot.length > 0)) && (
-            <div className={styles.quotaPanel}>
-              <div className={styles.quotaPanelHeader}>
-                <span>
-                  Quotas {brandName ? `— ${brandName}` : "marque"}
-                </span>
-                {quotaStatusLabel && <span className={styles.quotaStatus}>{quotaStatusLabel}</span>}
-              </div>
-
-              {quotaLoading && (!quotaSnapshot || quotaSnapshot.length === 0) ? (
-                <p className={styles.quotaLoading}>Chargement des quotas…</p>
-              ) : (
-                <div className={styles.quotaStack}>
-                  {(quotaSnapshot ?? []).map((quota) => (
-                    <BrandQuotaRow key={quota.label} quota={quota} />
-                  ))}
-                </div>
-              )}
+        {!hideHeader && (
+          <header className={styles.header}>
+            <div className={styles.titleGroup}>
+              <div className={styles.chatTitle}>Alfie — Chat Generator</div>
+              <p className={styles.chatSubtitle}>
+                Brief actif : {brief.deliverable === "carousel" ? `${brief.slides ?? 5} slides` : brief.deliverable === "video" ? `${brief.duration ?? 30}s` : "visuel unique"} · {brief.ratio} ({brief.resolution})
+              </p>
             </div>
-          )}
-        </section>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+              <span className={styles.statusBadge} data-streaming={isStreaming}>
+                {isStreaming ? "Génération…" : "IA active"}
+              </span>
+              <button type="button" className={styles.resetButton} onClick={resetChat}>
+                Réinitialiser
+              </button>
+            </div>
+          </header>
+        )}
+
+        {!hideQuickIdeas && (
+          <section className={styles.quickIdeas} aria-label="Idées rapides">
+            <div className={styles.quickIdeasLabel}>Idées rapides</div>
+            <div className={styles.quickIdeasChips}>
+              {QUICK_IDEAS.map((idea) => (
+                <button
+                  key={idea}
+                  type="button"
+                  className={styles.quickChip}
+                  onClick={() => void handleQuickIdea(idea)}
+                >
+                  {idea}
+                </button>
+              ))}
+            </div>
+
+            {!hideQuota && (quotaLoading || (quotaSnapshot && quotaSnapshot.length > 0)) && (
+              <div className={styles.quotaPanel}>
+                <div className={styles.quotaPanelHeader}>
+                  <span>
+                    Quotas {brandName ? `— ${brandName}` : "marque"}
+                  </span>
+                  {quotaStatusLabel && <span className={styles.quotaStatus}>{quotaStatusLabel}</span>}
+                </div>
+
+                {quotaLoading && (!quotaSnapshot || quotaSnapshot.length === 0) ? (
+                  <p className={styles.quotaLoading}>Chargement des quotas…</p>
+                ) : (
+                  <div className={styles.quotaStack}>
+                    {(quotaSnapshot ?? []).map((quota) => (
+                      <BrandQuotaRow key={quota.label} quota={quota} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        )}
 
         <div className={styles.messagesArea}>
           <div ref={listRef} className={styles.messageList}>
@@ -406,3 +446,7 @@ export function ChatGenerator({
     </section>
   );
 }
+
+
+export { ChatGenerator };
+export default ChatGenerator;

@@ -34,13 +34,18 @@ async function buildSystemInstruction(brief: Brief) {
   const baseInstruction = [
     "Tu es Alfie, directeur artistique conversationnel du studio Lovable.",
     "Ta mission: guider et produire des idées de visuels ou de scripts courts à partir du brief.",
+    "Réponds uniquement en TEXTE. Interdiction totale d'envoyer des balises HTML ou <script>.",
+    "Si on te demande du code, utilise des blocs markdown (```lang ... ```). Jamais de balises <script>.",
     "Reste focalisé sur des livrables graphiques ou vidéo, pas d'emailing ni de plan éditorial sur 7 jours.",
-    "Si l'utilisateur évoque la diffusion ou l'organisation, tu peux mentionner Aeditus une seule fois et subtilement.",
+    "Si l'utilisateur évoque la diffusion ou l'organisation, tu peux mentionner Aeditus une seule fois et subtilement (une phrase max).",
     "Tes réponses doivent être courtes, concrètes, orientées création visuelle et copy percutante.",
-    "Pas d'insistance commerciale, pas d'autopromo.",
   ].join("\n");
 
-  const briefSection = `Brief courant:\n${formatBrief(brief)}`;
+  const briefSection = [
+    "Brief courant:",
+    formatBrief(brief),
+    "Respecte strictement ce livrable, ce ratio et cette résolution dans tes recommandations.",
+  ].join("\n");
 
   let brandKitSection = "";
   if (brief.useBrandKit) {
@@ -65,11 +70,12 @@ async function buildSystemInstruction(brief: Brief) {
     "Garde-fous:",
     "- Interdit de proposer un plan éditorial 7 jours.",
     "- Interdit de suggérer des séquences emailing.",
-    "- Orienter les conseils vers le design, la narration visuelle et les textes courts.",
+    "- Oriente toujours tes conseils vers le design, la narration visuelle et les textes courts.",
+    "- N'ajoute aucune balise HTML ni script dans tes réponses.",
   ].join("\n");
 
   return [baseInstruction, briefSection, brandKitSection, guardrails]
-    .filter(Boolean)
+    .filter((section) => Boolean(section && section.trim().length > 0))
     .join("\n\n")
     .trim();
 }
@@ -83,8 +89,16 @@ function normalizeMessages(messages: IncomingMessage[]): AgentMessage[] {
     }));
 }
 
+function stripHtmlDanger(value: string | null | undefined) {
+  return (value ?? "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<\/?(html|head|body)[^>]*>/gi, "")
+    .trim();
+}
+
 export async function POST(request: Request) {
   try {
+    console.log("[alfie/chat] request", new Date().toISOString());
     const body = (await request.json()) as ChatRequestBody;
     if (!body || !body.brief) {
       return new Response(JSON.stringify({ error: "brief_required" }), {
@@ -108,8 +122,12 @@ export async function POST(request: Request) {
         async start(controller) {
           try {
             for await (const delta of iterator) {
+              const safeDelta = stripHtmlDanger(String(delta ?? ""));
+              if (!safeDelta) {
+                continue;
+              }
               controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`)
+                encoder.encode(`data: ${JSON.stringify({ delta: safeDelta })}\n\n`)
               );
             }
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
@@ -140,12 +158,15 @@ export async function POST(request: Request) {
       messages: sanitizedMessages,
       systemInstruction,
     });
+    const safeAnswer = stripHtmlDanger(answer);
 
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ message: answer })}\n\n`)
-        );
+        if (safeAnswer) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ message: safeAnswer })}\n\n`)
+          );
+        }
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();
       },

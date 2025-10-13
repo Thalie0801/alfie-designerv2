@@ -24,27 +24,12 @@ const ratioLabels: Array<{ value: BriefRatio; label: string }> = [
   { value: "16:9", label: "16:9 — Paysage" },
 ];
 
-const trendingPromptChips = [
-  "Visuel teasing produit sur fond dégradé doux",
-  "Carrousel storytelling avant/après transformation",
-  "Mockup d'application mobile avec reflets réalistes",
-  "Moodboard textures organiques + typographie élégante",
-];
-
-const tipsList = [
-  "Glisse une accroche ultra courte dans la première slide",
-  "Varie les contrastes entre texte et fond pour l'accessibilité",
-  "Place ton CTA sur la dernière scène ou slide avec un rappel visuel",
-  "Utilise le Brand Kit pour garder couleurs et typos alignées",
-];
-
 export interface BriefExpressProps {
   value: Brief;
   onChange: (next: Brief) => void;
-  onPromptSelect?: (prompt: string) => void;
 }
 
-export function BriefExpress({ value, onChange, onPromptSelect }: BriefExpressProps) {
+function BriefExpress({ value, onChange }: BriefExpressProps) {
   const formattedResolution = useMemo(() => ratioResolutions[value.ratio], [value.ratio]);
 
   const handleDeliverableChange = (deliverable: BriefDeliverable) => {
@@ -87,10 +72,6 @@ export function BriefExpress({ value, onChange, onPromptSelect }: BriefExpressPr
     const parsed = Number.parseInt(event.target.value, 10);
     const duration = Number.isNaN(parsed) ? undefined : Math.max(5, parsed);
     onChange({ ...value, duration: duration ?? 30 });
-  };
-
-  const handleTrendClick = (prompt: string) => {
-    onPromptSelect?.(prompt);
   };
 
   return (
@@ -186,34 +167,10 @@ export function BriefExpress({ value, onChange, onPromptSelect }: BriefExpressPr
         )}
       </div>
 
-      <div className={styles.footer}>
-        <aside className={styles.tipsCard}>
-          <h3 className={styles.tipsTitle}>Astuces</h3>
-          <ul className={styles.tipsList}>
-            {tipsList.map((tip) => (
-              <li key={tip}>{tip}</li>
-            ))}
-          </ul>
-        </aside>
-
-        <aside className={styles.trendsCard}>
-          <h3 className={styles.trendsTitle}>Prompts tendances</h3>
-          <div className={styles.trendChips}>
-            {trendingPromptChips.map((prompt) => (
-              <button
-                key={prompt}
-                type="button"
-                className={styles.trendChip}
-                onClick={() => handleTrendClick(prompt)}
-              >
-                {prompt}
-              </button>
-            ))}
-          </div>
-        </aside>
-      </div>
     </section>
   );
 }
 
+export { BriefExpress };
+export default BriefExpress;
 export type { Brief };

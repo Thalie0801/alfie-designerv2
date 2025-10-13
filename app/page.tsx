@@ -1,82 +1,93 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BriefExpress } from "../components/BriefExpress";
-import { ChatGenerator } from "../components/ChatGenerator";
-import type { Brief } from "../components/BriefExpress";
+import ChatCard from "@/components/ChatCard";
+import BriefExpress, { type Brief } from "@/components/BriefExpress";
+import TipsCard from "@/components/TipsCard";
+import TrendsCard from "@/components/TrendsCard";
+
+export const dynamic = "force-dynamic";
+
+const ratioResolutions: Record<Brief["ratio"], string> = {
+  "9:16": "1080x1920",
+  "1:1": "1080x1080",
+  "4:5": "1080x1350",
+  "16:9": "1920x1080",
+};
 
 const DEFAULT_BRIEF: Brief = {
   deliverable: "image",
   ratio: "9:16",
-  resolution: "1080x1920",
+  resolution: ratioResolutions["9:16"],
   useBrandKit: true,
 };
 
-export default function HomePage() {
+export default function Page() {
   const [brief, setBrief] = useState<Brief>(DEFAULT_BRIEF);
-  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
-  const briefWithResolution = useMemo(() => {
-    const ratioResolutions: Record<Brief["ratio"], string> = {
-      "9:16": "1080x1920",
-      "1:1": "1080x1080",
-      "4:5": "1080x1350",
-      "16:9": "1920x1080",
-    };
+  const normalizedBrief = useMemo(() => {
     const resolution = ratioResolutions[brief.ratio];
-    if (brief.resolution === resolution) return brief;
+    if (brief.resolution === resolution) {
+      return brief;
+    }
     return { ...brief, resolution };
   }, [brief]);
 
   return (
-    <main className="page">
-      <div className="page__inner">
-        <BriefExpress
-          value={briefWithResolution}
-          onChange={setBrief}
-          onPromptSelect={setPendingPrompt}
-        />
+    <div className="page">
+      <div className="card">
+        <ChatCard brief={normalizedBrief} />
       </div>
 
-      <div className="page__inner page__inner--chat">
-        <ChatGenerator
-          brief={briefWithResolution}
-          pendingPrompt={pendingPrompt}
-          onPromptConsumed={() => setPendingPrompt(null)}
-        />
+      <div className="card">
+        <BriefExpress value={normalizedBrief} onChange={setBrief} />
       </div>
 
-      <style jsx>{`
+      <div className="grid2">
+        <div className="card">
+          <TipsCard />
+        </div>
+        <div className="card">
+          <TrendsCard />
+        </div>
+      </div>
+
+      <style jsx global>{`
+        html, body {
+          background: #f7f7f8;
+        }
+
         .page {
-          min-height: 100vh;
-          background: linear-gradient(180deg, #f6f7ff 0%, #ffffff 35%);
-          padding: 32px 0 64px;
-        }
-
-        .page__inner {
-          max-width: 1180px;
+          max-width: 1200px;
           margin: 0 auto;
-          padding: 0 24px;
+          padding: 16px 20px 80px;
+          display: grid;
+          gap: 14px;
         }
 
-        .page__inner--chat {
-          margin-top: 32px;
+        .card {
+          background: #ffffff;
+          border: 1px solid #e5e7eb;
+          border-radius: 14px;
+          padding: 12px;
+        }
+
+        .grid2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
         }
 
         @media (max-width: 860px) {
           .page {
-            padding: 20px 0 64px;
+            padding: 16px 16px 72px;
           }
 
-          .page__inner {
-            padding: 0 16px;
-          }
-
-          .page__inner--chat {
-            margin-top: 24px;
+          .grid2 {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
-    </main>
+    </div>
   );
 }

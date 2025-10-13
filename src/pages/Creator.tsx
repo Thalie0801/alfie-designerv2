@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import styles from "./Creator.module.css";
 import type { Brief } from "../../lib/types/brief";
-import { BriefExpress } from "../../components/BriefExpress";
-import { ChatGenerator } from "../../components/ChatGenerator";
+import BriefExpress from "../../components/BriefExpress";
+import ChatGenerator from "../../components/ChatGenerator";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { getQuotaStatus, type QuotaStatus } from "@/utils/quotaManager";
 
@@ -22,7 +22,6 @@ const DEFAULT_BRIEF: Brief = {
 
 export default function Creator() {
   const [brief, setBrief] = useState<Brief>(DEFAULT_BRIEF);
-  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [quotaStatus, setQuotaStatus] = useState<QuotaStatus | null>(null);
   const [quotaLoading, setQuotaLoading] = useState(false);
 
@@ -113,10 +112,6 @@ export default function Creator() {
     }
   }, [quotaStatus]);
 
-  const handlePromptSelect = (prompt: string) => {
-    setPendingPrompt(prompt);
-  };
-
   const chatApiUrl = import.meta.env?.VITE_ALFIE_CHAT_URL ?? "/api/alfie/chat";
 
   return (
@@ -142,18 +137,12 @@ export default function Creator() {
 
         <div className={styles.grid}>
           <aside className={styles.sidebar}>
-            <BriefExpress
-              value={briefWithResolution}
-              onChange={setBrief}
-              onPromptSelect={handlePromptSelect}
-            />
+            <BriefExpress value={briefWithResolution} onChange={setBrief} />
           </aside>
 
           <div className={styles.chatColumn}>
             <ChatGenerator
               brief={briefWithResolution}
-              pendingPrompt={pendingPrompt}
-              onPromptConsumed={() => setPendingPrompt(null)}
               quotaSnapshot={quotaSnapshot}
               quotaStatusLabel={quotaStatusLabel}
               brandName={quotaStatus?.brandName ?? activeBrand?.name ?? undefined}
