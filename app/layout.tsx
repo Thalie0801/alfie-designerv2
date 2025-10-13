@@ -1,5 +1,8 @@
 import React from "react";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata = {
   title: "Alfie Designer",
   description: "Générateur de concepts créatifs assisté par Alfie.",
