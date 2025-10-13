@@ -54,6 +54,36 @@ function resolveId() {
   return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function resolveQuotaLabel(quota: QuotaSnapshotItem) {
+  const limit = Math.max(0, quota.limit);
+  const used = Math.max(0, quota.used);
+  if (limit <= 0) {
+    return `${used}`;
+  }
+  return `${used}/${limit}`;
+}
+
+function BrandQuotaRow({ quota }: { quota: QuotaSnapshotItem }) {
+  const limit = Math.max(1, quota.limit);
+  const used = Math.max(0, quota.used);
+  const percentage = Math.min(100, Math.round((used / limit) * 100));
+
+  return (
+    <div className={styles.quotaRow}>
+      <div className={styles.quotaRowHeader}>
+        <span>{quota.label}</span>
+        <span>{resolveQuotaLabel(quota)}</span>
+      </div>
+      <div className={styles.quotaTrack}>
+        <div
+          className={styles.quotaFill}
+          style={{ width: `${percentage}%`, background: quota.color }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function ChatGenerator({
   brief,
   pendingPrompt,
@@ -71,6 +101,10 @@ export function ChatGenerator({
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<ChatMessage[]>(messages);
+  const endpoint = useMemo(
+    () => chatApiUrl ?? process.env.NEXT_PUBLIC_ALFIE_ENDPOINT ?? "/api/alfie/chat",
+    [chatApiUrl]
+  );
 
   useEffect(() => {
     const container = listRef.current;
@@ -110,7 +144,7 @@ export function ChatGenerator({
   const dispatchStreamingRequest = useCallback(
     async (updatedMessages: ChatMessage[], assistantId: string) => {
       try {
-        const response = await fetch(chatApiUrl ?? "/api/alfie/chat", {
+        const response = await fetch(endpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -206,7 +240,7 @@ export function ChatGenerator({
         setStreamingMessageId(null);
       }
     },
-    [brief, chatApiUrl, pushAssistantFallback, upsertAssistantContent]
+    [brief, endpoint, pushAssistantFallback, upsertAssistantContent]
   );
 
   const sendMessage = useCallback(
@@ -268,6 +302,24 @@ export function ChatGenerator({
     return "Alfie rédige en direct…";
   }, [isStreaming, streamingMessageId]);
 
+  const renderMessageContent = useCallback(
+    (message: ChatMessage) => {
+      if (message.role === "assistant" && message.id === streamingMessageId && isStreaming) {
+        if (message.content.trim().length === 0) {
+          return (
+            <span className={styles.typingDots} aria-live="polite" aria-label="Alfie écrit">
+              <span />
+              <span />
+              <span />
+            </span>
+          );
+        }
+      }
+      return message.content;
+    },
+    [isStreaming, streamingMessageId]
+  );
+
   return (
     <section className={`${styles.container} ${className ?? ""}`.trim()}>
       <div className={styles.chatShell}>
@@ -279,7 +331,9 @@ export function ChatGenerator({
             </p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-            <span className={styles.statusBadge}>IA active</span>
+            <span className={styles.statusBadge} data-streaming={isStreaming}>
+              {isStreaming ? "Génération…" : "IA active"}
+            </span>
             <button type="button" className={styles.resetButton} onClick={resetChat}>
               Réinitialiser
             </button>
@@ -297,8 +351,8 @@ export function ChatGenerator({
           </div>
 
           {(quotaLoading || (quotaSnapshot && quotaSnapshot.length > 0)) && (
-            <div className={styles.quotaCard}>
-              <div className={styles.quotaHeader}>
+            <div className={styles.quotaPanel}>
+              <div className={styles.quotaPanelHeader}>
                 <span>
                   Quotas {brandName ? `— ${brandName}` : "marque"}
                 </span>
@@ -308,26 +362,10 @@ export function ChatGenerator({
               {quotaLoading && (!quotaSnapshot || quotaSnapshot.length === 0) ? (
                 <p className={styles.quotaLoading}>Chargement des quotas…</p>
               ) : (
-                <div className={styles.quotaProgressGroup}>
-                  {(quotaSnapshot ?? []).map((quota) => {
-                    const limit = Math.max(0, quota.limit);
-                    const used = Math.max(0, quota.used);
-                    const ratio = limit > 0 ? Math.min(1, used / limit) : 0;
-                    const label = limit > 0 ? `${used}/${limit}` : `${used}`;
-                    return (
-                      <div key={quota.label} className={styles.quotaProgress}>
-                        <span>
-                          {quota.label} · {label}
-                        </span>
-                        <div className={styles.progressBar}>
-                          <div
-                            className={styles.progressFill}
-                            style={{ width: `${ratio * 100}%`, background: quota.color }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className={styles.quotaStack}>
+                  {(quotaSnapshot ?? []).map((quota) => (
+                    <BrandQuotaRow key={quota.label} quota={quota} />
+                  ))}
                 </div>
               )}
             </div>
@@ -337,8 +375,13 @@ export function ChatGenerator({
         <div className={styles.messagesArea}>
           <div ref={listRef} className={styles.messageList}>
             {messages.map((message) => (
-              <article key={message.id} className={styles.message} data-role={message.role}>
-                {message.content || (message.role === "assistant" ? "…" : message.content)}
+              <article
+                key={message.id}
+                className={styles.message}
+                data-role={message.role}
+                data-streaming={message.id === streamingMessageId && isStreaming}
+              >
+                {renderMessageContent(message)}
               </article>
             ))}
           </div>
@@ -353,7 +396,7 @@ export function ChatGenerator({
                 disabled={isStreaming}
               />
               <button type="submit" className={styles.sendButton} disabled={isStreaming || inputValue.trim().length === 0}>
-                Envoyer
+                {isStreaming ? "Génération…" : "Envoyer"}
               </button>
             </form>
             {streamingLabel && <p className={styles.streamingIndicator}>{streamingLabel}</p>}
