@@ -92,6 +92,8 @@ function normalizeMessages(messages: IncomingMessage[]): AgentMessage[] {
 function stripHtmlDanger(value: string | null | undefined) {
   return (value ?? "")
     .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<script[^>]*>/gi, "")
+    .replace(/<\/script>/gi, "")
     .replace(/<\/?(html|head|body)[^>]*>/gi, "")
     .trim();
 }
