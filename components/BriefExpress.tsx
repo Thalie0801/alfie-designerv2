@@ -167,6 +167,7 @@ function BriefExpress({ value, onChange }: BriefExpressProps) {
         )}
       </div>
 
+      {/* Astuces et Prompts déplacés dans leurs cartes dédiées */}
     </section>
   );
 }
