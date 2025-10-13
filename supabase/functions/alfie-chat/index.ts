@@ -5,10 +5,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Configuration flexible du modèle IA (facile à changer)
-const AI_CONFIG = {
-  model: Deno.env.get("ALFIE_AI_MODEL") || "google/gemini-2.5-flash",
-  endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions"
+// Configuration flexible du modèle IA avec fallback
+const AI_CONFIGS = {
+  primary: {
+    model: "google/gemini-2.5-flash",
+    endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions"
+  },
+  fallback: {
+    model: "openai/gpt-5-mini",
+    endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions"
+  }
 };
 
 serve(async (req) => {
@@ -314,22 +320,53 @@ Template Canva :
       }
     ];
 
-    const response = await fetch(AI_CONFIG.endpoint, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: AI_CONFIG.model, // Modèle configurable via env variable
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...transformedMessages
-        ],
-        tools: tools,
-        stream: true,
-      }),
-    });
+    let response;
+    let usedConfig = AI_CONFIGS.primary;
+    
+    try {
+      // Tentative avec Gemini (primary)
+      response = await fetch(AI_CONFIGS.primary.endpoint, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: AI_CONFIGS.primary.model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...transformedMessages
+          ],
+          tools: tools,
+          stream: true,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Gemini failed: ${response.status}`);
+      }
+    } catch (geminiError) {
+      console.log("Gemini failed, falling back to OpenAI:", geminiError);
+      
+      // Fallback vers OpenAI
+      response = await fetch(AI_CONFIGS.fallback.endpoint, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: AI_CONFIGS.fallback.model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...transformedMessages
+          ],
+          tools: tools,
+          stream: true,
+        }),
+      });
+      usedConfig = AI_CONFIGS.fallback;
+    }
 
     if (!response.ok) {
       if (response.status === 429) {
