@@ -2,11 +2,19 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import HomePageClient from "@/components/HomePageClient";
+import { FEATURES_BY_ROLE, getRole } from "@/lib/role";
+import { headers } from "next/headers";
 
 export default function Page() {
+  const role = getRole();
+  const h = headers();
+  (h as unknown as Headers).set?.("Vary", "Cookie");
+
+  const features = FEATURES_BY_ROLE[role];
+
   return (
     <>
-      <HomePageClient />
+      <HomePageClient role={role} features={features} />
       <footer
         style={{
           textAlign: "right",
