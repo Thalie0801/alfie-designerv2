@@ -8,12 +8,8 @@ if git diff --name-only ${1:-HEAD} | grep -E '^(apps/landing/|www/|site/)' > /de
 fi
 
 echo "Checking API endpoints..."
-if ! test -f pages/api/alfie/session.ts; then
-  echo "Missing pages/api/alfie/session.ts" >&2
-  exit 1
-fi
-if ! test -f pages/api/alfie/message.ts; then
-  echo "Missing pages/api/alfie/message.ts" >&2
+if ! test -f app/api/alfie/chat/route.ts; then
+  echo "Missing app/api/alfie/chat/route.ts" >&2
   exit 1
 fi
 
