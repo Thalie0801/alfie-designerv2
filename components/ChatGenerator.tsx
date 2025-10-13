@@ -10,10 +10,23 @@ interface ChatMessage {
   content: string;
 }
 
+interface QuotaSnapshotItem {
+  label: string;
+  used: number;
+  limit: number;
+  color: string;
+}
+
 interface ChatGeneratorProps {
   brief: Brief;
   pendingPrompt?: string | null;
   onPromptConsumed?: () => void;
+  quotaSnapshot?: QuotaSnapshotItem[];
+  quotaStatusLabel?: string;
+  brandName?: string;
+  quotaLoading?: boolean;
+  chatApiUrl?: string;
+  className?: string;
 }
 
 const QUICK_IDEAS = [
@@ -22,12 +35,6 @@ const QUICK_IDEAS = [
   "Variantes de CTA",
   "Légende + hashtags",
   "Idées visuels",
-];
-
-const QUOTA_SAMPLE = [
-  { label: "Visuels", value: 48, max: 150, color: "#4057ff" },
-  { label: "Vidéos", value: 9, max: 45, color: "#24c08a" },
-  { label: "Woofs", value: 18, max: 45, color: "#f59f00" },
 ];
 
 function createInitialMessages(): ChatMessage[] {
@@ -47,13 +54,57 @@ function resolveId() {
   return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export function ChatGenerator({ brief, pendingPrompt, onPromptConsumed }: ChatGeneratorProps) {
+function resolveQuotaLabel(quota: QuotaSnapshotItem) {
+  const limit = Math.max(0, quota.limit);
+  const used = Math.max(0, quota.used);
+  if (limit <= 0) {
+    return `${used}`;
+  }
+  return `${used}/${limit}`;
+}
+
+function BrandQuotaRow({ quota }: { quota: QuotaSnapshotItem }) {
+  const limit = Math.max(1, quota.limit);
+  const used = Math.max(0, quota.used);
+  const percentage = Math.min(100, Math.round((used / limit) * 100));
+
+  return (
+    <div className={styles.quotaRow}>
+      <div className={styles.quotaRowHeader}>
+        <span>{quota.label}</span>
+        <span>{resolveQuotaLabel(quota)}</span>
+      </div>
+      <div className={styles.quotaTrack}>
+        <div
+          className={styles.quotaFill}
+          style={{ width: `${percentage}%`, background: quota.color }}
+        />
+      </div>
+    </div>
+  );
+}
+
+export function ChatGenerator({
+  brief,
+  pendingPrompt,
+  onPromptConsumed,
+  quotaSnapshot,
+  quotaStatusLabel,
+  brandName,
+  quotaLoading,
+  chatApiUrl,
+  className,
+}: ChatGeneratorProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(() => createInitialMessages());
   const [inputValue, setInputValue] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<ChatMessage[]>(messages);
+  const endpoint = useMemo(
+    () => chatApiUrl ?? process.env.NEXT_PUBLIC_ALFIE_ENDPOINT ?? "/api/alfie/chat",
+    [chatApiUrl]
+  );
 
   useEffect(() => {
     const container = listRef.current;
@@ -93,7 +144,7 @@ export function ChatGenerator({ brief, pendingPrompt, onPromptConsumed }: ChatGe
   const dispatchStreamingRequest = useCallback(
     async (updatedMessages: ChatMessage[], assistantId: string) => {
       try {
-        const response = await fetch("/api/alfie/chat", {
+        const response = await fetch(endpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -189,7 +240,7 @@ export function ChatGenerator({ brief, pendingPrompt, onPromptConsumed }: ChatGe
         setStreamingMessageId(null);
       }
     },
-    [brief, pushAssistantFallback, upsertAssistantContent]
+    [brief, endpoint, pushAssistantFallback, upsertAssistantContent]
   );
 
   const sendMessage = useCallback(
@@ -251,8 +302,26 @@ export function ChatGenerator({ brief, pendingPrompt, onPromptConsumed }: ChatGe
     return "Alfie rédige en direct…";
   }, [isStreaming, streamingMessageId]);
 
+  const renderMessageContent = useCallback(
+    (message: ChatMessage) => {
+      if (message.role === "assistant" && message.id === streamingMessageId && isStreaming) {
+        if (message.content.trim().length === 0) {
+          return (
+            <span className={styles.typingDots} aria-live="polite" aria-label="Alfie écrit">
+              <span />
+              <span />
+              <span />
+            </span>
+          );
+        }
+      }
+      return message.content;
+    },
+    [isStreaming, streamingMessageId]
+  );
+
   return (
-    <div className={styles.container}>
+    <section className={`${styles.container} ${className ?? ""}`.trim()}>
       <div className={styles.chatShell}>
         <header className={styles.header}>
           <div className={styles.titleGroup}>
@@ -262,7 +331,9 @@ export function ChatGenerator({ brief, pendingPrompt, onPromptConsumed }: ChatGe
             </p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-            <span className={styles.statusBadge}>IA active</span>
+            <span className={styles.statusBadge} data-streaming={isStreaming}>
+              {isStreaming ? "Génération…" : "IA active"}
+            </span>
             <button type="button" className={styles.resetButton} onClick={resetChat}>
               Réinitialiser
             </button>
@@ -279,37 +350,38 @@ export function ChatGenerator({ brief, pendingPrompt, onPromptConsumed }: ChatGe
             ))}
           </div>
 
-          <div className={styles.quotaCard}>
-            <div className={styles.quotaHeader}>
-              <span>Quotas marque</span>
-              <span className={styles.quotaStatus}>Connectés</span>
+          {(quotaLoading || (quotaSnapshot && quotaSnapshot.length > 0)) && (
+            <div className={styles.quotaPanel}>
+              <div className={styles.quotaPanelHeader}>
+                <span>
+                  Quotas {brandName ? `— ${brandName}` : "marque"}
+                </span>
+                {quotaStatusLabel && <span className={styles.quotaStatus}>{quotaStatusLabel}</span>}
+              </div>
+
+              {quotaLoading && (!quotaSnapshot || quotaSnapshot.length === 0) ? (
+                <p className={styles.quotaLoading}>Chargement des quotas…</p>
+              ) : (
+                <div className={styles.quotaStack}>
+                  {(quotaSnapshot ?? []).map((quota) => (
+                    <BrandQuotaRow key={quota.label} quota={quota} />
+                  ))}
+                </div>
+              )}
             </div>
-            <div className={styles.quotaProgressGroup}>
-              {QUOTA_SAMPLE.map((quota) => {
-                const ratio = Math.min(1, quota.value / quota.max);
-                return (
-                  <div key={quota.label} className={styles.quotaProgress}>
-                    <span>
-                      {quota.label} · {quota.value}/{quota.max}
-                    </span>
-                    <div className={styles.progressBar}>
-                      <div
-                        className={styles.progressFill}
-                        style={{ width: `${ratio * 100}%`, background: quota.color }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          )}
         </section>
 
         <div className={styles.messagesArea}>
           <div ref={listRef} className={styles.messageList}>
             {messages.map((message) => (
-              <article key={message.id} className={styles.message} data-role={message.role}>
-                {message.content || (message.role === "assistant" ? "…" : message.content)}
+              <article
+                key={message.id}
+                className={styles.message}
+                data-role={message.role}
+                data-streaming={message.id === streamingMessageId && isStreaming}
+              >
+                {renderMessageContent(message)}
               </article>
             ))}
           </div>
@@ -324,13 +396,13 @@ export function ChatGenerator({ brief, pendingPrompt, onPromptConsumed }: ChatGe
                 disabled={isStreaming}
               />
               <button type="submit" className={styles.sendButton} disabled={isStreaming || inputValue.trim().length === 0}>
-                Envoyer
+                {isStreaming ? "Génération…" : "Envoyer"}
               </button>
             </form>
             {streamingLabel && <p className={styles.streamingIndicator}>{streamingLabel}</p>}
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

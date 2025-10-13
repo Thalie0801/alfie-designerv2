@@ -38,11 +38,13 @@ export default function HomePage() {
         />
       </div>
 
-      <ChatGenerator
-        brief={briefWithResolution}
-        pendingPrompt={pendingPrompt}
-        onPromptConsumed={() => setPendingPrompt(null)}
-      />
+      <div className="page__inner page__inner--chat">
+        <ChatGenerator
+          brief={briefWithResolution}
+          pendingPrompt={pendingPrompt}
+          onPromptConsumed={() => setPendingPrompt(null)}
+        />
+      </div>
 
       <style jsx>{`
         .page {
@@ -57,6 +59,10 @@ export default function HomePage() {
           padding: 0 24px;
         }
 
+        .page__inner--chat {
+          margin-top: 32px;
+        }
+
         @media (max-width: 860px) {
           .page {
             padding: 20px 0 64px;
@@ -64,6 +70,10 @@ export default function HomePage() {
 
           .page__inner {
             padding: 0 16px;
+          }
+
+          .page__inner--chat {
+            margin-top: 24px;
           }
         }
       `}</style>
