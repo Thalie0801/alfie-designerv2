@@ -5,6 +5,7 @@ import ChatCard from "@/components/ChatCard";
 import BriefExpress, { type Brief } from "@/components/BriefExpress";
 import TipsCard from "@/components/TipsCard";
 import TrendsCard from "@/components/TrendsCard";
+import type { AppRole } from "@/lib/role";
 
 const ratioResolutions: Record<Brief["ratio"], string> = {
   "9:16": "1080x1920",
@@ -20,7 +21,17 @@ const DEFAULT_BRIEF: Brief = {
   useBrandKit: true,
 };
 
-export default function HomePageClient() {
+export default function HomePageClient({
+  role,
+  features,
+}: {
+  role: AppRole;
+  features: {
+    showTrends: boolean;
+    showTips: boolean;
+    showQuotaLink: boolean;
+  };
+}) {
   const [brief, setBrief] = useState<Brief>(DEFAULT_BRIEF);
 
   const normalizedBrief = useMemo(() => {
@@ -32,9 +43,9 @@ export default function HomePageClient() {
   }, [brief]);
 
   return (
-    <div className="page">
+    <div className="page" data-role={role}>
       <div className="card">
-        <ChatCard brief={normalizedBrief} />
+        <ChatCard brief={normalizedBrief} showQuotaLink={features.showQuotaLink} />
       </div>
 
       <div className="card">
@@ -42,12 +53,16 @@ export default function HomePageClient() {
       </div>
 
       <div className="grid2">
-        <div className="card">
-          <TipsCard />
-        </div>
-        <div className="card">
-          <TrendsCard />
-        </div>
+        {features.showTips && (
+          <div className="card">
+            <TipsCard />
+          </div>
+        )}
+        {features.showTrends && (
+          <div className="card">
+            <TrendsCard />
+          </div>
+        )}
       </div>
 
       <style jsx global>{`
