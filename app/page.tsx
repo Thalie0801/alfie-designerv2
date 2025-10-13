@@ -1,3 +1,11 @@
+// Server Component
+
+import { cookies } from "next/headers";
+import Link from "next/link";
+import HomePageClient from "@/components/HomePageClient";
+import ThemeToggle from "@/components/ThemeToggle";
+import RoleSwitcher from "@/components/RoleSwitcher";
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
