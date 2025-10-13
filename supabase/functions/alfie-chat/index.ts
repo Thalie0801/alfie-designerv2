@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,6 +26,87 @@ serve(async (req) => {
   try {
     const { messages, brandId } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    let brandContextDetails = "";
+
+    if (brandId && supabaseUrl && supabaseKey) {
+      try {
+        const supabaseClient = createClient(supabaseUrl, supabaseKey, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        });
+
+        const { data: brand, error: brandError } = await supabaseClient
+          .from('brands')
+          .select('name, plan, palette, logo_url, fonts, voice, quota_images, quota_videos, quota_woofs, images_used, videos_used, woofs_used')
+          .eq('id', brandId)
+          .maybeSingle();
+
+        if (brandError) {
+          console.error('Failed to fetch brand context for alfie-chat:', brandError);
+        } else if (brand) {
+          const paletteValues: string[] = [];
+          if (Array.isArray(brand.palette)) {
+            paletteValues.push(...brand.palette.filter((value: unknown): value is string => typeof value === 'string'));
+          } else if (brand.palette && typeof brand.palette === 'object') {
+            for (const value of Object.values(brand.palette)) {
+              if (typeof value === 'string') {
+                paletteValues.push(value);
+              }
+            }
+          } else if (typeof brand.palette === 'string') {
+            paletteValues.push(brand.palette);
+          }
+
+          const fontValues: string[] = [];
+          if (brand.fonts && typeof brand.fonts === 'object') {
+            for (const value of Object.values(brand.fonts)) {
+              if (typeof value === 'string') {
+                fontValues.push(value);
+              }
+            }
+          }
+
+          const remainingImages = typeof brand.quota_images === 'number'
+            ? Math.max(0, brand.quota_images - (brand.images_used ?? 0))
+            : undefined;
+          const remainingVideos = typeof brand.quota_videos === 'number'
+            ? Math.max(0, brand.quota_videos - (brand.videos_used ?? 0))
+            : undefined;
+          const remainingWoofs = typeof brand.quota_woofs === 'number'
+            ? Math.max(0, brand.quota_woofs - (brand.woofs_used ?? 0))
+            : undefined;
+
+          const quotaSummary: string[] = [];
+          if (typeof brand.quota_images === 'number') {
+            quotaSummary.push(`Images : ${remainingImages ?? 'N/A'} / ${brand.quota_images}`);
+          }
+          if (typeof brand.quota_videos === 'number') {
+            quotaSummary.push(`Vidéos : ${remainingVideos ?? 'N/A'} / ${brand.quota_videos}`);
+          }
+          if (typeof brand.quota_woofs === 'number') {
+            quotaSummary.push(`Woofs : ${remainingWoofs ?? 'N/A'} / ${brand.quota_woofs}`);
+          }
+
+          const contextLines = [
+            brand.name ? `- Nom : ${brand.name}` : null,
+            brand.plan ? `- Plan : ${brand.plan}` : null,
+            paletteValues.length ? `- Palette : ${paletteValues.join(', ')}` : null,
+            fontValues.length ? `- Typos : ${fontValues.join(', ')}` : null,
+            brand.logo_url ? `- Logo : ${brand.logo_url}` : null,
+            brand.voice ? `- Ton éditorial : ${brand.voice}` : null,
+            quotaSummary.length ? `- Quotas restants (mois en cours) : ${quotaSummary.join(' | ')}` : null
+          ].filter((line): line is string => Boolean(line));
+
+          if (contextLines.length) {
+            brandContextDetails = contextLines.join('\n');
+          }
+        }
+      } catch (brandContextError) {
+        console.error('Error building brand context for alfie-chat:', brandContextError);
+      }
+    }
     
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
@@ -44,7 +126,11 @@ serve(async (req) => {
       return msg;
     });
 
-    const systemPrompt = `Tu es Alfie Designer, opérateur IA focalisé Canva. Tu produis des visuels et des vidéos conformes au Brand Kit de la MARQUE ACTIVE, puis tu fournis un livrable prêt pour Canva.
+    const brandContextSection = brandContextDetails
+      ? `\n\n📌 CONTEXTE MARQUE ACTIF\n${brandContextDetails}\n`
+      : '';
+
+    const systemPrompt = `Tu es Alfie Designer, opérateur IA focalisé Canva. Tu produis des visuels et des vidéos conformes au Brand Kit de la MARQUE ACTIVE, puis tu fournis un livrable prêt pour Canva.${brandContextSection}
 
 🚩 FEATURE FLAGS
 - VEO3_ENABLED = false → Utilise UNIQUEMENT Sora2 (via Kie AI) tant que ce flag est false.
