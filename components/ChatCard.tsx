@@ -13,11 +13,8 @@ export default function ChatCard({ brief }: { brief: Brief }) {
             {" · "}{brief.ratio} ({brief.resolution})
           </small>
         </div>
-        <a href="/quota" style={{border:"1px solid #e5e7eb",borderRadius:999,padding:"6px 10px",textDecoration:"none",color:"#2535a0",background:"rgba(64,87,255,.08)"}}>
-          Détail de mon quota
-        </a>
       </header>
-      <ChatGenerator brief={brief} hideQuickIdeas hideQuota />
+      <ChatGenerator brief={brief} hideQuota />
     </section>
   );
 }
