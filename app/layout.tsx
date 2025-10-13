@@ -11,7 +11,7 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr">
-      <body data-theme="light">
+      <body>
         {children}
         <style jsx global>{`
           :root { color-scheme: light; }

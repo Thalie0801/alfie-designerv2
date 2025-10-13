@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./ChatGenerator.module.css";
-import type { Brief } from "@/lib/types/brief";
+import type { Brief } from "../lib/types/brief";
 
 interface ChatMessage {
   id: string;
@@ -41,18 +41,6 @@ const QUICK_IDEAS = [
   "Légende + hashtags",
   "Idées visuels",
 ];
-
-function stripDangerousMarkup(value: string | null | undefined) {
-  if (!value) return "";
-  const normalized = value
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<br\s*\/?\>/gi, "\n")
-    .replace(/<\/(p|li|ul|ol|h[1-6])>/gi, "\n")
-    .replace(/&nbsp;/gi, " ");
-  const withoutTags = normalized.replace(/<\/?[a-z][^>]*>/gi, "");
-  return withoutTags.replace(/\n{3,}/g, "\n\n");
-}
 
 function createInitialMessages(): ChatMessage[] {
   return [
@@ -169,23 +157,18 @@ function ChatGenerator({
   }, [resetToken, resetChat]);
 
   const upsertAssistantContent = useCallback((messageId: string, delta: string) => {
-    const safeDelta = stripDangerousMarkup(delta);
-    if (!safeDelta) {
-      return;
-    }
     setMessages((prev) =>
       prev.map((message) =>
         message.id === messageId
-          ? { ...message, content: `${message.content}${safeDelta}` }
+          ? { ...message, content: `${message.content}${delta}` }
           : message
       )
     );
   }, []);
 
   const pushAssistantFallback = useCallback((messageId: string, text: string) => {
-    const safeText = stripDangerousMarkup(text) || "Je rencontre un souci inattendu.";
     setMessages((prev) =>
-      prev.map((message) => (message.id === messageId ? { ...message, content: safeText } : message))
+      prev.map((message) => (message.id === messageId ? { ...message, content: text } : message))
     );
   }, []);
 
@@ -295,13 +278,11 @@ function ChatGenerator({
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || isStreaming) return;
-      const sanitizedUserInput = stripDangerousMarkup(trimmed).trim();
-      if (!sanitizedUserInput) return;
 
       const userMessage: ChatMessage = {
         id: resolveId(),
         role: "user",
-        content: sanitizedUserInput,
+        content: trimmed,
       };
       const assistantMessage: ChatMessage = {
         id: resolveId(),
@@ -333,20 +314,16 @@ function ChatGenerator({
 
   const handleQuickIdea = useCallback(
     async (idea: string) => {
-      const cleaned = stripDangerousMarkup(idea).trim();
-      if (!cleaned) return;
-      setInputValue(cleaned);
-      await sendMessage(cleaned);
+      setInputValue(idea);
+      await sendMessage(idea);
     },
     [sendMessage]
   );
 
   useEffect(() => {
     if (pendingPrompt && pendingPrompt.trim().length > 0) {
-      const cleaned = stripDangerousMarkup(pendingPrompt).trim();
-      if (!cleaned) return;
-      setInputValue(cleaned);
-      void sendMessage(cleaned);
+      setInputValue(pendingPrompt);
+      void sendMessage(pendingPrompt);
       onPromptConsumed?.();
     }
   }, [pendingPrompt, onPromptConsumed, sendMessage]);
