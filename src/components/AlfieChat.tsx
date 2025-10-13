@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import type { ChangeEvent, KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
@@ -16,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { detectIntent, canHandleLocally, generateLocalResponse } from '@/utils/alfieIntentDetector';
 import { getQuotaStatus, consumeQuota, canGenerateVideo, checkQuotaAlert, formatExpirationMessage } from '@/utils/quotaManager';
 import { JobPlaceholder, JobStatus } from '@/components/chat/JobPlaceholder';
+import { cn } from '@/lib/utils';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -52,7 +54,20 @@ Je peux t'aider à :
 Chaque marque a ses propres quotas qui se réinitialisent le 1er du mois (non reportables).
 Alors, qu'est-ce qu'on crée ensemble aujourd'hui ? 😊`;
 
-export function AlfieChat() {
+export type AlfieChatHandle = {
+  setPrompt: (value: string) => void;
+  sendPrompt: (value: string) => void;
+  focusInput: () => void;
+};
+
+interface AlfieChatProps {
+  className?: string;
+}
+
+export const AlfieChat = forwardRef<AlfieChatHandle, AlfieChatProps>(function AlfieChat(
+  { className }: AlfieChatProps,
+  ref
+) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
@@ -70,6 +85,7 @@ export function AlfieChat() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { brandKit, activeBrandId } = useBrandKit();
   const { totalCredits, decrementCredits, hasCredits, incrementGenerations } = useAlfieCredits();
   const { searchTemplates } = useTemplateLibrary();
@@ -168,7 +184,7 @@ export function AlfieChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, generationStatus]);
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -827,14 +843,15 @@ export function AlfieChat() {
     }
   };
 
-  const handleSend = async (options?: { forceVideo?: boolean; forceImage?: boolean }) => {
-    if (!input.trim() || isLoading || !loaded) return;
+  const handleSend = async (options?: { forceVideo?: boolean; forceImage?: boolean; message?: string }) => {
+    const pendingMessage = (options?.message ?? input).trim();
+    if (!pendingMessage || isLoading || !loaded) return;
 
     const forceVideo = options?.forceVideo ?? false;
     const forceImage = options?.forceImage ?? false;
 
-    const userMessage = input.trim();
-    const imageUrl = uploadedImage;
+    const userMessage = pendingMessage;
+    const imageUrl = options?.message ? null : uploadedImage;
     setInput('');
     setUploadedImage(null);
     
@@ -951,7 +968,23 @@ export function AlfieChat() {
     setIsLoading(false);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  useImperativeHandle(ref, () => ({
+    setPrompt: (value: string) => {
+      setInput(value);
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+      });
+    },
+    sendPrompt: (value: string) => {
+      if (!value.trim()) return;
+      void handleSend({ message: value });
+    },
+    focusInput: () => {
+      textareaRef.current?.focus();
+    }
+  }));
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -959,7 +992,7 @@ export function AlfieChat() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-180px)]">
+    <div className={cn('flex flex-col h-full bg-background', className)}>
       {/* Chat Messages - scroll area qui prend tout l'espace */}
       <ScrollArea className="flex-1 pr-4" ref={scrollRef}>
         <div className="space-y-4 pb-4 px-4 min-h-[200px]">
@@ -1195,6 +1228,7 @@ export function AlfieChat() {
             )}
           </Button>
           <Textarea
+            ref={textareaRef}
             placeholder="Décris ton idée à Alfie..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -1218,4 +1252,6 @@ export function AlfieChat() {
       </div>
     </div>
   );
-}
+});
+
+AlfieChat.displayName = 'AlfieChat';
