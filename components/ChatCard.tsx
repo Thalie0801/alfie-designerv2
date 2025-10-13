@@ -2,13 +2,7 @@
 import ChatGenerator from "@/components/ChatGenerator";
 import type { Brief } from "@/components/BriefExpress";
 
-export default function ChatCard({
-  brief,
-  showQuotaLink = false,
-}: {
-  brief: Brief;
-  showQuotaLink?: boolean;
-}) {
+export default function ChatCard({ brief }: { brief: Brief }) {
   return (
     <section>
       <header style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,padding:"6px 8px 10px"}}>
@@ -19,11 +13,6 @@ export default function ChatCard({
             {" · "}{brief.ratio} ({brief.resolution})
           </small>
         </div>
-        {showQuotaLink && (
-          <a href="/quota" style={{border:"1px solid #e5e7eb",borderRadius:999,padding:"6px 10px",textDecoration:"none",color:"#2535a0",background:"rgba(64,87,255,.08)"}}>
-            Détail de mon quota
-          </a>
-        )}
       </header>
       <ChatGenerator brief={brief} hideQuickIdeas hideQuota />
     </section>

@@ -1,6 +1,6 @@
-import { getBrandKit } from "../../../../lib/brandKit";
-import { respond, respondStream, type AgentMessage } from "../../../../lib/ai/alfie";
-import type { Brief } from "../../../../lib/types/brief";
+import { getBrandKit } from "@/lib/brandKit";
+import { respond, respondStream, type AgentMessage } from "@/lib/ai/alfie";
+import type { Brief } from "@/lib/types/brief";
 
 export const runtime = "nodejs";
 
@@ -80,22 +80,26 @@ async function buildSystemInstruction(brief: Brief) {
     .trim();
 }
 
+function stripHtmlDanger(value: string | null | undefined) {
+  if (!value) return "";
+  const normalized = value
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<br\s*\/?\>/gi, "\n")
+    .replace(/<\/(p|li|ul|ol|h[1-6])>/gi, "\n")
+    .replace(/&nbsp;/gi, " ");
+  const withoutTags = normalized.replace(/<\/?[a-z][^>]*>/gi, "");
+  return withoutTags.replace(/\n{3,}/g, "\n\n").trim();
+}
+
 function normalizeMessages(messages: IncomingMessage[]): AgentMessage[] {
   return messages
     .filter((message) => typeof message?.content === "string")
     .map((message) => ({
       role: message.role === "assistant" ? "assistant" : "user",
-      content: message.content.trim(),
-    }));
-}
-
-function stripHtmlDanger(value: string | null | undefined) {
-  return (value ?? "")
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<script[^>]*>/gi, "")
-    .replace(/<\/script>/gi, "")
-    .replace(/<\/?(html|head|body)[^>]*>/gi, "")
-    .trim();
+      content: stripHtmlDanger(message.content),
+    }))
+    .filter((message) => message.content.length > 0);
 }
 
 export async function POST(request: Request) {

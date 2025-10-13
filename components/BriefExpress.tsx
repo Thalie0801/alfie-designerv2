@@ -2,7 +2,7 @@
 
 import { useMemo, type ChangeEvent } from "react";
 import styles from "./BriefExpress.module.css";
-import type { Brief, BriefDeliverable, BriefRatio } from "../lib/types/brief";
+import type { Brief, BriefDeliverable, BriefRatio } from "@/lib/types/brief";
 
 const ratioResolutions: Record<BriefRatio, string> = {
   "9:16": "1080x1920",

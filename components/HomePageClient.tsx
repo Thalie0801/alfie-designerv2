@@ -29,7 +29,6 @@ export default function HomePageClient({
   features: {
     showTrends: boolean;
     showTips: boolean;
-    showQuotaLink: boolean;
   };
 }) {
   const [brief, setBrief] = useState<Brief>(DEFAULT_BRIEF);
@@ -45,7 +44,7 @@ export default function HomePageClient({
   return (
     <div className="page" data-role={role}>
       <div className="card">
-        <ChatCard brief={normalizedBrief} showQuotaLink={features.showQuotaLink} />
+        <ChatCard brief={normalizedBrief} />
       </div>
 
       <div className="card">

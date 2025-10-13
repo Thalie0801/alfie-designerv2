@@ -34,6 +34,8 @@ const PLAN_CONFIG = {
   },
 };
 
+const COMMISSION_RATE = Number(Deno.env.get("AFFILIATE_COMMISSION_RATE") ?? "0.2");
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -251,6 +253,46 @@ serve(async (req) => {
         }
       } else {
         console.log("Affiliate not found or error:", affiliateError);
+      }
+
+      const amountCents = session.amount_total ?? 0;
+      const commissionCents = Math.round(amountCents * COMMISSION_RATE);
+      const currency = (session.currency ?? "eur").toUpperCase();
+
+      if (commissionCents > 0) {
+        const attributionPayload = {
+          ref_code: affiliateRef,
+          user_id: userId,
+          customer_id: (session.customer as string) ?? null,
+          stripe_subscription_id: (session.subscription as string) ?? null,
+        };
+
+        const { error: attributionError } = await supabaseClient
+          .from("affiliate_attributions")
+          .upsert(attributionPayload, { onConflict: "user_id" });
+
+        if (attributionError) {
+          console.error("Error upserting affiliate attribution:", attributionError);
+        }
+
+        const today = new Date();
+        const isoDate = today.toISOString().slice(0, 10);
+
+        const { error: payoutError } = await supabaseClient
+          .from("affiliate_payouts")
+          .insert({
+            ref_code: affiliateRef,
+            amount_cents: commissionCents,
+            currency,
+            status: "pending",
+            period_start: isoDate,
+            period_end: isoDate,
+            notes: `Commission automatique pour la session ${session_id}`,
+          });
+
+        if (payoutError) {
+          console.error("Error recording affiliate payout:", payoutError);
+        }
       }
     }
 
