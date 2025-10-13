@@ -53,45 +53,10 @@ export default function Page() {
       </div>
 
       <style jsx global>{`
-        :root {
-          color-scheme: light;
-        }
-
-        html, body {
-          background: #f7f7f8;
-          color: #101114;
-        }
-
-        .page {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 16px 20px 80px;
-          display: grid;
-          gap: 14px;
-        }
-
-        .card {
-          background: #ffffff;
-          border: 1px solid #e5e7eb;
-          border-radius: 14px;
-          padding: 12px;
-        }
-
-        .grid2 {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 14px;
-        }
-
-        @media (max-width: 860px) {
-          .page {
-            padding: 16px 16px 72px;
-          }
-
-          .grid2 {
-            grid-template-columns: 1fr;
-          }
-        }
+        .page{max-width:1200px;margin:0 auto;padding:16px 20px 80px;display:grid;gap:14px}
+        .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:12px}
+        .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+        @media (max-width:860px){.grid2{grid-template-columns:1fr}}
       `}</style>
     </div>
   );
