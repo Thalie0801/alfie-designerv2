@@ -53,8 +53,13 @@ export default function Page() {
       </div>
 
       <style jsx global>{`
+        :root {
+          color-scheme: light;
+        }
+
         html, body {
           background: #f7f7f8;
+          color: #101114;
         }
 
         .page {
