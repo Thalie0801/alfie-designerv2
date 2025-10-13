@@ -27,11 +27,20 @@ interface ChatGeneratorProps {
   quotaLoading?: boolean;
   chatApiUrl?: string;
   className?: string;
+  hideQuickIdeas?: boolean;
   hideQuota?: boolean;
   hideHeader?: boolean;
   resetToken?: number;
   onStreamingChange?: (streaming: boolean) => void;
 }
+
+const QUICK_IDEAS = [
+  "Angles de carrousel",
+  "Script vidéo 30s",
+  "Variantes de CTA",
+  "Légende + hashtags",
+  "Idées visuels",
+];
 
 function createInitialMessages(): ChatMessage[] {
   return [
@@ -90,6 +99,7 @@ function ChatGenerator({
   quotaLoading,
   chatApiUrl,
   className,
+  hideQuickIdeas = false,
   hideQuota = false,
   hideHeader = false,
   resetToken,
@@ -302,6 +312,14 @@ function ChatGenerator({
     [inputValue, sendMessage]
   );
 
+  const handleQuickIdea = useCallback(
+    async (idea: string) => {
+      setInputValue(idea);
+      await sendMessage(idea);
+    },
+    [sendMessage]
+  );
+
   useEffect(() => {
     if (pendingPrompt && pendingPrompt.trim().length > 0) {
       setInputValue(pendingPrompt);
@@ -355,20 +373,40 @@ function ChatGenerator({
           </header>
         )}
 
-        {!hideQuota && (quotaLoading || (quotaSnapshot && quotaSnapshot.length > 0)) && (
-          <section className={styles.quotaPanel} aria-label="Suivi des quotas">
-            <div className={styles.quotaPanelHeader}>
-              <span>Quotas {brandName ? `— ${brandName}` : "marque"}</span>
-              {quotaStatusLabel && <span className={styles.quotaStatus}>{quotaStatusLabel}</span>}
+        {!hideQuickIdeas && (
+          <section className={styles.quickIdeas} aria-label="Idées rapides">
+            <div className={styles.quickIdeasLabel}>Idées rapides</div>
+            <div className={styles.quickIdeasChips}>
+              {QUICK_IDEAS.map((idea) => (
+                <button
+                  key={idea}
+                  type="button"
+                  className={styles.quickChip}
+                  onClick={() => void handleQuickIdea(idea)}
+                >
+                  {idea}
+                </button>
+              ))}
             </div>
 
-            {quotaLoading && (!quotaSnapshot || quotaSnapshot.length === 0) ? (
-              <p className={styles.quotaLoading}>Chargement des quotas…</p>
-            ) : (
-              <div className={styles.quotaStack}>
-                {(quotaSnapshot ?? []).map((quota) => (
-                  <BrandQuotaRow key={quota.label} quota={quota} />
-                ))}
+            {!hideQuota && (quotaLoading || (quotaSnapshot && quotaSnapshot.length > 0)) && (
+              <div className={styles.quotaPanel}>
+                <div className={styles.quotaPanelHeader}>
+                  <span>
+                    Quotas {brandName ? `— ${brandName}` : "marque"}
+                  </span>
+                  {quotaStatusLabel && <span className={styles.quotaStatus}>{quotaStatusLabel}</span>}
+                </div>
+
+                {quotaLoading && (!quotaSnapshot || quotaSnapshot.length === 0) ? (
+                  <p className={styles.quotaLoading}>Chargement des quotas…</p>
+                ) : (
+                  <div className={styles.quotaStack}>
+                    {(quotaSnapshot ?? []).map((quota) => (
+                      <BrandQuotaRow key={quota.label} quota={quota} />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </section>

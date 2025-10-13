@@ -74,17 +74,8 @@ export async function respond({ messages, systemInstruction }: RespondOptions) {
     };
   }
 
-  try {
-    const { text } = await callGemini(payload);
-    if (text && text.trim().length > 0) {
-      return text;
-    }
-    throw new Error("empty_gemini_response");
-  } catch (error) {
-    console.error("[alfie] Gemini failure", error);
-    const fallback = await callOpenAI({ messages, systemInstruction });
-    return fallback;
-  }
+  const { text } = await callGemini(payload);
+  return text;
 }
 
 export async function respondStream({ messages, systemInstruction }: RespondOptions) {
@@ -103,49 +94,4 @@ export async function respondStream({ messages, systemInstruction }: RespondOpti
   }
 
   return streamChunks();
-}
-
-const OPENAI_MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-
-async function callOpenAI({
-  messages,
-  systemInstruction,
-}: RespondOptions): Promise<string> {
-  if (!OPENAI_API_KEY) {
-    throw new Error("openai_api_key_missing");
-  }
-
-  const payload: any = {
-    model: OPENAI_MODEL,
-    temperature: 0.85,
-    messages: messages
-      .filter((message) => message.role !== "system")
-      .filter((message) => message.content.trim().length > 0)
-      .map((message) => ({ role: message.role, content: message.content })),
-  };
-
-  if (systemInstruction && systemInstruction.trim().length > 0) {
-    payload.messages.unshift({ role: "system", content: systemInstruction });
-  }
-
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`openai_error_${response.status}: ${errorText}`);
-  }
-
-  const data = await response.json();
-  const text = data?.choices?.[0]?.message?.content;
-  return typeof text === "string" && text.length > 0
-    ? text
-    : "Je n'ai pas pu générer de réponse pour le moment.";
 }

@@ -33,11 +33,12 @@ function formatBrief(brief: Brief) {
 async function buildSystemInstruction(brief: Brief) {
   const baseInstruction = [
     "Tu es Alfie, directeur artistique conversationnel du studio Lovable.",
-    "Ta mission : transformer le brief en recommandations créatives actionnables.",
-    "Production strictement TEXTUELLE : jamais de balises HTML ni de <script>.",
-    "Si tu dois renvoyer du code, utilise uniquement des blocs Markdown (```lang ... ```), sans aucune balise <script>.",
-    "Interdiction de proposer des plans sur 7 jours ou des séquences emailing.",
-    "Sois concis, concret, orienté design visuel, vidéo courte et copy punchy.",
+    "Ta mission: guider et produire des idées de visuels ou de scripts courts à partir du brief.",
+    "Réponds uniquement en TEXTE. Interdiction totale d'envoyer des balises HTML ou <script>.",
+    "Si on te demande du code, utilise des blocs markdown (```lang ... ```). Jamais de balises <script>.",
+    "Reste focalisé sur des livrables graphiques ou vidéo, pas d'emailing ni de plan éditorial sur 7 jours.",
+    "Si l'utilisateur évoque la diffusion ou l'organisation, tu peux mentionner Aeditus une seule fois et subtilement (une phrase max).",
+    "Tes réponses doivent être courtes, concrètes, orientées création visuelle et copy percutante.",
   ].join("\n");
 
   const briefSection = [
@@ -88,9 +89,11 @@ function normalizeMessages(messages: IncomingMessage[]): AgentMessage[] {
     }));
 }
 
-function sanitizeText(value: string | null | undefined) {
+function stripHtmlDanger(value: string | null | undefined) {
   return (value ?? "")
     .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<script[^>]*>/gi, "")
+    .replace(/<\/script>/gi, "")
     .replace(/<\/?(html|head|body)[^>]*>/gi, "")
     .trim();
 }
@@ -121,7 +124,7 @@ export async function POST(request: Request) {
         async start(controller) {
           try {
             for await (const delta of iterator) {
-              const safeDelta = sanitizeText(String(delta ?? ""));
+              const safeDelta = stripHtmlDanger(String(delta ?? ""));
               if (!safeDelta) {
                 continue;
               }
@@ -157,7 +160,7 @@ export async function POST(request: Request) {
       messages: sanitizedMessages,
       systemInstruction,
     });
-    const safeAnswer = sanitizeText(answer);
+    const safeAnswer = stripHtmlDanger(answer);
 
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
