@@ -223,7 +223,7 @@ function ChatGenerator({
         }
       } catch (error) {
         const fallbackMessage =
-          error instanceof Error
+          error instanceof Error && error.message && !/unexpected token/i.test(error.message)
             ? `\n\nJe n'ai pas pu générer le rendu Lovable : ${error.message}`
             : "\n\nJe n'ai pas pu générer le rendu Lovable pour le moment.";
         upsertAssistantContent(assistantId, fallbackMessage);
