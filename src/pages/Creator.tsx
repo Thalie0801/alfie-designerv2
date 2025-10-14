@@ -1,156 +1,80 @@
-import { useEffect, useMemo, useState } from "react";
-import styles from "./Creator.module.css";
-import type { Brief } from "../../lib/types/brief";
-import BriefExpress from "../../components/BriefExpress";
-import ChatGenerator from "../../components/ChatGenerator";
-import { useBrandKit } from "@/hooks/useBrandKit";
-import { getQuotaStatus, type QuotaStatus } from "@/utils/quotaManager";
+import { AppLayoutWithSidebar } from '@/components/AppLayoutWithSidebar';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlfieChat } from '@/components/AlfieChat';
+import { Sparkles, Zap, Palette } from 'lucide-react';
+import { useAlfieCredits } from '@/hooks/useAlfieCredits';
+import { useBrandKit } from '@/hooks/useBrandKit';
 
-const ratioResolutions: Record<Brief["ratio"], string> = {
-  "9:16": "1080x1920",
-  "1:1": "1080x1080",
-  "4:5": "1080x1350",
-  "16:9": "1920x1080",
-};
-
-const DEFAULT_BRIEF: Brief = {
-  deliverable: "image",
-  ratio: "9:16",
-  resolution: ratioResolutions["9:16"],
-  useBrandKit: true,
-};
-
-export default function Creator() {
-  const [brief, setBrief] = useState<Brief>(DEFAULT_BRIEF);
-  const [quotaStatus, setQuotaStatus] = useState<QuotaStatus | null>(null);
-  const [quotaLoading, setQuotaLoading] = useState(false);
-
-  const { activeBrandId, activeBrand } = useBrandKit();
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!activeBrandId) {
-      setQuotaStatus(null);
-      return undefined;
-    }
-
-    setQuotaLoading(true);
-    getQuotaStatus(activeBrandId)
-      .then((status) => {
-        if (!cancelled) {
-          setQuotaStatus(status);
-        }
-      })
-      .catch((error) => {
-        console.error("Erreur récupération quotas:", error);
-        if (!cancelled) {
-          setQuotaStatus(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setQuotaLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeBrandId]);
-
-  const briefWithResolution = useMemo(() => {
-    const expectedResolution = ratioResolutions[brief.ratio];
-    if (brief.resolution === expectedResolution) {
-      return brief;
-    }
-    return { ...brief, resolution: expectedResolution };
-  }, [brief]);
-
-  const quotaSnapshot = useMemo(() => {
-    if (!quotaStatus) return undefined;
-    const snapshot = [
-      {
-        label: "Visuels",
-        used: quotaStatus.visuals.used,
-        limit: quotaStatus.visuals.limit,
-        color: "#4057ff",
-      },
-      {
-        label: "Vidéos",
-        used: quotaStatus.videos.used,
-        limit: quotaStatus.videos.limit,
-        color: "#24c08a",
-      },
-      {
-        label: "Woofs",
-        used: quotaStatus.woofs.consumed,
-        limit: quotaStatus.woofs.limit,
-        color: "#f59f00",
-      },
-    ];
-
-    return snapshot.filter((item) => item.limit > 0 || item.used > 0);
-  }, [quotaStatus]);
-
-  const quotaStatusLabel = useMemo(() => {
-    if (!quotaStatus?.resetsOn) {
-      return undefined;
-    }
-    try {
-      const resetDate = new Date(quotaStatus.resetsOn);
-      if (Number.isNaN(resetDate.getTime())) {
-        return undefined;
-      }
-      return `Réinitialisation le ${resetDate.toLocaleDateString("fr-FR", {
-        day: "numeric",
-        month: "long",
-      })}`;
-    } catch (error) {
-      console.error("Format date quota invalide:", error);
-      return undefined;
-    }
-  }, [quotaStatus]);
-
-  const chatApiUrl = import.meta.env?.VITE_ALFIE_CHAT_URL ?? "/api/alfie/chat";
+export default function App() {
+  const { totalCredits } = useAlfieCredits();
+  const { totalBrands, quotaBrands } = useBrandKit();
 
   return (
-    <div className={styles.page}>
-      <div className={styles.inner}>
-        <header className={styles.header}>
-          <div className={styles.headerText}>
-            <span className={styles.headerBadge}>Studio</span>
-            <h1 className={styles.title}>Créer avec Alfie</h1>
-            <p className={styles.subtitle}>
-              Sélectionne ton format, compose ton brief et laisse Alfie produire des visuels professionnels adaptés à ton Brand Kit.
-            </p>
+    <AppLayoutWithSidebar>
+      <div className="space-y-6">
+      {/* Header */}
+      <div className="gradient-subtle rounded-2xl p-6 border-2 border-primary/20 shadow-medium">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="bg-gradient-to-br from-primary to-secondary p-3 rounded-xl shadow-glow">
+            <Sparkles className="h-8 w-8 text-white" />
           </div>
-          <div className={styles.headerMeta}>
-            <span className={styles.activeBadge}>IA active</span>
-            <span className={styles.brandBadge}>
-              Brand Kit appliqué
-              {activeBrand?.name ? ` — ${activeBrand.name}` : " automatiquement"}
-            </span>
-          </div>
-        </header>
-
-        <div className={styles.grid}>
-          <aside className={styles.sidebar}>
-            <BriefExpress value={briefWithResolution} onChange={setBrief} />
-          </aside>
-
-          <div className={styles.chatColumn}>
-            <ChatGenerator
-              brief={briefWithResolution}
-              quotaSnapshot={quotaSnapshot}
-              quotaStatusLabel={quotaStatusLabel}
-              brandName={quotaStatus?.brandName ?? activeBrand?.name ?? undefined}
-              quotaLoading={quotaLoading}
-              chatApiUrl={chatApiUrl}
-            />
-          </div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+            Alfie Designer
+          </h1>
         </div>
+        <p className="text-muted-foreground">
+          Ton assistant créatif IA qui trouve, adapte et génère des visuels Canva sur mesure 🎨✨
+        </p>
       </div>
-    </div>
+
+      <div className="space-y-4">
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 gap-4 max-w-2xl">
+          <Card className="border-primary/20">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="bg-primary/10 p-3 rounded-lg">
+                  <Zap className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{totalCredits}</p>
+                  <p className="text-xs text-muted-foreground">Crédits IA restants</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-secondary/20">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="bg-secondary/10 p-3 rounded-lg">
+                  <Palette className="h-6 w-6 text-secondary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{totalBrands}/{quotaBrands}</p>
+                  <p className="text-xs text-muted-foreground">Marques créées</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* Chat Interface - Full Width */}
+        <Card className="shadow-strong border-2 border-primary/20 max-w-5xl mx-auto">
+          <CardHeader className="border-b bg-gradient-subtle">
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Chat avec Alfie
+            </CardTitle>
+            <CardDescription>
+              Décris ce que tu veux créer, Alfie s'occupe du reste
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <AlfieChat />
+          </CardContent>
+        </Card>
+      </div>
+      </div>
+    </AppLayoutWithSidebar>
   );
 }

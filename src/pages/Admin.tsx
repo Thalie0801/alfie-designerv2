@@ -12,7 +12,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Users, FileText, DollarSign, Activity, ArrowLeft, Sparkles, Plus, ExternalLink, Trash2, Edit2, Search, RefreshCw, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { NewsManager } from '@/components/NewsManager';
-import { VideoDiagnostic } from '@/components/VideoDiagnostic';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -305,7 +304,6 @@ export default function Admin() {
           <TabsTrigger value="payouts">Payouts</TabsTrigger>
           <TabsTrigger value="catalog">Catalogue Canva</TabsTrigger>
           <TabsTrigger value="news">Actualités</TabsTrigger>
-          <TabsTrigger value="diagnostic">Diagnostic</TabsTrigger>
         </TabsList>
 
         {/* Users Tab */}
@@ -676,11 +674,6 @@ export default function Admin() {
         {/* News Tab */}
         <TabsContent value="news" className="space-y-4">
           <NewsManager />
-        </TabsContent>
-
-        {/* Diagnostic Tab */}
-        <TabsContent value="diagnostic" className="space-y-4">
-          <VideoDiagnostic />
         </TabsContent>
       </Tabs>
 

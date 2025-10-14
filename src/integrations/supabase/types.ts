@@ -336,22 +336,12 @@ export type Database = {
           created_at: string | null
           fonts: Json | null
           id: string
-          images_used: number | null
-          is_addon: boolean | null
           logo_url: string | null
           name: string
           palette: Json | null
-          plan: string | null
-          quota_images: number | null
-          quota_videos: number | null
-          quota_woofs: number | null
-          resets_on: string | null
-          stripe_subscription_id: string | null
           updated_at: string | null
           user_id: string
-          videos_used: number | null
           voice: string | null
-          woofs_used: number | null
         }
         Insert: {
           canva_access_token?: string | null
@@ -361,22 +351,12 @@ export type Database = {
           created_at?: string | null
           fonts?: Json | null
           id?: string
-          images_used?: number | null
-          is_addon?: boolean | null
           logo_url?: string | null
           name: string
           palette?: Json | null
-          plan?: string | null
-          quota_images?: number | null
-          quota_videos?: number | null
-          quota_woofs?: number | null
-          resets_on?: string | null
-          stripe_subscription_id?: string | null
           updated_at?: string | null
           user_id: string
-          videos_used?: number | null
           voice?: string | null
-          woofs_used?: number | null
         }
         Update: {
           canva_access_token?: string | null
@@ -386,22 +366,12 @@ export type Database = {
           created_at?: string | null
           fonts?: Json | null
           id?: string
-          images_used?: number | null
-          is_addon?: boolean | null
           logo_url?: string | null
           name?: string
           palette?: Json | null
-          plan?: string | null
-          quota_images?: number | null
-          quota_videos?: number | null
-          quota_woofs?: number | null
-          resets_on?: string | null
-          stripe_subscription_id?: string | null
           updated_at?: string | null
           user_id?: string
-          videos_used?: number | null
           voice?: string | null
-          woofs_used?: number | null
         }
         Relationships: [
           {
@@ -482,38 +452,6 @@ export type Database = {
         }
         Relationships: []
       }
-      counters_monthly: {
-        Row: {
-          brand_id: string
-          images_used: number
-          period_yyyymm: number
-          reels_used: number
-          woofs_used: number
-        }
-        Insert: {
-          brand_id: string
-          images_used?: number
-          period_yyyymm: number
-          reels_used?: number
-          woofs_used?: number
-        }
-        Update: {
-          brand_id?: string
-          images_used?: number
-          period_yyyymm?: number
-          reels_used?: number
-          woofs_used?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "counters_monthly_brand_id_fkey"
-            columns: ["brand_id"]
-            isOneToOne: false
-            referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       credit_packs: {
         Row: {
           created_at: string | null
@@ -579,112 +517,6 @@ export type Database = {
           },
         ]
       }
-      deliverable: {
-        Row: {
-          brand_id: string
-          canva_link: string | null
-          created_at: string
-          format: string
-          id: string
-          metadata: Json | null
-          objective: string | null
-          preview_url: string | null
-          status: string
-          style_choice: string | null
-          updated_at: string | null
-          zip_url: string | null
-        }
-        Insert: {
-          brand_id: string
-          canva_link?: string | null
-          created_at?: string
-          format: string
-          id?: string
-          metadata?: Json | null
-          objective?: string | null
-          preview_url?: string | null
-          status?: string
-          style_choice?: string | null
-          updated_at?: string | null
-          zip_url?: string | null
-        }
-        Update: {
-          brand_id?: string
-          canva_link?: string | null
-          created_at?: string
-          format?: string
-          id?: string
-          metadata?: Json | null
-          objective?: string | null
-          preview_url?: string | null
-          status?: string
-          style_choice?: string | null
-          updated_at?: string | null
-          zip_url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "deliverable_brand_id_fkey"
-            columns: ["brand_id"]
-            isOneToOne: false
-            referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      generation_logs: {
-        Row: {
-          brand_id: string | null
-          created_at: string
-          duration_seconds: number | null
-          engine: string | null
-          error_code: string | null
-          id: string
-          metadata: Json | null
-          prompt_summary: string | null
-          status: string
-          type: string
-          user_id: string
-          woofs_cost: number | null
-        }
-        Insert: {
-          brand_id?: string | null
-          created_at?: string
-          duration_seconds?: number | null
-          engine?: string | null
-          error_code?: string | null
-          id?: string
-          metadata?: Json | null
-          prompt_summary?: string | null
-          status: string
-          type: string
-          user_id: string
-          woofs_cost?: number | null
-        }
-        Update: {
-          brand_id?: string | null
-          created_at?: string
-          duration_seconds?: number | null
-          engine?: string | null
-          error_code?: string | null
-          id?: string
-          metadata?: Json | null
-          prompt_summary?: string | null
-          status?: string
-          type?: string
-          user_id?: string
-          woofs_cost?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "generation_logs_brand_id_fkey"
-            columns: ["brand_id"]
-            isOneToOne: false
-            referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       jobs: {
         Row: {
           completed_at: string | null
@@ -692,11 +524,7 @@ export type Database = {
           error: string | null
           id: string
           input_data: Json | null
-          max_retries: number | null
           output_data: Json | null
-          progress: number | null
-          retry_count: number | null
-          short_id: string | null
           status: string | null
           type: string
           user_id: string
@@ -707,11 +535,7 @@ export type Database = {
           error?: string | null
           id?: string
           input_data?: Json | null
-          max_retries?: number | null
           output_data?: Json | null
-          progress?: number | null
-          retry_count?: number | null
-          short_id?: string | null
           status?: string | null
           type: string
           user_id: string
@@ -722,11 +546,7 @@ export type Database = {
           error?: string | null
           id?: string
           input_data?: Json | null
-          max_retries?: number | null
           output_data?: Json | null
-          progress?: number | null
-          retry_count?: number | null
-          short_id?: string | null
           status?: string | null
           type?: string
           user_id?: string
@@ -735,84 +555,42 @@ export type Database = {
       }
       media_generations: {
         Row: {
-          brand_id: string | null
           created_at: string | null
-          duration_seconds: number | null
-          engine: Database["public"]["Enums"]["video_engine"] | null
-          expires_at: string | null
-          file_size_bytes: number | null
           id: string
           input_url: string | null
-          is_source_upload: boolean | null
-          job_id: string | null
           metadata: Json | null
           output_url: string
           prompt: string | null
           status: string
-          thumbnail_url: string | null
           type: string
           updated_at: string | null
           user_id: string
-          woofs: number | null
         }
         Insert: {
-          brand_id?: string | null
           created_at?: string | null
-          duration_seconds?: number | null
-          engine?: Database["public"]["Enums"]["video_engine"] | null
-          expires_at?: string | null
-          file_size_bytes?: number | null
           id?: string
           input_url?: string | null
-          is_source_upload?: boolean | null
-          job_id?: string | null
           metadata?: Json | null
           output_url: string
           prompt?: string | null
           status?: string
-          thumbnail_url?: string | null
           type: string
           updated_at?: string | null
           user_id: string
-          woofs?: number | null
         }
         Update: {
-          brand_id?: string | null
           created_at?: string | null
-          duration_seconds?: number | null
-          engine?: Database["public"]["Enums"]["video_engine"] | null
-          expires_at?: string | null
-          file_size_bytes?: number | null
           id?: string
           input_url?: string | null
-          is_source_upload?: boolean | null
-          job_id?: string | null
           metadata?: Json | null
           output_url?: string
           prompt?: string | null
           status?: string
-          thumbnail_url?: string | null
           type?: string
           updated_at?: string | null
           user_id?: string
-          woofs?: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "media_generations_brand_id_fkey"
-            columns: ["brand_id"]
-            isOneToOne: false
-            referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "media_generations_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       news: {
         Row: {
@@ -841,33 +619,6 @@ export type Database = {
           published?: boolean
           title?: string
           updated_at?: string
-        }
-        Relationships: []
-      }
-      payment_sessions: {
-        Row: {
-          amount: number | null
-          id: string
-          plan: string
-          processed_at: string
-          session_id: string
-          user_id: string | null
-        }
-        Insert: {
-          amount?: number | null
-          id?: string
-          plan: string
-          processed_at?: string
-          session_id: string
-          user_id?: string | null
-        }
-        Update: {
-          amount?: number | null
-          id?: string
-          plan?: string
-          processed_at?: string
-          session_id?: string
-          user_id?: string | null
         }
         Relationships: []
       }
@@ -931,13 +682,10 @@ export type Database = {
           id: string
           plan: string | null
           quota_brands: number | null
-          quota_videos: number | null
           quota_visuals_per_month: number | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           updated_at: string | null
-          videos_this_month: number | null
-          woofs_consumed_this_month: number | null
         }
         Insert: {
           active_brand_id?: string | null
@@ -956,13 +704,10 @@ export type Database = {
           id: string
           plan?: string | null
           quota_brands?: number | null
-          quota_videos?: number | null
           quota_visuals_per_month?: number | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           updated_at?: string | null
-          videos_this_month?: number | null
-          woofs_consumed_this_month?: number | null
         }
         Update: {
           active_brand_id?: string | null
@@ -981,13 +726,10 @@ export type Database = {
           id?: string
           plan?: string | null
           quota_brands?: number | null
-          quota_videos?: number | null
           quota_visuals_per_month?: number | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           updated_at?: string | null
-          videos_this_month?: number | null
-          woofs_consumed_this_month?: number | null
         }
         Relationships: [
           {
@@ -1029,48 +771,6 @@ export type Database = {
         }
         Relationships: []
       }
-      usage_event: {
-        Row: {
-          brand_id: string
-          created_at: string
-          deliverable_id: string | null
-          id: string
-          kind: string
-          meta: Json | null
-        }
-        Insert: {
-          brand_id: string
-          created_at?: string
-          deliverable_id?: string | null
-          id?: string
-          kind: string
-          meta?: Json | null
-        }
-        Update: {
-          brand_id?: string
-          created_at?: string
-          deliverable_id?: string | null
-          id?: string
-          kind?: string
-          meta?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "usage_event_brand_id_fkey"
-            columns: ["brand_id"]
-            isOneToOne: false
-            referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "usage_event_deliverable_id_fkey"
-            columns: ["deliverable_id"]
-            isOneToOne: false
-            referencedRelation: "deliverable"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -1092,44 +792,6 @@ export type Database = {
         }
         Relationships: []
       }
-      video_segments: {
-        Row: {
-          created_at: string | null
-          duration_seconds: number | null
-          id: string
-          is_temporary: boolean | null
-          parent_video_id: string | null
-          segment_index: number
-          segment_url: string
-        }
-        Insert: {
-          created_at?: string | null
-          duration_seconds?: number | null
-          id?: string
-          is_temporary?: boolean | null
-          parent_video_id?: string | null
-          segment_index: number
-          segment_url: string
-        }
-        Update: {
-          created_at?: string | null
-          duration_seconds?: number | null
-          id?: string
-          is_temporary?: boolean | null
-          parent_video_id?: string | null
-          segment_index?: number
-          segment_url?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "video_segments_parent_video_id_fkey"
-            columns: ["parent_video_id"]
-            isOneToOne: false
-            referencedRelation: "media_generations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       [_ in never]: never
@@ -1142,10 +804,6 @@ export type Database = {
           direct_affiliate_id: string
         }
         Returns: undefined
-      }
-      generate_short_job_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
       }
       has_active_plan: {
         Args: { user_id_param: string }
@@ -1162,16 +820,6 @@ export type Database = {
         Args: { user_id_param: string }
         Returns: number
       }
-      increment_monthly_counters: {
-        Args: {
-          p_brand_id: string
-          p_images?: number
-          p_period_yyyymm: number
-          p_reels?: number
-          p_woofs?: number
-        }
-        Returns: undefined
-      }
       update_affiliate_status: {
         Args: { affiliate_id_param: string }
         Returns: undefined
@@ -1179,10 +827,6 @@ export type Database = {
     }
     Enums: {
       app_role: "user" | "admin" | "affiliate"
-      asset_engine: "nano" | "sora" | "veo3"
-      brand_plan: "starter" | "pro" | "studio"
-      plan_type: "starter" | "pro" | "studio"
-      video_engine: "sora" | "seededance" | "kling"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1311,10 +955,6 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["user", "admin", "affiliate"],
-      asset_engine: ["nano", "sora", "veo3"],
-      brand_plan: ["starter", "pro", "studio"],
-      plan_type: ["starter", "pro", "studio"],
-      video_engine: ["sora", "seededance", "kling"],
     },
   },
 } as const

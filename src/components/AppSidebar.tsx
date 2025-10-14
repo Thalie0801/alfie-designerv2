@@ -8,8 +8,7 @@ import {
   Settings,
   LogOut,
   UserCircle,
-  Layers,
-  FolderOpen
+  Layers
 } from 'lucide-react';
 import {
   Sidebar,
@@ -34,15 +33,9 @@ export function AppSidebar() {
   const { user, profile, isAdmin, signOut } = useAuth();
   const canSeeAdminToggle = user?.email === 'nathaliestaelens@gmail.com';
 
-  const navItems: Array<{
-    path: string;
-    label: string;
-    icon: any;
-    badge?: string;
-  }> = [
+  const navItems = [
     { path: '/app', label: 'Créer', icon: Sparkles },
-    { path: '/templates', label: 'Catalogue', icon: Layers, badge: 'Bientôt' },
-    { path: '/library', label: 'Bibliothèque', icon: FolderOpen },
+    { path: '/templates', label: 'Catalogue', icon: Layers },
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/profile', label: 'Profil', icon: UserCircle },
     { path: '/billing', label: 'Abonnement', icon: CreditCard },
@@ -88,16 +81,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild isActive={location.pathname === item.path}>
                     <NavLink to={item.path} end className={getNavCls}>
                       <item.icon className={open ? "mr-2" : "mx-auto"} size={20} />
-                      {open && (
-                        <div className="flex items-center gap-2 flex-1">
-                          <span>{item.label}</span>
-                          {item.badge && (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                              {item.badge}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
+                      {open && <span>{item.label}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

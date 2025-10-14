@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -91,43 +90,8 @@ serve(async (req) => {
       throw new Error("No image generated");
     }
 
-    let finalUrl = improvedImageUrl;
-    try {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL');
-      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-      if (supabaseUrl && supabaseKey) {
-        const assetClient = createClient(supabaseUrl, supabaseKey, {
-          auth: { autoRefreshToken: false, persistSession: false }
-        });
-
-        const assetResponse = await fetch(improvedImageUrl);
-        if (assetResponse.ok) {
-          const arrayBuffer = await assetResponse.arrayBuffer();
-          const contentType = assetResponse.headers.get('content-type') || 'image/png';
-          const filePath = `improved/${crypto.randomUUID()}.png`;
-
-          const { error: uploadError } = await assetClient.storage
-            .from('assets')
-            .upload(filePath, new Uint8Array(arrayBuffer), {
-              contentType,
-              upsert: false
-            });
-
-          if (!uploadError) {
-            const { data: publicUrl } = assetClient.storage.from('assets').getPublicUrl(filePath);
-            if (publicUrl?.publicUrl) {
-              finalUrl = publicUrl.publicUrl;
-            }
-          }
-        }
-      }
-    } catch (storageError) {
-      console.warn('Failed to persist improved image to assets bucket', storageError);
-    }
-
     console.log("Image improved successfully");
-    return new Response(JSON.stringify({ imageUrl: finalUrl }), {
+    return new Response(JSON.stringify({ imageUrl: improvedImageUrl }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });

@@ -26,14 +26,10 @@ export default function AlfieLanding() {
 
   const calculatePrice = (monthlyPrice: number) => {
     if (isAnnual) {
-      const annualPrice = Math.round(monthlyPrice * 12 * 0.8); // -20% arrondi
-      return `${annualPrice}€`;
+      const annualPrice = monthlyPrice * 12 * 0.8; // -20%
+      return `${Math.round(annualPrice)}€`;
     }
     return `${monthlyPrice}€`;
-  };
-
-  const calculateOriginalAnnualPrice = (monthlyPrice: number) => {
-    return Math.round(monthlyPrice * 12);
   };
 
   const getPriceLabel = () => isAnnual ? " / an" : " / mois";
@@ -202,38 +198,35 @@ export default function AlfieLanding() {
           <PriceCard 
             title="Starter" 
             planKey="starter"
-            price={calculatePrice(39)} 
-            originalAnnualPrice={isAnnual ? calculateOriginalAnnualPrice(39) : undefined}
+            price={calculatePrice(29)} 
             priceLabel={getPriceLabel()}
             isAnnual={isAnnual}
-            bullets={["1 Brand Kit dédié","150 visuels/mois","15 vidéos/mois (15 Woofs)","Canva inclus","Stockage 30j","Téléchargement illimité"]} 
+            bullets={["1 marque","25 vidéos + 100 images/mois","150 crédits IA/mois","100 requêtes Alfie/mois","Générateur de contenu IA intégré","2 templates"]} 
             cta="Essayer Starter"
-            onSelect={() => createCheckout('starter', isAnnual ? 'annual' : 'monthly')}
+            onSelect={() => createCheckout('starter')}
             loading={checkoutLoading}
           />
           <PriceCard 
             title="Pro" 
             planKey="pro"
-            price={calculatePrice(99)} 
-            originalAnnualPrice={isAnnual ? calculateOriginalAnnualPrice(99) : undefined}
+            price={calculatePrice(79)} 
             priceLabel={getPriceLabel()}
             isAnnual={isAnnual}
             highlight 
-            bullets={["1 Brand Kit dédié","450 visuels/mois","45 vidéos/mois (45 Woofs)","Canva inclus","Add-on : Marque +39€","Packs Woofs","Support prioritaire"]} 
+            bullets={["3 marques","40 vidéos + 295 images/mois","375 crédits IA/mois","250 requêtes Alfie/mois","Générateur de contenu IA intégré","-20% sur packs de crédits","4 templates + Reels"]} 
             cta="Choisir Pro"
-            onSelect={() => createCheckout('pro', isAnnual ? 'annual' : 'monthly')}
+            onSelect={() => createCheckout('pro')}
             loading={checkoutLoading}
           />
           <PriceCard 
             title="Studio" 
             planKey="studio"
-            price={calculatePrice(199)} 
-            originalAnnualPrice={isAnnual ? calculateOriginalAnnualPrice(199) : undefined}
+            price={calculatePrice(149)} 
             priceLabel={getPriceLabel()}
             isAnnual={isAnnual}
-            bullets={["1 Brand Kit dédié","1000 visuels/mois","100 vidéos/mois (100 Woofs)","Canva inclus","Add-on : Marque +39€","Packs Woofs (+50, +100)","Analytics","Support prioritaire"]} 
+            bullets={["Multi-marques (5 max)","150 vidéos + 450 images/mois","750 crédits IA/mois","500 requêtes Alfie/mois","Générateur de contenu IA intégré","-20% sur packs de crédits","Reels avancés","Analytics"]} 
             cta="Passer Studio"
-            onSelect={() => createCheckout('studio', isAnnual ? 'annual' : 'monthly')}
+            onSelect={() => createCheckout('studio')}
             loading={checkoutLoading}
           />
           <PriceCard 
@@ -242,7 +235,7 @@ export default function AlfieLanding() {
             price="Sur mesure"
             priceLabel=""
             isAnnual={false}
-            bullets={["Marques illimitées","Visuels illimités","Vidéos illimitées","Canva inclus","API & SSO","White-label","Support dédié 24/7"]} 
+            bullets={["Marques illimitées","Visuels illimités","Crédits IA sur mesure","Alfie illimité","Générateur de contenu IA intégré","API & SSO","White-label","Support dédié 24/7"]} 
             cta="Nous contacter"
             onSelect={() => window.location.href = '/contact'}
             loading={false}
@@ -451,7 +444,6 @@ function PriceCard({
   title, 
   planKey,
   price, 
-  originalAnnualPrice,
   priceLabel, 
   bullets, 
   cta, 
@@ -463,7 +455,6 @@ function PriceCard({
   title: string; 
   planKey: string;
   price: string; 
-  originalAnnualPrice?: number;
   priceLabel: string; 
   bullets: string[]; 
   cta: string; 
@@ -480,11 +471,6 @@ function PriceCard({
           {highlight && <Badge className="bg-gradient-to-r from-primary to-secondary text-white text-[10px] sm:text-xs">⭐ Populaire</Badge>}
         </CardTitle>
         <CardDescription>
-          {isAnnual && originalAnnualPrice && (
-            <div className="text-slate-400 line-through text-sm sm:text-base mb-1">
-              {originalAnnualPrice}€ / an
-            </div>
-          )}
           <div className="flex items-baseline gap-1.5 sm:gap-2">
             <span className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">{price}</span>
             <span className="text-slate-500 text-xs sm:text-sm">{priceLabel}</span>

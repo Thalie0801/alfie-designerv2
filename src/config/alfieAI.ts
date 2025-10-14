@@ -51,8 +51,6 @@ export const QUICK_INTENTS = {
   openCanva: /ouvr(e|ir)|lance|va (dans|sur) canva/i,
   showBrandKit: /montre.*(brand|kit|marque)|affiche.*(couleurs|logo)/i,
   checkCredits: /(combien|check|vérifie).*(crédit|reste)/i,
-  showUsage: /(montre|affiche|check).*(quota|usage|consommation|compteur)/i,
-  packageDownload: /(télécharge|download|zip|package).*(tout|mes|assets)/i,
   
   // Templates par catégorie (cache possible)
   socialMedia: /instagram|facebook|linkedin|twitter|social/i,

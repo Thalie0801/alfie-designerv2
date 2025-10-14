@@ -69,7 +69,7 @@ export default function Auth() {
   // Redirect if already logged in (will be handled by ProtectedRoute)
   useEffect(() => {
     if (user && !verifyingPayment) {
-      navigate('/dashboard');
+      navigate('/app');
     }
   }, [user, verifyingPayment, navigate]);
 
@@ -95,7 +95,7 @@ export default function Auth() {
           }
         } else {
           toast.success('Connexion réussie !');
-          navigate('/dashboard');
+          navigate('/app');
         }
       } else {
         const { error } = await signUp(data.email, data.password, fullName);

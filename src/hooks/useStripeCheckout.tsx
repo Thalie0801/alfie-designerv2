@@ -9,10 +9,7 @@ export function useStripeCheckout() {
   const { session } = useAuth();
   const { getAffiliateRef } = useAffiliate();
 
-  const createCheckout = async (
-    plan: 'starter' | 'pro' | 'studio' | 'enterprise',
-    billingPeriod: 'monthly' | 'annual' = 'monthly'
-  ) => {
+  const createCheckout = async (plan: 'starter' | 'pro' | 'studio' | 'enterprise') => {
     setLoading(true);
     try {
       const affiliateRef = getAffiliateRef();
@@ -20,7 +17,6 @@ export function useStripeCheckout() {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: { 
           plan,
-          billing_period: billingPeriod,
           affiliate_ref: affiliateRef 
         },
         headers: session ? {

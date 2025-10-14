@@ -1,8 +1,5 @@
 project_id = "itsjonazifiiikozengd"
 
-[functions.creations-api]
-verify_jwt = true
-
 [functions.alfie-generate]
 verify_jwt = false
 
@@ -22,10 +19,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.create-checkout]
-verify_jwt = true
+verify_jwt = false
 
 [functions.verify-payment]
-verify_jwt = true
+verify_jwt = false
 
 [functions.send-confirmation-email]
 verify_jwt = false
@@ -37,7 +34,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.purchase-credit-pack]
-verify_jwt = true
+verify_jwt = false
 
 [functions.verify-credit-purchase]
 verify_jwt = false
@@ -58,25 +55,4 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.generate-ai-image]
-verify_jwt = false
-
-[functions.purge-expired-assets]
-verify_jwt = false
-
-[functions.reset-monthly-quotas]
-verify_jwt = false
-
-[functions.track-job-status]
-verify_jwt = false
-
-[functions.verify-video-generation]
-verify_jwt = false
-
-[functions.generate-sora-montage]
-verify_jwt = false
-
-[functions.cleanup-processing-videos]
-verify_jwt = false
-
-[functions.video-webhook]
 verify_jwt = false
