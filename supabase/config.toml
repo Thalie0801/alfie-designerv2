@@ -22,10 +22,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.create-checkout]
-verify_jwt = false
+verify_jwt = true
 
 [functions.verify-payment]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-confirmation-email]
 verify_jwt = false
@@ -37,7 +37,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.purchase-credit-pack]
-verify_jwt = false
+verify_jwt = true
 
 [functions.verify-credit-purchase]
 verify_jwt = false
