@@ -1,17 +1,19 @@
+import { useState } from 'react';
 import { AppLayoutWithSidebar } from '@/components/AppLayoutWithSidebar';
 import { AlfieChat } from '@/components/AlfieChat';
-import { ChatHeader } from '@/components/ChatHeader';
+import { CreateHeader } from '@/components/create/CreateHeader';
 
 export default function App() {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
+
   return (
     <AppLayoutWithSidebar>
-      <div className="h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
-        {/* Header compact sticky */}
-        <ChatHeader />
-        
-        {/* Chat qui prend tout l'espace restant */}
+      <div className="flex h-full min-h-[calc(100vh-8rem)] flex-col gap-6 bg-slate-50">
+        <CreateHeader onToggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
         <div className="flex-1 overflow-hidden">
-          <AlfieChat />
+          <AlfieChat isSidebarOpen={isSidebarOpen} />
         </div>
       </div>
     </AppLayoutWithSidebar>
