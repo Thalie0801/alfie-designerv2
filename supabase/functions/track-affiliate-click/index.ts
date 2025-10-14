@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,7 +30,18 @@ serve(async (req) => {
 
   try {
     const body = await parseBody(req);
-    const ref = body.ref || body.affiliate_id;
+    const validationResult = affiliateClickSchema.safeParse(body);
+    
+    if (!validationResult.success) {
+      console.error("Validation error:", validationResult.error);
+      return new Response(
+        JSON.stringify({ error: "Invalid request format" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    const { ref, affiliate_id, utm_source, utm_medium, utm_campaign } = validationResult.data;
+    const affiliateRef = ref || affiliate_id;
     const utm_source = body.utm_source || null;
     const utm_medium = body.utm_medium || null;
     const utm_campaign = body.utm_campaign || null;

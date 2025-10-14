@@ -24,7 +24,18 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, brandId } = await req.json();
+    const body = await req.json();
+    const validationResult = messageSchema.safeParse(body);
+    
+    if (!validationResult.success) {
+      console.error("Validation error:", validationResult.error);
+      return new Response(
+        JSON.stringify({ error: "Invalid request format" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    const { messages, brandId } = validationResult.data;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
