@@ -1,48 +1,30 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
-import { Upload, X } from 'lucide-react';
+import { Upload, X, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
 interface FileUploaderProps {
-  onFileUploaded: (url: string, file: File) => Promise<void> | void;
+  onFileUploaded: (url: string, file: File) => void;
   acceptedTypes?: string[];
   maxSizeMB?: number;
-  onUploadStart?: () => void;
-  onUploadComplete?: () => void;
 }
 
-export function FileUploader({
-  onFileUploaded,
+export function FileUploader({ 
+  onFileUploaded, 
   acceptedTypes = ['image/jpeg', 'image/png', 'image/webp'],
-  maxSizeMB = 10,
-  onUploadStart,
-  onUploadComplete
+  maxSizeMB = 10
 }: FileUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<Array<{ file: File; preview: string }>>([]);
 
-  useEffect(() => {
-    return () => {
-      uploadedFiles.forEach(item => URL.revokeObjectURL(item.preview));
-    };
-  }, [uploadedFiles]);
-
   const uploadToStorage = async (file: File): Promise<string> => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random()}.${fileExt}`;
+    const filePath = `uploads/${fileName}`;
 
-    if (!user) {
-      throw new Error('Utilisateur non authentifié');
-    }
-
-    const fileExt = file.name.split('.').pop() || 'png';
-    const uniqueId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const filePath = `${user.id}/${uniqueId}.${fileExt}`;
-
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError, data } = await supabase.storage
       .from('chat-uploads')
       .upload(filePath, file, {
         cacheControl: '3600',
@@ -64,38 +46,39 @@ export function FileUploader({
     if (acceptedFiles.length === 0) return;
 
     setUploading(true);
-    onUploadStart?.();
-
+    
     try {
-      const [file] = acceptedFiles;
+      for (const file of acceptedFiles) {
+        // Check file size
+        if (file.size > maxSizeMB * 1024 * 1024) {
+          toast.error(`${file.name} dépasse ${maxSizeMB}Mo`);
+          continue;
+        }
 
-      if (file.size > maxSizeMB * 1024 * 1024) {
-        toast.error(`${file.name} dépasse ${maxSizeMB}Mo`);
-        return;
+        // Upload to storage
+        const url = await uploadToStorage(file);
+        
+        // Create preview
+        const preview = URL.createObjectURL(file);
+        setUploadedFiles(prev => [...prev, { file, preview }]);
+        
+        // Notify parent
+        onFileUploaded(url, file);
+        
+        toast.success(`${file.name} uploadé`);
       }
-
-      const url = await uploadToStorage(file);
-      const preview = URL.createObjectURL(file);
-
-      setUploadedFiles(prev => {
-        prev.forEach(item => URL.revokeObjectURL(item.preview));
-        return [{ file, preview }];
-      });
-
-      await onFileUploaded(url, file);
     } catch (error) {
       console.error('Upload error:', error);
       toast.error('Erreur lors de l\'upload');
     } finally {
       setUploading(false);
-      onUploadComplete?.();
     }
-  }, [maxSizeMB, onFileUploaded, onUploadStart, onUploadComplete]);
+  }, [maxSizeMB, onFileUploaded]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: acceptedTypes.reduce((acc, type) => ({ ...acc, [type]: [] }), {}),
-    multiple: false,
+    multiple: true,
     disabled: uploading
   });
 

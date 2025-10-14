@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Toolbar, GeneratorMode, RatioOption } from './Toolbar';
@@ -34,8 +34,6 @@ interface GeneratorCardProps {
   selectedDuration: 'short' | 'medium' | 'long';
   onDurationChange: (duration: 'short' | 'medium' | 'long') => void;
   onForceVideo: () => void;
-  dropzone?: ReactNode;
-  promptSuggestions?: Array<{ label: string; prompt: string }>;
 }
 
 export function GeneratorCard({
@@ -60,17 +58,10 @@ export function GeneratorCard({
   selectedDuration,
   onDurationChange,
   onForceVideo,
-  dropzone,
-  promptSuggestions,
 }: GeneratorCardProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleMagicFocus = () => {
-    textareaRef.current?.focus();
-  };
-
-  const handleSuggestion = (prompt: string) => {
-    onInputChange(prompt);
     textareaRef.current?.focus();
   };
 
@@ -110,33 +101,6 @@ export function GeneratorCard({
           )}
 
           <Toolbar mode={mode} onModeChange={onModeChange} ratio={ratio} onRatioChange={onRatioChange} />
-
-          {dropzone && (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              {dropzone}
-            </div>
-          )}
-
-          {promptSuggestions?.length ? (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase text-slate-500">Suggestions rapides</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {promptSuggestions.map((suggestion) => (
-                  <button
-                    key={suggestion.label}
-                    type="button"
-                    onClick={() => handleSuggestion(suggestion.prompt)}
-                    className={cn(
-                      'rounded-full border px-3 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2',
-                      'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
-                    )}
-                  >
-                    {suggestion.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
 
           {showVideoDurationChips && (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
