@@ -96,6 +96,16 @@ type AffiliateStats = {
   neededForMentor: number;
 };
 
+const DEFAULT_STATS: AffiliateStats = {
+  uniqueClicks: 0,
+  uniqueConversions: 0,
+  totalEarnings: 0,
+  payoutAvailable: 0,
+  conversionRate: 0,
+  activeRefs: 0,
+  neededForMentor: 3
+};
+
 type ActivityItem = {
   id: string;
   type: 'click' | 'conversion';
@@ -127,15 +137,7 @@ export default function Affiliate() {
   const [loading, setLoading] = useState(true);
   const [commissions, setCommissions] = useState<any[]>([]);
   const [directReferrals, setDirectReferrals] = useState<any[]>([]);
-  const [stats, setStats] = useState<AffiliateStats>({
-    uniqueClicks: 0,
-    uniqueConversions: 0,
-    totalEarnings: 0,
-    payoutAvailable: 0,
-    conversionRate: 0,
-    activeRefs: 0,
-    neededForMentor: 3
-  });
+  const [stats, setStats] = useState<AffiliateStats>(DEFAULT_STATS);
   const [chartRange, setChartRange] = useState<'7' | '30'>('7');
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [suffixDialogOpen, setSuffixDialogOpen] = useState(false);
@@ -145,16 +147,17 @@ export default function Affiliate() {
 
   useEffect(() => {
     loadAffiliateData();
-  }, [user]);
+  }, [user?.id]);
 
   const loadAffiliateData = async () => {
-    if (!user?.email) {
+    if (!user?.id) {
       setAffiliate(null);
       setLoading(false);
       return;
     }
 
     try {
+      setLoading(true);
       const { data: affiliateData, error: affiliateError } = await supabase
         .from('affiliates')
         .select('*')
@@ -166,6 +169,13 @@ export default function Affiliate() {
       }
 
       if (!affiliateData) {
+        setAffiliate(null);
+        setClicks([]);
+        setConversions([]);
+        setPayouts([]);
+        setCommissions([]);
+        setDirectReferrals([]);
+        setStats(DEFAULT_STATS);
         return;
       }
 
