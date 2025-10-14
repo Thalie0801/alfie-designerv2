@@ -8,9 +8,6 @@ import { useLibraryAssets } from '@/hooks/useLibraryAssets';
 import { AssetCard } from '@/components/library/AssetCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { VideoDiagnostic } from '@/components/VideoDiagnostic';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 export default function Library() {
@@ -123,50 +120,6 @@ export default function Library() {
     return days;
   };
 
-  const handleDebugGenerate = async () => {
-    if (!user?.id) {
-      toast.error('Vous devez être connecté.');
-      return;
-    }
-    const prompt = 'Golden retriever in a playful Halloween scene, cinematic';
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-video', {
-        body: { prompt, aspectRatio: '9:16' }
-      });
-      if (error || data?.error) {
-        const msg = (error as any)?.message || data?.error || 'Erreur inconnue';
-        toast.error(`Échec génération: ${msg}`);
-        return;
-      }
-      const predictionId = data?.id as string | undefined;
-      const provider = data?.provider as 'sora' | 'seededance' | 'kling' | undefined;
-      const jobId = data?.jobId as string | undefined;
-      const jobShortId = data?.jobShortId as string | undefined;
-
-      if (!predictionId || !provider || !jobId) {
-        toast.error('Réponse invalide du backend (identifiants manquants)');
-        return;
-      }
-      await supabase
-        .from('media_generations')
-        .insert({
-          user_id: user.id,
-          type: 'video',
-          engine: provider,
-          status: 'processing',
-          prompt,
-          woofs: 1,
-          output_url: '',
-          job_id: null, // HOTFIX: éviter tout cast UUID pendant la migration
-          metadata: { predictionId, provider, jobId, jobShortId }
-        });
-      toast.success(`Génération vidéo lancée (${provider})`);
-    } catch (e: any) {
-      console.error('Debug generate error:', e);
-      toast.error(e.message || 'Erreur lors du lancement');
-    }
-  };
-
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -216,23 +169,14 @@ export default function Library() {
           )}
 
           {activeTab === 'videos' && (
-            <>
-              <Button 
-                size="sm" 
-                variant="outline"
-                onClick={cleanupProcessingVideos}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Nettoyer les vidéos bloquées
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleDebugGenerate}
-              >
-                Génération vidéo (debug)
-              </Button>
-            </>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={cleanupProcessingVideos}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Nettoyer les vidéos bloquées
+            </Button>
           )}
 
           {selectedAssets.length > 0 && (
