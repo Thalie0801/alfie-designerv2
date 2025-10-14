@@ -9,4 +9,9 @@ export interface Brief {
   slides?: number;
   duration?: number;
   useBrandKit: true;
+  brandId: string;
+  tone?: string;
+  ambiance?: string;
+  constraints?: string;
+  presetId?: string;
 }

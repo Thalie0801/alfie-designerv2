@@ -8,38 +8,40 @@ interface ChatMessage {
   id: string;
   role: "assistant" | "user";
   content: string;
+  attachments?: ChatMessageAttachment[];
 }
 
-interface QuotaSnapshotItem {
-  label: string;
-  used: number;
-  limit: number;
-  color: string;
+interface ChatMessageAttachment {
+  id: string;
+  type: "image" | "video";
+  url: string;
+  provider?: string;
+  format?: string;
+  posterUrl?: string;
 }
 
 interface ChatGeneratorProps {
   brief: Brief;
   pendingPrompt?: string | null;
   onPromptConsumed?: () => void;
-  quotaSnapshot?: QuotaSnapshotItem[];
-  quotaStatusLabel?: string;
   brandName?: string;
-  quotaLoading?: boolean;
   chatApiUrl?: string;
   className?: string;
   hideQuickIdeas?: boolean;
-  hideQuota?: boolean;
   hideHeader?: boolean;
   resetToken?: number;
   onStreamingChange?: (streaming: boolean) => void;
 }
 
+const LOVABLE_HANDSHAKE_TEXT =
+  "Connexion à Lovable AI pour générer des images et vidéos…";
+
 const QUICK_IDEAS = [
+  "Idées visuelles",
   "Angles de carrousel",
   "Script vidéo 30s",
   "Variantes de CTA",
   "Légende + hashtags",
-  "Idées visuels",
 ];
 
 function createInitialMessages(): ChatMessage[] {
@@ -47,7 +49,9 @@ function createInitialMessages(): ChatMessage[] {
     {
       id: "assistant-intro",
       role: "assistant",
-      content: "Salut, je suis Alfie. Donne-moi ton idée visuelle et je te guide jusqu'au livrable idéal.",
+      content:
+        "Salut, je suis Alfie. Dis-moi ce que tu veux créer et je m’occupe du meilleur format.",
+      attachments: [],
     },
   ];
 }
@@ -59,48 +63,14 @@ function resolveId() {
   return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function resolveQuotaLabel(quota: QuotaSnapshotItem) {
-  const limit = Math.max(0, quota.limit);
-  const used = Math.max(0, quota.used);
-  if (limit <= 0) {
-    return `${used}`;
-  }
-  return `${used}/${limit}`;
-}
-
-function BrandQuotaRow({ quota }: { quota: QuotaSnapshotItem }) {
-  const limit = Math.max(1, quota.limit);
-  const used = Math.max(0, quota.used);
-  const percentage = Math.min(100, Math.round((used / limit) * 100));
-
-  return (
-    <div className={styles.quotaRow}>
-      <div className={styles.quotaRowHeader}>
-        <span>{quota.label}</span>
-        <span>{resolveQuotaLabel(quota)}</span>
-      </div>
-      <div className={styles.quotaTrack}>
-        <div
-          className={styles.quotaFill}
-          style={{ width: `${percentage}%`, background: quota.color }}
-        />
-      </div>
-    </div>
-  );
-}
-
 function ChatGenerator({
   brief,
   pendingPrompt,
   onPromptConsumed,
-  quotaSnapshot,
-  quotaStatusLabel,
   brandName,
-  quotaLoading,
   chatApiUrl,
   className,
   hideQuickIdeas = false,
-  hideQuota = false,
   hideHeader = false,
   resetToken,
   onStreamingChange,
@@ -158,11 +128,17 @@ function ChatGenerator({
 
   const upsertAssistantContent = useCallback((messageId: string, delta: string) => {
     setMessages((prev) =>
-      prev.map((message) =>
-        message.id === messageId
-          ? { ...message, content: `${message.content}${delta}` }
-          : message
-      )
+      prev.map((message) => {
+        if (message.id !== messageId) {
+          return message;
+        }
+
+        if (message.content === LOVABLE_HANDSHAKE_TEXT) {
+          return { ...message, content: delta };
+        }
+
+        return { ...message, content: `${message.content}${delta}` };
+      })
     );
   }, []);
 
@@ -171,6 +147,90 @@ function ChatGenerator({
       prev.map((message) => (message.id === messageId ? { ...message, content: text } : message))
     );
   }, []);
+
+  const appendAttachment = useCallback(
+    (messageId: string, attachment: ChatMessageAttachment) => {
+      setMessages((prev) =>
+        prev.map((message) => {
+          if (message.id !== messageId) {
+            return message;
+          }
+
+          const nextAttachments = Array.isArray(message.attachments)
+            ? [...message.attachments, attachment]
+            : [attachment];
+
+          return { ...message, attachments: nextAttachments };
+        })
+      );
+    },
+    []
+  );
+
+  const produceAsset = useCallback(
+    async (assistantId: string, userPrompt: string) => {
+      const deliverable = brief.deliverable;
+      if (deliverable !== "image" && deliverable !== "video") {
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/alfie/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt: userPrompt,
+            deliverable,
+            ratio: brief.ratio,
+            resolution: brief.resolution,
+            tone: brief.tone,
+            ambiance: brief.ambiance,
+            constraints: brief.constraints,
+            brandId: brief.brandId,
+            brandName,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || "Lovable ne répond pas");
+        }
+
+        const payload = (await response.json()) as {
+          assetUrl?: string;
+          type?: "image" | "video";
+          message?: string;
+          format?: string;
+          posterUrl?: string;
+          provider?: string;
+        };
+
+        if (payload.message && payload.message.trim().length > 0) {
+          upsertAssistantContent(assistantId, `\n\n${payload.message}`);
+        }
+
+        if (payload.assetUrl) {
+          appendAttachment(assistantId, {
+            id: resolveId(),
+            type: payload.type === "video" ? "video" : "image",
+            url: payload.assetUrl,
+            format: payload.format,
+            posterUrl: payload.posterUrl,
+            provider: payload.provider ?? "Lovable AI",
+          });
+        }
+      } catch (error) {
+        const fallbackMessage =
+          error instanceof Error
+            ? `\n\nJe n'ai pas pu générer le rendu Lovable : ${error.message}`
+            : "\n\nJe n'ai pas pu générer le rendu Lovable pour le moment.";
+        upsertAssistantContent(assistantId, fallbackMessage);
+      }
+    },
+    [appendAttachment, brandName, brief, upsertAssistantContent]
+  );
 
   const dispatchStreamingRequest = useCallback(
     async (updatedMessages: ChatMessage[], assistantId: string) => {
@@ -192,17 +252,46 @@ function ChatGenerator({
           throw new Error(errorText || "Réponse inattendue du serveur");
         }
 
-        if (!response.body) {
-          const payload = await response.text();
-          let assistantText = payload;
+        const contentType = response.headers.get("content-type") ?? "";
+        const defaultErrorMessage =
+          "Je ne parviens pas à contacter le service pour le moment. Peux-tu réessayer un peu plus tard ?";
+
+        if (!contentType.includes("text/event-stream") || !response.body) {
           try {
-            const parsed = JSON.parse(payload);
-            assistantText = parsed.message ?? parsed.delta ?? payload;
+            if (contentType.includes("application/json")) {
+              const payload = await response.json();
+              const assistantText =
+                typeof payload === "string"
+                  ? payload
+                  : payload?.message ?? payload?.delta ?? payload?.error ?? "";
+              pushAssistantFallback(
+                assistantId,
+                assistantText && `${assistantText}`.trim().length > 0
+                  ? assistantText
+                  : defaultErrorMessage
+              );
+              return;
+            }
+
+            const payload = await response.text();
+            const trimmedPayload = payload.trim();
+
+            if (/<!DOCTYPE|<html|<body/i.test(trimmedPayload)) {
+              console.error("Réponse inattendue du service Alfie", trimmedPayload.slice(0, 120));
+              pushAssistantFallback(assistantId, defaultErrorMessage);
+              return;
+            }
+
+            pushAssistantFallback(
+              assistantId,
+              trimmedPayload.length > 0 ? trimmedPayload : defaultErrorMessage
+            );
+            return;
           } catch (error) {
-            // ignore JSON parse errors, keep raw payload
+            console.error("Impossible de lire la réponse Alfie", error);
+            pushAssistantFallback(assistantId, defaultErrorMessage);
+            return;
           }
-          pushAssistantFallback(assistantId, assistantText);
-          return;
         }
 
         const reader = response.body.getReader();
@@ -287,7 +376,8 @@ function ChatGenerator({
       const assistantMessage: ChatMessage = {
         id: resolveId(),
         role: "assistant",
-        content: "",
+        content: LOVABLE_HANDSHAKE_TEXT,
+        attachments: [],
       };
 
       const baseMessages = messagesRef.current;
@@ -300,8 +390,9 @@ function ChatGenerator({
 
       const updatedMessages = [...baseMessages, userMessage];
       await dispatchStreamingRequest(updatedMessages, assistantMessage.id);
+      await produceAsset(assistantMessage.id, trimmed);
     },
-    [dispatchStreamingRequest, isStreaming]
+    [dispatchStreamingRequest, isStreaming, produceAsset]
   );
 
   const handleSubmit = useCallback(
@@ -312,13 +403,15 @@ function ChatGenerator({
     [inputValue, sendMessage]
   );
 
-  const handleQuickIdea = useCallback(
-    async (idea: string) => {
-      setInputValue(idea);
-      await sendMessage(idea);
-    },
-    [sendMessage]
-  );
+  const handleQuickIdea = useCallback((idea: string) => {
+    setInputValue((previous) => {
+      if (!previous || previous.trim().length === 0) {
+        return idea;
+      }
+      const separator = previous.endsWith(" ") ? "" : " ";
+      return `${previous}${separator}${idea}`;
+    });
+  }, []);
 
   useEffect(() => {
     if (pendingPrompt && pendingPrompt.trim().length > 0) {
@@ -333,22 +426,74 @@ function ChatGenerator({
     return "Alfie rédige en direct…";
   }, [isStreaming, streamingMessageId]);
 
+  const handleSaveBrief = useCallback(() => {
+    console.info("Brief enregistré", {
+      brandId: brief.brandId,
+      deliverable: brief.deliverable,
+      ratio: brief.ratio,
+    });
+  }, [brief.brandId, brief.deliverable, brief.ratio]);
+
   const renderMessageContent = useCallback(
     (message: ChatMessage) => {
-      if (message.role === "assistant" && message.id === streamingMessageId && isStreaming) {
-        if (message.content.trim().length === 0) {
-          return (
+      const isAssistant = message.role === "assistant";
+      const isTyping =
+        isAssistant && message.id === streamingMessageId && isStreaming && message.content.trim().length === 0;
+
+      const attachments = message.attachments ?? [];
+
+      return (
+        <div className={styles.messageContent}>
+          {isTyping ? (
             <span className={styles.typingDots} aria-live="polite" aria-label="Alfie écrit">
               <span />
               <span />
               <span />
             </span>
-          );
-        }
-      }
-      return message.content;
+          ) : message.content.trim().length > 0 ? (
+            <p className={styles.messageText}>{message.content}</p>
+          ) : null}
+
+          {attachments.length > 0 && (
+            <div className={styles.attachments}>
+              {attachments.map((attachment) => (
+                <figure key={attachment.id} className={styles.assetFrame} data-type={attachment.type}>
+                  {attachment.type === "image" ? (
+                    <img
+                      src={attachment.url}
+                      alt={
+                        attachment.format
+                          ? `Visuel généré (${attachment.format})`
+                          : "Visuel généré par Alfie"
+                      }
+                      className={styles.assetMedia}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <video
+                      className={styles.assetMedia}
+                      controls
+                      preload="metadata"
+                      poster={attachment.posterUrl}
+                    >
+                      <source src={attachment.url} />
+                      Votre navigateur ne peut pas lire cette vidéo.
+                    </video>
+                  )}
+                  <figcaption className={styles.assetMeta}>
+                    <span className={styles.assetBadge}>Lovable AI</span>
+                    <span className={styles.assetFormat}>{
+                      attachment.format ?? `${brief.ratio} — ${brief.resolution}`
+                    }</span>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          )}
+        </div>
+      );
     },
-    [isStreaming, streamingMessageId]
+    [brief.ratio, brief.resolution, isStreaming, streamingMessageId]
   );
 
   return (
@@ -357,61 +502,32 @@ function ChatGenerator({
         {!hideHeader && (
           <header className={styles.header}>
             <div className={styles.titleGroup}>
-              <div className={styles.chatTitle}>Alfie — Chat Generator</div>
+              <h2 id="creation-conversation" className={styles.chatTitle}>
+                Conversation de création
+              </h2>
               <p className={styles.chatSubtitle}>
-                Brief actif : {brief.deliverable === "carousel" ? `${brief.slides ?? 5} slides` : brief.deliverable === "video" ? `${brief.duration ?? 30}s` : "visuel unique"} · {brief.ratio} ({brief.resolution})
+                Brief actif : {brief.deliverable === "carousel"
+                  ? `${brief.slides ?? 5} slides`
+                  : brief.deliverable === "video"
+                  ? `${brief.duration ?? 30}s`
+                  : "visuel unique"}
+                {" · "}
+                {brief.ratio} ({brief.resolution})
               </p>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-              <span className={styles.statusBadge} data-streaming={isStreaming}>
-                {isStreaming ? "Génération…" : "IA active"}
-              </span>
+            <div className={styles.headerMeta}>
+              <div className={styles.headerBadges}>
+                <span className={styles.statusBadge} data-streaming={isStreaming}>
+                  {isStreaming ? "Génération…" : "IA active"}
+                </span>
+                <span className={styles.brandBadge}>Brand Kit appliqué — {brandName ?? "Marque"}</span>
+              </div>
               <button type="button" className={styles.resetButton} onClick={resetChat}>
-                Réinitialiser
+                Effacer le brief
               </button>
             </div>
           </header>
         )}
-
-        {!hideQuickIdeas && (
-          <section className={styles.quickIdeas} aria-label="Idées rapides">
-            <div className={styles.quickIdeasLabel}>Idées rapides</div>
-            <div className={styles.quickIdeasChips}>
-              {QUICK_IDEAS.map((idea) => (
-                <button
-                  key={idea}
-                  type="button"
-                  className={styles.quickChip}
-                  onClick={() => void handleQuickIdea(idea)}
-                >
-                  {idea}
-                </button>
-              ))}
-            </div>
-
-            {!hideQuota && (quotaLoading || (quotaSnapshot && quotaSnapshot.length > 0)) && (
-              <div className={styles.quotaPanel}>
-                <div className={styles.quotaPanelHeader}>
-                  <span>
-                    Quotas {brandName ? `— ${brandName}` : "marque"}
-                  </span>
-                  {quotaStatusLabel && <span className={styles.quotaStatus}>{quotaStatusLabel}</span>}
-                </div>
-
-                {quotaLoading && (!quotaSnapshot || quotaSnapshot.length === 0) ? (
-                  <p className={styles.quotaLoading}>Chargement des quotas…</p>
-                ) : (
-                  <div className={styles.quotaStack}>
-                    {(quotaSnapshot ?? []).map((quota) => (
-                      <BrandQuotaRow key={quota.label} quota={quota} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
-        )}
-
         <div className={styles.messagesArea}>
           <div ref={listRef} className={styles.messageList}>
             {messages.map((message) => (
@@ -427,6 +543,24 @@ function ChatGenerator({
           </div>
 
           <div className={styles.composerWrapper}>
+            {!hideQuickIdeas && (
+              <div className={styles.quickIdeas} aria-label="Inspiration rapide">
+                <span className={styles.quickIdeasLabel}>Inspiration rapide</span>
+                <div className={styles.quickIdeasChips}>
+                  {QUICK_IDEAS.map((idea) => (
+                    <button
+                      key={idea}
+                      type="button"
+                      className={styles.quickChip}
+                      onClick={() => handleQuickIdea(idea)}
+                    >
+                      {idea}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <form className={styles.composerShell} onSubmit={handleSubmit}>
               <textarea
                 className={styles.textarea}
@@ -435,9 +569,21 @@ function ChatGenerator({
                 onChange={(event) => setInputValue(event.target.value)}
                 disabled={isStreaming}
               />
-              <button type="submit" className={styles.sendButton} disabled={isStreaming || inputValue.trim().length === 0}>
-                {isStreaming ? "Génération…" : "Envoyer"}
-              </button>
+              <div className={styles.composerActions}>
+                <button
+                  type="submit"
+                  className={styles.primaryButton}
+                  disabled={isStreaming || inputValue.trim().length === 0}
+                >
+                  {isStreaming ? "Génération…" : "Générer"}
+                </button>
+                <button type="button" className={styles.secondaryButton} onClick={handleSaveBrief}>
+                  Enregistrer le brief
+                </button>
+                <a className={styles.libraryLink} href="/library">
+                  Ouvrir dans la Bibliothèque
+                </a>
+              </div>
             </form>
             {streamingLabel && <p className={styles.streamingIndicator}>{streamingLabel}</p>}
           </div>
