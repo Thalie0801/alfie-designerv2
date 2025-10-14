@@ -2,22 +2,11 @@
 import ChatGenerator from "@/components/ChatGenerator";
 import type { Brief } from "@/components/BriefExpress";
 
-export default function ChatCard({ brief }: { brief: Brief }) {
-  return (
-    <section>
-      <header style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,padding:"6px 8px 10px"}}>
-        <div>
-          <h2 style={{margin:0,fontSize:"1.1rem"}}>Alfie — Chat Generator</h2>
-          <small style={{color:"#667085"}}>
-            Brief actif : {brief.deliverable === "carousel" ? `carrousel ${brief.slides ?? 5} slides` : brief.deliverable === "video" ? `vidéo ${brief.duration ?? 30}s` : "visuel unique"}
-            {" · "}{brief.ratio} ({brief.resolution})
-          </small>
-        </div>
-        <a href="/quota" style={{border:"1px solid #e5e7eb",borderRadius:999,padding:"6px 10px",textDecoration:"none",color:"#2535a0",background:"rgba(64,87,255,.08)"}}>
-          Détail de mon quota
-        </a>
-      </header>
-      <ChatGenerator brief={brief} hideQuickIdeas hideQuota />
-    </section>
-  );
+interface ChatCardProps {
+  brief: Brief;
+  brandName: string;
+}
+
+export default function ChatCard({ brief, brandName }: ChatCardProps) {
+  return <ChatGenerator brief={brief} brandName={brandName} hideQuota />;
 }
