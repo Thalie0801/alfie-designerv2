@@ -34,6 +34,9 @@ interface ChatGeneratorProps {
   onStreamingChange?: (streaming: boolean) => void;
 }
 
+const LOVABLE_HANDSHAKE_TEXT =
+  "Connexion à Lovable AI pour générer des images et vidéos…";
+
 const QUICK_IDEAS = [
   "Idées visuelles",
   "Angles de carrousel",
@@ -159,11 +162,17 @@ function ChatGenerator({
 
   const upsertAssistantContent = useCallback((messageId: string, delta: string) => {
     setMessages((prev) =>
-      prev.map((message) =>
-        message.id === messageId
-          ? { ...message, content: `${message.content}${delta}` }
-          : message
-      )
+      prev.map((message) => {
+        if (message.id !== messageId) {
+          return message;
+        }
+
+        if (message.content === LOVABLE_HANDSHAKE_TEXT) {
+          return { ...message, content: delta };
+        }
+
+        return { ...message, content: `${message.content}${delta}` };
+      })
     );
   }, []);
 
@@ -317,7 +326,7 @@ function ChatGenerator({
       const assistantMessage: ChatMessage = {
         id: resolveId(),
         role: "assistant",
-        content: "",
+        content: LOVABLE_HANDSHAKE_TEXT,
       };
 
       const baseMessages = messagesRef.current;
