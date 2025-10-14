@@ -161,7 +161,7 @@ export default function Affiliate() {
       const { data: affiliateData, error: affiliateError } = await supabase
         .from('affiliates')
         .select('*')
-        .eq('id', user.id)
+        .eq('email', user.email)
         .maybeSingle();
 
       if (affiliateError) {
