@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useState, useRef, useEffect, useMemo, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { toast } from 'sonner';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { useAlfieCredits } from '@/hooks/useAlfieCredits';
@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { detectIntent, canHandleLocally, generateLocalResponse } from '@/utils/alfieIntentDetector';
 import { getQuotaStatus, consumeQuota, canGenerateVideo, checkQuotaAlert, formatExpirationMessage } from '@/utils/quotaManager';
 import { JobPlaceholder, JobStatus } from '@/components/chat/JobPlaceholder';
+import { FileUploader } from '@/components/chat/FileUploader';
 import { CreateHeader } from '@/components/create/CreateHeader';
 import { GeneratorCard } from '@/components/create/GeneratorCard';
 import { ChatBubble } from '@/components/create/ChatBubble';
@@ -80,6 +81,28 @@ export function AlfieChat() {
     quota,
     quotaPercentage
   } = useAlfieOptimizations();
+
+  const promptSuggestions = useMemo(
+    () => [
+      {
+        label: 'Annonce produit',
+        prompt: "Crée un visuel hero LinkedIn pour annoncer le lancement d'un nouveau service SaaS, ton enthousiaste et moderne."
+      },
+      {
+        label: 'Carousel éducatif',
+        prompt: "Imagine un carousel 1080x1350 en 5 slides pour expliquer une astuce marketing avec un ton pédagogique." 
+      },
+      {
+        label: 'Stat insight',
+        prompt: "Génère un visuel insight carré avec une statistique marquante sur l'industrie, style data-driven minimaliste."
+      },
+      {
+        label: 'Script Reel',
+        prompt: "Écris un script de reel 30s sur les coulisses d'une équipe créative, avec accroche, plan par plan et CTA final."
+      }
+    ],
+    []
+  );
 
   useEffect(() => {
     const init = async () => {
@@ -166,46 +189,22 @@ export function AlfieChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, generationStatus]);
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Vérifier le type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Seules les images sont acceptées');
-      return;
+  const getCurrentUserId = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('Non authentifié');
     }
+    return user.id;
+  };
 
-    // Vérifier la taille (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image trop volumineuse (max 5MB)');
-      return;
-    }
-
-    setUploadingImage(true);
+  const registerUploadedImage = async (publicUrl: string, userId?: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Non authentifié');
-
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-
-      const { data, error } = await supabase.storage
-        .from('chat-uploads')
-        .upload(fileName, file);
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('chat-uploads')
-        .getPublicUrl(fileName);
-
+      const resolvedUserId = userId ?? (await getCurrentUserId());
       setUploadedImage(publicUrl);
-      
-      // Indexer l'image uploadée comme "source" (non comptée dans les quotas)
+
       try {
         await supabase.from('media_generations').insert({
-          user_id: user.id,
+          user_id: resolvedUserId,
           type: 'image',
           prompt: 'Upload source depuis le chat',
           output_url: publicUrl,
@@ -218,11 +217,54 @@ export function AlfieChat() {
       }
 
       toast.success('Image ajoutée ! 📸');
-    } catch (error: any) {
+    } catch (error) {
+      console.error('Register uploaded image error:', error);
+      toast.error("Impossible d'enregistrer l'image");
+    }
+  };
+
+  const uploadImageFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Seules les images sont acceptées');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image trop volumineuse (max 5MB)');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const userId = await getCurrentUserId();
+      const fileExt = file.name.split('.').pop() || 'png';
+      const fileName = `${userId}/${Date.now()}.${fileExt}`;
+
+      const { error } = await supabase.storage
+        .from('chat-uploads')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat-uploads')
+        .getPublicUrl(fileName);
+
+      await registerUploadedImage(publicUrl, userId);
+    } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Erreur lors de l\'upload');
+      toast.error("Erreur lors de l'upload");
     } finally {
       setUploadingImage(false);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      await uploadImageFile(file);
+    } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -1030,6 +1072,26 @@ export function AlfieChat() {
       }
     : null;
 
+  const uploadDropzone = !uploadedImage
+    ? (
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-slate-700">Importer une image de référence</p>
+            <p className="text-xs text-slate-500">Glisse-dépose ou clique pour ajouter un PNG, JPG ou WebP (max 5MB).</p>
+          </div>
+          <FileUploader
+            maxSizeMB={5}
+            onUploadStart={() => setUploadingImage(true)}
+            onUploadComplete={() => setUploadingImage(false)}
+            onFileUploaded={async (url) => {
+              await registerUploadedImage(url);
+            }}
+          />
+          <p className="text-xs text-slate-400">💡 L'image sera utilisée comme source pour la prochaine génération.</p>
+        </div>
+      )
+    : null;
+
   return (
     <div className="flex min-h-[calc(100vh-4rem)] flex-col bg-slate-50">
       <CreateHeader />
@@ -1064,6 +1126,8 @@ export function AlfieChat() {
             selectedDuration={selectedDuration}
             onDurationChange={(duration) => setSelectedDuration(duration)}
             onForceVideo={() => handleSend({ forceVideo: true })}
+            dropzone={uploadDropzone}
+            promptSuggestions={promptSuggestions}
           />
           <section className="flex flex-col gap-4 pb-10">
             {messages.map((message, index) => {
