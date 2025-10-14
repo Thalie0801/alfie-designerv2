@@ -1,0 +1,67 @@
+name: Refonte Codex (push→pull, disable autopublish)
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [ "refonte-alfie-2025" ]
+
+# Permet au job de pusher des commits sur le dépôt
+permissions:
+  contents: write
+
+jobs:
+  codex:
+    # Évite une boucle CI si le commit précédent a été créé par ce job
+    if: ${{ github.event_name != 'push' || (!startsWith(github.event.head_commit.message, 'Codex:') && !contains(github.event.head_commit.message, '[skip ci]')) }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # nécessaire pour diff HEAD^..HEAD
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Force public npm registry
+        shell: bash
+        run: npm config set registry https://registry.npmjs.org/
+
+      # Vérifie que le commit pushé ne touche pas la landing (apps/landing|www/|site/)
+      # On vérifie le diff du commit (HEAD^..HEAD), pas le working tree
+      - name: "Guard: No landing changes"
+        shell: bash
+        run: |
+          set -eo pipefail
+          # Si la branche n'a qu'un seul commit, on ne peut pas diff HEAD^..HEAD
+          if [ "$(git rev-list --count HEAD)" -le 1 ]; then
+            echo "Branche avec un seul commit: guard ignoré."
+            exit 0
+          fi
+
+          git fetch --depth=2
+          if git diff --name-only HEAD^ HEAD | grep -E '^(apps/landing|www/|site/)' ; then
+            echo "::error title=Landing modifiée::Ce patch ne doit pas toucher la landing."
+            exit 1
+          fi
+
+      - name: Run Codex
+        shell: bash
+        run: |
+          bash scripts/codex/run.sh
+
+      - name: Commit & Push (if changes)
+        shell: bash
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "alfie-codex-bot"
+            git config user.email "codex@alfie.local"
+            git add -A
+            git commit -m "Codex: push→pull, autopublish off, premium confirmation flag [skip ci]"
+            git push
+          else
+            echo "Pas de changements à pousser."
+          fi

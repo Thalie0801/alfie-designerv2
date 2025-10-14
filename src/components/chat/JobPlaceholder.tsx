@@ -4,18 +4,31 @@ import { Button } from '@/components/ui/button';
 import { Loader2, X, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
-export type JobStatus = 'queued' | 'running' | 'checking' | 'ready' | 'failed' | 'canceled';
+export type JobStatus =
+  | 'queued'
+  | 'running'
+  | 'processing'
+  | 'checking'
+  | 'ready'
+  | 'completed'
+  | 'failed'
+  | 'canceled';
 
 interface JobPlaceholderProps {
   jobId: string;
-  shortId: string;
+  shortId?: string;
   status: JobStatus;
   progress?: number;
   type: 'image' | 'video';
   onCancel?: () => void;
 }
 
-const statusConfig = {
+const statusConfig: Record<JobStatus, {
+  icon: typeof Loader2;
+  label: string;
+  color: string;
+  bgColor: string;
+}> = {
   queued: {
     icon: Clock,
     label: 'En file',
@@ -28,6 +41,12 @@ const statusConfig = {
     color: 'text-blue-500',
     bgColor: 'bg-blue-50 dark:bg-blue-950'
   },
+  processing: {
+    icon: Loader2,
+    label: 'En génération',
+    color: 'text-blue-500',
+    bgColor: 'bg-blue-50 dark:bg-blue-950'
+  },
   checking: {
     icon: Loader2,
     label: 'Vérification',
@@ -35,6 +54,12 @@ const statusConfig = {
     bgColor: 'bg-purple-50 dark:bg-purple-950'
   },
   ready: {
+    icon: CheckCircle2,
+    label: 'Prête',
+    color: 'text-green-500',
+    bgColor: 'bg-green-50 dark:bg-green-950'
+  },
+  completed: {
     icon: CheckCircle2,
     label: 'Prête',
     color: 'text-green-500',
@@ -54,18 +79,19 @@ const statusConfig = {
   }
 };
 
-export function JobPlaceholder({ 
-  jobId, 
-  shortId, 
-  status, 
+export function JobPlaceholder({
+  jobId,
+  shortId,
+  status,
   progress = 0,
   type,
-  onCancel 
+  onCancel
 }: JobPlaceholderProps) {
   const config = statusConfig[status];
   const Icon = config.icon;
-  const isActive = status === 'running' || status === 'checking';
-  const canCancel = status === 'queued' || status === 'running';
+  const isActive = status === 'running' || status === 'processing' || status === 'checking';
+  const canCancel = status === 'queued' || status === 'running' || status === 'processing';
+  const displayShortId = shortId || `${jobId.slice(0, 4).toUpperCase()}…${jobId.slice(-4).toUpperCase()}`;
 
   return (
     <Card className={`${config.bgColor} border-2`}>
@@ -78,7 +104,7 @@ export function JobPlaceholder({
             {type === 'video' ? 'Vidéo' : 'Image'} en cours…
           </CardTitle>
           <Badge variant="outline" className="text-xs">
-            {shortId}
+            {displayShortId}
           </Badge>
         </div>
       </CardHeader>
@@ -103,7 +129,7 @@ export function JobPlaceholder({
         )}
 
         {/* Long running message */}
-        {status === 'running' && progress === 0 && (
+        {(status === 'running' || status === 'processing') && progress === 0 && (
           <p className="text-xs text-muted-foreground">
             ⏳ Génération en cours, cela peut prendre quelques minutes...
           </p>

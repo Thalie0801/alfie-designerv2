@@ -18,6 +18,7 @@ export interface LibraryAsset {
   brand_id?: string;
   status?: string;
   metadata?: any;
+  job_id?: string;
 }
 
 export function useLibraryAssets(userId: string | undefined, type: 'images' | 'videos') {
@@ -50,10 +51,11 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
         for (const a of processing) {
           const genId = a.metadata?.predictionId || a.metadata?.id;
           const provider = a.engine || a.metadata?.provider || 'sora';
+          const jobId = a.job_id || a.metadata?.jobId;
           if (!genId) continue;
           try {
             const { data: statusData, error: statusError } = await supabase.functions.invoke('generate-video', {
-              body: { generationId: genId, provider }
+              body: { generationId: genId, provider, jobId }
             });
             if (!statusError && statusData?.status === 'succeeded') {
               const videoUrl = Array.isArray(statusData.output) ? statusData.output[0] : statusData.output;

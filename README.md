@@ -60,6 +60,17 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Refonte V1 runbook (PULL only)
+
+The refonte branch ships a locked-down delivery flow: Canva link + ZIP, no autopublish, quotas unchanged, and 30-day retention.
+
+- `make codex` runs the codemod that rewrites any lingering push/publish flows to the PULL delivery endpoint while skipping the landing page guardrails.
+- `make validate` calls `scripts/validate_refonte.sh` to ensure no "push Canva" or autopublish traces slip through the diff.
+- `make cleanup` triggers the 30-day retention cleanup script used in production cronjobs.
+- `make test` executes the codemod Jest suite (uses `npm test --scripts-prepend-node-path`).
+
+For backend integrations, see [`examples/api/express/counters.ts`](examples/api/express/counters.ts) for the `/v1/counters` handler that returns usage totals and 80% alerts, and consult the refonte docs in [`docs/REFONTE-2025`](docs/REFONTE-2025) for acceptance checklists.
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/b6ceafb7-5b2f-483f-b988-77dd6e3f8f0e) and click on Share -> Publish.
@@ -71,3 +82,24 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## Debugging the video job hotfix locally
+
+While the database migration from UUID to text identifiers is in progress, the app writes
+`job_id: null` for new video generations. If you need to verify that your local environment is
+clean and can still build successfully, run the quick checks below:
+
+```sh
+# Ensure no merge-conflict markers remain in the tracked files
+git grep -n '<<<<<<<\|=======\|>>>>>>>' -- . ':!package-lock.json'
+
+# Install dependencies from package-lock for a deterministic build
+npm ci
+
+# Reproduce the Lovable build to catch any runtime or type errors
+npm run build
+```
+
+The build should complete without reporting TypeScript or runtime errors. If you do see the
+database still forcing UUID casts, keep the hotfix in place until the schema migration is fully
+rolled out (all `job_id` columns converted to `TEXT` and no triggers re-casting values).
