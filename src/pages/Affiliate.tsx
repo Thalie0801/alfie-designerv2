@@ -1,34 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import {
-  Copy,
-  DollarSign,
-  MousePointerClick,
-  TrendingUp,
-  Users,
-  Award,
-  Target,
-  Crown,
-  Share2,
-  Edit3,
-  CalendarClock,
-  HelpCircle,
-  ArrowUpRight,
-  Globe,
-  MonitorSmartphone
-} from 'lucide-react';
-import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 import {
   Tooltip,
@@ -54,37 +27,40 @@ import {
   TableRow
 } from '@/components/ui/table';
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from '@/components/ui/card';
+import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent
 } from '@/components/ui/chart';
 import { Line, LineChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { eachDayOfInterval, format, isSameDay, subDays } from 'date-fns';
-
-const KPI_TOOLTIPS = {
-  clicks: 'Clics uniques suivis via cookie 1er parti (fenêtre 30 jours).',
-  conversions: 'Conversions uniques validées : abonnés payants sans remboursement.',
-  earnings: 'Somme des commissions validées (hors remboursements).',
-  payout: 'Montant disponible pour payout : gains validés – paiements versés – retenues.'
-} satisfies Record<'clicks' | 'conversions' | 'earnings' | 'payout', string>;
-
-const RATE_BY_LEVEL: Record<number, number> = {
-  1: 15,
-  2: 5,
-  3: 2
-};
-
-const chartConfig = {
-  clicks: {
-    label: 'Clics',
-    color: '#2563eb'
-  },
-  conversions: {
-    label: 'Conversions',
-    color: '#16a34a'
-  }
-} as const;
+import {
+  Copy,
+  DollarSign,
+  MousePointerClick,
+  TrendingUp,
+  Users,
+  Award,
+  Target,
+  Crown,
+  Share2,
+  Edit3,
+  CalendarClock,
+  HelpCircle,
+  ArrowUpRight,
+  Globe,
+  MonitorSmartphone
+} from 'lucide-react';
 
 type AffiliateStats = {
   uniqueClicks: number;
@@ -114,6 +90,20 @@ type ActivityItem = {
   device?: string | null;
 };
 
+const KPI_TOOLTIPS = {
+  clicks: 'Clics uniques suivis via cookie 1er parti (fenêtre 30 jours).',
+  conversions: 'Conversions uniques validées : abonnés payants sans remboursement.',
+  earnings: 'Somme des commissions validées (hors remboursements).',
+  payout: 'Montant disponible pour payout : gains validés – paiements versés – retenues.'
+} satisfies Record<'clicks' | 'conversions' | 'earnings' | 'payout', string>;
+
+const RATE_BY_LEVEL: Record<number, number> = { 1: 15, 2: 5, 3: 2 };
+
+const chartConfig = {
+  clicks: { label: 'Clics', color: '#2563eb' },
+  conversions: { label: 'Conversions', color: '#16a34a' }
+} as const;
+
 const SUCCESS_MESSAGES: Record<string, string> = {
   mentor: 'Bravo — Mentor débloqué !',
   leader: 'Exceptionnel — Ambassadeur confirmé !'
@@ -130,15 +120,18 @@ const sanitizeSuffix = (value: string) => {
 
 export default function Affiliate() {
   const { user } = useAuth();
+
   const [affiliate, setAffiliate] = useState<any>(null);
   const [clicks, setClicks] = useState<any[]>([]);
   const [conversions, setConversions] = useState<any[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [commissions, setCommissions] = useState<any[]>([]);
   const [directReferrals, setDirectReferrals] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [stats, setStats] = useState<AffiliateStats>(DEFAULT_STATS);
   const [chartRange, setChartRange] = useState<'7' | '30'>('7');
+
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [suffixDialogOpen, setSuffixDialogOpen] = useState(false);
   const [customSuffix, setCustomSuffix] = useState('');
@@ -147,7 +140,12 @@ export default function Affiliate() {
 
   useEffect(() => {
     loadAffiliateData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  useEffect(() => {
+    if (suffixDialogOpen) setSuffixDraft(customSuffix);
+  }, [suffixDialogOpen, customSuffix]);
 
   const loadAffiliateData = async () => {
     if (!user?.id) {
@@ -156,13 +154,15 @@ export default function Affiliate() {
       return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
+      // Affiliate
       const { data: affiliateData, error: affiliateError } = await supabase
         .from('affiliates')
         .select('*')
         .eq('email', user.email)
         .maybeSingle();
+      if (affiliateError) throw affiliateError;
 
       if (affiliateError) {
         throw affiliateError;
@@ -182,6 +182,7 @@ export default function Affiliate() {
       setAffiliate(affiliateData);
       setCustomSuffix(affiliateData.code || affiliateData.custom_suffix || affiliateData.id);
 
+      // Clicks
       const { data: clicksData } = await supabase
         .from('affiliate_clicks')
         .select('*')
@@ -189,24 +190,28 @@ export default function Affiliate() {
         .order('created_at', { ascending: false })
         .limit(200);
 
+      // Conversions
       const { data: conversionsData } = await supabase
         .from('affiliate_conversions')
         .select('*')
         .eq('affiliate_id', affiliateData.id)
         .order('created_at', { ascending: false });
 
+      // Payouts
       const { data: payoutsData } = await supabase
         .from('affiliate_payouts')
         .select('*')
         .eq('affiliate_id', affiliateData.id)
         .order('created_at', { ascending: false });
 
+      // Commissions
       const { data: commissionsData } = await supabase
         .from('affiliate_commissions')
         .select('*')
         .eq('affiliate_id', affiliateData.id)
         .order('created_at', { ascending: false });
 
+      // Direct referrals
       const { data: referralsData } = await supabase
         .from('affiliates')
         .select('id, name, email, created_at, affiliate_status, active_direct_referrals')
@@ -218,25 +223,24 @@ export default function Affiliate() {
       setCommissions(commissionsData || []);
       setDirectReferrals(referralsData || []);
 
+      // Metrics
       const uniqueClickSessions = new Set(
-        (clicksData || []).map((click: any) => click.session_id || click.id)
+        (clicksData || []).map((c: any) => c.session_id || c.id)
       );
       const uniqueConversionCustomers = new Set(
-        (conversionsData || []).map((conversion: any) => conversion.customer_id || conversion.id)
+        (conversionsData || []).map((cv: any) => cv.customer_id || cv.id)
       );
 
       const validatedCommissions = (commissionsData || []).filter((commission: any) =>
         ['validated', 'paid', 'completed', 'complete'].includes(commission.status)
       );
-
       const totalValidated = validatedCommissions.reduce(
-        (sum: number, commission: any) => sum + Number(commission.amount || 0),
+        (sum: number, c: any) => sum + Number(c.amount || 0),
         0
       );
-
       const paidOut = (payoutsData || [])
-        .filter((payout: any) => payout.status === 'paid')
-        .reduce((sum: number, payout: any) => sum + Number(payout.amount || 0), 0);
+        .filter((p: any) => p.status === 'paid')
+        .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
 
       const retainedAmount = Number(
         affiliateData.retained_amount ??
@@ -269,11 +273,15 @@ export default function Affiliate() {
     }
   };
 
-  useEffect(() => {
-    if (suffixDialogOpen) {
-      setSuffixDraft(customSuffix);
-    }
-  }, [suffixDialogOpen, customSuffix]);
+  const affiliateCode = (customSuffix || affiliate?.code || affiliate?.id || '').toString();
+  const origin =
+    typeof window !== 'undefined' ? window.location.origin : 'https://app.alfie.ai';
+  const baseLink = affiliateCode ? `${origin}?ref=${affiliateCode}` : origin;
+  const utmParams = `utm_source=affiliate&utm_campaign=mlm&aff=${affiliateCode}`;
+  const affiliateLink = `${baseLink}&${utmParams}`;
+  const qrLink = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
+    affiliateLink
+  )}`;
 
   const copyAffiliateLink = (link: string) => {
     navigator.clipboard.writeText(link);
@@ -288,8 +296,8 @@ export default function Affiliate() {
           text: "Rejoins Alfie Designer avec mon lien d'affiliation",
           url: link
         });
-      } catch (error) {
-        if ((error as Error).name !== 'AbortError') {
+      } catch (error: any) {
+        if (error?.name !== 'AbortError') {
           toast.error('Partage annulé ou indisponible');
         }
       }
@@ -300,24 +308,18 @@ export default function Affiliate() {
 
   const handleSaveSuffix = async () => {
     if (!affiliate) return;
-
     const sanitized = sanitizeSuffix(suffixDraft);
-
     if (!sanitized) {
       toast.error('Choisissez un suffixe avec des lettres, chiffres ou tirets.');
       return;
     }
-
     setSavingSuffix(true);
     try {
       const { error } = await supabase
         .from('affiliates')
         .update({ code: sanitized })
         .eq('id', affiliate.id);
-
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       setAffiliate({ ...affiliate, code: sanitized });
       setCustomSuffix(sanitized);
@@ -330,28 +332,6 @@ export default function Affiliate() {
       setSavingSuffix(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-muted-foreground">Chargement...</p>
-      </div>
-    );
-  }
-
-  if (!affiliate) {
-    return (
-      <div className="max-w-2xl mx-auto text-center py-12">
-        <h1 className="text-2xl font-bold mb-4">Programme MLM Alfie Designer</h1>
-        <p className="text-muted-foreground mb-6">
-          Votre compte affilié a été créé automatiquement ! Partagez votre lien et gagnez jusqu'à 3 niveaux de commissions.
-        </p>
-        <Button onClick={loadAffiliateData} className="gradient-hero text-white">
-          Actualiser
-        </Button>
-      </div>
-    );
-  }
 
   const getStatusInfo = (status: string) => {
     switch (status) {
@@ -379,53 +359,34 @@ export default function Affiliate() {
     }
   };
 
-  const statusInfo = getStatusInfo(affiliate.affiliate_status);
+  const statusInfo = getStatusInfo(affiliate?.affiliate_status || 'creator');
   const StatusIcon = statusInfo.icon;
 
-  const nextStatus = {
-    current: stats.activeRefs,
-    target: 3,
-    next: 'Mentor'
-  };
+  const nextStatus =
+    affiliate?.affiliate_status === 'creator'
+      ? { current: stats.activeRefs, target: 3, next: 'Mentor' }
+      : affiliate?.affiliate_status === 'mentor'
+      ? { current: stats.activeRefs, target: 5, next: 'Ambassadeur' }
+      : null;
 
-  const mentorDeadlineRaw = affiliate.mentor_deadline || affiliate.challenge_deadline;
+  const mentorDeadlineRaw = affiliate?.mentor_deadline || affiliate?.challenge_deadline;
   const mentorDeadlineDate = mentorDeadlineRaw ? new Date(mentorDeadlineRaw) : null;
-  const hasMentorDeadline = mentorDeadlineDate && !Number.isNaN(mentorDeadlineDate.getTime());
-
-  const affiliateCode = customSuffix || affiliate.code || affiliate.id;
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://app.alfie.ai';
-  const baseLink = `${origin}?ref=${affiliateCode}`;
-  const utmParams = `utm_source=affiliate&utm_campaign=mlm&aff=${affiliateCode}`;
-  const affiliateLink = `${baseLink}&${utmParams}`;
-  const qrLink = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
-    affiliateLink
-  )}`;
-
-  const canViewFinancials = affiliate.user_id
-    ? affiliate.user_id === user?.id
-    : affiliate.id === user?.id;
-
-  const formatAmount = (value: number) => `${value.toFixed(2)}€`;
-  const displayAmount = (value: number) => (canViewFinancials ? formatAmount(value) : '•••');
+  const hasMentorDeadline =
+    mentorDeadlineDate && !Number.isNaN(mentorDeadlineDate.getTime());
 
   const levelSummaries = useMemo(() => {
     return [1, 2, 3].map((level) => {
       const earnings = (commissions || [])
-        .filter((commission) => Number(commission.level) === level)
-        .filter((commission) => ['validated', 'paid', 'completed', 'complete'].includes(commission.status))
-        .reduce((sum: number, commission: any) => sum + Number(commission.amount || 0), 0);
+        .filter((c) => Number(c.level) === level)
+        .filter((c) => ['validated', 'paid', 'completed', 'complete'].includes(c.status))
+        .reduce((sum: number, c: any) => sum + Number(c.amount || 0), 0);
 
       const activeCount = (conversions || [])
-        .filter((conversion) => Number(conversion.level) === level)
-        .filter((conversion) => ['active', 'validated', 'paid'].includes(conversion.status))
-        .reduce((sum: number) => sum + 1, 0);
+        .filter((cv) => Number(cv.level) === level)
+        .filter((cv) => ['active', 'validated', 'paid'].includes(cv.status))
+        .length;
 
-      return {
-        level,
-        earnings,
-        activeCount,
-        rate: RATE_BY_LEVEL[level] || 0
-      };
+      return { level, earnings, activeCount, rate: RATE_BY_LEVEL[level] || 0 };
     });
   }, [commissions, conversions]);
 
@@ -436,13 +397,12 @@ export default function Affiliate() {
     const days = eachDayOfInterval({ start, end });
 
     return days.map((day) => {
-      const dayClicks = (clicks || []).filter((click) =>
-        click.created_at ? isSameDay(new Date(click.created_at), day) : false
+      const dayClicks = (clicks || []).filter((c) =>
+        c.created_at ? isSameDay(new Date(c.created_at), day) : false
       );
-      const dayConversions = (conversions || []).filter((conversion) =>
-        conversion.created_at ? isSameDay(new Date(conversion.created_at), day) : false
+      const dayConversions = (conversions || []).filter((cv) =>
+        cv.created_at ? isSameDay(new Date(cv.created_at), day) : false
       );
-
       return {
         date: format(day, 'yyyy-MM-dd'),
         label: format(day, 'dd MMM'),
@@ -460,7 +420,6 @@ export default function Affiliate() {
       country: click.country || click.geo_country || click.location,
       device: click.device || click.user_agent || click.platform
     }));
-
     const conversionItems = (conversions || []).map((conversion) => ({
       id: `conversion-${conversion.id}`,
       type: 'conversion' as const,
@@ -468,18 +427,42 @@ export default function Affiliate() {
       country: conversion.country || conversion.customer_country,
       device: conversion.device || conversion.source
     }));
-
     return [...clickItems, ...conversionItems]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 12);
   }, [clicks, conversions]);
 
   const zeroClicks = stats.uniqueClicks === 0;
+  const successMessage = SUCCESS_MESSAGES[affiliate?.affiliate_status || ''] as
+    | string
+    | undefined;
 
-  const successMessage = SUCCESS_MESSAGES[affiliate.affiliate_status];
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <p className="text-muted-foreground">Chargement...</p>
+      </div>
+    );
+  }
+
+  if (!affiliate) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-12">
+        <h1 className="text-2xl font-bold mb-4">Programme MLM Alfie Designer</h1>
+        <p className="text-muted-foreground mb-6">
+          Votre compte affilié a été créé automatiquement ! Partagez votre lien et
+          gagnez jusqu'à 3 niveaux de commissions.
+        </p>
+        <Button onClick={loadAffiliateData} className="gradient-hero text-white">
+          Actualiser
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-3xl font-bold mb-2">Programme MLM Alfie Designer</h1>
@@ -505,38 +488,45 @@ export default function Affiliate() {
         </div>
       )}
 
-      <Card className="border-primary/20 shadow-medium">
-        <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              Progression vers Mentor
-            </CardTitle>
-            <CardDescription>
-              {nextStatus.current} / {nextStatus.target} filleuls actifs
-              {hasMentorDeadline && mentorDeadlineDate && (
-                <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-orange-600 dark:text-orange-400">
-                  <CalendarClock className="h-3 w-3" />
-                  Challenge jusqu'au {format(mentorDeadlineDate, 'dd MMM yyyy')}
-                </span>
-              )}
-            </CardDescription>
-          </div>
-          <Button onClick={() => setShareDialogOpen(true)} className="gap-2">
-            <Share2 className="h-4 w-4" />
-            Inviter
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Progress value={(nextStatus.current / nextStatus.target) * 100} className="h-3" />
-          <p className="text-sm text-muted-foreground">
-            {stats.neededForMentor > 0
-              ? `Encore ${stats.neededForMentor} filleul(s) actif(s) pour débloquer le statut Mentor.`
-              : 'Objectif Mentor atteint — continuez pour viser Ambassadeur !'}
-          </p>
-        </CardContent>
-      </Card>
+      {/* Progress */}
+      {nextStatus && (
+        <Card className="border-primary/20 shadow-medium">
+          <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-primary" />
+                Progression vers {nextStatus.next}
+              </CardTitle>
+              <CardDescription>
+                {nextStatus.current} / {nextStatus.target} filleuls actifs
+                {hasMentorDeadline && mentorDeadlineDate && (
+                  <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-orange-600 dark:text-orange-400">
+                    <CalendarClock className="h-3 w-3" />
+                    Challenge jusqu'au {format(mentorDeadlineDate, 'dd MMM yyyy')}
+                  </span>
+                )}
+              </CardDescription>
+            </div>
+            <Button onClick={() => setShareDialogOpen(true)} className="gap-2">
+              <Share2 className="h-4 w-4" />
+              Inviter
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Progress
+              value={(nextStatus.current / nextStatus.target) * 100}
+              className="h-3"
+            />
+            <p className="text-sm text-muted-foreground">
+              {stats.neededForMentor > 0
+                ? `Encore ${stats.neededForMentor} filleul(s) actif(s) pour débloquer le statut Mentor.`
+                : 'Objectif Mentor atteint — continuez pour viser Ambassadeur !'}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
+      {/* Zero clicks helper */}
       {zeroClicks && (
         <Card className="border-dashed border-primary/30 bg-primary/5">
           <CardContent className="py-6">
@@ -544,7 +534,8 @@ export default function Affiliate() {
               <MousePointerClick className="h-10 w-10 text-primary" />
               <h3 className="text-lg font-semibold">Partage ton lien pour démarrer</h3>
               <p className="text-sm text-muted-foreground max-w-xl">
-                Aucun clic détecté pour l'instant. Active ton réseau en partageant le lien d'affiliation et en guidant tes prospects.
+                Aucun clic détecté pour l'instant. Active ton réseau en partageant le
+                lien d'affiliation et en guidant tes prospects.
               </p>
               <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• Publie ton lien sur tes réseaux sociaux clés</li>
@@ -556,6 +547,7 @@ export default function Affiliate() {
         </Card>
       )}
 
+      {/* KPIs */}
       <TooltipProvider>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Tooltip>
@@ -566,7 +558,9 @@ export default function Affiliate() {
                   <MousePointerClick className="h-5 w-5 text-blue-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-blue-600">{stats.uniqueClicks}</div>
+                  <div className="text-3xl font-bold text-blue-600">
+                    {stats.uniqueClicks}
+                  </div>
                 </CardContent>
               </Card>
             </TooltipTrigger>
@@ -581,7 +575,9 @@ export default function Affiliate() {
                   <TrendingUp className="h-5 w-5 text-green-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-green-600">{stats.uniqueConversions}</div>
+                  <div className="text-3xl font-bold text-green-600">
+                    {stats.uniqueConversions}
+                  </div>
                   {stats.uniqueClicks > 0 && (
                     <p className="text-xs text-muted-foreground mt-1">
                       {stats.conversionRate.toFixed(1)}% taux
@@ -601,7 +597,13 @@ export default function Affiliate() {
                   <DollarSign className="h-5 w-5 text-purple-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-purple-600">{displayAmount(stats.totalEarnings)}</div>
+                  <div className="text-3xl font-bold text-purple-600">
+                    {(() => {
+                      const canView =
+                        affiliate.user_id ? affiliate.user_id === user?.id : affiliate.id === user?.id;
+                      return canView ? `${stats.totalEarnings.toFixed(2)}€` : '•••';
+                    })()}
+                  </div>
                 </CardContent>
               </Card>
             </TooltipTrigger>
@@ -616,7 +618,13 @@ export default function Affiliate() {
                   <DollarSign className="h-5 w-5 text-orange-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-orange-600">{displayAmount(stats.payoutAvailable)}</div>
+                  <div className="text-3xl font-bold text-orange-600">
+                    {(() => {
+                      const canView =
+                        affiliate.user_id ? affiliate.user_id === user?.id : affiliate.id === user?.id;
+                      return canView ? `${stats.payoutAvailable.toFixed(2)}€` : '•••';
+                    })()}
+                  </div>
                 </CardContent>
               </Card>
             </TooltipTrigger>
@@ -625,6 +633,7 @@ export default function Affiliate() {
         </div>
       </TooltipProvider>
 
+      {/* Chart */}
       <Card className="shadow-medium">
         <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
@@ -632,7 +641,9 @@ export default function Affiliate() {
               <TrendingUp className="h-5 w-5 text-primary" />
               Engagement (7j / 30j)
             </CardTitle>
-            <CardDescription>Visualisez vos clics et conversions sur la période choisie.</CardDescription>
+            <CardDescription>
+              Visualisez vos clics et conversions sur la période choisie.
+            </CardDescription>
           </div>
           <div className="flex gap-2">
             <Button
@@ -665,6 +676,7 @@ export default function Affiliate() {
         </CardContent>
       </Card>
 
+      {/* Commissions by level */}
       <Card className="gradient-subtle border-0 shadow-medium">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -700,7 +712,11 @@ export default function Affiliate() {
                   </Badge>
                 </div>
                 <div className="text-2xl font-bold">
-                  {displayAmount(summary.earnings)}
+                  {(() => {
+                    const canView =
+                      affiliate.user_id ? affiliate.user_id === user?.id : affiliate.id === user?.id;
+                    return canView ? `${summary.earnings.toFixed(2)}€` : '•••';
+                  })()}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {summary.activeCount} filleul(s) actif(s) niveau {summary.level}
@@ -708,20 +724,31 @@ export default function Affiliate() {
               </div>
             ))}
           </div>
+
           <div className="rounded-lg border border-dashed border-primary/30 p-4 bg-primary/5">
             <p className="text-sm font-medium mb-2">Prochaine étape</p>
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
-              <Progress value={(nextStatus.current / nextStatus.target) * 100} className="h-2 md:flex-1" />
-              <span className="text-sm font-semibold text-primary">
-                {stats.neededForMentor > 0
-                  ? `+${stats.neededForMentor} actifs → Mentor`
-                  : 'Mentor acquis — cap sur Ambassadeur !'}
+            {nextStatus ? (
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
+                <Progress
+                  value={(nextStatus.current / nextStatus.target) * 100}
+                  className="h-2 md:flex-1"
+                />
+                <span className="text-sm font-semibold text-primary">
+                  {stats.neededForMentor > 0
+                    ? `+${stats.neededForMentor} actifs → Mentor`
+                    : 'Mentor acquis — cap sur Ambassadeur !'}
+                </span>
+              </div>
+            ) : (
+              <span className="text-sm text-muted-foreground">
+                Statut maximal atteint pour le moment.
               </span>
-            </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
+      {/* Affiliate link */}
       <Card className="border-primary/30 shadow-medium">
         <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -732,6 +759,7 @@ export default function Affiliate() {
             <CardDescription>Partagez ce lien pour construire votre réseau MLM.</CardDescription>
           </div>
           <div className="flex gap-2">
+            <Input readOnly value={affiliateLink} className="font-mono text-sm border-primary/30" />
             <Button onClick={() => copyAffiliateLink(affiliateLink)} className="gap-2">
               <Copy className="h-4 w-4" />
               Copier
@@ -751,10 +779,6 @@ export default function Affiliate() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Lien complet</Label>
-            <Input readOnly value={affiliateLink} className="font-mono text-sm border-primary/30" />
-          </div>
           <div className="rounded-lg border border-dashed border-muted-foreground/30 p-4 bg-muted/40 text-sm">
             <p className="font-medium mb-2">Paramètres UTM visibles :</p>
             <div className="grid gap-1 font-mono text-xs">
@@ -778,6 +802,7 @@ export default function Affiliate() {
         </CardContent>
       </Card>
 
+      {/* Direct referrals */}
       <Card className="shadow-medium">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -824,6 +849,7 @@ export default function Affiliate() {
         </CardContent>
       </Card>
 
+      {/* Activity */}
       {activityItems.length > 0 && (
         <Card className="shadow-medium">
           <CardHeader>
@@ -847,7 +873,6 @@ export default function Affiliate() {
                     date && !Number.isNaN(date.getTime())
                       ? format(date, 'dd MMM yyyy HH:mm')
                       : '—';
-
                   return (
                     <TableRow key={item.id}>
                       <TableCell>
@@ -873,6 +898,7 @@ export default function Affiliate() {
         </Card>
       )}
 
+      {/* Commissions list */}
       <Card className="shadow-medium">
         <CardHeader>
           <CardTitle>Commissions détaillées récentes</CardTitle>
@@ -889,25 +915,11 @@ export default function Affiliate() {
                 const level = Number(commission.level);
                 const levelStyles =
                   level === 1
-                    ? {
-                        border: 'border-green-500/20',
-                        bg: 'bg-green-50/10',
-                        badge: 'bg-green-500',
-                        text: 'text-green-600'
-                      }
+                    ? { border: 'border-green-500/20', bg: 'bg-green-50/10', badge: 'bg-green-500', text: 'text-green-600' }
                     : level === 2
-                    ? {
-                        border: 'border-blue-500/20',
-                        bg: 'bg-blue-50/10',
-                        badge: 'bg-blue-500',
-                        text: 'text-blue-600'
-                      }
-                    : {
-                        border: 'border-purple-500/20',
-                        bg: 'bg-purple-50/10',
-                        badge: 'bg-purple-500',
-                        text: 'text-purple-600'
-                      };
+                    ? { border: 'border-blue-500/20', bg: 'bg-blue-50/10', badge: 'bg-blue-500', text: 'text-blue-600' }
+                    : { border: 'border-purple-500/20', bg: 'bg-purple-50/10', badge: 'bg-purple-500', text: 'text-purple-600' };
+
                 const ratePercent =
                   commission.rate_bp !== undefined && commission.rate_bp !== null
                     ? Number(commission.rate_bp) / 100
@@ -936,7 +948,11 @@ export default function Affiliate() {
                       </p>
                     </div>
                     <span className={cn('font-bold text-lg', levelStyles.text)}>
-                      {displayAmount(Number(commission.amount || 0))}
+                      {(() => {
+                        const canView =
+                          affiliate.user_id ? affiliate.user_id === user?.id : affiliate.id === user?.id;
+                        return canView ? `+${Number(commission.amount || 0).toFixed(2)}€` : '•••';
+                      })()}
                     </span>
                   </div>
                 );
@@ -946,6 +962,7 @@ export default function Affiliate() {
         </CardContent>
       </Card>
 
+      {/* Payouts */}
       <Card>
         <CardHeader>
           <CardTitle>Historique des paiements</CardTitle>
@@ -975,7 +992,13 @@ export default function Affiliate() {
                     <Badge variant={payout.status === 'paid' ? 'default' : 'secondary'}>
                       {payout.status}
                     </Badge>
-                    <span className="font-bold">{displayAmount(Number(payout.amount || 0))}</span>
+                    <span className="font-bold">
+                      {(() => {
+                        const canView =
+                          affiliate.user_id ? affiliate.user_id === user?.id : affiliate.id === user?.id;
+                        return canView ? `${Number(payout.amount || 0).toFixed(2)}€` : '•••';
+                      })()}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -984,6 +1007,7 @@ export default function Affiliate() {
         </CardContent>
       </Card>
 
+      {/* Share dialog */}
       <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -1024,6 +1048,7 @@ export default function Affiliate() {
         </DialogContent>
       </Dialog>
 
+      {/* Suffix dialog */}
       <Dialog open={suffixDialogOpen} onOpenChange={setSuffixDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1058,3 +1083,4 @@ export default function Affiliate() {
     </div>
   );
 }
+
