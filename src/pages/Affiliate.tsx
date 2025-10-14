@@ -148,17 +148,24 @@ export default function Affiliate() {
   }, [user]);
 
   const loadAffiliateData = async () => {
-    if (!user) return;
+    if (!user?.email) {
+      setAffiliate(null);
+      setLoading(false);
+      return;
+    }
 
     try {
-      const { data: affiliateData } = await supabase
+      const { data: affiliateData, error: affiliateError } = await supabase
         .from('affiliates')
         .select('*')
-        .eq('id', user.id)
+        .eq('email', user.email)
         .maybeSingle();
 
+      if (affiliateError) {
+        throw affiliateError;
+      }
+
       if (!affiliateData) {
-        setLoading(false);
         return;
       }
 
