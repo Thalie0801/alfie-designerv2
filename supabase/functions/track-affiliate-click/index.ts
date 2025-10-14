@@ -7,6 +7,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const affiliateClickSchema = z.object({
+  ref: z.string().uuid().optional(),
+  affiliate_id: z.string().uuid().optional(),
+  utm_source: z.string().max(255).optional(),
+  utm_medium: z.string().max(255).optional(),
+  utm_campaign: z.string().max(255).optional()
+}).refine(data => data.ref || data.affiliate_id, {
+  message: "Either ref or affiliate_id must be provided"
+});
+
 const parseBody = async (req: Request): Promise<Record<string, string>> => {
   const contentType = req.headers.get("content-type") || "";
   try {
@@ -42,12 +52,9 @@ serve(async (req) => {
     
     const { ref, affiliate_id, utm_source, utm_medium, utm_campaign } = validationResult.data;
     const affiliateRef = ref || affiliate_id;
-    const utm_source = body.utm_source || null;
-    const utm_medium = body.utm_medium || null;
-    const utm_campaign = body.utm_campaign || null;
 
-    if (!ref) {
-      return new Response(JSON.stringify({ error: "Missing ref" }), {
+    if (!affiliateRef) {
+      return new Response(JSON.stringify({ error: "Missing affiliate reference" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
@@ -59,16 +66,30 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
+    // Validate affiliate exists
+    const { data: affiliate, error: affiliateError } = await supabaseAdmin
+      .from('affiliates')
+      .select('id')
+      .eq('id', affiliateRef)
+      .single();
+
+    if (affiliateError || !affiliate) {
+      return new Response(JSON.stringify({ error: "Invalid affiliate reference" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
+
     const click_id = crypto.randomUUID();
 
     const { error } = await supabaseAdmin
       .from("affiliate_clicks")
       .insert({
-        affiliate_id: ref,
+        affiliate_id: affiliateRef,
         click_id,
-        utm_source,
-        utm_medium,
-        utm_campaign,
+        utm_source: utm_source || null,
+        utm_medium: utm_medium || null,
+        utm_campaign: utm_campaign || null,
       });
 
     if (error) {

@@ -67,13 +67,13 @@ serve(async (req) => {
     });
 
     // Check for idempotency - prevent duplicate processing
-    const { data: existingProcessed, error: checkError } = await supabaseClient
-      .from("profiles")
-      .select("stripe_subscription_id")
-      .eq("stripe_subscription_id", session_id)
+    const { data: existingProcessed } = await supabaseClient
+      .from("payment_sessions")
+      .select("id")
+      .eq("session_id", session_id)
       .maybeSingle();
     
-    if (existingProcessed && !checkError) {
+    if (existingProcessed) {
       console.log("Session already processed:", session_id);
       return new Response(
         JSON.stringify({ error: "Session already processed" }),
@@ -100,6 +100,16 @@ serve(async (req) => {
     }
 
     const planConfig = PLAN_CONFIG[plan as keyof typeof PLAN_CONFIG];
+
+    // Record this payment session as processed
+    await supabaseClient
+      .from("payment_sessions")
+      .insert({
+        session_id: session_id,
+        user_id: userId || null,
+        plan,
+        amount: session.amount_total ? session.amount_total / 100 : 0
+      });
 
     // Update profile with stripe info and global quota (for backward compatibility)
     if (userId) {
