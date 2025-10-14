@@ -1,7 +1,7 @@
 import { QUICK_INTENTS } from '@/config/alfieAI';
 
 export interface DetectedIntent {
-  type: 'open_canva' | 'show_brandkit' | 'check_credits' | 'browse_templates' | 'unknown';
+  type: 'open_canva' | 'show_brandkit' | 'check_credits' | 'show_usage' | 'package_download' | 'browse_templates' | 'unknown';
   confidence: number;
   params?: Record<string, any>;
 }
@@ -26,6 +26,16 @@ export function detectIntent(userMessage: string): DetectedIntent {
   // Check credits
   if (QUICK_INTENTS.checkCredits.test(msg)) {
     return { type: 'check_credits', confidence: 0.9 };
+  }
+
+  // Show usage (nouveaux quotas)
+  if (QUICK_INTENTS.showUsage.test(msg)) {
+    return { type: 'show_usage', confidence: 0.9 };
+  }
+
+  // Package download
+  if (QUICK_INTENTS.packageDownload.test(msg)) {
+    return { type: 'package_download', confidence: 0.9 };
   }
 
   // Browse templates avec catégorie détectée
@@ -77,6 +87,12 @@ export function generateLocalResponse(intent: DetectedIntent): string | null {
     
     case 'check_credits':
       return "Je vérifie ton solde de crédits IA ✨";
+
+    case 'show_usage':
+      return "Je regarde tes compteurs de quotas (visuels, vidéos, Woofs) 📊";
+
+    case 'package_download':
+      return "Je prépare un package avec tous tes assets ! 📦";
     
     default:
       return null;

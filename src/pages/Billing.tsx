@@ -9,24 +9,22 @@ import { useCustomerPortal } from '@/hooks/useCustomerPortal';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useState } from 'react';
-import { CreditBalance } from '@/components/CreditBalance';
 
 const plans = [
   {
     name: 'Starter',
     key: 'starter',
-    price: '29€',
+    price: '39€',
     quota_brands: 1,
-    quota_visuals: 125,
-    ai_credits: 150,
-    alfie_requests: 100,
+    quota_visuals: 150,
+    quota_videos: 15,
     features: [
-      '1 marque',
-      '25 vidéos + 100 images/mois',
-      '150 crédits IA/mois',
-      '100 requêtes Alfie/mois',
-      'Générateur de contenu IA intégré',
-      '2 templates',
+      '1 Brand Kit dédié',
+      '150 visuels/mois (quotas non reportables)',
+      '15 vidéos/mois (15 Woofs)',
+      'Canva : adaptation & dépôt inclus',
+      'Stockage 30 jours (purge auto)',
+      'Téléchargement illimité',
       'Support email'
     ],
     popular: false
@@ -34,19 +32,18 @@ const plans = [
   {
     name: 'Pro',
     key: 'pro',
-    price: '79€',
-    quota_brands: 3,
-    quota_visuals: 335,
-    ai_credits: 375,
-    alfie_requests: 250,
+    price: '99€',
+    quota_brands: 1,
+    quota_visuals: 450,
+    quota_videos: 45,
     features: [
-      '3 marques',
-      '40 vidéos + 295 images/mois',
-      '375 crédits IA/mois',
-      '250 requêtes Alfie/mois',
-      'Générateur de contenu IA intégré',
-      '-20% sur packs de crédits',
-      '4 templates + Reels',
+      '1 Brand Kit dédié',
+      '450 visuels/mois (quotas non reportables)',
+      '45 vidéos/mois (45 Woofs)',
+      'Canva : adaptation & dépôt inclus',
+      'Stockage 30 jours (purge auto)',
+      'Téléchargement illimité',
+      'Add-on : Marque suppl. +39€/mois',
       'Support prioritaire'
     ],
     popular: true
@@ -54,20 +51,20 @@ const plans = [
   {
     name: 'Studio',
     key: 'studio',
-    price: '149€',
-    quota_brands: 5,
-    quota_visuals: 600,
-    ai_credits: 750,
-    alfie_requests: 500,
+    price: '199€',
+    quota_brands: 1,
+    quota_visuals: 1000,
+    quota_videos: 100,
     features: [
-      'Multi-marques (5 max)',
-      '150 vidéos + 450 images/mois',
-      '750 crédits IA/mois',
-      '500 requêtes Alfie/mois',
-      'Générateur de contenu IA intégré',
-      '-20% sur packs de crédits',
-      'Reels avancés',
-      'Analytics',
+      '1 Brand Kit dédié',
+      '1000 visuels/mois (quotas non reportables)',
+      '100 vidéos/mois (100 Woofs)',
+      'Canva : adaptation & dépôt inclus',
+      'Stockage 30 jours (purge auto)',
+      'Téléchargement illimité',
+      'Add-on : Marque suppl. +39€/mois',
+      'Packs Woofs (+50, +100)',
+      'Analytics avancés',
       'Support prioritaire'
     ],
     popular: false
@@ -78,14 +75,13 @@ const plans = [
     price: null,
     quota_brands: 999,
     quota_visuals: 9999,
-    ai_credits: 'custom',
-    alfie_requests: 'custom',
+    quota_videos: 9999,
     features: [
       'Marques illimitées',
       'Visuels illimités',
-      'Crédits IA sur mesure',
-      'Alfie illimité',
-      'Générateur de contenu IA intégré',
+      'Vidéos illimitées (Woofs illimités)',
+      'Canva : adaptation & dépôt inclus',
+      'Stockage personnalisé',
       'API & SSO',
       'White-label',
       'Support dédié 24/7',
@@ -128,9 +124,9 @@ export default function Billing() {
         .from('profiles')
         .update({
           plan: 'studio',
-          quota_brands: 5,
-          quota_visuals_per_month: 600,
-          ai_credits_monthly: 750
+          quota_brands: 1,
+          quota_visuals_per_month: 1000,
+          quota_videos: 100
         })
         .eq('id', user.id);
 
@@ -190,50 +186,50 @@ export default function Billing() {
 
       {/* Current Plan */}
       {hasActivePlan && (
-        <div className="grid md:grid-cols-2 gap-4">
-          <Card className="border-primary/30 shadow-medium gradient-subtle">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2 mb-2">
-                    <Badge className="bg-gradient-to-r from-primary to-secondary text-white px-4 py-1 text-base">
-                      Plan actuel: {currentPlan}
-                    </Badge>
-                  </CardTitle>
-                  <CardDescription>
-                    Profitez de tous les avantages de votre abonnement
-                  </CardDescription>
-                </div>
-                {hasStripeSubscription && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={openCustomerPortal}
-                    disabled={portalLoading}
-                    className="gap-2"
-                  >
-                    <Settings className="h-4 w-4" />
-                    {portalLoading ? 'Chargement...' : 'Gérer'}
-                  </Button>
-                )}
+        <Card className="border-primary/30 shadow-medium gradient-subtle">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 mb-2">
+                  <Badge className="bg-gradient-to-r from-primary to-secondary text-white px-4 py-1 text-base">
+                    Plan actuel: {currentPlan}
+                  </Badge>
+                </CardTitle>
+                <CardDescription>
+                  Profitez de tous les avantages de votre abonnement
+                </CardDescription>
               </div>
-            </CardHeader>
-            <CardContent className="bg-card/50">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-                  <span className="font-medium text-blue-700 dark:text-blue-300">📊 Visuels ce mois:</span>
-                  <span className="text-blue-600 dark:text-blue-400 font-bold">0 / {profile?.quota_visuals_per_month || 0}</span>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
-                  <span className="font-medium text-purple-700 dark:text-purple-300">🎨 Marques:</span>
-                  <span className="text-purple-600 dark:text-purple-400 font-bold">0 / {profile?.quota_brands || 0}</span>
-                </div>
+              {hasStripeSubscription && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={openCustomerPortal}
+                  disabled={portalLoading}
+                  className="gap-2"
+                >
+                  <Settings className="h-4 w-4" />
+                  {portalLoading ? 'Chargement...' : 'Gérer'}
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="bg-card/50">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                <span className="font-medium text-blue-700 dark:text-blue-300">📊 Visuels ce mois:</span>
+                <span className="text-blue-600 dark:text-blue-400 font-bold">{profile?.generations_this_month || 0} / {profile?.quota_visuals_per_month || 0}</span>
               </div>
-            </CardContent>
-          </Card>
-
-          <CreditBalance />
-        </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+                <span className="font-medium text-purple-700 dark:text-purple-300">🎬 Vidéos ce mois:</span>
+                <span className="text-purple-600 dark:text-purple-400 font-bold">0 / {profile?.quota_videos || 0}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                <span className="font-medium text-green-700 dark:text-green-300">🎨 Brand Kits:</span>
+                <span className="text-green-600 dark:text-green-400 font-bold">0 / {profile?.quota_brands || 0}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Plans */}

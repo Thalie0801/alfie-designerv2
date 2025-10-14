@@ -8,10 +8,16 @@ const corsHeaders = {
 };
 
 const PRICE_IDS = {
-  starter: "price_1SEtRuQvcbGhgt8SzSFWCC3L",
-  pro: "price_1SEtTMQvcbGhgt8SYQ0RV10U",
-  studio: "price_1SEtTeQvcbGhgt8SZ8X8LR4e",
-  enterprise: "price_1SEtTxQvcbGhgt8S6xO8OFSj",
+  monthly: {
+    starter: "price_1SGDCEQvcbGhgt8SB4SyubJd",    // 39€/mois
+    pro: "price_1SGDDFQvcbGhgt8Sxc5AD69b",        // 99€/mois
+    studio: "price_1SGDLmQvcbGhgt8SKWpBTjCg",     // 199€/mois
+  },
+  annual: {
+    starter: "price_1SGD0qQvcbGhgt8SRcNK3q0V",    // 374€/an (-20%)
+    pro: "price_1SGDCkQvcbGhgt8SmYEEE7H8",        // 950€/an (-20%)
+    studio: "price_1SGDMoQvcbGhgt8SxUMXLPpD",     // 1910€/an (-20%)
+  }
 };
 
 // Plan configuration (quotas are applied in verify-payment after successful payment)
@@ -27,13 +33,16 @@ serve(async (req) => {
   );
 
   try {
-    const { plan, affiliate_ref } = await req.json();
+    const { plan, billing_period = 'monthly', affiliate_ref } = await req.json();
     
-    if (!plan || !PRICE_IDS[plan as keyof typeof PRICE_IDS]) {
+    const billingType = billing_period === 'annual' ? 'annual' : 'monthly';
+    const planType = plan as 'starter' | 'pro' | 'studio';
+    
+    if (!planType || !PRICE_IDS[billingType][planType]) {
       throw new Error("Invalid plan selected");
     }
 
-    const priceId = PRICE_IDS[plan as keyof typeof PRICE_IDS];
+    const priceId = PRICE_IDS[billingType][planType];
     
     // Check if user is authenticated
     const authHeader = req.headers.get("Authorization");

@@ -69,10 +69,10 @@ export default function FAQ() {
             <AccordionContent className="text-muted-foreground">
               Nous proposons plusieurs formules adaptées à vos besoins :
               <ul className="list-disc pl-6 mt-2 space-y-2">
-                <li><strong>Starter</strong> : 29€/mois (20 visuels/mois)</li>
-                <li><strong>Pro</strong> : 79€/mois (100 visuels/mois + fonctionnalités avancées)</li>
-                <li><strong>Studio</strong> : 149€/mois (1000 visuels/mois + analytics)</li>
-                <li><strong>Enterprise</strong> : Sur mesure (visuels illimités + support dédié)</li>
+                <li><strong>Starter</strong> : 39€/mois (1 marque, 150 visuels/mois, 15 vidéos/mois)</li>
+                <li><strong>Pro</strong> : 99€/mois (1 marque, 450 visuels/mois, 45 vidéos/mois)</li>
+                <li><strong>Studio</strong> : 199€/mois (1 marque, 1000 visuels/mois, 100 vidéos/mois)</li>
+                <li><strong>Enterprise</strong> : Sur mesure (marques illimitées, visuels illimités, support dédié)</li>
               </ul>
               <p className="mt-3">Une réduction de 20% est appliquée sur tous les abonnements annuels.</p>
               <p className="mt-3">

@@ -336,12 +336,22 @@ export type Database = {
           created_at: string | null
           fonts: Json | null
           id: string
+          images_used: number | null
+          is_addon: boolean | null
           logo_url: string | null
           name: string
           palette: Json | null
+          plan: string | null
+          quota_images: number | null
+          quota_videos: number | null
+          quota_woofs: number | null
+          resets_on: string | null
+          stripe_subscription_id: string | null
           updated_at: string | null
           user_id: string
+          videos_used: number | null
           voice: string | null
+          woofs_used: number | null
         }
         Insert: {
           canva_access_token?: string | null
@@ -351,12 +361,22 @@ export type Database = {
           created_at?: string | null
           fonts?: Json | null
           id?: string
+          images_used?: number | null
+          is_addon?: boolean | null
           logo_url?: string | null
           name: string
           palette?: Json | null
+          plan?: string | null
+          quota_images?: number | null
+          quota_videos?: number | null
+          quota_woofs?: number | null
+          resets_on?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string | null
           user_id: string
+          videos_used?: number | null
           voice?: string | null
+          woofs_used?: number | null
         }
         Update: {
           canva_access_token?: string | null
@@ -366,12 +386,22 @@ export type Database = {
           created_at?: string | null
           fonts?: Json | null
           id?: string
+          images_used?: number | null
+          is_addon?: boolean | null
           logo_url?: string | null
           name?: string
           palette?: Json | null
+          plan?: string | null
+          quota_images?: number | null
+          quota_videos?: number | null
+          quota_woofs?: number | null
+          resets_on?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string | null
           user_id?: string
+          videos_used?: number | null
           voice?: string | null
+          woofs_used?: number | null
         }
         Relationships: [
           {
@@ -517,6 +547,59 @@ export type Database = {
           },
         ]
       }
+      generation_logs: {
+        Row: {
+          brand_id: string | null
+          created_at: string
+          duration_seconds: number | null
+          engine: string | null
+          error_code: string | null
+          id: string
+          metadata: Json | null
+          prompt_summary: string | null
+          status: string
+          type: string
+          user_id: string
+          woofs_cost: number | null
+        }
+        Insert: {
+          brand_id?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          engine?: string | null
+          error_code?: string | null
+          id?: string
+          metadata?: Json | null
+          prompt_summary?: string | null
+          status: string
+          type: string
+          user_id: string
+          woofs_cost?: number | null
+        }
+        Update: {
+          brand_id?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          engine?: string | null
+          error_code?: string | null
+          id?: string
+          metadata?: Json | null
+          prompt_summary?: string | null
+          status?: string
+          type?: string
+          user_id?: string
+          woofs_cost?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generation_logs_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           completed_at: string | null
@@ -524,7 +607,11 @@ export type Database = {
           error: string | null
           id: string
           input_data: Json | null
+          max_retries: number | null
           output_data: Json | null
+          progress: number | null
+          retry_count: number | null
+          short_id: string | null
           status: string | null
           type: string
           user_id: string
@@ -535,7 +622,11 @@ export type Database = {
           error?: string | null
           id?: string
           input_data?: Json | null
+          max_retries?: number | null
           output_data?: Json | null
+          progress?: number | null
+          retry_count?: number | null
+          short_id?: string | null
           status?: string | null
           type: string
           user_id: string
@@ -546,7 +637,11 @@ export type Database = {
           error?: string | null
           id?: string
           input_data?: Json | null
+          max_retries?: number | null
           output_data?: Json | null
+          progress?: number | null
+          retry_count?: number | null
+          short_id?: string | null
           status?: string | null
           type?: string
           user_id?: string
@@ -555,42 +650,84 @@ export type Database = {
       }
       media_generations: {
         Row: {
+          brand_id: string | null
           created_at: string | null
+          duration_seconds: number | null
+          engine: Database["public"]["Enums"]["video_engine"] | null
+          expires_at: string | null
+          file_size_bytes: number | null
           id: string
           input_url: string | null
+          is_source_upload: boolean | null
+          job_id: string | null
           metadata: Json | null
           output_url: string
           prompt: string | null
           status: string
+          thumbnail_url: string | null
           type: string
           updated_at: string | null
           user_id: string
+          woofs: number | null
         }
         Insert: {
+          brand_id?: string | null
           created_at?: string | null
+          duration_seconds?: number | null
+          engine?: Database["public"]["Enums"]["video_engine"] | null
+          expires_at?: string | null
+          file_size_bytes?: number | null
           id?: string
           input_url?: string | null
+          is_source_upload?: boolean | null
+          job_id?: string | null
           metadata?: Json | null
           output_url: string
           prompt?: string | null
           status?: string
+          thumbnail_url?: string | null
           type: string
           updated_at?: string | null
           user_id: string
+          woofs?: number | null
         }
         Update: {
+          brand_id?: string | null
           created_at?: string | null
+          duration_seconds?: number | null
+          engine?: Database["public"]["Enums"]["video_engine"] | null
+          expires_at?: string | null
+          file_size_bytes?: number | null
           id?: string
           input_url?: string | null
+          is_source_upload?: boolean | null
+          job_id?: string | null
           metadata?: Json | null
           output_url?: string
           prompt?: string | null
           status?: string
+          thumbnail_url?: string | null
           type?: string
           updated_at?: string | null
           user_id?: string
+          woofs?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "media_generations_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_generations_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       news: {
         Row: {
@@ -682,10 +819,13 @@ export type Database = {
           id: string
           plan: string | null
           quota_brands: number | null
+          quota_videos: number | null
           quota_visuals_per_month: number | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           updated_at: string | null
+          videos_this_month: number | null
+          woofs_consumed_this_month: number | null
         }
         Insert: {
           active_brand_id?: string | null
@@ -704,10 +844,13 @@ export type Database = {
           id: string
           plan?: string | null
           quota_brands?: number | null
+          quota_videos?: number | null
           quota_visuals_per_month?: number | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           updated_at?: string | null
+          videos_this_month?: number | null
+          woofs_consumed_this_month?: number | null
         }
         Update: {
           active_brand_id?: string | null
@@ -726,10 +869,13 @@ export type Database = {
           id?: string
           plan?: string | null
           quota_brands?: number | null
+          quota_videos?: number | null
           quota_visuals_per_month?: number | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           updated_at?: string | null
+          videos_this_month?: number | null
+          woofs_consumed_this_month?: number | null
         }
         Relationships: [
           {
@@ -792,6 +938,44 @@ export type Database = {
         }
         Relationships: []
       }
+      video_segments: {
+        Row: {
+          created_at: string | null
+          duration_seconds: number | null
+          id: string
+          is_temporary: boolean | null
+          parent_video_id: string | null
+          segment_index: number
+          segment_url: string
+        }
+        Insert: {
+          created_at?: string | null
+          duration_seconds?: number | null
+          id?: string
+          is_temporary?: boolean | null
+          parent_video_id?: string | null
+          segment_index: number
+          segment_url: string
+        }
+        Update: {
+          created_at?: string | null
+          duration_seconds?: number | null
+          id?: string
+          is_temporary?: boolean | null
+          parent_video_id?: string | null
+          segment_index?: number
+          segment_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_segments_parent_video_id_fkey"
+            columns: ["parent_video_id"]
+            isOneToOne: false
+            referencedRelation: "media_generations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -804,6 +988,10 @@ export type Database = {
           direct_affiliate_id: string
         }
         Returns: undefined
+      }
+      generate_short_job_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       has_active_plan: {
         Args: { user_id_param: string }
@@ -827,6 +1015,10 @@ export type Database = {
     }
     Enums: {
       app_role: "user" | "admin" | "affiliate"
+      asset_engine: "nano" | "sora" | "veo3"
+      brand_plan: "starter" | "pro" | "studio"
+      plan_type: "starter" | "pro" | "studio"
+      video_engine: "sora" | "seededance" | "kling"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -955,6 +1147,10 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["user", "admin", "affiliate"],
+      asset_engine: ["nano", "sora", "veo3"],
+      brand_plan: ["starter", "pro", "studio"],
+      plan_type: ["starter", "pro", "studio"],
+      video_engine: ["sora", "seededance", "kling"],
     },
   },
 } as const

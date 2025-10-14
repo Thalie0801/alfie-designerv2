@@ -10,27 +10,27 @@ const corsHeaders = {
 const PLAN_CONFIG = {
   starter: { 
     quota_brands: 1, 
-    quota_visuals: 125, 
-    ai_credits_monthly: 150,
-    alfie_requests: 100 
+    quota_images: 150, 
+    quota_videos: 15,
+    quota_woofs: 15
   },
   pro: { 
-    quota_brands: 3, 
-    quota_visuals: 335, 
-    ai_credits_monthly: 375,
-    alfie_requests: 250 
+    quota_brands: 1, 
+    quota_images: 450, 
+    quota_videos: 45,
+    quota_woofs: 45
   },
   studio: { 
-    quota_brands: 5, 
-    quota_visuals: 600, 
-    ai_credits_monthly: 750,
-    alfie_requests: 500 
+    quota_brands: 1, 
+    quota_images: 1000, 
+    quota_videos: 100,
+    quota_woofs: 100
   },
   enterprise: { 
     quota_brands: 999, 
-    quota_visuals: 9999, 
-    ai_credits_monthly: 9999,
-    alfie_requests: 9999 
+    quota_images: 9999, 
+    quota_videos: 9999,
+    quota_woofs: 9999
   },
 };
 
@@ -73,29 +73,87 @@ serve(async (req) => {
 
     const planConfig = PLAN_CONFIG[plan as keyof typeof PLAN_CONFIG];
 
-    // Update or create user profile
+    // Update profile with stripe info and global quota (for backward compatibility)
     if (userId) {
       // User was authenticated during checkout
-      const { error } = await supabaseClient
+      await supabaseClient
         .from("profiles")
         .update({
           plan,
           quota_brands: planConfig.quota_brands,
-          quota_visuals_per_month: planConfig.quota_visuals,
-          ai_credits_monthly: planConfig.ai_credits_monthly,
-          alfie_requests_this_month: 0,
-          alfie_requests_reset_date: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString(),
           stripe_customer_id: session.customer as string,
           stripe_subscription_id: session.subscription as string,
         })
         .eq("id", userId);
 
-      if (error) throw error;
+      // Get or create active brand for this user
+      const { data: profile } = await supabaseClient
+        .from("profiles")
+        .select("active_brand_id")
+        .eq("id", userId)
+        .single();
+
+      let brandId = profile?.active_brand_id;
+
+      // If no active brand, get or create the first brand
+      if (!brandId) {
+        const { data: existingBrands } = await supabaseClient
+          .from("brands")
+          .select("id")
+          .eq("user_id", userId)
+          .limit(1);
+
+        if (existingBrands && existingBrands.length > 0) {
+          brandId = existingBrands[0].id;
+          // Set as active brand
+          await supabaseClient
+            .from("profiles")
+            .update({ active_brand_id: brandId })
+            .eq("id", userId);
+        } else {
+          // Create first brand
+          const { data: newBrand } = await supabaseClient
+            .from("brands")
+            .insert({
+              user_id: userId,
+              name: "Ma Marque",
+              plan: plan,
+              quota_images: planConfig.quota_images,
+              quota_videos: planConfig.quota_videos,
+              quota_woofs: planConfig.quota_woofs,
+              stripe_subscription_id: session.subscription as string,
+            })
+            .select()
+            .single();
+
+          if (newBrand) {
+            brandId = newBrand.id;
+            await supabaseClient
+              .from("profiles")
+              .update({ active_brand_id: brandId })
+              .eq("id", userId);
+          }
+        }
+      }
+
+      // Update the active brand with plan and quotas
+      if (brandId) {
+        await supabaseClient
+          .from("brands")
+          .update({
+            plan: plan,
+            quota_images: planConfig.quota_images,
+            quota_videos: planConfig.quota_videos,
+            quota_woofs: planConfig.quota_woofs,
+            stripe_subscription_id: session.subscription as string,
+          })
+          .eq("id", brandId);
+      }
     } else if (customerEmail) {
       // Guest checkout - find or update profile by email
       const { data: existingProfile } = await supabaseClient
         .from("profiles")
-        .select("id")
+        .select("id, active_brand_id")
         .eq("email", customerEmail)
         .single();
 
@@ -105,14 +163,24 @@ serve(async (req) => {
           .update({
             plan,
             quota_brands: planConfig.quota_brands,
-            quota_visuals_per_month: planConfig.quota_visuals,
-            ai_credits_monthly: planConfig.ai_credits_monthly,
-            alfie_requests_this_month: 0,
-            alfie_requests_reset_date: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString(),
             stripe_customer_id: session.customer as string,
             stripe_subscription_id: session.subscription as string,
           })
           .eq("email", customerEmail);
+
+        // Update active brand if exists
+        if (existingProfile.active_brand_id) {
+          await supabaseClient
+            .from("brands")
+            .update({
+              plan: plan,
+              quota_images: planConfig.quota_images,
+              quota_videos: planConfig.quota_videos,
+              quota_woofs: planConfig.quota_woofs,
+              stripe_subscription_id: session.subscription as string,
+            })
+            .eq("id", existingProfile.active_brand_id);
+        }
       }
     }
 

@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { BrandSelector } from './BrandSelector';
 import { BrandDialog } from './BrandDialog';
+import { AddBrandDialog } from './AddBrandDialog';
 import { Palette, ExternalLink, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 
@@ -66,9 +67,19 @@ export function BrandManager() {
                   )}
                   <h3 className="font-semibold">{activeBrand.name}</h3>
                 </div>
-                <Badge variant={activeBrand.canva_connected ? "default" : "secondary"}>
-                  {activeBrand.canva_connected ? '✓ Canva connecté' : '○ Non connecté'}
-                </Badge>
+                <div className="flex gap-2">
+                  <Badge variant={(activeBrand as any).plan ? "default" : "secondary"}>
+                    {(activeBrand as any).plan?.toUpperCase() || 'AUCUN'}
+                  </Badge>
+                  <Badge variant={activeBrand.canva_connected ? "default" : "secondary"}>
+                    {activeBrand.canva_connected ? '✓ Canva' : '○ Canva'}
+                  </Badge>
+                  {(activeBrand as any).is_addon && (
+                    <Badge variant="outline" className="text-xs">
+                      Add-on
+                    </Badge>
+                  )}
+                </div>
               </div>
               <BrandDialog brand={activeBrand} onSuccess={loadBrands} />
             </div>
@@ -107,18 +118,8 @@ export function BrandManager() {
           </Alert>
         )}
 
-        {/* Quota Warning */}
-        {!canAddBrand && totalBrands >= quotaBrands && (
-          <Alert className="border-orange-500/50 bg-orange-500/10">
-            <AlertCircle className="h-4 w-4 text-orange-500" />
-            <AlertDescription className="text-sm">
-              Limite de marques atteinte ({quotaBrands} max). 
-              <Button variant="link" className="h-auto p-0 ml-1 text-orange-500" asChild>
-                <a href="/billing">Passe à un plan supérieur</a>
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
+        {/* Add Brand CTA */}
+        <AddBrandDialog onSuccess={loadBrands} />
       </CardContent>
     </Card>
   );

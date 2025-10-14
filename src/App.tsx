@@ -23,6 +23,7 @@ import Legal from "./pages/Legal";
 import FAQ from "./pages/FAQ";
 import NotFound from "./pages/NotFound";
 import Templates from "./pages/Templates";
+import Library from "./pages/Library";
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 
 const queryClient = new QueryClient();
@@ -59,6 +60,16 @@ const App = () => (
                 <ProtectedRoute requirePlan>
                   <AppLayoutWithSidebar>
                     <Templates />
+                  </AppLayoutWithSidebar>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/library"
+              element={
+                <ProtectedRoute requirePlan>
+                  <AppLayoutWithSidebar>
+                    <Library />
                   </AppLayoutWithSidebar>
                 </ProtectedRoute>
               }

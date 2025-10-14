@@ -15,6 +15,11 @@ import { openInCanva } from '@/services/canvaLinker';
 import { supabase } from '@/integrations/supabase/client';
 import { detectIntent, canHandleLocally, generateLocalResponse } from '@/utils/alfieIntentDetector';
 import { Progress } from '@/components/ui/progress';
+import { getQuotaStatus, consumeQuota, canGenerateVideo, checkQuotaAlert, formatExpirationMessage } from '@/utils/quotaManager';
+import { routeVideoEngine, estimateVideoDuration, detectVideoStyle } from '@/utils/videoRouting';
+import { JobPlaceholder, JobStatus } from '@/components/chat/JobPlaceholder';
+import { AssetMessage } from '@/components/chat/AssetMessage';
+import { FileUploader } from '@/components/chat/FileUploader';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -22,16 +27,32 @@ interface Message {
   imageUrl?: string;
   videoUrl?: string;
   created_at?: string;
+  jobId?: string;
+  jobStatus?: JobStatus;
+  progress?: number;
+  assetId?: string;
+  assetType?: 'image' | 'video';
 }
 
 const INITIAL_ASSISTANT_MESSAGE = `Salut ! 🐾 Je suis Alfie Designer, ton compagnon créatif IA 🎨
 
 Je peux t'aider à :
-• Créer des images IA (1 crédit ✨)
-• Générer des vidéos animées (2 crédits 🎬)
-• Trouver des templates Canva (bientôt 🚀)
-• Adapter au Brand Kit 🎨
+• Créer des images IA (1 crédit + quota visuels par marque) ✨
+• Générer des vidéos Sora2 (1 clip = 1 Woof, montage multi-clips possible) 🎬
+• Adapter templates Canva (GRATUIT, Brand Kit inclus) 🎨
+• Afficher tes quotas mensuels par marque (visuels, vidéos, Woofs) 📊
+• Préparer tes assets en package ZIP 📦
 
+📸 Tu peux me joindre une image pour :
+• Faire une variation stylisée (image→image)
+• Créer une vidéo à partir de l'image (image→vidéo)
+
+🎬 Pour les vidéos :
+• 10-12s loop = 1 Woof (1 clip Sora)
+• ~20s = 2 Woofs (montage 2 clips)
+• ~30s = 3 Woofs (montage 3 clips)
+
+Chaque marque a ses propres quotas qui se réinitialisent le 1er du mois (non reportables).
 Alors, qu'est-ce qu'on crée ensemble aujourd'hui ? 😊`;
 
 export function AlfieChat() {
@@ -48,10 +69,11 @@ export function AlfieChat() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<{ type: string; message: string } | null>(null);
+  const [selectedDuration, setSelectedDuration] = useState<'short' | 'medium' | 'long'>('short');
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { brandKit } = useBrandKit();
+  const { brandKit, activeBrandId } = useBrandKit();
   const { totalCredits, decrementCredits, hasCredits, incrementGenerations } = useAlfieCredits();
   const { searchTemplates } = useTemplateLibrary();
   const { 
@@ -184,6 +206,22 @@ export function AlfieChat() {
         .getPublicUrl(fileName);
 
       setUploadedImage(publicUrl);
+      
+      // Indexer l'image uploadée comme "source" (non comptée dans les quotas)
+      try {
+        await supabase.from('media_generations').insert({
+          user_id: user.id,
+          type: 'image',
+          prompt: 'Upload source depuis le chat',
+          output_url: publicUrl,
+          is_source_upload: true,
+          status: 'completed',
+          brand_id: activeBrandId || null
+        });
+      } catch (e) {
+        console.warn('Insertion source upload échouée (non bloquant):', e);
+      }
+
       toast.success('Image ajoutée ! 📸');
     } catch (error: any) {
       console.error('Upload error:', error);
@@ -396,130 +434,187 @@ export function AlfieChat() {
       
       case 'generate_video': {
         try {
-          setGenerationStatus({ type: 'video', message: 'Génération de ta vidéo en cours... Cela peut prendre 2-3 minutes 🎬' });
+          console.log('🎬 [generate_video] Starting with args:', args);
           
-          const { data, error } = await supabase.functions.invoke('generate-video', {
-            body: { prompt: args.prompt }
-          });
-
-          if (error) throw error;
-
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) throw new Error("Not authenticated");
-
-          const predictionId = data.id;
           
-          await supabase.from('media_generations').insert({
-            user_id: user.id,
-            type: 'video',
-            prompt: args.prompt,
-            output_url: '',
-            status: 'processing',
-            metadata: { predictionId }
+          // Décrémenter les Woofs (coût unifié = 1 Woof)
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('woofs_consumed_this_month')
+            .eq('id', user.id)
+            .single();
+
+          if (profile) {
+            await supabase
+              .from('profiles')
+              .update({ woofs_consumed_this_month: (profile.woofs_consumed_this_month || 0) + 1 })
+              .eq('id', user.id);
+          }
+          
+          // Appeler l'edge function avec fallback automatique
+          const { data, error } = await supabase.functions.invoke('generate-video', {
+            body: {
+              prompt: args.prompt,
+              aspectRatio: args.aspectRatio || '16:9',
+              imageUrl: args.imageUrl
+            }
           });
-
-          // Poll for status (max 10 minutes)
-          let attempts = 0;
-          const maxAttempts = 120; // 10 minutes
           
-          const checkStatus = async () => {
-            if (attempts >= maxAttempts) {
-              setGenerationStatus(null);
-              toast.error("La génération prend trop de temps. Vérifie ton historique dans quelques minutes.");
-              return;
-            }
+          if (error) {
+            console.error('Edge function error:', error);
+            throw new Error(error.message || 'Erreur backend');
+          }
 
-            try {
-              const { data: statusData, error: statusError } = await supabase.functions.invoke('generate-video', {
-                body: { predictionId }
-              });
+          if (data?.error) {
+            console.error('Provider error:', data.error);
+            throw new Error(data.error);
+          }
+          
+          const { id, provider } = data;
+          console.log(`✅ [generate_video] Started with provider: ${provider}, ID: ${id}`);
+          
+          // Créer l'asset dans la DB
+          const { data: asset, error: assetError } = await supabase
+            .from('media_generations')
+            .insert({
+              user_id: user.id,
+              brand_id: activeBrandId,
+              type: 'video',
+              engine: provider,
+              status: 'processing',
+              prompt: args.prompt,
+              woofs: 1,
+              output_url: '', // sera mis à jour quand prêt
+              metadata: { predictionId: id, provider }
+            })
+            .select()
+            .single();
+          
+          if (assetError) throw assetError;
+          
+          // Message de confirmation
+          const providerName = provider === 'sora' ? 'Sora2' : provider === 'seededance' ? 'Seededance' : 'Kling';
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `🎬 Génération vidéo lancée avec ${providerName} ! (1 Woof)\n\nJe te tiens au courant dès que c'est prêt.`,
+            jobId: asset.id,
+            jobStatus: 'processing' as JobStatus
+          }]);
+          
+          return { success: true, assetId: asset.id, provider };
+          
+        } catch (error: any) {
+          console.error('[generate_video] Error:', error);
+          const errorMessage = error?.message || "Erreur inconnue";
+          toast.error(`Échec génération vidéo: ${errorMessage}`);
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `❌ Erreur vidéo: ${errorMessage}\n\nVérifie les logs et les secrets backend (KIE_AI_API_KEY, REPLICATE_API_TOKEN).`
+          }]);
+          return { error: errorMessage };
+        }
+      }
 
-              if (statusError) {
-                console.error('Status check error:', statusError);
-                setGenerationStatus(null);
-                toast.error("Erreur lors de la vérification du statut");
-                return;
-              }
+      case 'show_usage': {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error("Not authenticated");
+          
+          if (!activeBrandId) {
+            return { error: "Aucune marque active. Crée d'abord un Brand Kit !" };
+          }
 
-              console.log('Video status check:', statusData.status, 'Attempt:', attempts);
-
-              if (statusData.status === 'succeeded') {
-                const videoUrl = Array.isArray(statusData.output) ? statusData.output[0] : statusData.output;
-                
-                const { data: existingRecords } = await supabase
-                  .from('media_generations')
-                  .select('id')
-                  .eq('user_id', user.id)
-                  .eq('type', 'video')
-                  .order('created_at', { ascending: false })
-                  .limit(1);
-                
-                if (existingRecords && existingRecords.length > 0) {
-                  await supabase.from('media_generations')
-                    .update({ output_url: videoUrl, status: 'completed' })
-                    .eq('id', existingRecords[0].id);
-                }
-
-                // Déduire les crédits (vidéo = 2 crédits)
-                await decrementCredits(2, 'video_generation');
-                
-                // Incrémenter le compteur de générations
-                await incrementGenerations();
-
-                setGenerationStatus(null);
-                toast.success("Vidéo générée avec succès ! 🎉");
-                
-                const videoMessage = {
-                  role: 'assistant' as const,
-                  content: `Vidéo générée avec succès ! (2 crédits utilisés) 🎬`,
-                  videoUrl
-                };
-                
-                setMessages(prev => [...prev, videoMessage]);
-                
-                // Persister le message vidéo en base
-                if (conversationId) {
-                  await supabase.from('alfie_messages').insert({
-                    conversation_id: conversationId,
-                    role: 'assistant',
-                    content: videoMessage.content,
-                    video_url: videoUrl
-                  });
-                }
-              } else if (statusData.status === 'failed') {
-                setGenerationStatus(null);
-                toast.error("La génération de vidéo a échoué");
-                setMessages(prev => [...prev, {
-                  role: 'assistant',
-                  content: `La génération de vidéo a échoué 😔 Réessaie avec un prompt différent.`
-                }]);
-              } else {
-                // Still processing - update status message
-                attempts++;
-                const elapsed = Math.floor((attempts * 5) / 60);
-                setGenerationStatus({
-                  type: 'video',
-                  message: `Génération en cours... ${elapsed > 0 ? `(${elapsed} min)` : '(quelques secondes)'} - Les vidéos prennent 2-5 minutes 🎬`
-                });
-                setTimeout(checkStatus, 5000);
-              }
-            } catch (err) {
-              console.error('Video status error:', err);
-              setGenerationStatus(null);
-              toast.error("Erreur lors de la vérification");
-            }
-          };
-
-          setTimeout(checkStatus, 5000);
+          const quotaStatus = await getQuotaStatus(activeBrandId);
+          if (!quotaStatus) throw new Error("Impossible de récupérer les quotas");
 
           return {
             success: true,
-            message: "Génération de vidéo lancée ! Patiente quelques minutes... 🎬"
+            brandName: quotaStatus.brandName,
+            plan: quotaStatus.plan,
+            resetsOn: quotaStatus.resetsOn,
+            quotas: {
+              visuals: {
+                used: quotaStatus.visuals.used,
+                limit: quotaStatus.visuals.limit,
+                percentage: quotaStatus.visuals.percentage.toFixed(1)
+              },
+              videos: {
+                used: quotaStatus.videos.used,
+                limit: quotaStatus.videos.limit,
+                percentage: quotaStatus.videos.percentage.toFixed(1)
+              },
+              woofs: {
+                consumed: quotaStatus.woofs.consumed,
+                remaining: quotaStatus.woofs.remaining,
+                limit: quotaStatus.woofs.limit
+              }
+            }
           };
         } catch (error: any) {
-          console.error('Video generation error:', error);
-          setGenerationStatus(null);
-          return { error: error.message || "Erreur de génération vidéo" };
+          console.error('Show usage error:', error);
+          return { error: error.message || "Erreur d'affichage des quotas" };
+        }
+      }
+
+      case 'adapt_template': {
+        // Adaptation Canva = GRATUIT, pas de quota consommé
+        openInCanva({
+          templateUrl: args.template_url || '',
+          brandKit: brandKit || undefined
+        });
+        return { 
+          success: true, 
+          message: "Template ouvert dans Canva avec ton Brand Kit appliqué ! (Gratuit, pas comptabilisé) 🎨" 
+        };
+      }
+
+      case 'package_download': {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error("Not authenticated");
+
+          // Récupérer les assets selon le filtre
+          const filterType = args.filter_type || 'all';
+          let query = supabase
+            .from('media_generations')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('status', 'completed')
+            .order('created_at', { ascending: false });
+
+          if (filterType === 'images') {
+            query = query.in('type', ['image', 'improved_image']);
+          } else if (filterType === 'videos') {
+            query = query.eq('type', 'video');
+          }
+
+          if (args.asset_ids && args.asset_ids.length > 0) {
+            query = query.in('id', args.asset_ids);
+          }
+
+          const { data: assets, error } = await query;
+          if (error) throw error;
+
+          // Ajouter les messages d'expiration
+          const assetsWithExpiration = assets?.map(a => ({
+            id: a.id,
+            type: a.type,
+            url: a.output_url,
+            created_at: a.created_at,
+            expires_at: a.expires_at,
+            expiration_message: a.expires_at ? formatExpirationMessage(a.expires_at) : null
+          })) || [];
+
+          return {
+            success: true,
+            assets: assetsWithExpiration,
+            message: `Package prêt avec ${assets?.length || 0} assets ! 📦\n\n${assetsWithExpiration[0]?.expiration_message || ''}`
+          };
+        } catch (error: any) {
+          console.error('Package download error:', error);
+          return { error: error.message || "Erreur de préparation du package" };
         }
       }
       
@@ -541,6 +636,10 @@ export function AlfieChat() {
 
   const wantsImageFromText = (text: string): boolean => {
     return /(image|visuel|carrousel|carousel|affiche|flyer)/i.test(text);
+  };
+
+  const wantsVideoFromText = (text: string): boolean => {
+    return /(vid[ée]o|reel|reels|tiktok|story|anime|animation|clip)/i.test(text);
   };
 
   const streamChat = async (userMessage: string) => {
@@ -781,6 +880,13 @@ export function AlfieChat() {
       return;
     }
 
+    // 2.6 Fallback local: si l'utilisateur demande clairement une vidéo, lance la génération directe
+    if (wantsVideoFromText(userMessage)) {
+      const aspect = detectAspectRatioFromText(userMessage);
+      await handleToolCall('generate_video', { prompt: userMessage, aspectRatio: aspect, imageUrl });
+      return;
+    }
+
     // 3. Vérifier le cache pour les templates
     if (intent.type === 'browse_templates') {
       const cacheKey = `${intent.params?.category || 'general'}`;
@@ -811,9 +917,10 @@ export function AlfieChat() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-12rem)] max-w-5xl mx-auto w-full">
+    <div className="flex flex-col h-[calc(100vh-180px)]">
+      {/* Chat Messages - scroll area qui prend tout l'espace */}
       <ScrollArea className="flex-1 pr-4" ref={scrollRef}>
-        <div className="space-y-4 pb-4">
+        <div className="space-y-4 pb-4 px-4 min-h-[200px]">
           {messages.map((message, index) => (
             <div
               key={index}
@@ -824,73 +931,83 @@ export function AlfieChat() {
                   <img src={alfieMain} alt="Alfie" className="object-cover" />
                 </Avatar>
               )}
-               <Card
-                className={`p-4 max-w-[75%] ${
-                  message.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted'
-                }`}
-              >
-               {message.imageUrl && (
-                  <div className="relative group">
-                    <img 
-                      src={message.imageUrl} 
-                      alt="Image générée" 
-                      className="max-w-full rounded-lg mb-2"
-                    />
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => {
-                        const link = document.createElement('a');
-                        link.href = message.imageUrl!;
-                        link.download = `alfie-image-${Date.now()}.png`;
-                        link.click();
-                      }}
-                    >
-                      <Download className="h-4 w-4 mr-1" />
-                      Télécharger
-                    </Button>
-                  </div>
-                )}
-                {message.videoUrl && (
-                  <div className="relative group">
-                    <video 
-                      src={message.videoUrl} 
-                      controls
-                      className="max-w-full rounded-lg mb-2"
-                    />
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => {
-                        const link = document.createElement('a');
-                        link.href = message.videoUrl!;
-                        link.download = `alfie-video-${Date.now()}.mp4`;
-                        link.click();
-                      }}
-                    >
-                      <Download className="h-4 w-4 mr-1" />
-                      Télécharger
-                    </Button>
-                  </div>
-                )}
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                {message.created_at && (
-                  <p className="text-xs opacity-60 mt-2">
-                    {new Date(message.created_at).toLocaleDateString('fr-FR', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric',
-                      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-                    })} à {new Date(message.created_at).toLocaleTimeString('fr-FR', {
-                      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-                    })}
-                  </p>
-                )}
-              </Card>
+{message.jobId ? (
+  <JobPlaceholder
+    jobId={message.jobId}
+    shortId={message.jobId.slice(-6).toUpperCase()}
+    status={message.jobStatus || 'running'}
+    progress={message.progress}
+    type={message.assetType === 'image' ? 'image' : 'video'}
+  />
+) : (
+  <Card
+    className={`p-4 max-w-[75%] ${
+      message.role === 'user'
+        ? 'bg-primary text-primary-foreground'
+        : 'bg-muted'
+    }`}
+  >
+   {message.imageUrl && (
+      <div className="relative group">
+        <img 
+          src={message.imageUrl} 
+          alt="Image générée" 
+          className="max-w-full rounded-lg mb-2"
+        />
+        <Button
+          size="sm"
+          variant="secondary"
+          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={() => {
+            const link = document.createElement('a');
+            link.href = message.imageUrl!;
+            link.download = `alfie-image-${Date.now()}.png`;
+            link.click();
+          }}
+        >
+          <Download className="h-4 w-4 mr-1" />
+          Télécharger
+        </Button>
+      </div>
+    )}
+    {message.videoUrl && (
+      <div className="relative group">
+        <video 
+          src={message.videoUrl} 
+          controls
+          className="max-w-full rounded-lg mb-2"
+        />
+        <Button
+          size="sm"
+          variant="secondary"
+          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={() => {
+            const link = document.createElement('a');
+            link.href = message.videoUrl!;
+            link.download = `alfie-video-${Date.now()}.mp4`;
+            link.click();
+          }}
+        >
+          <Download className="h-4 w-4 mr-1" />
+          Télécharger
+        </Button>
+      </div>
+    )}
+    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+    {message.created_at && (
+      <p className="text-xs opacity-60 mt-2">
+        {new Date(message.created_at).toLocaleDateString('fr-FR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        })} à {new Date(message.created_at).toLocaleTimeString('fr-FR', {
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        })}
+      </p>
+    )}
+  </Card>
+)}
               {message.role === 'user' && (
                 <Avatar className="h-8 w-8 flex-shrink-0 bg-secondary">
                   <div className="flex items-center justify-center h-full text-secondary-foreground">
@@ -933,7 +1050,57 @@ export function AlfieChat() {
         </div>
       </ScrollArea>
 
-      <div className="space-y-2 pt-4 border-t">
+      {/* Composer - sticky bottom */}
+      <div className="sticky bottom-0 border-t bg-background pt-4 space-y-2">
+        {/* Chips durée vidéo */}
+        {input.toLowerCase().includes('vidéo') || input.toLowerCase().includes('tiktok') || input.toLowerCase().includes('reel') ? (
+          <div className="mb-2 space-y-2">
+            <div className="flex gap-2 items-center">
+              <span className="text-xs text-muted-foreground">Durée :</span>
+              <button
+                onClick={() => setSelectedDuration('short')}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  selectedDuration === 'short'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+              >
+                10-12s loop (1 Woof)
+              </button>
+              <button
+                onClick={() => setSelectedDuration('medium')}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  selectedDuration === 'medium'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+              >
+                ~20s (2 Woofs)
+              </button>
+              <button
+                onClick={() => setSelectedDuration('long')}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  selectedDuration === 'long'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+              >
+                ~30s (3 Woofs)
+              </button>
+              <span className="text-xs text-muted-foreground ml-2">
+                💡 1 clip Sora = 1 Woof
+              </span>
+            </div>
+
+            {/* Bouton désactivé temporairement - problème IP whitelist Kie.ai */}
+            <div className="flex items-center justify-center p-4 bg-muted/50 rounded-lg">
+              <span className="text-xs text-muted-foreground">
+                🎬 Génération vidéo temporairement indisponible
+              </span>
+            </div>
+          </div>
+        ) : null}
+        
         {/* Image preview si uploadée */}
         {uploadedImage && (
           <div className="relative inline-block">
@@ -950,6 +1117,9 @@ export function AlfieChat() {
             >
               <X className="h-3 w-3" />
             </Button>
+            <div className="mt-1 text-xs text-muted-foreground">
+              ✅ Utiliser cette image comme base
+            </div>
           </div>
         )}
         
@@ -966,8 +1136,13 @@ export function AlfieChat() {
             size="lg"
             onClick={() => fileInputRef.current?.click()}
             disabled={isLoading || uploadingImage}
+            title="Glissez une image ou cliquez pour téléverser"
           >
-            <ImagePlus className="h-5 w-5" />
+            {uploadingImage ? (
+              <Sparkles className="h-5 w-5 animate-spin" />
+            ) : (
+              <ImagePlus className="h-5 w-5" />
+            )}
           </Button>
           <Textarea
             placeholder="Décris ton idée à Alfie..."
