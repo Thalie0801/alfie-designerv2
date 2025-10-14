@@ -35,11 +35,11 @@ interface ChatGeneratorProps {
 }
 
 const QUICK_IDEAS = [
+  "Idées visuelles",
   "Angles de carrousel",
   "Script vidéo 30s",
   "Variantes de CTA",
   "Légende + hashtags",
-  "Idées visuels",
 ];
 
 function createInitialMessages(): ChatMessage[] {
@@ -47,7 +47,8 @@ function createInitialMessages(): ChatMessage[] {
     {
       id: "assistant-intro",
       role: "assistant",
-      content: "Salut, je suis Alfie. Donne-moi ton idée visuelle et je te guide jusqu'au livrable idéal.",
+      content:
+        "Salut, je suis Alfie. Dis-moi ce que tu veux créer et je m’occupe du meilleur format.",
     },
   ];
 }
@@ -192,17 +193,46 @@ function ChatGenerator({
           throw new Error(errorText || "Réponse inattendue du serveur");
         }
 
-        if (!response.body) {
-          const payload = await response.text();
-          let assistantText = payload;
+        const contentType = response.headers.get("content-type") ?? "";
+        const defaultErrorMessage =
+          "Je ne parviens pas à contacter le service pour le moment. Peux-tu réessayer un peu plus tard ?";
+
+        if (!contentType.includes("text/event-stream") || !response.body) {
           try {
-            const parsed = JSON.parse(payload);
-            assistantText = parsed.message ?? parsed.delta ?? payload;
+            if (contentType.includes("application/json")) {
+              const payload = await response.json();
+              const assistantText =
+                typeof payload === "string"
+                  ? payload
+                  : payload?.message ?? payload?.delta ?? payload?.error ?? "";
+              pushAssistantFallback(
+                assistantId,
+                assistantText && `${assistantText}`.trim().length > 0
+                  ? assistantText
+                  : defaultErrorMessage
+              );
+              return;
+            }
+
+            const payload = await response.text();
+            const trimmedPayload = payload.trim();
+
+            if (/<!DOCTYPE|<html|<body/i.test(trimmedPayload)) {
+              console.error("Réponse inattendue du service Alfie", trimmedPayload.slice(0, 120));
+              pushAssistantFallback(assistantId, defaultErrorMessage);
+              return;
+            }
+
+            pushAssistantFallback(
+              assistantId,
+              trimmedPayload.length > 0 ? trimmedPayload : defaultErrorMessage
+            );
+            return;
           } catch (error) {
-            // ignore JSON parse errors, keep raw payload
+            console.error("Impossible de lire la réponse Alfie", error);
+            pushAssistantFallback(assistantId, defaultErrorMessage);
+            return;
           }
-          pushAssistantFallback(assistantId, assistantText);
-          return;
         }
 
         const reader = response.body.getReader();
@@ -312,13 +342,15 @@ function ChatGenerator({
     [inputValue, sendMessage]
   );
 
-  const handleQuickIdea = useCallback(
-    async (idea: string) => {
-      setInputValue(idea);
-      await sendMessage(idea);
-    },
-    [sendMessage]
-  );
+  const handleQuickIdea = useCallback((idea: string) => {
+    setInputValue((previous) => {
+      if (!previous || previous.trim().length === 0) {
+        return idea;
+      }
+      const separator = previous.endsWith(" ") ? "" : " ";
+      return `${previous}${separator}${idea}`;
+    });
+  }, []);
 
   useEffect(() => {
     if (pendingPrompt && pendingPrompt.trim().length > 0) {
@@ -332,6 +364,14 @@ function ChatGenerator({
     if (!isStreaming || !streamingMessageId) return null;
     return "Alfie rédige en direct…";
   }, [isStreaming, streamingMessageId]);
+
+  const handleSaveBrief = useCallback(() => {
+    console.info("Brief enregistré", {
+      brandId: brief.brandId,
+      deliverable: brief.deliverable,
+      ratio: brief.ratio,
+    });
+  }, [brief.brandId, brief.deliverable, brief.ratio]);
 
   const renderMessageContent = useCallback(
     (message: ChatMessage) => {
@@ -357,61 +397,32 @@ function ChatGenerator({
         {!hideHeader && (
           <header className={styles.header}>
             <div className={styles.titleGroup}>
-              <div className={styles.chatTitle}>Alfie — Chat Generator</div>
+              <h2 id="creation-conversation" className={styles.chatTitle}>
+                Conversation de création
+              </h2>
               <p className={styles.chatSubtitle}>
-                Brief actif : {brief.deliverable === "carousel" ? `${brief.slides ?? 5} slides` : brief.deliverable === "video" ? `${brief.duration ?? 30}s` : "visuel unique"} · {brief.ratio} ({brief.resolution})
+                Brief actif : {brief.deliverable === "carousel"
+                  ? `${brief.slides ?? 5} slides`
+                  : brief.deliverable === "video"
+                  ? `${brief.duration ?? 30}s`
+                  : "visuel unique"}
+                {" · "}
+                {brief.ratio} ({brief.resolution})
               </p>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-              <span className={styles.statusBadge} data-streaming={isStreaming}>
-                {isStreaming ? "Génération…" : "IA active"}
-              </span>
+            <div className={styles.headerMeta}>
+              <div className={styles.headerBadges}>
+                <span className={styles.statusBadge} data-streaming={isStreaming}>
+                  {isStreaming ? "Génération…" : "IA active"}
+                </span>
+                <span className={styles.brandBadge}>Brand Kit appliqué — {brandName ?? "Marque"}</span>
+              </div>
               <button type="button" className={styles.resetButton} onClick={resetChat}>
-                Réinitialiser
+                Effacer le brief
               </button>
             </div>
           </header>
         )}
-
-        {!hideQuickIdeas && (
-          <section className={styles.quickIdeas} aria-label="Idées rapides">
-            <div className={styles.quickIdeasLabel}>Idées rapides</div>
-            <div className={styles.quickIdeasChips}>
-              {QUICK_IDEAS.map((idea) => (
-                <button
-                  key={idea}
-                  type="button"
-                  className={styles.quickChip}
-                  onClick={() => void handleQuickIdea(idea)}
-                >
-                  {idea}
-                </button>
-              ))}
-            </div>
-
-            {!hideQuota && (quotaLoading || (quotaSnapshot && quotaSnapshot.length > 0)) && (
-              <div className={styles.quotaPanel}>
-                <div className={styles.quotaPanelHeader}>
-                  <span>
-                    Quotas {brandName ? `— ${brandName}` : "marque"}
-                  </span>
-                  {quotaStatusLabel && <span className={styles.quotaStatus}>{quotaStatusLabel}</span>}
-                </div>
-
-                {quotaLoading && (!quotaSnapshot || quotaSnapshot.length === 0) ? (
-                  <p className={styles.quotaLoading}>Chargement des quotas…</p>
-                ) : (
-                  <div className={styles.quotaStack}>
-                    {(quotaSnapshot ?? []).map((quota) => (
-                      <BrandQuotaRow key={quota.label} quota={quota} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
-        )}
-
         <div className={styles.messagesArea}>
           <div ref={listRef} className={styles.messageList}>
             {messages.map((message) => (
@@ -427,6 +438,43 @@ function ChatGenerator({
           </div>
 
           <div className={styles.composerWrapper}>
+            {!hideQuickIdeas && (
+              <div className={styles.quickIdeas} aria-label="Inspiration rapide">
+                <span className={styles.quickIdeasLabel}>Inspiration rapide</span>
+                <div className={styles.quickIdeasChips}>
+                  {QUICK_IDEAS.map((idea) => (
+                    <button
+                      key={idea}
+                      type="button"
+                      className={styles.quickChip}
+                      onClick={() => handleQuickIdea(idea)}
+                    >
+                      {idea}
+                    </button>
+                  ))}
+                </div>
+
+                {!hideQuota && (quotaLoading || (quotaSnapshot && quotaSnapshot.length > 0)) && (
+                  <div className={styles.quotaPanel}>
+                    <div className={styles.quotaPanelHeader}>
+                      <span>Quotas {brandName ? `— ${brandName}` : "marque"}</span>
+                      {quotaStatusLabel && <span className={styles.quotaStatus}>{quotaStatusLabel}</span>}
+                    </div>
+
+                    {quotaLoading && (!quotaSnapshot || quotaSnapshot.length === 0) ? (
+                      <p className={styles.quotaLoading}>Chargement des quotas…</p>
+                    ) : (
+                      <div className={styles.quotaStack}>
+                        {(quotaSnapshot ?? []).map((quota) => (
+                          <BrandQuotaRow key={quota.label} quota={quota} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             <form className={styles.composerShell} onSubmit={handleSubmit}>
               <textarea
                 className={styles.textarea}
@@ -435,9 +483,21 @@ function ChatGenerator({
                 onChange={(event) => setInputValue(event.target.value)}
                 disabled={isStreaming}
               />
-              <button type="submit" className={styles.sendButton} disabled={isStreaming || inputValue.trim().length === 0}>
-                {isStreaming ? "Génération…" : "Envoyer"}
-              </button>
+              <div className={styles.composerActions}>
+                <button
+                  type="submit"
+                  className={styles.primaryButton}
+                  disabled={isStreaming || inputValue.trim().length === 0}
+                >
+                  {isStreaming ? "Génération…" : "Générer"}
+                </button>
+                <button type="button" className={styles.secondaryButton} onClick={handleSaveBrief}>
+                  Enregistrer le brief
+                </button>
+                <a className={styles.libraryLink} href="/library">
+                  Ouvrir dans la Bibliothèque
+                </a>
+              </div>
             </form>
             {streamingLabel && <p className={styles.streamingIndicator}>{streamingLabel}</p>}
           </div>
