@@ -8,27 +8,26 @@ interface ChatMessage {
   id: string;
   role: "assistant" | "user";
   content: string;
+  attachments?: ChatMessageAttachment[];
 }
 
-interface QuotaSnapshotItem {
-  label: string;
-  used: number;
-  limit: number;
-  color: string;
+interface ChatMessageAttachment {
+  id: string;
+  type: "image" | "video";
+  url: string;
+  provider?: string;
+  format?: string;
+  posterUrl?: string;
 }
 
 interface ChatGeneratorProps {
   brief: Brief;
   pendingPrompt?: string | null;
   onPromptConsumed?: () => void;
-  quotaSnapshot?: QuotaSnapshotItem[];
-  quotaStatusLabel?: string;
   brandName?: string;
-  quotaLoading?: boolean;
   chatApiUrl?: string;
   className?: string;
   hideQuickIdeas?: boolean;
-  hideQuota?: boolean;
   hideHeader?: boolean;
   resetToken?: number;
   onStreamingChange?: (streaming: boolean) => void;
@@ -52,6 +51,7 @@ function createInitialMessages(): ChatMessage[] {
       role: "assistant",
       content:
         "Salut, je suis Alfie. Dis-moi ce que tu veux créer et je m’occupe du meilleur format.",
+      attachments: [],
     },
   ];
 }
@@ -63,48 +63,14 @@ function resolveId() {
   return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function resolveQuotaLabel(quota: QuotaSnapshotItem) {
-  const limit = Math.max(0, quota.limit);
-  const used = Math.max(0, quota.used);
-  if (limit <= 0) {
-    return `${used}`;
-  }
-  return `${used}/${limit}`;
-}
-
-function BrandQuotaRow({ quota }: { quota: QuotaSnapshotItem }) {
-  const limit = Math.max(1, quota.limit);
-  const used = Math.max(0, quota.used);
-  const percentage = Math.min(100, Math.round((used / limit) * 100));
-
-  return (
-    <div className={styles.quotaRow}>
-      <div className={styles.quotaRowHeader}>
-        <span>{quota.label}</span>
-        <span>{resolveQuotaLabel(quota)}</span>
-      </div>
-      <div className={styles.quotaTrack}>
-        <div
-          className={styles.quotaFill}
-          style={{ width: `${percentage}%`, background: quota.color }}
-        />
-      </div>
-    </div>
-  );
-}
-
 function ChatGenerator({
   brief,
   pendingPrompt,
   onPromptConsumed,
-  quotaSnapshot,
-  quotaStatusLabel,
   brandName,
-  quotaLoading,
   chatApiUrl,
   className,
   hideQuickIdeas = false,
-  hideQuota = false,
   hideHeader = false,
   resetToken,
   onStreamingChange,
@@ -181,6 +147,90 @@ function ChatGenerator({
       prev.map((message) => (message.id === messageId ? { ...message, content: text } : message))
     );
   }, []);
+
+  const appendAttachment = useCallback(
+    (messageId: string, attachment: ChatMessageAttachment) => {
+      setMessages((prev) =>
+        prev.map((message) => {
+          if (message.id !== messageId) {
+            return message;
+          }
+
+          const nextAttachments = Array.isArray(message.attachments)
+            ? [...message.attachments, attachment]
+            : [attachment];
+
+          return { ...message, attachments: nextAttachments };
+        })
+      );
+    },
+    []
+  );
+
+  const produceAsset = useCallback(
+    async (assistantId: string, userPrompt: string) => {
+      const deliverable = brief.deliverable;
+      if (deliverable !== "image" && deliverable !== "video") {
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/alfie/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt: userPrompt,
+            deliverable,
+            ratio: brief.ratio,
+            resolution: brief.resolution,
+            tone: brief.tone,
+            ambiance: brief.ambiance,
+            constraints: brief.constraints,
+            brandId: brief.brandId,
+            brandName,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || "Lovable ne répond pas");
+        }
+
+        const payload = (await response.json()) as {
+          assetUrl?: string;
+          type?: "image" | "video";
+          message?: string;
+          format?: string;
+          posterUrl?: string;
+          provider?: string;
+        };
+
+        if (payload.message && payload.message.trim().length > 0) {
+          upsertAssistantContent(assistantId, `\n\n${payload.message}`);
+        }
+
+        if (payload.assetUrl) {
+          appendAttachment(assistantId, {
+            id: resolveId(),
+            type: payload.type === "video" ? "video" : "image",
+            url: payload.assetUrl,
+            format: payload.format,
+            posterUrl: payload.posterUrl,
+            provider: payload.provider ?? "Lovable AI",
+          });
+        }
+      } catch (error) {
+        const fallbackMessage =
+          error instanceof Error
+            ? `\n\nJe n'ai pas pu générer le rendu Lovable : ${error.message}`
+            : "\n\nJe n'ai pas pu générer le rendu Lovable pour le moment.";
+        upsertAssistantContent(assistantId, fallbackMessage);
+      }
+    },
+    [appendAttachment, brandName, brief, upsertAssistantContent]
+  );
 
   const dispatchStreamingRequest = useCallback(
     async (updatedMessages: ChatMessage[], assistantId: string) => {
@@ -327,6 +377,7 @@ function ChatGenerator({
         id: resolveId(),
         role: "assistant",
         content: LOVABLE_HANDSHAKE_TEXT,
+        attachments: [],
       };
 
       const baseMessages = messagesRef.current;
@@ -339,8 +390,9 @@ function ChatGenerator({
 
       const updatedMessages = [...baseMessages, userMessage];
       await dispatchStreamingRequest(updatedMessages, assistantMessage.id);
+      await produceAsset(assistantMessage.id, trimmed);
     },
-    [dispatchStreamingRequest, isStreaming]
+    [dispatchStreamingRequest, isStreaming, produceAsset]
   );
 
   const handleSubmit = useCallback(
@@ -384,20 +436,64 @@ function ChatGenerator({
 
   const renderMessageContent = useCallback(
     (message: ChatMessage) => {
-      if (message.role === "assistant" && message.id === streamingMessageId && isStreaming) {
-        if (message.content.trim().length === 0) {
-          return (
+      const isAssistant = message.role === "assistant";
+      const isTyping =
+        isAssistant && message.id === streamingMessageId && isStreaming && message.content.trim().length === 0;
+
+      const attachments = message.attachments ?? [];
+
+      return (
+        <div className={styles.messageContent}>
+          {isTyping ? (
             <span className={styles.typingDots} aria-live="polite" aria-label="Alfie écrit">
               <span />
               <span />
               <span />
             </span>
-          );
-        }
-      }
-      return message.content;
+          ) : message.content.trim().length > 0 ? (
+            <p className={styles.messageText}>{message.content}</p>
+          ) : null}
+
+          {attachments.length > 0 && (
+            <div className={styles.attachments}>
+              {attachments.map((attachment) => (
+                <figure key={attachment.id} className={styles.assetFrame} data-type={attachment.type}>
+                  {attachment.type === "image" ? (
+                    <img
+                      src={attachment.url}
+                      alt={
+                        attachment.format
+                          ? `Visuel généré (${attachment.format})`
+                          : "Visuel généré par Alfie"
+                      }
+                      className={styles.assetMedia}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <video
+                      className={styles.assetMedia}
+                      controls
+                      preload="metadata"
+                      poster={attachment.posterUrl}
+                    >
+                      <source src={attachment.url} />
+                      Votre navigateur ne peut pas lire cette vidéo.
+                    </video>
+                  )}
+                  <figcaption className={styles.assetMeta}>
+                    <span className={styles.assetBadge}>Lovable AI</span>
+                    <span className={styles.assetFormat}>{
+                      attachment.format ?? `${brief.ratio} — ${brief.resolution}`
+                    }</span>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          )}
+        </div>
+      );
     },
-    [isStreaming, streamingMessageId]
+    [brief.ratio, brief.resolution, isStreaming, streamingMessageId]
   );
 
   return (
@@ -462,25 +558,6 @@ function ChatGenerator({
                     </button>
                   ))}
                 </div>
-
-                {!hideQuota && (quotaLoading || (quotaSnapshot && quotaSnapshot.length > 0)) && (
-                  <div className={styles.quotaPanel}>
-                    <div className={styles.quotaPanelHeader}>
-                      <span>Quotas {brandName ? `— ${brandName}` : "marque"}</span>
-                      {quotaStatusLabel && <span className={styles.quotaStatus}>{quotaStatusLabel}</span>}
-                    </div>
-
-                    {quotaLoading && (!quotaSnapshot || quotaSnapshot.length === 0) ? (
-                      <p className={styles.quotaLoading}>Chargement des quotas…</p>
-                    ) : (
-                      <div className={styles.quotaStack}>
-                        {(quotaSnapshot ?? []).map((quota) => (
-                          <BrandQuotaRow key={quota.label} quota={quota} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             )}
 

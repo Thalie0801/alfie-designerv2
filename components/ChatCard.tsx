@@ -8,5 +8,5 @@ interface ChatCardProps {
 }
 
 export default function ChatCard({ brief, brandName }: ChatCardProps) {
-  return <ChatGenerator brief={brief} brandName={brandName} hideQuota />;
+  return <ChatGenerator brief={brief} brandName={brandName} />;
 }
