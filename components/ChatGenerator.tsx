@@ -193,17 +193,46 @@ function ChatGenerator({
           throw new Error(errorText || "Réponse inattendue du serveur");
         }
 
-        if (!response.body) {
-          const payload = await response.text();
-          let assistantText = payload;
+        const contentType = response.headers.get("content-type") ?? "";
+        const defaultErrorMessage =
+          "Je ne parviens pas à contacter le service pour le moment. Peux-tu réessayer un peu plus tard ?";
+
+        if (!contentType.includes("text/event-stream") || !response.body) {
           try {
-            const parsed = JSON.parse(payload);
-            assistantText = parsed.message ?? parsed.delta ?? payload;
+            if (contentType.includes("application/json")) {
+              const payload = await response.json();
+              const assistantText =
+                typeof payload === "string"
+                  ? payload
+                  : payload?.message ?? payload?.delta ?? payload?.error ?? "";
+              pushAssistantFallback(
+                assistantId,
+                assistantText && `${assistantText}`.trim().length > 0
+                  ? assistantText
+                  : defaultErrorMessage
+              );
+              return;
+            }
+
+            const payload = await response.text();
+            const trimmedPayload = payload.trim();
+
+            if (/<!DOCTYPE|<html|<body/i.test(trimmedPayload)) {
+              console.error("Réponse inattendue du service Alfie", trimmedPayload.slice(0, 120));
+              pushAssistantFallback(assistantId, defaultErrorMessage);
+              return;
+            }
+
+            pushAssistantFallback(
+              assistantId,
+              trimmedPayload.length > 0 ? trimmedPayload : defaultErrorMessage
+            );
+            return;
           } catch (error) {
-            // ignore JSON parse errors, keep raw payload
+            console.error("Impossible de lire la réponse Alfie", error);
+            pushAssistantFallback(assistantId, defaultErrorMessage);
+            return;
           }
-          pushAssistantFallback(assistantId, assistantText);
-          return;
         }
 
         const reader = response.body.getReader();
