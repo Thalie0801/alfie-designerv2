@@ -844,33 +844,6 @@ export type Database = {
         }
         Relationships: []
       }
-      payment_sessions: {
-        Row: {
-          amount: number | null
-          id: string
-          plan: string
-          processed_at: string
-          session_id: string
-          user_id: string | null
-        }
-        Insert: {
-          amount?: number | null
-          id?: string
-          plan: string
-          processed_at?: string
-          session_id: string
-          user_id?: string | null
-        }
-        Update: {
-          amount?: number | null
-          id?: string
-          plan?: string
-          processed_at?: string
-          session_id?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       posts: {
         Row: {
           brand_key: string | null

@@ -1,49 +1,15 @@
-name: "Guard - No Landing Changes"
-
+name: Guard — No Landing Changes
 on:
   pull_request:
-    branches: ["**"]
-
+    branches: [ "**" ]
 jobs:
   no-landing:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PR HEAD
-        uses: actions/checkout@v4
-        with:
-          # Historique complet pour un merge-base fiable
-          fetch-depth: 0
-
-      - name: Fetch base branch
-        shell: bash
-        run: |
-          set -eo pipefail
-          echo "Base ref = ${{ github.base_ref }}"
-          git fetch --no-tags --prune origin +refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}
-
+      - uses: actions/checkout@v4
       - name: Fail if landing modified
-        shell: bash
-        env:
-          LC_ALL: C
         run: |
-          set -eo pipefail
-
-          # Calculer le point commun entre la PR (HEAD) et la base
-          MB=$(git merge-base HEAD origin/${{ github.base_ref }})
-          echo "Merge-base = $MB"
-
-          # Fichiers touchés par la PR (Ajouts/Modifs/Copies/Renames/Suppressions)
-          CHANGED=$(git diff --name-only -M --diff-filter=ACMRD "$MB..HEAD" || true)
-          echo "Changed files since merge-base:"
-          echo "$CHANGED"
-
-          # Détecter tout impact sur la landing
-          if grep -Eq '^(apps/landing/|www/|site/)' <<< "$CHANGED"; then
+          if git diff --name-only origin/${{ github.base_ref }}... | grep -E '^(apps/landing|www/|site/)' ; then
             echo "::error title=Landing modifiée::La landing ne doit pas être modifiée par cette PR."
             exit 1
           fi
-
-          echo "OK: aucune modification de la landing."
-
-
-         

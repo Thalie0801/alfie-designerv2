@@ -1,16 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-const verifyPaymentSchema = z.object({
-  session_id: z.string().min(1)
-});
 
 const PLAN_CONFIG = {
   starter: { 
@@ -50,36 +45,15 @@ serve(async (req) => {
   );
 
   try {
-    const body = await req.json();
-    const validationResult = verifyPaymentSchema.safeParse(body);
+    const { session_id } = await req.json();
     
-    if (!validationResult.success) {
-      return new Response(
-        JSON.stringify({ error: "Invalid request format" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!session_id) {
+      throw new Error("Session ID required");
     }
-    
-    const { session_id } = validationResult.data;
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2025-08-27.basil",
     });
-
-    // Check for idempotency - prevent duplicate processing
-    const { data: existingProcessed } = await supabaseClient
-      .from("payment_sessions")
-      .select("id")
-      .eq("session_id", session_id)
-      .maybeSingle();
-    
-    if (existingProcessed) {
-      console.log("Session already processed:", session_id);
-      return new Response(
-        JSON.stringify({ error: "Session already processed" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
     // Get checkout session details
     const session = await stripe.checkout.sessions.retrieve(session_id);
@@ -93,23 +67,11 @@ serve(async (req) => {
     const customerEmail = session.customer_details?.email;
     const affiliateRef = session.metadata?.affiliate_ref;
 
-    // Validate plan against allowed values
-    const allowedPlans = ['starter', 'pro', 'studio', 'enterprise'] as const;
-    if (!plan || !allowedPlans.includes(plan as any) || !PLAN_CONFIG[plan as keyof typeof PLAN_CONFIG]) {
+    if (!plan || !PLAN_CONFIG[plan as keyof typeof PLAN_CONFIG]) {
       throw new Error("Invalid plan in session metadata");
     }
 
     const planConfig = PLAN_CONFIG[plan as keyof typeof PLAN_CONFIG];
-
-    // Record this payment session as processed
-    await supabaseClient
-      .from("payment_sessions")
-      .insert({
-        session_id: session_id,
-        user_id: userId || null,
-        plan,
-        amount: session.amount_total ? session.amount_total / 100 : 0
-      });
 
     // Update profile with stripe info and global quota (for backward compatibility)
     if (userId) {
@@ -226,20 +188,14 @@ serve(async (req) => {
     if (affiliateRef && userId) {
       console.log("Processing affiliate conversion for ref:", affiliateRef);
       
-      // Validate affiliate_ref format
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(affiliateRef)) {
-        console.error("Invalid affiliate_ref format:", affiliateRef);
-      } else {
-        // Find the affiliate by their code (using id as the code)
-        const { data: affiliate, error: affiliateError } = await supabaseClient
-          .from("affiliates")
-          .select("id, status")
-          .eq("id", affiliateRef)
-          .eq("status", "active")
-          .single();
+      // Find the affiliate by their code (using id as the code)
+      const { data: affiliate, error: affiliateError } = await supabaseClient
+        .from("affiliates")
+        .select("id")
+        .eq("id", affiliateRef)
+        .single();
 
-        if (affiliate && !affiliateError) {
+      if (affiliate && !affiliateError) {
         console.log("Found affiliate:", affiliate.id);
         
         // Get the amount from session
@@ -290,12 +246,11 @@ serve(async (req) => {
           } else {
             console.log("Affiliate status updated successfully");
           }
-          } else {
-            console.error("Error creating conversion:", conversionError);
-          }
         } else {
-          console.log("Affiliate not found or error:", affiliateError);
+          console.error("Error creating conversion:", conversionError);
         }
+      } else {
+        console.log("Affiliate not found or error:", affiliateError);
       }
     }
 
