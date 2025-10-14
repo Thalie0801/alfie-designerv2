@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -26,7 +25,7 @@ export default function Creer() {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-semibold">Créer une image</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Décris ton idée pour générer une image avec Gemini (Imagen 3).
+            Décris ton idée pour générer une image avec Lovable (Gemini Nano Banana).
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -64,19 +63,9 @@ export default function Creer() {
           {error && <p className="text-sm text-red-600">{error}</p>}
 
           {urls.length > 0 && (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {urls.map((url) => (
-                <Card key={url} className="overflow-hidden">
-                  <div className="relative aspect-square">
-                    <Image
-                      src={url}
-                      alt="image générée"
-                      fill
-                      className="object-cover"
-                      sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-                    />
-                  </div>
-                </Card>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+              {urls.map((u) => (
+                <img key={u} src={u} alt="image générée" className="rounded-xl border" />
               ))}
             </div>
           )}
