@@ -131,9 +131,6 @@ export default function Library() {
         </p>
       </div>
 
-      {/* Video Diagnostic */}
-      <VideoDiagnostic />
-
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'images' | 'videos')}>
         <TabsList>

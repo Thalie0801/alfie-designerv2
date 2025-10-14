@@ -120,10 +120,9 @@ export default function Creator() {
         <header className={styles.header}>
           <div className={styles.headerText}>
             <span className={styles.headerBadge}>Studio</span>
-            <h1 className={styles.title}>Chat Generator avec Alfie</h1>
+            <h1 className={styles.title}>Créer avec Alfie</h1>
             <p className={styles.subtitle}>
-              Compose ton brief idéal, sélectionne les bons formats et laisse Alfie produire visuels, vidéos ou copy.
-              Le moteur de réponse reste piloté par Alfie pour la création et la livraison.
+              Sélectionne ton format, compose ton brief et laisse Alfie produire des visuels professionnels adaptés à ton Brand Kit.
             </p>
           </div>
           <div className={styles.headerMeta}>

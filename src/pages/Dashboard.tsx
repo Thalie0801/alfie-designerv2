@@ -79,15 +79,22 @@ export default function Dashboard() {
     }
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Bonjour";
+    if (hour < 18) return "Bon après-midi";
+    return "Bonsoir";
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Dashboard
+            {getGreeting()} {user?.email?.split('@')[0] || 'créateur'} 👋
           </h1>
           <p className="text-muted-foreground">
-            Retrouvez vos créations et gérez vos marques
+            Voici un aperçu de votre activité Alfie Designer
           </p>
         </div>
         <Button 
@@ -100,6 +107,39 @@ export default function Dashboard() {
         </Button>
       </div>
 
+      {/* KPI Cards */}
+      <div className="grid md:grid-cols-3 gap-4">
+        <Card className="border-primary/20 shadow-medium">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Brand Kits actifs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-primary">{brands.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">marques configurées</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-green-500/20 shadow-medium">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Créations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-green-600">{posts.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">visuels générés</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-secondary/20 shadow-medium">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Statut</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-secondary">Actif</div>
+            <p className="text-xs text-muted-foreground mt-1">compte vérifié</p>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Alfie Designer Card */}
       <Card className="border-primary/30 shadow-strong bg-gradient-subtle">
         <CardHeader className="bg-gradient-to-br from-primary/10 to-secondary/10">
@@ -109,8 +149,8 @@ export default function Dashboard() {
                 <Sparkles className="h-6 w-6 text-white" />
               </div>
               <div>
-                <CardTitle className="text-xl">Alfie Designer</CardTitle>
-                <CardDescription>Ton assistant créatif IA</CardDescription>
+                <CardTitle className="text-xl">Créer avec Alfie</CardTitle>
+                <CardDescription>Votre assistant créatif IA</CardDescription>
               </div>
             </div>
             <Button 
@@ -118,21 +158,14 @@ export default function Dashboard() {
               className="gap-2 bg-gradient-to-r from-primary to-secondary text-white hover:opacity-90"
             >
               <MessageSquare className="h-4 w-4" />
-              Ouvrir le chat
+              Créer maintenant
             </Button>
           </div>
         </CardHeader>
         <CardContent className="pt-6">
-          <div className="flex items-center gap-3 p-4 rounded-lg border-2 border-primary/20 bg-background/50 max-w-md">
-            <Palette className="h-8 w-8 text-secondary" />
-            <div>
-              <p className="text-2xl font-bold">{brands.length}</p>
-              <p className="text-sm text-muted-foreground">Brand Kits</p>
-            </div>
-          </div>
-          <div className="mt-4 p-4 rounded-lg bg-primary/5 border border-primary/10">
+          <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
             <p className="text-sm text-muted-foreground">
-              💡 <strong>Astuce :</strong> Discute avec Alfie pour générer des visuels IA ou adapter des templates Canva à ton Brand Kit. 
+              💡 <strong>Astuce :</strong> Alfie génère des visuels IA adaptés à ton Brand Kit. 
               Les quotas (visuels, vidéos, Woofs) sont gérés par marque.
             </p>
           </div>
