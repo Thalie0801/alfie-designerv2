@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,12 +11,16 @@ import { Badge } from '@/components/ui/badge';
 import { VideoDiagnostic } from '@/components/VideoDiagnostic';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 export default function Library() {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'images' | 'videos'>('images');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
+  const [periodFilter, setPeriodFilter] = useState<'all' | 'current'>('all');
 
   const { 
     assets, 
@@ -27,6 +31,27 @@ export default function Library() {
     cleanupProcessingVideos
   } = useLibraryAssets(user?.id, activeTab);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    const periodParam = params.get('period');
+
+    if (tabParam === 'images' || tabParam === 'videos') {
+      setActiveTab(tabParam);
+    }
+
+    if (periodParam === 'current') {
+      setPeriodFilter('current');
+    } else {
+      setPeriodFilter('all');
+    }
+  }, [location.search]);
+
+  const startOfMonth = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  }, []);
+
   // Auto cleanup when switching to videos tab
   useEffect(() => {
     if (activeTab === 'videos') {
@@ -34,11 +59,34 @@ export default function Library() {
     }
   }, [activeTab]);
 
-  const filteredAssets = assets.filter(asset =>
-    !searchQuery || 
-    asset.prompt?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    asset.engine?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredAssets = assets
+    .filter(asset => {
+      if (periodFilter !== 'current') return true;
+      const assetDate = new Date(asset.created_at);
+      return assetDate >= startOfMonth;
+    })
+    .filter(asset =>
+      !searchQuery ||
+      asset.prompt?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      asset.engine?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+  const handleTabChange = (value: 'images' | 'videos') => {
+    setActiveTab(value);
+    const params = new URLSearchParams(location.search);
+    params.set('tab', value);
+    if (periodFilter === 'all') {
+      params.delete('period');
+    }
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+  };
+
+  const clearPeriodFilter = () => {
+    setPeriodFilter('all');
+    const params = new URLSearchParams(location.search);
+    params.delete('period');
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+  };
 
   const handleSelectAsset = (assetId: string) => {
     setSelectedAssets(prev => 
@@ -132,7 +180,7 @@ export default function Library() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'images' | 'videos')}>
+      <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as 'images' | 'videos')}>
         <TabsList>
           <TabsTrigger value="images">🖼️ Images</TabsTrigger>
           <TabsTrigger value="videos">🎬 Vidéos</TabsTrigger>
@@ -143,14 +191,29 @@ export default function Library() {
           <div className="flex-1 min-w-[200px]">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Rechercher..." 
+              <Input
+                placeholder="Rechercher..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
             </div>
           </div>
+
+          {periodFilter === 'current' && (
+            <Badge variant="outline" className="flex items-center gap-2 px-3 py-1">
+              Période : mois en cours
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6 text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary"
+                onClick={clearPeriodFilter}
+                aria-label="Retirer le filtre période"
+              >
+                ✕
+              </Button>
+            </Badge>
+          )}
 
           {activeTab === 'videos' && (
             <>

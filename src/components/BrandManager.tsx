@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { BrandDialog } from './BrandDialog';
 import { AddBrandDialog } from './AddBrandDialog';
-import { Palette, AlertCircle, Edit, Plus } from 'lucide-react';
+import { Palette, AlertCircle, Edit, Plus, Link2, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { toast } from 'sonner';
@@ -30,6 +30,12 @@ export function BrandManager() {
       toast.error('Erreur');
     }
   };
+
+  const totalAllowedBrands = quotaBrands ?? 0;
+  const remainingBrandSlots = Math.max(0, totalAllowedBrands - totalBrands);
+  const capacityLabel = totalAllowedBrands > 0
+    ? (remainingBrandSlots > 0 ? `${remainingBrandSlots} slots restants` : 'Capacité atteinte')
+    : 'Quota en cours';
 
   if (loading) {
     return (
@@ -65,7 +71,7 @@ export function BrandManager() {
             <span>Marque active</span>
             {canAddBrand && (
               <BrandDialog onSuccess={loadBrands}>
-                <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs">
+                <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary">
                   <Plus className="h-3 w-3" />
                   Nouvelle
                 </Button>
@@ -79,10 +85,11 @@ export function BrandManager() {
                 {activeBrand && (
                   <div className="flex items-center gap-2">
                     {activeBrand.logo_url && (
-                      <img 
-                        src={activeBrand.logo_url} 
+                      <img
+                        src={activeBrand.logo_url}
                         alt={activeBrand.name}
                         className="w-6 h-6 object-contain rounded"
+                        loading="lazy"
                       />
                     )}
                     <span className="font-medium">{activeBrand.name}</span>
@@ -112,8 +119,17 @@ export function BrandManager() {
         {/* Active Brand Preview */}
         {activeBrand ? (
           <div className="space-y-4 p-4 rounded-lg border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-secondary/5">
-            <div className="flex items-start justify-between">
+            <div className="flex items-start justify-between gap-4">
               <div className="flex-1 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={activeBrand.canva_connected ? 'secondary' : 'outline'} className="gap-1">
+                    <Link2 className="h-3.5 w-3.5" />
+                    {activeBrand.canva_connected ? 'Canva connecté' : 'Canva non connecté'}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {capacityLabel}
+                  </Badge>
+                </div>
                 {/* Palette */}
                 {activeBrand.palette && activeBrand.palette.length > 0 && (
                   <div className="space-y-2">
@@ -147,12 +163,20 @@ export function BrandManager() {
               </div>
 
               <BrandDialog brand={activeBrand} onSuccess={loadBrands}>
-                <Button variant="outline" size="sm" className="gap-1.5">
+                <Button variant="outline" size="sm" className="gap-1.5 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary">
                   <Edit className="h-3.5 w-3.5" />
                   Modifier
                 </Button>
               </BrandDialog>
             </div>
+            <Button
+              variant="secondary"
+              disabled
+              className="w-full justify-center gap-2 opacity-70 cursor-not-allowed"
+            >
+              <Sparkles className="h-4 w-4" />
+              Tester avec un template (bientôt)
+            </Button>
           </div>
         ) : (
           <Alert className="border-primary/30">
