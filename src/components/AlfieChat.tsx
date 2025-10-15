@@ -68,6 +68,7 @@ export function AlfieChat() {
   const [selectedRatio, setSelectedRatio] = useState<RatioOption>('1:1');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const { brandKit, activeBrandId } = useBrandKit();
   const { totalCredits, decrementCredits, hasCredits, incrementGenerations } = useAlfieCredits();
   const { searchTemplates } = useTemplateLibrary();
@@ -227,6 +228,14 @@ export function AlfieChat() {
         fileInputRef.current.value = '';
       }
     }
+  };
+
+  const removeUploadedImage = () => {
+    setUploadedImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    toast.info('Image retirée');
   };
 
   const handleToolCall = async (toolName: string, args: any) => {
@@ -1031,7 +1040,7 @@ export function AlfieChat() {
     : null;
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] flex-col bg-slate-50">
+    <div className="flex min-h-[calc(100vh-4rem)] flex-col bg-gradient-to-b from-slate-50 via-white to-slate-50">
       <CreateHeader />
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-4 py-6">
@@ -1059,17 +1068,18 @@ export function AlfieChat() {
             onUploadClick={() => fileInputRef.current?.click()}
             uploadingImage={uploadingImage}
             uploadedImage={uploadedImage}
-            onRemoveUpload={() => setUploadedImage(null)}
+            onRemoveUpload={removeUploadedImage}
             showVideoDurationChips={showVideoDurationChips}
             selectedDuration={selectedDuration}
             onDurationChange={(duration) => setSelectedDuration(duration)}
             onForceVideo={() => handleSend({ forceVideo: true })}
+            inputRef={inputRef}
           />
-          <section className="flex flex-col gap-4 pb-10">
+          <section className="flex flex-col gap-3 pb-10">
             {messages.map((message, index) => {
               if (message.jobId) {
                 return (
-                  <div key={`job-${message.jobId}-${index}`} className="flex justify-start">
+                  <div key={`job-${message.jobId}-${index}`} className="flex justify-start animate-fade-in">
                     <JobPlaceholder
                       jobId={message.jobId}
                       shortId={message.jobShortId}
@@ -1082,27 +1092,30 @@ export function AlfieChat() {
               }
 
               return (
-                <ChatBubble
-                  key={index}
-                  role={message.role}
-                  content={message.content}
-                  imageUrl={message.imageUrl}
-                  videoUrl={message.videoUrl}
-                  timestamp={message.created_at}
-                  onDownloadImage={message.imageUrl ? () => handleDownload(message.imageUrl!, 'image') : undefined}
-                  onDownloadVideo={message.videoUrl ? () => handleDownload(message.videoUrl!, 'video') : undefined}
-                />
+                <div key={index} className="animate-fade-in">
+                  <ChatBubble
+                    role={message.role}
+                    content={message.content}
+                    imageUrl={message.imageUrl}
+                    videoUrl={message.videoUrl}
+                    timestamp={message.created_at}
+                    onDownloadImage={message.imageUrl ? () => handleDownload(message.imageUrl!, 'image') : undefined}
+                    onDownloadVideo={message.videoUrl ? () => handleDownload(message.videoUrl!, 'video') : undefined}
+                  />
+                </div>
               );
             })}
 
             {(isLoading || generationStatus) && (
-              <ChatBubble
-                role="assistant"
-                content={generationStatus?.message || 'Alfie réfléchit à ta demande...'}
-                isStatus
-                generationType={generationStatus?.type === 'video' ? 'video' : generationStatus ? 'image' : 'text'}
-                isLoading={isLoading && !generationStatus}
-              />
+              <div className="animate-fade-in">
+                <ChatBubble
+                  role="assistant"
+                  content={generationStatus?.message || 'Alfie réfléchit à ta demande...'}
+                  isStatus
+                  generationType={generationStatus?.type === 'video' ? 'video' : generationStatus ? 'image' : 'text'}
+                  isLoading={isLoading && !generationStatus}
+                />
+              </div>
             )}
 
             <div ref={messagesEndRef} />

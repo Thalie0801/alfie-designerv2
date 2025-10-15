@@ -34,6 +34,7 @@ interface GeneratorCardProps {
   selectedDuration: 'short' | 'medium' | 'long';
   onDurationChange: (duration: 'short' | 'medium' | 'long') => void;
   onForceVideo: () => void;
+  inputRef?: React.RefObject<HTMLTextAreaElement>;
 }
 
 export function GeneratorCard({
@@ -58,8 +59,9 @@ export function GeneratorCard({
   selectedDuration,
   onDurationChange,
   onForceVideo,
+  inputRef,
 }: GeneratorCardProps) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = inputRef || useRef<HTMLTextAreaElement>(null);
 
   const handleMagicFocus = () => {
     textareaRef.current?.focus();
@@ -95,7 +97,8 @@ export function GeneratorCard({
           )}
 
           {generationStatus && (
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+            <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 text-sm font-medium text-blue-700 shadow-sm animate-fade-in flex items-center gap-2">
+              <Sparkles className="h-4 w-4 animate-pulse" />
               {generationStatus.message}
             </div>
           )}
@@ -144,33 +147,39 @@ export function GeneratorCard({
           )}
 
           {uploadedImage && (
-            <div className="flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-3">
-              <img src={uploadedImage} alt="Image ajoutée" className="h-16 w-16 rounded-xl object-cover" />
+            <div className="group relative flex items-center gap-3 rounded-2xl border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-3 shadow-sm transition-all hover:shadow-md animate-fade-in">
+              <div className="relative overflow-hidden rounded-xl">
+                <img src={uploadedImage} alt="Image ajoutée" className="h-20 w-20 object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100"></div>
+              </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-slate-700">Image importée</p>
-                <p className="text-xs text-slate-500">Elle sera utilisée comme source pour la prochaine génération.</p>
+                <p className="font-semibold text-slate-800 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-blue-600" />
+                  Image source prête
+                </p>
+                <p className="text-xs text-slate-600 mt-1">Utilisée pour la prochaine génération</p>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
-                className="rounded-full text-slate-600 hover:bg-slate-100"
+                className="rounded-full text-slate-600 hover:bg-white/80 hover:text-red-600 transition-colors"
                 onClick={onRemoveUpload}
               >
-                Retirer
+                ✕ Retirer
               </Button>
             </div>
           )}
         </div>
 
         <div className="md:static md:bg-transparent md:p-0">
-          <div className="sticky bottom-4 z-10 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg md:static md:shadow-none">
+          <div className="sticky bottom-4 z-10 rounded-2xl border-2 border-slate-200 bg-white p-4 shadow-xl md:static md:shadow-sm md:border">
             <div className="flex items-end gap-3">
               <div className="flex flex-col gap-2">
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-10 w-10 rounded-full text-slate-600 hover:bg-slate-100"
+                  className="h-11 w-11 rounded-full text-slate-600 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 hover:text-blue-600 transition-all hover:scale-105"
                   onClick={handleMagicFocus}
                   aria-label="Suggestions créatives"
                 >
@@ -180,7 +189,7 @@ export function GeneratorCard({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-10 w-10 rounded-full text-slate-600 hover:bg-slate-100"
+                  className="h-11 w-11 rounded-full text-slate-600 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 hover:text-blue-600 transition-all hover:scale-105"
                   onClick={onUploadClick}
                   disabled={uploadingImage}
                   aria-label="Téléverser une image"
@@ -190,18 +199,18 @@ export function GeneratorCard({
               </div>
               <Textarea
                 ref={textareaRef}
-                placeholder="Décris ton idée à Alfie..."
+                placeholder="Décris ton idée à Alfie... (Shift + Enter pour nouvelle ligne)"
                 value={inputValue}
                 onChange={(event) => onInputChange(event.target.value)}
                 onKeyDown={onKeyDown}
                 disabled={isTextareaDisabled}
-                className="min-h-[120px] flex-1 resize-none rounded-2xl border-slate-200 bg-white px-4 py-3 text-base focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="min-h-[120px] flex-1 resize-none rounded-2xl border-slate-200 bg-white px-4 py-3 text-base focus-visible:ring-2 focus-visible:ring-blue-500 transition-shadow"
               />
               <Button
                 type="button"
                 onClick={onSend}
                 disabled={isSendDisabled}
-                className="h-12 rounded-full bg-blue-600 px-6 text-white transition-transform hover:-translate-y-0.5 hover:bg-blue-700"
+                className="h-12 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-6 text-white transition-all hover:shadow-lg hover:scale-105 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:hover:scale-100"
               >
                 {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
               </Button>

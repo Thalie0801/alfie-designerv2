@@ -41,10 +41,10 @@ export function ChatBubble({
     : null;
 
   const bubbleClasses = cn(
-    'rounded-2xl border px-4 py-3 text-sm transition-opacity duration-200 shadow-sm',
+    'rounded-2xl border px-4 py-3 text-sm transition-all duration-200 shadow-sm',
     isUser
-      ? 'bg-blue-50 border-blue-200 text-slate-900'
-      : 'bg-white border-slate-200 text-slate-900'
+      ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 text-slate-900'
+      : 'bg-white border-slate-200 text-slate-900 hover:shadow-md'
   );
 
   const statusLabel =
@@ -55,15 +55,15 @@ export function ChatBubble({
         : '✨ Génération image';
 
   return (
-    <div className={cn('flex w-full gap-3', isUser ? 'justify-end' : 'justify-start')}>
+    <div className={cn('flex w-full gap-3 transition-all hover:scale-[1.01]', isUser ? 'justify-end' : 'justify-start')}>
       {!isUser && (
-        <Avatar className="h-9 w-9 border border-slate-200">
+        <Avatar className="h-9 w-9 border-2 border-slate-200 shadow-sm">
           <AvatarImage src={alfieMain} alt="Alfie" />
-          <AvatarFallback>AF</AvatarFallback>
+          <AvatarFallback className="bg-blue-50 text-blue-700">AF</AvatarFallback>
         </Avatar>
       )}
 
-      <div className={cn('flex max-w-[80%] flex-col gap-3', isUser && 'items-end')}>
+      <div className={cn('flex max-w-[80%] flex-col gap-2', isUser && 'items-end')}>
         {isStatus ? (
           <div className={bubbleClasses}>
             <div className="flex items-center gap-3">
@@ -71,11 +71,11 @@ export function ChatBubble({
                 {isLoading ? (
                   <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
                 ) : (
-                  <Sparkles className="h-5 w-5 text-blue-600" />
+                  <Sparkles className="h-5 w-5 text-blue-600 animate-pulse" />
                 )}
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-medium text-slate-900">{statusLabel}</p>
+                <p className="text-sm font-semibold text-slate-900">{statusLabel}</p>
                 <p className="text-sm text-slate-600">{content}</p>
               </div>
             </div>
@@ -109,13 +109,13 @@ export function ChatBubble({
         )}
 
         {formattedDate && !isStatus && (
-          <p className="text-xs text-slate-400">{formattedDate}</p>
+          <p className="text-xs text-slate-400 px-2">{formattedDate}</p>
         )}
       </div>
 
       {isUser && (
-        <Avatar className="h-9 w-9 border border-slate-200 bg-blue-50 text-blue-700">
-          <AvatarFallback>Moi</AvatarFallback>
+        <Avatar className="h-9 w-9 border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-700 shadow-sm">
+          <AvatarFallback className="font-semibold">Tu</AvatarFallback>
         </Avatar>
       )}
     </div>
