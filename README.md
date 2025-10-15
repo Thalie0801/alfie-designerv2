@@ -1,105 +1,130 @@
-# Welcome to your Lovable project
+# 🎨 Alfie Designer - AI Design Assistant
 
-## Project info
+![Alfie Designer](https://img.shields.io/badge/Next.js-15.5.3-black?style=for-the-badge&logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38bdf8?style=for-the-badge&logo=tailwind-css)
 
-**URL**: https://lovable.dev/projects/b6ceafb7-5b2f-483f-b988-77dd6e3f8f0e
+**Alfie Designer** est une plateforme d'assistant créatif IA qui transforme tes idées en designs professionnels pour Instagram, TikTok, LinkedIn et plus encore.
 
-## How can I edit this code?
+## ✨ Fonctionnalités
 
-There are several ways of editing your application.
+### 🎯 Core Features
+- **Chat IA Créatif** - Dialogue naturel avec Alfie pour créer des visuels
+- **Upload d'images** - Ajoute tes propres images dans le chat
+- **Téléchargement** - Download tes créations en HD/4K
+- **Sidebar Navigation** - Navigation fluide et responsive
 
-**Use Lovable**
+### 📊 Dashboard & Analytics
+- **Quota System** - Suivi de l'utilisation mensuelle (images/vidéos)
+- **Progress Bars** - Visualisation des limites par plan
+- **Statistiques** - Vues, téléchargements, conversions
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/b6ceafb7-5b2f-483f-b988-77dd6e3f8f0e) and start prompting.
+### 💰 Programme d'Affiliation
+- **3 niveaux de commissions** - 15% / 5% / 2%
+- **Système de payout** - Demande de paiement (minimum 50€)
+- **Historique des paiements** - Suivi complet des versements
+- **Lien de parrainage** - Partage et tracking
 
-Changes made via Lovable will be committed automatically to this repo.
+### 🎨 Design System
+- **Couleurs pastel mixtes** - Rose clair, bleu clair, vert clair
+- **Gradients harmonieux** - Design moderne et apaisant
+- **Cards colorées** - Chaque section a sa propre couleur
+- **Responsive** - Mobile-first design
 
-**Use your preferred IDE**
+## 🚀 Installation
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+```bash
+# Clone le repo
+git clone https://github.com/Thalie0801/Alfie-designer-2.git
+cd Alfie-designer-2
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+# Installe les dépendances
+bun install
 
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+# Lance le serveur de développement
+bun run dev
 ```
 
-**Edit a file directly in GitHub**
+Ouvre [http://localhost:3000](http://localhost:3000) dans ton navigateur.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 📦 Stack Technique
 
-**Use GitHub Codespaces**
+- **Framework** - Next.js 14 (App Router)
+- **Language** - TypeScript
+- **Styling** - Tailwind CSS + shadcn/ui
+- **Icons** - Lucide React
+- **Package Manager** - Bun
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 🎨 Palette de Couleurs
 
-## What technologies are used for this project?
+```css
+/* Rose clair */
+--primary: 340 82% 67%;
 
-This project is built with:
+/* Bleu clair */
+--accent: 200 95% 65%;
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+/* Vert clair */
+--success: 142 76% 73%;
 
-## Refonte V1 runbook (PULL only)
-
-The refonte branch ships a locked-down delivery flow: Canva link + ZIP, no autopublish, quotas unchanged, and 30-day retention.
-
-- `make codex` runs the codemod that rewrites any lingering push/publish flows to the PULL delivery endpoint while skipping the landing page guardrails.
-- `make validate` calls `scripts/validate_refonte.sh` to ensure no "push Canva" or autopublish traces slip through the diff.
-- `make cleanup` triggers the 30-day retention cleanup script used in production cronjobs.
-- `make test` executes the codemod Jest suite (uses `npm test --scripts-prepend-node-path`).
-
-For backend integrations, see [`examples/api/express/counters.ts`](examples/api/express/counters.ts) for the `/v1/counters` handler that returns usage totals and 80% alerts, and consult the refonte docs in [`docs/REFONTE-2025`](docs/REFONTE-2025) for acceptance checklists.
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/b6ceafb7-5b2f-483f-b988-77dd6e3f8f0e) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
-
-## Debugging the video job hotfix locally
-
-While the database migration from UUID to text identifiers is in progress, the app writes
-`job_id: null` for new video generations. If you need to verify that your local environment is
-clean and can still build successfully, run the quick checks below:
-
-```sh
-# Ensure no merge-conflict markers remain in the tracked files
-git grep -n '<<<<<<<\|=======\|>>>>>>>' -- . ':!package-lock.json'
-
-# Install dependencies from package-lock for a deterministic build
-npm ci
-
-# Reproduce the Lovable build to catch any runtime or type errors
-npm run build
+/* Violet */
+--chart-4: 280 65% 60%;
 ```
 
-The build should complete without reporting TypeScript or runtime errors. If you do see the
-database still forcing UUID casts, keep the hotfix in place until the schema migration is fully
-rolled out (all `job_id` columns converted to `TEXT` and no triggers re-casting values).
+## 📁 Structure du Projet
+
+```
+alfie-designer/
+├── app/
+│   ├── page.tsx              # Landing page
+│   ├── chat/page.tsx         # Chat IA
+│   ├── dashboard/page.tsx    # Dashboard avec quotas
+│   ├── affiliate/page.tsx    # Programme d'affiliation + payout
+│   ├── profile/page.tsx      # Profil utilisateur
+│   ├── projects/page.tsx     # Bibliothèque de projets
+│   └── favorites/page.tsx    # Favoris
+├── components/
+│   ├── sidebar.tsx           # Navigation sidebar
+│   └── ui/                   # shadcn/ui components
+├── lib/
+│   ├── auth/                 # JWT & password hashing
+│   ├── db/                   # Database schema & seed
+│   └── ai/                   # AI generators
+└── public/
+    └── alfie-avatar.png      # Avatar Alfie
+```
+
+## 💳 Plans Tarifaires
+
+| Plan | Prix | Images/mois | Vidéos/mois |
+|------|------|-------------|-------------|
+| **Starter** | 39€ | 150 | 15 |
+| **Pro** | 99€ | 450 | 45 |
+| **Business** | 199€ | 1500 | 150 |
+| **Enterprise** | Custom | ∞ | ∞ |
+
+## 🤝 Programme d'Affiliation
+
+- **Niveau 1** - 15% de commission sur tes filleuls directs
+- **Niveau 2** - 5% sur le réseau de ton réseau
+- **Niveau 3** - 2% sur le réseau étendu
+- **Payout minimum** - 50€
+- **Délai de paiement** - 5-7 jours ouvrés
+
+## 🔐 Authentification
+
+Compte de test :
+- **Email** : test@alfie-designer.com
+- **Password** : testpassword123
+
+## 📝 License
+
+© 2025 Alfie Designer. Tous droits réservés.
+
+## 👥 Auteur
+
+Créé avec ❤️ par [Thalie0801](https://github.com/Thalie0801)
+
+---
+
+**Live Demo** : [https://late-pans-crash.lindy.site](https://late-pans-crash.lindy.site)
