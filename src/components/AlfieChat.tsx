@@ -217,7 +217,7 @@ export function AlfieChat() {
         console.warn('Insertion source upload échouée (non bloquant):', e);
       }
 
-      toast.success('Image ajoutée ! 📸');
+      toast.success('Image ajoutée ! Elle sera utilisée lors de la génération. 📸');
     } catch (error: any) {
       console.error('Upload error:', error);
       toast.error('Erreur lors de l\'upload');

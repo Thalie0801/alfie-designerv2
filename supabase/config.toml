@@ -80,3 +80,6 @@ verify_jwt = false
 
 [functions.video-webhook]
 verify_jwt = false
+
+[functions.create-studio-accounts]
+verify_jwt = false
