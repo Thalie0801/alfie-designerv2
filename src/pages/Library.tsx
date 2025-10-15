@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -8,16 +8,15 @@ import { useLibraryAssets } from '@/hooks/useLibraryAssets';
 import { AssetCard } from '@/components/library/AssetCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { VideoDiagnostic } from '@/components/VideoDiagnostic';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export default function Library() {
   const { user } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'images' | 'videos'>('images');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
-  const [periodFilter, setPeriodFilter] = useState<'all' | 'current'>('all');
 
   const { 
     assets, 
@@ -28,27 +27,6 @@ export default function Library() {
     cleanupProcessingVideos
   } = useLibraryAssets(user?.id, activeTab);
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const tabParam = params.get('tab');
-    const periodParam = params.get('period');
-
-    if (tabParam === 'images' || tabParam === 'videos') {
-      setActiveTab(tabParam);
-    }
-
-    if (periodParam === 'current') {
-      setPeriodFilter('current');
-    } else {
-      setPeriodFilter('all');
-    }
-  }, [location.search]);
-
-  const startOfMonth = useMemo(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  }, []);
-
   // Auto cleanup when switching to videos tab
   useEffect(() => {
     if (activeTab === 'videos') {
@@ -56,34 +34,11 @@ export default function Library() {
     }
   }, [activeTab]);
 
-  const filteredAssets = assets
-    .filter(asset => {
-      if (periodFilter !== 'current') return true;
-      const assetDate = new Date(asset.created_at);
-      return assetDate >= startOfMonth;
-    })
-    .filter(asset =>
-      !searchQuery ||
-      asset.prompt?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      asset.engine?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-  const handleTabChange = (value: 'images' | 'videos') => {
-    setActiveTab(value);
-    const params = new URLSearchParams(location.search);
-    params.set('tab', value);
-    if (periodFilter === 'all') {
-      params.delete('period');
-    }
-    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
-  };
-
-  const clearPeriodFilter = () => {
-    setPeriodFilter('all');
-    const params = new URLSearchParams(location.search);
-    params.delete('period');
-    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
-  };
+  const filteredAssets = assets.filter(asset =>
+    !searchQuery || 
+    asset.prompt?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    asset.engine?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const handleSelectAsset = (assetId: string) => {
     setSelectedAssets(prev => 
@@ -120,6 +75,50 @@ export default function Library() {
     return days;
   };
 
+  const handleDebugGenerate = async () => {
+    if (!user?.id) {
+      toast.error('Vous devez être connecté.');
+      return;
+    }
+    const prompt = 'Golden retriever in a playful Halloween scene, cinematic';
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-video', {
+        body: { prompt, aspectRatio: '9:16' }
+      });
+      if (error || data?.error) {
+        const msg = (error as any)?.message || data?.error || 'Erreur inconnue';
+        toast.error(`Échec génération: ${msg}`);
+        return;
+      }
+      const predictionId = data?.id as string | undefined;
+      const provider = data?.provider as 'sora' | 'seededance' | 'kling' | undefined;
+      const jobId = data?.jobId as string | undefined;
+      const jobShortId = data?.jobShortId as string | undefined;
+
+      if (!predictionId || !provider || !jobId) {
+        toast.error('Réponse invalide du backend (identifiants manquants)');
+        return;
+      }
+      await supabase
+        .from('media_generations')
+        .insert({
+          user_id: user.id,
+          type: 'video',
+          engine: provider,
+          status: 'processing',
+          prompt,
+          woofs: 1,
+          output_url: '',
+          job_id: null, // HOTFIX: éviter tout cast UUID pendant la migration
+          metadata: { predictionId, provider, jobId, jobShortId }
+        });
+      toast.success(`Génération vidéo lancée (${provider})`);
+    } catch (e: any) {
+      console.error('Debug generate error:', e);
+      toast.error(e.message || 'Erreur lors du lancement');
+    }
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -132,8 +131,11 @@ export default function Library() {
         </p>
       </div>
 
+      {/* Video Diagnostic */}
+      <VideoDiagnostic />
+
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as 'images' | 'videos')}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'images' | 'videos')}>
         <TabsList>
           <TabsTrigger value="images">🖼️ Images</TabsTrigger>
           <TabsTrigger value="videos">🎬 Vidéos</TabsTrigger>
@@ -144,8 +146,8 @@ export default function Library() {
           <div className="flex-1 min-w-[200px]">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher..."
+              <Input 
+                placeholder="Rechercher..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -153,30 +155,24 @@ export default function Library() {
             </div>
           </div>
 
-          {periodFilter === 'current' && (
-            <Badge variant="outline" className="flex items-center gap-2 px-3 py-1">
-              Période : mois en cours
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-6 w-6 text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary"
-                onClick={clearPeriodFilter}
-                aria-label="Retirer le filtre période"
-              >
-                ✕
-              </Button>
-            </Badge>
-          )}
-
           {activeTab === 'videos' && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={cleanupProcessingVideos}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Nettoyer les vidéos bloquées
-            </Button>
+            <>
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={cleanupProcessingVideos}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Nettoyer les vidéos bloquées
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleDebugGenerate}
+              >
+                Génération vidéo (debug)
+              </Button>
+            </>
           )}
 
           {selectedAssets.length > 0 && (
