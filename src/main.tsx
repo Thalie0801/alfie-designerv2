@@ -1,14 +1,48 @@
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
+import React, { Component, ReactNode, StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 
-import App from "./App";
-import "./index.css";
+import App from './App';
+import './index.css';
 
-createRoot(document.getElementById("root")!).render(
+type ErrorBoundaryState = { error?: Error };
+
+class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { error: undefined };
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { error };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error('Runtime error:', error);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <pre style={{ padding: 16, color: 'crimson', whiteSpace: 'pre-wrap' }}>
+          {String(this.state.error.message ?? this.state.error)}
+        </pre>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+const rootElement = document.getElementById('root');
+
+if (!rootElement) {
+  throw new Error('Root element not found');
+}
+
+createRoot(rootElement).render(
   <StrictMode>
-    <BrowserRouter basename="/app">
-      <App />
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
+        <App />
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>,
 );
