@@ -5,6 +5,10 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  build: {
+    outDir: "dist", // Default output directory for Vite
+  },
+
   base: "/", // Ensure assets are served from the root path
 
   server: {
