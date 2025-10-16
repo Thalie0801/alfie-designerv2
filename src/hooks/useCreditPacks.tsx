@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getAuthHeader } from '@/lib/auth';
 import { toast } from 'sonner';
 
 interface CreditPack {
@@ -37,13 +38,9 @@ export function useCreditPacks() {
   const purchasePack = async (packId: string) => {
     setLoading(true);
     try {
-      const { data: session } = await supabase.auth.getSession();
-      
       const { data, error } = await supabase.functions.invoke('purchase-credit-pack', {
         body: { pack_id: packId },
-        headers: session?.session ? {
-          Authorization: `Bearer ${session.session.access_token}`,
-        } : {},
+        headers: await getAuthHeader(),
       });
 
       if (error) throw error;

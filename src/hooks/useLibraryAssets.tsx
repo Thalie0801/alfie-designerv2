@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { getAuthHeader } from '@/lib/auth';
 
 export interface LibraryAsset {
   id: string;
@@ -45,6 +46,7 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
 
       // Vérifier et débloquer les vidéos "processing" (si prédiction connue)
       if (type === 'videos' && data && data.length > 0) {
+        const authHeader = await getAuthHeader();
         const processing = (data as any[]).filter(
           a => a.type === 'video' && ((a.status === 'processing') || !a.output_url)
         );
@@ -55,7 +57,8 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
           if (!genId) continue;
           try {
             const { data: statusData, error: statusError } = await supabase.functions.invoke('generate-video', {
-              body: { generationId: genId, provider, jobId }
+              body: { generationId: genId, provider, jobId },
+              headers: authHeader,
             });
             if (!statusError && statusData?.status === 'succeeded') {
               const videoUrl = Array.isArray(statusData.output) ? statusData.output[0] : statusData.output;
@@ -149,7 +152,9 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
   const cleanupProcessingVideos = async () => {
     try {
       // Try backend function first
-      const { data, error } = await supabase.functions.invoke('cleanup-processing-videos');
+      const { data, error } = await supabase.functions.invoke('cleanup-processing-videos', {
+        headers: await getAuthHeader(),
+      });
       
       if (error) {
         console.warn('Backend cleanup failed, using client-side fallback:', error);
