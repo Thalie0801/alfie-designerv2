@@ -22,6 +22,41 @@ Ces endpoints doivent respecter : pas de _push_ Canva, pas d'autopublication, d
 ## Front (points d'entrée)
 - Afficher la **modale Premium** avant tout usage Premium T2V (consommation Woofs). :contentReference[oaicite:7]{index=7}
 - Afficher les **compteurs** et l'alerte à 80 %.
+- Récupérer l'abonnement actif via Supabase et vérifier les quotas avant de créer un visuel.
+
+```ts
+// hooks/useSubscription.ts
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/supabase/client';
+
+export const useSubscription = () =>
+  useQuery({
+    queryKey: ['subscription'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('user_subscription_details')
+        .select('*')
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+export const canCreateVisual = async (
+  userId: string,
+  increment = 1,
+) => {
+  const { data, error } = await supabase.rpc('check_user_quota', {
+    p_user_id: userId,
+    p_quota_type: 'visuals_per_month',
+    p_increment: increment,
+  });
+
+  if (error) throw error;
+  return Boolean(data);
+};
+```
 
 ## Qualité
 - Checklists AA, alt‑texts, SRT vidéo, safe‑zones 9:16. :contentReference[oaicite:8]{index=8}
