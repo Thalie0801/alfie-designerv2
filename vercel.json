@@ -1,4 +1,9 @@
 {
+  "build": {
+    "env": {
+      "VITE_APP_BASE_URL": "/"
+    }
+  },
   "outputDirectory": "public/app",
   "rewrites": [
     { "source": "/", "destination": "/index.html" },
