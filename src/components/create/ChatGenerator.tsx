@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getAuthHeader } from '@/lib/auth';
 
 interface GeneratedAsset {
   type: 'image' | 'video';
@@ -99,7 +100,8 @@ export function ChatGenerator() {
             templateImageUrl: uploadedImage,
             brandKit: brandKit,
             prompt: prompt || "Transform this image with a creative style"
-          }
+          },
+          headers: await getAuthHeader(),
         });
 
         if (error) throw error;
@@ -131,10 +133,11 @@ export function ChatGenerator() {
       } else {
         // Sinon génération d'image depuis le texte
         const { data, error } = await supabase.functions.invoke('generate-ai-image', {
-          body: { 
+          body: {
             prompt: prompt,
             aspectRatio: aspectRatio
-          }
+          },
+          headers: await getAuthHeader(),
         });
 
         if (error) throw error;
