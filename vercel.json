@@ -1,10 +1,15 @@
 {
   "routes": [
     {
-      "handle": "filesystem"
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
     },
     {
-      "src": "/.*",
+      "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|json))",
+      "dest": "/$1"
+    },
+    {
+      "src": "/(.*)",
       "dest": "/index.html"
     }
   ]
