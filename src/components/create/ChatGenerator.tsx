@@ -6,12 +6,16 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface GeneratedAsset {
   type: 'image' | 'video';
   url: string;
   prompt: string;
+  format: string;
 }
+
+type AspectRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
 
 export function ChatGenerator() {
   const [prompt, setPrompt] = useState('');
@@ -19,6 +23,7 @@ export function ChatGenerator() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [generatedAsset, setGeneratedAsset] = useState<GeneratedAsset | null>(null);
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { brandKit } = useBrandKit();
 
@@ -106,10 +111,11 @@ export function ChatGenerator() {
         setGeneratedAsset({
           type: 'image',
           url: data.imageUrl,
-          prompt: prompt || "Image transformation"
+          prompt: prompt || "Image transformation",
+          format: aspectRatio
         });
 
-        // Stocker en DB
+        // Stocker en DB dans media_generations (bibliothèque)
         await supabase.from('media_generations').insert({
           user_id: user.id,
           type: 'image',
@@ -117,7 +123,8 @@ export function ChatGenerator() {
           input_url: uploadedImage,
           output_url: data.imageUrl,
           status: 'completed',
-          brand_id: brandKit?.id || null
+          brand_id: brandKit?.id || null,
+          metadata: { aspectRatio }
         });
 
         toast.success('Image générée avec succès ! ✨');
@@ -126,7 +133,7 @@ export function ChatGenerator() {
         const { data, error } = await supabase.functions.invoke('generate-ai-image', {
           body: { 
             prompt: prompt,
-            aspectRatio: '1:1'
+            aspectRatio: aspectRatio
           }
         });
 
@@ -139,17 +146,19 @@ export function ChatGenerator() {
         setGeneratedAsset({
           type: 'image',
           url: data.imageUrl,
-          prompt: prompt
+          prompt: prompt,
+          format: aspectRatio
         });
 
-        // Stocker en DB
+        // Stocker en DB dans media_generations (bibliothèque)
         await supabase.from('media_generations').insert({
           user_id: user.id,
           type: 'image',
           prompt: prompt,
           output_url: data.imageUrl,
           status: 'completed',
-          brand_id: brandKit?.id || null
+          brand_id: brandKit?.id || null,
+          metadata: { aspectRatio }
         });
 
         toast.success('Image générée avec succès ! ✨');
@@ -176,20 +185,20 @@ export function ChatGenerator() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="container mx-auto px-4 py-12">
         {/* Header */}
         <div className="text-center mb-12 space-y-4">
           <div className="flex items-center justify-center gap-3 mb-4">
             <div className="relative">
-              <Sparkles className="h-16 w-16 text-emerald-400 animate-pulse" />
-              <div className="absolute inset-0 blur-xl bg-emerald-400/20 animate-pulse"></div>
+              <Sparkles className="h-16 w-16 text-primary animate-pulse" />
+              <div className="absolute inset-0 blur-xl bg-primary/20 animate-pulse"></div>
             </div>
           </div>
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight">
             ALFIE STUDIO
           </h1>
-          <p className="text-slate-400 text-lg">
+          <p className="text-muted-foreground text-lg">
             Créez des visuels époustouflants en quelques secondes
           </p>
         </div>
@@ -198,19 +207,27 @@ export function ChatGenerator() {
         <div className="max-w-5xl mx-auto space-y-6">
           {/* Generated Asset Preview */}
           {generatedAsset && (
-            <div className="relative rounded-2xl overflow-hidden bg-slate-900/50 border border-slate-800 backdrop-blur-sm animate-fade-in">
-              <div className="aspect-square relative">
+            <div className="relative rounded-2xl overflow-hidden bg-card border border-border backdrop-blur-sm animate-fade-in">
+              <div className={cn(
+                "relative",
+                generatedAsset.format === '1:1' && "aspect-square",
+                generatedAsset.format === '16:9' && "aspect-video",
+                generatedAsset.format === '9:16' && "aspect-[9/16]",
+                generatedAsset.format === '4:3' && "aspect-[4/3]",
+                generatedAsset.format === '3:4' && "aspect-[3/4]"
+              )}>
                 <img 
                   src={generatedAsset.url} 
                   alt={generatedAsset.prompt}
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent"></div>
                 <div className="absolute bottom-0 left-0 right-0 p-6 space-y-3">
-                  <p className="text-sm text-slate-300">{generatedAsset.prompt}</p>
+                  <p className="text-sm text-muted-foreground">{generatedAsset.prompt}</p>
+                  <p className="text-xs text-muted-foreground">Format: {generatedAsset.format}</p>
                   <Button
                     onClick={handleDownload}
-                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white"
+                    className="w-full bg-primary hover:bg-primary/90"
                   >
                     <Download className="mr-2 h-4 w-4" />
                     Télécharger
@@ -221,10 +238,10 @@ export function ChatGenerator() {
           )}
 
           {/* Input Section */}
-          <div className="rounded-2xl bg-slate-900/50 border border-slate-800 backdrop-blur-sm p-6 space-y-6">
+          <div className="rounded-2xl bg-card border border-border backdrop-blur-sm p-6 space-y-6">
             {/* Uploaded Image Preview */}
             {uploadedImage && (
-              <div className="relative rounded-xl overflow-hidden bg-slate-800/50 border border-slate-700">
+              <div className="relative rounded-xl overflow-hidden bg-muted/50 border border-border">
                 <div className="flex items-center gap-4 p-4">
                   <img 
                     src={uploadedImage} 
@@ -232,12 +249,12 @@ export function ChatGenerator() {
                     className="h-24 w-24 object-cover rounded-lg"
                   />
                   <div className="flex-1">
-                    <p className="text-sm text-slate-300 mb-2">Image source ajoutée</p>
+                    <p className="text-sm text-muted-foreground mb-2">Image source ajoutée</p>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => setUploadedImage(null)}
-                      className="text-red-400 hover:text-red-300 hover:bg-red-950/20"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
                     >
                       Retirer
                     </Button>
@@ -246,13 +263,30 @@ export function ChatGenerator() {
               </div>
             )}
 
+            {/* Format Selector */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Format de l'image</label>
+              <Select value={aspectRatio} onValueChange={(value) => setAspectRatio(value as AspectRatio)}>
+                <SelectTrigger className="bg-muted/50 border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1:1">Carré (1:1)</SelectItem>
+                  <SelectItem value="16:9">Paysage (16:9)</SelectItem>
+                  <SelectItem value="9:16">Portrait (9:16)</SelectItem>
+                  <SelectItem value="4:3">Standard (4:3)</SelectItem>
+                  <SelectItem value="3:4">Portrait (3:4)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Prompt Input */}
             <div className="relative">
               <Textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Décrivez la scène que vous imaginez, ou uploadez une image pour la transformer..."
-                className="min-h-[120px] bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 resize-none text-base"
+                className="min-h-[120px] bg-muted/50 border-border resize-none text-base"
                 disabled={isGenerating}
               />
             </div>
@@ -272,7 +306,6 @@ export function ChatGenerator() {
                   variant="ghost"
                   size="sm"
                   disabled={uploadingImage || isGenerating}
-                  className="text-slate-300 hover:text-white hover:bg-slate-800"
                 >
                   {uploadingImage ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -287,8 +320,8 @@ export function ChatGenerator() {
                 onClick={handleGenerate}
                 disabled={isGenerating || (!prompt.trim() && !uploadedImage)}
                 className={cn(
-                  "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600",
-                  "text-white font-semibold px-8 shadow-lg shadow-emerald-500/20",
+                  "bg-primary hover:bg-primary/90",
+                  "font-semibold px-8",
                   "disabled:opacity-50 disabled:cursor-not-allowed"
                 )}
               >
@@ -307,8 +340,8 @@ export function ChatGenerator() {
             </div>
 
             {/* Info Text */}
-            <div className="pt-4 border-t border-slate-800">
-              <p className="text-xs text-slate-500 text-center">
+            <div className="pt-4 border-t border-border">
+              <p className="text-xs text-muted-foreground text-center">
                 Propulsé par Lovable AI • Gemini Nano Banana
               </p>
             </div>
