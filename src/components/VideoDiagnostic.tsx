@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Activity } from 'lucide-react';
+import { getAuthHeader } from '@/lib/auth';
 
 export function VideoDiagnostic() {
   const [loading, setLoading] = useState(false);
@@ -15,7 +16,8 @@ export function VideoDiagnostic() {
     
     try {
       const { data, error } = await supabase.functions.invoke('generate-video', {
-        body: { diagnose: true }
+        body: { diagnose: true },
+        headers: await getAuthHeader(),
       });
 
       if (error) throw error;

@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { VideoDiagnostic } from '@/components/VideoDiagnostic';
 import { supabase } from '@/integrations/supabase/client';
+import { getAuthHeader } from '@/lib/auth';
 import { toast } from 'sonner';
 
 export default function Library() {
@@ -83,7 +84,8 @@ export default function Library() {
     const prompt = 'Golden retriever in a playful Halloween scene, cinematic';
     try {
       const { data, error } = await supabase.functions.invoke('generate-video', {
-        body: { prompt, aspectRatio: '9:16' }
+        body: { prompt, aspectRatio: '9:16' },
+        headers: await getAuthHeader(),
       });
       if (error || data?.error) {
         const msg = (error as any)?.message || data?.error || 'Erreur inconnue';

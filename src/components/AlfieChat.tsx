@@ -6,6 +6,7 @@ import { useTemplateLibrary } from '@/hooks/useTemplateLibrary';
 import { useAlfieOptimizations } from '@/hooks/useAlfieOptimizations';
 import { openInCanva } from '@/services/canvaLinker';
 import { supabase } from '@/integrations/supabase/client';
+import { getAuthHeader } from '@/lib/auth';
 import { detectIntent, canHandleLocally, generateLocalResponse } from '@/utils/alfieIntentDetector';
 import { getQuotaStatus, consumeQuota, canGenerateVideo, checkQuotaAlert, formatExpirationMessage } from '@/utils/quotaManager';
 import { JobPlaceholder, JobStatus } from '@/components/chat/JobPlaceholder';
@@ -282,12 +283,14 @@ export function AlfieChat() {
         }
         
         try {
+          const headers = await getAuthHeader();
           const { data, error } = await supabase.functions.invoke('alfie-generate-ai-image', {
             body: {
               templateImageUrl: args.template_image_url,
               brandKit: brandKit,
               prompt: args.style_instructions
-            }
+            },
+            headers,
           });
           
           if (error) throw error;
@@ -313,12 +316,14 @@ export function AlfieChat() {
       case 'generate_image': {
         try {
           setGenerationStatus({ type: 'image', message: 'Génération de ton image en cours... ✨' });
-          
+
+          const headers = await getAuthHeader();
           const { data, error } = await supabase.functions.invoke('generate-ai-image', {
-            body: { 
+            body: {
               prompt: args.prompt,
               aspectRatio: args.aspect_ratio || '1:1'
-            }
+            },
+            headers,
           });
 
           if (error) {
@@ -381,9 +386,11 @@ export function AlfieChat() {
       case 'improve_image': {
         try {
           setGenerationStatus({ type: 'image', message: 'Amélioration de ton image en cours... 🪄' });
-          
+
+          const headers = await getAuthHeader();
           const { data, error } = await supabase.functions.invoke('improve-image', {
-            body: { imageUrl: args.image_url, prompt: args.instructions }
+            body: { imageUrl: args.image_url, prompt: args.instructions },
+            headers,
           });
 
           if (error) throw error;
@@ -444,6 +451,7 @@ export function AlfieChat() {
           if (!user) throw new Error("Not authenticated");
 
           // Appel backend (Edge Function)
+          const headers = await getAuthHeader();
           const { data, error } = await supabase.functions.invoke('generate-video', {
             body: {
               prompt: args.prompt,
@@ -451,7 +459,8 @@ export function AlfieChat() {
               imageUrl: args.imageUrl,
               durationPreference: selectedDuration,
               woofCost: 2
-            }
+            },
+            headers,
           });
 
           if (error) throw new Error(error.message || 'Erreur backend');
@@ -686,12 +695,14 @@ export function AlfieChat() {
     const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/alfie-chat`;
     
     try {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(await getAuthHeader()),
+      };
+
       const response = await fetch(CHAT_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
+        headers,
         body: JSON.stringify({
           messages: [...messages, { role: 'user', content: userMessage, imageUrl: uploadedImage }],
           brandId: brandKit?.id // Pass active brand ID
