@@ -1,10 +1,5 @@
-import { AppLayoutWithSidebar } from '@/components/AppLayoutWithSidebar';
-import { AlfieChat } from '@/components/AlfieChat';
+import { ChatGenerator } from '@/components/create/ChatGenerator';
 
-export default function App() {
-  return (
-    <AppLayoutWithSidebar>
-      <AlfieChat />
-    </AppLayoutWithSidebar>
-  );
+export default function Creator() {
+  return <ChatGenerator />;
 }
