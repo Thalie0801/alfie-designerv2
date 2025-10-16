@@ -48,7 +48,7 @@ export default function AlfieLanding() {
             <span className="font-semibold text-sm sm:text-base">Alfie Designer</span>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
-            <Button size="sm" className="text-xs sm:text-sm" onClick={() => window.location.href = '/auth'}>Ouvrir l'app</Button>
+            <Button size="sm" className="text-xs sm:text-sm" onClick={() => window.location.href = '/app'}>Ouvrir l'app</Button>
           </div>
         </div>
       </header>
@@ -64,7 +64,7 @@ export default function AlfieLanding() {
                 <Button size="lg" className="gradient-hero text-white shadow-medium hover:shadow-strong text-sm sm:text-base" onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}>
                   Commencer ✨
                 </Button>
-                <Button size="lg" variant="outline" className="hover:scale-105 transition-transform text-sm sm:text-base" onClick={() => window.location.href = '/auth'}>
+                <Button size="lg" variant="outline" className="hover:scale-105 transition-transform text-sm sm:text-base" onClick={() => window.location.href = '/app'}>
                   Voir une démo
                 </Button>
               </div>
