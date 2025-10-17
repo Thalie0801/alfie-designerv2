@@ -7,7 +7,7 @@ export function SupabaseHealth() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setEnvOk(Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY));
+    setEnvOk(Boolean(import.meta.env.VITE_SUPABASE_URL && (import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY)));
 
     (async () => {
       try {
