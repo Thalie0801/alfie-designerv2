@@ -1,11 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Button } from './ui/button';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { BrandSelector } from './BrandSelector';
 import { BrandDialog } from './BrandDialog';
 import { AddBrandDialog } from './AddBrandDialog';
-import { Palette, ExternalLink, AlertCircle } from 'lucide-react';
+import { Palette, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 
 export function BrandManager() {

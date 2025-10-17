@@ -9,7 +9,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
 import { Zap } from 'lucide-react';
 import { useBrandManagement } from '@/hooks/useBrandManagement';
 import { SYSTEM_CONFIG } from '@/config/systemConfig';

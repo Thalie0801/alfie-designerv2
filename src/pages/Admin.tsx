@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, FileText, DollarSign, Activity, ArrowLeft, Sparkles, Plus, ExternalLink, Trash2, Edit2, Search, RefreshCw, TrendingUp } from 'lucide-react';
+import { Users, Activity, ArrowLeft, Sparkles, Plus, ExternalLink, Trash2, Edit2, Search, RefreshCw, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { NewsManager } from '@/components/NewsManager';
 import { VideoDiagnostic } from '@/components/VideoDiagnostic';

@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Check, CreditCard, AlertCircle, Settings } from 'lucide-react';
+import { Check, AlertCircle, Settings } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useStripeCheckout } from '@/hooks/useStripeCheckout';
 import { useCustomerPortal } from '@/hooks/useCustomerPortal';

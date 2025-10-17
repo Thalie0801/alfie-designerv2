@@ -8,7 +8,7 @@ import { openInCanva } from '@/services/canvaLinker';
 import { supabase } from '@/integrations/supabase/client';
 import { getAuthHeader } from '@/lib/auth';
 import { detectIntent, canHandleLocally, generateLocalResponse } from '@/utils/alfieIntentDetector';
-import { getQuotaStatus, consumeQuota, canGenerateVideo, checkQuotaAlert, formatExpirationMessage } from '@/utils/quotaManager';
+import { getQuotaStatus, formatExpirationMessage } from '@/utils/quotaManager';
 import { JobPlaceholder, JobStatus } from '@/components/chat/JobPlaceholder';
 import { CreateHeader } from '@/components/create/CreateHeader';
 import { GeneratorCard } from '@/components/create/GeneratorCard';

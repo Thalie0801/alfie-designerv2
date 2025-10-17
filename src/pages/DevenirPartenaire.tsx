@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Users, Award, Crown, Target, TrendingUp, Sparkles, ArrowRight } from "lucide-react";
+import { Check, Users, Award, Crown, Target, Sparkles, ArrowRight } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function DevenirPartenaire() {
