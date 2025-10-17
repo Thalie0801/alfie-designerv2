@@ -23,7 +23,7 @@ interface Brand {
   fonts?: any;
   voice?: string;
   canva_connected: boolean;
-  created_at: string;
+  created_at: string | null;
 }
 
 export function useBrandKit() {
@@ -51,7 +51,14 @@ export function useBrandKit() {
 
       if (brandsError) throw brandsError;
       
-      setBrands(brandsData || []);
+      // Transform null to undefined for TypeScript compatibility
+      const transformedBrands = (brandsData || []).map(brand => ({
+        ...brand,
+        logo_url: brand.logo_url ?? undefined,
+        voice: brand.voice ?? undefined,
+        canva_connected: brand.canva_connected ?? false
+      }));
+      setBrands(transformedBrands);
 
       // Load active brand from profile or use first brand
       const { data: profileData } = await supabase

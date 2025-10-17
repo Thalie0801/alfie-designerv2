@@ -36,7 +36,7 @@ export function CreditPurchaseDialog() {
             const priceEur = pack.price_cents / 100;
             const hasDiscount = isEligibleForDiscount && pack.name === 'Pack 50 crédits';
             const finalPrice = hasDiscount 
-              ? priceEur * (1 - pack.discount_percentage / 100)
+              ? priceEur * (1 - (pack.discount_percentage || 0) / 100)
               : priceEur;
             const pricePerCredit = (finalPrice / pack.credits).toFixed(2);
 

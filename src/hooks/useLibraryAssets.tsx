@@ -159,6 +159,8 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
       if (error) {
         console.warn('Backend cleanup failed, using client-side fallback:', error);
         // Fallback: delete directly via client
+        if (!userId) return;
+        
         const { data: deletedData, error: deleteError } = await supabase
           .from('media_generations')
           .delete()

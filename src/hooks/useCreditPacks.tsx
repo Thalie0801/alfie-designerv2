@@ -8,7 +8,7 @@ interface CreditPack {
   name: string;
   credits: number;
   price_cents: number;
-  discount_percentage: number;
+  discount_percentage: number | null;
   stripe_price_id: string;
 }
 

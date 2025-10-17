@@ -75,8 +75,8 @@ export async function getQuotaStatus(brandId: string): Promise<QuotaStatus | nul
         canUse: (cost: number) => woofsRemaining >= cost
       },
       brandName: brand.name,
-      plan: brand.plan,
-      resetsOn: brand.resets_on
+      plan: brand.plan ?? undefined,
+      resetsOn: brand.resets_on ?? undefined
     };
   } catch (error) {
     console.error('Error fetching quota status:', error);

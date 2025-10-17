@@ -64,10 +64,10 @@ export function useAlfieOptimizations() {
         // Incrémenter le compteur d'usage
         await supabase
           .from('alfie_cache')
-          .update({ usage_count: data.usage_count + 1 })
+          .update({ usage_count: (data.usage_count || 0) + 1 })
           .eq('id', data.id);
 
-        console.log('✅ Cache HIT:', type, '(usage:', data.usage_count + 1, ')');
+        console.log('✅ Cache HIT:', type, '(usage:', (data.usage_count || 0) + 1, ')');
         return data.response;
       }
 

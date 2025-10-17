@@ -89,7 +89,7 @@ export function BrandManager() {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Palette de couleurs</label>
                 <div className="flex gap-2 flex-wrap">
-                  {activeBrand.palette.map((color, index) => (
+                  {activeBrand.palette.map((color: string, index: number) => (
                     <div
                       key={index}
                       className="w-12 h-12 rounded-lg border-2 border-border shadow-sm"

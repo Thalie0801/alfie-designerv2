@@ -873,7 +873,7 @@ export function AlfieChat() {
     }
     
     // Add user message (UI)
-    setMessages(prev => [...prev, { role: 'user', content: userMessage, imageUrl, created_at: new Date().toISOString() }]);
+    setMessages(prev => [...prev, { role: 'user', content: userMessage, imageUrl: imageUrl ?? undefined, created_at: new Date().toISOString() }]);
 
     // Persister le message utilisateur
     try {

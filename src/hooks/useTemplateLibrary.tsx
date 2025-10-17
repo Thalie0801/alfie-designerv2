@@ -13,8 +13,8 @@ export interface CanvaTemplate {
   title: string;
   image_url: string;
   canva_url: string;
-  description?: string;
-  category?: string;
+  description?: string | null;
+  category?: string | null;
   fit_score?: number;
 }
 
