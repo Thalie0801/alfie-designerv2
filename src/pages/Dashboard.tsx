@@ -26,7 +26,6 @@ import {
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [posts, setPosts] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -38,22 +37,13 @@ export default function Dashboard() {
     if (!user) return;
 
     try {
-      const [postsRes, brandsRes] = await Promise.all([
-        supabase
-          .from('posts')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(10),
-        supabase
-          .from('brands')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-      ]);
+      const { data: brandsData } = await supabase
+        .from('brands')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-      setPosts(postsRes.data || []);
-      setBrands(brandsRes.data || []);
+      setBrands(brandsData || []);
     } catch (error) {
       console.error('Error loading dashboard:', error);
     } finally {

@@ -10,17 +10,15 @@ import { useStripeCheckout } from "@/hooks/useStripeCheckout";
 
 // --- Hooks to simulate actions (replace with Lovable actions / API calls) ---
 const useAlfieActions = () => {
-  const connectCanva = () => alert("OAuth Canva → redirection… (remplacer par oauth_canva_start)");
   const createHero = () => alert("Créer design Hero… (design_create_from_template)");
   const createCarousel = () => alert("Créer design Carousel…");
   const createInsight = () => alert("Créer design Insight…");
   const createReel = () => alert("Créer design Reel 9:16…");
-  return { connectCanva, createHero, createCarousel, createInsight, createReel };
+  return { createHero, createCarousel, createInsight, createReel };
 };
 
 export default function AlfieLanding() {
   const { createHero, createCarousel, createInsight, createReel } = useAlfieActions();
-  const [email, setEmail] = useState("");
   const [isAnnual, setIsAnnual] = useState(false);
   const { createCheckout, loading: checkoutLoading } = useStripeCheckout();
 

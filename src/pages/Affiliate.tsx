@@ -12,8 +12,6 @@ import { Progress } from '@/components/ui/progress';
 export default function Affiliate() {
   const { user } = useAuth();
   const [affiliate, setAffiliate] = useState<any>(null);
-  const [clicks, setClicks] = useState<any[]>([]);
-  const [conversions, setConversions] = useState<any[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [commissions, setCommissions] = useState<any[]>([]);
@@ -85,8 +83,6 @@ export default function Affiliate() {
         .select('id, name, email, created_at, affiliate_status, active_direct_referrals')
         .eq('parent_id', affiliateData.id);
 
-      setClicks(clicksData || []);
-      setConversions(conversionsData || []);
       setPayouts(payoutsData || []);
       setCommissions(commissionsData || []);
       setDirectReferrals(referralsData || []);

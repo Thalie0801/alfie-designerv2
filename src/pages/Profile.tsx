@@ -56,16 +56,6 @@ export default function Profile() {
     return labels[plan] || plan;
   };
 
-  const getPlanVariant = (plan: string) => {
-    const variants: Record<string, 'default' | 'secondary'> = {
-      starter: 'secondary',
-      pro: 'default',
-      business: 'default',
-      enterprise: 'default'
-    };
-    return variants[plan] || 'secondary';
-  };
-
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
