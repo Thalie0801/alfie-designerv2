@@ -37,7 +37,6 @@ export function BrandQuotaDisplay() {
   const alert = checkQuotaAlert(quotaStatus);
   const woofsLeft = quotaStatus.woofs.remaining;
   const imagesLeft = quotaStatus.visuals.limit - quotaStatus.visuals.used;
-  const videosLeft = quotaStatus.videos.limit - quotaStatus.videos.used;
 
   return (
     <Card className="p-4 space-y-4 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">

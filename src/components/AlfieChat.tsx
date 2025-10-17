@@ -76,11 +76,9 @@ export function AlfieChat() {
   const {
     checkQuota,
     getCachedResponse,
-    setCachedResponse,
     incrementRequests,
     requestsThisMonth,
-    quota,
-    quotaPercentage
+    quota
   } = useAlfieOptimizations();
 
   useEffect(() => {
@@ -192,7 +190,7 @@ export function AlfieChat() {
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('chat-uploads')
         .upload(fileName, file);
 

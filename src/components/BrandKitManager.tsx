@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { Palette, Upload, X } from 'lucide-react';
 
 export function BrandKitManager() {
-  const { brandKit, updateBrandKit } = useBrandKit();
+  const { brandKit } = useBrandKit();
   const [colors, setColors] = useState<string[]>(brandKit?.palette || ['#000000']);
   const [logoUrl, setLogoUrl] = useState(brandKit?.logo_url || '');
 

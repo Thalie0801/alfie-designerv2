@@ -30,7 +30,7 @@ export function BrandUpgradeDialog({
 }: BrandUpgradeDialogProps) {
   const [open, setOpen] = useState(false);
   const { upgradeBrand, getUpgradeCost, loading } = useBrandManagement();
-  const { createCheckout, loading: checkoutLoading } = useStripeCheckout();
+  const { loading: checkoutLoading } = useStripeCheckout();
 
   const tiers: { tier: BrandTier; name: string }[] = [
     { tier: 'starter', name: 'Starter' },

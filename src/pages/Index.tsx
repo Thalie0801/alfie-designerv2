@@ -19,7 +19,7 @@ const useAlfieActions = () => {
 };
 
 export default function AlfieLanding() {
-  const { connectCanva, createHero, createCarousel, createInsight, createReel } = useAlfieActions();
+  const { createHero, createCarousel, createInsight, createReel } = useAlfieActions();
   const [email, setEmail] = useState("");
   const [isAnnual, setIsAnnual] = useState(false);
   const { createCheckout, loading: checkoutLoading } = useStripeCheckout();
@@ -448,9 +448,8 @@ function TemplateCard({ title, subtitle, ratios, image }: { title: string; subti
 }
 
 function PriceCard({ 
-  title, 
-  planKey,
-  price, 
+  title,
+  price,
   originalAnnualPrice,
   priceLabel, 
   bullets, 
@@ -462,7 +461,7 @@ function PriceCard({
 }: { 
   title: string; 
   planKey: string;
-  price: string; 
+  price: string;
   originalAnnualPrice?: number;
   priceLabel: string; 
   bullets: string[]; 

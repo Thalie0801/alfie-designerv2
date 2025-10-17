@@ -24,7 +24,7 @@ export function FileUploader({
     const fileName = `${Math.random()}.${fileExt}`;
     const filePath = `uploads/${fileName}`;
 
-    const { error: uploadError, data } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('chat-uploads')
       .upload(filePath, file, {
         cacheControl: '3600',

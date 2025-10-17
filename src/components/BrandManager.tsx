@@ -11,8 +11,7 @@ export function BrandManager() {
   const { 
     activeBrand, 
     totalBrands, 
-    quotaBrands, 
-    canAddBrand,
+    quotaBrands,
     loadBrands,
     loading 
   } = useBrandKit();

@@ -53,7 +53,6 @@ export function AppSidebar() {
     navItems.push({ path: '/admin', label: 'Admin', icon: Settings });
   }
 
-  const isActive = (path: string) => location.pathname === path;
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
     isActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
 

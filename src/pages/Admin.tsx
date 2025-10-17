@@ -87,7 +87,7 @@ export default function Admin() {
 
     setScraping(true);
     try {
-      const { data, error } = await supabase.functions.invoke('scrape-canva', {
+      const { error } = await supabase.functions.invoke('scrape-canva', {
         body: { url: normalized, category },
         headers: await getAuthHeader(),
       });

@@ -19,7 +19,7 @@ export function ContentGenerator() {
   const [generatedContent, setGeneratedContent] = useState<string | null>(null);
   
   const { brandKit } = useBrandKit();
-  const { totalCredits, decrementCredits, hasCredits } = useAlfieCredits();
+  const { decrementCredits, hasCredits } = useAlfieCredits();
 
   const downloadContent = async (url: string, filename: string) => {
     try {

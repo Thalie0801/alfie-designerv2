@@ -11,13 +11,6 @@ const MONTHLY_QUOTAS = {
   studio: 500,   // Plan Studio
 };
 
-interface CacheEntry {
-  prompt_hash: string;
-  prompt_type: string;
-  response: any;
-  usage_count: number;
-}
-
 export function useAlfieOptimizations() {
   const { profile } = useAuth();
   const [requestsThisMonth, setRequestsThisMonth] = useState(0);

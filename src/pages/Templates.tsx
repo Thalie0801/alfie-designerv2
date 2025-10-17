@@ -17,7 +17,7 @@ interface CanvaDesign {
 }
 
 export default function Templates() {
-  const { profile } = useAuth();
+  const { user } = useAuth();
   const [designs, setDesigns] = useState<CanvaDesign[]>([]);
   const [loading, setLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState('all');
