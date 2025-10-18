@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { consumeBrandQuota } from "../_shared/quota.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,6 +16,63 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
+    }
+
+    // Get authenticated user
+    const authHeader = req.headers.get('Authorization')?.split('Bearer ')[1];
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401,
+        }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+    // Verify user and get active brand
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(authHeader);
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401,
+        }
+      );
+    }
+
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('active_brand_id')
+      .eq('user_id', user.id)
+      .single();
+
+    const brandId = profile?.active_brand_id;
+    if (!brandId) {
+      return new Response(
+        JSON.stringify({ error: 'No active brand found. Please create a brand first.' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
+    }
+
+    // Consume quota BEFORE generating
+    const quotaResult = await consumeBrandQuota(supabaseClient, brandId, 'visual', 0);
+    if (!quotaResult.success) {
+      return new Response(
+        JSON.stringify({ error: quotaResult.error || 'Quota exhausted' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403,
+        }
+      );
     }
 
     const { prompt, aspectRatio = "1:1" } = await req.json();

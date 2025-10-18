@@ -9,7 +9,8 @@ import {
   LogOut,
   UserCircle,
   Layers,
-  FolderOpen
+  FolderOpen,
+  Palette
 } from 'lucide-react';
 import {
   Sidebar,
@@ -43,6 +44,7 @@ export function AppSidebar() {
     { path: '/app', label: 'Créer', icon: Sparkles },
     { path: '/templates', label: 'Catalogue', icon: Layers, badge: 'Bientôt' },
     { path: '/library', label: 'Bibliothèque', icon: FolderOpen },
+    { path: '/brand-kit-questionnaire', label: 'Brand Kit', icon: Palette },
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/profile', label: 'Profil', icon: UserCircle },
     { path: '/billing', label: 'Abonnement', icon: CreditCard },

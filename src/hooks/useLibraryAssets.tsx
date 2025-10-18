@@ -33,12 +33,14 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
     try {
       const assetType = type === 'images' ? 'image' : 'video';
       
+      // Optimized query with limit to avoid timeouts
       const { data, error } = await supabase
         .from('media_generations')
-        .select('*')
+        .select('id, type, status, output_url, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id')
         .eq('user_id', userId)
         .eq('type', assetType)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100); // Limit to 100 most recent items
 
       if (error) throw error;
 

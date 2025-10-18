@@ -20,6 +20,7 @@ import DevenirPartenaire from "./pages/DevenirPartenaire";
 import Privacy from "./pages/Privacy";
 import Legal from "./pages/Legal";
 import FAQ from "./pages/FAQ";
+import BrandKitQuestionnaire from "./pages/BrandKitQuestionnaire";
 import NotFound from "./pages/NotFound";
 import Templates from "./pages/Templates";
 import Library from "./pages/Library";
@@ -42,6 +43,16 @@ const App = () => (
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/legal" element={<Legal />} />
           <Route path="/faq" element={<FAQ />} />
+          <Route
+            path="/brand-kit-questionnaire"
+            element={
+              <ProtectedRoute>
+                <AppLayoutWithSidebar>
+                  <BrandKitQuestionnaire />
+                </AppLayoutWithSidebar>
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/app"
             element={
