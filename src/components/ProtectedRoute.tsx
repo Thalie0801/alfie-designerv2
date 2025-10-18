@@ -22,8 +22,9 @@ export function ProtectedRoute({ children, requireAdmin = false, requirePlan = f
   if (loading || checkingAdmin) {
     return (
       <div className="min-h-screen gradient-subtle flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-pulse text-2xl font-bold">Chargement...</div>
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <div className="text-lg font-medium text-muted-foreground">Chargement...</div>
         </div>
       </div>
     );

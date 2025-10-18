@@ -91,27 +91,35 @@ export default function Auth() {
       if (mode === 'login') {
         const { error } = await signIn(data.email, data.password);
         if (error) {
-          if (error.message.includes('Invalid')) {
+          if (error.message.includes('Invalid login credentials')) {
             toast.error('Email ou mot de passe incorrect');
+          } else if (error.message.includes('Email not confirmed')) {
+            toast.error('Veuillez confirmer votre email avant de vous connecter');
+          } else if (error.message.includes('User not found')) {
+            toast.error('Aucun compte trouvé avec cet email');
           } else {
-            toast.error(error.message);
+            toast.error(`Erreur de connexion: ${error.message}`);
           }
         } else {
           toast.success('Connexion réussie !');
-          navigate('/app');
+          // Redirection gérée par le state change de auth
         }
       } else {
         const { error } = await signUp(data.email, data.password, fullName);
         if (error) {
-          if (error.message.includes('already registered')) {
-            toast.error('Cet email est déjà enregistré');
+          if (error.message.includes('already registered') || error.message.includes('User already registered')) {
+            toast.error('Cet email est déjà enregistré. Essayez de vous connecter.');
+            setMode('login');
+          } else if (error.message.includes('Password should be')) {
+            toast.error('Le mot de passe doit contenir au moins 6 caractères');
+          } else if (error.message.includes('Unable to validate email')) {
+            toast.error('Email invalide');
           } else {
-            toast.error(error.message);
+            toast.error(`Erreur lors de la création du compte: ${error.message}`);
           }
         } else {
-          toast.success('Compte créé !');
-          // After signup, redirect will be handled by auth state change
-          // User will go to /app if they have a plan, or /billing if not
+          toast.success('Compte créé avec succès ! Bienvenue 🎉');
+          // Redirection gérée par le state change de auth
         }
       }
     } catch (error) {

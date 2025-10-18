@@ -6,7 +6,7 @@ export async function getAuthHeader() {
   } = await supabase.auth.getSession();
 
   const userToken = session?.access_token;
-  const anonToken = import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const anonToken = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   const token = userToken ?? anonToken;
 
   if (!token) {

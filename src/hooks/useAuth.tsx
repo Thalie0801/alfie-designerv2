@@ -91,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string, fullName: string) => {
     const redirectUrl = `${window.location.origin}/`;
 
-    const { error } = await supabase.auth.signUp({
+    const { error, data } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -99,6 +99,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data: { full_name: fullName }
       }
     });
+    
+    if (!error && data.user) {
+      // Force profile refresh after signup
+      await refreshProfile();
+    }
+    
     return { error };
   };
 
