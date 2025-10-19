@@ -1022,7 +1022,11 @@ export function AlfieChat() {
   };
 
   const lowerInput = input.toLowerCase();
-  const showVideoDurationChips = lowerInput.includes('vidéo') || lowerInput.includes('tiktok') || lowerInput.includes('reel');
+  const showVideoDurationChips =
+    lowerInput.includes('vidéo') ||
+    lowerInput.includes('video') ||
+    lowerInput.includes('tiktok') ||
+    lowerInput.includes('reel');
   const isTextareaDisabled = isLoading || !loaded;
   const isSendDisabled = isTextareaDisabled || !input.trim();
 
