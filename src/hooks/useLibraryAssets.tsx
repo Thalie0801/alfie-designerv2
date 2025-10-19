@@ -40,7 +40,7 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
         .eq('user_id', userId)
         .eq('type', assetType)
         .order('created_at', { ascending: false })
-        .limit(100); // Limit to 100 most recent items
+        .limit(50); // Reduced limit to improve performance
 
       if (error) throw error;
 
@@ -121,12 +121,37 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
     }
 
     try {
-      const response = await fetch(asset.output_url);
-      const blob = await response.blob();
+      let blob: Blob;
+      
+      // Si c'est une image base64, la convertir en blob
+      if (asset.output_url.startsWith('data:')) {
+        const base64Data = asset.output_url.split(',')[1];
+        const mimeType = asset.output_url.match(/data:([^;]+);/)?.[1] || 'image/png';
+        const byteString = atob(base64Data);
+        const arrayBuffer = new ArrayBuffer(byteString.length);
+        const uint8Array = new Uint8Array(arrayBuffer);
+        
+        for (let i = 0; i < byteString.length; i++) {
+          uint8Array[i] = byteString.charCodeAt(i);
+        }
+        
+        blob = new Blob([arrayBuffer], { type: mimeType });
+      } else {
+        // Sinon, télécharger depuis l'URL
+        const response = await fetch(asset.output_url);
+        if (!response.ok) throw new Error('Erreur lors du téléchargement');
+        blob = await response.blob();
+      }
+      
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${asset.type}-${asset.id}.${asset.type === 'image' ? 'png' : 'mp4'}`;
+      
+      // Extension basée sur le type
+      const extension = asset.type === 'image' ? 'png' : 'mp4';
+      const timestamp = new Date().toISOString().slice(0, 10);
+      a.download = `${asset.type}-${timestamp}-${asset.id.slice(0, 8)}.${extension}`;
+      
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);

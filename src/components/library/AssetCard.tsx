@@ -56,7 +56,7 @@ export function AssetCard({
           <Checkbox 
             checked={selected} 
             onCheckedChange={onSelect}
-            className="bg-white/90 backdrop-blur"
+            className="bg-background/90 backdrop-blur border-2"
           />
         </div>
 
@@ -64,12 +64,12 @@ export function AssetCard({
         <div className="absolute top-2 right-2 z-10 flex flex-col gap-1 items-end">
           {getExpiryBadge()}
           {asset.is_source_upload && (
-            <Badge variant="outline" className="bg-white/90 backdrop-blur text-xs">
+            <Badge variant="outline" className="bg-background/90 backdrop-blur text-xs">
               Source
             </Badge>
           )}
           {asset.engine && (
-            <Badge variant="outline" className="bg-white/90 backdrop-blur text-xs">
+            <Badge variant="outline" className="bg-background/90 backdrop-blur text-xs">
               {asset.engine}
             </Badge>
           )}
