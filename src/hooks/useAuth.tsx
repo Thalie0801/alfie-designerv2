@@ -25,16 +25,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const ensureStudioPlanForTestAccount = async (profileData: any) => {
+    if (!session?.user?.email || session.user.email !== 'nathaliestaelens@gmail.com') {
+      return profileData;
+    }
+
+    if (profileData?.plan === 'studio') {
+      return profileData;
+    }
+
+    const quotaBrands = profileData?.quota_brands && profileData.quota_brands > 0 ? profileData.quota_brands : 1;
+    const updates = {
+      plan: 'studio',
+      quota_brands: quotaBrands,
+      quota_visuals_per_month: Math.max(profileData?.quota_visuals_per_month ?? 0, 1000),
+      quota_videos: Math.max(profileData?.quota_videos ?? 0, 100)
+    };
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', session.user.id)
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('Failed to activate Studio plan for test account', error);
+      return profileData;
+    }
+
+    return data ?? { ...profileData, ...updates };
+  };
+
   const refreshProfile = async () => {
     if (!session?.user) return;
-    
+
     const { data: profileData } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', session.user.id)
       .single();
-    
-    if (profileData) setProfile(profileData);
+
+    if (profileData) {
+      const ensuredProfile = await ensureStudioPlanForTestAccount(profileData);
+      setProfile(ensuredProfile);
+    }
 
     const { data: rolesData } = await supabase
       .from('user_roles')
