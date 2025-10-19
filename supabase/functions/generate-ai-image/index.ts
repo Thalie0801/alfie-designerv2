@@ -49,7 +49,7 @@ serve(async (req) => {
     const { data: profile } = await supabaseClient
       .from('profiles')
       .select('active_brand_id')
-      .eq('user_id', user.id)
+      .eq('id', user.id)
       .single();
 
     const brandId = profile?.active_brand_id;
