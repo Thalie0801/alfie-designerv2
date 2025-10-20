@@ -48,6 +48,15 @@ verify_jwt = false
 [functions.get-affiliate-public]
 verify_jwt = false
 
+[functions.create-video]
+verify_jwt = true
+
+[functions.get-credits]
+verify_jwt = true
+
+[functions.export-canva]
+verify_jwt = true
+
 [functions.customer-portal]
 verify_jwt = false
 

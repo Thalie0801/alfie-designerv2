@@ -24,6 +24,7 @@ import BrandKitQuestionnaire from "./pages/BrandKitQuestionnaire";
 import NotFound from "./pages/NotFound";
 import Templates from "./pages/Templates";
 import Library from "./pages/Library";
+import Videos from "./pages/Videos";
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 
 const queryClient = new QueryClient();
@@ -56,7 +57,7 @@ const App = () => (
           <Route
             path="/app"
             element={
-              <ProtectedRoute requirePlan>
+              <ProtectedRoute>
                 <AppLayoutWithSidebar>
                   <Creator />
                 </AppLayoutWithSidebar>
@@ -66,7 +67,7 @@ const App = () => (
           <Route
             path="/templates"
             element={
-              <ProtectedRoute requirePlan>
+              <ProtectedRoute>
                 <AppLayoutWithSidebar>
                   <Templates />
                 </AppLayoutWithSidebar>
@@ -76,7 +77,7 @@ const App = () => (
           <Route
             path="/library"
             element={
-              <ProtectedRoute requirePlan>
+              <ProtectedRoute>
                 <AppLayoutWithSidebar>
                   <Library />
                 </AppLayoutWithSidebar>
@@ -84,9 +85,19 @@ const App = () => (
             }
           />
           <Route
+            path="/videos"
+            element={
+              <ProtectedRoute>
+                <AppLayoutWithSidebar>
+                  <Videos />
+                </AppLayoutWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/dashboard"
             element={
-              <ProtectedRoute requirePlan>
+              <ProtectedRoute>
                 <AppLayoutWithSidebar>
                   <Dashboard />
                 </AppLayoutWithSidebar>
@@ -96,7 +107,7 @@ const App = () => (
           <Route
             path="/affiliate"
             element={
-              <ProtectedRoute requirePlan>
+              <ProtectedRoute>
                 <AppLayoutWithSidebar>
                   <Affiliate />
                 </AppLayoutWithSidebar>
@@ -106,7 +117,7 @@ const App = () => (
           <Route
             path="/profile"
             element={
-              <ProtectedRoute requirePlan>
+              <ProtectedRoute>
                 <AppLayoutWithSidebar>
                   <Profile />
                 </AppLayoutWithSidebar>
