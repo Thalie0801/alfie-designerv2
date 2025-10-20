@@ -871,6 +871,36 @@ export type Database = {
         }
         Relationships: []
       }
+      plans_config: {
+        Row: {
+          created_at: string | null
+          durations: string
+          plan: string
+          price_eur: number
+          storage_days: number
+          visuals_per_month: number
+          woofs_per_month: number
+        }
+        Insert: {
+          created_at?: string | null
+          durations: string
+          plan: string
+          price_eur: number
+          storage_days: number
+          visuals_per_month: number
+          woofs_per_month: number
+        }
+        Update: {
+          created_at?: string | null
+          durations?: string
+          plan?: string
+          price_eur?: number
+          storage_days?: number
+          visuals_per_month?: number
+          woofs_per_month?: number
+        }
+        Relationships: []
+      }
       posts: {
         Row: {
           brand_key: string | null
@@ -1130,6 +1160,154 @@ export type Database = {
           },
         ]
       }
+      videos: {
+        Row: {
+          assets: Json | null
+          brand_id: string | null
+          created_at: string | null
+          duration: number
+          error_message: string | null
+          expires_at: string | null
+          file_size_bytes: number | null
+          id: string
+          ratio: string
+          rendering_completed_at: string | null
+          rendering_started_at: string | null
+          status: string
+          template_id: string | null
+          thumbnail_url: string | null
+          title: string
+          tts_config: Json | null
+          updated_at: string | null
+          user_id: string
+          video_url: string | null
+          woofs_cost: number
+        }
+        Insert: {
+          assets?: Json | null
+          brand_id?: string | null
+          created_at?: string | null
+          duration: number
+          error_message?: string | null
+          expires_at?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          ratio?: string
+          rendering_completed_at?: string | null
+          rendering_started_at?: string | null
+          status?: string
+          template_id?: string | null
+          thumbnail_url?: string | null
+          title: string
+          tts_config?: Json | null
+          updated_at?: string | null
+          user_id: string
+          video_url?: string | null
+          woofs_cost?: number
+        }
+        Update: {
+          assets?: Json | null
+          brand_id?: string | null
+          created_at?: string | null
+          duration?: number
+          error_message?: string | null
+          expires_at?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          ratio?: string
+          rendering_completed_at?: string | null
+          rendering_started_at?: string | null
+          status?: string
+          template_id?: string | null
+          thumbnail_url?: string | null
+          title?: string
+          tts_config?: Json | null
+          updated_at?: string | null
+          user_id?: string
+          video_url?: string | null
+          woofs_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "videos_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      woof_pack_purchases: {
+        Row: {
+          created_at: string | null
+          id: string
+          pack_id: string
+          price_eur: number
+          status: string | null
+          stripe_payment_intent_id: string | null
+          user_id: string
+          woofs: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          pack_id: string
+          price_eur: number
+          status?: string | null
+          stripe_payment_intent_id?: string | null
+          user_id: string
+          woofs: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          pack_id?: string
+          price_eur?: number
+          status?: string | null
+          stripe_payment_intent_id?: string | null
+          user_id?: string
+          woofs?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "woof_pack_purchases_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
+            referencedRelation: "woof_packs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      woof_packs: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          id: string
+          name: string
+          price_eur: number
+          stripe_price_id: string | null
+          woofs: number
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          id?: string
+          name: string
+          price_eur: number
+          stripe_price_id?: string | null
+          woofs: number
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          price_eur?: number
+          stripe_price_id?: string | null
+          woofs?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1142,6 +1320,23 @@ export type Database = {
           direct_affiliate_id: string
         }
         Returns: undefined
+      }
+      calculate_woofs_cost: {
+        Args: { duration_seconds: number }
+        Returns: number
+      }
+      can_create_video: {
+        Args: { duration_seconds: number; user_id_param: string }
+        Returns: {
+          can_create: boolean
+          reason: string
+          woofs_available: number
+          woofs_needed: number
+        }[]
+      }
+      consume_woofs: {
+        Args: { user_id_param: string; woofs_amount: number }
+        Returns: boolean
       }
       generate_short_job_id: {
         Args: Record<PropertyKey, never>
@@ -1171,6 +1366,10 @@ export type Database = {
           p_woofs?: number
         }
         Returns: undefined
+      }
+      refund_woofs: {
+        Args: { user_id_param: string; woofs_amount: number }
+        Returns: boolean
       }
       update_affiliate_status: {
         Args: { affiliate_id_param: string }
