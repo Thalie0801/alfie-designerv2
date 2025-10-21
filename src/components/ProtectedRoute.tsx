@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
-  const { user, isAdmin, loading, refreshProfile } = useAuth();
+  const { user, isAdmin, hasActivePlan, loading, refreshProfile } = useAuth();
   const [checkingAdmin, setCheckingAdmin] = useState(false);
 
   useEffect(() => {
@@ -35,6 +35,11 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
 
   if (requireAdmin && !isAdmin) {
     return <Navigate to="/app" replace />;
+  }
+
+  // Vérifier si l'utilisateur a un plan actif (sauf pour les admins)
+  if (!isAdmin && !hasActivePlan) {
+    return <Navigate to="/auth" replace />;
   }
 
   return <>{children}</>;
