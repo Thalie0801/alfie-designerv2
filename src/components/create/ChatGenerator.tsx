@@ -144,65 +144,88 @@ interface VideoGenerationParams {
 }
 
 const generateVideoWithFfmpeg = async ({ prompt, aspectRatio, source }: VideoGenerationParams) => {
-  const payload: Record<string, unknown> = {
-    prompt,
+  const headers = await getAuthHeader();
+
+  const trimmedPrompt = typeof prompt === 'string' ? prompt.trim() : '';
+
+  const body: Record<string, unknown> = {
+    prompt: trimmedPrompt,
     aspectRatio,
+    source: source
+      ? {
+          type: source.type,
+          url: source.url,
+          name: source.name,
+        }
+      : null,
   };
 
-  if (source?.type === 'image') {
-    payload.imageUrl = source.url;
-  }
+  let responseData: unknown = null;
 
-  if (source?.type === 'video') {
-    payload.videoUrl = source.url;
-  }
+  try {
+    const { data, error } = await supabase.functions.invoke('chat-generate-video', {
+      body,
+      headers,
+    });
 
-  const response = await fetch(`${VIDEO_ENGINE_CONFIG.FFMPEG_BACKEND_URL}/api/generate`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const rawText = await response.text();
-
-  if (!response.ok) {
-    const message = rawText || 'Erreur lors de la génération vidéo';
-    throw new Error(message);
-  }
-
-  let data: unknown = null;
-  if (rawText) {
-    try {
-      data = JSON.parse(rawText);
-    } catch (error) {
-      console.error('Réponse JSON invalide du backend vidéo', error, rawText);
-      throw new Error('Réponse du backend vidéo invalide.');
+    if (error) {
+      throw new Error(error.message || 'Erreur lors de la génération vidéo');
     }
+
+    responseData = data;
+  } catch (error) {
+    if (error instanceof Error && /fetch/i.test(error.message)) {
+      throw new Error("Connexion impossible avec le moteur vidéo. Réessayez dans un instant.");
+    }
+
+    throw error;
   }
 
-  const directUrl = extractMediaUrl(data);
+  const directUrl = extractMediaUrl(responseData);
   if (directUrl) {
     return directUrl;
   }
 
   const statusUrls: string[] = [];
-  if (isRecord(data)) {
-    const possibleStatusFields = ['statusUrl', 'status_url', 'pollUrl', 'poll_url', 'resultUrl', 'result_url'];
+  if (isRecord(responseData)) {
+    const possibleStatusFields = [
+      'statusUrl',
+      'status_url',
+      'pollUrl',
+      'poll_url',
+      'resultUrl',
+      'result_url',
+      'progressUrl',
+      'progress_url',
+    ];
+
     for (const key of possibleStatusFields) {
-      const value = data[key];
+      const value = responseData[key];
       if (typeof value === 'string') {
         statusUrls.push(value);
       }
     }
 
+    const statusUrlList = Array.isArray(responseData.statusUrls)
+      ? responseData.statusUrls
+      : Array.isArray(responseData.status_urls)
+      ? responseData.status_urls
+      : null;
+
+    if (Array.isArray(statusUrlList)) {
+      for (const url of statusUrlList) {
+        if (typeof url === 'string') {
+          statusUrls.push(url);
+        }
+      }
+    }
+
     const jobId =
-      (typeof data.jobId === 'string' && data.jobId) ||
-      (typeof data.job_id === 'string' && data.job_id) ||
-      (typeof data.id === 'string' && data.id) ||
-      (typeof data.taskId === 'string' && data.taskId) ||
-      (typeof data.task_id === 'string' && data.task_id) ||
+      (typeof responseData.jobId === 'string' && responseData.jobId) ||
+      (typeof responseData.job_id === 'string' && responseData.job_id) ||
+      (typeof responseData.id === 'string' && responseData.id) ||
+      (typeof responseData.taskId === 'string' && responseData.taskId) ||
+      (typeof responseData.task_id === 'string' && responseData.task_id) ||
       null;
 
     if (jobId) {
