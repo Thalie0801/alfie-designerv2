@@ -89,13 +89,6 @@ export default function Auth() {
         fullName: mode === 'signup' ? fullName : undefined
       });
 
-      // Empêcher l'inscription sans paiement
-      if (mode === 'signup' && !hasPaymentSession) {
-        toast.error('Vous devez d\'abord choisir un plan pour vous inscrire');
-        window.location.href = '/#pricing';
-        return;
-      }
-
       if (mode === 'login') {
         const { error } = await signIn(data.email, data.password);
         if (error) {
@@ -143,48 +136,7 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen gradient-subtle flex items-center justify-center p-4">
-      {/* Bloquer l'accès si pas de paiement ET pas connecté */}
-      {!hasPaymentSession && !user && (
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
-                <Sparkles className="h-6 w-6" />
-              </span>
-            </div>
-            <CardTitle className="text-2xl">Accès restreint</CardTitle>
-            <CardDescription>
-              Vous devez d'abord choisir un plan pour accéder à Alfie Designer
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <Alert>
-                <AlertDescription>
-                  Pour vous inscrire et utiliser Alfie Designer, vous devez d'abord souscrire à un plan.
-                </AlertDescription>
-              </Alert>
-              <Button 
-                className="w-full" 
-                onClick={() => window.location.href = '/#pricing'}
-              >
-                Voir les plans et tarifs
-              </Button>
-              <Button 
-                variant="outline" 
-                className="w-full" 
-                onClick={() => navigate('/')}
-              >
-                Retour à l'accueil
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Formulaire d'authentification - uniquement si paiement OU déjà connecté */}
-      {(hasPaymentSession || user) && (
-        <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
@@ -290,7 +242,6 @@ export default function Auth() {
           </div>
         </CardContent>
       </Card>
-      )}
     </div>
   );
 }
