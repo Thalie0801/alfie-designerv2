@@ -28,7 +28,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     userId: user?.id,
     email: user?.email 
   });
-  const canSeeAdminToggle = isAdmin || user?.email === 'nathaliestaelens@gmail.com';
+  const canSeeAdminToggle = isAdmin || (user?.email ? ['nathaliestaelens@gmail.com','staelensnathalie@gmail.com'].includes(user.email) : false);
 
   const handleSignOut = async () => {
     await signOut();

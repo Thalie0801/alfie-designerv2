@@ -33,7 +33,7 @@ export function AppSidebar() {
   const { open } = useSidebar();
   const location = useLocation();
   const { user, profile, isAdmin, signOut } = useAuth();
-  const canSeeAdminToggle = user?.email === 'nathaliestaelens@gmail.com';
+  const canSeeAdminToggle = user?.email ? ['nathaliestaelens@gmail.com','staelensnathalie@gmail.com'].includes(user.email) : false;
 
   const navItems: Array<{
     path: string;

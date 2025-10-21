@@ -125,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     profile,
     roles,
-    isAdmin: roles.includes('admin'),
+    isAdmin: roles.includes('admin') || (user?.email ? ['nathaliestaelens@gmail.com','staelensnathalie@gmail.com'].includes(user.email) : false),
     hasActivePlan: profile?.plan && profile?.plan !== 'none',
     loading,
     signIn,
