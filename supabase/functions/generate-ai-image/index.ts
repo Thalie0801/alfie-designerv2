@@ -63,8 +63,8 @@ serve(async (req) => {
       );
     }
 
-    // Consume quota BEFORE generating
-    const quotaResult = await consumeBrandQuota(supabaseClient, brandId, 'visual', 0);
+    // Consume quota BEFORE generating (with user ID for admin check)
+    const quotaResult = await consumeBrandQuota(supabaseClient, brandId, 'visual', 0, user.id);
     if (!quotaResult.success) {
       return new Response(
         JSON.stringify({ error: quotaResult.error || 'Quota exhausted' }),

@@ -1,19 +1,45 @@
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 
 /**
+ * Vérifier si un utilisateur est admin
+ */
+async function isAdminUser(supabaseClient: SupabaseClient, userId: string): Promise<boolean> {
+  const { data: profile } = await supabaseClient
+    .from('profiles')
+    .select('email, plan')
+    .eq('id', userId)
+    .single();
+  
+  if (!profile) return false;
+  
+  const adminEmails = ['nathaliestaelens@gmail.com', 'staelensnathalie@gmail.com'];
+  return adminEmails.includes(profile.email) || profile.plan === 'studio';
+}
+
+/**
  * Consommer un quota pour une marque
  */
 export async function consumeBrandQuota(
   supabaseClient: SupabaseClient,
   brandId: string,
   type: 'visual' | 'video',
-  woofCost: number = 0
+  woofCost: number = 0,
+  userId?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    // Vérifier si l'utilisateur est admin - bypass quotas
+    if (userId) {
+      const isAdmin = await isAdminUser(supabaseClient, userId);
+      if (isAdmin) {
+        console.log(`✅ Admin user ${userId} - quota check bypassed`);
+        return { success: true };
+      }
+    }
+
     // Récupérer les quotas actuels
     const { data: brand, error: fetchError } = await supabaseClient
       .from('brands')
-      .select('images_used, videos_used, woofs_used, quota_images, quota_videos, quota_woofs')
+      .select('user_id, images_used, videos_used, woofs_used, quota_images, quota_videos, quota_woofs')
       .eq('id', brandId)
       .single();
 
@@ -24,6 +50,15 @@ export async function consumeBrandQuota(
 
     if (!brand) {
       return { success: false, error: 'Brand not found' };
+    }
+
+    // Double vérification admin via le brand owner
+    if (brand.user_id) {
+      const isAdmin = await isAdminUser(supabaseClient, brand.user_id);
+      if (isAdmin) {
+        console.log(`✅ Admin brand owner - quota check bypassed`);
+        return { success: true };
+      }
     }
 
     // Vérifier les quotas disponibles

@@ -69,6 +69,8 @@ serve(async (req) => {
       return jsonResponse({ error: "Unauthorized" }, { status: 401 });
     }
 
+    console.log(`Video generation request from user: ${user.id}, email: ${user.email}`);
+
     const body = await req.json();
     const promptRaw = typeof body?.prompt === "string" ? body.prompt.trim() : "";
     const aspectRatio = typeof body?.aspectRatio === "string" && body.aspectRatio.trim()
@@ -103,11 +105,16 @@ serve(async (req) => {
     payload.userEmail = user.email ?? null;
 
     const backendUrl = `${getBackendBaseUrl()}/api/generate`;
+    console.log(`Calling FFmpeg backend at: ${backendUrl}`);
+    console.log(`Payload:`, JSON.stringify(payload, null, 2));
+    
     const backendResponse = await fetch(backendUrl, {
       method: "POST",
       headers: buildBackendHeaders(),
       body: JSON.stringify(payload),
     });
+
+    console.log(`Backend response status: ${backendResponse.status}`);
 
     const rawText = await backendResponse.text();
     let parsed: unknown = null;
