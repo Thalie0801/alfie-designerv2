@@ -104,27 +104,52 @@ serve(async (req) => {
     payload.userId = user.id;
     payload.userEmail = user.email ?? null;
 
-    const backendUrl = `${getBackendBaseUrl()}/api/generate`;
-    console.log(`Calling FFmpeg backend at: ${backendUrl}`);
-    console.log(`Payload:`, JSON.stringify(payload, null, 2));
-    
-    const backendResponse = await fetch(backendUrl, {
-      method: "POST",
-      headers: buildBackendHeaders(),
-      body: JSON.stringify(payload),
-    });
+    // Try multiple endpoints in case backend path differs
+    const baseUrl = getBackendBaseUrl();
+    const endpoints = [
+      `${baseUrl}/api/generate`,
+      `${baseUrl}/generate`,
+      `${baseUrl}/v1/generate`
+    ];
 
-    console.log(`Backend response status: ${backendResponse.status}`);
-
-    const rawText = await backendResponse.text();
+    let backendResponse: Response | null = null;
+    let rawText = '';
     let parsed: unknown = null;
+    let lastStatus = 0;
 
-    if (rawText) {
-      try {
-        parsed = JSON.parse(rawText);
-      } catch (error) {
-        console.warn("chat-generate-video: invalid JSON from backend", error);
+    for (const url of endpoints) {
+      console.log(`Attempting backend URL: ${url}`);
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: buildBackendHeaders(),
+        body: JSON.stringify(payload),
+      });
+      lastStatus = resp.status;
+      const text = await resp.text();
+      rawText = text;
+      parsed = null;
+      if (text) {
+        try {
+          parsed = JSON.parse(text);
+        } catch (e) {
+          console.warn("chat-generate-video: invalid JSON from backend", e);
+        }
       }
+
+      if (resp.ok) {
+        backendResponse = resp;
+        break;
+      }
+
+      // Retry next endpoint only on 404 (route not found)
+      if (resp.status !== 404) {
+        backendResponse = resp;
+        break;
+      }
+    }
+
+    if (!backendResponse) {
+      return jsonResponse({ error: "Video backend unreachable" }, { status: 502 });
     }
 
     if (!backendResponse.ok) {
@@ -133,10 +158,10 @@ serve(async (req) => {
           ? (parsed as any).error
           : (typeof parsed === "string" && parsed)
           ? parsed
-          : rawText || "Video backend error";
+          : rawText || `Video backend error (${lastStatus})`;
 
-      return jsonResponse({ error: errorMessage, status: backendResponse.status, raw: parsed ?? rawText }, {
-        status: backendResponse.status,
+      return jsonResponse({ error: errorMessage, status: lastStatus, raw: parsed ?? rawText }, {
+        status: lastStatus,
       });
     }
 
