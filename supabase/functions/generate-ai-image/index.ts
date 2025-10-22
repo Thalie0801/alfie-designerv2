@@ -158,29 +158,58 @@ serve(async (req) => {
           auth: { autoRefreshToken: false, persistSession: false }
         });
 
-        const assetResponse = await fetch(generatedImageUrl);
-        if (assetResponse.ok) {
-          const arrayBuffer = await assetResponse.arrayBuffer();
-          const contentType = assetResponse.headers.get('content-type') || 'image/png';
-          const filePath = `generated/${crypto.randomUUID()}.png`;
+        let binary: Uint8Array | null = null;
+        let contentType = 'image/png';
+        let ext = 'png';
 
+        if (generatedImageUrl.startsWith('data:image')) {
+          const match = generatedImageUrl.match(/^data:(image\/(png|jpeg|webp));base64,(.*)$/);
+          if (match) {
+            contentType = match[1];
+            ext = match[2] === 'jpeg' ? 'jpg' : match[2];
+            const b64 = match[3];
+            const raw = atob(b64);
+            const arr = new Uint8Array(raw.length);
+            for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+            binary = arr;
+          }
+        }
+
+        if (!binary) {
+          const assetResponse = await fetch(generatedImageUrl);
+          if (assetResponse.ok) {
+            const arrayBuffer = await assetResponse.arrayBuffer();
+            contentType = assetResponse.headers.get('content-type') || contentType;
+            if (contentType.includes('jpeg')) ext = 'jpg';
+            else if (contentType.includes('webp')) ext = 'webp';
+            else ext = 'png';
+            binary = new Uint8Array(arrayBuffer);
+          }
+        }
+
+        if (binary) {
+          const filePath = `generated/${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
           const { error: uploadError } = await assetClient.storage
-            .from('assets')
-            .upload(filePath, new Uint8Array(arrayBuffer), {
+            .from('media-generations')
+            .upload(filePath, binary, {
               contentType,
-              upsert: false
+              upsert: false,
             });
 
           if (!uploadError) {
-            const { data: publicUrl } = assetClient.storage.from('assets').getPublicUrl(filePath);
+            const { data: publicUrl } = assetClient.storage
+              .from('media-generations')
+              .getPublicUrl(filePath);
             if (publicUrl?.publicUrl) {
               finalUrl = publicUrl.publicUrl;
             }
+          } else {
+            console.warn('Upload to media-generations failed', uploadError);
           }
         }
       }
     } catch (storageError) {
-      console.warn('Failed to persist generated image to assets bucket', storageError);
+      console.warn('Failed to persist generated image to media-generations bucket', storageError);
     }
 
     console.log("Image generated successfully");
