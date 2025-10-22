@@ -1,19 +1,33 @@
 import { supabase } from '@/integrations/supabase/client';
 
 export async function getAuthHeader() {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  try {
+    const {
+      data: { session },
+      error: sessionError
+    } = await supabase.auth.getSession();
 
-  const userToken = session?.access_token;
-  const anonToken =
-    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
-    import.meta.env.VITE_SUPABASE_ANON_KEY;
-  const token = userToken ?? anonToken;
+    if (sessionError) {
+      console.error('Session error:', sessionError);
+      throw new Error('Session expirée. Veuillez vous reconnecter.');
+    }
 
-  if (!token) {
-    throw new Error('Supabase credentials are missing.');
+    const userToken = session?.access_token;
+    const anonToken =
+      import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
+      import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const token = userToken ?? anonToken;
+
+    if (!token) {
+      throw new Error('Authentification requise. Veuillez vous reconnecter.');
+    }
+
+    return { Authorization: `Bearer ${token}` };
+  } catch (error) {
+    console.error('Auth header error:', error);
+    if (error instanceof Error && error.message.includes('Refresh Token')) {
+      throw new Error('Session expirée. Veuillez vous reconnecter.');
+    }
+    throw error;
   }
-
-  return { Authorization: `Bearer ${token}` };
 }

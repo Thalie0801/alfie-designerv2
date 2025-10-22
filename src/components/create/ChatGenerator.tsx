@@ -457,7 +457,17 @@ export function ChatGenerator() {
     } catch (error: any) {
       console.error('Generation error:', error);
       const message = error?.message || 'Erreur lors de la génération';
-      if (contentType === 'video' && /préparation/i.test(message)) {
+      
+      if (message.includes('Session expirée') || message.includes('reconnecter')) {
+        toast.error(message, {
+          action: {
+            label: 'Se reconnecter',
+            onClick: () => {
+              window.location.href = '/auth';
+            }
+          }
+        });
+      } else if (contentType === 'video' && /préparation/i.test(message)) {
         toast.info(message);
       } else {
         toast.error(message);
