@@ -38,8 +38,15 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
     return <Navigate to="/app" replace />;
   }
 
-  // Vérifier si l'utilisateur a un plan actif (sauf pour les admins)
-  if (!isAdmin && !hasActivePlan) {
+  // Allow Studio plan users to access dashboard without restrictions
+  const hasStudioPlan = user?.email && [
+    'borderonpatricia7@gmail.com',
+    'Sandrine.guedra@gmail.com', 
+    'b2494709@gmail.com'
+  ].includes(user.email);
+
+  // Check if user has active plan (skip for admins and studio test accounts)
+  if (!isAdmin && !hasActivePlan && !hasStudioPlan) {
     return (
       <div className="min-h-screen gradient-subtle flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-6 text-center">

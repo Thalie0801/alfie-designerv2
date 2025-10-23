@@ -93,5 +93,8 @@ verify_jwt = false
 [functions.create-studio-accounts]
 verify_jwt = false
 
+[functions.create-missing-studio-accounts]
+verify_jwt = false
+
 [functions.chat-generate-video]
 verify_jwt = true
