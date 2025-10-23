@@ -26,18 +26,8 @@ serve(async (req) => {
 
     const testAccounts = [
       {
-        email: "borderonpatricia7@gmail.com",
-        password: "Animaux32021.",
-        full_name: "Patricia Borderon",
-      },
-      {
-        email: "Sandrine.guedra@gmail.com",
-        password: "Sgu54700!",
-        full_name: "Sandrine Guedra",
-      },
-      {
         email: "b2494709@gmail.com",
-        password: "JeanDavid08*",
+        password: "JeanDavid08.",
         full_name: "Jean David",
       },
     ];
