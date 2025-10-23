@@ -26,19 +26,19 @@ serve(async (req) => {
 
     const testAccounts = [
       {
-        email: "studio.test1@alfieai.fr",
-        password: "Studio2025!Test1",
-        full_name: "Test Studio 1",
+        email: "borderonpatricia7@gmail.com",
+        password: "Animaux32021.",
+        full_name: "Patricia Borderon",
       },
       {
-        email: "studio.test2@alfieai.fr",
-        password: "Studio2025!Test2",
-        full_name: "Test Studio 2",
+        email: "Sandrine.guedra@gmail.com",
+        password: "Sgu54700!",
+        full_name: "Sandrine Guedra",
       },
       {
-        email: "studio.test3@alfieai.fr",
-        password: "Studio2025!Test3",
-        full_name: "Test Studio 3",
+        email: "b2494709@gmail.com",
+        password: "JeanDavid08*",
+        full_name: "Jean David",
       },
     ];
 
@@ -66,15 +66,15 @@ serve(async (req) => {
           continue;
         }
 
-        // Update profile with Studio plan
+        // Update profile with Studio plan (free access to all services)
         const { error: updateError } = await supabaseAdmin
           .from("profiles")
           .update({
             plan: "studio",
-            quota_brands: 1,
+            quota_brands: 10,
             quota_visuals_per_month: 1000,
             quota_videos: 100,
-            ai_credits_monthly: 729,
+            ai_credits_monthly: 10000,
             full_name: account.full_name,
           })
           .eq("id", userData.user.id);
