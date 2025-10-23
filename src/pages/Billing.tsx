@@ -8,7 +8,7 @@ import { useStripeCheckout } from '@/hooks/useStripeCheckout';
 import { useCustomerPortal } from '@/hooks/useCustomerPortal';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const plans = [
   {
@@ -100,6 +100,12 @@ export default function Billing() {
   const currentPlan = profile?.plan || null;
   const hasActivePlan = currentPlan && currentPlan !== 'none';
   const hasStripeSubscription = profile?.stripe_subscription_id;
+
+  // Ensure fresh profile on page load (avoids stale plan state)
+  useEffect(() => {
+    refreshProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSelectPlan = async (plan: typeof plans[0]) => {
     if (plan.isEnterprise) {
