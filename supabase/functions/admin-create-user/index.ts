@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -12,6 +11,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Liste des emails admin
+const ADMIN_EMAILS = [
+  'nathaliestaelens@gmail.com',
+]
+
 serve(async (req) => {
   // Gérer les requêtes preflight CORS
   if (req.method === 'OPTIONS') {
@@ -22,7 +26,6 @@ serve(async (req) => {
   }
 
   try {
-    // Créer un client Supabase avec la clé service_role
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -34,7 +37,6 @@ serve(async (req) => {
       }
     )
 
-    // Récupérer les données de la requête
     const { email, fullName, plan, sendInvite, password } = await req.json()
 
     // Vérifier que l'utilisateur actuel est authentifié
@@ -54,6 +56,8 @@ serve(async (req) => {
       throw new Error('Accès refusé : droits administrateur requis')
     }
 
+    console.log('Admin verified:', user.email)
+
     // Créer l'utilisateur
     const createUserData: any = {
       email,
@@ -64,16 +68,20 @@ serve(async (req) => {
       }
     }
 
-    // Ajouter le mot de passe seulement si pas d'invitation
     if (!sendInvite && password) {
       createUserData.password = password
     }
 
+    console.log('Creating user with data:', { email, plan, sendInvite })
+
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser(createUserData)
 
     if (createError) {
+      console.error('Error creating user:', createError)
       throw new Error(createError.message)
     }
+
+    console.log('User created successfully:', newUser.user?.id)
 
     // Créer ou mettre à jour le profil
     if (newUser.user) {
@@ -83,21 +91,22 @@ serve(async (req) => {
           id: newUser.user.id,
           full_name: fullName || '',
           plan: plan,
-          role: 'user', // Par défaut, les nouveaux utilisateurs sont 'user'
           updated_at: new Date().toISOString(),
         })
 
       if (upsertError) {
         console.error('Error upserting profile:', upsertError)
+        // Ne pas échouer si l'upsert échoue
       }
     }
 
     // Envoyer l'invitation par email si demandé
     if (sendInvite && newUser.user) {
+      console.log('Sending invite to:', email)
       const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email)
       if (inviteError) {
         console.error('Error sending invite:', inviteError)
-        // Ne pas échouer si l'invitation échoue, l'utilisateur est déjà créé
+        // Ne pas échouer si l'invitation échoue
       }
     }
 
@@ -130,3 +139,8 @@ serve(async (req) => {
     )
   }
 })
+
+
+
+     
+      
