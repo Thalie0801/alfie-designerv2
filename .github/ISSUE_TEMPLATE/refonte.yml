@@ -1,18 +1,30 @@
 name: "Refonte: tâche"
 description: "Tâche liée à la refonte Alfie Designer"
 title: "[Refonte] "
-labels: ["refonte","codex"]
+labels: ["refonte", "codex"]
+
 body:
   - type: checkboxes
+    id: cdc
     attributes:
-      label: Conformité CDC (cocher avant close)
+      label: Conformité CDC (cocher toutes les cases pour créer l’issue)
       options:
-        - label: Livraison **PULL** (lien Canva + ZIP), aucune publication automatique. ✔
-        - label: Compteurs **images/reels/woofs** visibles, alerte **80 %**. ✔
-        - label: Offres/quotas **inchangés** (Starter/Pro/Studio), **1 plan = 1 marque**. ✔
-        - label: Stockage **30 jours** par défaut (purge activée). ✔
-        - label: Modale **Premium/Woofs** avant toute conso Woof. ✔
+        - label: "Livraison **PULL** (lien Canva + ZIP), aucune publication automatique."
+          required: true
+        - label: "Compteurs **images/reels/woofs** visibles, alerte **80 %**."
+          required: true
+        - label: "Offres/quotas **inchangés** (Starter/Pro/Studio), **1 plan = 1 marque**."
+          required: true
+        - label: "Stockage **30 jours** par défaut (purge activée)."
+          required: true
+        - label: "Modale **Premium/Woofs** avant toute conso Woof."
+          required: true
+
   - type: textarea
+    id: notes
     attributes:
       label: Notes
-      placeholder: Détails, captures, etc.
+      description: Détails, captures, liens de PRs/Canva, contraintes, etc.
+      placeholder: "Ex: L’alerte 80% s’affiche dans la navbar + page Compte..."
+    validations:
+      required: false
