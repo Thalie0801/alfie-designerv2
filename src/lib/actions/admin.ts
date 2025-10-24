@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { isAdmin } from '@/lib/config/admin';
 
 interface CreateUserParams {
   email: string;
@@ -17,14 +18,7 @@ export async function createUser(params: CreateUserParams) {
       throw new Error('Non authentifié');
     }
 
-    // Vérifier que l'utilisateur est admin
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || profile?.role !== 'admin') {
+    if (!isAdmin(user.email)) {
       throw new Error('Accès refusé : droits administrateur requis');
     }
 
