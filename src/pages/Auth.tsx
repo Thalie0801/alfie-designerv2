@@ -27,19 +27,23 @@ export default function Auth() {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [verifyingPayment, setVerifyingPayment] = useState(false);
+  const [canSignUp, setCanSignUp] = useState(false);
 
   // Vérifier si l'utilisateur vient d'un paiement
   const sessionId = searchParams.get('session_id');
   const paymentStatus = searchParams.get('payment');
-  const hasPaymentSession = sessionId && paymentStatus === 'success';
+  const hasPaymentSession = Boolean(sessionId && paymentStatus === 'success');
 
   // Check for payment success
   useEffect(() => {
-    if (hasPaymentSession) {
+    if (hasPaymentSession && sessionId) {
       setVerifyingPayment(true);
       verifyPayment(sessionId);
+    } else {
+      setCanSignUp(false);
+      setMode('login');
     }
-  }, [searchParams]);
+  }, [hasPaymentSession, sessionId]);
 
   const verifyPayment = async (sessionId: string) => {
     try {
@@ -51,7 +55,9 @@ export default function Auth() {
       if (error) throw error;
 
       toast.success(`Paiement confirmé ! Plan ${data.plan} activé.`);
-      
+
+      setCanSignUp(true);
+
       // Redirect to signup if not logged in
       if (!user) {
         setMode('signup');
@@ -59,12 +65,14 @@ export default function Auth() {
           setEmail(data.email);
         }
       } else {
-                // Already logged in, redirect to dashboard
-                navigate('/dashboard');
-              }
-            } catch (error: any) {
+        // Already logged in, redirect to dashboard
+        navigate('/dashboard');
+      }
+    } catch (error: any) {
       console.error('Payment verification error:', error);
       toast.error('Erreur lors de la vérification du paiement');
+      setCanSignUp(false);
+      setMode('login');
     } finally {
       setVerifyingPayment(false);
     }
@@ -77,11 +85,32 @@ export default function Auth() {
     }
   }, [user, verifyingPayment, navigate]);
 
+  const redirectToPricing = () => {
+    navigate('/#pricing');
+  };
+
+  const handleModeChange = (nextMode: 'login' | 'signup') => {
+    if (nextMode === 'signup' && !canSignUp) {
+      toast.error('Veuillez choisir un plan avant de créer un compte.');
+      redirectToPricing();
+      return;
+    }
+
+    setMode(nextMode);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      if (mode === 'signup' && !canSignUp) {
+        toast.error('Veuillez choisir un plan avant de créer un compte.');
+        redirectToPricing();
+        setMode('login');
+        return;
+      }
+
       // Validate
       const data = authSchema.parse({
         email,
@@ -97,7 +126,8 @@ export default function Auth() {
           } else if (error.message.includes('Email not confirmed')) {
             toast.error('Veuillez confirmer votre email avant de vous connecter');
           } else if (error.message.includes('User not found')) {
-            toast.error('Aucun compte trouvé avec cet email');
+            toast.error('Aucun compte trouvé avec cet email. Découvrez nos offres pour vous inscrire.');
+            redirectToPricing();
           } else {
             toast.error(`Erreur de connexion: ${error.message}`);
           }
@@ -211,7 +241,7 @@ export default function Auth() {
                 Pas encore de compte ?{' '}
                 <button
                   type="button"
-                  onClick={() => setMode('signup')}
+                  onClick={() => handleModeChange('signup')}
                   className="text-primary hover:underline font-medium"
                 >
                   S'inscrire
@@ -222,7 +252,7 @@ export default function Auth() {
                 Déjà un compte ?{' '}
                 <button
                   type="button"
-                  onClick={() => setMode('login')}
+                  onClick={() => handleModeChange('login')}
                   className="text-primary hover:underline font-medium"
                 >
                   Se connecter
