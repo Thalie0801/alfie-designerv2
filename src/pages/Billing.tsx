@@ -9,6 +9,7 @@ import { useCustomerPortal } from '@/hooks/useCustomerPortal';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const plans = [
   {
@@ -94,11 +95,13 @@ const plans = [
 
 export default function Billing() {
   const { profile, user, refreshProfile } = useAuth();
+  const navigate = useNavigate();
   const { createCheckout, loading } = useStripeCheckout();
   const { openCustomerPortal, loading: portalLoading } = useCustomerPortal();
   const [activating, setActivating] = useState(false);
   const currentPlan = profile?.plan || null;
   const hasActivePlan = currentPlan && currentPlan !== 'none';
+  const isSpecialTester = ['borderonpatricia7@gmail.com','Sandrine.guedra@gmail.com'].includes(user?.email || '');
   const hasStripeSubscription = profile?.stripe_subscription_id;
 
   // Ensure fresh profile on page load (avoids stale plan state)
@@ -106,6 +109,13 @@ export default function Billing() {
     refreshProfile();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // If tester already on Studio, go straight to dashboard
+  useEffect(() => {
+    if (isSpecialTester && currentPlan === 'studio') {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isSpecialTester, currentPlan, navigate]);
 
   const handleSelectPlan = async (plan: typeof plans[0]) => {
     if (plan.isEnterprise) {
@@ -140,6 +150,7 @@ export default function Billing() {
 
       toast.success('Plan Studio activé gratuitement !');
       await refreshProfile();
+      navigate('/dashboard', { replace: true });
     } catch (error) {
       console.error('Error activating free studio:', error);
       toast.error('Erreur lors de l\'activation du plan');
@@ -164,7 +175,7 @@ export default function Billing() {
         )}
       </div>
 
-      {(['nathaliestaelens@gmail.com','borderonpatricia7@gmail.com','Sandrine.guedra@gmail.com'].includes(user?.email || '')) && currentPlan !== 'studio' && (
+      {(isSpecialTester) && currentPlan !== 'studio' && (
         <Alert className="border-green-500/50 bg-green-50 dark:bg-green-900/20">
           <AlertDescription className="flex items-center justify-between">
             <span className="text-green-700 dark:text-green-300">

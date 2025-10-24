@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
   const { user, isAdmin, hasActivePlan, loading, refreshProfile } = useAuth();
+  const location = useLocation();
   const [checkingAdmin, setCheckingAdmin] = useState(false);
 
   useEffect(() => {
@@ -43,6 +44,11 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
     'borderonpatricia7@gmail.com',
     'Sandrine.guedra@gmail.com'
   ].includes(user.email);
+
+  // If special testers hit /billing, redirect them to dashboard
+  if (hasStudioPlan && location.pathname === '/billing') {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   // Check if user has active plan (skip for admins and studio test accounts)
   if (!isAdmin && !hasActivePlan && !hasStudioPlan) {
