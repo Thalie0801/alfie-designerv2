@@ -1,7 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -9,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
-  const { user, isAdmin, hasActivePlan, loading, refreshProfile } = useAuth();
+  const { user, isAdmin, loading, refreshProfile } = useAuth();
   const location = useLocation();
   const [checkingAdmin, setCheckingAdmin] = useState(false);
 
@@ -48,37 +47,6 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
   // If special testers hit /billing, redirect them to dashboard
   if (hasStudioPlan && location.pathname === '/billing') {
     return <Navigate to="/dashboard" replace />;
-  }
-
-  // Check if user has active plan (skip for admins and studio test accounts)
-  if (!isAdmin && !hasActivePlan && !hasStudioPlan) {
-    return (
-      <div className="min-h-screen gradient-subtle flex items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-6 text-center">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold">Accès restreint</h1>
-            <p className="text-muted-foreground">
-              Vous devez souscrire à un plan pour accéder à Alfie Designer
-            </p>
-          </div>
-          <div className="space-y-3">
-            <Button 
-              className="w-full" 
-              onClick={() => window.location.href = '/#pricing'}
-            >
-              Voir les plans et tarifs
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full" 
-              onClick={() => window.location.href = '/'}
-            >
-              Retour à l'accueil
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
   }
 
   return <>{children}</>;
