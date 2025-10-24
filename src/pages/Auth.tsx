@@ -69,7 +69,7 @@ export default function Auth() {
         setVerifyingPayment(false);
       }
     },
-    [navigate, user]
+    [navigate, user],
   );
 
   // Déclenche la vérification UNE seule fois si la session de paiement est présente
@@ -158,9 +158,7 @@ export default function Auth() {
               <Sparkles className="h-6 w-6" />
             </span>
           </div>
-          <CardTitle className="text-2xl">
-            {mode === "login" ? "Connexion" : "Créer un compte"}
-          </CardTitle>
+          <CardTitle className="text-2xl">{mode === "login" ? "Connexion" : "Créer un compte"}</CardTitle>
           <CardDescription>
             {mode === "login"
               ? "Connectez-vous pour accéder à Alfie Designer"
