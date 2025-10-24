@@ -1,19 +1,14 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Liste des emails admin - REMPLACEZ PAR VOTRE EMAIL
-const ADMIN_EMAILS = [
-  'nathaliestaelens@gmail.com', // ← Mettez votre email ici
-]
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Liste des emails admin - À REMPLACER PAR VOTRE EMAIL
+// Liste des emails admin
 const ADMIN_EMAILS = [
-  'nathaliestaelens@gmail.com', // Remplacez par votre email
+  'nathaliestaelens@gmail.com',
 ]
 
 serve(async (req) => {
@@ -52,9 +47,15 @@ serve(async (req) => {
       throw new Error('Non authentifié')
     }
 
+    console.log('User attempting to create account:', user.email)
+
+    // Vérifier que l'email de l'utilisateur est dans la liste des admins
     if (!ADMIN_EMAILS.includes(user.email || '')) {
+      console.error('Access denied for:', user.email)
       throw new Error('Accès refusé : droits administrateur requis')
     }
+
+    console.log('Admin verified:', user.email)
 
     // Créer l'utilisateur
     const createUserData: any = {
@@ -70,13 +71,18 @@ serve(async (req) => {
       createUserData.password = password
     }
 
+    console.log('Creating user with data:', { email, plan, sendInvite })
+
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser(createUserData)
 
     if (createError) {
+      console.error('Error creating user:', createError)
       throw new Error(createError.message)
     }
 
-    // Créer ou mettre à jour le profil (sans role)
+    console.log('User created successfully:', newUser.user?.id)
+
+    // Créer ou mettre à jour le profil
     if (newUser.user) {
       const { error: upsertError } = await supabaseAdmin
         .from('profiles')
@@ -89,14 +95,17 @@ serve(async (req) => {
 
       if (upsertError) {
         console.error('Error upserting profile:', upsertError)
+        // Ne pas échouer si l'upsert échoue
       }
     }
 
     // Envoyer l'invitation par email si demandé
     if (sendInvite && newUser.user) {
+      console.log('Sending invite to:', email)
       const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email)
       if (inviteError) {
         console.error('Error sending invite:', inviteError)
+        // Ne pas échouer si l'invitation échoue
       }
     }
 
@@ -131,7 +140,6 @@ serve(async (req) => {
 })
 
 
-    
 
      
       
