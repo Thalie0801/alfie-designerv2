@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { createUser } from './actions/admin';
 
 interface CreateUserParams {
   email: string;
@@ -9,14 +9,5 @@ interface CreateUserParams {
 }
 
 export async function adminCreateUser(params: CreateUserParams) {
-  const { data, error } = await supabase.functions.invoke('admin-create-user', {
-    body: params,
-  });
-
-  if (error) {
-    console.error('Error creating user:', error);
-    throw new Error(error.message || "Erreur lors de la création de l'utilisateur");
-  }
-
-  return data;
+  return await createUser(params);
 }
