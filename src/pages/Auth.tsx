@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -27,19 +27,49 @@ export default function Auth() {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [verifyingPayment, setVerifyingPayment] = useState(false);
+  const [canSignUp, setCanSignUp] = useState(false);
+  const warnedAboutSignupRedirect = useRef(false);
 
   // Vérifier si l'utilisateur vient d'un paiement
   const sessionId = searchParams.get('session_id');
   const paymentStatus = searchParams.get('payment');
-  const hasPaymentSession = sessionId && paymentStatus === 'success';
+  const hasPaymentSession = Boolean(sessionId && paymentStatus === 'success');
+  const searchKey = searchParams.toString();
 
   // Check for payment success
   useEffect(() => {
-    if (hasPaymentSession) {
+    if (hasPaymentSession && sessionId) {
       setVerifyingPayment(true);
       verifyPayment(sessionId);
+    } else {
+      setCanSignUp(false);
+      setMode('login');
     }
-  }, [searchParams]);
+  }, [hasPaymentSession, sessionId]);
+
+  // Empêche l'accès manuel au mode inscription sans paiement
+  useEffect(() => {
+    const requestedMode = searchParams.get('mode');
+
+    if (requestedMode === 'signup') {
+      if (canSignUp) {
+        setMode('signup');
+        warnedAboutSignupRedirect.current = false;
+      } else if (!warnedAboutSignupRedirect.current) {
+        warnedAboutSignupRedirect.current = true;
+        toast.error('Veuillez choisir un plan avant de créer un compte.');
+        redirectToPricing();
+      }
+    } else {
+      warnedAboutSignupRedirect.current = false;
+    }
+  }, [searchKey, canSignUp]);
+
+  useEffect(() => {
+    if (!canSignUp && mode === 'signup') {
+      setMode('login');
+    }
+  }, [canSignUp, mode]);
 
   const verifyPayment = async (sessionId: string) => {
     try {
@@ -51,7 +81,9 @@ export default function Auth() {
       if (error) throw error;
 
       toast.success(`Paiement confirmé ! Plan ${data.plan} activé.`);
-      
+
+      setCanSignUp(true);
+
       // Redirect to signup if not logged in
       if (!user) {
         setMode('signup');
@@ -59,12 +91,14 @@ export default function Auth() {
           setEmail(data.email);
         }
       } else {
-                // Already logged in, redirect to dashboard
-                navigate('/dashboard');
-              }
-            } catch (error: any) {
+        // Already logged in, redirect to dashboard
+        navigate('/dashboard');
+      }
+    } catch (error: any) {
       console.error('Payment verification error:', error);
       toast.error('Erreur lors de la vérification du paiement');
+      setCanSignUp(false);
+      setMode('login');
     } finally {
       setVerifyingPayment(false);
     }
@@ -77,11 +111,38 @@ export default function Auth() {
     }
   }, [user, verifyingPayment, navigate]);
 
+  const redirectToPricing = () => {
+    if (typeof window !== 'undefined') {
+      window.location.href = '/#pricing';
+    } else {
+      navigate('/#pricing');
+    }
+  };
+
+  const handleModeChange = (nextMode: 'login' | 'signup') => {
+    if (nextMode === 'signup' && !canSignUp) {
+      toast.error('Veuillez choisir un plan avant de créer un compte.');
+      redirectToPricing();
+      return;
+    }
+
+    setMode(nextMode);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (mode === 'signup' && !canSignUp) {
+      toast.error('Veuillez choisir un plan avant de créer un compte.');
+      redirectToPricing();
+      setMode('login');
+      return;
+    }
+
     setLoading(true);
 
     try {
+
       // Validate
       const data = authSchema.parse({
         email,
@@ -97,7 +158,8 @@ export default function Auth() {
           } else if (error.message.includes('Email not confirmed')) {
             toast.error('Veuillez confirmer votre email avant de vous connecter');
           } else if (error.message.includes('User not found')) {
-            toast.error('Aucun compte trouvé avec cet email');
+            toast.error('Aucun compte trouvé avec cet email. Découvrez nos offres pour vous inscrire.');
+            redirectToPricing();
           } else {
             toast.error(`Erreur de connexion: ${error.message}`);
           }
@@ -115,8 +177,12 @@ export default function Auth() {
             toast.error('Le mot de passe doit contenir au moins 6 caractères');
           } else if (error.message.includes('Unable to validate email')) {
             toast.error('Email invalide');
+          } else if (error.message.includes('Aucun paiement validé trouvé')) {
+            toast.error('Veuillez choisir un plan avant de créer un compte.');
+            redirectToPricing();
+            setMode('login');
           } else {
-            toast.error(`Erreur lors de la création du compte: ${error.message}`);
+            toast.error('Impossible de créer le compte pour le moment. Merci de réessayer ou de contacter le support.');
           }
         } else {
           toast.success('Compte créé avec succès ! Bienvenue 🎉');
@@ -200,7 +266,11 @@ export default function Auth() {
                 </button>
               )}
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={loading || (mode === 'signup' && !canSignUp)}
+            >
               {loading ? 'Chargement...' : mode === 'login' ? 'Se connecter' : 'Créer mon compte'}
             </Button>
           </form>
@@ -211,8 +281,11 @@ export default function Auth() {
                 Pas encore de compte ?{' '}
                 <button
                   type="button"
-                  onClick={() => setMode('signup')}
-                  className="text-primary hover:underline font-medium"
+                  onClick={() => handleModeChange('signup')}
+                  className={`text-primary font-medium ${
+                    canSignUp ? 'hover:underline' : 'cursor-not-allowed opacity-60'
+                  }`}
+                  aria-disabled={!canSignUp}
                 >
                   S'inscrire
                 </button>
@@ -222,7 +295,7 @@ export default function Auth() {
                 Déjà un compte ?{' '}
                 <button
                   type="button"
-                  onClick={() => setMode('login')}
+                  onClick={() => handleModeChange('login')}
                   className="text-primary hover:underline font-medium"
                 >
                   Se connecter
@@ -230,6 +303,21 @@ export default function Auth() {
               </p>
             )}
           </div>
+
+          {!canSignUp && (
+            <div className="mt-3 text-center text-xs text-slate-500">
+              <p>
+                L'inscription est réservée aux clients ayant validé un paiement.{' '}
+                <button
+                  type="button"
+                  onClick={redirectToPricing}
+                  className="font-medium text-primary hover:underline"
+                >
+                  Voir les offres
+                </button>
+              </p>
+            </div>
+          )}
 
           <div className="mt-6 text-center">
             <Button
