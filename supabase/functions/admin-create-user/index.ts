@@ -8,7 +8,7 @@ const corsHeaders = {
 
 // Liste des emails admin - À REMPLACER PAR VOTRE EMAIL
 const ADMIN_EMAILS = [
-  'votre@email.com', // Remplacez par votre email
+  'nathaliestaelens@gmail.com', // Remplacez par votre email
 ]
 
 serve(async (req) => {
