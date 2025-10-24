@@ -164,7 +164,7 @@ export default function Billing() {
         )}
       </div>
 
-      {user?.email === 'nathaliestaelens@gmail.com' && currentPlan !== 'studio' && (
+      {(['nathaliestaelens@gmail.com','borderonpatricia7@gmail.com','Sandrine.guedra@gmail.com'].includes(user?.email || '')) && currentPlan !== 'studio' && (
         <Alert className="border-green-500/50 bg-green-50 dark:bg-green-900/20">
           <AlertDescription className="flex items-center justify-between">
             <span className="text-green-700 dark:text-green-300">
