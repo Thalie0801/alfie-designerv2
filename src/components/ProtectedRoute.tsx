@@ -1,6 +1,6 @@
-import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { useEffect, useState } from 'react';
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { useEffect, useState } from "react";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -39,14 +39,16 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
   }
 
   // Allow Studio plan users to access dashboard without restrictions
-  const hasStudioPlan = user?.email && [
-    'borderonpatricia7@gmail.com',
-    'Sandrine.guedra@gmail.com'
-  ].includes(user.email);
+  const hasStudioPlan =
+    user?.email && ["borderonpatricia7@gmail.com", "Sandrine.guedra@gmail.com"].includes(user.email);
 
-  // If special testers hit /billing, redirect them to dashboard
-  if (hasStudioPlan && location.pathname === '/billing') {
-    return <Navigate to="/dashboard" replace />;
+  // ProtectedRoute.tsx — remplace juste le bloc "non authentifié"
+if (!user) {
+  // si l'utilisateur venait de /billing, on remplace par /dashboard
+  const from =
+    location.pathname.startsWith("/billing") ? { pathname: "/dashboard" } : location;
+  return <Navigate to="/auth" replace state={{ from }} />;
+}
   }
 
   return <>{children}</>;
