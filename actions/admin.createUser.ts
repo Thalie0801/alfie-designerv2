@@ -24,13 +24,42 @@ export default async function handler(req: Request) {
   }
 
   const { data, error } = await supabaseAdmin.auth.admin.createUser(createPayload);
-  if (error || !data?.user?.id) {
+
+  let userId = data?.user?.id ?? null;
+  let existed = false;
+
+  if (error) {
+    const message = error.message?.toLowerCase() ?? '';
+    if (message.includes('already')) {
+      existed = true;
+    } else {
+      console.error('createUser error:', error.message);
+    }
+  }
+
+  if (!userId) {
+    const { data: existing, error: lookupError } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1,
+      email: String(email),
+    });
+
+    if (lookupError) {
+      console.error('listUsers error:', lookupError.message);
+    }
+
+    const existingUserId = existing?.users?.[0]?.id;
+    if (existingUserId) {
+      userId = existingUserId;
+      existed = true;
+    }
+  }
+
+  if (!userId) {
     return new Response(error?.message || 'createUser failed', { status: 500 });
   }
 
-  const userId = data.user.id;
-
-  if (sendInvite) {
+  if (sendInvite && !existed) {
     const { error: invErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email);
     if (invErr) {
       console.error('Invite error:', invErr.message);
@@ -44,7 +73,7 @@ export default async function handler(req: Request) {
     return new Response('Failed to set plan on profile', { status: 500 });
   }
 
-  return new Response(JSON.stringify({ ok: true, userId }), {
+  return new Response(JSON.stringify({ ok: true, userId, existed }), {
     headers: { 'Content-Type': 'application/json' },
   });
 }
