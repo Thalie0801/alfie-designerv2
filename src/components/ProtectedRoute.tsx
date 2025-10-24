@@ -41,8 +41,7 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
   // Allow Studio plan users to access dashboard without restrictions
   const hasStudioPlan = user?.email && [
     'borderonpatricia7@gmail.com',
-    'Sandrine.guedra@gmail.com', 
-    'b2494709@gmail.com'
+    'Sandrine.guedra@gmail.com'
   ].includes(user.email);
 
   // Check if user has active plan (skip for admins and studio test accounts)

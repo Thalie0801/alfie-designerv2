@@ -95,7 +95,7 @@ export default function CreditPurchaseSuccess() {
 
           <div className="flex gap-3">
             <Button
-              onClick={() => navigate('/app')}
+              onClick={() => navigate('/dashboard')}
               className="flex-1"
               size="lg"
             >

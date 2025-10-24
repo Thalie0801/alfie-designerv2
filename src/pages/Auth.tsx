@@ -59,10 +59,10 @@ export default function Auth() {
           setEmail(data.email);
         }
       } else {
-        // Already logged in, redirect to app
-        navigate('/app');
-      }
-    } catch (error: any) {
+                // Already logged in, redirect to dashboard
+                navigate('/dashboard');
+              }
+            } catch (error: any) {
       console.error('Payment verification error:', error);
       toast.error('Erreur lors de la vérification du paiement');
     } finally {
@@ -73,7 +73,7 @@ export default function Auth() {
   // Redirect if already logged in (will be handled by ProtectedRoute)
   useEffect(() => {
     if (user && !verifyingPayment) {
-      navigate('/app');
+      navigate('/dashboard');
     }
   }, [user, verifyingPayment, navigate]);
 
