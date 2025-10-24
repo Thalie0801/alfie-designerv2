@@ -1,6 +1,11 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// Liste des emails admin - REMPLACEZ PAR VOTRE EMAIL
+const ADMIN_EMAILS = [
+  'nathaliestaelens@gmail.com', // ← Mettez votre email ici
+]
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -47,11 +52,7 @@ serve(async (req) => {
       throw new Error('Non authentifié')
     }
 
-    console.log('User attempting to create account:', user.email)
-
-    // Vérifier que l'email de l'utilisateur est dans la liste des admins
     if (!ADMIN_EMAILS.includes(user.email || '')) {
-      console.error('Access denied for:', user.email)
       throw new Error('Accès refusé : droits administrateur requis')
     }
 
