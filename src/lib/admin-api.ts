@@ -1,19 +1,22 @@
-export async function adminCreateUser(input: {
+import { supabase } from '@/integrations/supabase/client';
+
+interface CreateUserParams {
   email: string;
   fullName?: string;
-  plan: 'starter' | 'pro' | 'studio';
-  sendInvite?: boolean;
+  plan: string;
+  sendInvite: boolean;
   password?: string;
-}) {
-  const r = await fetch('/actions/admin.createUser', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(input),
+}
+
+export async function adminCreateUser(params: CreateUserParams) {
+  const { data, error } = await supabase.functions.invoke('admin-create-user', {
+    body: params,
   });
-  if (!r.ok) {
-    const msg = await r.text().catch(() => '');
-    throw new Error(msg || 'admin.createUser failed');
+
+  if (error) {
+    console.error('Error creating user:', error);
+    throw new Error(error.message || "Erreur lors de la création de l'utilisateur");
   }
-  return r.json() as Promise<{ ok: true; userId: string }>;
+
+  return data;
 }
