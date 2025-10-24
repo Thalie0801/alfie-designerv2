@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -28,11 +28,13 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [verifyingPayment, setVerifyingPayment] = useState(false);
   const [canSignUp, setCanSignUp] = useState(false);
+  const warnedAboutSignupRedirect = useRef(false);
 
   // Vérifier si l'utilisateur vient d'un paiement
   const sessionId = searchParams.get('session_id');
   const paymentStatus = searchParams.get('payment');
   const hasPaymentSession = Boolean(sessionId && paymentStatus === 'success');
+  const searchKey = searchParams.toString();
 
   // Check for payment success
   useEffect(() => {
@@ -44,6 +46,30 @@ export default function Auth() {
       setMode('login');
     }
   }, [hasPaymentSession, sessionId]);
+
+  // Empêche l'accès manuel au mode inscription sans paiement
+  useEffect(() => {
+    const requestedMode = searchParams.get('mode');
+
+    if (requestedMode === 'signup') {
+      if (canSignUp) {
+        setMode('signup');
+        warnedAboutSignupRedirect.current = false;
+      } else if (!warnedAboutSignupRedirect.current) {
+        warnedAboutSignupRedirect.current = true;
+        toast.error('Veuillez choisir un plan avant de créer un compte.');
+        redirectToPricing();
+      }
+    } else {
+      warnedAboutSignupRedirect.current = false;
+    }
+  }, [searchKey, canSignUp]);
+
+  useEffect(() => {
+    if (!canSignUp && mode === 'signup') {
+      setMode('login');
+    }
+  }, [canSignUp, mode]);
 
   const verifyPayment = async (sessionId: string) => {
     try {
@@ -86,7 +112,11 @@ export default function Auth() {
   }, [user, verifyingPayment, navigate]);
 
   const redirectToPricing = () => {
-    navigate('/#pricing');
+    if (typeof window !== 'undefined') {
+      window.location.href = '/#pricing';
+    } else {
+      navigate('/#pricing');
+    }
   };
 
   const handleModeChange = (nextMode: 'login' | 'signup') => {
@@ -101,15 +131,17 @@ export default function Auth() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (mode === 'signup' && !canSignUp) {
+      toast.error('Veuillez choisir un plan avant de créer un compte.');
+      redirectToPricing();
+      setMode('login');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      if (mode === 'signup' && !canSignUp) {
-        toast.error('Veuillez choisir un plan avant de créer un compte.');
-        redirectToPricing();
-        setMode('login');
-        return;
-      }
 
       // Validate
       const data = authSchema.parse({
@@ -230,7 +262,11 @@ export default function Auth() {
                 </button>
               )}
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={loading || (mode === 'signup' && !canSignUp)}
+            >
               {loading ? 'Chargement...' : mode === 'login' ? 'Se connecter' : 'Créer mon compte'}
             </Button>
           </form>
@@ -242,7 +278,10 @@ export default function Auth() {
                 <button
                   type="button"
                   onClick={() => handleModeChange('signup')}
-                  className="text-primary hover:underline font-medium"
+                  className={`text-primary font-medium ${
+                    canSignUp ? 'hover:underline' : 'cursor-not-allowed opacity-60'
+                  }`}
+                  aria-disabled={!canSignUp}
                 >
                   S'inscrire
                 </button>
@@ -260,6 +299,21 @@ export default function Auth() {
               </p>
             )}
           </div>
+
+          {!canSignUp && (
+            <div className="mt-3 text-center text-xs text-slate-500">
+              <p>
+                L'inscription est réservée aux clients ayant validé un paiement.{' '}
+                <button
+                  type="button"
+                  onClick={redirectToPricing}
+                  className="font-medium text-primary hover:underline"
+                >
+                  Voir les offres
+                </button>
+              </p>
+            </div>
+          )}
 
           <div className="mt-6 text-center">
             <Button
