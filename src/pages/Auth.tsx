@@ -146,7 +146,7 @@ export default function Auth() {
           } else if (error.message.includes('Unable to validate email')) {
             toast.error('Email invalide');
           } else {
-            toast.error(`Erreur lors de la création du compte: ${error.message}`);
+            toast.error('Impossible de créer le compte pour le moment. Merci de réessayer ou de contacter le support.');
           }
         } else {
           toast.success('Compte créé avec succès ! Bienvenue 🎉');
