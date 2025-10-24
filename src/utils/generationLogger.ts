@@ -111,14 +111,22 @@ export async function getBrandAnalytics(brandId: string): Promise<{
 
     if (error) throw error;
     
-    const logs = data || [];
+    type GenerationLogRow = {
+      type?: string | null;
+      engine?: string | null;
+      duration_seconds?: number | null;
+      status?: string | null;
+    };
+
+    const logs: GenerationLogRow[] = (data ?? []) as GenerationLogRow[];
     const totalGenerations = logs.length;
-    const totalImages = logs.filter(l => l.type === 'image').length;
-    const totalVideos = logs.filter(l => l.type === 'video').length;
-    const soraCount = logs.filter(l => l.engine === 'sora').length;
-    const veo3Count = logs.filter(l => l.engine === 'veo3').length;
-    const avgDurationSeconds = logs.reduce((sum, l) => sum + (l.duration_seconds || 0), 0) / totalGenerations || 0;
-    const successCount = logs.filter(l => l.status === 'success').length;
+    const totalImages = logs.filter((l) => l.type === 'image').length;
+    const totalVideos = logs.filter((l) => l.type === 'video').length;
+    const soraCount = logs.filter((l) => l.engine === 'sora').length;
+    const veo3Count = logs.filter((l) => l.engine === 'veo3').length;
+    const avgDurationSeconds =
+      logs.reduce((sum, l) => sum + (l.duration_seconds || 0), 0) / totalGenerations || 0;
+    const successCount = logs.filter((l) => l.status === 'success').length;
     const successRate = totalGenerations > 0 ? (successCount / totalGenerations) * 100 : 0;
 
     return {
