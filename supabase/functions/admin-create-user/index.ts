@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -12,6 +11,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Liste des emails admin - À REMPLACER PAR VOTRE EMAIL
+const ADMIN_EMAILS = [
+  'nathaliestaelens@gmail.com', // Remplacez par votre email
+]
+
 serve(async (req) => {
   // Gérer les requêtes preflight CORS
   if (req.method === 'OPTIONS') {
@@ -22,7 +26,6 @@ serve(async (req) => {
   }
 
   try {
-    // Créer un client Supabase avec la clé service_role
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -34,7 +37,6 @@ serve(async (req) => {
       }
     )
 
-    // Récupérer les données de la requête
     const { email, fullName, plan, sendInvite, password } = await req.json()
 
     // Vérifier que l'utilisateur actuel est authentifié
@@ -64,7 +66,6 @@ serve(async (req) => {
       }
     }
 
-    // Ajouter le mot de passe seulement si pas d'invitation
     if (!sendInvite && password) {
       createUserData.password = password
     }
@@ -75,7 +76,7 @@ serve(async (req) => {
       throw new Error(createError.message)
     }
 
-    // Créer ou mettre à jour le profil
+    // Créer ou mettre à jour le profil (sans role)
     if (newUser.user) {
       const { error: upsertError } = await supabaseAdmin
         .from('profiles')
@@ -83,7 +84,6 @@ serve(async (req) => {
           id: newUser.user.id,
           full_name: fullName || '',
           plan: plan,
-          role: 'user', // Par défaut, les nouveaux utilisateurs sont 'user'
           updated_at: new Date().toISOString(),
         })
 
@@ -97,7 +97,6 @@ serve(async (req) => {
       const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email)
       if (inviteError) {
         console.error('Error sending invite:', inviteError)
-        // Ne pas échouer si l'invitation échoue, l'utilisateur est déjà créé
       }
     }
 
@@ -130,3 +129,9 @@ serve(async (req) => {
     )
   }
 })
+
+
+    
+
+     
+      
