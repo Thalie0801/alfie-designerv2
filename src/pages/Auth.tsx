@@ -177,6 +177,10 @@ export default function Auth() {
             toast.error('Le mot de passe doit contenir au moins 6 caractères');
           } else if (error.message.includes('Unable to validate email')) {
             toast.error('Email invalide');
+          } else if (error.message.includes('Aucun paiement validé trouvé')) {
+            toast.error('Veuillez choisir un plan avant de créer un compte.');
+            redirectToPricing();
+            setMode('login');
           } else {
             toast.error('Impossible de créer le compte pour le moment. Merci de réessayer ou de contacter le support.');
           }
