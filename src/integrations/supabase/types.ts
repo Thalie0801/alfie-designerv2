@@ -1338,14 +1338,8 @@ export type Database = {
         Args: { user_id_param: string; woofs_amount: number }
         Returns: boolean
       }
-      generate_short_job_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      has_active_plan: {
-        Args: { user_id_param: string }
-        Returns: boolean
-      }
+      generate_short_job_id: { Args: never; Returns: string }
+      has_active_plan: { Args: { user_id_param: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
