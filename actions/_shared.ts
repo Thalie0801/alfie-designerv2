@@ -7,6 +7,8 @@ export const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KE
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
+const ADMIN_EMAILS = ['nathaliestaelens@gmail.com', 'staelensnathalie@gmail.com'];
+
 function parseCookies(cookieHeader: string | null): Record<string, string> {
   if (!cookieHeader) return {};
   return cookieHeader.split(';').reduce<Record<string, string>>((acc, part) => {
@@ -30,12 +32,15 @@ async function resolveUserFromToken(token: string | undefined) {
       .eq('user_id', user.id);
 
     const roles = Array.isArray(rolesData) ? rolesData.map((r) => r.role) : [];
-    const isAdmin = roles.includes('admin') || (user.email ? ['nathaliestaelens@gmail.com','staelensnathalie@gmail.com'].includes(user.email) : false);
+    const normalizedEmail = user.email?.toLowerCase();
+    const isAdmin =
+      roles.includes('admin') ||
+      (normalizedEmail ? ADMIN_EMAILS.includes(normalizedEmail) : false);
 
     return {
       id: user.id,
-      role: isAdmin ? 'admin' as const : 'user' as const,
-      email: user.email ?? undefined,
+      role: isAdmin ? ('admin' as const) : ('user' as const),
+      email: normalizedEmail ?? undefined,
     };
   } catch (error) {
     console.error('resolveUserFromToken error:', error);
@@ -43,16 +48,28 @@ async function resolveUserFromToken(token: string | undefined) {
   }
 }
 
-export async function getCurrentUser(req: Request): Promise<{ id: string; role: 'admin' | 'user'; email?: string } | null> {
+export async function getCurrentUser(
+  req: Request
+): Promise<{ id: string; role: 'admin' | 'user'; email?: string } | null> {
+  const headerEmail = req.headers.get('x-user-email')?.toLowerCase();
+  if (headerEmail && ADMIN_EMAILS.includes(headerEmail)) {
+    return { id: 'admin', role: 'admin', email: headerEmail };
+  }
+
   const headerUser = req.headers.get('x-user') ?? req.headers.get('x-lovable-user');
   if (headerUser) {
     try {
       const parsed = JSON.parse(headerUser);
       if (parsed && typeof parsed.id === 'string' && parsed.role) {
+        const parsedEmail =
+          typeof parsed.email === 'string' ? parsed.email.toLowerCase() : undefined;
+        const isAdmin =
+          parsed.role === 'admin' ||
+          (parsedEmail ? ADMIN_EMAILS.includes(parsedEmail) : false);
         return {
           id: parsed.id,
-          role: parsed.role === 'admin' ? 'admin' : 'user',
-          email: typeof parsed.email === 'string' ? parsed.email : undefined,
+          role: isAdmin ? 'admin' : 'user',
+          email: parsedEmail ?? undefined,
         };
       }
     } catch (error) {
