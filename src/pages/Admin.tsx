@@ -237,10 +237,16 @@ export default function Admin() {
             Gérez les utilisateurs, affiliés et paiements
           </p>
         </div>
-        <Button variant="outline" onClick={() => navigate('/app')} className="gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Retour Client
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => navigate('/admin/create-customer')} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Créer un client
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/app')} className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Retour Client
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
