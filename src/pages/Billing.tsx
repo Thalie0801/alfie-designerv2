@@ -100,7 +100,7 @@ export default function Billing() {
   const { openCustomerPortal, loading: portalLoading } = useCustomerPortal();
   const [activating, setActivating] = useState(false);
   const currentPlan = profile?.plan || null;
-  const hasActivePlan = currentPlan && currentPlan !== 'none';
+  const hasActivePlan = Boolean(profile?.status === 'active' || profile?.granted_by_admin);
   const isSpecialTester = ['borderonpatricia7@gmail.com','Sandrine.guedra@gmail.com'].includes(user?.email || '');
   const hasStripeSubscription = profile?.stripe_subscription_id;
 
@@ -142,7 +142,9 @@ export default function Billing() {
           plan: 'studio',
           quota_brands: 1,
           quota_visuals_per_month: 1000,
-          quota_videos: 100
+          quota_videos: 100,
+          granted_by_admin: true,
+          status: 'active'
         })
         .eq('id', user.id);
 

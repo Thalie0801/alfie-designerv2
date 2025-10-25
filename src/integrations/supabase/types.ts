@@ -955,6 +955,7 @@ export type Database = {
           created_at: string | null
           credits_reset_date: string | null
           email: string
+          email_verified: boolean | null
           full_name: string | null
           generations_reset_date: string | null
           generations_this_month: number | null
@@ -964,6 +965,7 @@ export type Database = {
           quota_brands: number | null
           quota_videos: number | null
           quota_visuals_per_month: number | null
+          status: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           updated_at: string | null
@@ -981,6 +983,7 @@ export type Database = {
           created_at?: string | null
           credits_reset_date?: string | null
           email: string
+          email_verified?: boolean | null
           full_name?: string | null
           generations_reset_date?: string | null
           generations_this_month?: number | null
@@ -990,6 +993,7 @@ export type Database = {
           quota_brands?: number | null
           quota_videos?: number | null
           quota_visuals_per_month?: number | null
+          status?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           updated_at?: string | null
@@ -1007,6 +1011,7 @@ export type Database = {
           created_at?: string | null
           credits_reset_date?: string | null
           email?: string
+          email_verified?: boolean | null
           full_name?: string | null
           generations_reset_date?: string | null
           generations_this_month?: number | null
@@ -1016,6 +1021,7 @@ export type Database = {
           quota_brands?: number | null
           quota_videos?: number | null
           quota_visuals_per_month?: number | null
+          status?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           updated_at?: string | null

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { isAuthorized as computeIsAuthorized } from '@/utils/authz-helpers';
 
 interface AuthContextType {
   user: User | null;
@@ -8,6 +9,7 @@ interface AuthContextType {
   profile: any | null;
   roles: string[];
   isAdmin: boolean;
+  isAuthorized: boolean;
   hasActivePlan: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
@@ -145,13 +147,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const authEnforcement = import.meta.env.VITE_AUTH_ENFORCEMENT;
+  const killSwitchDisabled = typeof authEnforcement === 'string' && authEnforcement.toLowerCase() === 'off';
+  const isAdmin = roles.includes('admin') || (user?.email ? ['nathaliestaelens@gmail.com','staelensnathalie@gmail.com'].includes(user.email) : false);
+  const hasActivePlan = Boolean(profile?.status === 'active' || profile?.granted_by_admin || isAdmin);
+  const computedIsAuthorized = computeIsAuthorized(user, {
+    isAdmin,
+    profile,
+    killSwitchDisabled,
+  });
+
   const value = {
     user,
     session,
     profile,
     roles,
-    isAdmin: roles.includes('admin') || (user?.email ? ['nathaliestaelens@gmail.com','staelensnathalie@gmail.com'].includes(user.email) : false),
-    hasActivePlan: profile?.plan && profile?.plan !== 'none',
+    isAdmin,
+    isAuthorized: computedIsAuthorized,
+    hasActivePlan,
     loading,
     signIn,
     signUp,
