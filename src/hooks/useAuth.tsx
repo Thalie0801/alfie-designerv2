@@ -1,13 +1,16 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { isAuthorized as computeIsAuthorized } from '@/utils/authz-helpers';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   profile: any | null;
+  subscription: any | null;
   roles: string[];
   isAdmin: boolean;
+  isAuthorized: boolean;
   hasActivePlan: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
@@ -22,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
+  const [subscription, setSubscription] = useState<any | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -48,8 +52,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .from('user_roles')
       .select('role')
       .eq('user_id', session.user.id);
-    
+
     if (rolesData) setRoles(rolesData.map(r => r.role));
+
+    const { data: subscriptionData } = await supabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('current_period_end', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    setSubscription(subscriptionData ?? null);
   };
 
   useEffect(() => {
@@ -66,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }, 0);
         } else {
           setProfile(null);
+          setSubscription(null);
           setRoles([]);
         }
       }
@@ -82,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }, 0);
       } else {
         setLoading(false);
+        setSubscription(null);
       }
     });
 
@@ -145,13 +161,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const authEnforcement = import.meta.env.VITE_AUTH_ENFORCEMENT;
+  const killSwitchDisabled = typeof authEnforcement === 'string' && authEnforcement.toLowerCase() === 'off';
+  const isAdmin = roles.includes('admin') || (user?.email ? ['nathaliestaelens@gmail.com','staelensnathalie@gmail.com'].includes(user.email) : false);
+  const computedIsAuthorized = computeIsAuthorized(user, {
+    isAdmin,
+    profile,
+    subscription,
+    killSwitchDisabled,
+  });
+  const hasActivePlan = computedIsAuthorized;
+
   const value = {
     user,
     session,
     profile,
+    subscription,
     roles,
-    isAdmin: roles.includes('admin') || (user?.email ? ['nathaliestaelens@gmail.com','staelensnathalie@gmail.com'].includes(user.email) : false),
-    hasActivePlan: profile?.plan && profile?.plan !== 'none',
+    isAdmin,
+    isAuthorized: computedIsAuthorized,
+    hasActivePlan,
     loading,
     signIn,
     signUp,

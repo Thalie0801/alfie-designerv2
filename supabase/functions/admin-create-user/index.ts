@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // Liste des emails admin
 const ADMIN_EMAILS = [
   'nathaliestaelens@gmail.com',
+  'staelensnathalie@gmail.com',
 ]
 
 const corsHeaders = {
@@ -33,6 +34,16 @@ serve(async (req) => {
     )
 
     const { email, fullName, plan, sendInvite, grantedByAdmin, password } = await req.json()
+
+    if (!email || !plan) {
+      return new Response(
+        JSON.stringify({ error: 'email_plan_required' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        }
+      )
+    }
 
     // Vérifier que l'utilisateur actuel est authentifié
     const authHeader = req.headers.get('Authorization')
@@ -87,6 +98,7 @@ serve(async (req) => {
           full_name: fullName || '',
           plan: plan,
           granted_by_admin: grantedByAdmin || false,
+          status: grantedByAdmin ? 'active' : 'pending',
           updated_at: new Date().toISOString(),
         })
 
@@ -107,12 +119,15 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         user: newUser,
-        message: sendInvite 
-          ? 'Utilisateur créé et invitation envoyée' 
-          : 'Utilisateur créé avec succès'
+        message: sendInvite
+          ? 'Utilisateur créé et invitation envoyée'
+          : 'Utilisateur créé avec succès',
+        plan,
+        grantedByAdmin: !!grantedByAdmin,
+        status: grantedByAdmin ? 'active' : 'pending'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -83,6 +83,7 @@ serve(async (req) => {
           quota_brands: planConfig.quota_brands,
           stripe_customer_id: session.customer as string,
           stripe_subscription_id: session.subscription as string,
+          status: 'active',
         })
         .eq("id", userId);
 
@@ -165,6 +166,7 @@ serve(async (req) => {
             quota_brands: planConfig.quota_brands,
             stripe_customer_id: session.customer as string,
             stripe_subscription_id: session.subscription as string,
+            status: 'active',
           })
           .eq("email", customerEmail);
 
