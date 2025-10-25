@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { consumeBrandQuota } from "../_shared/quota.ts";
 import { incrementProfileGenerations } from "../_shared/quotaUtils.ts";
+import { assertUserHasAccess } from "../_shared/accessControl.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -52,6 +53,18 @@ serve(async (req) => {
       .select('active_brand_id')
       .eq('id', user.id)
       .single();
+
+    // Vérifier l'accès (Stripe OU granted_by_admin)
+    const accessCheck = await assertUserHasAccess(supabaseClient, user.id);
+    if (!accessCheck.success) {
+      return new Response(
+        JSON.stringify({ error: accessCheck.error || 'Access denied' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403,
+        }
+      );
+    }
 
     const brandId = profile?.active_brand_id;
     if (!brandId) {

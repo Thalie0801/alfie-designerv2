@@ -5,6 +5,7 @@ interface CreateUserParams {
   fullName?: string;
   plan: string;
   sendInvite: boolean;
+  grantedByAdmin?: boolean;
   password?: string;
 }
 
@@ -15,6 +16,7 @@ export async function adminCreateUser(params: CreateUserParams) {
       fullName: params.fullName,
       plan: params.plan,
       sendInvite: params.sendInvite,
+      grantedByAdmin: params.grantedByAdmin,
       password: params.password,
     },
   });

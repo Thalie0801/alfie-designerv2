@@ -342,7 +342,8 @@ export function AlfieChat() {
             type: 'image',
             prompt: args.prompt,
             output_url: data.imageUrl,
-            status: 'completed'
+            status: 'completed',
+            brand_id: activeBrandId || null
           });
 
           // Débiter les crédits SEULEMENT si l'image a été générée et stockée
@@ -398,11 +399,12 @@ export function AlfieChat() {
 
           await supabase.from('media_generations').insert({
             user_id: user.id,
-            type: 'improved_image',
+            type: 'image',
             prompt: args.instructions,
             input_url: args.image_url,
             output_url: data.imageUrl,
-            status: 'completed'
+            status: 'completed',
+            brand_id: activeBrandId || null
           });
 
           // Déduire 1 crédit pour l'amélioration d'image

@@ -32,7 +32,7 @@ serve(async (req) => {
       }
     )
 
-    const { email, fullName, plan, sendInvite, password } = await req.json()
+    const { email, fullName, plan, sendInvite, grantedByAdmin, password } = await req.json()
 
     // Vérifier que l'utilisateur actuel est authentifié
     const authHeader = req.headers.get('Authorization')
@@ -86,6 +86,7 @@ serve(async (req) => {
           id: newUser.user.id,
           full_name: fullName || '',
           plan: plan,
+          granted_by_admin: grantedByAdmin || false,
           updated_at: new Date().toISOString(),
         })
 

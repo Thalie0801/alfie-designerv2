@@ -1,9 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { assertUserHasAccess } from "../_shared/accessControl.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
 };
 
 const jsonResponse = (data: unknown, init?: ResponseInit) =>
@@ -70,6 +71,12 @@ serve(async (req) => {
     }
 
     console.log(`Video generation request from user: ${user.id}, email: ${user.email}`);
+
+    // Vérifier l'accès (Stripe OU granted_by_admin)
+    const accessCheck = await assertUserHasAccess(supabase, user.id);
+    if (!accessCheck.success) {
+      return jsonResponse({ error: accessCheck.error || 'Access denied' }, { status: 403 });
+    }
 
     const body = await req.json();
     const promptRaw = typeof body?.prompt === "string" ? body.prompt.trim() : "";

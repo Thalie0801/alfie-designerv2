@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { BrandManager } from '@/components/BrandManager';
 import { BrandQuotaDisplay } from '@/components/BrandQuotaDisplay';
 import { NewsFeed } from '@/components/NewsFeed';
+import { AccessGuard } from '@/components/AccessGuard';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,7 +71,8 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-6">
+    <AccessGuard>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
@@ -228,5 +230,6 @@ export default function Dashboard() {
       </Card>
 
     </div>
+    </AccessGuard>
   );
 }

@@ -958,6 +958,7 @@ export type Database = {
           full_name: string | null
           generations_reset_date: string | null
           generations_this_month: number | null
+          granted_by_admin: boolean | null
           id: string
           plan: string | null
           quota_brands: number | null
@@ -983,6 +984,7 @@ export type Database = {
           full_name?: string | null
           generations_reset_date?: string | null
           generations_this_month?: number | null
+          granted_by_admin?: boolean | null
           id: string
           plan?: string | null
           quota_brands?: number | null
@@ -1008,6 +1010,7 @@ export type Database = {
           full_name?: string | null
           generations_reset_date?: string | null
           generations_this_month?: number | null
+          granted_by_admin?: boolean | null
           id?: string
           plan?: string | null
           quota_brands?: number | null
@@ -1369,6 +1372,7 @@ export type Database = {
         Args: { affiliate_id_param: string }
         Returns: undefined
       }
+      user_has_access: { Args: { user_id_param: string }; Returns: boolean }
     }
     Enums: {
       app_role: "user" | "admin" | "affiliate"

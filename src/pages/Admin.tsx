@@ -132,6 +132,7 @@ export default function Admin() {
           plan: editingUser.plan,
           quota_brands: editingUser.quota_brands,
           quota_visuals_per_month: editingUser.quota_visuals_per_month,
+          granted_by_admin: editingUser.granted_by_admin,
         })
         .eq('id', editingUser.id);
 
@@ -365,6 +366,16 @@ export default function Admin() {
                           <Badge className={getPlanBadgeColor(user.plan)} variant="secondary">
                             {user.plan || 'none'}
                           </Badge>
+                          {user.granted_by_admin && (
+                            <Badge variant="outline" className="border-green-500 text-green-700 dark:text-green-300">
+                              ✓ Accès manuel
+                            </Badge>
+                          )}
+                          {user.stripe_subscription_id && (
+                            <Badge variant="outline" className="border-blue-500 text-blue-700 dark:text-blue-300">
+                              Stripe
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-sm text-muted-foreground">{user.email}</p>
                         <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
@@ -739,6 +750,21 @@ export default function Admin() {
                   type="number"
                   value={editingUser.quota_visuals_per_month || 0}
                   onChange={(e) => setEditingUser({ ...editingUser, quota_visuals_per_month: parseInt(e.target.value) })}
+                />
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div>
+                  <Label htmlFor="grantAccess">Accès manuel (sans Stripe)</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Accorder l'accès complet sans abonnement Stripe
+                  </p>
+                </div>
+                <input
+                  id="grantAccess"
+                  type="checkbox"
+                  checked={editingUser.granted_by_admin || false}
+                  onChange={(e) => setEditingUser({ ...editingUser, granted_by_admin: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-300"
                 />
               </div>
             </div>

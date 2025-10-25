@@ -1,5 +1,10 @@
 import { ChatGenerator } from '@/components/create/ChatGenerator';
+import { AccessGuard } from '@/components/AccessGuard';
 
 export default function Creator() {
-  return <ChatGenerator />;
+  return (
+    <AccessGuard>
+      <ChatGenerator />
+    </AccessGuard>
+  );
 }

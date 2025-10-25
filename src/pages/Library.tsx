@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { getAuthHeader } from '@/lib/auth';
 import { toast } from 'sonner';
+import { AccessGuard } from '@/components/AccessGuard';
 
 export default function Library() {
   const { user } = useAuth();
@@ -121,7 +122,8 @@ export default function Library() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <AccessGuard>
+      <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
@@ -269,5 +271,6 @@ export default function Library() {
         </TabsContent>
       </Tabs>
     </div>
+    </AccessGuard>
   );
 }

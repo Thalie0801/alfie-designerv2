@@ -14,6 +14,7 @@ export default function AdminCreateCustomerPage() {
   const [fullName, setFullName] = useState('');
   const [plan, setPlan] = useState<Plan>('starter');
   const [sendInvite, setSendInvite] = useState(true);
+  const [grantedByAdmin, setGrantedByAdmin] = useState(false);
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -32,6 +33,7 @@ export default function AdminCreateCustomerPage() {
         fullName,
         plan,
         sendInvite,
+        grantedByAdmin,
         password: sendInvite ? undefined : password,
       });
       toast.success('Utilisateur créé et plan appliqué ✅');
@@ -39,6 +41,7 @@ export default function AdminCreateCustomerPage() {
       setFullName('');
       setPlan('starter');
       setSendInvite(true);
+      setGrantedByAdmin(false);
       setPassword('');
     } catch (e: any) {
       toast.error(e?.message || 'Échec de la création');
@@ -94,6 +97,20 @@ export default function AdminCreateCustomerPage() {
             <div className="flex items-center justify-between">
               <Label htmlFor="invite">Envoyer une invitation email</Label>
               <Switch id="invite" checked={sendInvite} onCheckedChange={(value) => setSendInvite(Boolean(value))} />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="grantAccess">Accès manuel (sans Stripe)</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Accorder l'accès complet sans abonnement Stripe
+                </p>
+              </div>
+              <Switch 
+                id="grantAccess" 
+                checked={grantedByAdmin} 
+                onCheckedChange={(value) => setGrantedByAdmin(Boolean(value))} 
+              />
             </div>
 
             {!sendInvite && (

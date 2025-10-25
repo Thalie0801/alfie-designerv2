@@ -701,12 +701,6 @@ export function ChatGenerator() {
               </Button>
             </div>
 
-            {/* Info Text */}
-            <div className="pt-4 border-t border-border">
-              <p className="text-xs text-muted-foreground text-center">
-                Propulsé par Lovable AI • Gemini Nano Banana
-              </p>
-            </div>
           </div>
         </div>
       </div>
