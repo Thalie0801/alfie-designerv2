@@ -28,20 +28,25 @@ export function isAuthorized(user: User | null, options?: {
   const hasPaidPlan = plan ? ['starter', 'pro', 'studio', 'enterprise'].includes(plan) : false;
   if (profile?.status === 'active' && hasPaidPlan) return true;
 
-  if (subscription) {
-    const normalizedStatus = subscription.status?.toLowerCase();
-    const isActive = normalizedStatus === 'active' || normalizedStatus === 'trial' || normalizedStatus === 'trialing';
   if (profile?.status === 'active') return true;
 
   if (subscription) {
-    const isActive = (subscription.status === 'active' || subscription.status === 'trial');
+    const normalizedStatus = subscription.status?.toLowerCase();
+    const isActive =
+      normalizedStatus === 'active' ||
+      normalizedStatus === 'trial' ||
+      normalizedStatus === 'trialing';
+
     if (isActive) {
       if (!subscription.current_period_end) {
         return true;
       }
-      const periodEnd = subscription.current_period_end instanceof Date
-        ? subscription.current_period_end
-        : new Date(subscription.current_period_end);
+
+      const periodEnd =
+        subscription.current_period_end instanceof Date
+          ? subscription.current_period_end
+          : new Date(subscription.current_period_end);
+
       if (!Number.isNaN(periodEnd.getTime()) && periodEnd > new Date()) {
         return true;
       }
