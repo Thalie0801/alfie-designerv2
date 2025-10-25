@@ -3,6 +3,133 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { getAuthHeader } from '@/lib/auth';
 
+const MEDIA_URL_KEYS = [
+  'videoUrl',
+  'video_url',
+  'url',
+  'output',
+  'outputUrl',
+  'output_url',
+  'downloadUrl',
+  'download_url',
+  'resultUrl',
+  'result_url',
+  'fileUrl',
+  'file_url'
+] as const;
+
+const COMPLETED_STATUSES = ['succeeded', 'completed', 'ready', 'success', 'finished'];
+
+type ProviderEngine = 'sora' | 'seededance' | 'kling';
+
+const isRecord = (value: unknown): value is Record<string, any> =>
+  typeof value === 'object' && value !== null;
+
+const extractMediaUrl = (payload: unknown): string | null => {
+  if (!payload) return null;
+
+  if (typeof payload === 'string') {
+    const trimmed = payload.trim();
+    return trimmed.startsWith('http') ? trimmed : null;
+  }
+
+  if (Array.isArray(payload)) {
+    for (const item of payload) {
+      const extracted = extractMediaUrl(item);
+      if (extracted) return extracted;
+    }
+    return null;
+  }
+
+  if (isRecord(payload)) {
+    for (const key of MEDIA_URL_KEYS) {
+      if (key in payload) {
+        const extracted = extractMediaUrl(payload[key]);
+        if (extracted) return extracted;
+      }
+    }
+
+    if ('data' in payload) {
+      const extracted = extractMediaUrl(payload.data);
+      if (extracted) return extracted;
+    }
+
+    if ('result' in payload) {
+      const extracted = extractMediaUrl(payload.result);
+      if (extracted) return extracted;
+    }
+  }
+
+  return null;
+};
+
+const extractDuration = (payload: unknown): number | null => {
+  if (payload == null) return null;
+  if (typeof payload === 'number' && Number.isFinite(payload)) {
+    return payload;
+  }
+
+  if (typeof payload === 'string') {
+    const parsed = Number(payload);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  if (isRecord(payload)) {
+    const keys = ['duration', 'duration_seconds', 'durationSeconds', 'predict_time'];
+    for (const key of keys) {
+      if (key in payload) {
+        const extracted = extractDuration(payload[key]);
+        if (extracted !== null) {
+          return extracted;
+        }
+      }
+    }
+  }
+
+  return null;
+};
+
+interface ProviderStatusInfo {
+  provider: string;
+  engine?: ProviderEngine;
+}
+
+const resolveProviderForStatus = (asset: any): ProviderStatusInfo => {
+  const metadata = isRecord(asset?.metadata) ? asset.metadata : {};
+  const candidates = [
+    metadata.providerResolved,
+    metadata.providerStatus,
+    metadata.providerInternal,
+    metadata.providerNormalized,
+    metadata.provider,
+    asset?.engine,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') continue;
+    const value = candidate.trim().toLowerCase();
+    if (!value) continue;
+
+    if (['seededance', 'replicate', 'replicate-bytedance', 'bytedance', 'byte-dance'].includes(value)) {
+      return { provider: 'seededance', engine: 'seededance' };
+    }
+
+    if (['kling', 'kie', 'kie.ai', 'kling-ai'].includes(value)) {
+      return { provider: 'kling', engine: 'kling' };
+    }
+
+    if (['sora', 'sora2'].includes(value)) {
+      return { provider: 'sora', engine: 'sora' };
+    }
+
+    if (['animate', 'ffmpeg-backend', 'animate-backend'].includes(value)) {
+      return { provider: 'animate' };
+    }
+  }
+
+  return { provider: 'seededance', engine: 'seededance' };
+};
+
 export interface LibraryAsset {
   id: string;
   type: 'image' | 'video';
@@ -54,14 +181,80 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
         );
         for (const a of processing) {
           const genId = a.metadata?.predictionId || a.metadata?.id;
+          const { provider: providerForStatus, engine: engineForDb } = resolveProviderForStatus(a);
+          const jobId =
+            a.job_id ||
+            a.metadata?.jobId ||
+            a.metadata?.job_id ||
+            a.metadata?.taskId ||
+            a.metadata?.task_id;
           const provider = ((a.engine || a.metadata?.provider || 'sora') as string).toLowerCase();
           const jobId = a.job_id || a.metadata?.jobId;
           if (!genId) continue;
           try {
             const { data: statusData, error: statusError } = await supabase.functions.invoke('generate-video', {
-              body: { generationId: genId, provider, jobId },
+              body: { generationId: genId, provider: providerForStatus, jobId },
               headers: authHeader,
             });
+            const hasBackendError = Boolean(statusData?.error);
+            if (!statusError && !hasBackendError) {
+              const rawStatus =
+                (typeof statusData?.status === 'string' && statusData.status) ||
+                (typeof statusData?.state === 'string' && statusData.state) ||
+                '';
+              const status = rawStatus.toLowerCase();
+              const isCompleted = COMPLETED_STATUSES.includes(status);
+              const isFailed = ['failed', 'error', 'cancelled', 'canceled'].includes(status);
+              const videoUrl =
+                extractMediaUrl(statusData?.output) ||
+                extractMediaUrl(statusData?.metadata) ||
+                extractMediaUrl(statusData);
+
+              const updatePayload: Record<string, any> = {};
+
+              const metadataUpdate: Record<string, any> = isRecord(a.metadata) ? { ...a.metadata } : {};
+              metadataUpdate.providerResolved = providerForStatus;
+              metadataUpdate.provider = metadataUpdate.provider ?? providerForStatus;
+              metadataUpdate.providerInternal = metadataUpdate.providerInternal ?? providerForStatus;
+              if (typeof statusData?.provider === 'string') {
+                metadataUpdate.provider = statusData.provider;
+              }
+              if (typeof statusData?.providerInternal === 'string') {
+                metadataUpdate.providerInternal = statusData.providerInternal;
+              }
+              metadataUpdate.lastStatus = status || rawStatus;
+              metadataUpdate.statusCheckedAt = new Date().toISOString();
+
+              if (videoUrl) {
+                metadataUpdate.outputUrl = videoUrl;
+              }
+
+              const durationFromStatus =
+                extractDuration(statusData?.metadata) ?? extractDuration(statusData?.duration) ?? extractDuration(statusData);
+              if (durationFromStatus !== null) {
+                updatePayload.duration_seconds = Math.round(durationFromStatus);
+              }
+
+              if (isCompleted && videoUrl) {
+                updatePayload.output_url = videoUrl;
+                updatePayload.status = 'completed';
+                if (engineForDb) {
+                  updatePayload.engine = engineForDb;
+                  metadataUpdate.provider = metadataUpdate.provider ?? engineForDb;
+                }
+              } else if (isFailed) {
+                updatePayload.status = 'failed';
+              }
+
+              if (Object.keys(metadataUpdate).length > 0) {
+                updatePayload.metadata = metadataUpdate;
+              }
+
+              if (Object.keys(updatePayload).length > 0) {
+                await supabase
+                  .from('media_generations')
+                  .update(updatePayload)
+                  .eq('id', a.id);
             if (!statusError) {
               const status = typeof statusData?.status === 'string' ? statusData.status.toLowerCase() : '';
               const isCompleted = ['succeeded', 'completed', 'ready', 'success', 'finished'].includes(status);

@@ -15,6 +15,65 @@ import { GeneratorCard } from '@/components/create/GeneratorCard';
 import { ChatBubble } from '@/components/create/ChatBubble';
 import type { GeneratorMode, RatioOption } from '@/components/create/Toolbar';
 
+type VideoEngine = 'sora' | 'seededance' | 'kling';
+
+interface VideoProviderInfo {
+  provider: string;
+  engine: VideoEngine;
+  statusProvider: string;
+  providerInternal: string;
+  label: string;
+}
+
+const resolveVideoProviderInfo = (raw: string | undefined): VideoProviderInfo => {
+  const normalized = raw?.toLowerCase();
+
+  switch (normalized) {
+    case 'kling':
+      return { provider: 'kling', engine: 'kling', statusProvider: 'kling', providerInternal: 'kling', label: 'Kling' };
+    case 'sora':
+      return { provider: 'sora', engine: 'sora', statusProvider: 'sora', providerInternal: 'kling', label: 'Sora2' };
+    case 'animate':
+    case 'ffmpeg-backend':
+      return {
+        provider: 'animate',
+        engine: 'seededance',
+        statusProvider: 'animate',
+        providerInternal: 'animate',
+        label: 'Animate'
+      };
+    case 'seededance':
+      return {
+        provider: 'seededance',
+        engine: 'seededance',
+        statusProvider: 'seededance',
+        providerInternal: 'replicate',
+        label: 'Seededance'
+      };
+    case 'replicate':
+      return {
+        provider: 'seededance',
+        engine: 'seededance',
+        statusProvider: 'seededance',
+        providerInternal: 'replicate',
+        label: 'Seededance'
+      };
+    default: {
+      const fallback = normalized ?? 'seededance';
+      const label = fallback
+        .replace(/[_-]+/g, ' ')
+        .replace(/(^|\s)\w/g, (m) => m.toUpperCase());
+      return {
+        provider: fallback,
+        engine: 'seededance',
+        statusProvider: fallback,
+        providerInternal: fallback,
+        label
+      };
+    }
+  }
+};
+
 interface Message {
   role: 'user' | 'assistant';
   content: string;
@@ -481,6 +540,7 @@ export function AlfieChat() {
             ((data as any).metadata && str(((data as any).metadata as any).provider));
 
           const provider = providerRaw?.toLowerCase(); // 'replicate' | 'kling' | 'sora' | 'seededance'...
+          const providerInfo = resolveVideoProviderInfo(provider);
 
           const jobIdentifier =
             str((data as any).jobId) ||
@@ -490,7 +550,7 @@ export function AlfieChat() {
 
           const jobShortId = str((data as any).jobShortId);
 
-          if (!predictionId || !provider) {
+          if (!predictionId || !providerInfo.provider) {
             console.error('❌ [generate_video] Invalid response payload:', data);
             throw new Error('Réponse vidéo invalide (id prédiction ou provider manquant). Vérifie les secrets Lovable Cloud.');
           }
@@ -498,11 +558,11 @@ export function AlfieChat() {
           // Créer l'asset en DB (status processing) — 2 Woofs / vidéo
           const { data: asset, error: assetError } = await supabase
             .from('media_generations')
-            .insert([{
+            .insert([{ 
               user_id: user.id,
               brand_id: activeBrandId,
               type: 'video',
-              engine: provider as 'sora',
+              engine: providerInfo.engine,
               status: 'processing',
               prompt: args.prompt,
               woofs: 2,
@@ -510,7 +570,10 @@ export function AlfieChat() {
               job_id: null,
               metadata: {
                 predictionId,
-                provider: providerRaw ?? provider,
+                provider: providerInfo.provider,
+                providerResolved: providerInfo.provider,
+                providerInternal: providerInfo.providerInternal,
+                providerStatus: providerInfo.statusProvider,
                 jobId: jobIdentifier ?? null,
                 jobShortId: jobShortId ?? null,
                 durationPreference: selectedDuration,
@@ -537,11 +600,7 @@ export function AlfieChat() {
               .eq('id', user.id);
           }
 
-          const providerName =
-            provider === 'sora' ? 'Sora2'
-            : provider === 'seededance' ? 'Seededance'
-            : provider === 'kling' ? 'Kling'
-            : provider;
+          const providerName = providerInfo.label;
 
           setMessages(prev => [...prev, {
             role: 'assistant',
@@ -553,7 +612,7 @@ export function AlfieChat() {
             assetType: 'video'
           }]);
 
-          return { success: true, assetId: asset.id, provider };
+          return { success: true, assetId: asset.id, provider: providerInfo.statusProvider };
         } catch (error: any) {
           console.error('[generate_video] Error:', error);
           const errorMessage = error?.message || "Erreur inconnue";
