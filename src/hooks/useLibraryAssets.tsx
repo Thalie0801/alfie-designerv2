@@ -54,7 +54,7 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
         );
         for (const a of processing) {
           const genId = a.metadata?.predictionId || a.metadata?.id;
-          const provider = a.engine || a.metadata?.provider || 'sora';
+          const provider = ((a.engine || a.metadata?.provider || 'sora') as string).toLowerCase();
           const jobId = a.job_id || a.metadata?.jobId;
           if (!genId) continue;
           try {
@@ -62,12 +62,18 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
               body: { generationId: genId, provider, jobId },
               headers: authHeader,
             });
-            if (!statusError && statusData?.status === 'succeeded') {
-              const videoUrl = Array.isArray(statusData.output) ? statusData.output[0] : statusData.output;
+            if (!statusError) {
+              const status = typeof statusData?.status === 'string' ? statusData.status.toLowerCase() : '';
+              const isCompleted = ['succeeded', 'completed', 'ready', 'success', 'finished'].includes(status);
+              const videoUrl = Array.isArray(statusData?.output)
+                ? statusData.output[0]
+                : statusData?.output || statusData?.output_url || statusData?.video_url;
+              if (isCompleted && videoUrl) {
               await supabase
                 .from('media_generations')
                 .update({ output_url: videoUrl, status: 'completed' })
                 .eq('id', a.id);
+              }
             }
           } catch (e) {
             console.warn('Verification vidéo échouée pour', a.id, e);

@@ -25,19 +25,92 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const {
-      prompt,
-      aspectRatio = "16:9",
-      imageUrl,
-      provider = "replicate",
-      publicBaseUrl
-    } = body ?? {};
+    const prompt = typeof body?.prompt === "string" ? body.prompt : undefined;
+    const aspectRatio = typeof body?.aspectRatio === "string" ? body.aspectRatio : "16:9";
+    const imageUrl = typeof body?.imageUrl === "string" ? body.imageUrl : undefined;
+    const publicBaseUrl = typeof body?.publicBaseUrl === "string" ? body.publicBaseUrl : undefined;
+    const generationId = typeof body?.generationId === "string" ? body.generationId : undefined;
+    const jobId = typeof body?.jobId === "string" ? body.jobId : undefined;
 
-    if (!prompt || typeof prompt !== "string") {
+    const providerRaw = typeof body?.provider === "string" ? body.provider : undefined;
+    const provider = (providerRaw ?? "replicate").toLowerCase();
+    const normalizedProvider = provider === "sora" ? "kling" : provider;
+
+    const isStatusCheck = !!(generationId || jobId) && !prompt;
+
+    if (!isStatusCheck && (!prompt || typeof prompt !== "string")) {
       return jsonResponse({ error: "Missing prompt" }, { status: 400 });
     }
 
-    if (provider === "replicate") {
+    if (isStatusCheck) {
+      const lookupId = generationId ?? jobId;
+      if (!lookupId) {
+        return jsonResponse({ error: "Missing generationId" }, { status: 400 });
+      }
+
+      if (normalizedProvider === "replicate") {
+        if (!REPLICATE_TOKEN) {
+          throw new Error("Missing REPLICATE_API_TOKEN");
+        }
+
+        const response = await fetch(`${REPLICATE_API}/${lookupId}`, {
+          headers: {
+            Authorization: `Token ${REPLICATE_TOKEN}`,
+            "Content-Type": "application/json"
+          }
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          const detail = typeof data?.detail === "string" ? data.detail : "Replicate error";
+          return jsonResponse({ error: detail }, { status: 500 });
+        }
+
+        return jsonResponse({
+          id: data.id ?? lookupId,
+          provider: provider,
+          status: data.status ?? data.state ?? "processing",
+          output: data.output ?? null,
+          logs: data.logs ?? undefined,
+          error: data.error ?? undefined
+        });
+      }
+
+      if (normalizedProvider === "kling") {
+        if (!KIE_TOKEN) {
+          throw new Error("Missing KIE_API_KEY");
+        }
+
+        const response = await fetch(`https://api.kie.ai/v1/video/${lookupId}`, {
+          headers: {
+            Authorization: `Bearer ${KIE_TOKEN}`,
+            "Content-Type": "application/json"
+          }
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          const message = typeof data?.message === "string" ? data.message : "Kling error";
+          return jsonResponse({ error: message }, { status: 500 });
+        }
+
+        const output = Array.isArray(data?.output)
+          ? data.output[0]
+          : data?.output ?? data?.video_url ?? data?.url ?? null;
+
+        return jsonResponse({
+          id: data?.id ?? lookupId,
+          provider: provider,
+          status: data?.status ?? data?.state ?? "processing",
+          output,
+          metadata: data
+        });
+      }
+
+      return jsonResponse({ error: "Unknown provider" }, { status: 400 });
+    }
+
+    if (normalizedProvider === "replicate") {
       if (!REPLICATE_TOKEN) {
         throw new Error("Missing REPLICATE_API_TOKEN");
       }
@@ -76,18 +149,18 @@ serve(async (req) => {
 
       return jsonResponse({
         id,
-        provider: "replicate",
+        provider,
         jobId: id,
         jobShortId: id ? String(id).slice(0, 8) : null,
         status,
         metadata: {
-          provider: "replicate",
+          provider,
           modelVersion: REPLICATE_MODEL_VERSION
         }
       });
     }
 
-    if (provider === "kling") {
+    if (normalizedProvider === "kling") {
       if (!KIE_TOKEN) {
         throw new Error("Missing KIE_API_KEY");
       }
@@ -115,11 +188,11 @@ serve(async (req) => {
       const jobId = data.jobId ?? data.id ?? data.task_id ?? null;
       return jsonResponse({
         id: jobId,
-        provider: "kling",
+        provider,
         jobId,
         jobShortId: jobId ? String(jobId).slice(0, 8) : null,
         status: "processing",
-        metadata: { provider: "kling" }
+        metadata: { provider }
       });
     }
 
