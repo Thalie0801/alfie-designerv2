@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Activity, ArrowLeft, Sparkles, Plus, ExternalLink, Trash2, Edit2, Search, RefreshCw, TrendingUp } from 'lucide-react';
+import { Users, Activity, ArrowLeft, Sparkles, Plus, ExternalLink, Trash2, Edit2, Search, RefreshCw, TrendingUp, UserCheck, UserX } from 'lucide-react';
 import { toast } from 'sonner';
 import { NewsManager } from '@/components/NewsManager';
 import { VideoDiagnostic } from '@/components/VideoDiagnostic';
@@ -196,6 +196,42 @@ export default function Admin() {
       toast.error('Erreur lors du scraping automatique');
     } finally {
       setAutoScraping(false);
+    }
+  };
+
+  const handleToggleAffiliateStatus = async (affiliateId: string, nextStatus: 'active' | 'inactive') => {
+    try {
+      const { error } = await supabase
+        .from('affiliates')
+        .update({ status: nextStatus })
+        .eq('id', affiliateId);
+
+      if (error) throw error;
+
+      toast.success(
+        nextStatus === 'active' ? 'Affilié réactivé' : 'Affilié désactivé'
+      );
+      loadAdminData();
+    } catch (error) {
+      console.error('Affiliate status update error:', error);
+      toast.error('Impossible de mettre à jour le statut de l’affilié');
+    }
+  };
+
+  const handleRemoveAffiliate = async (affiliateId: string) => {
+    try {
+      const { error } = await supabase
+        .from('affiliates')
+        .delete()
+        .eq('id', affiliateId);
+
+      if (error) throw error;
+
+      toast.success('Affilié purgé');
+      loadAdminData();
+    } catch (error) {
+      console.error('Affiliate purge error:', error);
+      toast.error('Erreur lors de la purge de l’affilié');
     }
   };
 
@@ -427,15 +463,44 @@ export default function Admin() {
                         <p className="font-medium">{affiliate.name}</p>
                         <p className="text-sm text-muted-foreground">{affiliate.email}</p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={affiliate.status === 'active' ? 'default' : 'secondary'}>
-                          {affiliate.status}
-                        </Badge>
-                        {affiliate.payout_method && (
-                          <span className="text-sm text-muted-foreground">
-                            {affiliate.payout_method}
-                          </span>
-                        )}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <Badge variant={affiliate.status === 'active' ? 'default' : 'secondary'}>
+                            {affiliate.status}
+                          </Badge>
+                          {affiliate.payout_method && (
+                            <span className="text-sm text-muted-foreground">
+                              {affiliate.payout_method}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              handleToggleAffiliateStatus(
+                                affiliate.id,
+                                affiliate.status === 'active' ? 'inactive' : 'active'
+                              )
+                            }
+                          >
+                            {affiliate.status === 'active' ? (
+                              <UserX className="h-4 w-4 mr-2" />
+                            ) : (
+                              <UserCheck className="h-4 w-4 mr-2" />
+                            )}
+                            {affiliate.status === 'active' ? 'Désactiver' : 'Activer'}
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleRemoveAffiliate(affiliate.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Purger
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}

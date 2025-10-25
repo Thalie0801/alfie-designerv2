@@ -7,6 +7,7 @@ type SubscriptionLike = {
 
 type ProfileLike = {
   status?: string | null;
+  plan?: string | null;
   granted_by_admin?: boolean | null;
 } | null | undefined;
 
@@ -22,6 +23,14 @@ export function isAuthorized(user: User | null, options?: {
   if (killSwitchDisabled) return true;
   if (isAdmin) return true;
   if (profile?.granted_by_admin) return true;
+
+  const plan = profile?.plan?.toLowerCase();
+  const hasPaidPlan = plan ? ['starter', 'pro', 'studio', 'enterprise'].includes(plan) : false;
+  if (profile?.status === 'active' && hasPaidPlan) return true;
+
+  if (subscription) {
+    const normalizedStatus = subscription.status?.toLowerCase();
+    const isActive = normalizedStatus === 'active' || normalizedStatus === 'trial' || normalizedStatus === 'trialing';
   if (profile?.status === 'active') return true;
 
   if (subscription) {

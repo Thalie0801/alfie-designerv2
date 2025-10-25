@@ -94,7 +94,7 @@ const plans = [
 ];
 
 export default function Billing() {
-  const { profile, user, refreshProfile } = useAuth();
+  const { profile, user, refreshProfile, hasActivePlan } = useAuth();
   const navigate = useNavigate();
   const { createCheckout, loading } = useStripeCheckout();
   const { openCustomerPortal, loading: portalLoading } = useCustomerPortal();

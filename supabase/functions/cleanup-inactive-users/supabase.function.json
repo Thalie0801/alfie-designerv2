@@ -1,0 +1,5 @@
+{
+  "name": "cleanup-inactive-users",
+  "verify_jwt": false,
+  "schedule": "0 3 30 * *"
+}
