@@ -100,6 +100,7 @@ export default function Billing() {
   const { openCustomerPortal, loading: portalLoading } = useCustomerPortal();
   const [activating, setActivating] = useState(false);
   const currentPlan = profile?.plan || null;
+  const hasActivePlan = Boolean(profile?.status === 'active' || profile?.granted_by_admin);
   const isSpecialTester = ['borderonpatricia7@gmail.com','Sandrine.guedra@gmail.com'].includes(user?.email || '');
   const hasStripeSubscription = profile?.stripe_subscription_id;
 

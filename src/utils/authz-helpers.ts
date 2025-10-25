@@ -31,6 +31,10 @@ export function isAuthorized(user: User | null, options?: {
   if (subscription) {
     const normalizedStatus = subscription.status?.toLowerCase();
     const isActive = normalizedStatus === 'active' || normalizedStatus === 'trial' || normalizedStatus === 'trialing';
+  if (profile?.status === 'active') return true;
+
+  if (subscription) {
+    const isActive = (subscription.status === 'active' || subscription.status === 'trial');
     if (isActive) {
       if (!subscription.current_period_end) {
         return true;

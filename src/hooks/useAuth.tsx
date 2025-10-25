@@ -171,6 +171,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     killSwitchDisabled,
   });
   const hasActivePlan = computedIsAuthorized;
+  const hasActivePlan = Boolean(profile?.status === 'active' || profile?.granted_by_admin || isAdmin);
+  const computedIsAuthorized = computeIsAuthorized(user, {
+    isAdmin,
+    profile,
+    killSwitchDisabled,
+  });
 
   const value = {
     user,
