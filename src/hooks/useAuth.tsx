@@ -162,21 +162,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const authEnforcement = import.meta.env.VITE_AUTH_ENFORCEMENT;
-  const killSwitchDisabled = typeof authEnforcement === 'string' && authEnforcement.toLowerCase() === 'off';
-  const isAdmin = roles.includes('admin') || (user?.email ? ['nathaliestaelens@gmail.com','staelensnathalie@gmail.com'].includes(user.email) : false);
+  const killSwitchDisabled =
+    typeof authEnforcement === 'string' && authEnforcement.toLowerCase() === 'off';
+  const isAdmin =
+    roles.includes('admin') ||
+    (user?.email
+      ? ['nathaliestaelens@gmail.com', 'staelensnathalie@gmail.com'].includes(user.email)
+      : false);
   const computedIsAuthorized = computeIsAuthorized(user, {
     isAdmin,
     profile,
     subscription,
     killSwitchDisabled,
   });
-  const hasActivePlan = computedIsAuthorized;
-  const hasActivePlan = Boolean(profile?.status === 'active' || profile?.granted_by_admin || isAdmin);
-  const computedIsAuthorized = computeIsAuthorized(user, {
-    isAdmin,
-    profile,
-    killSwitchDisabled,
-  });
+  const hasActivePlan = Boolean(
+    profile?.status === 'active' ||
+      profile?.granted_by_admin ||
+      isAdmin ||
+      (subscription?.status
+        ? ['active', 'trial', 'trialing'].includes(
+            subscription.status.toLowerCase()
+          )
+        : false)
+  );
 
   const value = {
     user,
