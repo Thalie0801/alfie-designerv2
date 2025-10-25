@@ -195,6 +195,8 @@ serve(async (req) => {
     const providerDisplay = providerResolution.display;
     const providerApi = providerResolution.api;
     const providerEngine = providerResolution.engine;
+    const provider = (providerRaw ?? "replicate").toLowerCase();
+    const normalizedProvider = provider === "sora" ? "kling" : provider;
 
     const isStatusCheck = !!(generationId || jobId) && !prompt;
 
@@ -209,6 +211,7 @@ serve(async (req) => {
       }
 
       if (providerApi === "replicate") {
+      if (normalizedProvider === "replicate") {
         if (!REPLICATE_TOKEN) {
           throw new Error("Missing REPLICATE_API_TOKEN");
         }
@@ -231,6 +234,7 @@ serve(async (req) => {
           provider: providerDisplay,
           providerInternal: providerApi,
           providerEngine,
+          provider: provider,
           status: data.status ?? data.state ?? "processing",
           output: data.output ?? null,
           logs: data.logs ?? undefined,
@@ -239,6 +243,7 @@ serve(async (req) => {
       }
 
       if (providerApi === "kling") {
+      if (normalizedProvider === "kling") {
         if (!KIE_TOKEN) {
           throw new Error("Missing KIE_API_KEY");
         }
@@ -265,6 +270,7 @@ serve(async (req) => {
           provider: providerDisplay,
           providerInternal: providerApi,
           providerEngine,
+          provider: provider,
           status: data?.status ?? data?.state ?? "processing",
           output,
           metadata: data
@@ -337,6 +343,10 @@ serve(async (req) => {
     }
 
     if (providerApi === "replicate") {
+      return jsonResponse({ error: "Unknown provider" }, { status: 400 });
+    }
+
+    if (normalizedProvider === "replicate") {
       if (!REPLICATE_TOKEN) {
         throw new Error("Missing REPLICATE_API_TOKEN");
       }
@@ -378,18 +388,21 @@ serve(async (req) => {
         provider: providerDisplay,
         providerInternal: providerApi,
         providerEngine,
+        provider,
         jobId: id,
         jobShortId: id ? String(id).slice(0, 8) : null,
         status,
         metadata: {
           provider: providerDisplay,
           providerInternal: providerApi,
+          provider,
           modelVersion: REPLICATE_MODEL_VERSION
         }
       });
     }
 
     if (providerApi === "kling") {
+    if (normalizedProvider === "kling") {
       if (!KIE_TOKEN) {
         throw new Error("Missing KIE_API_KEY");
       }
@@ -424,6 +437,11 @@ serve(async (req) => {
         jobShortId: jobId ? String(jobId).slice(0, 8) : null,
         status: "processing",
         metadata: { provider: providerDisplay, providerInternal: providerApi }
+        provider,
+        jobId,
+        jobShortId: jobId ? String(jobId).slice(0, 8) : null,
+        status: "processing",
+        metadata: { provider }
       });
     }
 
