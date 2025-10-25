@@ -26,6 +26,7 @@ import Templates from "./pages/Templates";
 import Library from "./pages/Library";
 import Videos from "./pages/Videos";
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
+import ActivateAccess from "./pages/onboarding/Activate";
 
 const queryClient = new QueryClient();
 
@@ -126,7 +127,7 @@ const App = () => (
           <Route
             path="/billing"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowPending>
                 <AppLayoutWithSidebar>
                   <Billing />
                 </AppLayoutWithSidebar>
@@ -134,9 +135,19 @@ const App = () => (
             }
           />
           <Route
+            path="/onboarding/activate"
+            element={
+              <ProtectedRoute allowPending>
+                <AppLayoutWithSidebar>
+                  <ActivateAccess />
+                </AppLayoutWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/credit-purchase-success"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowPending>
                 <AppLayoutWithSidebar>
                   <CreditPurchaseSuccess />
                 </AppLayoutWithSidebar>

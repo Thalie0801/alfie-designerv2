@@ -15,11 +15,13 @@ interface AccessStatus {
  * - OU granted_by_admin = true
  */
 export function useAccessControl(): AccessStatus {
-  const { user, profile } = useAuth();
+  const { user, profile, isAdmin, isAuthorized } = useAuth();
   const [accessStatus, setAccessStatus] = useState<AccessStatus>({
     hasAccess: false,
     loading: true,
   });
+  const authEnforcement = import.meta.env.VITE_AUTH_ENFORCEMENT;
+  const killSwitchDisabled = typeof authEnforcement === 'string' && authEnforcement.toLowerCase() === 'off';
 
   useEffect(() => {
     async function checkAccess() {
@@ -28,6 +30,14 @@ export function useAccessControl(): AccessStatus {
           hasAccess: false,
           loading: false,
           reason: 'Utilisateur non connecté',
+        });
+        return;
+      }
+
+      if (killSwitchDisabled || isAdmin || isAuthorized) {
+        setAccessStatus({
+          hasAccess: true,
+          loading: false,
         });
         return;
       }
@@ -53,12 +63,12 @@ export function useAccessControl(): AccessStatus {
         loading: false,
         reason: hasAccess
           ? undefined
-          : 'Abonnement requis. Activez un plan pour accéder aux fonctionnalités.',
+          : 'Abonnement requis. Activez votre accès pour continuer.',
       });
     }
 
     checkAccess();
-  }, [user, profile]);
+  }, [user, profile, isAdmin, isAuthorized, killSwitchDisabled]);
 
   return accessStatus;
 }

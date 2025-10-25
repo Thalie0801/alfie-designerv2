@@ -42,9 +42,9 @@ export function AccessGuard({ children, fallback }: AccessGuardProps) {
           </AlertTitle>
           <AlertDescription className="text-orange-700 dark:text-orange-300 mt-2">
             {reason}
-            <div className="mt-4 space-x-2">
-              <Button onClick={() => navigate('/billing')} variant="default">
-                Voir les plans
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button onClick={() => navigate('/onboarding/activate')} variant="default">
+                Activer mon accès
               </Button>
               <Button onClick={() => navigate('/contact')} variant="outline">
                 Nous contacter

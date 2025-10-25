@@ -5,10 +5,11 @@ import { useEffect, useState } from 'react';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAdmin?: boolean;
+  allowPending?: boolean;
 }
 
-export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
-  const { user, isAdmin, loading, refreshProfile } = useAuth();
+export function ProtectedRoute({ children, requireAdmin = false, allowPending = false }: ProtectedRouteProps) {
+  const { user, isAdmin, isAuthorized, loading, refreshProfile } = useAuth();
   const location = useLocation();
   const [checkingAdmin, setCheckingAdmin] = useState(false);
 
@@ -36,6 +37,10 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
 
   if (requireAdmin && !isAdmin) {
     return <Navigate to="/app" replace />;
+  }
+
+  if (!requireAdmin && !allowPending && !isAuthorized) {
+    return <Navigate to="/onboarding/activate" replace />;
   }
 
   // Allow Studio plan users to access dashboard without restrictions

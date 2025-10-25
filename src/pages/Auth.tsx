@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,7 @@ const authSchema = z.object({
 export default function Auth() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, user, isAdmin, isAuthorized, loading: authLoading } = useAuth();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -71,6 +71,16 @@ export default function Auth() {
     }
   }, [canSignUp, mode]);
 
+  const navigateAfterAuth = useCallback(() => {
+    if (isAdmin) {
+      navigate('/admin');
+    } else if (!isAuthorized) {
+      navigate('/onboarding/activate');
+    } else {
+      navigate('/dashboard');
+    }
+  }, [isAdmin, isAuthorized, navigate]);
+
   const verifyPayment = async (sessionId: string) => {
     try {
       const { data, error } = await supabase.functions.invoke('verify-payment', {
@@ -91,8 +101,7 @@ export default function Auth() {
           setEmail(data.email);
         }
       } else {
-        // Already logged in, redirect to dashboard
-        navigate('/dashboard');
+        navigateAfterAuth();
       }
     } catch (error: any) {
       console.error('Payment verification error:', error);
@@ -106,10 +115,10 @@ export default function Auth() {
 
   // Redirect if already logged in (will be handled by ProtectedRoute)
   useEffect(() => {
-    if (user && !verifyingPayment) {
-      navigate('/dashboard');
+    if (!authLoading && user && !verifyingPayment) {
+      navigateAfterAuth();
     }
-  }, [user, verifyingPayment, navigate]);
+  }, [user, verifyingPayment, authLoading, navigateAfterAuth]);
 
   const redirectToPricing = () => {
     if (typeof window !== 'undefined') {
