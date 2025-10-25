@@ -1,20 +1,15 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Liste des emails admin - REMPLACEZ PAR VOTRE EMAIL
+// Liste des emails admin
 const ADMIN_EMAILS = [
-  'nathaliestaelens@gmail.com', // ← Mettez votre email ici
+  'nathaliestaelens@gmail.com',
 ]
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
-
-// Liste des emails admin
-const ADMIN_EMAILS = [
-  'nathaliestaelens@gmail.com',
-]
 
 serve(async (req) => {
   // Gérer les requêtes preflight CORS
@@ -124,13 +119,13 @@ serve(async (req) => {
       },
     )
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in admin-create-user:', error)
     
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Une erreur est survenue',
-        details: error.toString()
+        error: error?.message || 'Une erreur est survenue',
+        details: error?.toString()
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { AffiliateTracker } from "@/components/AffiliateTracker";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Creator from "./pages/Creator";
@@ -35,7 +34,6 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <AffiliateTracker />
       <AuthProvider>
         <Routes>
           <Route path="/" element={<Index />} />

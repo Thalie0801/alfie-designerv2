@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { consumeBrandQuota } from "../_shared/quota.ts";
+import { incrementProfileGenerations } from "../_shared/quotaUtils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -211,6 +212,9 @@ serve(async (req) => {
     } catch (storageError) {
       console.warn('Failed to persist generated image to media-generations bucket', storageError);
     }
+
+    // Increment profile generations counter
+    await incrementProfileGenerations(supabaseClient, user.id);
 
     console.log("Image generated successfully");
     return new Response(JSON.stringify({ imageUrl: finalUrl }), {

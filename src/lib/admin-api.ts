@@ -1,4 +1,4 @@
-import { createUser } from './actions/admin';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CreateUserParams {
   email: string;
