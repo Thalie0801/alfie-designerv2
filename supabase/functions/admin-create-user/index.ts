@@ -85,23 +85,25 @@ serve(async (req) => {
     let targetUserId = newUser?.user?.id || null;
 
     if (createError) {
-      console.error('Error creating user:', createError)
-      // Si l'utilisateur existe déjà, on met à jour son profil via l'email
-      const { data: existing, error: findError } = await supabaseAdmin
-        .from('profiles')
-        .select('id')
-        .eq('email', email)
-        .maybeSingle();
-
-      if (existing?.id && !findError) {
-        targetUserId = existing.id;
-        console.log('User already existed, updating profile:', targetUserId)
+      console.log('User creation error:', createError.message)
+      
+      // Si l'utilisateur existe déjà, récupérer son ID depuis auth.users
+      const { data: existingAuthUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers()
+      
+      if (!listError && existingAuthUsers?.users) {
+        const existingUser = existingAuthUsers.users.find(u => u.email === email)
+        if (existingUser) {
+          targetUserId = existingUser.id
+          console.log('User already exists in auth.users, updating profile:', targetUserId)
+        } else {
+          throw new Error(createError.message)
+        }
       } else {
         throw new Error(createError.message)
       }
+    } else {
+      console.log('User created successfully:', targetUserId)
     }
-
-    console.log('User ready:', targetUserId)
 
     // Créer ou mettre à jour le profil
     if (targetUserId) {
@@ -109,16 +111,21 @@ serve(async (req) => {
         .from('profiles')
         .upsert({
           id: targetUserId,
+          email: email,
           full_name: fullName || '',
           plan: plan,
           granted_by_admin: grantedByAdmin || false,
           updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'id'
         })
 
       if (upsertError) {
         console.error('Error upserting profile:', upsertError)
-        // Ne pas échouer si l'upsert échoue
+        throw new Error('Failed to update profile: ' + upsertError.message)
       }
+      
+      console.log('Profile updated successfully for user:', targetUserId)
     }
 
     // Envoyer l'invitation par email si demandé et si le compte vient d'être créé
