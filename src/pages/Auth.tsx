@@ -177,26 +177,9 @@ export default function Auth() {
           // Redirection gérée par le state change de auth
         }
       } else {
-        const { error } = await signUp(data.email, data.password, fullName);
-        if (error) {
-          if (error.message.includes('already registered') || error.message.includes('User already registered')) {
-            toast.error('Cet email est déjà enregistré. Essayez de vous connecter.');
-            setMode('login');
-          } else if (error.message.includes('Password should be')) {
-            toast.error('Le mot de passe doit contenir au moins 6 caractères');
-          } else if (error.message.includes('Unable to validate email')) {
-            toast.error('Email invalide');
-          } else if (error.message.includes('Aucun paiement validé trouvé')) {
-            toast.error('Veuillez choisir un plan avant de créer un compte.');
-            redirectToPricing();
-            setMode('login');
-          } else {
-            toast.error('Impossible de créer le compte pour le moment. Merci de réessayer ou de contacter le support.');
-          }
-        } else {
-          toast.success('Compte créé avec succès ! Bienvenue 🎉');
-          // Redirection gérée par le state change de auth
-        }
+        // L'inscription est gérée automatiquement par verify-payment après paiement Stripe
+        toast.error('Les inscriptions sont désactivées. Votre compte a été créé automatiquement après paiement.');
+        setMode('login');
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
