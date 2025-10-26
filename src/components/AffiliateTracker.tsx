@@ -1,7 +1,5 @@
 import { useEffect } from 'react';
 import { useAffiliate } from '@/hooks/useAffiliate';
-import { toast } from 'sonner';
-import { Users } from 'lucide-react';
 
 export function AffiliateTracker() {
   const { affiliateRef, affiliateName } = useAffiliate();
