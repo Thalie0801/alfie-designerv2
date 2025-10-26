@@ -1,5 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import { isAdmin } from '@/lib/config/admin';
 import { adminCreateUser, type CreateUserParams } from '@/lib/admin-api';
 
 export async function createUser(params: CreateUserParams) {
@@ -13,7 +12,15 @@ export async function createUser(params: CreateUserParams) {
       throw new Error('Non authentifié');
     }
 
-    if (!isAdmin(user.email)) {
+    // Vérifier le rôle admin via la table user_roles
+    const { data: rolesData } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
+
+    const hasAdminRole = rolesData?.some(r => r.role === 'admin');
+    
+    if (!hasAdminRole) {
       throw new Error('Accès refusé : droits administrateur requis');
     }
 

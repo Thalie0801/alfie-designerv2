@@ -21,17 +21,10 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, profile, isAdmin, roles, signOut } = useAuth();
+  const { user, profile, isAdmin, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Debug pour vérifier le rôle admin
-  console.log('🔐 AppLayout Debug:', { 
-    isAdmin, 
-    roles, 
-    userId: user?.id,
-    email: user?.email 
-  });
-  const canSeeAdminToggle = isAdmin || (user?.email ? ['nathaliestaelens@gmail.com','staelensnathalie@gmail.com'].includes(user.email) : false);
+  const canSeeAdminToggle = isAdmin;
 
   const handleSignOut = async () => {
     await signOut();

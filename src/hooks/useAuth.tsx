@@ -159,11 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const authEnforcement = import.meta.env.VITE_AUTH_ENFORCEMENT;
   const killSwitchDisabled =
     typeof authEnforcement === 'string' && authEnforcement.toLowerCase() === 'off';
-  const isAdmin =
-    roles.includes('admin') ||
-    (user?.email
-      ? ['nathaliestaelens@gmail.com', 'staelensnathalie@gmail.com'].includes(user.email)
-      : false);
+  const isAdmin = roles.includes('admin');
   const computedIsAuthorized = computeIsAuthorized(user, {
     isAdmin,
     profile,

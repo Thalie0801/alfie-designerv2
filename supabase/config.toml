@@ -4,25 +4,25 @@ project_id = "itsjonazifiiikozengd"
 verify_jwt = true
 
 [functions.alfie-generate]
-verify_jwt = false
+verify_jwt = true
 
 [functions.alfie-chat]
-verify_jwt = false
+verify_jwt = true
 
 [functions.alfie-generate-ai-image]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-content]
-verify_jwt = false
+verify_jwt = true
 
 [functions.canva-oauth]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-alfie-variant]
-verify_jwt = false
+verify_jwt = true
 
 [functions.create-checkout]
-verify_jwt = false
+verify_jwt = true
 
 [functions.verify-payment]
 verify_jwt = false
@@ -31,13 +31,13 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.scrape-canva]
-verify_jwt = false
+verify_jwt = true
 
 [functions.auto-scrape-canva-templates]
 verify_jwt = false
 
 [functions.purchase-credit-pack]
-verify_jwt = false
+verify_jwt = true
 
 [functions.verify-credit-purchase]
 verify_jwt = false
@@ -58,16 +58,16 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.customer-portal]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-video]
-verify_jwt = false
+verify_jwt = true
 
 [functions.improve-image]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-ai-image]
-verify_jwt = false
+verify_jwt = true
 
 [functions.purge-expired-assets]
 verify_jwt = false
@@ -76,13 +76,13 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.track-job-status]
-verify_jwt = false
+verify_jwt = true
 
 [functions.verify-video-generation]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-sora-montage]
-verify_jwt = false
+verify_jwt = true
 
 [functions.cleanup-processing-videos]
 verify_jwt = false
