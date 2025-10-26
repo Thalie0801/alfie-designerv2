@@ -210,7 +210,6 @@ serve(async (req) => {
         return jsonResponse({ error: "Missing generationId" }, { status: 400 });
       }
 
-      if (providerApi === "replicate") {
       if (normalizedProvider === "replicate") {
         if (!REPLICATE_TOKEN) {
           throw new Error("Missing REPLICATE_API_TOKEN");
@@ -234,7 +233,6 @@ serve(async (req) => {
           provider: providerDisplay,
           providerInternal: providerApi,
           providerEngine,
-          provider: provider,
           status: data.status ?? data.state ?? "processing",
           output: data.output ?? null,
           logs: data.logs ?? undefined,
@@ -242,7 +240,6 @@ serve(async (req) => {
         });
       }
 
-      if (providerApi === "kling") {
       if (normalizedProvider === "kling") {
         if (!KIE_TOKEN) {
           throw new Error("Missing KIE_API_KEY");
@@ -270,7 +267,6 @@ serve(async (req) => {
           provider: providerDisplay,
           providerInternal: providerApi,
           providerEngine,
-          provider: provider,
           status: data?.status ?? data?.state ?? "processing",
           output,
           metadata: data
@@ -388,20 +384,17 @@ serve(async (req) => {
         provider: providerDisplay,
         providerInternal: providerApi,
         providerEngine,
-        provider,
         jobId: id,
         jobShortId: id ? String(id).slice(0, 8) : null,
         status,
         metadata: {
           provider: providerDisplay,
           providerInternal: providerApi,
-          provider,
           modelVersion: REPLICATE_MODEL_VERSION
         }
       });
     }
 
-    if (providerApi === "kling") {
     if (normalizedProvider === "kling") {
       if (!KIE_TOKEN) {
         throw new Error("Missing KIE_API_KEY");
@@ -437,11 +430,6 @@ serve(async (req) => {
         jobShortId: jobId ? String(jobId).slice(0, 8) : null,
         status: "processing",
         metadata: { provider: providerDisplay, providerInternal: providerApi }
-        provider,
-        jobId,
-        jobShortId: jobId ? String(jobId).slice(0, 8) : null,
-        status: "processing",
-        metadata: { provider }
       });
     }
 
