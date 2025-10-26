@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { 
@@ -30,10 +31,17 @@ import { Separator } from '@/components/ui/separator';
 import alfieMain from '@/assets/alfie-main.png';
 
 export function AppSidebar() {
-  const { open } = useSidebar();
+  const { open, setOpen, isMobile } = useSidebar();
   const location = useLocation();
   const { user, profile, isAdmin, signOut } = useAuth();
   const canSeeAdminToggle = user?.email ? ['nathaliestaelens@gmail.com','staelensnathalie@gmail.com'].includes(user.email) : false;
+
+  // Fermer le sidebar automatiquement lors du changement de page sur mobile
+  useEffect(() => {
+    if (isMobile && open) {
+      setOpen(false);
+    }
+  }, [location.pathname, isMobile, open, setOpen]);
 
   const navItems: Array<{
     path: string;
