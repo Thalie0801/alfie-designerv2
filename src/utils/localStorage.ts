@@ -35,3 +35,6 @@ export const normalizeEmail = (e?: string | null): string =>
 
 export const completedKey = (email?: string | null): string => 
   `alfie.tour.completed:${normalizeEmail(email)}`;
+
+export const autoCompletedKey = (email?: string | null): string => 
+  `alfie.tour.auto-completed:${normalizeEmail(email)}`;

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useTour } from './InteractiveTour';
 import { useAuth } from '@/hooks/useAuth';
-import { completedKey, lsGet } from '@/utils/localStorage';
+import { autoCompletedKey, lsGet } from '@/utils/localStorage';
 
 interface DashboardTourAutoStartProps {
   targets?: string[];
@@ -30,10 +30,10 @@ export function DashboardTourAutoStart({
     if (attemptedRef.current || !user?.email) return;
     attemptedRef.current = true;
 
-    // Check if tour already completed for this user
-    const key = completedKey(user.email);
+    // Check if tour already auto-completed for this user
+    const key = autoCompletedKey(user.email);
     if (lsGet(key) === '1') {
-      console.debug('[TourAutoStart] Tour already completed for', user.email);
+      console.debug('[TourAutoStart] Tour already auto-completed for', user.email);
       return;
     }
 

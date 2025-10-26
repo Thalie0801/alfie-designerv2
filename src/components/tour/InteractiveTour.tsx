@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { X, ChevronLeft, ChevronRight, HelpCircle } from 'lucide-react';
-import { lsGet, lsSet, completedKey } from '@/utils/localStorage';
+import { lsGet, lsSet, autoCompletedKey } from '@/utils/localStorage';
 
 // ============= Types =============
 type Placement = 'top' | 'bottom' | 'left' | 'right' | 'center';
@@ -25,7 +25,7 @@ interface TourContextValue {
   isActive: boolean;
   currentStep: number;
   totalSteps: number;
-  start: () => void;
+  start: (force?: boolean) => void;
   stop: () => void;
   next: () => void;
   prev: () => void;
@@ -95,28 +95,28 @@ export function TourProvider({ children, steps = DEFAULT_STEPS, options = {} }: 
 
   const { userEmail, autoStart = 'on-first-login' } = options;
 
-  // Mark tour as completed when it becomes inactive after being active
+  // Mark tour as auto-completed when it becomes inactive after being active
   useEffect(() => {
     if (wasActiveRef.current && !isActive && userEmail) {
-      const key = completedKey(userEmail);
+      const key = autoCompletedKey(userEmail);
       lsSet(key, '1');
-      console.debug('[Tour] Marked as completed for', userEmail);
+      console.debug('[Tour] Marked as auto-completed for', userEmail);
     }
     wasActiveRef.current = isActive;
   }, [isActive, userEmail]);
 
-  const start = useCallback(() => {
-    // Check if already completed (unless autoStart = 'always')
-    if (autoStart !== 'always' && userEmail) {
-      const key = completedKey(userEmail);
+  const start = useCallback((force: boolean = false) => {
+    // Check if already auto-completed (unless force = true or autoStart = 'always')
+    if (!force && autoStart !== 'always' && userEmail) {
+      const key = autoCompletedKey(userEmail);
       if (lsGet(key) === '1') {
-        console.debug('[Tour] Already completed for', userEmail);
+        console.debug('[Tour] Already auto-completed for', userEmail);
         return;
       }
     }
     setCurrentStep(0);
     setIsActive(true);
-    console.debug('[Tour] Started');
+    console.debug('[Tour] Started', { force, userEmail });
   }, [userEmail, autoStart]);
 
   const stop = useCallback(() => {
@@ -353,13 +353,19 @@ function TourBubble({ step, currentStep, totalSteps }: TourBubbleProps) {
 
 // ============= Help Launcher =============
 export function HelpLauncher() {
-  const { start } = useTour();
+  const { start, isActive } = useTour();
+
+  const handleClick = () => {
+    console.debug('[HelpLauncher] Clicked - forcing tour restart');
+    start(true); // Force restart even if tour was previously completed
+  };
 
   return (
     <Button
       variant="outline"
       size="sm"
-      onClick={start}
+      onClick={handleClick}
+      disabled={isActive}
       className="gap-2"
     >
       <HelpCircle className="h-4 w-4" />

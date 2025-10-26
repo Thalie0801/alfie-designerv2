@@ -3,7 +3,7 @@ import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { TourProvider, useTour, HelpLauncher } from './InteractiveTour';
-import { lsGet, lsSet, completedKey } from '@/utils/localStorage';
+import { lsGet, lsSet, autoCompletedKey } from '@/utils/localStorage';
 
 // Mock localStorage
 vi.mock('@/utils/localStorage', () => ({
@@ -12,6 +12,7 @@ vi.mock('@/utils/localStorage', () => ({
   lsRemove: vi.fn(),
   normalizeEmail: (e?: string | null) => (e ?? '').trim().toLowerCase(),
   completedKey: (email?: string | null) => `alfie.tour.completed:${(email ?? '').trim().toLowerCase()}`,
+  autoCompletedKey: (email?: string | null) => `alfie.tour.auto-completed:${(email ?? '').trim().toLowerCase()}`,
 }));
 
 // Test component that uses tour
@@ -23,7 +24,7 @@ function TestTourConsumer() {
       <div data-testid="tour-status">{isActive ? 'active' : 'inactive'}</div>
       <div data-testid="tour-step">{currentStep}</div>
       <div data-testid="tour-total">{totalSteps}</div>
-      <button onClick={start}>Start</button>
+      <button onClick={() => start()}>Start</button>
       <button onClick={next}>Next</button>
       <button onClick={prev}>Prev</button>
       <button onClick={stop}>Stop</button>
@@ -139,7 +140,7 @@ describe('InteractiveTour', () => {
     });
   });
 
-  it('should mark tour as completed when stopped after being active', async () => {
+  it('should mark tour as auto-completed when stopped after being active', async () => {
     const user = userEvent.setup();
     const email = 'test@example.com';
 
@@ -156,7 +157,7 @@ describe('InteractiveTour', () => {
     if (stopBtn) await user.click(stopBtn);
 
     await waitFor(() => {
-      expect(lsSet).toHaveBeenCalledWith(completedKey(email), '1');
+      expect(lsSet).toHaveBeenCalledWith(autoCompletedKey(email), '1');
     });
   });
 
@@ -188,6 +189,37 @@ describe('InteractiveTour', () => {
 
     const button = document.querySelector('button');
     expect(button).toBeTruthy();
+  });
+
+  it('should allow manual restart via force parameter', async () => {
+    const user = userEvent.setup();
+    const email = 'test@example.com';
+    (lsGet as any).mockReturnValue('1'); // Tour already completed
+
+    function TestForceStart() {
+      const { isActive, start } = useTour();
+      return (
+        <div>
+          <div data-testid="tour-status">{isActive ? 'active' : 'inactive'}</div>
+          <button onClick={() => start(true)}>Force Start</button>
+        </div>
+      );
+    }
+
+    render(
+      <TourProvider options={{ userEmail: email }}>
+        <TestForceStart />
+      </TourProvider>
+    );
+
+    const forceBtn = getByText('Force Start');
+    if (forceBtn) await user.click(forceBtn);
+
+    // Should start even though tour was completed
+    await waitFor(() => {
+      const status = getByTestId('tour-status');
+      expect(status?.textContent).toBe('active');
+    });
   });
 });
 
