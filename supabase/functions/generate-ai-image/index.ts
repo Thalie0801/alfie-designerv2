@@ -162,10 +162,21 @@ serve(async (req) => {
     }
 
     const data = await response.json();
+    console.log("AI Gateway response:", JSON.stringify(data, null, 2));
+    
     const generatedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
     if (!generatedImageUrl) {
-      throw new Error("No image generated");
+      console.error("No image URL found in response. Full response:", JSON.stringify(data));
+      return new Response(
+        JSON.stringify({ 
+          error: "L'IA n'a pas généré d'image. Essayez de reformuler votre demande ou réessayez dans quelques instants." 
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     let finalUrl = generatedImageUrl;

@@ -14,9 +14,9 @@ const PRICE_IDS = {
     studio: "price_1SGDLmQvcbGhgt8SKWpBTjCg",     // 199€/mois
   },
   annual: {
-    starter: "price_1SGD0qQvcbGhgt8SRcNK3q0V",    // 374€/an (-20%)
-    pro: "price_1SGDCkQvcbGhgt8SmYEEE7H8",        // 950€/an (-20%)
-    studio: "price_1SGDMoQvcbGhgt8SxUMXLPpD",     // 1910€/an (-20%)
+    starter: "price_1SGDPHQvcbGhgt8SUJSVCBmg",    // 374.40€/an (-20%)
+    pro: "price_1SGDPWQvcbGhgt8SZglD8b5d",        // 950.40€/an (-20%)
+    studio: "price_1SGDPkQvcbGhgt8SttOl1idn",     // 1910.40€/an (-20%)
   }
 };
 
