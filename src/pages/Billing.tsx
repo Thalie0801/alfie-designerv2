@@ -123,6 +123,14 @@ export default function Billing() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      <div className="flex items-center justify-between">
+        <Button variant="outline" size="sm" onClick={() => (window.location.href = '/app')}>
+          ← Retour
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => (window.location.href = '/dashboard')}>
+          Aller au dashboard
+        </Button>
+      </div>
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
           Abonnement

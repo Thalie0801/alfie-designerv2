@@ -11,10 +11,10 @@ export default function ActivateAccess() {
   const { profile, isAuthorized } = useAuth();
 
   useEffect(() => {
-    if (isAuthorized) {
+    if (isAuthorized || profile?.granted_by_admin) {
       navigate('/dashboard', { replace: true });
     }
-  }, [isAuthorized, navigate]);
+  }, [isAuthorized, profile?.granted_by_admin, navigate]);
 
   const status = profile?.status ?? 'pending';
 
