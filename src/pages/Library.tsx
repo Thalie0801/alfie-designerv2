@@ -123,13 +123,13 @@ export default function Library() {
 
   return (
     <AccessGuard>
-      <div className="container mx-auto p-6 space-y-6">
+      <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
           📚 Bibliothèque
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-sm sm:text-base text-muted-foreground">
           Toutes vos créations en un seul endroit. Stockage 30 jours.
         </p>
       </div>
@@ -142,15 +142,15 @@ export default function Library() {
         </TabsList>
 
         {/* Toolbar */}
-        <div className="flex items-center gap-3 mt-4 flex-wrap">
-          <div className="flex-1 min-w-[200px]">
+        <div className="flex items-center gap-2 sm:gap-3 mt-4 flex-wrap">
+          <div className="flex-1 min-w-[150px] sm:min-w-[200px]">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input 
                 placeholder="Rechercher..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-8 sm:pl-10 text-sm"
               />
             </div>
           </div>

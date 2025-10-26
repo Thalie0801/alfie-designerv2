@@ -72,58 +72,59 @@ export default function Dashboard() {
 
   return (
     <AccessGuard>
-      <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
             Dashboard
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground">
             Retrouvez vos créations et gérez vos marques
           </p>
         </div>
         <Button 
           disabled 
-          className="gap-2 gradient-hero text-white shadow-medium opacity-50 cursor-not-allowed"
+          className="gap-2 gradient-hero text-white shadow-medium opacity-50 cursor-not-allowed text-sm w-full sm:w-auto"
           title="En attente de la réponse de l'API Canva"
         >
           <ExternalLink className="h-4 w-4" />
-          Connecter Canva
+          <span className="hidden sm:inline">Connecter Canva</span>
+          <span className="sm:hidden">Canva</span>
         </Button>
       </div>
 
       {/* Alfie Designer Card */}
       <Card className="border-primary/30 shadow-strong bg-gradient-subtle">
-        <CardHeader className="bg-gradient-to-br from-primary/10 to-secondary/10">
-          <div className="flex items-center justify-between">
+        <CardHeader className="bg-gradient-to-br from-primary/10 to-secondary/10 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="bg-gradient-to-br from-primary to-secondary p-3 rounded-xl shadow-glow">
-                <Sparkles className="h-6 w-6 text-white" />
+              <div className="bg-gradient-to-br from-primary to-secondary p-2 sm:p-3 rounded-xl shadow-glow">
+                <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               </div>
               <div>
-                <CardTitle className="text-xl">Alfie Designer</CardTitle>
-                <CardDescription>Ton assistant créatif IA</CardDescription>
+                <CardTitle className="text-lg sm:text-xl">Alfie Designer</CardTitle>
+                <CardDescription className="text-sm">Ton assistant créatif IA</CardDescription>
               </div>
             </div>
             <Button 
               onClick={() => navigate('/app')}
-              className="gap-2 bg-gradient-to-r from-primary to-secondary text-white hover:opacity-90"
+              className="gap-2 bg-gradient-to-r from-primary to-secondary text-white hover:opacity-90 w-full sm:w-auto text-sm"
             >
               <MessageSquare className="h-4 w-4" />
               Ouvrir le chat
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-3 p-4 rounded-lg border-2 border-primary/20 bg-background/50 max-w-md">
-            <Palette className="h-8 w-8 text-secondary" />
+        <CardContent className="pt-4 sm:pt-6 p-4 sm:p-6">
+          <div className="flex items-center gap-3 p-3 sm:p-4 rounded-lg border-2 border-primary/20 bg-background/50 max-w-md">
+            <Palette className="h-6 w-6 sm:h-8 sm:w-8 text-secondary" />
             <div>
-              <p className="text-2xl font-bold">{brands.length}</p>
-              <p className="text-sm text-muted-foreground">Brand Kits</p>
+              <p className="text-xl sm:text-2xl font-bold">{brands.length}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Brand Kits</p>
             </div>
           </div>
-          <div className="mt-4 p-4 rounded-lg bg-primary/5 border border-primary/10">
-            <p className="text-sm text-muted-foreground">
+          <div className="mt-4 p-3 sm:p-4 rounded-lg bg-primary/5 border border-primary/10">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               💡 <strong>Astuce :</strong> Discute avec Alfie pour générer des visuels IA ou adapter des templates Canva à ton Brand Kit. 
               Les quotas (visuels, vidéos, Woofs) sont gérés par marque.
             </p>
@@ -142,32 +143,32 @@ export default function Dashboard() {
 
       {/* Brands */}
       <Card className="border-primary/20 shadow-medium">
-        <CardHeader className="bg-gradient-subtle">
-          <div className="flex items-center justify-between">
+        <CardHeader className="bg-gradient-subtle p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <Palette className="h-5 w-5 text-primary" />
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                <Palette className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                 Mes marques
               </CardTitle>
-              <CardDescription>Gérez vos Brand Kits</CardDescription>
+              <CardDescription className="text-sm">Gérez vos Brand Kits</CardDescription>
             </div>
             <BrandDialog onSuccess={loadData} />
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6">
           {loading ? (
             <p className="text-sm text-muted-foreground text-center py-4">
               Chargement...
             </p>
           ) : brands.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
+            <p className="text-xs sm:text-sm text-muted-foreground text-center py-8">
               Aucune marque configurée. Cliquez sur "Ajouter" ci-dessus pour créer votre première marque.
             </p>
           ) : (
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
               {brands.map((brand) => (
                 <Card key={brand.id} className="group hover:shadow-strong hover:border-primary/30 transition-all border-2">
-                  <CardHeader className="bg-gradient-subtle">
+                  <CardHeader className="bg-gradient-subtle p-3 sm:p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
@@ -175,25 +176,25 @@ export default function Dashboard() {
                             <img 
                               src={brand.logo_url} 
                               alt={brand.name}
-                              className="w-8 h-8 object-contain rounded"
+                              className="w-6 h-6 sm:w-8 sm:h-8 object-contain rounded"
                             />
                           )}
-                          <CardTitle className="text-lg">{brand.name}</CardTitle>
+                          <CardTitle className="text-base sm:text-lg">{brand.name}</CardTitle>
                         </div>
                         <div className="space-y-2">
                           <Badge 
-                            className={brand.canva_connected ? 'bg-green-500 hover:bg-green-600' : 'bg-orange-500 hover:bg-orange-600'}
+                            className={`text-xs ${brand.canva_connected ? 'bg-green-500 hover:bg-green-600' : 'bg-orange-500 hover:bg-orange-600'}`}
                           >
                             {brand.canva_connected ? '✓ Canva connecté' : '○ Non connecté'}
                           </Badge>
                           {brand.voice && (
-                            <p className="text-sm text-muted-foreground line-clamp-2">
+                            <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
                               {brand.voice}
                             </p>
                           )}
                         </div>
                       </div>
-                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex gap-1 sm:gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <BrandDialog brand={brand} onSuccess={loadData} />
                         <AlertDialog>
                           <AlertDialogTrigger asChild>

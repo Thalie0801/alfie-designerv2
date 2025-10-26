@@ -512,25 +512,25 @@ export function ChatGenerator() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="container mx-auto px-4 py-12">
+      <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-12">
         {/* Header */}
-        <div className="text-center mb-12 space-y-4">
+        <div className="text-center mb-8 sm:mb-12 space-y-3 sm:space-y-4">
           <div className="flex items-center justify-center gap-3 mb-4">
             <div className="relative">
-              <Sparkles className="h-16 w-16 text-primary animate-pulse" />
+              <Sparkles className="h-12 w-12 sm:h-16 sm:w-16 text-primary animate-pulse" />
               <div className="absolute inset-0 blur-xl bg-primary/20 animate-pulse"></div>
             </div>
           </div>
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight">
+          <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold tracking-tight">
             ALFIE STUDIO
           </h1>
-          <p className="text-muted-foreground text-lg">
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg">
             Créez des visuels époustouflants en quelques secondes
           </p>
         </div>
 
         {/* Main Content */}
-        <div className="max-w-5xl mx-auto space-y-6">
+        <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6">
           {/* Generated Asset Preview */}
           {generatedAsset && (
             <div className="relative rounded-2xl overflow-hidden bg-card border border-border backdrop-blur-sm animate-fade-in">
@@ -574,35 +574,35 @@ export function ChatGenerator() {
           )}
 
           {/* Input Section */}
-          <div className="rounded-2xl bg-card border border-border backdrop-blur-sm p-6 space-y-6">
+          <div className="rounded-2xl bg-card border border-border backdrop-blur-sm p-4 sm:p-6 space-y-4 sm:space-y-6">
             {/* Uploaded Media Preview */}
             {uploadedSource && (
               <div className="relative rounded-xl overflow-hidden bg-muted/50 border border-border">
-                <div className="flex items-center gap-4 p-4">
+                <div className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4">
                   {uploadedSource.type === 'image' ? (
                     <img
                       src={uploadedSource.url}
                       alt="Média source"
-                      className="h-24 w-24 object-cover rounded-lg"
+                      className="h-16 w-16 sm:h-24 sm:w-24 object-cover rounded-lg"
                     />
                   ) : (
                     <video
                       src={uploadedSource.url}
-                      className="h-24 w-24 object-cover rounded-lg"
+                      className="h-16 w-16 sm:h-24 sm:w-24 object-cover rounded-lg"
                       autoPlay
                       loop
                       muted
                     />
                   )}
                   <div className="flex-1">
-                    <p className="text-sm text-muted-foreground mb-2">
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-2">
                       {uploadedSource.type === 'video' ? 'Vidéo source ajoutée' : 'Image source ajoutée'}
                     </p>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => setUploadedSource(null)}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10 text-xs sm:text-sm"
                     >
                       Retirer
                     </Button>
@@ -654,7 +654,7 @@ export function ChatGenerator() {
             </div>
 
             {/* Action Bar */}
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
               <div className="flex items-center gap-2">
                 <input
                   ref={fileInputRef}
@@ -668,13 +668,15 @@ export function ChatGenerator() {
                   variant="ghost"
                   size="sm"
                   disabled={uploadingSource || isGenerating}
+                  className="text-xs sm:text-sm"
                 >
                   {uploadingSource ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : (
                     <ImagePlus className="h-4 w-4 mr-2" />
                   )}
-                  {uploadingSource ? 'Upload...' : 'Ajouter un média'}
+                  <span className="hidden sm:inline">{uploadingSource ? 'Upload...' : 'Ajouter un média'}</span>
+                  <span className="sm:hidden">{uploadingSource ? 'Upload...' : 'Média'}</span>
                 </Button>
               </div>
 
@@ -683,7 +685,7 @@ export function ChatGenerator() {
                 disabled={isGenerating || (!prompt.trim() && !uploadedSource)}
                 className={cn(
                   "bg-primary hover:bg-primary/90",
-                  "font-semibold px-8",
+                  "font-semibold px-6 sm:px-8 w-full sm:w-auto text-sm sm:text-base",
                   "disabled:opacity-50 disabled:cursor-not-allowed"
                 )}
               >
