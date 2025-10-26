@@ -152,26 +152,46 @@ export interface LibraryAsset {
 export function useLibraryAssets(userId: string | undefined, type: 'images' | 'videos') {
   const [assets, setAssets] = useState<LibraryAsset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 3;
 
-  const fetchAssets = async () => {
-    if (!userId) return;
+  const fetchAssets = async (isRetry = false) => {
+    if (!userId) {
+      console.warn('[LibraryAssets] No userId provided');
+      return;
+    }
     
+    console.log(`[LibraryAssets] Fetching ${type} for user ${userId}${isRetry ? ` (retry ${retryCount + 1}/${MAX_RETRIES})` : ''}`);
     setLoading(true);
+    
     try {
       const assetType = type === 'images' ? 'image' : 'video';
       
-      // Optimized query with limit to avoid timeouts
+      // Optimized query: exclude output_url to avoid loading large base64 images
+      // Output URL will be loaded individually when downloading
       const { data, error } = await supabase
         .from('media_generations')
-        .select('id, type, status, output_url, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id')
+        .select('id, type, status, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes')
         .eq('user_id', userId)
         .eq('type', assetType)
         .order('created_at', { ascending: false })
-        .limit(50); // Reduced limit to improve performance
+        .limit(100);
 
-      if (error) throw error;
+      if (error) {
+        console.error('[LibraryAssets] Query error:', error);
+        throw error;
+      }
 
-      setAssets((data || []) as LibraryAsset[]);
+      console.log(`[LibraryAssets] Loaded ${data?.length || 0} ${type}`);
+      
+      // Map data to include a placeholder output_url that will be loaded on demand
+      const mappedAssets = (data || []).map(asset => ({
+        ...asset,
+        output_url: asset.thumbnail_url || '', // Use thumbnail for preview, load full on download
+      })) as LibraryAsset[];
+      
+      setAssets(mappedAssets);
+      setRetryCount(0); // Reset retry count on success
 
       // Vérifier et débloquer les vidéos "processing" (si prédiction connue)
       if (type === 'videos' && data && data.length > 0) {
@@ -260,9 +280,32 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
           }
         }
       }
-    } catch (error) {
-      console.error('Error fetching assets:', error);
-      toast.error('Erreur lors du chargement des assets');
+    } catch (error: any) {
+      console.error('[LibraryAssets] Fetch error:', error);
+      
+      // Retry logic
+      if (retryCount < MAX_RETRIES) {
+        console.log(`[LibraryAssets] Retrying in 2 seconds... (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+        setRetryCount(prev => prev + 1);
+        setTimeout(() => fetchAssets(true), 2000);
+        return;
+      }
+      
+      // Detailed error messages
+      let errorMessage = 'Erreur lors du chargement des assets';
+      
+      if (error?.message?.includes('timeout') || error?.code === 'ETIMEDOUT') {
+        errorMessage = 'Timeout lors du chargement. Vos assets sont peut-être trop volumineux.';
+      } else if (error?.message?.includes('auth') || error?.code === '401') {
+        errorMessage = 'Erreur d\'authentification. Veuillez vous reconnecter.';
+      } else if (error?.message?.includes('network')) {
+        errorMessage = 'Erreur réseau. Vérifiez votre connexion.';
+      } else if (error?.message) {
+        errorMessage = `Erreur: ${error.message}`;
+      }
+      
+      toast.error(errorMessage);
+      setRetryCount(0); // Reset retry count
     } finally {
       setLoading(false);
     }
@@ -301,18 +344,34 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
     const asset = assets.find(a => a.id === assetId);
     if (!asset) return;
 
-    if (!asset.output_url) {
-      toast.info(asset.type === 'video' ? 'Vidéo encore en génération… réessayez dans quelques minutes.' : "Fichier indisponible");
-      return;
-    }
+    console.log('[LibraryAssets] Downloading asset:', assetId);
 
     try {
+      // Load the full output_url from database (not in initial query to avoid heavy load)
+      const { data: fullAsset, error } = await supabase
+        .from('media_generations')
+        .select('output_url')
+        .eq('id', assetId)
+        .single();
+      
+      if (error) {
+        console.error('[LibraryAssets] Error loading asset for download:', error);
+        throw error;
+      }
+      
+      const outputUrl = fullAsset?.output_url;
+      
+      if (!outputUrl) {
+        toast.info(asset.type === 'video' ? 'Vidéo encore en génération… réessayez dans quelques minutes.' : "Fichier indisponible");
+        return;
+      }
+
       let blob: Blob;
       
       // Si c'est une image base64, la convertir en blob
-      if (asset.output_url.startsWith('data:')) {
-        const base64Data = asset.output_url.split(',')[1];
-        const mimeType = asset.output_url.match(/data:([^;]+);/)?.[1] || 'image/png';
+      if (outputUrl.startsWith('data:')) {
+        const base64Data = outputUrl.split(',')[1];
+        const mimeType = outputUrl.match(/data:([^;]+);/)?.[1] || 'image/png';
         const byteString = atob(base64Data);
         const arrayBuffer = new ArrayBuffer(byteString.length);
         const uint8Array = new Uint8Array(arrayBuffer);
@@ -324,7 +383,7 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
         blob = new Blob([arrayBuffer], { type: mimeType });
       } else {
         // Sinon, télécharger depuis l'URL
-        const response = await fetch(asset.output_url);
+        const response = await fetch(outputUrl);
         if (!response.ok) throw new Error('Erreur lors du téléchargement');
         blob = await response.blob();
       }
