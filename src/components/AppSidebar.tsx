@@ -36,11 +36,10 @@ export function AppSidebar() {
   const { user, profile, isAdmin, signOut } = useAuth();
   const canSeeAdminToggle = user?.email ? ['nathaliestaelens@gmail.com','staelensnathalie@gmail.com'].includes(user.email) : false;
 
-  // Fermer le sidebar automatiquement lors du changement de page sur mobile
+  // Fermer sur mobile, ouvrir sur desktop
   useEffect(() => {
-    if (isMobile && open) {
-      setOpen(false);
-    }
+    if (isMobile && open) setOpen(false);
+    if (!isMobile && !open) setOpen(true);
   }, [location.pathname, isMobile, open, setOpen]);
 
   const navItems: Array<{

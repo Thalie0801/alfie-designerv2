@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Check, AlertCircle, Settings, Sparkles, Award } from 'lucide-react';
+import { Check, Settings, Sparkles, Award } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useStripeCheckout } from '@/hooks/useStripeCheckout';
 import { useCustomerPortal } from '@/hooks/useCustomerPortal';
@@ -175,14 +175,6 @@ export default function Billing() {
         </Alert>
       )}
 
-      {!hasActivePlan && (
-        <Alert className="border-orange-500/50 bg-orange-50 dark:bg-orange-900/20">
-          <AlertCircle className="h-4 w-4 text-orange-600" />
-          <AlertDescription className="text-orange-700 dark:text-orange-300">
-            Vous n'avez pas de plan actif. Choisissez un plan ci-dessous pour accéder à Alfie Designer.
-          </AlertDescription>
-        </Alert>
-      )}
 
       {/* Current Plan */}
       {hasActivePlan && (

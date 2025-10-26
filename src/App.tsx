@@ -27,7 +27,6 @@ import Templates from "./pages/Templates";
 import Library from "./pages/Library";
 import Videos from "./pages/Videos";
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
-import ActivateAccess from "./pages/onboarding/Activate";
 
 const queryClient = new QueryClient();
 
@@ -131,16 +130,6 @@ const App = () => (
               <ProtectedRoute allowPending>
                 <AppLayoutWithSidebar>
                   <Billing />
-                </AppLayoutWithSidebar>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/onboarding/activate"
-            element={
-              <ProtectedRoute allowPending>
-                <AppLayoutWithSidebar>
-                  <ActivateAccess />
                 </AppLayoutWithSidebar>
               </ProtectedRoute>
             }
