@@ -10,7 +10,8 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { BrandManager } from '@/components/BrandManager';
 import { BrandQuotaDisplay } from '@/components/BrandQuotaDisplay';
-import { NewsFeed } from '@/components/NewsFeed';
+import { NewsWidget } from '@/components/NewsWidget';
+import { FeatureRequestDialog } from '@/components/FeatureRequestDialog';
 import { AccessGuard } from '@/components/AccessGuard';
 import {
   AlertDialog,
@@ -82,15 +83,19 @@ export default function Dashboard() {
             Retrouvez vos créations et gérez vos marques
           </p>
         </div>
-        <Button 
-          disabled 
-          className="gap-2 gradient-hero text-white shadow-medium opacity-50 cursor-not-allowed text-sm w-full sm:w-auto"
-          title="En attente de la réponse de l'API Canva"
-        >
-          <ExternalLink className="h-4 w-4" />
-          <span className="hidden sm:inline">Connecter Canva</span>
-          <span className="sm:hidden">Canva</span>
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <NewsWidget />
+          <FeatureRequestDialog />
+          <Button 
+            disabled 
+            className="gap-2 gradient-hero text-white shadow-medium opacity-50 cursor-not-allowed text-sm"
+            title="En attente de la réponse de l'API Canva"
+          >
+            <ExternalLink className="h-4 w-4" />
+            <span className="hidden sm:inline">Connecter Canva</span>
+            <span className="sm:hidden">Canva</span>
+          </Button>
+        </div>
       </div>
 
       {/* Alfie Designer Card */}
@@ -137,9 +142,6 @@ export default function Dashboard() {
 
       {/* Brand Manager */}
       <BrandManager />
-
-      {/* News Feed */}
-      <NewsFeed />
 
       {/* Brands */}
       <Card className="border-primary/20 shadow-medium">
