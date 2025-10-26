@@ -40,6 +40,7 @@ export function DashboardTourAutoStart({
     console.debug('[TourAutoStart] Waiting for targets:', targets);
 
     let ready = false;
+    let timeoutId: number | undefined;
 
     // Check if all targets exist in DOM
     const hasAllTargets = () => targets.every(sel => !!document.querySelector(sel));
@@ -50,7 +51,7 @@ export function DashboardTourAutoStart({
         console.debug('[TourAutoStart] All targets ready, starting tour');
         start();
         mo.disconnect();
-        clearTimeout(timeoutId);
+        if (timeoutId) clearTimeout(timeoutId);
       }
     };
 
@@ -70,7 +71,7 @@ export function DashboardTourAutoStart({
     tryStart();
 
     // Safety timeout - give up after maxWaitMs
-    const timeoutId = window.setTimeout(() => {
+    timeoutId = window.setTimeout(() => {
       if (!ready) {
         console.debug('[TourAutoStart] Timeout reached, targets not found');
         mo.disconnect();
@@ -79,7 +80,7 @@ export function DashboardTourAutoStart({
 
     return () => {
       mo.disconnect();
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, [user, start, targets, maxWaitMs]);
 
