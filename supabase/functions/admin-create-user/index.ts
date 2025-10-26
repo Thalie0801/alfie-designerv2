@@ -82,23 +82,36 @@ serve(async (req) => {
 
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser(createUserData)
 
+    let targetUserId = newUser?.user?.id || null;
+
     if (createError) {
       console.error('Error creating user:', createError)
-      throw new Error(createError.message)
+      // Si l'utilisateur existe déjà, on met à jour son profil via l'email
+      const { data: existing, error: findError } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (existing?.id && !findError) {
+        targetUserId = existing.id;
+        console.log('User already existed, updating profile:', targetUserId)
+      } else {
+        throw new Error(createError.message)
+      }
     }
 
-    console.log('User created successfully:', newUser.user?.id)
+    console.log('User ready:', targetUserId)
 
     // Créer ou mettre à jour le profil
-    if (newUser.user) {
+    if (targetUserId) {
       const { error: upsertError } = await supabaseAdmin
         .from('profiles')
         .upsert({
-          id: newUser.user.id,
+          id: targetUserId,
           full_name: fullName || '',
           plan: plan,
           granted_by_admin: grantedByAdmin || false,
-          status: grantedByAdmin ? 'active' : 'pending',
           updated_at: new Date().toISOString(),
         })
 
@@ -108,8 +121,8 @@ serve(async (req) => {
       }
     }
 
-    // Envoyer l'invitation par email si demandé
-    if (sendInvite && newUser.user) {
+    // Envoyer l'invitation par email si demandé et si le compte vient d'être créé
+    if (sendInvite && newUser?.user) {
       console.log('Sending invite to:', email)
       const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email)
       if (inviteError) {
