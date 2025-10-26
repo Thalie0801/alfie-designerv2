@@ -73,105 +73,39 @@ serve(async (req) => {
 
     const planConfig = PLAN_CONFIG[plan as keyof typeof PLAN_CONFIG];
 
-    // Create or update user account based on email
-    let targetUserId = userId;
-    
-    if (!userId && customerEmail) {
-      // Guest checkout - create the user account via admin API
-      const { data: newUser, error: createError } = await supabaseClient.auth.admin.createUser({
+    // Store payment session for signup verification
+    const { error: insertError } = await supabaseClient
+      .from('payment_sessions')
+      .insert({
+        session_id,
         email: customerEmail,
-        email_confirm: true,
-        user_metadata: { created_via: 'stripe_payment' }
+        plan,
+        verified: true,
+        amount: session.amount_total ? session.amount_total / 100 : 0,
       });
 
-      if (createError) {
-        console.error("Error creating user:", createError);
-        throw new Error(`Failed to create user account: ${createError.message}`);
-      }
-
-      targetUserId = newUser.user.id;
-      console.log("Created new user account:", targetUserId);
+    if (insertError) {
+      console.error('Error storing payment session:', insertError);
+      throw new Error(`Failed to store payment session: ${insertError.message}`);
     }
 
-    // Update profile with stripe info and global quota (for backward compatibility)
+    console.log(`✅ Payment session stored for ${customerEmail}, plan: ${plan}`);
+
+    // If user is already logged in (rare case), update their profile
+    let targetUserId = userId;
     if (targetUserId) {
-      // Upsert profile to ensure it exists
       await supabaseClient
         .from("profiles")
-        .upsert({
-          id: targetUserId,
-          user_id: targetUserId,
-          email: customerEmail,
+        .update({
           plan,
           quota_brands: planConfig.quota_brands,
           stripe_customer_id: session.customer as string,
           stripe_subscription_id: session.subscription as string,
           status: 'active',
-        }, { onConflict: 'user_id' });
+        })
+        .eq("id", targetUserId);
 
-      // Get or create active brand for this user
-      const { data: profile } = await supabaseClient
-        .from("profiles")
-        .select("active_brand_id")
-        .eq("id", targetUserId)
-        .single();
-
-      let brandId = profile?.active_brand_id;
-
-      // If no active brand, get or create the first brand
-      if (!brandId) {
-        const { data: existingBrands } = await supabaseClient
-          .from("brands")
-          .select("id")
-          .eq("user_id", targetUserId)
-          .limit(1);
-
-        if (existingBrands && existingBrands.length > 0) {
-          brandId = existingBrands[0].id;
-          // Set as active brand
-          await supabaseClient
-            .from("profiles")
-            .update({ active_brand_id: brandId })
-            .eq("id", targetUserId);
-        } else {
-          // Create first brand
-          const { data: newBrand } = await supabaseClient
-            .from("brands")
-            .insert({
-              user_id: targetUserId,
-              name: "Ma Marque",
-              plan: plan,
-              quota_images: planConfig.quota_images,
-              quota_videos: planConfig.quota_videos,
-              quota_woofs: planConfig.quota_woofs,
-              stripe_subscription_id: session.subscription as string,
-            })
-            .select()
-            .single();
-
-          if (newBrand) {
-            brandId = newBrand.id;
-            await supabaseClient
-              .from("profiles")
-              .update({ active_brand_id: brandId })
-              .eq("id", targetUserId);
-          }
-        }
-      }
-
-      // Update the active brand with plan and quotas
-      if (brandId) {
-        await supabaseClient
-          .from("brands")
-          .update({
-            plan: plan,
-            quota_images: planConfig.quota_images,
-            quota_videos: planConfig.quota_videos,
-            quota_woofs: planConfig.quota_woofs,
-            stripe_subscription_id: session.subscription as string,
-          })
-          .eq("id", brandId);
-      }
+      console.log(`✅ Updated profile for existing user ${targetUserId}`);
     }
 
     // Handle affiliate conversion if affiliate_ref exists

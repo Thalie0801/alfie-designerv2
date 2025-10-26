@@ -20,7 +20,7 @@ const authSchema = z.object({
 export default function Auth() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { signIn, user, isAdmin, isAuthorized, loading: authLoading } = useAuth();
+  const { signIn, signUp, user, isAdmin, isAuthorized, loading: authLoading } = useAuth();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -177,9 +177,23 @@ export default function Auth() {
           // Redirection gérée par le state change de auth
         }
       } else {
-        // L'inscription est gérée automatiquement par verify-payment après paiement Stripe
-        toast.error('Les inscriptions sont désactivées. Votre compte a été créé automatiquement après paiement.');
-        setMode('login');
+        // Mode inscription - appel à signUp
+        const { error } = await signUp(data.email, data.password, data.fullName || '');
+        
+        if (error) {
+          if (error.message.includes('User already registered')) {
+            toast.error('Cet email est déjà utilisé. Veuillez vous connecter.');
+            setMode('login');
+          } else if (error.message.includes('Aucun paiement validé')) {
+            toast.error('Aucun paiement validé trouvé. Veuillez choisir un plan.');
+            redirectToPricing();
+          } else {
+            toast.error(`Erreur d'inscription: ${error.message}`);
+          }
+        } else {
+          toast.success('Compte créé avec succès ! Vérifiez votre email pour confirmer.');
+          // Redirection gérée automatiquement par le state change
+        }
       }
     } catch (error) {
       if (error instanceof z.ZodError) {

@@ -847,27 +847,36 @@ export type Database = {
       payment_sessions: {
         Row: {
           amount: number | null
+          created_at: string | null
+          email: string | null
           id: string
           plan: string
           processed_at: string
           session_id: string
           user_id: string | null
+          verified: boolean | null
         }
         Insert: {
           amount?: number | null
+          created_at?: string | null
+          email?: string | null
           id?: string
           plan: string
           processed_at?: string
           session_id: string
           user_id?: string | null
+          verified?: boolean | null
         }
         Update: {
           amount?: number | null
+          created_at?: string | null
+          email?: string | null
           id?: string
           plan?: string
           processed_at?: string
           session_id?: string
           user_id?: string | null
+          verified?: boolean | null
         }
         Relationships: []
       }
