@@ -1,6 +1,7 @@
 import { ChangeEvent, FormEvent, useState } from 'react';
 import { toast } from 'sonner';
 import { adminCreateUser } from '@/lib/admin-api';
+import { supabase } from '@/integrations/supabase/client';
 import { ALL_PLANS, Plan } from '@/lib/plans';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,7 +48,45 @@ export default function AdminCreateCustomerPage() {
       setGrantedByAdmin(false);
       setPassword('');
     } catch (e: any) {
-      toast.error(e?.message || 'Échec de la création');
+      const msg = (e?.message || '').toLowerCase();
+      if (msg.includes('already') || msg.includes('exists') || msg.includes('email_exists')) {
+        try {
+          const { data: existing, error: findErr } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('email', email)
+            .maybeSingle();
+
+          if (findErr) throw findErr;
+
+          if (existing?.id) {
+            const { error: upErr } = await supabase
+              .from('profiles')
+              .update({
+                plan,
+                granted_by_admin: grantedByAdmin,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', existing.id);
+
+            if (upErr) throw upErr;
+
+            toast.success('Profil existant mis à jour ✅');
+            setEmail('');
+            setFullName('');
+            setPlan('starter');
+            setSendInvite(true);
+            setGrantedByAdmin(false);
+            setPassword('');
+          } else {
+            toast.error('Utilisateur existant mais profil introuvable');
+          }
+        } catch (err: any) {
+          toast.error(err?.message || 'Impossible de mettre à jour le profil.');
+        }
+      } else {
+        toast.error(e?.message || 'Échec de la création');
+      }
     } finally {
       setLoading(false);
     }
