@@ -14,6 +14,7 @@ import Contact from "./pages/Contact";
 import CreditPurchaseSuccess from "./pages/CreditPurchaseSuccess";
 import Admin from "./pages/Admin";
 import AdminCreateCustomerPage from "./pages/admin/CreateCustomer";
+import ManageAmbassadors from "./pages/admin/ManageAmbassadors";
 import Affiliate from "./pages/Affiliate";
 import Profile from "./pages/Profile";
 import DevenirPartenaire from "./pages/DevenirPartenaire";
@@ -170,6 +171,16 @@ const App = () => (
               <ProtectedRoute requireAdmin>
                 <AppLayoutWithSidebar>
                   <AdminCreateCustomerPage />
+                </AppLayoutWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/ambassadors"
+            element={
+              <ProtectedRoute requireAdmin>
+                <AppLayoutWithSidebar>
+                  <ManageAmbassadors />
                 </AppLayoutWithSidebar>
               </ProtectedRoute>
             }

@@ -186,9 +186,17 @@ export default function Affiliate() {
             Bienvenue {affiliate.name} ! Suivez vos performances multi-niveaux.
           </p>
         </div>
-        <div className={`${statusInfo.color} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2`}>
-          <StatusIcon className="h-6 w-6" />
-          <span className="font-bold text-lg">{statusInfo.label}</span>
+        <div className="flex items-center gap-3">
+          {/* Badge Ambassadeur - Pour TOUS les affiliés */}
+          <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 text-base font-semibold shadow-lg">
+            🎖️ Ambassadeur
+          </Badge>
+          
+          {/* Badge Statut gamification (Créateur/Mentor/Leader) */}
+          <div className={`${statusInfo.color} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2`}>
+            <StatusIcon className="h-6 w-6" />
+            <span className="font-bold text-lg">{statusInfo.label}</span>
+          </div>
         </div>
       </div>
 

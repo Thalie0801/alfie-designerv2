@@ -1,4 +1,4 @@
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect, useState } from 'react';
 
@@ -10,7 +10,6 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, requireAdmin = false, allowPending = false }: ProtectedRouteProps) {
   const { user, isAdmin, isAuthorized, loading, refreshProfile } = useAuth();
-  const location = useLocation();
   const [checkingAdmin, setCheckingAdmin] = useState(false);
 
   useEffect(() => {
@@ -41,17 +40,6 @@ export function ProtectedRoute({ children, requireAdmin = false, allowPending = 
 
   if (!requireAdmin && !allowPending && !isAuthorized) {
     return <Navigate to="/onboarding/activate" replace />;
-  }
-
-  // Allow Studio plan users to access dashboard without restrictions
-  const hasStudioPlan = user?.email && [
-    'borderonpatricia7@gmail.com',
-    'Sandrine.guedra@gmail.com'
-  ].includes(user.email);
-
-  // If special testers hit /billing, redirect them to dashboard
-  if (hasStudioPlan && location.pathname === '/billing') {
-    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
