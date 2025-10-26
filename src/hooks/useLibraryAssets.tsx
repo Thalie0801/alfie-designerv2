@@ -188,8 +188,6 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
             a.metadata?.job_id ||
             a.metadata?.taskId ||
             a.metadata?.task_id;
-          const provider = ((a.engine || a.metadata?.provider || 'sora') as string).toLowerCase();
-          const jobId = a.job_id || a.metadata?.jobId;
           if (!genId) continue;
           try {
             const { data: statusData, error: statusError } = await supabase.functions.invoke('generate-video', {
@@ -255,17 +253,6 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
                   .from('media_generations')
                   .update(updatePayload)
                   .eq('id', a.id);
-            if (!statusError) {
-              const status = typeof statusData?.status === 'string' ? statusData.status.toLowerCase() : '';
-              const isCompleted = ['succeeded', 'completed', 'ready', 'success', 'finished'].includes(status);
-              const videoUrl = Array.isArray(statusData?.output)
-                ? statusData.output[0]
-                : statusData?.output || statusData?.output_url || statusData?.video_url;
-              if (isCompleted && videoUrl) {
-              await supabase
-                .from('media_generations')
-                .update({ output_url: videoUrl, status: 'completed' })
-                .eq('id', a.id);
               }
             }
           } catch (e) {

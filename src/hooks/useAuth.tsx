@@ -55,13 +55,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (rolesData) setRoles(rolesData.map(r => r.role));
 
-    const { data: subscriptionData } = await supabase
-      .from('user_subscriptions')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .order('current_period_end', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Subscription data is managed via profile.stripe_subscription_id
+    const subscriptionData = null;
 
     setSubscription(subscriptionData ?? null);
   };
