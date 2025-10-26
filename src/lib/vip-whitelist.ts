@@ -12,6 +12,7 @@
 
 export const FORCE_DASHBOARD_EMAILS = new Set([
   'sandrine.guedra@gmail.com',
+  'sandrine.guedra54@gmail.com',
   'patriciaborderon7@gamil.com', // Note: "gamil" orthographe originale
 ]);
 

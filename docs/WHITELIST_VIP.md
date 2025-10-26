@@ -9,6 +9,7 @@ Certains comptes clients bénéficient d'un accès **garanti** au dashboard (`/d
 | Email | Notes |
 |-------|-------|
 | `sandrine.guedra@gmail.com` | Compte client exceptionnel |
+| `sandrine.guedra54@gmail.com` | Compte client exceptionnel (variante) |
 | `patriciaborderon7@gamil.com` | Compte client exceptionnel (note: "gamil" orthographe originale) |
 
 ## Fonctionnement
