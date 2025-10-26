@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { ExternalLink, Trash2, Palette, Sparkles, MessageSquare } from 'lucide-react';
+import { Trash2, Palette, Sparkles, MessageSquare } from 'lucide-react';
 import { BrandDialog } from '@/components/BrandDialog';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
@@ -73,166 +73,206 @@ export default function Dashboard() {
 
   return (
     <AccessGuard>
-      <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Dashboard
-          </h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Retrouvez vos créations et gérez vos marques
-          </p>
+      <div className="space-y-6 lg:space-y-8">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+              Bienvenue sur votre Dashboard
+            </h1>
+            <p className="text-base text-muted-foreground max-w-2xl">
+              Gérez vos marques, générez du contenu créatif avec Alfie et suivez vos quotas
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <NewsWidget />
+            <FeatureRequestDialog />
+          </div>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <NewsWidget />
-          <FeatureRequestDialog />
-          <Button 
-            disabled 
-            className="gap-2 gradient-hero text-white shadow-medium opacity-50 cursor-not-allowed text-sm"
-            title="En attente de la réponse de l'API Canva"
-          >
-            <ExternalLink className="h-4 w-4" />
-            <span className="hidden sm:inline">Connecter Canva</span>
-            <span className="sm:hidden">Canva</span>
-          </Button>
-        </div>
-      </div>
 
-      {/* Alfie Designer Card */}
-      <Card className="border-primary/30 shadow-strong bg-gradient-subtle">
-        <CardHeader className="bg-gradient-to-br from-primary/10 to-secondary/10 p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="bg-gradient-to-br from-primary to-secondary p-2 sm:p-3 rounded-xl shadow-glow">
-                <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+        {/* Alfie Designer Hero Card */}
+        <Card className="border-none shadow-strong overflow-hidden relative group">
+          <div className="absolute inset-0 gradient-hero opacity-10"></div>
+          <CardContent className="relative p-8">
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+              <div className="flex items-center gap-6">
+                <div className="relative">
+                  <div className="absolute inset-0 gradient-hero blur-xl opacity-50 animate-pulse-soft"></div>
+                  <div className="relative gradient-hero p-4 rounded-2xl shadow-glow">
+                    <Sparkles className="h-10 w-10 text-white" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-2xl lg:text-3xl font-bold">Alfie Designer</h2>
+                  <p className="text-muted-foreground text-lg">Votre assistant créatif IA nouvelle génération</p>
+                </div>
               </div>
+              <Button 
+                onClick={() => navigate('/app')}
+                size="lg"
+                className="gap-3 gradient-hero text-white shadow-strong hover:shadow-glow transition-all px-8 py-6 text-base font-semibold"
+              >
+                <MessageSquare className="h-5 w-5" />
+                Commencer à créer
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Stats Grid */}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Card className="border-primary/20 shadow-medium hover:shadow-strong transition-all">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-primary/10">
+                  <Palette className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-3xl font-bold">{brands.length}</p>
+                  <p className="text-sm text-muted-foreground">Brand Kits</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-secondary/20 shadow-medium hover:shadow-strong transition-all sm:col-span-2 lg:col-span-2">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="p-3 rounded-xl bg-secondary/10 flex-shrink-0">
+                  <Sparkles className="h-6 w-6 text-secondary" />
+                </div>
+                <div className="space-y-1">
+                  <p className="font-semibold text-base">💡 Conseil Pro</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Configurez vos Brand Kits avec votre palette de couleurs, typographie et voix de marque. 
+                    Alfie s'en servira pour générer du contenu parfaitement adapté à votre identité visuelle.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quotas Display */}
+        <BrandQuotaDisplay />
+
+        {/* Brand Manager */}
+        <BrandManager />
+
+        {/* Brand List */}
+        <Card className="border-primary/10 shadow-medium">
+          <CardHeader className="border-b bg-gradient-subtle">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <CardTitle className="text-lg sm:text-xl">Alfie Designer</CardTitle>
-                <CardDescription className="text-sm">Ton assistant créatif IA</CardDescription>
+                <CardTitle className="flex items-center gap-3 text-2xl">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <Palette className="h-5 w-5 text-primary" />
+                  </div>
+                  Mes marques
+                </CardTitle>
+                <CardDescription className="mt-2">Gérez et organisez vos Brand Kits</CardDescription>
               </div>
+              <BrandDialog onSuccess={loadData} />
             </div>
-            <Button 
-              onClick={() => navigate('/app')}
-              className="gap-2 bg-gradient-to-r from-primary to-secondary text-white hover:opacity-90 w-full sm:w-auto text-sm"
-            >
-              <MessageSquare className="h-4 w-4" />
-              Ouvrir le chat
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-4 sm:pt-6 p-4 sm:p-6">
-          <div className="flex items-center gap-3 p-3 sm:p-4 rounded-lg border-2 border-primary/20 bg-background/50 max-w-md">
-            <Palette className="h-6 w-6 sm:h-8 sm:w-8 text-secondary" />
-            <div>
-              <p className="text-xl sm:text-2xl font-bold">{brands.length}</p>
-              <p className="text-xs sm:text-sm text-muted-foreground">Brand Kits</p>
-            </div>
-          </div>
-          <div className="mt-4 p-3 sm:p-4 rounded-lg bg-primary/5 border border-primary/10">
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              💡 <strong>Astuce :</strong> Discute avec Alfie pour générer des visuels IA ou adapter des templates Canva à ton Brand Kit. 
-              Les quotas (visuels, vidéos, Woofs) sont gérés par marque.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Quotas de la marque active */}
-      <BrandQuotaDisplay />
-
-      {/* Brand Manager */}
-      <BrandManager />
-
-      {/* Brands */}
-      <Card className="border-primary/20 shadow-medium">
-        <CardHeader className="bg-gradient-subtle p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                <Palette className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                Mes marques
-              </CardTitle>
-              <CardDescription className="text-sm">Gérez vos Brand Kits</CardDescription>
-            </div>
-            <BrandDialog onSuccess={loadData} />
-          </div>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6">
-          {loading ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              Chargement...
-            </p>
-          ) : brands.length === 0 ? (
-            <p className="text-xs sm:text-sm text-muted-foreground text-center py-8">
-              Aucune marque configurée. Cliquez sur "Ajouter" ci-dessus pour créer votre première marque.
-            </p>
-          ) : (
-            <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
-              {brands.map((brand) => (
-                <Card key={brand.id} className="group hover:shadow-strong hover:border-primary/30 transition-all border-2">
-                  <CardHeader className="bg-gradient-subtle p-3 sm:p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
+          </CardHeader>
+          <CardContent className="p-6">
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="animate-pulse space-y-3">
+                  <div className="h-4 bg-muted rounded w-32 mx-auto"></div>
+                  <div className="h-3 bg-muted rounded w-48 mx-auto"></div>
+                </div>
+              </div>
+            ) : brands.length === 0 ? (
+              <div className="text-center py-16 space-y-4">
+                <div className="p-4 rounded-full bg-muted/50 w-20 h-20 mx-auto flex items-center justify-center">
+                  <Palette className="h-10 w-10 text-muted-foreground" />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-lg font-semibold">Aucune marque créée</p>
+                  <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                    Créez votre première marque pour commencer à générer du contenu personnalisé avec Alfie
+                  </p>
+                </div>
+                <BrandDialog onSuccess={loadData} />
+              </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {brands.map((brand) => (
+                  <Card key={brand.id} className="group hover:shadow-strong hover:border-primary/40 transition-all border-2 overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-1 gradient-hero opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <CardHeader className="p-5 space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
                           {brand.logo_url && (
-                            <img 
-                              src={brand.logo_url} 
-                              alt={brand.name}
-                              className="w-6 h-6 sm:w-8 sm:h-8 object-contain rounded"
-                            />
+                            <div className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 border-border bg-background">
+                              <img 
+                                src={brand.logo_url} 
+                                alt={brand.name}
+                                className="w-full h-full object-contain"
+                              />
+                            </div>
                           )}
-                          <CardTitle className="text-base sm:text-lg">{brand.name}</CardTitle>
+                          <div className="flex-1 min-w-0 space-y-2">
+                            <h3 className="font-bold text-lg truncate">{brand.name}</h3>
+                            {brand.plan && (
+                              <Badge variant="secondary" className="text-xs font-medium">
+                                {brand.plan.toUpperCase()}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
-                        <div className="space-y-2">
-                          <Badge 
-                            className={`text-xs ${brand.canva_connected ? 'bg-green-500 hover:bg-green-600' : 'bg-orange-500 hover:bg-orange-600'}`}
-                          >
-                            {brand.canva_connected ? '✓ Canva connecté' : '○ Non connecté'}
-                          </Badge>
-                          {brand.voice && (
-                            <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
-                              {brand.voice}
-                            </p>
-                          )}
+                        <div className="flex gap-1 flex-shrink-0">
+                          <BrandDialog brand={brand} onSuccess={loadData} />
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Supprimer la marque ?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Cette action est irréversible. La marque "{brand.name}" sera définitivement supprimée.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteBrand(brand.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Supprimer
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </div>
-                      <div className="flex gap-1 sm:gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                        <BrandDialog brand={brand} onSuccess={loadData} />
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Supprimer la marque ?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Cette action est irréversible. La marque "{brand.name}" sera définitivement supprimée.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Annuler</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDeleteBrand(brand.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Supprimer
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                      
+                      {brand.voice && (
+                        <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+                          {brand.voice}
+                        </p>
+                      )}
+                      
+                      <div className="flex items-center gap-2">
+                        <Badge 
+                          variant={brand.canva_connected ? "default" : "outline"}
+                          className={`text-xs ${brand.canva_connected ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'border-orange-500/20 text-orange-600'}`}
+                        >
+                          {brand.canva_connected ? '✓ Canva' : '○ Canva'}
+                        </Badge>
                       </div>
-                    </div>
-                  </CardHeader>
-                </Card>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-    </div>
+                    </CardHeader>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </AccessGuard>
   );
 }
