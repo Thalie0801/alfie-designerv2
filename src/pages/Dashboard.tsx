@@ -19,6 +19,9 @@ import { RecentCreations } from '@/components/dashboard/RecentCreations';
 import { ProfileProgress } from '@/components/dashboard/ProfileProgress';
 import { useAffiliateStatus } from '@/hooks/useAffiliateStatus';
 import { useBrandKit } from '@/hooks/useBrandKit';
+import { TourProvider } from '@/components/tour/InteractiveTour';
+import { DashboardTourAutoStart } from '@/components/tour/DashboardTourAutoStart';
+import { HelpLauncher } from '@/components/tour/InteractiveTour';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -81,14 +84,20 @@ export default function Dashboard() {
 
   return (
     <AccessGuard>
-      <div className="space-y-6 lg:space-y-8">
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                Bienvenue sur votre Dashboard
-              </h1>
+      <TourProvider options={{ userEmail: user?.email }}>
+        <DashboardTourAutoStart />
+        
+        <div className="space-y-6 lg:space-y-8">
+          {/* Header */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 
+                  data-tour-id="nav-dashboard"
+                  className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent"
+                >
+                  Bienvenue sur votre Dashboard
+                </h1>
               {affiliate && (
                 <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white gap-1.5 px-3 py-1">
                   <Award className="h-4 w-4" />
@@ -101,6 +110,7 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
+            <HelpLauncher />
             <NewsWidget />
             <FeatureRequestDialog />
           </div>
@@ -127,6 +137,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <Button 
+                data-tour-id="btn-create"
                 onClick={() => navigate('/app')}
                 size="lg"
                 className="gap-3 gradient-hero text-white shadow-strong hover:shadow-glow transition-all px-8 py-6 text-base font-semibold"
@@ -139,7 +150,9 @@ export default function Dashboard() {
         </Card>
 
         {/* Quick Actions */}
-        <QuickActions />
+        <div data-tour-id="quick-actions">
+          <QuickActions />
+        </div>
 
         {/* Main Grid - Active Brand + Activity */}
         <div className="grid lg:grid-cols-2 gap-6">
@@ -174,7 +187,7 @@ export default function Dashboard() {
         </div>
 
         {/* Brand List */}
-        <Card className="border-primary/10 shadow-medium">
+        <Card className="border-primary/10 shadow-medium" data-tour-id="brand-kit">
           <CardHeader className="border-b bg-gradient-subtle">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
@@ -286,7 +299,8 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-      </div>
+        </div>
+      </TourProvider>
     </AccessGuard>
   );
 }
