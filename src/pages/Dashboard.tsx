@@ -4,15 +4,21 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Trash2, Palette, Sparkles, MessageSquare } from 'lucide-react';
+import { Trash2, Palette, Sparkles, MessageSquare, Award } from 'lucide-react';
 import { BrandDialog } from '@/components/BrandDialog';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { BrandManager } from '@/components/BrandManager';
-import { BrandQuotaDisplay } from '@/components/BrandQuotaDisplay';
 import { NewsWidget } from '@/components/NewsWidget';
 import { FeatureRequestDialog } from '@/components/FeatureRequestDialog';
 import { AccessGuard } from '@/components/AccessGuard';
+import { AlertBanner } from '@/components/dashboard/AlertBanner';
+import { ActiveBrandCard } from '@/components/dashboard/ActiveBrandCard';
+import { QuickActions } from '@/components/dashboard/QuickActions';
+import { ActivityCard } from '@/components/dashboard/ActivityCard';
+import { RecentCreations } from '@/components/dashboard/RecentCreations';
+import { ProfileProgress } from '@/components/dashboard/ProfileProgress';
+import { useAffiliateStatus } from '@/hooks/useAffiliateStatus';
+import { useBrandKit } from '@/hooks/useBrandKit';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +34,8 @@ import {
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { affiliate } = useAffiliateStatus();
+  const { activeBrandId } = useBrandKit();
   const [brands, setBrands] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -76,10 +84,18 @@ export default function Dashboard() {
       <div className="space-y-6 lg:space-y-8">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              Bienvenue sur votre Dashboard
-            </h1>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                Bienvenue sur votre Dashboard
+              </h1>
+              {affiliate && (
+                <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white gap-1.5 px-3 py-1">
+                  <Award className="h-4 w-4" />
+                  Ambassadeur {affiliate.affiliate_status === 'leader' ? '· Leader' : affiliate.affiliate_status === 'mentor' ? '· Mentor' : ''}
+                </Badge>
+              )}
+            </div>
             <p className="text-base text-muted-foreground max-w-2xl">
               Gérez vos marques, générez du contenu créatif avec Alfie et suivez vos quotas
             </p>
@@ -89,6 +105,9 @@ export default function Dashboard() {
             <FeatureRequestDialog />
           </div>
         </div>
+
+        {/* Alert Banner */}
+        <AlertBanner />
 
         {/* Alfie Designer Hero Card */}
         <Card className="border-none shadow-strong overflow-hidden relative group">
@@ -119,45 +138,40 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Stats Grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Card className="border-primary/20 shadow-medium hover:shadow-strong transition-all">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-primary/10">
-                  <Palette className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-3xl font-bold">{brands.length}</p>
-                  <p className="text-sm text-muted-foreground">Brand Kits</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Quick Actions */}
+        <QuickActions />
 
-          <Card className="border-secondary/20 shadow-medium hover:shadow-strong transition-all sm:col-span-2 lg:col-span-2">
+        {/* Main Grid - Active Brand + Activity */}
+        <div className="grid lg:grid-cols-2 gap-6">
+          <ActiveBrandCard />
+          <ActivityCard activeBrandId={activeBrandId} />
+        </div>
+
+        {/* Recent Creations */}
+        <RecentCreations />
+
+        {/* Bottom Grid - Profile Progress + Pro Tip */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <ProfileProgress />
+          
+          <Card className="border-secondary/20 shadow-medium md:col-span-2 lg:col-span-2">
             <CardContent className="p-6">
               <div className="flex items-start gap-4">
                 <div className="p-3 rounded-xl bg-secondary/10 flex-shrink-0">
                   <Sparkles className="h-6 w-6 text-secondary" />
                 </div>
-                <div className="space-y-1">
-                  <p className="font-semibold text-base">💡 Conseil Pro</p>
+                <div className="space-y-2">
+                  <p className="font-semibold text-lg">💡 Conseil Pro</p>
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     Configurez vos Brand Kits avec votre palette de couleurs, typographie et voix de marque. 
                     Alfie s'en servira pour générer du contenu parfaitement adapté à votre identité visuelle.
+                    Plus votre Brand Kit est complet, plus les créations seront personnalisées et cohérentes avec votre image de marque.
                   </p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
-
-        {/* Quotas Display */}
-        <BrandQuotaDisplay />
-
-        {/* Brand Manager */}
-        <BrandManager />
 
         {/* Brand List */}
         <Card className="border-primary/10 shadow-medium">
