@@ -279,6 +279,10 @@ export default function Admin() {
             <Award className="h-4 w-4" />
             Gérer Ambassadeurs
           </Button>
+          <Button onClick={() => navigate('/admin/create-bulk-customers')} variant="outline" className="gap-2">
+            <Users className="h-4 w-4" />
+            Création groupée
+          </Button>
           <Button onClick={() => navigate('/admin/create-customer')} className="gap-2">
             <Plus className="h-4 w-4" />
             Créer un client
