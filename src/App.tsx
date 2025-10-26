@@ -14,7 +14,6 @@ import Contact from "./pages/Contact";
 import CreditPurchaseSuccess from "./pages/CreditPurchaseSuccess";
 import Admin from "./pages/Admin";
 import AdminCreateCustomerPage from "./pages/admin/CreateCustomer";
-import CreateBulkCustomers from "./pages/admin/CreateBulkCustomers";
 import ManageAmbassadors from "./pages/admin/ManageAmbassadors";
 import Affiliate from "./pages/Affiliate";
 import Profile from "./pages/Profile";
@@ -172,16 +171,6 @@ const App = () => (
               <ProtectedRoute requireAdmin>
                 <AppLayoutWithSidebar>
                   <AdminCreateCustomerPage />
-                </AppLayoutWithSidebar>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/create-bulk-customers"
-            element={
-              <ProtectedRoute requireAdmin>
-                <AppLayoutWithSidebar>
-                  <CreateBulkCustomers />
                 </AppLayoutWithSidebar>
               </ProtectedRoute>
             }
