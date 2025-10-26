@@ -8,8 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 
 export default function AdminCreateCustomerPage() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [plan, setPlan] = useState<Plan>('starter');
@@ -51,7 +54,13 @@ export default function AdminCreateCustomerPage() {
   }
 
   return (
-    <div className="p-6 max-w-xl mx-auto">
+    <div className="p-6 max-w-xl mx-auto space-y-4">
+      <div className="flex items-center">
+        <Button variant="outline" size="sm" onClick={() => navigate('/admin')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Retour Admin
+        </Button>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Créer un client</CardTitle>
