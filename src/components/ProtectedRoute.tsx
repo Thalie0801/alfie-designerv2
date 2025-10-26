@@ -9,7 +9,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requireAdmin = false, allowPending = false }: ProtectedRouteProps) {
-  const { user, isAdmin, isAuthorized, loading, refreshProfile } = useAuth();
+  const { user, isAdmin, hasActivePlan, loading, refreshProfile } = useAuth();
   const [checkingAdmin, setCheckingAdmin] = useState(false);
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export function ProtectedRoute({ children, requireAdmin = false, allowPending = 
     return <Navigate to="/app" replace />;
   }
 
-  if (!requireAdmin && !allowPending && !isAuthorized) {
+  if (!requireAdmin && !allowPending && !(isAdmin || hasActivePlan)) {
     return <Navigate to="/onboarding/activate" replace />;
   }
 

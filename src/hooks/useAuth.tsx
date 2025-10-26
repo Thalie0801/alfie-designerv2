@@ -55,10 +55,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (rolesData) setRoles(rolesData.map(r => r.role));
 
-    // Subscription data is managed via profile.stripe_subscription_id
-    const subscriptionData = null;
-
-    setSubscription(subscriptionData ?? null);
+    // Récupérer l'état d'abonnement via la fonction edge
+    try {
+      const { data, error } = await supabase.functions.invoke('check-subscription');
+      if (!error && data) {
+        setSubscription({
+          status: data.subscribed ? 'active' : 'none',
+          current_period_end: data.current_period_end ?? null,
+        } as any);
+      } else {
+        setSubscription(null);
+      }
+    } catch {
+      setSubscription(null);
+    }
   };
 
   useEffect(() => {
@@ -167,14 +177,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     killSwitchDisabled,
   });
   const hasActivePlan = Boolean(
-    profile?.status === 'active' ||
-      profile?.granted_by_admin ||
-      isAdmin ||
-      (subscription?.status
-        ? ['active', 'trial', 'trialing'].includes(
-            subscription.status.toLowerCase()
-          )
-        : false)
+    isAdmin ||
+    profile?.granted_by_admin ||
+    (subscription?.status ? ['active', 'trial', 'trialing'].includes(String(subscription.status).toLowerCase()) : false)
   );
 
   const value = {
