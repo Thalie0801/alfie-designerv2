@@ -19,7 +19,7 @@ const authSchema = z.object({
 
 export default function Auth() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { signIn, signUp, user, isAdmin, isAuthorized, loading: authLoading } = useAuth();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
@@ -29,6 +29,18 @@ export default function Auth() {
   const [verifyingPayment, setVerifyingPayment] = useState(false);
   const [canSignUp, setCanSignUp] = useState(false);
   const warnedAboutSignupRedirect = useRef(false);
+  const isMountedRef = useRef(true);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Déterminer si les flags auth sont prêts (pas undefined)
+  const flagsReady = typeof isAdmin === 'boolean' && typeof isAuthorized === 'boolean';
 
   // Vérifier si l'utilisateur vient d'un paiement
   const sessionId = searchParams.get('session_id');
@@ -36,16 +48,15 @@ export default function Auth() {
   const hasPaymentSession = Boolean(sessionId && paymentStatus === 'success');
   const searchKey = searchParams.toString();
 
-  // Check for payment success
-  useEffect(() => {
-    if (hasPaymentSession && sessionId) {
-      setVerifyingPayment(true);
-      verifyPayment(sessionId);
-    } else {
-      setCanSignUp(false);
-      setMode('login');
-    }
-  }, [hasPaymentSession, sessionId]);
+  // Nettoyer les paramètres de paiement après traitement
+  const stripPaymentParams = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('session_id');
+    next.delete('payment');
+    next.delete('mode');
+    setSearchParams(next, { replace: true });
+    console.debug('[Auth] Cleaned payment params from URL');
+  }, [searchParams, setSearchParams]);
 
   // Empêche l'accès manuel au mode inscription sans paiement
   useEffect(() => {
@@ -71,54 +82,128 @@ export default function Auth() {
     }
   }, [canSignUp, mode]);
 
+  // Navigation après authentification - PRIORITÉ: Admin > Authorized > Onboarding
   const navigateAfterAuth = useCallback(() => {
+    console.debug('[Auth redirect] Navigating after auth', { isAdmin, isAuthorized, flagsReady });
+    
     if (isAdmin) {
+      console.debug('[Auth redirect] → /admin (admin user)');
       navigate('/admin');
     } else if (!isAuthorized) {
+      console.debug('[Auth redirect] → /onboarding/activate (not authorized)');
       navigate('/onboarding/activate');
     } else {
+      console.debug('[Auth redirect] → /dashboard (authorized user)');
       navigate('/dashboard');
     }
-  }, [isAdmin, isAuthorized, navigate]);
+  }, [isAdmin, isAuthorized, navigate, flagsReady]);
 
-  const verifyPayment = async (sessionId: string) => {
+  // Vérification du paiement (useCallback stable)
+  const verifyPayment = useCallback(async (sessionId: string) => {
+    if (!isMountedRef.current) return;
+    
+    setVerifyingPayment(true);
+    console.debug('[Auth] Starting payment verification', { sessionId });
+
     try {
+      const headers = await getAuthHeader().catch(() => ({}));
       const { data, error } = await supabase.functions.invoke('verify-payment', {
         body: { session_id: sessionId },
-        headers: await getAuthHeader(),
+        headers,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[Auth] Payment verification error:', error);
+        throw error;
+      }
 
-      toast.success(`Paiement confirmé ! Plan ${data.plan} activé.`);
+      if (!isMountedRef.current) return;
+
+      // Gestion des codes d'erreur structurés si disponibles
+      const errorCode = data?.code;
+      const plan = data?.plan;
+      const customerEmail = data?.email;
+
+      if (errorCode) {
+        // Gérer les codes d'erreur structurés
+        switch (errorCode) {
+          case 'PAYMENT_NOT_COMPLETED':
+            toast.error('Le paiement n\'a pas été complété');
+            break;
+          case 'INVALID_PLAN':
+            toast.error('Plan invalide dans la session de paiement');
+            break;
+          case 'SESSION_NOT_FOUND':
+            toast.error('Session de paiement introuvable');
+            break;
+          default:
+            toast.error(data?.message || 'Erreur lors de la vérification du paiement');
+        }
+        setCanSignUp(false);
+        setMode('login');
+        return;
+      }
+
+      console.debug('[Auth] Payment verified successfully', { plan, email: customerEmail });
+      toast.success(`Paiement confirmé ! Plan ${plan || ''} activé.`);
 
       setCanSignUp(true);
 
-      // Redirect to signup if not logged in
+      // Si pas connecté, basculer en mode inscription avec email pré-rempli
       if (!user) {
+        console.debug('[Auth] User not logged in, switching to signup mode');
         setMode('signup');
-        if (data.email) {
-          setEmail(data.email);
+        if (customerEmail) {
+          setEmail(customerEmail);
         }
       } else {
+        // Si déjà connecté, naviguer selon les rôles
+        console.debug('[Auth] User already logged in, navigating');
         navigateAfterAuth();
       }
+
+      // Nettoyer l'URL après succès
+      stripPaymentParams();
     } catch (error: any) {
-      console.error('Payment verification error:', error);
-      toast.error('Erreur lors de la vérification du paiement');
+      if (!isMountedRef.current) return;
+      
+      console.error('[Auth] Payment verification failed:', error);
+      
+      // Gestion d'erreur robuste (ne pas se baser uniquement sur message.includes)
+      const errorMsg = error?.message || 'Erreur inconnue';
+      toast.error(`Erreur lors de la vérification du paiement: ${errorMsg}`);
+      
       setCanSignUp(false);
       setMode('login');
     } finally {
-      setVerifyingPayment(false);
+      if (isMountedRef.current) {
+        setVerifyingPayment(false);
+      }
     }
-  };
+  }, [user, navigateAfterAuth, stripPaymentParams]);
 
-  // Redirect if already logged in (will be handled by ProtectedRoute)
+  // Check for payment success (vérifie une seule fois au montage ou changement de sessionId)
   useEffect(() => {
-    if (!authLoading && user && !verifyingPayment) {
+    if (hasPaymentSession && sessionId) {
+      console.debug('[Auth] Payment session detected, verifying...');
+      verifyPayment(sessionId);
+    } else {
+      setCanSignUp(false);
+      setMode('login');
+    }
+  }, [hasPaymentSession, sessionId, verifyPayment]);
+
+  // Redirect if already logged in - ATTENDRE que les flags soient prêts
+  useEffect(() => {
+    if (!authLoading && !verifyingPayment && user && flagsReady) {
+      console.debug('[Auth] User logged in and flags ready, navigating...', { 
+        isAdmin, 
+        isAuthorized,
+        user: user?.email 
+      });
       navigateAfterAuth();
     }
-  }, [user, verifyingPayment, authLoading, navigateAfterAuth]);
+  }, [user, verifyingPayment, authLoading, flagsReady, navigateAfterAuth, isAdmin, isAuthorized]);
 
   const redirectToPricing = () => {
     if (typeof window !== 'undefined') {
@@ -149,9 +234,9 @@ export default function Auth() {
     }
 
     setLoading(true);
+    console.debug('[Auth] Form submission started', { mode, email });
 
     try {
-
       // Validate
       const data = authSchema.parse({
         email,
@@ -162,17 +247,23 @@ export default function Auth() {
       if (mode === 'login') {
         const { error } = await signIn(data.email, data.password);
         if (error) {
-          if (error.message.includes('Invalid login credentials')) {
+          console.error('[Auth] Login error:', error);
+          
+          // Gestion d'erreur robuste
+          const errorMsg = error.message.toLowerCase();
+          
+          if (errorMsg.includes('invalid login credentials')) {
             toast.error('Email ou mot de passe incorrect');
-          } else if (error.message.includes('Email not confirmed')) {
+          } else if (errorMsg.includes('email not confirmed')) {
             toast.error('Veuillez confirmer votre email avant de vous connecter');
-          } else if (error.message.includes('User not found')) {
+          } else if (errorMsg.includes('user not found')) {
             toast.error('Aucun compte trouvé avec cet email. Découvrez nos offres pour vous inscrire.');
             redirectToPricing();
           } else {
             toast.error(`Erreur de connexion: ${error.message}`);
           }
         } else {
+          console.debug('[Auth] Login successful');
           toast.success('Connexion réussie !');
           // Redirection gérée par le state change de auth
         }
@@ -181,16 +272,21 @@ export default function Auth() {
         const { error } = await signUp(data.email, data.password, data.fullName || '');
         
         if (error) {
-          if (error.message.includes('User already registered')) {
+          console.error('[Auth] Signup error:', error);
+          
+          const errorMsg = error.message.toLowerCase();
+          
+          if (errorMsg.includes('user already registered')) {
             toast.error('Cet email est déjà utilisé. Veuillez vous connecter.');
             setMode('login');
-          } else if (error.message.includes('Aucun paiement validé')) {
+          } else if (errorMsg.includes('aucun paiement validé')) {
             toast.error('Aucun paiement validé trouvé. Veuillez choisir un plan.');
             redirectToPricing();
           } else {
             toast.error(`Erreur d'inscription: ${error.message}`);
           }
         } else {
+          console.debug('[Auth] Signup successful');
           toast.success('Compte créé avec succès ! Vérifiez votre email pour confirmer.');
           // Redirection gérée automatiquement par le state change
         }
@@ -199,12 +295,16 @@ export default function Auth() {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
       } else {
+        console.error('[Auth] Unexpected error:', error);
         toast.error('Une erreur est survenue');
       }
     } finally {
       setLoading(false);
     }
   };
+
+  // Déterminer si le formulaire doit être désactivé
+  const formDisabled = loading || verifyingPayment || (mode === 'signup' && !canSignUp);
 
   return (
     <div className="min-h-screen gradient-subtle flex items-center justify-center p-4">
@@ -242,6 +342,7 @@ export default function Auth() {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   required={mode === 'signup'}
+                  disabled={formDisabled}
                 />
               </div>
             )}
@@ -252,6 +353,7 @@ export default function Auth() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={formDisabled}
               />
             </div>
             <div>
@@ -261,6 +363,7 @@ export default function Auth() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={formDisabled}
               />
               {mode === 'login' && (
                 <button
@@ -275,9 +378,9 @@ export default function Auth() {
             <Button
               type="submit"
               className="w-full"
-              disabled={loading || (mode === 'signup' && !canSignUp)}
+              disabled={formDisabled}
             >
-              {loading ? 'Chargement...' : mode === 'login' ? 'Se connecter' : 'Créer mon compte'}
+              {loading || verifyingPayment ? 'Chargement...' : mode === 'login' ? 'Se connecter' : 'Créer mon compte'}
             </Button>
           </form>
 

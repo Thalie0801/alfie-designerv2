@@ -48,7 +48,16 @@ serve(async (req) => {
     const { session_id } = await req.json();
     
     if (!session_id) {
-      throw new Error("Session ID required");
+      return new Response(
+        JSON.stringify({ 
+          code: 'SESSION_ID_REQUIRED',
+          message: 'Session ID is required' 
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
     }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
@@ -56,10 +65,34 @@ serve(async (req) => {
     });
 
     // Get checkout session details
-    const session = await stripe.checkout.sessions.retrieve(session_id);
+    let session;
+    try {
+      session = await stripe.checkout.sessions.retrieve(session_id);
+    } catch (stripeError) {
+      console.error('Stripe error retrieving session:', stripeError);
+      return new Response(
+        JSON.stringify({ 
+          code: 'SESSION_NOT_FOUND',
+          message: 'Session de paiement introuvable' 
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 404,
+        }
+      );
+    }
     
     if (session.payment_status !== "paid") {
-      throw new Error("Payment not completed");
+      return new Response(
+        JSON.stringify({ 
+          code: 'PAYMENT_NOT_COMPLETED',
+          message: 'Le paiement n\'a pas été complété' 
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
     }
 
     const plan = session.metadata?.plan;
@@ -68,7 +101,17 @@ serve(async (req) => {
     const affiliateRef = session.metadata?.affiliate_ref;
 
     if (!plan || !PLAN_CONFIG[plan as keyof typeof PLAN_CONFIG]) {
-      throw new Error("Invalid plan in session metadata");
+      return new Response(
+        JSON.stringify({ 
+          code: 'INVALID_PLAN',
+          message: 'Plan invalide dans la session de paiement',
+          plan 
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
     }
 
     const planConfig = PLAN_CONFIG[plan as keyof typeof PLAN_CONFIG];
@@ -86,7 +129,17 @@ serve(async (req) => {
 
     if (insertError) {
       console.error('Error storing payment session:', insertError);
-      throw new Error(`Failed to store payment session: ${insertError.message}`);
+      return new Response(
+        JSON.stringify({ 
+          code: 'STORAGE_ERROR',
+          message: 'Erreur lors de l\'enregistrement de la session de paiement',
+          details: insertError.message 
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        }
+      );
     }
 
     console.log(`✅ Payment session stored for ${customerEmail}, plan: ${plan}`);
@@ -188,7 +241,12 @@ serve(async (req) => {
     });
 
     return new Response(
-      JSON.stringify({ success: true, plan, email: customerEmail }),
+      JSON.stringify({ 
+        success: true, 
+        plan, 
+        email: customerEmail,
+        code: 'SUCCESS'
+      }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
@@ -196,9 +254,22 @@ serve(async (req) => {
     );
   } catch (error: any) {
     console.error("Error in verify-payment:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    
+    // Si c'est déjà une réponse structurée, la retourner telle quelle
+    if (error instanceof Response) {
+      return error;
+    }
+    
+    // Sinon, retourner une erreur générique structurée
+    return new Response(
+      JSON.stringify({ 
+        code: 'UNKNOWN_ERROR',
+        message: error.message || 'Une erreur inconnue s\'est produite' 
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      }
+    );
   }
 });
