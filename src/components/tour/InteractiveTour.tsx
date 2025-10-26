@@ -25,6 +25,7 @@ interface TourContextValue {
   isActive: boolean;
   currentStep: number;
   totalSteps: number;
+  bubbleVisible: boolean;
   start: (force?: boolean) => void;
   stop: () => void;
   next: () => void;
@@ -91,7 +92,9 @@ interface TourProviderProps {
 export function TourProvider({ children, steps = DEFAULT_STEPS, options = {} }: TourProviderProps) {
   const [isActive, setIsActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [bubbleVisible, setBubbleVisible] = useState(false);
   const wasActiveRef = useRef(false);
+  const forceRef = useRef(false);
 
   const { userEmail, autoStart = 'on-first-login' } = options;
 
@@ -106,6 +109,8 @@ export function TourProvider({ children, steps = DEFAULT_STEPS, options = {} }: 
   }, [isActive, userEmail]);
 
   const start = useCallback((force: boolean = false) => {
+    forceRef.current = !!force;
+    
     // Check if already auto-completed (unless force = true or autoStart = 'always')
     if (!force && autoStart !== 'always' && userEmail) {
       const key = autoCompletedKey(userEmail);
@@ -151,6 +156,7 @@ export function TourProvider({ children, steps = DEFAULT_STEPS, options = {} }: 
     isActive,
     currentStep,
     totalSteps: steps.length,
+    bubbleVisible,
     start,
     stop,
     next,
@@ -161,7 +167,15 @@ export function TourProvider({ children, steps = DEFAULT_STEPS, options = {} }: 
   return (
     <TourContext.Provider value={value}>
       {children}
-      {isActive && <TourBubble step={steps[currentStep]} currentStep={currentStep} totalSteps={steps.length} />}
+      {isActive && (
+        <TourBubble 
+          step={steps[currentStep]} 
+          currentStep={currentStep} 
+          totalSteps={steps.length}
+          onVisibilityChange={setBubbleVisible}
+          forceCenter={forceRef.current}
+        />
+      )}
     </TourContext.Provider>
   );
 }
@@ -171,9 +185,11 @@ interface TourBubbleProps {
   step: TourStep;
   currentStep: number;
   totalSteps: number;
+  onVisibilityChange: (visible: boolean) => void;
+  forceCenter: boolean;
 }
 
-function TourBubble({ step, currentStep, totalSteps }: TourBubbleProps) {
+function TourBubble({ step, currentStep, totalSteps, onVisibilityChange, forceCenter }: TourBubbleProps) {
   const { next, prev, stop } = useTour();
   const [position, setPosition] = useState<BubblePosition | null>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
@@ -184,8 +200,29 @@ function TourBubble({ step, currentStep, totalSteps }: TourBubbleProps) {
   // Calculate bubble position
   const calculatePosition = useCallback(() => {
     const target = document.querySelector(step.selector);
-    if (!target || !bubbleRef.current) {
+    if (!target) {
+      if (forceCenter && bubbleRef.current) {
+        // Center fallback for forced restarts when target not found
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const bubbleRect = bubbleRef.current.getBoundingClientRect();
+        
+        setPosition({
+          top: (viewportHeight - bubbleRect.height) / 2,
+          left: (viewportWidth - bubbleRect.width) / 2,
+          placement: 'center' as const
+        });
+        onVisibilityChange(true);
+        return;
+      }
       setPosition(null);
+      onVisibilityChange(false);
+      return;
+    }
+    
+    if (!bubbleRef.current) {
+      setPosition(null);
+      onVisibilityChange(false);
       return;
     }
 
@@ -230,7 +267,8 @@ function TourBubble({ step, currentStep, totalSteps }: TourBubbleProps) {
     left = Math.max(padding, Math.min(left, viewportWidth - bubbleRect.width - padding));
 
     setPosition({ top, left, placement });
-  }, [step.selector, step.placement, isMobile]);
+    onVisibilityChange(true);
+  }, [step.selector, step.placement, isMobile, forceCenter, onVisibilityChange]);
 
   // Update position on mount, scroll, resize
   useEffect(() => {
@@ -259,8 +297,9 @@ function TourBubble({ step, currentStep, totalSteps }: TourBubbleProps) {
       window.removeEventListener('scroll', updatePosition);
       window.removeEventListener('resize', updatePosition);
       resizeObserver?.disconnect();
+      onVisibilityChange(false);
     };
-  }, [step.selector, calculatePosition]);
+  }, [step.selector, calculatePosition, onVisibilityChange]);
 
   if (!position) return null;
 
@@ -353,7 +392,7 @@ function TourBubble({ step, currentStep, totalSteps }: TourBubbleProps) {
 
 // ============= Help Launcher =============
 export function HelpLauncher() {
-  const { start, isActive } = useTour();
+  const { start, isActive, bubbleVisible } = useTour();
 
   const handleClick = () => {
     console.debug('[HelpLauncher] Clicked - forcing tour restart');
@@ -365,7 +404,7 @@ export function HelpLauncher() {
       variant="outline"
       size="sm"
       onClick={handleClick}
-      disabled={isActive}
+      disabled={isActive && bubbleVisible}
       className="gap-2"
     >
       <HelpCircle className="h-4 w-4" />
