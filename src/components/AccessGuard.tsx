@@ -33,22 +33,32 @@ export function AccessGuard({ children, fallback }: AccessGuardProps) {
       return <>{fallback}</>;
     }
 
+    const isNotConnected = reason === 'Utilisateur non connecté';
+
     return (
       <div className="p-6 max-w-2xl mx-auto">
         <Alert className="border-orange-500/50 bg-orange-50 dark:bg-orange-900/20">
           <Lock className="h-5 w-5 text-orange-600" />
           <AlertTitle className="text-orange-700 dark:text-orange-300 font-semibold">
-            Accès réservé aux membres actifs
+            {isNotConnected ? 'Connexion requise' : 'Accès réservé aux membres actifs'}
           </AlertTitle>
           <AlertDescription className="text-orange-700 dark:text-orange-300 mt-2">
             {reason}
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button onClick={() => navigate('/onboarding/activate')} variant="default">
-                Activer mon accès
-              </Button>
-              <Button onClick={() => navigate('/contact')} variant="outline">
-                Nous contacter
-              </Button>
+              {isNotConnected ? (
+                <Button onClick={() => navigate('/auth')} variant="default">
+                  Se connecter
+                </Button>
+              ) : (
+                <>
+                  <Button onClick={() => navigate('/onboarding/activate')} variant="default">
+                    Activer mon accès
+                  </Button>
+                  <Button onClick={() => navigate('/contact')} variant="outline">
+                    Nous contacter
+                  </Button>
+                </>
+              )}
             </div>
           </AlertDescription>
         </Alert>
