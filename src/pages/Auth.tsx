@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { getAuthHeader } from '@/lib/auth';
+import { isVIPUser, getEffectiveAuthorization } from '@/lib/vip-whitelist';
 
 const authSchema = z.object({
   email: z.string().email({ message: "Email invalide" }),
@@ -41,6 +42,15 @@ export default function Auth() {
 
   // Déterminer si les flags auth sont prêts (pas undefined)
   const flagsReady = typeof isAdmin === 'boolean' && typeof isAuthorized === 'boolean';
+
+  // ============================================================================
+  // LOGIQUE WHITELIST: Accès dashboard forcé pour comptes exceptionnels
+  // ============================================================================
+  const isForceDashboard = isVIPUser(user?.email);
+  
+  // Flags effectifs pour la navigation (whitelist ou autorisé normalement)
+  const effectiveIsAuthorized = getEffectiveAuthorization(isAuthorized, user?.email);
+  const effectiveIsAdmin = isAdmin; // Admin garde toujours la priorité
 
   // Vérifier si l'utilisateur vient d'un paiement
   const sessionId = searchParams.get('session_id');
@@ -82,21 +92,33 @@ export default function Auth() {
     }
   }, [canSignUp, mode]);
 
-  // Navigation après authentification - PRIORITÉ: Admin > Authorized > Onboarding
+  // Navigation après authentification - PRIORITÉ: Admin > Whitelist/Authorized > Onboarding
   const navigateAfterAuth = useCallback(() => {
-    console.debug('[Auth redirect] Navigating after auth', { isAdmin, isAuthorized, flagsReady });
+    console.debug('[Auth redirect] Navigating after auth', { 
+      email: user?.email,
+      isAdmin: effectiveIsAdmin, 
+      isAuthorized,
+      isForceDashboard,
+      effectiveIsAuthorized,
+      flagsReady 
+    });
     
-    if (isAdmin) {
+    // 1. Admin d'abord (priorité absolue)
+    if (effectiveIsAdmin) {
       console.debug('[Auth redirect] → /admin (admin user)');
-      navigate('/admin');
-    } else if (!isAuthorized) {
-      console.debug('[Auth redirect] → /onboarding/activate (not authorized)');
-      navigate('/onboarding/activate');
-    } else {
-      console.debug('[Auth redirect] → /dashboard (authorized user)');
-      navigate('/dashboard');
+      return navigate('/admin');
     }
-  }, [isAdmin, isAuthorized, navigate, flagsReady]);
+    
+    // 2. Comptes whitelist (Sandrine/Patricia) ou users autorisés normalement
+    if (effectiveIsAuthorized) {
+      console.debug('[Auth redirect] → /dashboard (authorized or whitelisted)');
+      return navigate('/dashboard');
+    }
+    
+    // 3. Sinon onboarding
+    console.debug('[Auth redirect] → /onboarding/activate (not authorized)');
+    return navigate('/onboarding/activate');
+  }, [effectiveIsAdmin, effectiveIsAuthorized, isAuthorized, isForceDashboard, navigate, user?.email, flagsReady]);
 
   // Vérification du paiement (useCallback stable)
   const verifyPayment = useCallback(async (sessionId: string) => {
@@ -197,13 +219,15 @@ export default function Auth() {
   useEffect(() => {
     if (!authLoading && !verifyingPayment && user && flagsReady) {
       console.debug('[Auth] User logged in and flags ready, navigating...', { 
-        isAdmin, 
+        email: user?.email,
+        isAdmin: effectiveIsAdmin,
         isAuthorized,
-        user: user?.email 
+        isForceDashboard,
+        effectiveIsAuthorized
       });
       navigateAfterAuth();
     }
-  }, [user, verifyingPayment, authLoading, flagsReady, navigateAfterAuth, isAdmin, isAuthorized]);
+  }, [user, verifyingPayment, authLoading, flagsReady, navigateAfterAuth, effectiveIsAdmin, isAuthorized, effectiveIsAuthorized, isForceDashboard]);
 
   const redirectToPricing = () => {
     if (typeof window !== 'undefined') {

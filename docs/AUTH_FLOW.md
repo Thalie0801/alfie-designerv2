@@ -4,15 +4,27 @@
 
 La fonction `navigateAfterAuth()` dans `src/pages/Auth.tsx` applique cette logique :
 
-1. **Admin** (`isAdmin === true`) → `/admin`
-2. **Non autorisé** (`isAuthorized === false`) → `/onboarding/activate`
-3. **Autorisé** (`isAuthorized === true`) → `/dashboard`
+1. **Admin** (`effectiveIsAdmin === true`) → `/admin`
+2. **Whitelist VIP OU Autorisé** (`effectiveIsAuthorized === true`) → `/dashboard`
+   - `effectiveIsAuthorized = isAuthorized || isForceDashboard`
+   - Whitelist VIP : comptes clients exceptionnels (Sandrine, Patricia)
+3. **Non autorisé** → `/onboarding/activate`
+
+## Comptes VIP (Whitelist)
+
+Certains clients bénéficient d'un accès **garanti** au dashboard, même sans plan actif :
+- `sandrine.guedra@gmail.com`
+- `patriciaborderon7@gamil.com`
+
+Voir `docs/WHITELIST_VIP.md` pour plus de détails.
 
 ## Garanties de sécurité
 
 - La navigation n'a lieu que lorsque `flagsReady === true`, c'est-à-dire que `isAdmin` et `isAuthorized` sont des booléens (pas `undefined`)
 - Tous les logs de redirection commencent par `[Auth redirect]` pour faciliter le debugging
 - Les admins ne sont **jamais** redirigés vers `/onboarding/activate`
+- Les comptes VIP whitelist ont un accès **garanti** au dashboard, même sans plan actif
+- Normalisation des emails (trim + lowercase) pour éviter les contournements
 
 ## Codes d'erreur de `verify-payment`
 
@@ -47,8 +59,15 @@ Pour les désactiver en production, utiliser un wrapper ou une variable d'enviro
 ```
 [Auth] Payment session detected, verifying...
 [Auth] Payment verified successfully { plan: 'pro', email: 'user@example.com' }
-[Auth redirect] Navigating after auth { isAdmin: true, isAuthorized: true, flagsReady: true }
-[Auth redirect] → /admin (admin user)
+[Auth redirect] Navigating after auth {
+  email: 'sandrine.guedra@gmail.com',
+  isAdmin: false,
+  isAuthorized: false,
+  isForceDashboard: true,        ← Whitelist VIP
+  effectiveIsAuthorized: true,   ← Accès garanti
+  flagsReady: true
+}
+[Auth redirect] → /dashboard (authorized or whitelisted)
 [Auth] Cleaned payment params from URL
 ```
 
