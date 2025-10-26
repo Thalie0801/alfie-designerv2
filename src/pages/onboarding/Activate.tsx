@@ -21,6 +21,10 @@ export default function ActivateAccess() {
   return (
     <div className="p-6">
       <div className="max-w-3xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <Button variant="outline" onClick={() => navigate('/app')}>← Retour</Button>
+          <Button variant="ghost" onClick={() => navigate('/dashboard')}>Aller au dashboard</Button>
+        </div>
         <Card className="border-primary/20 shadow-sm">
           <CardHeader>
             <div className="flex items-center gap-3">
