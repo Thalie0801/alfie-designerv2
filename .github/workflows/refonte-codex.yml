@@ -1,37 +1,68 @@
 name: Refonte Codex (push→pull, disable autopublish)
+
 on:
   workflow_dispatch: {}
   push:
-    branches: [ "refonte-alfie-2025" ]
+    branches: ["refonte-alfie-2025"]
+
+# le bot doit pouvoir créer une branche et une PR
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   codex:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0         # nécessaire pour créer une branche propre
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
+
       - name: Run Codex
+        shell: bash
         run: |
           bash scripts/codex/run.sh
+
       - name: Guard: No landing changes
+        shell: bash
         run: |
-          if git diff --name-only | grep -E '^(apps/landing|www/|site/)' ; then
+          # Vérifie les fichiers modifiés (non indexés et indexés)
+          if git diff --name-only | grep -E '^(apps/landing|www/|site/)'; then
             echo "::error title=Landing modifiée::Ce patch ne doit pas toucher la landing."
             exit 1
           fi
-      - name: Commit & Push (if changes)
-        run: |
-          if [ -n "$(git status --porcelain)" ]; then
-            git config user.name "alfie-codex-bot"
-            git config user.email "codex@alfie.local"
-            git add -A
-            git commit -m "Codex: push→pull, autopublish off, premium confirmation flag"
-            git push
-          else
-            echo "Pas de changements à pousser."
+          if git diff --name-only --cached | grep -E '^(apps/landing|www/|site/)'; then
+            echo "::error title=Landing modifiée (index)::Ce patch ne doit pas toucher la landing."
+            exit 1
           fi
+
+      # Remplace le push direct par une Pull Request
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "Codex: push→pull, autopublish off, premium confirmation flag"
+          title: "Codex: push→pull, autopublish off, premium confirmation flag"
+          body: |
+            Cette PR est générée par le workflow Codex.
+            - Passage du flux push ➜ pull request
+            - Autopublish désactivé
+            - Ajout du flag de confirmation premium
+          branch: codex/refonte-alfie-2025-${{ github.run_id }}
+          base: refonte-alfie-2025
+          author: "alfie-codex-bot <codex@alfie.local>"
+          committer: "alfie-codex-bot <codex@alfie.local>"
+          labels: |
+            automated
+            codex
+          draft: false
+
