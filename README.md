@@ -36,6 +36,36 @@ npm i
 npm run dev
 ```
 
+### Troubleshooting dependency installs
+
+If the npm registry returns `403` errors or the install stops with `ENOTEMPTY`/`EBUSY` issues, make sure the root `.npmrc` is
+present and points to the public registry. The file in this repository already contains sane defaults:
+
+```ini
+registry=https://registry.npmjs.org/
+always-auth=true
+fund=false
+audit=false
+# proxy=http://user:pass@proxy.company:8080
+# https-proxy=http://user:pass@proxy.company:8080
+```
+
+When the cache is corrupted locally, clean up the workspace and reinstall using exact versions locked in `package-lock.json`:
+
+```sh
+git clean -xfd -e .env -e .env.local
+npm cache verify || true
+npm cache clean --force || true
+npm ci --prefer-online
+```
+
+If your organisation requires an npm auth token in CI, expose it as `NPM_TOKEN` and append it to `~/.npmrc` before running
+`npm ci`:
+
+```sh
+echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
+```
+
 **Edit a file directly in GitHub**
 
 - Navigate to the desired file(s).
