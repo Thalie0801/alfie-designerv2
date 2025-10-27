@@ -1,97 +1,53 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import {
+  supabaseAdmin,
+  supabaseUserFromReq,
+  getAuthUserId,
+  assertIsAdmin,
+  corsHeaders,
+  json,
+} from "../_shared/utils/admin.ts";
+import { GrantAccessBody } from "../_shared/validation.ts";
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const userId = await getAuthUserId(req);
+    if (!userId) return json({ error: "Non authentifié" }, 401);
 
-    // Vérifier que l'appelant est admin
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    const clientUser = supabaseUserFromReq(req);
+    if (!(await assertIsAdmin(clientUser, userId))) return json({ error: "Interdit" }, 403);
+
+    const body = await req.json();
+    const parsed = GrantAccessBody.parse(body);
+
+    const admin = supabaseAdmin();
+
+    const { error: upErr } = await admin
+      .from("profiles")
+      .update({
+        plan: parsed.plan,
+        granted_by_admin: parsed.granted_by_admin ?? true,
+      })
+      .eq("id", parsed.user_id);
+    if (upErr) return json({ error: upErr.message }, 500);
+
+    const updates: Record<string, number> = {};
+    if (typeof parsed.quota_visuals_per_month === "number") updates["quota_visuals_per_month"] = parsed.quota_visuals_per_month;
+    if (typeof parsed.quota_brands === "number") updates["quota_brands"] = parsed.quota_brands;
+    if (typeof parsed.quota_videos === "number") updates["quota_videos"] = parsed.quota_videos;
+    if (typeof parsed.quota_woofs === "number") updates["quota_woofs"] = parsed.quota_woofs;
+
+    if (Object.keys(updates).length) {
+      const { error: uqErr } = await admin.from("profiles").update(updates).eq("id", parsed.user_id);
+      if (uqErr) return json({ error: uqErr.message }, 500);
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
-
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const { data: roles } = await supabaseClient
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id);
-
-    const isAdmin = roles?.some(r => r.role === 'admin');
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: 'Forbidden: Admin only' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Récupérer les paramètres
-    const { 
-      user_id, 
-      plan, 
-      granted_by_admin, 
-      quota_visuals_per_month, 
-      quota_brands, 
-      quota_videos 
-    } = await req.json();
-
-    if (!user_id) {
-      return new Response(JSON.stringify({ error: 'user_id is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Mettre à jour le profil
-    const updates: any = {};
-    if (plan !== undefined) updates.plan = plan;
-    if (granted_by_admin !== undefined) updates.granted_by_admin = granted_by_admin;
-    if (quota_visuals_per_month !== undefined) updates.quota_visuals_per_month = quota_visuals_per_month;
-    if (quota_brands !== undefined) updates.quota_brands = quota_brands;
-    if (quota_videos !== undefined) updates.quota_videos = quota_videos;
-
-    const { error } = await supabaseClient
-      .from('profiles')
-      .update(updates)
-      .eq('id', user_id);
-
-    if (error) {
-      console.error('Update error:', error);
-      throw error;
-    }
-
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  } catch (error: any) {
-    console.error('Error in admin-grant-access:', error);
-    return new Response(JSON.stringify({ error: error.message || 'Internal server error' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return json({ success: true });
+  } catch (e) {
+    if (e instanceof z.ZodError) return json({ error: e.issues }, 400);
+    return json({ error: (e as Error).message ?? "Erreur inconnue" }, 500);
   }
 });

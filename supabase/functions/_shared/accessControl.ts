@@ -1,43 +1,29 @@
-import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
-/**
- * Vérifie si un utilisateur a accès aux fonctionnalités payantes
- * Accès autorisé si :
- * - Abonnement Stripe actif (plan non null + stripe_subscription_id présent)
- * - OU granted_by_admin = true
- */
-export async function assertUserHasAccess(
-  supabaseClient: SupabaseClient,
-  userId: string
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const enforcementFlag = Deno.env.get('AUTH_ENFORCEMENT');
-    if (enforcementFlag && enforcementFlag.toLowerCase() === 'off') {
-      return { success: true };
-    }
+export async function userHasAccess(authHeader: string | null) {
+  const ENFORCE = (Deno.env.get("AUTH_ENFORCEMENT") ?? "on").toLowerCase() === "on";
+  if (!ENFORCE) return true;
 
-    // Appeler la fonction DB qui vérifie l'accès
-    const { data, error } = await supabaseClient.rpc('user_has_access', {
-      user_id_param: userId,
-    });
+  const client = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+    { global: { headers: { Authorization: authHeader ?? "" } } }
+  );
 
-    if (error) {
-      console.error('[ACCESS] Error checking access:', error);
-      return { success: false, error: 'Failed to verify access' };
-    }
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) return false;
 
-    const hasAccess = Boolean(data);
+  const { data: profile } = await client
+    .from("profiles")
+    .select("plan, granted_by_admin, stripe_subscription_id")
+    .eq("id", user.id)
+    .single();
 
-    if (!hasAccess) {
-      return {
-        success: false,
-        error: 'Access denied. Active subscription or manual access required.',
-      };
-    }
+  if (!profile) return false;
 
-    return { success: true };
-  } catch (error) {
-    console.error('[ACCESS] Exception checking access:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-  }
+  const paid = !!profile.stripe_subscription_id;
+  const granted = !!profile.granted_by_admin;
+  const planOk = !!profile.plan;
+
+  return paid || granted || planOk;
 }

@@ -1,8 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { consumeBrandQuota } from "../_shared/quota.ts";
-import { incrementProfileGenerations } from "../_shared/quotaUtils.ts";
-import { assertUserHasAccess } from "../_shared/accessControl.ts";
+import { consumeBrandQuotas } from "../_shared/quota.ts";
+import { incrementMonthlyVisuals } from "../_shared/quotaUtils.ts";
+import { userHasAccess } from "../_shared/accessControl.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -55,10 +55,10 @@ serve(async (req) => {
       .single();
 
     // Vérifier l'accès (Stripe OU granted_by_admin)
-    const accessCheck = await assertUserHasAccess(supabaseClient, user.id);
-    if (!accessCheck.success) {
+    const hasAccess = await userHasAccess(req.headers.get('Authorization'));
+    if (!hasAccess) {
       return new Response(
-        JSON.stringify({ error: accessCheck.error || 'Access denied' }),
+        JSON.stringify({ error: 'Access denied' }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 403,
@@ -77,11 +77,11 @@ serve(async (req) => {
       );
     }
 
-    // Consume quota BEFORE generating (with user ID for admin check)
-    const quotaResult = await consumeBrandQuota(supabaseClient, brandId, 'visual', 0, user.id);
-    if (!quotaResult.success) {
+    try {
+      await consumeBrandQuotas(brandId);
+    } catch (quotaError) {
       return new Response(
-        JSON.stringify({ error: quotaResult.error || 'Quota exhausted' }),
+        JSON.stringify({ error: quotaError instanceof Error ? quotaError.message : 'Quota exhausted' }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 403,
@@ -244,7 +244,7 @@ serve(async (req) => {
     }
 
     // Increment profile generations counter
-    await incrementProfileGenerations(supabaseClient, user.id);
+    await incrementMonthlyVisuals(user.id);
 
     console.log("Image generated successfully");
     return new Response(JSON.stringify({ imageUrl: finalUrl }), {

@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { assertUserHasAccess } from "../_shared/accessControl.ts";
+import { userHasAccess } from "../_shared/accessControl.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -45,9 +45,9 @@ serve(async (req) => {
     }
 
     // Vérifier l'accès (Stripe OU granted_by_admin)
-    const accessCheck = await assertUserHasAccess(supabase, user.id);
-    if (!accessCheck.success) {
-      return new Response(JSON.stringify({ error: accessCheck.error || 'Access denied' }), {
+    const hasAccess = await userHasAccess(req.headers.get('Authorization'));
+    if (!hasAccess) {
+      return new Response(JSON.stringify({ error: 'Access denied' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
