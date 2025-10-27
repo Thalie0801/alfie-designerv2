@@ -1,200 +1,79 @@
-# Tests de validation - Whitelist VIP
+# Tests de validation - Whitelist VIP / Admin
 
-Ce document fournit une checklist de tests manuels pour valider le bon fonctionnement de la whitelist VIP.
+Cette checklist permet de vérifier que la configuration d'accès fonctionne correctement avec
+les variables d'environnement `VIP_EMAILS` et `ADMIN_EMAILS`.
 
-## ✅ Checklist de tests
+## 1. Compte Admin (email présent dans `ADMIN_EMAILS`)
 
-### 1. Test Admin (nathaliestaelens@gmail.com)
+- [ ] Se connecter avec un email configuré dans `ADMIN_EMAILS`.
+- [ ] Vérifier la redirection directe vers `/admin`.
+- [ ] Aucun passage par `/onboarding/activate`.
+- [ ] Vérifier les logs console : `[Auth redirect] → /admin (admin user)`.
 
-**Objectif** : Vérifier que les admins ne sont jamais redirigés vers `/onboarding/activate`
+## 2. Compte VIP (email présent dans `VIP_EMAILS`)
 
-- [ ] Login avec compte admin
-- [ ] Vérifier redirection → `/admin`
-- [ ] Vérifier logs console : `[Auth redirect] → /admin (admin user)`
-- [ ] ✅ **JAMAIS** de passage par `/onboarding/activate`
-
-### 2. Test Sandrine (sandrine.guedra@gmail.com)
-
-**Objectif** : Compte VIP sans plan actif doit accéder au dashboard
-
-#### 2.1 Sans plan actif
-
-- [ ] Login avec sandrine.guedra@gmail.com
-- [ ] Vérifier redirection → `/dashboard`
-- [ ] Vérifier logs console :
+- [ ] Login avec un email listé dans `VIP_EMAILS` sans abonnement actif.
+- [ ] Redirection immédiate vers `/dashboard`.
+- [ ] Logs attendus :
   ```
   [Auth redirect] Navigating after auth {
-    email: 'sandrine.guedra@gmail.com',
-    isAdmin: false,
-    isAuthorized: false,
-    isForceDashboard: true,        ← Doit être true
-    effectiveIsAuthorized: true,   ← Doit être true
+    isWhitelisted: true,
+    effectiveIsAuthorized: true
   }
   ```
-- [ ] Aucun message "Plan requis" ou redirection `/onboarding/activate`
-- [ ] Accès complet aux fonctionnalités dashboard
+- [ ] Pas de bannière « Connexion requise » sur le dashboard.
 
-#### 2.2 Navigation manuelle
+### 2.1 Navigation manuelle
 
-- [ ] Essayer d'accéder directement à `/onboarding/activate`
-- [ ] Vérifier que le `ProtectedRoute` laisse passer (pas de redirection)
-- [ ] Vérifier logs : `[ProtectedRoute] Access granted { isForceDashboard: true }`
+- [ ] Accéder à `/dashboard` puis rafraîchir la page → rester sur le dashboard.
+- [ ] Accéder directement à `/onboarding/activate` → rester autorisé (pas de redirection).
 
-#### 2.3 Refresh page
+## 3. Utilisateur normal sans plan
 
-- [ ] Sur `/dashboard`, faire F5 (refresh)
-- [ ] Vérifier que l'utilisateur reste sur `/dashboard`
-- [ ] Pas de redirection intempestive vers `/onboarding/activate`
+- [ ] Login avec un email **non présent** dans les whitelist et plan `free`.
+- [ ] La connexion doit être refusée.
+- [ ] Redirection vers `/pricing?reason=no-sub`.
+- [ ] Message toast affiché : « Votre abonnement n'est pas actif… ».
 
-### 3. Test Patricia (patriciaborderon7@gamil.com)
+## 4. Utilisateur normal avec plan actif
 
-**Objectif** : Même comportement que Sandrine
+- [ ] Login avec un compte payant.
+- [ ] Redirection vers `/dashboard`.
+- [ ] Logs `[Auth redirect]` indiquant `isAuthorized: true`.
 
-- [ ] Login avec patriciaborderon7@gamil.com
-- [ ] Vérifier redirection → `/dashboard`
-- [ ] Vérifier `isForceDashboard: true` dans les logs
-- [ ] Accès complet dashboard sans plan actif
+## 5. Normalisation des emails
 
-**Note** : Attention à l'orthographe "gamil" (pas "gmail") dans l'email
+Pour chaque adresse configurée dans `VIP_EMAILS`/`ADMIN_EMAILS` :
 
-### 4. Test User normal sans plan
+- [ ] Tester avec majuscules/minuscules (`Vip.User@Example.com`).
+- [ ] Tester avec espaces (`  vip.user@example.com  `).
+- [ ] Vérifier que l'accès est toujours accordé.
 
-**Objectif** : Comportement standard doit être préservé
+## 6. Contrôle post-login
 
-- [ ] Login avec compte non-VIP sans plan actif
-- [ ] Vérifier redirection → `/onboarding/activate`
-- [ ] Vérifier logs :
-  ```
-  [Auth redirect] {
-    isAdmin: false,
-    isAuthorized: false,
-    isForceDashboard: false,       ← Doit être false
-    effectiveIsAuthorized: false,  ← Doit être false
-  }
-  ```
-- [ ] Message approprié sur la page onboarding
+- [ ] Pour un compte non autorisé, vérifier que `useAuth.signIn` renvoie une erreur
+      `NO_ACTIVE_SUBSCRIPTION`.
+- [ ] S'assurer que `supabase.auth` revient à un état déconnecté.
 
-### 5. Test User normal avec plan actif
+## 7. Logs à surveiller
 
-**Objectif** : Comportement standard avec abonnement
-
-- [ ] Login avec compte ayant un plan actif (non-VIP)
-- [ ] Vérifier redirection → `/dashboard`
-- [ ] Vérifier logs :
-  ```
-  [Auth redirect] {
-    isAuthorized: true,
-    isForceDashboard: false,
-    effectiveIsAuthorized: true,   ← true via isAuthorized
-  }
-  ```
-
-### 6. Test normalisation email
-
-**Objectif** : Vérifier que les variations d'email fonctionnent
-
-Pour chaque compte VIP, tester :
-
-- [ ] Email avec espaces : `  sandrine.guedra@gmail.com  `
-- [ ] Email avec majuscules : `Sandrine.Guedra@Gmail.com`
-- [ ] Email mixte : `  SaNdRiNe.GUEdRA@gmail.com  `
-
-Tous doivent fonctionner → redirection `/dashboard`
-
-### 7. Test après paiement
-
-**Objectif** : VIP + nouveau paiement = dashboard direct
-
-- [ ] Simuler un paiement avec email VIP (sandrine.guedra@gmail.com)
-- [ ] URL : `/auth?session_id=XXX&payment=success`
-- [ ] Vérifier vérification paiement OK
-- [ ] Vérifier redirection → `/dashboard` (pas onboarding)
-- [ ] Vérifier nettoyage URL (plus de `session_id`, `payment`, `mode`)
-
-### 8. Test edge case : VIP + Admin
-
-**Objectif** : Admin prioritaire même si VIP
-
-- [ ] Si Sandrine devient admin (ajout rôle)
-- [ ] Login → doit aller vers `/admin` (priorité admin)
-- [ ] Pas vers `/dashboard` même si VIP
-
-## 🔍 Logs à surveiller
-
-Activer la console du navigateur et filtrer par :
 - `[Auth redirect]`
 - `[Auth]`
 - `[ProtectedRoute]`
 
-### Logs OK pour VIP
+Exemple d'accès autorisé via whitelist :
 
 ```
-[Auth] User logged in and flags ready, navigating... {
-  email: 'sandrine.guedra@gmail.com',
-  isAdmin: false,
-  isAuthorized: false,
-  isForceDashboard: true,          ← ✅ OK
-  effectiveIsAuthorized: true      ← ✅ OK
+[ProtectedRoute] Access granted {
+  email: 'vip1@example.com',
+  effectiveIsAdmin: false,
+  effectiveIsAuthorized: true,
+  isWhitelisted: true
 }
-[Auth redirect] → /dashboard (authorized or whitelisted)
 ```
 
-### Logs KO (problème)
+Si un compte autorisé est bloqué, vérifier :
 
-```
-[Auth redirect] → /onboarding/activate (not authorized)
-```
-
-❌ Si un compte VIP arrive ici, il y a un problème !
-
-## 🐛 Debugging
-
-Si un compte VIP est redirigé vers `/onboarding/activate` :
-
-1. **Vérifier l'email dans la whitelist**
-   - Ouvrir `src/lib/vip-whitelist.ts`
-   - Chercher l'email exact (attention typos)
-
-2. **Vérifier la normalisation**
-   - Dans console : `normalizeEmail('  SaNdRiNe.GUEdRA@gmail.com  ')`
-   - Résultat attendu : `'sandrine.guedra@gmail.com'`
-
-3. **Vérifier les logs**
-   - `isForceDashboard` doit être `true`
-   - `effectiveIsAuthorized` doit être `true`
-
-4. **Vérifier le code**
-   - `Auth.tsx` importe bien `isVIPUser` et `getEffectiveAuthorization`
-   - `ProtectedRoute.tsx` importe bien les mêmes utilitaires
-   - Pas de code mort qui écrase les flags
-
-## ✨ Tests de régression
-
-Après chaque modification du système d'auth, re-tester :
-
-- [ ] Les 2 comptes VIP (Sandrine + Patricia)
-- [ ] Au moins 1 admin
-- [ ] Au moins 1 user normal (avec et sans plan)
-
-**Durée estimée** : ~15 minutes pour test complet
-
-## 📊 Résultats attendus
-
-| Compte | Plan actif | `isForceDashboard` | `effectiveIsAuthorized` | Destination |
-|--------|------------|-------------------|------------------------|-------------|
-| Admin (nathaliestaelens) | N/A | false | N/A | `/admin` |
-| Sandrine VIP | ❌ Non | ✅ true | ✅ true | `/dashboard` |
-| Patricia VIP | ❌ Non | ✅ true | ✅ true | `/dashboard` |
-| User normal | ✅ Oui | ❌ false | ✅ true | `/dashboard` |
-| User normal | ❌ Non | ❌ false | ❌ false | `/onboarding/activate` |
-
-## 🎯 Validation finale
-
-Pour considérer la whitelist VIP comme validée :
-
-- ✅ Tous les tests Sandrine passent (sans plan)
-- ✅ Tous les tests Patricia passent (sans plan)
-- ✅ Admin nathaliestaelens va toujours vers `/admin`
-- ✅ Users normaux comportement standard préservé
-- ✅ Logs de debug cohérents et informatifs
-- ✅ Aucun compte VIP ne passe par `/onboarding/activate`
+1. Les variables d'environnement (`VIP_EMAILS`, `ADMIN_EMAILS`).
+2. La présence éventuelle d'espaces ou de fautes de frappe.
+3. Le redémarrage du serveur après modification de l'environnement.

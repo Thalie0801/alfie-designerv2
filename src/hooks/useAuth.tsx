@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { isAuthorized as computeIsAuthorized } from '@/utils/authz-helpers';
+import { isVipOrAdmin, isAdmin as isAdminEmail } from '@/lib/access';
+import { hasActiveSubscriptionByEmail } from '@/lib/billing';
 
 interface AuthContextType {
   user: User | null;
@@ -29,6 +31,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const authEnforcement = import.meta.env.VITE_AUTH_ENFORCEMENT;
+  const killSwitchDisabled =
+    typeof authEnforcement === 'string' && authEnforcement.toLowerCase() === 'off';
+
+  const ensureActiveSubscription = async (currentUser: User | null) => {
+    if (!currentUser?.email) {
+      return false;
+    }
+
+    if (killSwitchDisabled) {
+      return true;
+    }
+
+    if (isVipOrAdmin(currentUser.email)) {
+      return true;
+    }
+
+    const hasSubscription = await hasActiveSubscriptionByEmail(currentUser.email, {
+      userId: currentUser.id,
+    });
+
+    if (!hasSubscription) {
+      console.warn('[Auth] Access denied: subscription required for', currentUser.email);
+    }
+
+    return hasSubscription;
+  };
+
   const ensureStudioPlanForTestAccount = async (profileData: any) => {
     // Removed hardcoded test account logic for security
     return profileData;
@@ -36,6 +66,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = async () => {
     if (!session?.user) return;
+
+    const allowed = await ensureActiveSubscription(session.user);
+    if (!allowed) {
+      await supabase.auth.signOut();
+      setProfile(null);
+      setSubscription(null);
+      setRoles([]);
+      return;
+    }
 
     const { data: profileData } = await supabase
       .from('profiles')
@@ -110,11 +149,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    return { error };
+    if (error) {
+      return { error };
+    }
+
+    const userFromAuth = data.user ?? null;
+
+    if (!userFromAuth?.email) {
+      await supabase.auth.signOut();
+      return { error: new Error('NO_ACTIVE_SUBSCRIPTION') };
+    }
+
+    if (killSwitchDisabled || isVipOrAdmin(userFromAuth.email)) {
+      return { error: null };
+    }
+
+    const hasSubscription = await hasActiveSubscriptionByEmail(userFromAuth.email, {
+      userId: userFromAuth.id,
+    });
+
+    if (!hasSubscription) {
+      await supabase.auth.signOut();
+      return { error: new Error('NO_ACTIVE_SUBSCRIPTION') };
+    }
+
+    return { error: null };
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
@@ -166,18 +229,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
-  const authEnforcement = import.meta.env.VITE_AUTH_ENFORCEMENT;
-  const killSwitchDisabled =
-    typeof authEnforcement === 'string' && authEnforcement.toLowerCase() === 'off';
-  const isAdmin = roles.includes('admin');
+  const roleAdmin = roles.includes('admin');
+  const envAdmin = isAdminEmail(user?.email);
+  const computedAdmin = roleAdmin || envAdmin;
   const computedIsAuthorized = computeIsAuthorized(user, {
-    isAdmin,
+    isAdmin: computedAdmin,
     profile,
     subscription,
     killSwitchDisabled,
   });
   const hasActivePlan = Boolean(
-    isAdmin ||
+    computedAdmin ||
     profile?.granted_by_admin ||
     (subscription?.status ? ['active', 'trial', 'trialing'].includes(String(subscription.status).toLowerCase()) : false)
   );
@@ -188,7 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profile,
     subscription,
     roles,
-    isAdmin,
+    isAdmin: computedAdmin,
     isAuthorized: computedIsAuthorized,
     hasActivePlan,
     loading,
