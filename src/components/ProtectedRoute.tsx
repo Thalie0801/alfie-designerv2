@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect, useState } from 'react';
-import { isVIPUser, getEffectiveAuthorization } from '@/lib/vip-whitelist';
+import { isVipOrAdmin, isAdmin as isAdminEmail } from '@/lib/access';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -16,11 +16,11 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
   // ============================================================================
   // LOGIQUE WHITELIST: Accès dashboard forcé pour comptes exceptionnels
   // ============================================================================
-  const isForceDashboard = isVIPUser(user?.email);
-  
+  const isWhitelisted = isVipOrAdmin(user?.email);
+
   // Flags effectifs pour la navigation (whitelist ou autorisé normalement)
-  const effectiveIsAuthorized = getEffectiveAuthorization(isAuthorized, user?.email);
-  const effectiveIsAdmin = isAdmin; // Admin garde toujours la priorité
+  const effectiveIsAuthorized = isAuthorized || isWhitelisted;
+  const effectiveIsAdmin = isAdmin || isAdminEmail(user?.email); // Admin garde toujours la priorité
 
   useEffect(() => {
     if (requireAdmin && user && !effectiveIsAdmin && !checkingAdmin) {
@@ -59,11 +59,11 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
   // La redirection onboarding est gérée uniquement dans Auth.tsx après login
   // Une fois dans l'app, les utilisateurs whitelist (Sandrine/Patricia) 
   // sont traités comme autorisés grâce à effectiveIsAuthorized
-  console.debug('[ProtectedRoute] Access granted', { 
+  console.debug('[ProtectedRoute] Access granted', {
     email: user?.email,
-    effectiveIsAdmin, 
+    effectiveIsAdmin,
     effectiveIsAuthorized,
-    isForceDashboard 
+    isWhitelisted
   });
 
   return <>{children}</>;

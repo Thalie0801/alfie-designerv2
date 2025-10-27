@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { getAuthHeader } from '@/lib/auth';
-import { isVIPUser, getEffectiveAuthorization } from '@/lib/vip-whitelist';
+import { isVipOrAdmin, isAdmin as isAdminEmail } from '@/lib/access';
 
 const authSchema = z.object({
   email: z.string().email({ message: "Email invalide" }),
@@ -46,11 +46,11 @@ export default function Auth() {
   // ============================================================================
   // LOGIQUE WHITELIST: Accès dashboard forcé pour comptes exceptionnels
   // ============================================================================
-  const isForceDashboard = isVIPUser(user?.email);
-  
+  const isWhitelisted = isVipOrAdmin(user?.email);
+
   // Flags effectifs pour la navigation (whitelist ou autorisé normalement)
-  const effectiveIsAuthorized = getEffectiveAuthorization(isAuthorized, user?.email);
-  const effectiveIsAdmin = isAdmin; // Admin garde toujours la priorité
+  const effectiveIsAuthorized = isAuthorized || isWhitelisted;
+  const effectiveIsAdmin = isAdmin || isAdminEmail(user?.email); // Admin garde toujours la priorité
 
   // Vérifier si l'utilisateur vient d'un paiement
   const sessionId = searchParams.get('session_id');
@@ -94,13 +94,13 @@ export default function Auth() {
 
   // Navigation après authentification - PRIORITÉ: Admin > Whitelist/Authorized > Onboarding
   const navigateAfterAuth = useCallback(() => {
-    console.debug('[Auth redirect] Navigating after auth', { 
+    console.debug('[Auth redirect] Navigating after auth', {
       email: user?.email,
-      isAdmin: effectiveIsAdmin, 
+      isAdmin: effectiveIsAdmin,
       isAuthorized,
-      isForceDashboard,
+      isWhitelisted,
       effectiveIsAuthorized,
-      flagsReady 
+      flagsReady
     });
     
     // 1. Admin d'abord (priorité absolue)
@@ -118,7 +118,7 @@ export default function Auth() {
     // 3. Sinon onboarding
     console.debug('[Auth redirect] → /onboarding/activate (not authorized)');
     return navigate('/onboarding/activate');
-  }, [effectiveIsAdmin, effectiveIsAuthorized, isAuthorized, isForceDashboard, navigate, user?.email, flagsReady]);
+  }, [effectiveIsAdmin, effectiveIsAuthorized, isAuthorized, isWhitelisted, navigate, user?.email, flagsReady]);
 
   // Vérification du paiement (useCallback stable)
   const verifyPayment = useCallback(async (sessionId: string) => {
@@ -218,22 +218,22 @@ export default function Auth() {
   // Redirect if already logged in - ATTENDRE que les flags soient prêts
   useEffect(() => {
     if (!authLoading && !verifyingPayment && user && flagsReady) {
-      console.debug('[Auth] User logged in and flags ready, navigating...', { 
+      console.debug('[Auth] User logged in and flags ready, navigating...', {
         email: user?.email,
         isAdmin: effectiveIsAdmin,
         isAuthorized,
-        isForceDashboard,
+        isWhitelisted,
         effectiveIsAuthorized
       });
       navigateAfterAuth();
     }
-  }, [user, verifyingPayment, authLoading, flagsReady, navigateAfterAuth, effectiveIsAdmin, isAuthorized, effectiveIsAuthorized, isForceDashboard]);
+  }, [user, verifyingPayment, authLoading, flagsReady, navigateAfterAuth, effectiveIsAdmin, isAuthorized, effectiveIsAuthorized, isWhitelisted]);
 
-  const redirectToPricing = () => {
+  const redirectToPricing = (reason?: string) => {
     if (typeof window !== 'undefined') {
-      window.location.href = '/#pricing';
+      window.location.href = reason ? `/pricing?reason=${reason}` : '/#pricing';
     } else {
-      navigate('/#pricing');
+      navigate(reason ? `/pricing?reason=${reason}` : '/#pricing');
     }
   };
 
@@ -283,6 +283,9 @@ export default function Auth() {
           } else if (errorMsg.includes('user not found')) {
             toast.error('Aucun compte trouvé avec cet email. Découvrez nos offres pour vous inscrire.');
             redirectToPricing();
+          } else if (errorMsg.includes('no_active_subscription')) {
+            toast.error("Votre abonnement n'est pas actif. Choisissez un plan pour accéder au dashboard.");
+            redirectToPricing('no-sub');
           } else {
             toast.error(`Erreur de connexion: ${error.message}`);
           }

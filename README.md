@@ -114,6 +114,20 @@ Si vous déployez manuellement le projet sur Vercel, pensez à renseigner les va
 
 Ces valeurs sont utilisées pour initialiser le client Supabase côté front-end. Sans elles, l'application plante au chargement et Vercel affiche une erreur lors de l'ouverture du déploiement.
 
+## Variables d'environnement (accès VIP/Admin)
+
+- `VIP_EMAILS` : liste d'adresses e-mail (séparées par des virgules, insensibles à la casse) autorisées à accéder au dashboard même sans abonnement actif.
+- `ADMIN_EMAILS` : mêmes règles, mais octroie l'accès administrateur complet.
+
+> ⚠️ Ne stockez pas d'e-mails réels dans le dépôt Git. Renseignez ces valeurs uniquement dans vos fichiers `.env.local` ou via la configuration de votre hébergeur.
+
+## Flux d'authentification & facturation
+
+1. **Inscription** : la page `/auth` vérifie qu'une session Stripe (`verify-payment`) a été validée avant d'autoriser la création de compte.
+2. **Connexion** : `useAuth.signIn` autorise immédiatement les e-mails listés dans `VIP_EMAILS` ou `ADMIN_EMAILS`. Les autres utilisateurs doivent disposer d'un plan actif (`starter`, `pro`, `studio`, `enterprise`) ou d'un accès `granted_by_admin`.
+3. **Blocage des comptes gratuits** : si aucun abonnement actif n'est détecté, la connexion est refusée et l'utilisateur est redirigé vers `/pricing?reason=no-sub`.
+4. **Protection UI** : `AccessGuard` n'affiche « Connexion requise » que pour les visiteurs non authentifiés, éliminant les faux positifs sur `/dashboard`.
+
 ## Can I connect a custom domain to my Lovable project?
 
 Yes, you can!
