@@ -32,89 +32,91 @@ export default function Affiliate() {
 
   const loadAffiliateData = async () => {
     if (!user) return;
-
+    setLoading(true);
     try {
-      // Get affiliate info
-      const { data: affiliateData } = await supabase
+      const aff = await supabase
         .from('affiliates')
         .select('*')
         .eq('id', user.id)
         .maybeSingle();
 
-      if (!affiliateData) {
-        setLoading(false);
+      if (aff.error) {
+        toast.error('Accès affilié refusé', { description: aff.error.message });
+        setAffiliate(null);
         return;
       }
 
-      setAffiliate(affiliateData);
+      if (!aff.data) {
+        setAffiliate(null);
+        return;
+      }
 
-      // Get clicks
-      const { data: clicksData } = await supabase
-        .from('affiliate_clicks')
-        .select('*')
-        .eq('affiliate_id', affiliateData.id)
-        .order('created_at', { ascending: false })
-        .limit(100);
+      setAffiliate(aff.data);
 
-      // Get conversions
-      const { data: conversionsData } = await supabase
-        .from('affiliate_conversions')
-        .select('*')
-        .eq('affiliate_id', affiliateData.id)
-        .order('created_at', { ascending: false });
+      const [clicks, conv, pays, comms, refs] = await Promise.all([
+        supabase
+          .from('affiliate_clicks')
+          .select('*')
+          .eq('affiliate_id', aff.data.id)
+          .order('created_at', { ascending: false })
+          .limit(100),
+        supabase
+          .from('affiliate_conversions')
+          .select('*')
+          .eq('affiliate_id', aff.data.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('affiliate_payouts')
+          .select('*')
+          .eq('affiliate_id', aff.data.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('affiliate_commissions')
+          .select('*')
+          .eq('affiliate_id', aff.data.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('affiliates')
+          .select('id, name, email, created_at, affiliate_status, active_direct_referrals')
+          .eq('parent_id', aff.data.id),
+      ]);
 
-      // Get payouts
-      const { data: payoutsData } = await supabase
-        .from('affiliate_payouts')
-        .select('*')
-        .eq('affiliate_id', affiliateData.id)
-        .order('created_at', { ascending: false });
+      for (const r of [clicks, conv, pays, comms, refs]) {
+        if ((r as any).error) {
+          toast.error('Lecture refusée', { description: (r as any).error.message });
+        }
+      }
 
-      // Get commissions by level
-      const { data: commissionsData } = await supabase
-        .from('affiliate_commissions')
-        .select('*')
-        .eq('affiliate_id', affiliateData.id)
-        .order('created_at', { ascending: false });
+      setPayouts(pays.data ?? []);
+      setCommissions(comms.data ?? []);
+      setDirectReferrals(refs.data ?? []);
 
-      // Get direct referrals
-      const { data: referralsData } = await supabase
-        .from('affiliates')
-        .select('id, name, email, created_at, affiliate_status, active_direct_referrals')
-        .eq('parent_id', affiliateData.id);
-
-      setPayouts(payoutsData || []);
-      setCommissions(commissionsData || []);
-      setDirectReferrals(referralsData || []);
-
-      // Calculate stats by commission level
-      const level1Earnings = (commissionsData || [])
+      const level1 = (comms.data ?? [])
         .filter((c: any) => c.level === 1)
-        .reduce((sum: number, c: any) => sum + Number(c.amount), 0);
-      const level2Earnings = (commissionsData || [])
+        .reduce((s: number, c: any) => s + Number(c.amount || 0), 0);
+      const level2 = (comms.data ?? [])
         .filter((c: any) => c.level === 2)
-        .reduce((sum: number, c: any) => sum + Number(c.amount), 0);
-      const level3Earnings = (commissionsData || [])
+        .reduce((s: number, c: any) => s + Number(c.amount || 0), 0);
+      const level3 = (comms.data ?? [])
         .filter((c: any) => c.level === 3)
-        .reduce((sum: number, c: any) => sum + Number(c.amount), 0);
-      
-      const totalEarnings = level1Earnings + level2Earnings + level3Earnings;
-      const pendingPayout = (payoutsData || [])
+        .reduce((s: number, c: any) => s + Number(c.amount || 0), 0);
+      const total = level1 + level2 + level3;
+      const pending = (pays.data ?? [])
         .filter((p: any) => p.status === 'pending')
-        .reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+        .reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
 
       setStats({
-        totalClicks: clicksData?.length || 0,
-        totalConversions: conversionsData?.length || 0,
-        totalEarnings,
-        pendingPayout,
-        level1Earnings,
-        level2Earnings,
-        level3Earnings
+        totalClicks: clicks.data?.length ?? 0,
+        totalConversions: conv.data?.length ?? 0,
+        totalEarnings: total,
+        pendingPayout: pending,
+        level1Earnings: level1,
+        level2Earnings: level2,
+        level3Earnings: level3,
       });
-    } catch (error) {
-      console.error('Error loading affiliate data:', error);
-      toast.error('Erreur lors du chargement');
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Erreur lors du chargement', { description: err?.message });
     } finally {
       setLoading(false);
     }
