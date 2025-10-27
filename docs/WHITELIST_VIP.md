@@ -1,168 +1,94 @@
-# Whitelist VIP - Comptes Clients Exceptionnels
+# Whitelist VIP & Admin (Accès Dashboard)
 
 ## Vue d'ensemble
 
-Certains comptes clients bénéficient d'un accès **garanti** au dashboard (`/dashboard`), indépendamment de leur statut d'abonnement ou d'autorisation normale. Ces comptes sont gérés via une **whitelist** définie dans le code.
+Les comptes disposant d'un accès garanti au dashboard sont désormais gérés par des
+**variables d'environnement**. Deux listes distinctes existent :
 
-## Comptes VIP actuels
+- `VIP_EMAILS` : clients autorisés à utiliser l'app même sans abonnement actif.
+- `ADMIN_EMAILS` : accès administrateur complet, même sans abonnement.
 
-| Email | Notes |
-|-------|-------|
-| `sandrine.guedra@gmail.com` | Compte VIP - Ambassadeur |
-| `sandrine.guedra54@gmail.com` | Compte VIP - Ambassadeur (variante) |
-| `borderonpatricia7@gmail.com` | Compte VIP - Ambassadeur |
-| `patriciaborderon7@gamil.com` | Rétro-compatibilité (ancienne orthographe) |
-| `nathaliestaelens@gmail.com` | Admin - Accès complet |
+Les valeurs sont **insensibles à la casse** et doivent être séparées par des virgules.
+Exemple dans `.env.local` :
 
-## Fonctionnement
-
-### 1. Normalisation des emails
-
-Tous les emails sont normalisés avant comparaison :
-- Trim (suppression espaces)
-- Lowercase (minuscules)
-
-```typescript
-function normalizeEmail(email?: string | null): string {
-  return (email ?? '').trim().toLowerCase();
-}
+```ini
+VIP_EMAILS="vip1@example.com,vip2@example.com"
+ADMIN_EMAILS="admin@example.com"
 ```
 
-### 2. Calcul des flags effectifs
-
-Dans **Auth.tsx** et **ProtectedRoute.tsx** :
-
-```typescript
-const emailNorm = normalizeEmail(user?.email);
-const isForceDashboard = FORCE_DASHBOARD_EMAILS.has(emailNorm);
-
-// Flag effectif = autorisé normalement OU dans la whitelist
-const effectiveIsAuthorized = isAuthorized || isForceDashboard;
-```
-
-### 3. Logique de navigation (Auth.tsx)
-
-```typescript
-const navigateAfterAuth = useCallback(() => {
-  // 1. Admin d'abord (priorité absolue)
-  if (effectiveIsAdmin) return navigate('/admin');
-  
-  // 2. Whitelist VIP OU autorisés normalement
-  if (effectiveIsAuthorized) return navigate('/dashboard');
-  
-  // 3. Sinon onboarding
-  return navigate('/onboarding/activate');
-}, [effectiveIsAdmin, effectiveIsAuthorized, navigate]);
-```
-
-### 4. Protection des routes (ProtectedRoute.tsx)
-
-- Les utilisateurs whitelist **ne sont jamais redirigés** vers `/onboarding/activate`
-- Ils sont traités comme des utilisateurs autorisés normaux
-- Les admins conservent toujours la priorité (accès `/admin`)
-
-## Hiérarchie des priorités
-
-1. **Admin** → `/admin` (priorité absolue)
-2. **Whitelist VIP** → `/dashboard` (même sans plan actif)
-3. **Autorisé normal** → `/dashboard` (avec plan actif)
-4. **Non autorisé** → `/onboarding/activate`
-
-## Ajout d'un nouveau compte VIP
-
-Pour ajouter un compte à la whitelist :
-
-1. Ouvrir `src/lib/vip-whitelist.ts`
-2. Ajouter l'email (sera automatiquement normalisé) dans `FORCE_DASHBOARD_EMAILS` :
-
-```typescript
-export const FORCE_DASHBOARD_EMAILS = new Set([
-  'sandrine.guedra@gmail.com',
-  'patriciaborderon7@gamil.com',
-  'nouveau.client@example.com', // ← Nouveau compte
-]);
-```
-
-3. ✅ **Un seul fichier à modifier** - la logique est automatiquement synchronisée dans :
-   - `src/pages/Auth.tsx` (navigation après login)
-   - `src/components/ProtectedRoute.tsx` (protection des routes)
+> ⚠️ N'ajoutez jamais d'adresses e-mail réelles dans le dépôt Git. Elles doivent être
+> configurées uniquement dans vos variables d'environnement locales ou de production.
 
 ## Utilitaires disponibles
 
-Le fichier `src/lib/vip-whitelist.ts` expose :
+La logique centrale se trouve dans `src/lib/access.ts` :
 
-```typescript
-// Whitelist des emails VIP
-export const FORCE_DASHBOARD_EMAILS: Set<string>
-
-// Normalise un email (trim + lowercase)
-export function normalizeEmail(email?: string | null): string
-
-// Vérifie si un email est VIP
-export function isVIPUser(email?: string | null): boolean
-
-// Calcule l'autorisation effective (autorisé OU VIP)
-export function getEffectiveAuthorization(
-  isAuthorized: boolean, 
-  userEmail?: string | null
-): boolean
+```ts
+export const list = (value?: string): string[]
+export const VIPS: string[]
+export const ADMINS: string[]
+export const isVip(email?: string | null): boolean
+export const isAdmin(email?: string | null): boolean
+export const isVipOrAdmin(email?: string | null): boolean
 ```
 
-## Logs de debug
+Ces helpers sont utilisés côté client pour :
 
-Tous les logs de whitelist utilisent le préfixe `[Auth redirect]` ou `[ProtectedRoute]` :
+- Autoriser la connexion (cf. `useAuth.tsx`).
+- Calculer les redirections post-login (`src/pages/Auth.tsx`).
+- Protéger les routes (`src/components/ProtectedRoute.tsx`).
+
+## Comment ajouter un nouvel accès VIP/Admin ?
+
+1. Ouvrez votre fichier `.env.local` (ou la configuration Vercel/Vercel CLI).
+2. Ajoutez l'email désiré dans la liste correspondante, séparé par une virgule.
+3. Redémarrez le serveur de développement si nécessaire.
+
+Exemple :
+
+```ini
+VIP_EMAILS="vip1@example.com,new.vip@example.com"
+ADMIN_EMAILS="admin@example.com,cto@example.com"
+```
+
+## Règles de priorité
+
+1. **Admin** (`ADMIN_EMAILS` ou rôle Supabase `admin`) → accès complet `/admin`.
+2. **VIP** (`VIP_EMAILS`) → accès dashboard même sans plan actif.
+3. **Utilisateur payant** → accès normal via abonnement.
+4. **Utilisateur non connecté** → redirection vers `/auth`.
+5. **Utilisateur sans abonnement** → connexion refusée, redirection `/pricing?reason=no-sub`.
+
+## Vérifications rapides
+
+- `isVipOrAdmin(email)` renvoie `true` pour tout compte autorisé sans abonnement.
+- `useAuth.signIn` bloque la connexion si `hasActiveSubscriptionByEmail` renvoie `false` et que
+  l'utilisateur n'est ni VIP ni admin.
+- `AccessGuard` n'affiche « Connexion requise » que pour les visiteurs non connectés.
+
+## Logs utiles
+
+Activez la console du navigateur et surveillez les préfixes suivants :
+
+- `[Auth redirect]` → logique de navigation après login.
+- `[Auth]` → détails sur la récupération de session et l'état d'autorisation.
+- `[ProtectedRoute]` → validation côté client avant affichage d'une page protégée.
+
+Exemple attendu pour un VIP :
 
 ```
 [Auth redirect] Navigating after auth {
-  email: 'sandrine.guedra@gmail.com',
+  email: 'vip1@example.com',
   isAdmin: false,
   isAuthorized: false,
-  isForceDashboard: true,        ← Whitelist détectée
-  effectiveIsAuthorized: true,   ← Accès garanti
+  isWhitelisted: true,
+  effectiveIsAuthorized: true,
   flagsReady: true
 }
 ```
 
-```
-[ProtectedRoute] Access granted {
-  email: 'sandrine.guedra@gmail.com',
-  effectiveIsAdmin: false,
-  effectiveIsAuthorized: true,   ← Accès garanti via whitelist
-  isForceDashboard: true
-}
-```
+Si un compte configuré dans `VIP_EMAILS` est bloqué, vérifiez :
 
-## Tests de validation
-
-### Cas 1 : Sandrine sans plan actif
-
-- ✅ Login → `/dashboard` (pas `/onboarding/activate`)
-- ✅ Accès direct à toutes les fonctionnalités dashboard
-- ✅ Pas de message "Plan requis"
-
-### Cas 2 : Patricia sans plan actif
-
-- ✅ Login → `/dashboard`
-- ✅ Même comportement que Sandrine
-
-### Cas 3 : Compte VIP + Admin
-
-- ✅ Login → `/admin` (admin prioritaire)
-- ✅ Peut aussi accéder `/dashboard` si souhaité
-
-### Cas 4 : User normal sans plan
-
-- ✅ Login → `/onboarding/activate` (comportement normal)
-
-## Sécurité
-
-- ❌ **NE PAS** stocker les flags whitelist en localStorage/sessionStorage
-- ✅ **TOUJOURS** calculer `effectiveIsAuthorized` côté serveur si besoin
-- ✅ Les emails sont normalisés pour éviter les contournements
-- ✅ Set JavaScript garantit unicité et recherche O(1)
-
-## Maintenance
-
-- **Revue mensuelle** : Vérifier si les comptes VIP sont toujours actifs
-- **Documentation** : Garder ce fichier à jour avec les nouveaux VIP
-- **Communication** : Informer l'équipe support des comptes exceptionnels
+1. Que l'email est correctement orthographié et sans espaces.
+2. Que le serveur a été redémarré après modification de l'environnement.
+3. Que la casse est normalisée (le helper applique déjà `trim().toLowerCase()`).
