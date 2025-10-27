@@ -12,6 +12,8 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,6 +25,9 @@ jobs:
           cache: 'npm'
 
       - name: Configure npm auth
+        if: ${{ env.NPM_TOKEN != '' }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
         if: ${{ secrets.NPM_TOKEN != '' }}
         run: |
           echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
