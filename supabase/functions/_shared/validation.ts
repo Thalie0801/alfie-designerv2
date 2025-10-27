@@ -2,6 +2,30 @@ import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 // Validation schemas for edge functions
 
+export const CreateUserBody = z.object({
+  email: z.string().email(),
+  fullName: z.string().optional(),
+  plan: z.string().min(1),
+  sendInvite: z.boolean().default(true),
+  grantedByAdmin: z.boolean().optional(),
+  password: z.string().min(8).optional(),
+});
+
+export const GrantAccessBody = z.object({
+  user_id: z.string().min(1),
+  plan: z.string().min(1).optional(),
+  granted_by_admin: z.boolean().optional(),
+  quota_visuals_per_month: z.number().int().min(0).optional(),
+  quota_brands: z.number().int().min(0).optional(),
+  quota_videos: z.number().int().min(0).optional(),
+  quota_woofs: z.number().int().min(0).optional(),
+});
+
+export const ResetPasswordBody = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+});
+
 export const generateVideoSchema = z.object({
   prompt: z.string().min(3, 'Prompt trop court').max(5000, 'Prompt limité à 5000 caractères'),
   aspectRatio: z.enum(['16:9', '9:16', '1:1']).optional(),

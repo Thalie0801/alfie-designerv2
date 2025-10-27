@@ -1,0 +1,50 @@
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+
+export const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+};
+
+export const supabaseAdmin = () =>
+  createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+
+export const supabaseUserFromReq = (req: Request) =>
+  createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+    { global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } } }
+  );
+
+export async function getAuthUserId(req: Request): Promise<string | null> {
+  const client = supabaseUserFromReq(req);
+  const { data } = await client.auth.getUser();
+  return data?.user?.id ?? null;
+}
+
+export async function assertIsAdmin(client: SupabaseClient, userId: string): Promise<boolean> {
+  // 1) Rôle en BDD
+  const { data: roles } = await client.from("user_roles").select("role").eq("user_id", userId);
+  const byRole = !!roles?.some((r) => r.role === "admin");
+
+  // 2) Email autorisé via env
+  const { data: profile } = await client.from("profiles").select("email").eq("id", userId).single();
+  const admins = (Deno.env.get("ADMIN_EMAILS") ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  const byEmail = profile?.email && admins.includes(profile.email.toLowerCase());
+
+  return byRole || !!byEmail;
+}
+
+export function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}

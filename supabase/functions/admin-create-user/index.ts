@@ -1,177 +1,58 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-// Liste des emails admin
-const ADMIN_EMAILS = [
-  'nathaliestaelens@gmail.com',
-  'staelensnathalie@gmail.com',
-]
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import {
+  supabaseAdmin,
+  supabaseUserFromReq,
+  getAuthUserId,
+  assertIsAdmin,
+  corsHeaders,
+  json,
+} from "../_shared/utils/admin.ts";
+import { CreateUserBody } from "../_shared/validation.ts";
 
 serve(async (req) => {
-  // Gérer les requêtes preflight CORS
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { 
-      headers: corsHeaders,
-      status: 200 
-    })
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    )
+    const userId = await getAuthUserId(req);
+    if (!userId) return json({ error: "Non authentifié" }, 401);
 
-    const { email, fullName, plan, sendInvite, grantedByAdmin, password } = await req.json()
+    const clientUser = supabaseUserFromReq(req);
+    if (!(await assertIsAdmin(clientUser, userId))) return json({ error: "Interdit" }, 403);
 
-    if (!email || !plan) {
-      return new Response(
-        JSON.stringify({ error: 'email_plan_required' }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400
-        }
-      )
+    const body = await req.json();
+    const parsed = CreateUserBody.parse(body);
+
+    if (parsed.sendInvite === false && !parsed.password) {
+      return json({ error: "Mot de passe requis si sendInvite = false" }, 400);
     }
 
-    // Vérifier que l'utilisateur actuel est authentifié
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      throw new Error('Non authentifié')
+    const admin = supabaseAdmin();
+
+    const { data: userRes, error: createErr } = await admin.auth.admin.createUser({
+      email: parsed.email,
+      password: parsed.password ?? crypto.randomUUID(),
+      email_confirm: !!parsed.password,
+      user_metadata: { full_name: parsed.fullName ?? "" },
+    });
+    if (createErr || !userRes?.user) return json({ error: createErr?.message ?? "Création échouée" }, 500);
+
+    const { error: upErr } = await admin.from("profiles").upsert({
+      id: userRes.user.id,
+      email: parsed.email,
+      full_name: parsed.fullName ?? null,
+      plan: parsed.plan,
+      granted_by_admin: parsed.grantedByAdmin ?? true,
+    });
+    if (upErr) return json({ error: upErr.message }, 500);
+
+    if (parsed.sendInvite) {
+      await admin.auth.admin.inviteUserByEmail(parsed.email);
     }
 
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
-
-    if (userError || !user) {
-      throw new Error('Non authentifié')
-    }
-
-    if (!ADMIN_EMAILS.includes(user.email || '')) {
-      throw new Error('Accès refusé : droits administrateur requis')
-    }
-
-    console.log('Admin verified:', user.email)
-
-    // Créer l'utilisateur
-    const createUserData: any = {
-      email,
-      email_confirm: !sendInvite,
-      user_metadata: {
-        full_name: fullName || '',
-        plan: plan,
-      }
-    }
-
-    if (!sendInvite && password) {
-      createUserData.password = password
-    }
-
-    console.log('Creating user with data:', { email, plan, sendInvite })
-
-    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser(createUserData)
-
-    let targetUserId = newUser?.user?.id || null;
-
-    if (createError) {
-      console.log('User creation error:', createError.message)
-      
-      // Si l'utilisateur existe déjà, récupérer son ID depuis auth.users
-      const { data: existingAuthUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers()
-      
-      if (!listError && existingAuthUsers?.users) {
-        const existingUser = existingAuthUsers.users.find(u => u.email === email)
-        if (existingUser) {
-          targetUserId = existingUser.id
-          console.log('User already exists in auth.users, updating profile:', targetUserId)
-        } else {
-          throw new Error(createError.message)
-        }
-      } else {
-        throw new Error(createError.message)
-      }
-    } else {
-      console.log('User created successfully:', targetUserId)
-    }
-
-    // Créer ou mettre à jour le profil
-    if (targetUserId) {
-      const { error: upsertError } = await supabaseAdmin
-        .from('profiles')
-        .upsert({
-          id: targetUserId,
-          email: email,
-          full_name: fullName || '',
-          plan: plan,
-          granted_by_admin: grantedByAdmin || false,
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'id'
-        })
-
-      if (upsertError) {
-        console.error('Error upserting profile:', upsertError)
-        throw new Error('Failed to update profile: ' + upsertError.message)
-      }
-      
-      console.log('Profile updated successfully for user:', targetUserId)
-    }
-
-    // Envoyer l'invitation par email si demandé et si le compte vient d'être créé
-    if (sendInvite && newUser?.user) {
-      console.log('Sending invite to:', email)
-      const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email)
-      if (inviteError) {
-        console.error('Error sending invite:', inviteError)
-        // Ne pas échouer si l'invitation échoue
-      }
-    }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        user: newUser,
-        message: sendInvite
-          ? 'Utilisateur créé et invitation envoyée'
-          : 'Utilisateur créé avec succès',
-        plan,
-        grantedByAdmin: !!grantedByAdmin,
-        status: grantedByAdmin ? 'active' : 'pending'
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      },
-    )
-
-  } catch (error: any) {
-    console.error('Error in admin-create-user:', error)
-    
-    return new Response(
-      JSON.stringify({ 
-        error: error?.message || 'Une erreur est survenue',
-        details: error?.toString()
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      },
-    )
+    return json({ success: true, user_id: userRes.user.id });
+  } catch (e) {
+    if (e instanceof z.ZodError) return json({ error: e.issues }, 400);
+    return json({ error: (e as Error).message ?? "Erreur inconnue" }, 500);
   }
-})
-
-
-
-     
-      
+});
