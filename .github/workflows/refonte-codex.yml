@@ -32,35 +32,32 @@ jobs:
         run: |
           bash scripts/codex/run.sh
 
+      # GARDE SIMPLE & FIABLE : bloque toute modif dans apps/landing/, www/, site/
       - name: Guard: No landing changes
         shell: bash
         run: |
           set -euo pipefail
 
-          # Récupère tous les chemins modifiés : non indexés, indexés et non suivis
-          mapfile -t CHANGED < <(
-            {
-              git diff --name-only
-              git diff --name-only --cached
-              git ls-files --others --exclude-standard
-            } | sort -u
-          )
+          # Etat git stable (inclut non suivis avec "??")
+          CHANGED="$(git -c core.quotepath=false status --porcelain)"
 
-          # S'il n'y a aucun changement, ne bloque pas
-          if [ ${#CHANGED[@]} -eq 0 ]; then
+          # Rien à signaler
+          if [ -z "${CHANGED}" ]; then
             echo "OK: aucune modification détectée."
             exit 0
           fi
 
-          # Filtre uniquement les fichiers de la landing (avec / pour cibler les dossiers)
-          mapfile -t LANDING_HITS < <(
-            printf '%s\n' "${CHANGED[@]}" | grep -E '^(apps/landing/|www/|site/)' || true
-          )
+          # Extrait les chemins (gère ?? et renommages Rxxx old -> new)
+          FILES="$(echo "${CHANGED}" | awk '
+            $1 ~ /^\?\?/ { $1=""; sub(/^ +/,""); print; next }
+            $1 ~ /^R/   { match($0, /-> (.*)$/, m); if (m[1]!="") print m[1]; next }
+            { $1=""; sub(/^ +/,""); print }')"
 
-          if [ ${#LANDING_HITS[@]} -gt 0 ]; then
+          # Filtre dossiers interdits (slash requis pour cibler le dossier)
+          if echo "${FILES}" | grep -E -q '^(apps/landing/|www/|site/)'; then
             echo "::error title=Landing modifiée::Ce patch ne doit pas toucher la landing."
             echo "Fichiers concernés :"
-            printf ' - %s\n' "${LANDING_HITS[@]}"
+            echo "${FILES}" | grep -E '^(apps/landing/|www/|site/)' | sed 's/^/ - /'
             exit 1
           fi
 
@@ -84,5 +81,4 @@ jobs:
             automated
             codex
           draft: false
-
 
