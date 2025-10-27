@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { 
+import { cn } from '@/lib/utils';
+import {
   Sparkles, 
   LayoutDashboard, 
   CreditCard,
@@ -95,8 +96,8 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.path}>
                   <SidebarMenuButton asChild isActive={location.pathname === item.path}>
                     <NavLink to={item.path} end className={getNavCls}>
-                      <item.icon className={open ? "mr-2" : "mx-auto"} size={20} />
-                      {open && (
+                      <item.icon className={cn(open && !isMobile ? "mr-2" : "mx-auto")} size={20} />
+                      {(open || isMobile) && (
                         <div className="flex items-center gap-2 flex-1">
                           <span>{item.label}</span>
                           {item.badge && (
@@ -138,8 +139,8 @@ export function AppSidebar() {
             onClick={handleSignOut}
             className="w-full justify-start"
           >
-            <LogOut className={open ? "mr-2" : "mx-auto"} size={16} />
-            {open && <span>Déconnexion</span>}
+            <LogOut className={cn(open && !isMobile ? "mr-2" : "mx-auto")} size={16} />
+            {(open || isMobile) && <span>Déconnexion</span>}
           </Button>
         </div>
       </SidebarFooter>

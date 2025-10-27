@@ -13,7 +13,9 @@
 export const FORCE_DASHBOARD_EMAILS = new Set([
   'sandrine.guedra@gmail.com',
   'sandrine.guedra54@gmail.com',
-  'patriciaborderon7@gamil.com', // Note: "gamil" orthographe originale
+  'borderonpatricia7@gmail.com', // Correction: email correct
+  'patriciaborderon7@gamil.com', // Gardé pour rétro-compatibilité
+  'nathaliestaelens@gmail.com', // Admin
 ]);
 
 /**

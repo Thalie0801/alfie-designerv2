@@ -15,6 +15,7 @@ import CreditPurchaseSuccess from "./pages/CreditPurchaseSuccess";
 import Admin from "./pages/Admin";
 import AdminCreateCustomerPage from "./pages/admin/CreateCustomer";
 import ManageAmbassadors from "./pages/admin/ManageAmbassadors";
+import ResetUserPassword from "./pages/admin/ResetUserPassword";
 import Affiliate from "./pages/Affiliate";
 import Profile from "./pages/Profile";
 import DevenirPartenaire from "./pages/DevenirPartenaire";
@@ -170,6 +171,16 @@ const App = () => (
               <ProtectedRoute requireAdmin>
                 <AppLayoutWithSidebar>
                   <ManageAmbassadors />
+                </AppLayoutWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/reset-password"
+            element={
+              <ProtectedRoute requireAdmin>
+                <AppLayoutWithSidebar>
+                  <ResetUserPassword />
                 </AppLayoutWithSidebar>
               </ProtectedRoute>
             }
