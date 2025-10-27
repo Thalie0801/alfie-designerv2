@@ -3,7 +3,13 @@ name: Refonte Codex (push→pull, disable autopublish)
 on:
   workflow_dispatch: {}
   push:
-    branches: ["refonte-alfie-2025"]
+    branches:
+      - main
+      - refonte-alfie-2025
+  pull_request:
+    branches:
+      - main
+      - refonte-alfie-2025
 
 permissions:
   contents: write
@@ -24,8 +30,17 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Configure npm auth (optional)
+        if: ${{ secrets.NPM_TOKEN != '' }}
+        run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
+
+      - name: Install dependencies
+        run: npm ci --prefer-online
 
       - name: Run Codex
         shell: bash
