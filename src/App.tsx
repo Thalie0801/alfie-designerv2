@@ -27,16 +27,17 @@ import NotFound from "./pages/NotFound";
 import Templates from "./pages/Templates";
 import Library from "./pages/Library";
 import Videos from "./pages/Videos";
+import ActivateAccess from "./pages/onboarding/Activate";
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <AuthProvider>
+    <Toaster />
+    <Sonner />
+    <AuthProvider>
+      <TooltipProvider>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
@@ -185,10 +186,20 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/onboarding/activate"
+            element={
+              <ProtectedRoute>
+                <AppLayoutWithSidebar>
+                  <ActivateAccess />
+                </AppLayoutWithSidebar>
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </AuthProvider>
-    </TooltipProvider>
+      </TooltipProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 
