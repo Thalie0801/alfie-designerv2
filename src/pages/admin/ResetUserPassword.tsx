@@ -83,10 +83,10 @@ export default function ResetUserPassword() {
           </form>
 
           <div className="mt-6 p-4 bg-muted rounded-md">
-            <h4 className="font-medium mb-2">Comptes à réinitialiser :</h4>
+            <h4 className="font-medium mb-2">Comptes VIP à réinitialiser :</h4>
             <ul className="space-y-1 text-sm">
               <li>• borderonpatricia7@gmail.com → Animaux32021.</li>
-              <li>• sandrine.guedra@gmail.com → Sgu5470O!</li>
+              <li>• sandrine.guedra54@gmail.com → Sgu54700!</li>
             </ul>
           </div>
         </CardContent>

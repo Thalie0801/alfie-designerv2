@@ -446,7 +446,7 @@ export default function Auth() {
                 L'inscription est réservée aux clients ayant validé un paiement.{' '}
                 <button
                   type="button"
-                  onClick={redirectToPricing}
+                  onClick={() => redirectToPricing()}
                   className="font-medium text-primary hover:underline"
                 >
                   Voir les offres

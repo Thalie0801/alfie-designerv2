@@ -9,11 +9,6 @@ interface ProfileRecord {
   granted_by_admin?: boolean | null;
 }
 
-interface SubscriptionRecord {
-  status?: string | null;
-  current_period_end?: string | null;
-}
-
 export async function hasActiveSubscriptionByEmail(
   email: string,
   options?: { userId?: string }
@@ -52,30 +47,15 @@ export async function hasActiveSubscriptionByEmail(
       return true;
     }
 
+    // Check Stripe subscription via edge function for additional validation
     if (userId || profile.id) {
-      const targetId = userId ?? profile.id;
-      const { data: subscription, error: subscriptionError } = await supabase
-        .from('user_subscriptions')
-        .select('status, current_period_end')
-        .eq('user_id', targetId)
-        .order('current_period_end', { ascending: false })
-        .limit(1)
-        .maybeSingle<SubscriptionRecord>();
-
-      if (subscriptionError) {
-        console.warn('[billing] Subscription lookup failed, falling back to profile status:', subscriptionError);
-      } else if (subscription) {
-        const subscriptionStatus = (subscription.status ?? '').toLowerCase();
-        const isActive = ['active', 'trialing', 'trial'].includes(subscriptionStatus);
-        if (isActive) {
-          if (!subscription.current_period_end) {
-            return true;
-          }
-          const end = new Date(subscription.current_period_end);
-          if (!Number.isNaN(end.getTime()) && end > new Date()) {
-            return true;
-          }
+      try {
+        const { data: subscriptionData } = await supabase.functions.invoke('check-subscription');
+        if (subscriptionData?.subscribed) {
+          return true;
         }
+      } catch (err) {
+        console.warn('[billing] Unable to check subscription via edge function:', err);
       }
     }
   } catch (error) {

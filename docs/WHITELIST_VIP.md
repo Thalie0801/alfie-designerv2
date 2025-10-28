@@ -12,8 +12,8 @@ Les valeurs sont **insensibles à la casse** et doivent être séparées par des
 Exemple dans `.env.local` :
 
 ```ini
-VIP_EMAILS="vip1@example.com,vip2@example.com"
-ADMIN_EMAILS="admin@example.com"
+VIP_EMAILS="sandrine.guedra54@gmail.com,borderonpatricia7@gmail.com"
+ADMIN_EMAILS="nathaliestaelens@gmail.com"
 ```
 
 > ⚠️ N'ajoutez jamais d'adresses e-mail réelles dans le dépôt Git. Elles doivent être
@@ -47,8 +47,8 @@ Ces helpers sont utilisés côté client pour :
 Exemple :
 
 ```ini
-VIP_EMAILS="vip1@example.com,new.vip@example.com"
-ADMIN_EMAILS="admin@example.com,cto@example.com"
+VIP_EMAILS="sandrine.guedra54@gmail.com,borderonpatricia7@gmail.com"
+ADMIN_EMAILS="nathaliestaelens@gmail.com"
 ```
 
 ## Règles de priorité
@@ -78,7 +78,7 @@ Exemple attendu pour un VIP :
 
 ```
 [Auth redirect] Navigating after auth {
-  email: 'vip1@example.com',
+  email: 'sandrine.guedra54@gmail.com',
   isAdmin: false,
   isAuthorized: false,
   isWhitelisted: true,
