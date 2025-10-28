@@ -231,9 +231,10 @@ export default function Auth() {
 
   const redirectToPricing = (reason?: string) => {
     if (typeof window !== 'undefined') {
-      window.location.href = reason ? `/pricing?reason=${reason}` : '/#pricing';
+      const url = reason ? `/?reason=${encodeURIComponent(reason)}#pricing` : '/#pricing';
+      window.location.href = url;
     } else {
-      navigate(reason ? `/pricing?reason=${reason}` : '/#pricing');
+      navigate(reason ? `/?reason=${encodeURIComponent(reason)}#pricing` : '/#pricing');
     }
   };
 
