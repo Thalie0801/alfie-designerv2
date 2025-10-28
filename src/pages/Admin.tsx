@@ -274,7 +274,11 @@ export default function Admin() {
             Gérez les utilisateurs, affiliés et paiements
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button onClick={() => navigate('/admin/reset-password')} variant="outline" className="gap-2">
+            <UserCheck className="h-4 w-4" />
+            Reset mot de passe
+          </Button>
           <Button onClick={() => navigate('/admin/ambassadors')} variant="outline" className="gap-2">
             <Award className="h-4 w-4" />
             Gérer Ambassadeurs

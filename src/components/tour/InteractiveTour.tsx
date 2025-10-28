@@ -200,21 +200,26 @@ function TourBubble({ step, currentStep, totalSteps, onVisibilityChange, forceCe
   // Calculate bubble position
   const calculatePosition = useCallback(() => {
     const target = document.querySelector(step.selector);
+    
+    // Always show bubble in center if target not found and forced restart
+    if (!target && forceCenter) {
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      // Use fixed dimensions if bubbleRef not ready yet
+      const bubbleHeight = bubbleRef.current?.getBoundingClientRect().height || 300;
+      const bubbleWidth = bubbleRef.current?.getBoundingClientRect().width || (isMobile ? Math.min(320, viewportWidth * 0.9) : 380);
+      
+      setPosition({
+        top: (viewportHeight - bubbleHeight) / 2,
+        left: (viewportWidth - bubbleWidth) / 2,
+        placement: 'center' as const
+      });
+      onVisibilityChange(true);
+      return;
+    }
+    
     if (!target) {
-      if (forceCenter && bubbleRef.current) {
-        // Center fallback for forced restarts when target not found
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        const bubbleRect = bubbleRef.current.getBoundingClientRect();
-        
-        setPosition({
-          top: (viewportHeight - bubbleRect.height) / 2,
-          left: (viewportWidth - bubbleRect.width) / 2,
-          placement: 'center' as const
-        });
-        onVisibilityChange(true);
-        return;
-      }
       setPosition(null);
       onVisibilityChange(false);
       return;
