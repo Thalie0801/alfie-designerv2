@@ -9,6 +9,11 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Skip admin routes - they have their own protection via ProtectedRoute
+  if (url.pathname.startsWith("/admin")) {
+    return NextResponse.next();
+  }
+
   // Lis un flag d'env simple pour forcer OFF
   const ONBOARDING_ENABLED = process.env.NEXT_PUBLIC_ONBOARDING_ENABLED !== "off";
 

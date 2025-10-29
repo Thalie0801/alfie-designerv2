@@ -68,6 +68,26 @@ export default function Admin() {
     }
   };
 
+  const handlePurgeAffiliates = async () => {
+    if (!confirm('⚠️ Confirmer la purge de tous les affiliés ? Cette action est irréversible.')) {
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-purge-affiliates', {
+        headers: await getAuthHeader(),
+      });
+
+      if (error) throw error;
+
+      toast.success(data.message || 'Affiliés purgés avec succès');
+      loadAdminData();
+    } catch (error: any) {
+      console.error('Error purging affiliates:', error);
+      toast.error(error.message || 'Erreur lors de la purge des affiliés');
+    }
+  };
+
   const handleScrape = async () => {
     const raw = newUrl.trim();
     if (!raw) {
@@ -452,8 +472,21 @@ export default function Admin() {
         <TabsContent value="affiliates" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Affiliés</CardTitle>
-              <CardDescription>Tous les comptes affiliés actifs</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Affiliés</CardTitle>
+                  <CardDescription>Tous les comptes affiliés actifs</CardDescription>
+                </div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handlePurgeAffiliates}
+                  disabled={loading || affiliates.length === 0}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Purger tous les affiliés
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {loading ? (

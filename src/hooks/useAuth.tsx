@@ -44,7 +44,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return true;
     }
 
+    // Vérifier d'abord si l'utilisateur est VIP ou Admin par email
     if (isVipOrAdmin(currentUser.email)) {
+      return true;
+    }
+
+    // Vérifier également si l'utilisateur a un rôle admin en DB
+    const { data: adminRoles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', currentUser.id)
+      .eq('role', 'admin');
+
+    if (adminRoles && adminRoles.length > 0) {
       return true;
     }
 
