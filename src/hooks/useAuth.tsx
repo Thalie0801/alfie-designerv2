@@ -37,26 +37,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const ensureActiveSubscription = async (currentUser: User | null) => {
     if (!currentUser?.email) {
+      console.debug('[Auth] ensureActiveSubscription: no user email');
       return false;
     }
 
     if (killSwitchDisabled) {
+      console.debug('[Auth] ensureActiveSubscription: kill switch disabled, allowing access');
       return true;
     }
 
     // Vérifier d'abord si l'utilisateur est VIP ou Admin par email
     if (isVipOrAdmin(currentUser.email)) {
+      console.debug('[Auth] ensureActiveSubscription: user is VIP/Admin by email');
       return true;
     }
 
-    // Vérifier également si l'utilisateur a un rôle admin en DB
-    const { data: adminRoles } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', currentUser.id)
-      .eq('role', 'admin');
+    // Vérifier également si l'utilisateur a un rôle admin via RPC (bypass RLS)
+    const { data: isAdminRpc, error: rpcError } = await supabase
+      .rpc('has_role', { _user_id: currentUser.id, _role: 'admin' });
 
-    if (adminRoles && adminRoles.length > 0) {
+    if (!rpcError && isAdminRpc === true) {
+      console.debug('[Auth] ensureActiveSubscription: user is admin via RPC');
       return true;
     }
 
@@ -65,7 +66,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (!hasSubscription) {
-      console.warn('[Auth] Access denied: subscription required for', currentUser.email);
+      console.debug('[Auth] ensureActiveSubscription: no active subscription for', currentUser.email);
+    } else {
+      console.debug('[Auth] ensureActiveSubscription: user has active subscription');
     }
 
     return hasSubscription;
@@ -81,7 +84,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const allowed = await ensureActiveSubscription(session.user);
     if (!allowed) {
-      await supabase.auth.signOut();
+      console.debug('[Auth] refreshProfile: access not allowed, clearing profile');
+      // NE PAS déconnecter - laisser l'app gérer l'accès
       setProfile(null);
       setSubscription(null);
       setRoles([]);
@@ -97,6 +101,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (profileData) {
       const ensuredProfile = await ensureStudioPlanForTestAccount(profileData);
       setProfile(ensuredProfile);
+      
+      // Définir les cookies pour stabiliser les redirects
+      const plan = ensuredProfile.plan ?? 'none';
+      const grantedByAdmin = ensuredProfile.granted_by_admin ?? false;
+      document.cookie = `plan=${plan}; Max-Age=${60*60*12}; Path=/; SameSite=Lax`;
+      document.cookie = `granted_by_admin=${grantedByAdmin}; Max-Age=${60*60*12}; Path=/; SameSite=Lax`;
+      console.debug('[Auth] refreshProfile: cookies set', { plan, grantedByAdmin });
     }
 
     const { data: rolesData } = await supabase
@@ -177,6 +188,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (killSwitchDisabled || isVipOrAdmin(userFromAuth.email)) {
+      console.debug('[Auth] signIn: bypass subscription check (kill switch or VIP/admin)');
+      return { error: null };
+    }
+
+    // Vérifier si admin via RPC avant de check l'abonnement
+    const { data: isAdminRpc, error: rpcError } = await supabase
+      .rpc('has_role', { _user_id: userFromAuth.id, _role: 'admin' });
+    
+    if (!rpcError && isAdminRpc === true) {
+      console.debug('[Auth] signIn: user is admin via RPC, bypassing subscription check');
       return { error: null };
     }
 
@@ -185,10 +206,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (!hasSubscription) {
+      console.debug('[Auth] signIn: no active subscription, signing out');
       await supabase.auth.signOut();
       return { error: new Error('NO_ACTIVE_SUBSCRIPTION') };
     }
 
+    console.debug('[Auth] signIn: user has active subscription');
     return { error: null };
   };
 
@@ -244,6 +267,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const roleAdmin = roles.includes('admin');
   const envAdmin = isAdminEmail(user?.email);
   const computedAdmin = roleAdmin || envAdmin;
+  
+  console.debug('[Auth] Authorization computed:', {
+    email: user?.email,
+    roleAdmin,
+    envAdmin,
+    computedAdmin,
+    hasActivePlan: Boolean(
+      computedAdmin ||
+      profile?.granted_by_admin ||
+      (subscription?.status ? ['active', 'trial', 'trialing'].includes(String(subscription.status).toLowerCase()) : false)
+    )
+  });
   const computedIsAuthorized = computeIsAuthorized(user, {
     isAdmin: computedAdmin,
     profile,
