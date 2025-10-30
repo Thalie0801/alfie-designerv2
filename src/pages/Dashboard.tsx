@@ -110,8 +110,12 @@ export default function Dashboard() {
           </div>
           <div className="flex flex-wrap gap-3">
             <HelpLauncher />
-            <NewsWidget />
-            <FeatureRequestDialog />
+            <div data-tour-id="news">
+              <NewsWidget />
+            </div>
+            <div data-tour-id="suggest">
+              <FeatureRequestDialog />
+            </div>
           </div>
         </div>
 
@@ -156,7 +160,9 @@ export default function Dashboard() {
         {/* Main Grid - Active Brand + Activity */}
         <div className="grid lg:grid-cols-2 gap-6">
           <ActiveBrandCard />
-          <ActivityCard activeBrandId={activeBrandId} />
+          <div data-tour-id="quotas">
+            <ActivityCard activeBrandId={activeBrandId} />
+          </div>
         </div>
 
         {/* Recent Creations */}
@@ -198,7 +204,9 @@ export default function Dashboard() {
                 </CardTitle>
                 <CardDescription className="mt-2">Gérez et organisez vos Brand Kits</CardDescription>
               </div>
-              <BrandDialog onSuccess={loadData} />
+              <div data-tour-id="add-brand">
+                <BrandDialog onSuccess={loadData} />
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-6">

@@ -48,15 +48,16 @@ export function AppSidebar() {
     label: string;
     icon: any;
     badge?: string;
+    tourId?: string;
   }> = [
     { path: '/app', label: 'Créer', icon: Sparkles },
     { path: '/templates', label: 'Catalogue', icon: Layers, badge: 'Bientôt' },
-    { path: '/library', label: 'Bibliothèque', icon: FolderOpen },
+    { path: '/library', label: 'Bibliothèque', icon: FolderOpen, tourId: 'library' },
     { path: '/brand-kit-questionnaire', label: 'Brand Kit', icon: Palette },
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/profile', label: 'Profil', icon: UserCircle },
     { path: '/billing', label: 'Abonnement', icon: CreditCard },
-    { path: '/affiliate', label: 'Affiliation', icon: TrendingUp },
+    { path: '/affiliate', label: 'Affiliation', icon: TrendingUp, tourId: 'affiliate' },
   ];
 
   if (isAdmin || canSeeAdminToggle) {
@@ -95,7 +96,12 @@ export function AppSidebar() {
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.path}>
                   <SidebarMenuButton asChild isActive={location.pathname === item.path}>
-                    <NavLink to={item.path} end className={getNavCls}>
+                    <NavLink 
+                      to={item.path} 
+                      end 
+                      className={getNavCls}
+                      data-sidebar-id={item.tourId}
+                    >
                       <item.icon className={cn(open && !isMobile ? "mr-2" : "mx-auto")} size={20} />
                       {(open || isMobile) && (
                         <div className="flex items-center gap-2 flex-1">

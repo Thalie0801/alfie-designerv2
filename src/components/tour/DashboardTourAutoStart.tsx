@@ -16,8 +16,14 @@ export function DashboardTourAutoStart({
   targets = [
     '[data-tour-id="nav-dashboard"]',
     '[data-tour-id="btn-create"]',
-    '[data-tour-id="brand-kit"]',
     '[data-tour-id="quick-actions"]',
+    '[data-tour-id="quotas"]',
+    '[data-tour-id="brand-kit"]',
+    '[data-tour-id="add-brand"]',
+    '[data-tour-id="news"]',
+    '[data-tour-id="suggest"]',
+    '[data-sidebar-id="library"]',
+    '[data-sidebar-id="affiliate"]',
   ],
   maxWaitMs = 8000 
 }: DashboardTourAutoStartProps) {

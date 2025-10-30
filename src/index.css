@@ -203,7 +203,7 @@ All colors MUST be HSL.
   .tour-target-highlight {
     animation: tour-pulse 2s ease-in-out infinite;
     position: relative;
-    z-index: 9997;
+    z-index: 9999 !important;
     border-radius: 8px;
   }
 }
