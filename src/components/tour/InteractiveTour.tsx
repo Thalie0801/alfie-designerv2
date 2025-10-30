@@ -82,6 +82,24 @@ const DEFAULT_STEPS: TourStep[] = [
   },
 ];
 
+// Utility to wait for DOM targets to be ready
+const waitForTargets = (selectors: string[], maxWaitMs = 4000) => new Promise<boolean>((resolve) => {
+  const hasAll = () => selectors.every((sel) => !!document.querySelector(sel));
+  if (hasAll()) return resolve(true);
+  const mo = new MutationObserver(() => {
+    if (hasAll()) {
+      mo.disconnect();
+      if (timeoutId) clearTimeout(timeoutId);
+      resolve(true);
+    }
+  });
+  mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-tour-id'] });
+  const timeoutId = window.setTimeout(() => {
+    mo.disconnect();
+    resolve(false);
+  }, maxWaitMs);
+});
+
 // ============= Provider =============
 interface TourProviderProps {
   children: React.ReactNode;
