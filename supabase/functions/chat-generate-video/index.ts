@@ -85,6 +85,12 @@ serve(async (req) => {
       : "1:1";
 
     const source = typeof body?.source === "object" && body?.source !== null ? body.source : null;
+    const brandKit = typeof body?.brandKit === "object" && body?.brandKit !== null ? body.brandKit : null;
+    const slideIndex = typeof body?.slideIndex === "number" ? body.slideIndex : null;
+    const totalSlides = typeof body?.totalSlides === "number" ? body.totalSlides : null;
+    const duration = typeof body?.duration === "number" ? body.duration : null;
+    const fps = typeof body?.fps === "number" ? body.fps : null;
+    
     const payload: Record<string, unknown> = {
       aspectRatio,
     };
@@ -92,6 +98,9 @@ serve(async (req) => {
     if (promptRaw) {
       payload.prompt = promptRaw;
     }
+    
+    if (duration) payload.duration = duration;
+    if (fps) payload.fps = fps;
 
     const sourceType = typeof source?.type === "string" ? source.type : null;
     const sourceUrl = typeof source?.url === "string" ? source.url : null;
@@ -172,6 +181,42 @@ serve(async (req) => {
       });
     }
 
+    // Sauvegarder en bibliothèque (Phase 4)
+    if (parsed && typeof parsed === "object" && "videoUrl" in parsed) {
+      const videoUrl = (parsed as any).videoUrl || (parsed as any).url;
+      
+      if (videoUrl && typeof videoUrl === "string") {
+        const brandId = typeof brandKit?.id === "string" ? brandKit.id : null;
+        
+        await supabase
+          .from('media_generations')
+          .insert({
+            user_id: user.id,
+            brand_id: brandId,
+            type: 'video',
+            engine: 'ffmpeg-backend',
+            status: 'completed',
+            prompt: (payload.prompt as string)?.substring(0, 500) || "",
+            output_url: videoUrl,
+            thumbnail_url: videoUrl,
+            woofs: 2,
+            duration_seconds: duration,
+            metadata: {
+              aspectRatio: payload.aspectRatio,
+              fps: fps,
+              brandName: brandKit?.name,
+              slideIndex,
+              totalSlides,
+              generatedAt: new Date().toISOString()
+            }
+          })
+          .select()
+          .single();
+        
+        console.log(`Video saved to library for user ${user.id}`);
+      }
+    }
+    
     if (parsed && typeof parsed === "object") {
       return jsonResponse(parsed);
     }

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,10 +9,15 @@ const corsHeaders = {
 interface GenerateRequest {
   templateImageUrl: string;
   brandKit?: {
+    id?: string;
+    name?: string;
     palette?: string[];
     logo_url?: string;
   };
   prompt?: string;
+  resolution?: string;
+  slideIndex?: number;
+  totalSlides?: number;
 }
 
 serve(async (req) => {
@@ -20,7 +26,8 @@ serve(async (req) => {
   }
 
   try {
-    const { templateImageUrl, brandKit, prompt }: GenerateRequest = await req.json();
+    const body: GenerateRequest = await req.json();
+    const { templateImageUrl, brandKit, prompt, resolution, slideIndex, totalSlides } = body;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
@@ -99,7 +106,7 @@ serve(async (req) => {
     const data = await response.json();
     console.log("API Response:", JSON.stringify(data, null, 2));
     
-    const generatedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    let generatedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
     if (!generatedImageUrl) {
       console.error("Full response data:", JSON.stringify(data, null, 2));
@@ -137,10 +144,50 @@ serve(async (req) => {
         throw new Error("No image generated");
       }
 
-      return new Response(
-        JSON.stringify({ imageUrl: retryUrl, message: retryJson?.choices?.[0]?.message?.content }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      generatedImageUrl = retryUrl;
+    }
+
+    // Sauvegarder en bibliothèque (Phase 4)
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    
+    if (supabaseUrl && supabaseKey) {
+      const authHeader = req.headers.get("Authorization")?.replace("Bearer", "").trim();
+      if (authHeader) {
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        const { data: { user } } = await supabase.auth.getUser(authHeader);
+        
+        if (user) {
+          const brandId = typeof brandKit?.id === "string" ? brandKit.id : null;
+          const slideIdx = typeof slideIndex === "number" ? slideIndex : null;
+          const totalSlidesVal = typeof totalSlides === "number" ? totalSlides : null;
+          
+          await supabase
+            .from('media_generations')
+            .insert({
+              user_id: user.id,
+              brand_id: brandId,
+              type: 'image',
+              engine: 'gemini-2.5-flash-image',
+              status: 'completed',
+              prompt: fullPrompt.substring(0, 500),
+              output_url: generatedImageUrl,
+              thumbnail_url: generatedImageUrl,
+              woofs: 1,
+              metadata: {
+                resolution: resolution || "1080x1350",
+                brandName: brandKit?.name,
+                slideIndex: slideIdx,
+                totalSlides: totalSlidesVal,
+                generatedAt: new Date().toISOString()
+              }
+            })
+            .select()
+            .single();
+          
+          console.log(`Image saved to library for user ${user.id}`);
+        }
+      }
     }
 
     return new Response(
