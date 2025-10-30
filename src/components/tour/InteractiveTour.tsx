@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { X, ChevronLeft, ChevronRight, HelpCircle } from 'lucide-react';
@@ -293,8 +293,8 @@ function TourBubble({ step, currentStep, totalSteps, onVisibilityChange, forceCe
     onVisibilityChange(true);
   }, [step.selector, step.placement, isMobile, forceCenter, onVisibilityChange]);
 
-  // Update position on mount, scroll, resize
-  useEffect(() => {
+  // Update position on mount, scroll, resize using useLayoutEffect for immediate measurement
+  useLayoutEffect(() => {
     const updatePosition = () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(calculatePosition);
@@ -305,12 +305,16 @@ function TourBubble({ step, currentStep, totalSteps, onVisibilityChange, forceCe
     window.addEventListener('scroll', updatePosition, { passive: true });
     window.addEventListener('resize', updatePosition);
 
+    const target = document.querySelector(step.selector);
+    
+    // Scroll target into view to ensure it's visible
+    target?.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
+
     const resizeObserver =
       typeof ResizeObserver !== 'undefined'
         ? new ResizeObserver(updatePosition)
         : null;
 
-    const target = document.querySelector(step.selector);
     if (target && resizeObserver) {
       resizeObserver.observe(target);
     }
@@ -323,8 +327,6 @@ function TourBubble({ step, currentStep, totalSteps, onVisibilityChange, forceCe
       onVisibilityChange(false);
     };
   }, [step.selector, calculatePosition, onVisibilityChange]);
-
-  if (!position) return null;
 
   const maxWidth = isMobile ? Math.min(320, window.innerWidth * 0.9) : 380;
 
@@ -341,10 +343,12 @@ function TourBubble({ step, currentStep, totalSteps, onVisibilityChange, forceCe
         ref={bubbleRef}
         className="fixed z-[9999] shadow-2xl border-2 border-primary/20 animate-in fade-in-0 zoom-in-95"
         style={{
-          top: `${position.top}px`,
-          left: `${position.left}px`,
+          top: `${position?.top ?? 0}px`,
+          left: `${position?.left ?? 0}px`,
           maxWidth: `${maxWidth}px`,
           width: isMobile ? '90vw' : 'auto',
+          visibility: position ? 'visible' : 'hidden',
+          pointerEvents: position ? 'auto' : 'none',
         }}
       >
         <div className="p-4 space-y-4">
