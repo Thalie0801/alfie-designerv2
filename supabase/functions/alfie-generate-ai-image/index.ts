@@ -37,6 +37,15 @@ serve(async (req) => {
     // Construire le prompt pour la génération
     let fullPrompt = prompt || "Create a high-quality marketing visual based on the description";
 
+    // Si c'est une slide de carrousel, préciser au modèle de générer UNE SEULE image
+    if (typeof slideIndex === "number" && typeof totalSlides === "number" && totalSlides > 1) {
+      fullPrompt = `IMPORTANT: Generate ONLY slide ${slideIndex + 1} of ${totalSlides}. 
+Create ONE SINGLE standalone image, NOT a collage or grid of multiple slides.
+This is slide ${slideIndex + 1}/${totalSlides} of a carousel.
+
+${fullPrompt}`;
+    }
+
     if (brandKit?.palette && brandKit.palette.length > 0) {
       fullPrompt += `. Use these brand colors: ${brandKit.palette.join(', ')}`;
     }
@@ -65,7 +74,7 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: "You generate images only. Always return an image in message.images[0]. Never ask clarifying questions; infer missing details from the prompt and produce a single high-quality image."
+            content: "You are a professional image generator. Always produce exactly ONE high-quality image in message.images[0]. Never ask questions or return text-only replies.\n\nCRITICAL: When generating text overlays in French, use PERFECT French spelling and grammar. Double-check all accents (é, è, ê, à, ç, ï, ü) and avoid common mistakes like 'CRÉATIVET' (should be 'CRÉATIVITÉ'), 'ENTRPRENEURS' (should be 'ENTREPRENEURS'). Pay special attention to: créativité, entrepreneurs, opportunités, qualité, succès, stratégie."
           },
           {
             role: "user",
@@ -122,7 +131,7 @@ serve(async (req) => {
           messages: [
             {
               role: "system",
-              content: "You are an image generator. Always produce exactly one image and include it in message.images[0]. Never ask questions or return text-only replies."
+              content: "You are a professional image generator. Always produce exactly ONE high-quality image in message.images[0]. Never ask questions or return text-only replies.\n\nCRITICAL: When generating text overlays in French, use PERFECT French spelling and grammar. Double-check all accents (é, è, ê, à, ç, ï, ü) and avoid common mistakes."
             },
             {
               role: "user",
