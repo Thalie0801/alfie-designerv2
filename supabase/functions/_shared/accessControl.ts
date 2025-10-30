@@ -13,6 +13,27 @@ export async function userHasAccess(authHeader: string | null) {
   const { data: { user } } = await client.auth.getUser();
   if (!user) return false;
 
+  // Check VIP status
+  const vipEmails = (Deno.env.get("VIP_EMAILS") ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  
+  if (vipEmails.includes(user.email?.toLowerCase() ?? "")) {
+    return true;
+  }
+
+  // Check ADMIN status
+  const adminEmails = (Deno.env.get("ADMIN_EMAILS") ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  
+  if (adminEmails.includes(user.email?.toLowerCase() ?? "")) {
+    return true;
+  }
+
+  // Check regular subscription
   const { data: profile } = await client
     .from("profiles")
     .select("plan, granted_by_admin, stripe_subscription_id")

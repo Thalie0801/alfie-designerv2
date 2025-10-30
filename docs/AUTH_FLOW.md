@@ -13,8 +13,8 @@ La fonction `navigateAfterAuth()` dans `src/pages/Auth.tsx` applique cette logiq
 ## Comptes VIP (Whitelist)
 
 Certains clients bénéficient d'un accès **garanti** au dashboard, même sans plan actif :
-- `sandrine.guedra@gmail.com`
-- `patriciaborderon7@gamil.com`
+- `sandrine.guedra54@gmail.com`
+- `borderonpatricia7@gmail.com`
 
 Voir `docs/WHITELIST_VIP.md` pour plus de détails.
 
