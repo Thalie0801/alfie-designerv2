@@ -6,14 +6,15 @@ export function BrandPaymentSuccess() {
   const { createAddonBrand } = useBrandManagement();
 
   useEffect(() => {
-    const pendingBrandName = localStorage.getItem('pending_brand_name');
+    // Check for paid brand creation
+    const pendingPaidBrandName = localStorage.getItem('pending_paid_brand_name');
     
-    if (pendingBrandName) {
-      // Create the brand after successful payment
-      createAddonBrand({ name: pendingBrandName }).then((brand) => {
+    if (pendingPaidBrandName) {
+      // Create the paid brand after successful payment
+      createAddonBrand({ name: pendingPaidBrandName }).then((brand) => {
         if (brand) {
-          toast.success(`Marque "${pendingBrandName}" créée avec succès !`);
-          localStorage.removeItem('pending_brand_name');
+          toast.success(`Marque "${pendingPaidBrandName}" créée avec succès !`);
+          localStorage.removeItem('pending_paid_brand_name');
         }
       });
     }

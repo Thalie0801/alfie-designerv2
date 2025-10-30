@@ -4,6 +4,7 @@ import { useBrandKit } from '@/hooks/useBrandKit';
 import { BrandSelector } from './BrandSelector';
 import { BrandDialog } from './BrandDialog';
 import { AddBrandDialog } from './AddBrandDialog';
+import { AddPaidBrandDialog } from './AddPaidBrandDialog';
 import { Palette, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 
@@ -117,7 +118,10 @@ export function BrandManager() {
         )}
 
         {/* Add Brand CTA */}
-        <AddBrandDialog onSuccess={loadBrands} />
+        <div className="space-y-2">
+          <AddBrandDialog onSuccess={loadBrands} />
+          <AddPaidBrandDialog />
+        </div>
       </CardContent>
     </Card>
   );
