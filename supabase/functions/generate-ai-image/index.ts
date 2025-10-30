@@ -246,6 +246,30 @@ serve(async (req) => {
     // Increment profile generations counter
     await incrementMonthlyVisuals(user.id);
 
+    // Save to media_generations for library
+    try {
+      await supabaseClient
+        .from('media_generations')
+        .insert({
+          user_id: user.id,
+          brand_id: brandId,
+          type: 'image',
+          engine: 'gemini-2.5-flash-image',
+          status: 'completed',
+          prompt: prompt.substring(0, 500),
+          output_url: finalUrl,
+          thumbnail_url: finalUrl,
+          metadata: {
+            aspectRatio,
+            generatedAt: new Date().toISOString(),
+            via: 'generate-ai-image'
+          }
+        });
+      console.log('Image saved to library');
+    } catch (insertError) {
+      console.error('Failed to save image to library:', insertError);
+    }
+
     console.log("Image generated successfully");
     return new Response(JSON.stringify({ imageUrl: finalUrl }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

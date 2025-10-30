@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -379,6 +380,52 @@ serve(async (req) => {
       const id = data.id ?? data.prediction?.id ?? null;
       const status: string = data.status ?? "processing";
 
+      // Save to media_generations for library
+      const authHeader = req.headers.get("Authorization")?.replace("Bearer ", "").trim();
+      if (authHeader && id) {
+        try {
+          const supabaseUrl = Deno.env.get("SUPABASE_URL");
+          const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+          
+          if (supabaseUrl && supabaseKey) {
+            const supabase = createClient(supabaseUrl, supabaseKey);
+            const { data: { user } } = await supabase.auth.getUser(authHeader);
+            
+            if (user) {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('active_brand_id')
+                .eq('id', user.id)
+                .maybeSingle();
+              
+              await supabase
+                .from('media_generations')
+                .insert({
+                  user_id: user.id,
+                  brand_id: profile?.active_brand_id || null,
+                  type: 'video',
+                  engine: providerEngine || 'seededance',
+                  status: 'processing',
+                  prompt: prompt.substring(0, 500),
+                  output_url: '',
+                  thumbnail_url: '',
+                  job_id: id,
+                  metadata: {
+                    provider: providerDisplay,
+                    providerInternal: providerApi,
+                    predictionId: id,
+                    aspectRatio,
+                    generatedAt: new Date().toISOString()
+                  }
+                });
+              console.log(`[generate-video] Video entry created for job ${id}`);
+            }
+          }
+        } catch (insertError) {
+          console.error('[generate-video] Failed to create media_generations entry:', insertError);
+        }
+      }
+
       return jsonResponse({
         id,
         provider: providerDisplay,
@@ -421,6 +468,53 @@ serve(async (req) => {
       }
 
       const jobId = data.jobId ?? data.id ?? data.task_id ?? null;
+
+      // Save to media_generations for library
+      const authHeader = req.headers.get("Authorization")?.replace("Bearer ", "").trim();
+      if (authHeader && jobId) {
+        try {
+          const supabaseUrl = Deno.env.get("SUPABASE_URL");
+          const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+          
+          if (supabaseUrl && supabaseKey) {
+            const supabase = createClient(supabaseUrl, supabaseKey);
+            const { data: { user } } = await supabase.auth.getUser(authHeader);
+            
+            if (user) {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('active_brand_id')
+                .eq('id', user.id)
+                .maybeSingle();
+              
+              await supabase
+                .from('media_generations')
+                .insert({
+                  user_id: user.id,
+                  brand_id: profile?.active_brand_id || null,
+                  type: 'video',
+                  engine: providerEngine || 'kling',
+                  status: 'processing',
+                  prompt: prompt.substring(0, 500),
+                  output_url: '',
+                  thumbnail_url: '',
+                  job_id: jobId,
+                  metadata: {
+                    provider: providerDisplay,
+                    providerInternal: providerApi,
+                    predictionId: jobId,
+                    aspectRatio,
+                    generatedAt: new Date().toISOString()
+                  }
+                });
+              console.log(`[generate-video] Video entry created for job ${jobId}`);
+            }
+          }
+        } catch (insertError) {
+          console.error('[generate-video] Failed to create media_generations entry:', insertError);
+        }
+      }
+
       return jsonResponse({
         id: jobId,
         provider: providerDisplay,
