@@ -13,7 +13,6 @@ import { Users, Activity, ArrowLeft, Sparkles, Plus, ExternalLink, Trash2, Edit2
 import { toast } from 'sonner';
 import { NewsManager } from '@/components/NewsManager';
 import { VideoDiagnostic } from '@/components/VideoDiagnostic';
-import { getAuthHeader } from '@/lib/auth';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -74,9 +73,7 @@ export default function Admin() {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('admin-purge-affiliates', {
-        headers: await getAuthHeader(),
-      });
+      const { data, error } = await supabase.functions.invoke('admin-purge-affiliates', {});
 
       if (error) throw error;
 
@@ -109,7 +106,6 @@ export default function Admin() {
     try {
       const { error } = await supabase.functions.invoke('scrape-canva', {
         body: { url: normalized, category },
-        headers: await getAuthHeader(),
       });
 
       if (error) throw error;
@@ -200,9 +196,7 @@ export default function Admin() {
         description: 'Cela peut prendre quelques minutes' 
       });
 
-      const { data, error } = await supabase.functions.invoke('auto-scrape-canva-templates', {
-        headers: await getAuthHeader(),
-      });
+      const { data, error } = await supabase.functions.invoke('auto-scrape-canva-templates', {});
 
       if (error) throw error;
 

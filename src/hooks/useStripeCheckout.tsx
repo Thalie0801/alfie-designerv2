@@ -1,13 +1,10 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useAuth } from './useAuth';
 import { useAffiliate } from './useAffiliate';
-import { getAuthHeader } from '@/lib/auth';
 
 export function useStripeCheckout() {
   const [loading, setLoading] = useState(false);
-  const { session } = useAuth();
   const { getAffiliateRef } = useAffiliate();
 
   const createCheckout = async (
@@ -17,10 +14,6 @@ export function useStripeCheckout() {
     setLoading(true);
     try {
       const affiliateRef = getAffiliateRef();
-      
-      const headers = session
-        ? { Authorization: `Bearer ${session.access_token}` }
-        : await getAuthHeader();
 
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
@@ -28,7 +21,6 @@ export function useStripeCheckout() {
           billing_period: billingPeriod,
           affiliate_ref: affiliateRef
         },
-        headers,
       });
 
       if (error) throw error;

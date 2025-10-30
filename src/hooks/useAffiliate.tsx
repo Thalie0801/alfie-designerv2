@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { getAuthHeader } from '@/lib/auth';
 
 const AFFILIATE_STORAGE_KEY = 'alfie_ref';
 const AFFILIATE_EXPIRY_DAYS = 365;
@@ -71,7 +70,6 @@ export function useAffiliate() {
     try {
       const { data, error } = await supabase.functions.invoke('get-affiliate-public', {
         body: { ref },
-        headers: await getAuthHeader(),
       });
 
       if (error || !data) {
@@ -128,7 +126,6 @@ export function useAffiliate() {
           utm_medium,
           utm_campaign,
         },
-        headers: await getAuthHeader(),
       });
     } catch (error) {
       console.error('Failed to track affiliate click:', error);

@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
-import { getAuthHeader } from '@/lib/auth';
 import { toast } from 'sonner';
 import { Plus, Award, Trash2 } from 'lucide-react';
 
@@ -66,7 +65,6 @@ export default function ManageAmbassadors() {
           quota_brands: parseInt(customQuotaBrands),
           quota_videos: parseInt(customQuotaVideos)
         },
-        headers: await getAuthHeader(),
       });
 
       if (error) throw error;
@@ -92,7 +90,6 @@ export default function ManageAmbassadors() {
           user_id: userId,
           granted_by_admin: false
         },
-        headers: await getAuthHeader(),
       });
 
       if (error) throw error;

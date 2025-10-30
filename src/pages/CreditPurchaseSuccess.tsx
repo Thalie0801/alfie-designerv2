@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { getAuthHeader } from '@/lib/auth';
 import { toast } from 'sonner';
 
 export default function CreditPurchaseSuccess() {
@@ -28,7 +27,6 @@ export default function CreditPurchaseSuccess() {
     try {
       const { data, error } = await supabase.functions.invoke('verify-credit-purchase', {
         body: { session_id: sessionId },
-        headers: await getAuthHeader(),
       });
 
       if (error) throw error;

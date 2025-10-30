@@ -46,8 +46,8 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
 
   // Priorité 1: Route admin requise
   if (requireAdmin && !effectiveIsAdmin) {
-    console.debug('[ProtectedRoute] Admin required but user is not admin, redirecting to /app');
-    return <Navigate to="/app" replace />;
+    console.debug('[ProtectedRoute] Admin required but user is not admin, redirecting to /dashboard');
+    return <Navigate to="/dashboard" replace />;
   }
 
   // Priorité 2: Admin général → toujours /admin si pas déjà sur une route admin

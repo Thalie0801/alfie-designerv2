@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { getAuthHeader } from '@/lib/auth';
 
 export function useCustomerPortal() {
   const [loading, setLoading] = useState(false);
@@ -11,7 +10,6 @@ export function useCustomerPortal() {
     try {
       const { data, error } = await supabase.functions.invoke('customer-portal', {
         body: {},
-        headers: await getAuthHeader(),
       });
 
       if (error) throw error;

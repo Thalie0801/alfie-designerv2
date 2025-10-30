@@ -7,7 +7,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getAuthHeader } from '@/lib/auth';
 import { VIDEO_ENGINE_CONFIG } from '@/config/videoEngine';
 
 type GeneratedAsset = {
@@ -144,8 +143,6 @@ interface VideoGenerationParams {
 }
 
 const generateVideoWithFfmpeg = async ({ prompt, aspectRatio, source }: VideoGenerationParams) => {
-  const headers = await getAuthHeader();
-
   const trimmedPrompt = typeof prompt === 'string' ? prompt.trim() : '';
 
   const body: Record<string, unknown> = {
@@ -165,7 +162,6 @@ const generateVideoWithFfmpeg = async ({ prompt, aspectRatio, source }: VideoGen
   try {
     const { data, error } = await supabase.functions.invoke('chat-generate-video', {
       body,
-      headers,
     });
 
     if (error) {
@@ -355,7 +351,6 @@ export function ChatGenerator() {
               brandKit: brandKit,
               prompt: prompt || 'Transform this image with a creative style',
             },
-            headers: await getAuthHeader(),
           });
 
           if (error) throw error;
@@ -392,7 +387,6 @@ export function ChatGenerator() {
               prompt: prompt,
               aspectRatio: aspectRatio,
             },
-            headers: await getAuthHeader(),
           });
 
           if (error) throw error;

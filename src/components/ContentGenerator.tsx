@@ -9,7 +9,6 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { useAlfieCredits } from '@/hooks/useAlfieCredits';
-import { getAuthHeader } from '@/lib/auth';
 
 export function ContentGenerator() {
   const [prompt, setPrompt] = useState('');
@@ -66,7 +65,6 @@ export function ContentGenerator() {
           brandKit: brandKit,
           aspectRatio: aspectRatio
         },
-        headers: await getAuthHeader(),
       });
 
       if (error) throw error;

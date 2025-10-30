@@ -9,7 +9,6 @@ import { Sparkles, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
-import { getAuthHeader } from '@/lib/auth';
 import { isVipOrAdmin, isAdmin as isAdminEmail } from '@/lib/access';
 
 const authSchema = z.object({
@@ -129,10 +128,8 @@ export default function Auth() {
     console.debug('[Auth] Starting payment verification', { sessionId });
 
     try {
-      const headers = await getAuthHeader().catch(() => ({}));
       const { data, error } = await supabase.functions.invoke('verify-payment', {
         body: { session_id: sessionId },
-        headers,
       });
 
       if (error) {

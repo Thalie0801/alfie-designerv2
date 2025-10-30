@@ -27,19 +27,30 @@ export async function getAuthUserId(req: Request): Promise<string | null> {
 }
 
 export async function assertIsAdmin(client: SupabaseClient, userId: string): Promise<boolean> {
-  // 1) Rôle en BDD
-  const { data: roles } = await client.from("user_roles").select("role").eq("user_id", userId);
-  const byRole = !!roles?.some((r) => r.role === "admin");
-
-  // 2) Email autorisé via env
-  const { data: profile } = await client.from("profiles").select("email").eq("id", userId).single();
+  // 1) Email autorisé via env (priorité pour éviter dépendance RLS)
+  const { data: { user } } = await client.auth.getUser();
+  const userEmail = user?.email?.toLowerCase() || "";
+  
   const admins = (Deno.env.get("ADMIN_EMAILS") ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
-  const byEmail = profile?.email && admins.includes(profile.email.toLowerCase());
+  
+  const byEmail = userEmail && admins.includes(userEmail);
+  
+  // 2) Rôle en BDD (check additionnel)
+  const { data: roles } = await client.from("user_roles").select("role").eq("user_id", userId);
+  const byRole = !!roles?.some((r) => r.role === "admin");
 
-  return byRole || !!byEmail;
+  // Log diagnostic
+  console.log(`[AdminCheck] Checking admin for: ${userEmail} | byEmail: ${byEmail} | byRole: ${byRole} | ADMIN_EMAILS: ${admins.join(',')}`);
+  
+  const isAdmin = byEmail || byRole;
+  if (isAdmin) {
+    console.log(`[AdminCheck] ✅ Admin access granted via ${byEmail ? 'EMAIL' : 'ROLE'}`);
+  }
+
+  return isAdmin;
 }
 
 export function json(data: unknown, status = 200) {

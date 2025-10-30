@@ -9,7 +9,6 @@ import { AssetCard } from '@/components/library/AssetCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { getAuthHeader } from '@/lib/auth';
 import { toast } from 'sonner';
 import { AccessGuard } from '@/components/AccessGuard';
 
@@ -85,7 +84,6 @@ export default function Library() {
     try {
       const { data, error } = await supabase.functions.invoke('generate-video', {
         body: { prompt, aspectRatio: '9:16' },
-        headers: await getAuthHeader(),
       });
       if (error || data?.error) {
         const msg = (error as any)?.message || data?.error || 'Erreur inconnue';
