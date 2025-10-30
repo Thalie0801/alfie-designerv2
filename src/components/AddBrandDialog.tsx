@@ -52,8 +52,16 @@ export function AddBrandDialog({ onSuccess }: AddBrandDialogProps) {
   const handleCreate = async () => {
     if (!brandName.trim()) return;
 
+    // Re-check brand count in real-time before creating
+    const { count: currentCount } = await supabase
+      .from('brands')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user!.id);
+
+    const actualCount = currentCount || 0;
+
     // Check if limit reached
-    if (brandsCount >= MAX_BRANDS) {
+    if (actualCount >= MAX_BRANDS) {
       setOpen(false); // Close this dialog
       setShowPayment(true);
       return;
