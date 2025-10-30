@@ -198,6 +198,19 @@ export function TourProvider({ children, steps = DEFAULT_STEPS, options = {} }: 
   );
 }
 
+// ============= Arrow Component =============
+const Arrow = ({ placement }: { placement: Placement }) => {
+  const arrowClasses = {
+    top: 'absolute left-1/2 -translate-x-1/2 -bottom-2 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-background',
+    bottom: 'absolute left-1/2 -translate-x-1/2 -top-2 border-l-8 border-r-8 border-b-8 border-l-transparent border-r-transparent border-b-background',
+    left: 'absolute top-1/2 -translate-y-1/2 -right-2 border-t-8 border-b-8 border-l-8 border-t-transparent border-b-transparent border-l-background',
+    right: 'absolute top-1/2 -translate-y-1/2 -left-2 border-t-8 border-b-8 border-r-8 border-t-transparent border-b-transparent border-r-background',
+    center: 'hidden',
+  };
+
+  return <div className={arrowClasses[placement]} />;
+};
+
 // ============= Tour Bubble Component =============
 interface TourBubbleProps {
   step: TourStep;
@@ -305,10 +318,13 @@ function TourBubble({ step, currentStep, totalSteps, onVisibilityChange, forceCe
     window.addEventListener('scroll', updatePosition, { passive: true });
     window.addEventListener('resize', updatePosition);
 
-    const target = document.querySelector(step.selector);
+    const target = document.querySelector(step.selector) as HTMLElement;
     
-    // Scroll target into view to ensure it's visible
-    target?.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
+    // Add pulsing effect on target element
+    if (target) {
+      target.classList.add('tour-target-highlight');
+      target.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
+    }
 
     const resizeObserver =
       typeof ResizeObserver !== 'undefined'
@@ -324,6 +340,8 @@ function TourBubble({ step, currentStep, totalSteps, onVisibilityChange, forceCe
       window.removeEventListener('scroll', updatePosition);
       window.removeEventListener('resize', updatePosition);
       resizeObserver?.disconnect();
+      // Remove pulsing effect from target element
+      target?.classList.remove('tour-target-highlight');
       onVisibilityChange(false);
     };
   }, [step.selector, calculatePosition, onVisibilityChange]);
@@ -351,6 +369,7 @@ function TourBubble({ step, currentStep, totalSteps, onVisibilityChange, forceCe
           pointerEvents: position ? 'auto' : 'none',
         }}
       >
+        {position && <Arrow placement={position.placement} />}
         <div className="p-4 space-y-4">
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
