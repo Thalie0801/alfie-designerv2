@@ -201,10 +201,10 @@ export function TourProvider({ children, steps = DEFAULT_STEPS, options = {} }: 
 // ============= Arrow Component =============
 const Arrow = ({ placement }: { placement: Placement }) => {
   const arrowClasses = {
-    top: 'absolute left-1/2 -translate-x-1/2 -bottom-2 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-background',
-    bottom: 'absolute left-1/2 -translate-x-1/2 -top-2 border-l-8 border-r-8 border-b-8 border-l-transparent border-r-transparent border-b-background',
-    left: 'absolute top-1/2 -translate-y-1/2 -right-2 border-t-8 border-b-8 border-l-8 border-t-transparent border-b-transparent border-l-background',
-    right: 'absolute top-1/2 -translate-y-1/2 -left-2 border-t-8 border-b-8 border-r-8 border-t-transparent border-b-transparent border-r-background',
+    top: 'absolute left-1/2 -translate-x-1/2 -bottom-2 w-0 h-0 border-l-[12px] border-r-[12px] border-t-[12px] border-l-transparent border-r-transparent border-t-primary drop-shadow-lg',
+    bottom: 'absolute left-1/2 -translate-x-1/2 -top-2 w-0 h-0 border-l-[12px] border-r-[12px] border-b-[12px] border-l-transparent border-r-transparent border-b-primary drop-shadow-lg',
+    left: 'absolute top-1/2 -translate-y-1/2 -right-2 w-0 h-0 border-t-[12px] border-b-[12px] border-l-[12px] border-t-transparent border-b-transparent border-l-primary drop-shadow-lg',
+    right: 'absolute top-1/2 -translate-y-1/2 -left-2 w-0 h-0 border-t-[12px] border-b-[12px] border-r-[12px] border-t-transparent border-b-transparent border-r-primary drop-shadow-lg',
     center: 'hidden',
   };
 
