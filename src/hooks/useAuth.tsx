@@ -273,18 +273,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const envAdmin = isAdminEmail(user?.email);
   const computedAdmin = roleAdmin || envAdmin;
   
-  console.debug('[Auth] Authorization computed:', {
-    email: user?.email,
-    roleAdmin,
-    envAdmin,
-    computedAdmin,
-    hasActivePlan: Boolean(
-      computedAdmin ||
-      profile?.granted_by_admin ||
-      (subscription?.status ? ['active', 'trial', 'trialing'].includes(String(subscription.status).toLowerCase()) : false)
-    )
-  });
+  // 1. Calculer vipBypass en premier
   const vipBypass = isVipOrAdmin(user?.email);
+  
+  // 2. Calculer computedIsAuthorized avec vipBypass
   const computedIsAuthorized = vipBypass || computeIsAuthorized(user, {
     isAdmin: computedAdmin,
     profile,
@@ -292,6 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     killSwitchDisabled,
   });
 
+  // 3. Log complet avec toutes les infos
   console.debug('[Auth] Authorization computed:', {
     email: user?.email,
     vipBypass,
