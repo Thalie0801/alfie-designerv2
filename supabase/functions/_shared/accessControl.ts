@@ -19,17 +19,21 @@ export async function userHasAccess(authHeader: string | null) {
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
   
-  if (vipEmails.includes(user.email?.toLowerCase() ?? "")) {
-    return true;
-  }
-
+  const isVip = vipEmails.includes(user.email?.toLowerCase() ?? "");
+  
   // Check ADMIN status
   const adminEmails = (Deno.env.get("ADMIN_EMAILS") ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
   
-  if (adminEmails.includes(user.email?.toLowerCase() ?? "")) {
+  const isAdmin = adminEmails.includes(user.email?.toLowerCase() ?? "");
+  
+  // Log diagnostic pour debug
+  console.log(`[AccessControl] Checking access for: ${user.email} | VIP list: ${vipEmails.join(',')} | Admin list: ${adminEmails.join(',')} | isVip: ${isVip} | isAdmin: ${isAdmin}`);
+  
+  if (isVip || isAdmin) {
+    console.log(`[AccessControl] ✅ Access granted via ${isVip ? 'VIP' : 'ADMIN'} status`);
     return true;
   }
 
