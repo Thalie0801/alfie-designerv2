@@ -417,9 +417,20 @@ function TourBubble({ step, currentStep, totalSteps, onVisibilityChange, forceCe
 export function HelpLauncher() {
   const { start, isActive, bubbleVisible } = useTour();
 
-  const handleClick = () => {
-    console.debug('[HelpLauncher] Clicked - forcing tour restart');
-    start(true); // Force restart even if tour was previously completed
+  const handleClick = async () => {
+    console.debug('[HelpLauncher] Clicked - waiting for tour targets');
+    
+    // Wait for all tour target elements to be ready
+    const selectors = DEFAULT_STEPS.map(s => s.selector);
+    const ready = await waitForTargets(selectors, 2000);
+    
+    if (ready) {
+      console.debug('[HelpLauncher] All targets ready, starting tour');
+      start(true); // Force restart even if tour was previously completed
+    } else {
+      console.warn('[HelpLauncher] Some targets not found, starting anyway');
+      start(true);
+    }
   };
 
   return (
