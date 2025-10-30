@@ -92,9 +92,12 @@ serve(async (req) => {
     }
 
     const data = await response.json();
+    console.log("API Response:", JSON.stringify(data, null, 2));
+    
     const generatedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
     if (!generatedImageUrl) {
+      console.error("Full response data:", JSON.stringify(data, null, 2));
       throw new Error("No image generated");
     }
 
