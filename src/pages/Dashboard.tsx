@@ -21,6 +21,7 @@ import { useAffiliateStatus } from '@/hooks/useAffiliateStatus';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { TourProvider, HelpLauncher } from '@/components/tour/InteractiveTour';
 import { DashboardTourAutoStart } from '@/components/tour/DashboardTourAutoStart';
+import { BrandPaymentSuccess } from '@/components/BrandPaymentSuccess';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -84,6 +85,7 @@ export default function Dashboard() {
   return (
     <AccessGuard>
       <TourProvider options={{ userEmail: user?.email }}>
+        <BrandPaymentSuccess />
         <DashboardTourAutoStart />
         
         <div className="space-y-6 lg:space-y-8">

@@ -54,6 +54,7 @@ export function AddBrandDialog({ onSuccess }: AddBrandDialogProps) {
 
     // Check if limit reached
     if (brandsCount >= MAX_BRANDS) {
+      setOpen(false); // Close this dialog
       setShowPayment(true);
       return;
     }
@@ -131,6 +132,11 @@ export function AddBrandDialog({ onSuccess }: AddBrandDialogProps) {
         open={showPayment}
         onOpenChange={setShowPayment}
         currentBrandsCount={brandsCount}
+        brandName={brandName}
+        onPaymentInitiated={() => {
+          setOpen(false);
+          setBrandName('');
+        }}
       />
     </>
   );

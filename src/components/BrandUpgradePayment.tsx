@@ -15,18 +15,29 @@ interface BrandUpgradePaymentProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentBrandsCount: number;
+  brandName: string;
+  onPaymentInitiated: () => void;
 }
 
 export function BrandUpgradePayment({ 
   open, 
   onOpenChange,
-  currentBrandsCount 
+  currentBrandsCount,
+  brandName,
+  onPaymentInitiated
 }: BrandUpgradePaymentProps) {
   const { createCheckout, loading } = useStripeCheckout();
 
   const handlePayment = async () => {
+    // Save brand name to localStorage for post-payment creation
+    localStorage.setItem('pending_brand_name', brandName);
+    
     // Create checkout for starter plan (39€/month for additional brand)
     await createCheckout('starter', 'monthly');
+    
+    // Close dialogs
+    onPaymentInitiated();
+    onOpenChange(false);
   };
 
   return (

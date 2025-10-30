@@ -388,7 +388,7 @@ function TourBubble({ step, currentStep, totalSteps, onVisibilityChange, forceCe
     <>
       {/* Overlay */}
       <div 
-        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[9998]"
+        className="fixed inset-0 bg-background/80 z-[9998]"
         onClick={stop}
       />
       
