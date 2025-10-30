@@ -19,6 +19,8 @@ import { RecentCreations } from '@/components/dashboard/RecentCreations';
 import { ProfileProgress } from '@/components/dashboard/ProfileProgress';
 import { useAffiliateStatus } from '@/hooks/useAffiliateStatus';
 import { useBrandKit } from '@/hooks/useBrandKit';
+import { TourProvider, HelpLauncher } from '@/components/tour/InteractiveTour';
+import { DashboardTourAutoStart } from '@/components/tour/DashboardTourAutoStart';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -81,7 +83,10 @@ export default function Dashboard() {
 
   return (
     <AccessGuard>
-      <div className="space-y-6 lg:space-y-8">
+      <TourProvider options={{ userEmail: user?.email }}>
+        <DashboardTourAutoStart />
+        
+        <div className="space-y-6 lg:space-y-8">
           {/* Header */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             <div className="space-y-3">
@@ -104,6 +109,7 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
+            <HelpLauncher />
             <NewsWidget />
             <FeatureRequestDialog />
           </div>
@@ -292,7 +298,8 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-      </div>
+        </div>
+      </TourProvider>
     </AccessGuard>
   );
 }
