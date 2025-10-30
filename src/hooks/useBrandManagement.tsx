@@ -27,6 +27,18 @@ export function useBrandManagement() {
 
     setLoading(true);
     try {
+      // Check brand limit (max 5)
+      const { count: currentBrands } = await supabase
+        .from('brands')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      const MAX_BRANDS = 5;
+      if ((currentBrands || 0) >= MAX_BRANDS) {
+        toast.error(`Limite de ${MAX_BRANDS} marques atteinte. Supprimez une marque ou contactez-nous.`);
+        return null;
+      }
+
       const quotas = SYSTEM_CONFIG.QUOTAS.starter;
       const nextReset = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
       

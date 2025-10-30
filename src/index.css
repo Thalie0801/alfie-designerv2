@@ -203,7 +203,12 @@ All colors MUST be HSL.
   .tour-target-highlight {
     animation: tour-pulse 2s ease-in-out infinite;
     position: relative;
-    z-index: 9999 !important;
+    z-index: 10001 !important;
     border-radius: 8px;
+  }
+
+  /* Force sidebar items to appear above overlay during tour */
+  [data-sidebar-id].tour-target-highlight {
+    z-index: 10001 !important;
   }
 }
