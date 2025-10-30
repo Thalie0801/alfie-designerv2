@@ -171,28 +171,35 @@ ${fullPrompt}`;
           const slideIdx = typeof slideIndex === "number" ? slideIndex : null;
           const totalSlidesVal = typeof totalSlides === "number" ? totalSlides : null;
           
-          await supabase
+          const insertPayload = {
+            user_id: user.id,
+            brand_id: brandId,
+            type: 'image',
+            status: 'completed',
+            prompt: fullPrompt.substring(0, 500),
+            output_url: generatedImageUrl,
+            thumbnail_url: generatedImageUrl,
+            woofs: 1,
+            metadata: {
+              resolution: resolution || "1080x1350",
+              brandName: brandKit?.name,
+              slideIndex: slideIdx,
+              totalSlides: totalSlidesVal,
+              generatedAt: new Date().toISOString()
+            }
+          } as const;
+
+          const { data: inserted, error: insertError } = await supabase
             .from('media_generations')
-            .insert({
-              user_id: user.id,
-              brand_id: brandId,
-              type: 'image',
-              engine: 'gemini-2.5-flash-image',
-              status: 'completed',
-              prompt: fullPrompt.substring(0, 500),
-              output_url: generatedImageUrl,
-              thumbnail_url: generatedImageUrl,
-              woofs: 1,
-              metadata: {
-                resolution: resolution || "1080x1350",
-                brandName: brandKit?.name,
-                slideIndex: slideIdx,
-                totalSlides: totalSlidesVal,
-                generatedAt: new Date().toISOString()
-              }
-            })
+            .insert(insertPayload)
             .select()
             .single();
+
+          if (insertError) {
+            console.error('Failed to save image to library:', insertError);
+          } else {
+            console.log(`Image saved to library for user ${user.id} with id ${inserted?.id}`);
+          }
           
           console.log(`Image saved to library for user ${user.id}`);
         }
