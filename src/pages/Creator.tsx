@@ -97,7 +97,12 @@ export default function Creator() {
     "5) Exporter & sauvegarder",
   ];
 
-  async function generateSingleSlide(index: number): Promise<Artifact> {
+  async function generateSingleSlide(
+    index: number, 
+    templateUrl?: string, 
+    carouselId?: string, 
+    overlayText?: string
+  ): Promise<Artifact> {
     const enrichedPrompt = buildBrandAwarePrompt(prompt, brandKit);
     const { w, h } = parseWH(resolution);
     
@@ -105,7 +110,7 @@ export default function Creator() {
       const { data, error: imgError } = await supabase.functions.invoke("alfie-generate-ai-image", {
         body: {
           prompt: enrichedPrompt,
-          templateImageUrl: undefined,
+          templateImageUrl: templateUrl,
           brandKit: brandKit ? {
             id: brandKit.id,
             name: brandKit.name,
@@ -116,12 +121,46 @@ export default function Creator() {
           } : null,
           resolution,
           slideIndex: index,
-          totalSlides: slides
+          totalSlides: slides,
+          overlayText,
+          carouselId
         }
       });
       
       if (imgError) throw new Error(`Image: ${imgError.message || "échec d'invocation"}`);
       if (!data?.imageUrl) throw new Error("Image: aucune URL renvoyée par le backend");
+      
+      // Fallback client si l'insert backend a échoué
+      if (data.saved === false && data.imageUrl) {
+        console.log('Backend insert failed, attempting client-side insert...');
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await supabase.from('media_generations').insert({
+              user_id: user.id,
+              brand_id: brandKit?.id || null,
+              type: 'image',
+              status: 'completed',
+              prompt: enrichedPrompt.substring(0, 500),
+              output_url: data.imageUrl,
+              thumbnail_url: data.imageUrl,
+              woofs: 1,
+              metadata: {
+                resolution,
+                slideIndex: index,
+                totalSlides: slides,
+                carouselId: carouselId || null,
+                overlayText: overlayText || null,
+                brandName: brandKit?.name,
+                generatedAt: new Date().toISOString()
+              }
+            });
+            console.log('Client-side insert successful');
+          }
+        } catch (e) {
+          console.error('Client-side insert failed:', e);
+        }
+      }
       
       return {
         kind: "image",
@@ -185,23 +224,73 @@ export default function Creator() {
     try {
       const results: Artifact[] = [];
       
+      // Si carrousel (>1 slide), on génère d'abord le plan avec textes corrigés
+      let carouselPlan: any = null;
+      const carouselId = slides > 1 ? crypto.randomUUID() : undefined;
+      
+      if (slides > 1 && mode === "image") {
+        setPlan(prev => [...prev, "⏳ Planification du carrousel..."]);
+        
+        const { data: planData, error: planError } = await supabase.functions.invoke("alfie-plan-carousel", {
+          body: {
+            prompt: prompt || "Créer un carrousel engageant",
+            brandKit: brandKit ? {
+              name: brandKit.name,
+              palette: brandKit.palette,
+              voice: brandKit.voice
+            } : null,
+            slideCount: slides
+          }
+        });
+        
+        if (planError) {
+          console.warn('Carousel planning failed, continuing without plan:', planError);
+        } else if (planData?.slides) {
+          carouselPlan = planData;
+          setPlan(prev => [...prev, "✓ Plan du carrousel créé avec textes corrigés"]);
+        }
+      }
+      
+      let firstSlideUrl: string | undefined;
+      
       for (let i = 0; i < slides; i++) {
         console.log(`Génération slide ${i + 1}/${slides}...`);
-        const artifact = await generateSingleSlide(i + 1);
+        
+        // Construire l'overlayText depuis le plan si disponible
+        let overlayText: string | undefined;
+        if (carouselPlan?.slides?.[i]) {
+          const slide = carouselPlan.slides[i];
+          const parts: string[] = [];
+          if (slide.title) parts.push(slide.title);
+          if (slide.subtitle) parts.push(slide.subtitle);
+          if (slide.bullets?.length) parts.push(...slide.bullets);
+          if (slide.cta) parts.push(slide.cta);
+          overlayText = parts.join('\n');
+        }
+        
+        // Pour les slides 2+, on passe la 1re slide comme référence visuelle
+        const templateUrl = (i > 0 && firstSlideUrl) ? firstSlideUrl : undefined;
+        
+        const artifact = await generateSingleSlide(i + 1, templateUrl, carouselId, overlayText);
+        
+        if (i === 0) {
+          firstSlideUrl = artifact.uri;
+        }
+        
         results.push(artifact);
         setArtifacts(prev => [...prev, artifact]);
         
         setPlan(prev => {
           const updated = [...prev];
-          updated.push(`✓ Slide ${i + 1}/${slides} généré`);
+          updated.push(`✓ Slide ${i + 1}/${slides} généré${overlayText ? ' (avec texte corrigé)' : ''}`);
           return updated;
         });
       }
       
-      setPlan(prev => [...prev, "✓ Tous les livrables prêts"]);
+      setPlan(prev => [...prev, "✓ Tous les livrables prêts et enregistrés en bibliothèque"]);
       toast({
         title: "Génération réussie",
-        description: `${slides} slide(s) ${mode === "video" ? "vidéo" : "image"} généré(s) avec succès.`
+        description: `${slides} slide(s) ${mode === "video" ? "vidéo" : "image"} généré(s) avec succès et enregistré(s) dans votre bibliothèque.`
       });
     } catch (e: any) {
       const errorMsg = e?.message ?? "Erreur inconnue";

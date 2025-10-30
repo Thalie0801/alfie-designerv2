@@ -12,6 +12,9 @@ verify_jwt = true
 [functions.alfie-generate-ai-image]
 verify_jwt = true
 
+[functions.alfie-plan-carousel]
+verify_jwt = true
+
 [functions.generate-content]
 verify_jwt = true
 
