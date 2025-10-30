@@ -52,7 +52,7 @@ export function BrandManager() {
         </div>
 
         {/* Active Brand Details */}
-        {activeBrand ? (
+        {activeBrand && (
           <div className="space-y-4 p-4 rounded-lg border-2 bg-muted/30">
             <div className="flex items-start justify-between">
               <div className="space-y-1">
@@ -108,7 +108,9 @@ export function BrandManager() {
               </div>
             )}
           </div>
-        ) : (
+        )}
+
+        {!activeBrand && (
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
@@ -117,10 +119,23 @@ export function BrandManager() {
           </Alert>
         )}
 
-        {/* Add Brand CTA */}
-        <div className="space-y-2">
-          <AddBrandDialog onSuccess={loadBrands} />
-          <AddPaidBrandDialog />
+        {/* Add Brand Section */}
+        <div className="space-y-4 pt-4 border-t">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold">Marque gratuite</label>
+            <p className="text-xs text-muted-foreground">
+              Vous avez droit à 1 marque gratuite incluse dans votre compte
+            </p>
+            <AddBrandDialog onSuccess={loadBrands} />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold">Marques supplémentaires</label>
+            <p className="text-xs text-muted-foreground">
+              Ajoutez des marques supplémentaires pour 39€/mois par marque
+            </p>
+            <AddPaidBrandDialog />
+          </div>
         </div>
       </CardContent>
     </Card>

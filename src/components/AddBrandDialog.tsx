@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus } from 'lucide-react';
 import { useBrandManagement } from '@/hooks/useBrandManagement';
+import { useBrandKit } from '@/hooks/useBrandKit';
 
 interface AddBrandDialogProps {
   onSuccess?: () => void;
@@ -22,6 +23,9 @@ export function AddBrandDialog({ onSuccess }: AddBrandDialogProps) {
   const [open, setOpen] = useState(false);
   const [brandName, setBrandName] = useState('');
   const { createAddonBrand, loading } = useBrandManagement();
+  const { totalBrands } = useBrandKit();
+  
+  const hasOneBrand = totalBrands >= 1;
 
   const handleCreate = async () => {
     if (!brandName.trim()) return;
@@ -38,9 +42,9 @@ export function AddBrandDialog({ onSuccess }: AddBrandDialogProps) {
     <>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" className="w-full">
+          <Button variant="outline" className="w-full" disabled={hasOneBrand}>
             <Plus className="w-4 h-4 mr-2" />
-            Ajouter une marque
+            Ajouter une marque {hasOneBrand ? '(1/1)' : ''}
           </Button>
         </DialogTrigger>
         <DialogContent>
