@@ -143,24 +143,27 @@ export default function Admin() {
       loadAdminData();
     } catch (error) {
       console.error('Affiliate status update error:', error);
-      toast.error('Impossible de mettre à jour le statut de l’affilié');
+      toast.error('Impossible de mettre à jour le statut de l\'affilié');
     }
   };
 
   const handleRemoveAffiliate = async (affiliateId: string) => {
+    if (!confirm('⚠️ Confirmer la suppression complète de cet utilisateur ? (profil, affilié, compte) Cette action est irréversible.')) {
+      return;
+    }
+
     try {
-      const { error } = await supabase
-        .from('affiliates')
-        .delete()
-        .eq('id', affiliateId);
+      const { data, error } = await supabase.functions.invoke('admin-delete-user', {
+        body: { targetUserId: affiliateId }
+      });
 
       if (error) throw error;
 
-      toast.success('Affilié purgé');
+      toast.success(data.message || 'Utilisateur supprimé complètement');
       loadAdminData();
-    } catch (error) {
-      console.error('Affiliate purge error:', error);
-      toast.error('Erreur lors de la purge de l’affilié');
+    } catch (error: any) {
+      console.error('User deletion error:', error);
+      toast.error(error.message || 'Erreur lors de la suppression de l\'utilisateur');
     }
   };
 
