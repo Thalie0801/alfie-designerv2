@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { isVipOrAdmin, isAdmin as isAdminEmail } from '@/lib/access';
+import { BrandPaymentSuccess } from '@/components/BrandPaymentSuccess';
 
 const authSchema = z.object({
   email: z.string().email({ message: "Email invalide" }),
@@ -341,6 +342,7 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen gradient-subtle flex items-center justify-center p-4">
+      <BrandPaymentSuccess />
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
