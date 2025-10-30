@@ -57,6 +57,10 @@ serve(async (req) => {
         model: "google/gemini-2.5-flash-image-preview",
         messages: [
           {
+            role: "system",
+            content: "You generate images only. Always return an image in message.images[0]. Never ask clarifying questions; infer missing details from the prompt and produce a single high-quality image."
+          },
+          {
             role: "user",
             content: userContent
           }
@@ -99,7 +103,44 @@ serve(async (req) => {
 
     if (!generatedImageUrl) {
       console.error("Full response data:", JSON.stringify(data, null, 2));
-      throw new Error("No image generated");
+      // Retry once with a stronger directive to force image output
+      const retry = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image-preview",
+          messages: [
+            {
+              role: "system",
+              content: "You are an image generator. Always produce exactly one image and include it in message.images[0]. Never ask questions or return text-only replies."
+            },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: `${fullPrompt}. Generate now.` },
+                ...(templateImageUrl ? [{ type: "image_url", image_url: { url: templateImageUrl } }] : [])
+              ]
+            }
+          ],
+          modalities: ["image", "text"]
+        })
+      });
+
+      const retryJson = await retry.json().catch(() => null);
+      console.log("Retry API Response:", JSON.stringify(retryJson, null, 2));
+      const retryUrl = retryJson?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+      if (!retryUrl) {
+        throw new Error("No image generated");
+      }
+
+      return new Response(
+        JSON.stringify({ imageUrl: retryUrl, message: retryJson?.choices?.[0]?.message?.content }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     return new Response(
