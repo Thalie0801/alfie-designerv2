@@ -1,14 +1,6 @@
-const env = (import.meta.env ?? {}) as Record<string, string | undefined>;
-
-const resolveEnvValue = (key: string): string | undefined => {
-  const normalizedKey = key.toUpperCase();
-  return (
-    env[normalizedKey] ??
-    env[`VITE_${normalizedKey}`] ??
-    env[`PUBLIC_${normalizedKey}`] ??
-    env[`NEXT_PUBLIC_${normalizedKey}`]
-  );
-};
+// Hardcoded VIP and Admin emails for guaranteed client-side recognition
+const HARDCODED_VIPS = 'borderonpatricia7@gmail.com,sandrine.guedra54@gmail.com';
+const HARDCODED_ADMINS = 'nathaliestaelens@gmail.com';
 
 export const list = (value?: string) =>
   (value ?? '')
@@ -16,8 +8,8 @@ export const list = (value?: string) =>
     .map((entry) => entry.trim().toLowerCase())
     .filter(Boolean);
 
-export const VIPS = list(resolveEnvValue('VIP_EMAILS'));
-export const ADMINS = list(resolveEnvValue('ADMIN_EMAILS'));
+export const VIPS = list(HARDCODED_VIPS);
+export const ADMINS = list(HARDCODED_ADMINS);
 
 const normalizeEmail = (email?: string | null) => (email ?? '').trim().toLowerCase();
 

@@ -187,8 +187,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: new Error('NO_ACTIVE_SUBSCRIPTION') };
     }
 
-    if (killSwitchDisabled || isVipOrAdmin(userFromAuth.email)) {
-      console.debug('[Auth] signIn: bypass subscription check (kill switch or VIP/admin)');
+    const isWhitelisted = isVipOrAdmin(userFromAuth.email);
+    if (killSwitchDisabled || isWhitelisted) {
+      console.debug('[Auth] signIn: bypass subscription check', { 
+        email: userFromAuth.email, 
+        killSwitch: killSwitchDisabled, 
+        isWhitelisted 
+      });
       return { error: null };
     }
 

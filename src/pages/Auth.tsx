@@ -100,7 +100,8 @@ export default function Auth() {
       isAuthorized,
       isWhitelisted,
       effectiveIsAuthorized,
-      flagsReady
+      flagsReady,
+      vipBypass: isWhitelisted ? 'VIP ACCESS GRANTED' : 'no bypass'
     });
     
     // 1. Admin d'abord (priorité absolue)
@@ -285,8 +286,15 @@ export default function Auth() {
             toast.error('Aucun compte trouvé avec cet email. Découvrez nos offres pour vous inscrire.');
             redirectToPricing();
           } else if (errorMsg.includes('no_active_subscription')) {
-            toast.error("Votre abonnement n'est pas actif. Choisissez un plan pour accéder au dashboard.");
-            redirectToPricing('no-sub');
+            // Défense VIP: ne jamais rediriger un VIP/admin vers pricing
+            if (isVipOrAdmin(email)) {
+              console.debug('[Auth] VIP/Admin detected, bypassing pricing redirect');
+              toast.success('Connexion réussie !');
+              // La redirection sera gérée par navigateAfterAuth
+            } else {
+              toast.error("Votre abonnement n'est pas actif. Choisissez un plan pour accéder au dashboard.");
+              redirectToPricing('no-sub');
+            }
           } else {
             toast.error(`Erreur de connexion: ${error.message}`);
           }
