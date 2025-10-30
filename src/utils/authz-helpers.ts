@@ -1,4 +1,5 @@
 import type { User } from '@supabase/supabase-js';
+import { isVipOrAdmin } from '@/lib/access';
 
 type SubscriptionLike = {
   status?: string | null;
@@ -71,6 +72,10 @@ export function isAuthorized(user: User | null, options?: {
 
   if (!user) return false;
   if (killSwitchDisabled) return true;
+  
+  // ⭐ VIP/Admin bypass - vérification par email hardcodé
+  if (isVipOrAdmin(user.email)) return true;
+  
   if (isAdmin) return true;
   if (profile?.granted_by_admin) return true;
 

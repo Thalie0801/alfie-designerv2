@@ -284,11 +284,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (subscription?.status ? ['active', 'trial', 'trialing'].includes(String(subscription.status).toLowerCase()) : false)
     )
   });
-  const computedIsAuthorized = computeIsAuthorized(user, {
+  const vipBypass = isVipOrAdmin(user?.email);
+  const computedIsAuthorized = vipBypass || computeIsAuthorized(user, {
     isAdmin: computedAdmin,
     profile,
     subscription,
     killSwitchDisabled,
+  });
+
+  console.debug('[Auth] Authorization computed:', {
+    email: user?.email,
+    vipBypass,
+    roleAdmin,
+    envAdmin,
+    computedAdmin,
+    computedIsAuthorized,
+    hasActivePlan: Boolean(
+      vipBypass ||
+      computedAdmin ||
+      profile?.granted_by_admin ||
+      (subscription?.status ? ['active', 'trial', 'trialing'].includes(String(subscription.status).toLowerCase()) : false)
+    )
   });
   const hasActivePlan = Boolean(
     computedAdmin ||
