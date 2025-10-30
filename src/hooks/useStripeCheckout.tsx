@@ -9,7 +9,8 @@ export function useStripeCheckout() {
 
   const createCheckout = async (
     plan: 'starter' | 'pro' | 'studio' | 'enterprise',
-    billingPeriod: 'monthly' | 'annual' = 'monthly'
+    billingPeriod: 'monthly' | 'annual' = 'monthly',
+    brandName?: string
   ) => {
     setLoading(true);
     try {
@@ -19,7 +20,8 @@ export function useStripeCheckout() {
         body: {
           plan,
           billing_period: billingPeriod,
-          affiliate_ref: affiliateRef
+          affiliate_ref: affiliateRef,
+          brand_name: brandName
         },
       });
 

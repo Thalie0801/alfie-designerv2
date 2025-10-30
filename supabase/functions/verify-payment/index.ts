@@ -99,6 +99,74 @@ serve(async (req) => {
     const userId = session.metadata?.user_id;
     const customerEmail = session.customer_details?.email;
     const affiliateRef = session.metadata?.affiliate_ref;
+    const brandName = session.metadata?.brand_name;
+
+    // Handle brand purchase (additional brand for existing user)
+    if (brandName && userId) {
+      console.log(`🎨 Processing brand purchase for user ${userId}, brand: ${brandName}`);
+      
+      // Get starter plan config
+      const starterConfig = PLAN_CONFIG.starter;
+      
+      // Create the new brand
+      const { data: newBrand, error: brandError } = await supabaseClient
+        .from('brands')
+        .insert({
+          user_id: userId,
+          name: brandName,
+          plan: 'starter',
+          is_addon: true,
+          quota_images: starterConfig.quota_images,
+          quota_videos: starterConfig.quota_videos,
+          quota_woofs: starterConfig.quota_woofs,
+          stripe_subscription_id: session.subscription as string,
+        })
+        .select()
+        .single();
+
+      if (brandError) {
+        console.error('Error creating brand:', brandError);
+        return new Response(
+          JSON.stringify({ 
+            code: 'BRAND_CREATION_ERROR',
+            message: 'Erreur lors de la création de la marque',
+            details: brandError.message 
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 500,
+          }
+        );
+      }
+
+      console.log(`✅ Brand created: ${newBrand.id} - ${brandName}`);
+
+      // Send confirmation email
+      try {
+        await supabaseClient.functions.invoke('send-confirmation-email', {
+          body: {
+            email: customerEmail,
+            plan: 'starter',
+            brand_name: brandName,
+          },
+        });
+      } catch (emailError) {
+        console.error('Email sending error:', emailError);
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          brand_id: newBrand.id,
+          brand_name: brandName,
+          plan: 'starter',
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
+    }
 
     if (!plan || !PLAN_CONFIG[plan as keyof typeof PLAN_CONFIG]) {
       return new Response(

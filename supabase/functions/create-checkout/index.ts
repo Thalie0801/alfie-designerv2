@@ -33,7 +33,7 @@ serve(async (req) => {
   );
 
   try {
-    const { plan, billing_period = 'monthly', affiliate_ref } = await req.json();
+    const { plan, billing_period = 'monthly', affiliate_ref, brand_name } = await req.json();
     
     const billingType = billing_period === 'annual' ? 'annual' : 'monthly';
     const planType = plan as 'starter' | 'pro' | 'studio';
@@ -82,12 +82,13 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
-      success_url: `${origin}/auth?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${origin}/?payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/?payment=canceled`,
       metadata: {
         plan,
         user_id: userId || "",
         affiliate_ref: affiliate_ref || "",
+        brand_name: brand_name || "",
       },
     });
 

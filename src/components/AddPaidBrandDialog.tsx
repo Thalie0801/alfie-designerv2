@@ -22,14 +22,10 @@ export function AddPaidBrandDialog() {
 
   const handlePayment = async () => {
     if (!brandName.trim()) return;
-
-    // Save brand name to localStorage for post-payment creation
-    localStorage.setItem('pending_paid_brand_name', brandName.trim());
     
-    // Create checkout for starter plan
-    await createCheckout('starter', 'monthly');
+    // Create Stripe checkout with brand name in metadata
+    await createCheckout('starter', 'monthly', brandName);
     
-    // Close dialog
     setOpen(false);
     setBrandName('');
   };

@@ -1,39 +1,34 @@
 import { useEffect } from 'react';
-import { useBrandManagement } from '@/hooks/useBrandManagement';
+import { useBrandKit } from '@/hooks/useBrandKit';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 
 export function BrandPaymentSuccess() {
-  const { createAddonBrand } = useBrandManagement();
+  const { loadBrands } = useBrandKit();
 
   useEffect(() => {
-    const pendingPaidBrandName = localStorage.getItem('pending_paid_brand_name');
     const params = new URLSearchParams(window.location.search);
     const payment = params.get('payment');
     const sessionId = params.get('session_id');
 
-    // Only proceed if returning from Stripe success page with a session
-    if (!pendingPaidBrandName || payment !== 'success' || !sessionId) return;
+    // Only proceed if returning from Stripe success page
+    if (payment !== 'success' || !sessionId) return;
 
+    // Brand creation is handled by verify-payment edge function
+    // Just reload brands and show success message
     (async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('verify-payment', {
-          body: { session_id: sessionId },
-        });
-        if (error) throw error;
-        if (!data?.success) {
-          return; // Do not create brand if payment not verified
-        }
-        const brand = await createAddonBrand({ name: pendingPaidBrandName });
-        if (brand) {
-          toast.success(`Marque "${pendingPaidBrandName}" créée avec succès !`);
-          localStorage.removeItem('pending_paid_brand_name');
-        }
+        // Wait a bit for the edge function to complete
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        await loadBrands();
+        toast.success('Marque créée avec succès !');
+        
+        // Clean up URL
+        window.history.replaceState({}, '', window.location.pathname);
       } catch (e: any) {
-        console.error('Payment verification failed:', e);
+        console.error('Error reloading brands:', e);
       }
     })();
-  }, [createAddonBrand]);
+  }, [loadBrands]);
 
   return null; // Invisible component
 }
