@@ -22,10 +22,6 @@ export default function Admin() {
   const [payouts, setPayouts] = useState<any[]>([]);
   const [designs, setDesigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [scraping, setScraping] = useState(false);
-  const [autoScraping, setAutoScraping] = useState(false);
-  const [newUrl, setNewUrl] = useState('');
-  const [category, setCategory] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [editingUser, setEditingUser] = useState<any>(null);
   const [editingDesign, setEditingDesign] = useState<any>(null);
@@ -82,46 +78,6 @@ export default function Admin() {
     } catch (error: any) {
       console.error('Error purging affiliates:', error);
       toast.error(error.message || 'Erreur lors de la purge des affiliés');
-    }
-  };
-
-  const handleScrape = async () => {
-    const raw = newUrl.trim();
-    if (!raw) {
-      toast.error('URL requise', { description: 'Veuillez entrer une URL Canva' });
-      return;
-    }
-
-    // Normaliser et valider l'URL
-    let normalized = raw;
-    if (normalized.startsWith('www.')) {
-      normalized = 'https://' + normalized;
-    }
-    if (!normalized.includes('canva.com')) {
-      toast.error('URL invalide', { description: 'Veuillez coller une URL Canva valide (canva.com)' });
-      return;
-    }
-
-    setScraping(true);
-    try {
-      const { error } = await supabase.functions.invoke('scrape-canva', {
-        body: { url: normalized, category },
-      });
-
-      if (error) throw error;
-
-      toast.success('Design ajouté', { description: 'Le design a été ajouté au catalogue' });
-      setNewUrl('');
-      setCategory('');
-      loadAdminData();
-    } catch (error: any) {
-      console.error('Scraping error:', error);
-      const description = (error?.message || '').includes('Valid Canva URL required')
-        ? 'URL Canva invalide. Merci de coller une URL complète canva.com.'
-        : 'Impossible de scraper ce design';
-      toast.error('Erreur', { description });
-    } finally {
-      setScraping(false);
     }
   };
 
@@ -186,30 +142,6 @@ export default function Admin() {
     } catch (error) {
       console.error('Update error:', error);
       toast.error('Erreur lors de la mise à jour');
-    }
-  };
-
-  const handleAutoScrape = async () => {
-    setAutoScraping(true);
-    try {
-      toast.info('Scraping automatique lancé...', { 
-        description: 'Cela peut prendre quelques minutes' 
-      });
-
-      const { data, error } = await supabase.functions.invoke('auto-scrape-canva-templates', {});
-
-      if (error) throw error;
-
-      toast.success('Scraping terminé !', {
-        description: `${data.added} designs ajoutés, ${data.skipped} déjà existants`
-      });
-
-      loadAdminData();
-    } catch (error) {
-      console.error('Auto-scraping error:', error);
-      toast.error('Erreur lors du scraping automatique');
-    } finally {
-      setAutoScraping(false);
     }
   };
 
@@ -630,89 +562,6 @@ export default function Admin() {
 
         {/* Catalog Tab */}
         <TabsContent value="catalog" className="space-y-4">
-          {/* Auto-scraping Card */}
-          <Card className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950 border-2 border-purple-200 dark:border-purple-800">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-purple-600" />
-                Scraping Automatique
-              </CardTitle>
-              <CardDescription>
-                Le système scrape automatiquement des templates Canva toutes les 6 heures.
-                Vous pouvez aussi lancer un scraping manuel immédiatement.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-3">
-                <Button 
-                  onClick={handleAutoScrape} 
-                  disabled={autoScraping}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                >
-                  {autoScraping ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Scraping en cours...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Lancer le scraping maintenant
-                    </>
-                  )}
-                </Button>
-                <div className="text-sm text-muted-foreground">
-                  Prochain scraping automatique dans ~{Math.floor(Math.random() * 6) + 1}h
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-strong border-2 border-primary/20">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Plus className="h-5 w-5" />
-                Ajouter un design manuellement
-              </CardTitle>
-              <CardDescription>
-                Ou ajoutez un design Canva spécifique via son URL
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col gap-4">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="URL Canva (https://www.canva.com/design/...)"
-                    value={newUrl}
-                    onChange={(e) => setNewUrl(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Niche / Catégorie" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="e-commerce">E-commerce</SelectItem>
-                      <SelectItem value="coaching">Coaching</SelectItem>
-                      <SelectItem value="immobilier">Immobilier</SelectItem>
-                      <SelectItem value="restauration">Restauration</SelectItem>
-                      <SelectItem value="mode">Mode & Beauté</SelectItem>
-                      <SelectItem value="tech">Tech & SaaS</SelectItem>
-                      <SelectItem value="sport">Sport & Fitness</SelectItem>
-                      <SelectItem value="sante">Santé & Bien-être</SelectItem>
-                      <SelectItem value="education">Éducation</SelectItem>
-                      <SelectItem value="general">Général</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button onClick={handleScrape} disabled={scraping}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    {scraping ? 'Ajout...' : 'Ajouter'}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           <Card>
             <CardHeader>
               <CardTitle>Designs du catalogue ({designs.length})</CardTitle>
