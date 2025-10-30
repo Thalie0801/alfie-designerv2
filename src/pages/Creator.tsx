@@ -136,19 +136,11 @@ export default function Creator() {
       };
     } else {
       const aspectRatio = `${w}:${h}`;
-      const { data, error: videoError } = await supabase.functions.invoke("chat-generate-video", {
+      const { data, error: videoError } = await supabase.functions.invoke("generate-video", {
         body: {
           prompt: enrichedPrompt,
           aspectRatio,
-          source: null,
-          duration,
-          fps,
-          brandKit: brandKit ? {
-            id: brandKit.id,
-            name: brandKit.name
-          } : null,
-          slideIndex: index,
-          totalSlides: slides
+          provider: "replicate"
         }
       });
       
