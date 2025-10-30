@@ -28,10 +28,22 @@ serve(async (req) => {
     }
 
     // Construire le prompt pour la génération
-    let fullPrompt = prompt || "Adapt this design maintaining the layout and structure";
-    
+    let fullPrompt = prompt || "Create a high-quality marketing visual based on the description";
+
     if (brandKit?.palette && brandKit.palette.length > 0) {
       fullPrompt += `. Use these brand colors: ${brandKit.palette.join(', ')}`;
+    }
+
+    // Construire le message en fonction de la présence d'une image modèle
+    const userContent: any[] = [
+      { type: "text", text: fullPrompt },
+    ];
+
+    if (templateImageUrl && typeof templateImageUrl === 'string' && templateImageUrl.trim().length > 0) {
+      userContent.push({
+        type: "image_url",
+        image_url: { url: templateImageUrl }
+      });
     }
 
     // Appel à l'API Lovable AI avec google/gemini-2.5-flash-image-preview
@@ -46,18 +58,7 @@ serve(async (req) => {
         messages: [
           {
             role: "user",
-            content: [
-              {
-                type: "text",
-                text: fullPrompt
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: templateImageUrl
-                }
-              }
-            ]
+            content: userContent
           }
         ],
         modalities: ["image", "text"]

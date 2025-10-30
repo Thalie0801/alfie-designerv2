@@ -50,14 +50,15 @@ export default function Creator() {
         const { data, error: imgError } = await supabase.functions.invoke("alfie-generate-ai-image", {
           body: {
             prompt,
-            templateImageUrl: null,
+            // Ne passe pas d'image modèle si elle n'existe pas
+            templateImageUrl: undefined,
             brandKit: null,
           },
         });
 
         if (imgError) throw new Error(imgError.message);
-        if (data?.generatedImageUrl) {
-          setArtifacts([{ kind: "image", uri: data.generatedImageUrl }]);
+        if (data?.imageUrl) {
+          setArtifacts([{ kind: "image", uri: data.imageUrl }]);
           setPlan((p) => [...p, "✓ Livrables prêts"]);
         }
       } else {
