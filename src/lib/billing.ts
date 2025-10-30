@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { isVip } from '@/lib/access';
 
 const ACTIVE_PLANS = new Set(['starter', 'pro', 'studio', 'enterprise']);
 
@@ -15,6 +16,12 @@ export async function hasActiveSubscriptionByEmail(
 ): Promise<boolean> {
   const normalizedEmail = (email ?? '').trim().toLowerCase();
   if (!normalizedEmail) return false;
+
+  // Si VIP par whitelist → accès garanti même sans profil
+  if (isVip(normalizedEmail)) {
+    console.debug('[billing] VIP email detected, granting access:', normalizedEmail);
+    return true;
+  }
 
   try {
     const { userId } = options ?? {};
@@ -33,6 +40,10 @@ export async function hasActiveSubscriptionByEmail(
     }
 
     if (!profile) {
+      // Si VIP mais pas de profil, logger un warning
+      if (isVip(normalizedEmail)) {
+        console.warn('[billing] VIP user without profile detected:', normalizedEmail);
+      }
       return false;
     }
 

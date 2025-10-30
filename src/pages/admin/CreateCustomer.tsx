@@ -30,6 +30,13 @@ export default function AdminCreateCustomerPage() {
       return toast.error("Mot de passe requis si l'invitation n'est pas envoyée");
     }
 
+    // Vérifier la session admin avant d'appeler l'edge function
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast.error('Session expirée, veuillez vous reconnecter');
+      return;
+    }
+
     setLoading(true);
     try {
       await adminCreateUser({
@@ -48,45 +55,8 @@ export default function AdminCreateCustomerPage() {
       setGrantedByAdmin(false);
       setPassword('');
     } catch (e: any) {
-      const msg = (e?.message || '').toLowerCase();
-      if (msg.includes('already') || msg.includes('exists') || msg.includes('email_exists')) {
-        try {
-          const { data: existing, error: findErr } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('email', email)
-            .maybeSingle();
-
-          if (findErr) throw findErr;
-
-          if (existing?.id) {
-            const { error: upErr } = await supabase
-              .from('profiles')
-              .update({
-                plan,
-                granted_by_admin: grantedByAdmin,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', existing.id);
-
-            if (upErr) throw upErr;
-
-            toast.success('Profil existant mis à jour ✅');
-            setEmail('');
-            setFullName('');
-            setPlan('starter');
-            setSendInvite(true);
-            setGrantedByAdmin(false);
-            setPassword('');
-          } else {
-            toast.error('Utilisateur existant mais profil introuvable');
-          }
-        } catch (err: any) {
-          toast.error(err?.message || 'Impossible de mettre à jour le profil.');
-        }
-      } else {
-        toast.error(e?.message || 'Échec de la création');
-      }
+      console.error('[CreateCustomer] Error creating user:', e);
+      toast.error(e?.message || 'Échec de la création');
     } finally {
       setLoading(false);
     }

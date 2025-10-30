@@ -10,6 +10,13 @@ interface CreateUserParams {
 }
 
 export async function adminCreateUser(params: CreateUserParams) {
+  console.debug('[admin-api] Calling admin-create-user with:', { 
+    email: params.email, 
+    plan: params.plan,
+    sendInvite: params.sendInvite,
+    grantedByAdmin: params.grantedByAdmin 
+  });
+
   const { data, error } = await supabase.functions.invoke('admin-create-user', {
     body: {
       email: params.email,
@@ -22,10 +29,11 @@ export async function adminCreateUser(params: CreateUserParams) {
   });
 
   if (error) {
-    console.error('Error invoking admin-create-user:', error);
+    console.error('[admin-api] Error invoking admin-create-user:', error);
     throw new Error(error.message || "Erreur lors de l'appel à l'Edge Function admin-create-user");
   }
 
+  console.debug('[admin-api] Success:', data);
   return data;
 }
 
