@@ -5,14 +5,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useBrandKit, BrandKit } from "@/hooks/useBrandKit";
 
+type Mode = "image" | "video";
+
 type Artifact = { 
   kind: "image" | "video"; 
   uri: string; 
   meta?: { 
     index?: number; 
     resolution?: string; 
-    brandId?: string; 
-    brandName?: string;
+    brandId?: string | null; 
+    brandName?: string | null;
     overlay?: boolean;
     duration?: number;
     fps?: number;
@@ -25,45 +27,42 @@ const RESOLUTIONS = [
   { label: "Story (1080x1920)", value: "1080x1920" },
   { label: "Paysage (1920x1080)", value: "1920x1080" },
   { label: "Ultra HD (3840x2160)", value: "3840x2160" }
-];
+] as const;
 
-const DEFAULT_PLAN = [
-  "1) Préparer prompt visuel",
-  "2) Générer {image|vidéo}",
-  "3) (Option) Poser le texte fourni",
-  "4) Vérifier lisibilité & formats",
-  "5) Exporter & sauvegarder"
-];
-
-const parseWH = (r: string) => {
-  const [w, h] = r.split("x").map((n) => parseInt(n, 10));
-  return { w: w || 1080, h: h || 1350 };
-};
+function parseWH(res: string): { w: number; h: number } {
+  const m = res.match(/^(\d+)\s*x\s*(\d+)$/i);
+  if (!m) return { w: 1080, h: 1350 };
+  const w = Math.max(1, parseInt(m[1], 10));
+  const h = Math.max(1, parseInt(m[2], 10));
+  return { w, h };
+}
 
 function buildBrandAwarePrompt(userPrompt: string, brand?: BrandKit | null): string {
-  if (!brand) return userPrompt;
-  
+  if (!brand) return userPrompt?.trim() || "";
+
   let paletteStr = "";
-  if (Array.isArray(brand.palette)) {
-    paletteStr = `primary ${brand.palette[0] || "auto"}, accents ${brand.palette.slice(1).join(", ")}`;
-  } else if (typeof brand.palette === "object" && brand.palette !== null) {
-    const p = brand.palette as any;
-    const accents = Array.isArray(p.accents) ? p.accents.join(", ") : "—";
-    paletteStr = `primary ${p.primary || "auto"}, secondary ${p.secondary || "auto"}, accents ${accents}`;
+  const pal = brand.palette as any;
+  if (Array.isArray(pal)) {
+    paletteStr = `primary ${pal[0] ?? "auto"}, accents ${pal.slice(1).filter(Boolean).join(", ") || "—"}`;
+  } else if (pal && typeof pal === "object") {
+    const accents = Array.isArray(pal.accents) ? pal.accents.filter(Boolean).join(", ") : "—";
+    paletteStr = `primary ${pal.primary ?? "auto"}, secondary ${pal.secondary ?? "auto"}, accents ${accents}`;
+  } else {
+    paletteStr = "auto";
   }
-  
+
   const fontsStr = brand.fonts
     ? `headings ${brand.fonts.primary || "sans-serif"}, body ${brand.fonts.secondary || "sans-serif"}`
     : "cohérentes à la marque";
-  
+
   return [
-    userPrompt,
-    `\n--- Brand Guidelines ---`,
+    userPrompt?.trim() || "",
+    `--- Brand Guidelines ---`,
     `Brand: ${brand.name || "Non spécifiée"}`,
     `Colors → ${paletteStr}`,
     `Tone: ${brand.voice || "cohérent à la marque"}`,
     `Typography vibe: ${fontsStr}`,
-    `Avoid: low contrast, off-brand colors, generic stock vibes`
+    `Avoid: low contrast, off-brand colors, generic stock vibes`,
   ].join("\n");
 }
 
@@ -71,7 +70,7 @@ export default function Creator() {
   const { toast } = useToast();
   const { brands, activeBrandId, setActiveBrand, brandKit } = useBrandKit();
   
-  const [mode, setMode] = useState<"image" | "video">("image");
+  const [mode, setMode] = useState<Mode>("image");
   const [prompt, setPrompt] = useState("");
   const [headline, setHeadline] = useState("");
   const [caption, setCaption] = useState("");
@@ -89,6 +88,14 @@ export default function Creator() {
   const [error, setError] = useState<string | null>(null);
 
   const missingSocialCaption = socialCaption.trim() === "";
+  
+  const DEFAULT_PLAN = [
+    "1) Préparer prompt visuel",
+    `2) Générer ${slides} ${mode === "video" ? "vidéo(s)" : "image(s)"}`,
+    "3) (Option) Poser le texte fourni",
+    "4) Vérifier lisibilité & formats",
+    "5) Exporter & sauvegarder",
+  ];
 
   async function generateSingleSlide(index: number): Promise<Artifact> {
     const enrichedPrompt = buildBrandAwarePrompt(prompt, brandKit);
@@ -113,8 +120,8 @@ export default function Creator() {
         }
       });
       
-      if (imgError) throw new Error(imgError.message);
-      if (!data?.imageUrl) throw new Error("Aucune URL d'image renvoyée");
+      if (imgError) throw new Error(`Image: ${imgError.message || "échec d'invocation"}`);
+      if (!data?.imageUrl) throw new Error("Image: aucune URL renvoyée par le backend");
       
       return {
         kind: "image",
@@ -122,9 +129,9 @@ export default function Creator() {
         meta: {
           index,
           resolution,
-          brandId: brandKit?.id,
-          brandName: brandKit?.name,
-          overlay: writeOnSlides && (headline.trim() !== "" || caption.trim() !== "" || cta.trim() !== "")
+          brandId: brandKit?.id ?? null,
+          brandName: brandKit?.name ?? null,
+          overlay: !!(writeOnSlides && (headline || caption || cta))
         }
       };
     } else {
@@ -145,9 +152,9 @@ export default function Creator() {
         }
       });
       
-      if (videoError) throw new Error(videoError.message);
-      const videoUrl = data?.videoUrl || data?.url;
-      if (!videoUrl) throw new Error("Aucune URL vidéo renvoyée");
+      if (videoError) throw new Error(`Vidéo: ${videoError.message || "échec d'invocation"}`);
+      const videoUrl: string | undefined = data?.videoUrl || data?.url;
+      if (!videoUrl) throw new Error("Vidéo: aucune URL renvoyée par le backend");
       
       return {
         kind: "video",
@@ -157,14 +164,18 @@ export default function Creator() {
           resolution,
           duration,
           fps,
-          brandId: brandKit?.id,
-          brandName: brandKit?.name
+          brandId: brandKit?.id ?? null,
+          brandName: brandKit?.name ?? null
         }
       };
     }
   }
 
   async function handleGenerate() {
+    if (!resolution.match(/^\d+x\d+$/)) {
+      toast({ title: "Résolution invalide", description: "Format attendu: LxH (ex: 1080x1350)", variant: "destructive" });
+      return;
+    }
     if (slides < 1 || slides > 20) {
       toast({ 
         title: "Erreur", 
@@ -177,7 +188,7 @@ export default function Creator() {
     setLoading(true);
     setError(null);
     setArtifacts([]);
-    setPlan(DEFAULT_PLAN.map(s => s.replace("{image|vidéo}", mode === "video" ? "vidéo" : "image")));
+    setPlan(DEFAULT_PLAN);
     
     try {
       const results: Artifact[] = [];
@@ -256,10 +267,14 @@ export default function Creator() {
                     onChange={(e) => setActiveBrand(e.target.value)}
                     className="mt-1 w-full rounded-xl border border-input bg-background p-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <option value="">Aucune marque</option>
-                    {brands.map(b => (
+                  <option value="">Aucune marque</option>
+                  {Array.isArray(brands) && brands.length > 0 ? (
+                    brands.map(b => (
                       <option key={b.id} value={b.id}>{b.name}</option>
-                    ))}
+                    ))
+                  ) : (
+                    <option disabled>Aucune marque disponible</option>
+                  )}
                   </select>
                   {brandKit && brandKit.palette.length > 0 && (
                     <div className="mt-1 flex gap-1">
@@ -423,7 +438,7 @@ export default function Creator() {
                   aria-disabled={!canGenerate}
                 >
                   {loading 
-                    ? `Génération ${artifacts.length + 1}/${slides}…` 
+                    ? `Génération ${Math.min(artifacts.length + 1, slides)}/${slides}…` 
                     : `Générer ${slides} ${mode === "video" ? "vidéo(s)" : "image(s)"}`
                   }
                 </button>
