@@ -204,7 +204,12 @@ export function GeneratorCard({
                 onChange={(event) => onInputChange(event.target.value)}
                 onKeyDown={onKeyDown}
                 disabled={isTextareaDisabled}
-                className="min-h-[120px] flex-1 resize-none rounded-2xl border-slate-200 bg-white px-4 py-3 text-base focus-visible:ring-2 focus-visible:ring-blue-500 transition-shadow"
+                className="min-h-[120px] flex-1 resize-none rounded-2xl border-slate-200 bg-white px-4 py-3 text-base text-gray-900 placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-blue-500 transition-shadow disabled:opacity-60"
+                style={{
+                  WebkitTextFillColor: '#111827',
+                  color: '#111827',
+                  zIndex: 2,
+                }}
               />
               <Button
                 type="button"

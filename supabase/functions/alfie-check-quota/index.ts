@@ -31,31 +31,36 @@ serve(async (req) => {
       );
     }
 
-    const { cost_woofs } = await req.json();
+    const { cost_woofs, brand_id } = await req.json();
 
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("quota_videos, woofs_consumed_this_month")
-      .eq("id", user.id)
-      .single();
+    // Appeler get-quota pour avoir la source de vérité unique
+    const quotaResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/get-quota`, {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader!,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ brand_id }),
+    });
 
-    if (error || !profile) {
+    if (!quotaResponse.ok) {
+      const errorData = await quotaResponse.json();
       return new Response(
-        JSON.stringify({ error: "Profil non trouvé" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: errorData.error || 'Failed to check quota' }),
+        { status: quotaResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const quotaTotal = profile.quota_videos || 0;
-    const consumed = profile.woofs_consumed_this_month || 0;
-    const remaining = quotaTotal - consumed;
+    const quota = await quotaResponse.json();
+
+    const remaining = quota.woofs_remaining;
     const ok = remaining >= cost_woofs;
 
     return new Response(
       JSON.stringify({
         ok,
         remaining,
-        quota_total: quotaTotal,
+        quota_total: quota.woofs_quota,
         new_balance_if_ok: ok ? remaining - cost_woofs : remaining,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

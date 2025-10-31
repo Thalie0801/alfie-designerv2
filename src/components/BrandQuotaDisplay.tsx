@@ -4,11 +4,12 @@ import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertCircle, Info, Zap } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { getQuotaStatus, checkQuotaAlert, QuotaStatus } from '@/utils/quotaManager';
+import { checkQuotaAlert, QuotaStatus } from '@/utils/quotaManager';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { BrandUpgradeDialog } from './BrandUpgradeDialog';
 import { WoofsPackDialog } from './WoofsPackDialog';
 import { BrandTier } from '@/hooks/useBrandManagement';
+import { supabase } from '@/integrations/supabase/client';
 
 export function BrandQuotaDisplay() {
   const { activeBrandId, activeBrand } = useBrandKit();
@@ -25,9 +26,41 @@ export function BrandQuotaDisplay() {
       return;
     }
 
-    const status = await getQuotaStatus(activeBrandId);
-    setQuotaStatus(status);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase.functions.invoke('get-quota', {
+        body: { brand_id: activeBrandId }
+      });
+
+      if (error) throw error;
+
+      setQuotaStatus({
+        visuals: {
+          used: data.visuals_used,
+          limit: data.visuals_quota,
+          percentage: (data.visuals_used / Math.max(1, data.visuals_quota)) * 100,
+          canGenerate: data.visuals_remaining > 0
+        },
+        videos: {
+          used: data.woofs_used,
+          limit: data.woofs_quota,
+          percentage: (data.woofs_used / Math.max(1, data.woofs_quota)) * 100,
+          canGenerate: data.woofs_remaining > 0
+        },
+        woofs: {
+          consumed: data.woofs_used,
+          limit: data.woofs_quota,
+          remaining: data.woofs_remaining,
+          canUse: (cost: number) => data.woofs_remaining >= cost
+        },
+        brandName: activeBrand?.name,
+        plan: data.plan,
+        resetsOn: data.reset_date
+      });
+    } catch (error) {
+      console.error('Error loading quotas:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading || !quotaStatus) {

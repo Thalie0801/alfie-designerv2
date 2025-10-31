@@ -20,13 +20,12 @@ serve(async (req) => {
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
     if (authError || !user) {
       return new Response(
         JSON.stringify({ error: 'Invalid authentication' }),
@@ -34,43 +33,45 @@ serve(async (req) => {
       );
     }
 
-    // Récupérer le profil utilisateur
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
+    // Appeler la nouvelle fonction get-quota unifiée
+    const quotaResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/get-quota`, {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
 
-    if (profileError || !profile) {
+    if (!quotaResponse.ok) {
+      const errorData = await quotaResponse.json();
       return new Response(
-        JSON.stringify({ error: 'Profile not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: errorData.error || 'Failed to fetch quota' }),
+        { status: quotaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Récupérer la config du plan
+    const quotaData = await quotaResponse.json();
+
+    // Récupérer storage_days depuis plans_config
     const { data: planConfig } = await supabase
       .from('plans_config')
-      .select('*')
-      .eq('plan', profile.plan || 'starter')
+      .select('storage_days')
+      .eq('plan', quotaData.plan || 'starter')
       .single();
 
-    const woofsTotal = planConfig?.woofs_per_month || profile.quota_videos || 0;
-    const woofsUsed = profile.woofs_consumed_this_month || 0;
-    const visualsTotal = planConfig?.visuals_per_month || profile.quota_visuals_per_month || 0;
-    const visualsUsed = profile.generations_this_month || 0;
-
+    // Format de compatibilité avec l'ancien get-credits
     return new Response(
       JSON.stringify({
-        plan: profile.plan || 'none',
-        woofs_total: woofsTotal,
-        woofs_used: woofsUsed,
-        woofs_remaining: Math.max(0, woofsTotal - woofsUsed),
-        visuals_total: visualsTotal,
-        visuals_used: visualsUsed,
-        visuals_remaining: Math.max(0, visualsTotal - visualsUsed),
-        reset_date: profile.generations_reset_date,
-        storage_days: planConfig?.storage_days || 30
+        plan: quotaData.plan,
+        woofs_total: quotaData.woofs_quota,
+        woofs_used: quotaData.woofs_used,
+        woofs_remaining: quotaData.woofs_remaining,
+        visuals_total: quotaData.visuals_quota,
+        visuals_used: quotaData.visuals_used,
+        visuals_remaining: quotaData.visuals_remaining,
+        reset_date: quotaData.reset_date,
+        storage_days: planConfig?.storage_days || 30,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
