@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { callEdge } from '@/lib/edgeClient';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle } from 'lucide-react';
 
 interface QuotaData {
-  visuals_total: number;
-  visuals_used: number;
-  visuals_remaining: number;
-  woofs_total: number;
+  woofs_quota: number;
   woofs_used: number;
   woofs_remaining: number;
+  visuals_quota: number;
+  visuals_used: number;
+  visuals_remaining: number;
   plan: string;
   reset_date: string | null;
 }
@@ -37,13 +37,13 @@ export function QuotaBar({ activeBrandId }: QuotaBarProps) {
       setLoading(true);
       setError(null);
 
-      const { data, error: fnError } = await supabase.functions.invoke('get-quota', {
-        body: { brand_id: activeBrandId }
-      });
+      const result = await callEdge('get-quota', { brand_id: activeBrandId }, { silent: true });
 
-      if (fnError) throw fnError;
+      if (!result.ok) {
+        throw new Error(result.error || 'Erreur de chargement des quotas');
+      }
 
-      setQuota(data);
+      setQuota(result.data);
     } catch (err: any) {
       console.error('Error fetching quota:', err);
       setError(err.message || 'Erreur de chargement des quotas');
@@ -74,8 +74,8 @@ export function QuotaBar({ activeBrandId }: QuotaBarProps) {
     );
   }
 
-  const visualsPercent = Math.round((quota.visuals_used / quota.visuals_total) * 100);
-  const woofsPercent = Math.round((quota.woofs_used / quota.woofs_total) * 100);
+  const visualsPercent = Math.round((quota.visuals_used / quota.visuals_quota) * 100);
+  const woofsPercent = Math.round((quota.woofs_used / quota.woofs_quota) * 100);
 
   const getQuotaColor = (percent: number) => {
     if (percent >= 90) return 'text-destructive';
@@ -96,13 +96,13 @@ export function QuotaBar({ activeBrandId }: QuotaBarProps) {
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted text-sm font-medium ${getQuotaColor(visualsPercent)}`}>
             <span className="text-xs">📸</span>
             <span>
-              Visuels : {quota.visuals_remaining}/{quota.visuals_total}
+              Visuels : {quota.visuals_remaining}/{quota.visuals_quota}
             </span>
           </div>
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted text-sm font-medium ${getQuotaColor(woofsPercent)}`}>
             <span className="text-xs">🐾</span>
             <span>
-              Woofs : {quota.woofs_remaining}/{quota.woofs_total}
+              Woofs : {quota.woofs_remaining}/{quota.woofs_quota}
             </span>
           </div>
         </div>
