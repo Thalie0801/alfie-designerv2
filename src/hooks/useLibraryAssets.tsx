@@ -339,26 +339,38 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
 
   const downloadAsset = async (assetId: string) => {
     const asset = assets.find(a => a.id === assetId);
-    if (!asset) return;
+    if (!asset) {
+      console.error('[Download] Asset not found in local state:', assetId);
+      toast.error('Asset introuvable');
+      return;
+    }
 
-    console.log('[LibraryAssets] Downloading asset:', assetId);
+    console.log('[Download] Starting download for asset:', assetId);
+    console.log('[Download] Asset type:', asset.type);
+    console.log('[Download] Asset status:', asset.status);
 
     try {
       // Load the full output_url from database (not in initial query to avoid heavy load)
       const { data: fullAsset, error } = await supabase
         .from('media_generations')
-        .select('output_url')
+        .select('output_url, type, status')
         .eq('id', assetId)
         .single();
       
+      console.log('[Download] DB query result:', { fullAsset, error });
+      
       if (error) {
-        console.error('[LibraryAssets] Error loading asset for download:', error);
+        console.error('[Download] Error loading asset from DB:', error);
         throw error;
       }
       
       const outputUrl = fullAsset?.output_url;
       
+      console.log('[Download] Output URL:', outputUrl ? `${outputUrl.substring(0, 100)}...` : 'null');
+      console.log('[Download] Output URL type:', outputUrl?.startsWith('data:') ? 'base64' : outputUrl?.startsWith('http') ? 'http' : 'unknown');
+      
       if (!outputUrl) {
+        console.warn('[Download] No output_url found in DB');
         toast.info(asset.type === 'video' ? 'Vidéo encore en génération… réessayez dans quelques minutes.' : "Fichier indisponible");
         return;
       }
