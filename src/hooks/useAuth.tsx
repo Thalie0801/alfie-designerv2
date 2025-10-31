@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { isAuthorized as computeIsAuthorized } from '@/utils/authz-helpers';
-import { isVipOrAdmin, isAdmin as isAdminEmail } from '@/lib/access';
+import { hasRole } from '@/lib/access';
 import { hasActiveSubscriptionByEmail } from '@/lib/billing';
 
 interface AuthContextType {
@@ -46,18 +46,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return true;
     }
 
-    // Vérifier d'abord si l'utilisateur est VIP ou Admin par email
-    if (isVipOrAdmin(currentUser.email)) {
-      console.debug('[Auth] ensureActiveSubscription: user is VIP/Admin by email');
-      return true;
-    }
+    // Vérifier si l'utilisateur a un rôle VIP ou Admin via la DB
+    const { data: rolesData } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', currentUser.id);
+    
+    const userRoles = (rolesData || []).map(r => r.role);
+    const isVipOrAdmin = userRoles.includes('vip') || userRoles.includes('admin');
 
-    // Vérifier également si l'utilisateur a un rôle admin via RPC (bypass RLS)
-    const { data: isAdminRpc, error: rpcError } = await supabase
-      .rpc('has_role', { _user_id: currentUser.id, _role: 'admin' });
-
-    if (!rpcError && isAdminRpc === true) {
-      console.debug('[Auth] ensureActiveSubscription: user is admin via RPC');
+    if (isVipOrAdmin) {
+      console.debug('[Auth] ensureActiveSubscription: user has VIP/Admin role from database', { roles: userRoles });
       return true;
     }
 
@@ -187,22 +186,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: new Error('NO_ACTIVE_SUBSCRIPTION') };
     }
 
-    const isWhitelisted = isVipOrAdmin(userFromAuth.email);
-    if (killSwitchDisabled || isWhitelisted) {
+    // Vérifier si l'utilisateur a un rôle VIP ou Admin via la DB
+    const { data: rolesData } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userFromAuth.id);
+    
+    const userRoles = (rolesData || []).map(r => r.role);
+    const isVipOrAdmin = userRoles.includes('vip') || userRoles.includes('admin');
+
+    if (killSwitchDisabled || isVipOrAdmin) {
       console.debug('[Auth] signIn: bypass subscription check', { 
         email: userFromAuth.email, 
         killSwitch: killSwitchDisabled, 
-        isWhitelisted 
+        roles: userRoles,
+        isVipOrAdmin
       });
-      return { error: null };
-    }
-
-    // Vérifier si admin via RPC avant de check l'abonnement
-    const { data: isAdminRpc, error: rpcError } = await supabase
-      .rpc('has_role', { _user_id: userFromAuth.id, _role: 'admin' });
-    
-    if (!rpcError && isAdminRpc === true) {
-      console.debug('[Auth] signIn: user is admin via RPC, bypassing subscription check');
       return { error: null };
     }
 
@@ -269,16 +268,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
-  const roleAdmin = roles.includes('admin');
-  const envAdmin = isAdminEmail(user?.email);
-  const computedAdmin = roleAdmin || envAdmin;
+  // Calculer les statuts VIP et Admin depuis les rôles de la DB
+  const roleAdmin = hasRole(roles, 'admin');
+  const roleVip = hasRole(roles, 'vip');
+  const computedAdmin = roleAdmin;
   
-  // 1. Calculer vipBypass en premier
-  const vipBypass = isVipOrAdmin(user?.email);
+  // 1. Calculer vipBypass en premier (VIP ou Admin)
+  const vipBypass = roleVip || roleAdmin;
   
   // 2. Calculer computedIsAuthorized avec vipBypass
   const computedIsAuthorized = vipBypass || computeIsAuthorized(user, {
     isAdmin: computedAdmin,
+    roles,
     profile,
     subscription,
     killSwitchDisabled,
@@ -289,7 +290,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: user?.email,
     vipBypass,
     roleAdmin,
-    envAdmin,
     computedAdmin,
     computedIsAuthorized,
     hasActivePlan: Boolean(

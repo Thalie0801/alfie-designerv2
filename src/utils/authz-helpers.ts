@@ -1,5 +1,5 @@
 import type { User } from '@supabase/supabase-js';
-import { isVipOrAdmin } from '@/lib/access';
+import { hasRole } from '@/lib/access';
 
 type SubscriptionLike = {
   status?: string | null;
@@ -57,6 +57,7 @@ type ProfileLike = {
  * 
  * @param user - Utilisateur Supabase (auth.users)
  * @param options.isAdmin - True si l'utilisateur a le rôle 'admin' dans user_roles
+ * @param options.roles - Rôles de l'utilisateur chargés depuis user_roles
  * @param options.profile - Profil utilisateur (profiles table)
  * @param options.subscription - Abonnement Stripe éventuel
  * @param options.killSwitchDisabled - True si AUTH_ENFORCEMENT=off (dev only)
@@ -64,17 +65,19 @@ type ProfileLike = {
  */
 export function isAuthorized(user: User | null, options?: {
   isAdmin?: boolean;
+  roles?: string[];
   profile?: ProfileLike;
   subscription?: SubscriptionLike;
   killSwitchDisabled?: boolean;
 }): boolean {
-  const { isAdmin = false, profile, subscription, killSwitchDisabled = false } = options ?? {};
+  const { isAdmin = false, roles = [], profile, subscription, killSwitchDisabled = false } = options ?? {};
 
   if (!user) return false;
   if (killSwitchDisabled) return true;
   
-  // ⭐ VIP/Admin bypass - vérification par email hardcodé
-  if (isVipOrAdmin(user.email)) return true;
+  // ⭐ VIP/Admin bypass - vérification par rôle DB
+  const isVipOrAdmin = hasRole(roles, 'vip') || hasRole(roles, 'admin');
+  if (isVipOrAdmin) return true;
   
   if (isAdmin) return true;
   if (profile?.granted_by_admin) return true;

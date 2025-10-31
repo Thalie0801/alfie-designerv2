@@ -13,27 +13,21 @@ export async function userHasAccess(authHeader: string | null) {
   const { data: { user } } = await client.auth.getUser();
   if (!user) return false;
 
-  // Check VIP status
-  const vipEmails = (Deno.env.get("VIP_EMAILS") ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
+  // Check VIP/ADMIN status via database roles
+  const { data: roles } = await client
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", user.id);
   
-  const isVip = vipEmails.includes(user.email?.toLowerCase() ?? "");
-  
-  // Check ADMIN status
-  const adminEmails = (Deno.env.get("ADMIN_EMAILS") ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  
-  const isAdmin = adminEmails.includes(user.email?.toLowerCase() ?? "");
+  const userRoles = (roles || []).map(r => r.role);
+  const isVip = userRoles.includes('vip');
+  const isAdmin = userRoles.includes('admin');
   
   // Log diagnostic pour debug
-  console.log(`[AccessControl] Checking access for: ${user.email} | VIP list: ${vipEmails.join(',')} | Admin list: ${adminEmails.join(',')} | isVip: ${isVip} | isAdmin: ${isAdmin}`);
+  console.log(`[AccessControl] Checking access for: ${user.email} | Roles: ${userRoles.join(',')} | isVip: ${isVip} | isAdmin: ${isAdmin}`);
   
   if (isVip || isAdmin) {
-    console.log(`[AccessControl] ✅ Access granted via ${isVip ? 'VIP' : 'ADMIN'} status`);
+    console.log(`[AccessControl] ✅ Access granted via ${isVip ? 'VIP' : 'ADMIN'} role from database`);
     return true;
   }
 

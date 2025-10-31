@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect, useState } from 'react';
-import { isVipOrAdmin, isAdmin as isAdminEmail } from '@/lib/access';
+import { hasRole } from '@/lib/access';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -10,17 +10,17 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
-  const { user, isAdmin, isAuthorized, loading, refreshProfile } = useAuth();
+  const { user, isAdmin, isAuthorized, roles, loading, refreshProfile } = useAuth();
   const [checkingAdmin, setCheckingAdmin] = useState(false);
 
   // ============================================================================
   // LOGIQUE WHITELIST: Accès dashboard forcé pour comptes exceptionnels
   // ============================================================================
-  const isWhitelisted = isVipOrAdmin(user?.email);
+  const isWhitelisted = hasRole(roles, 'vip') || hasRole(roles, 'admin');
 
   // Flags effectifs pour la navigation (whitelist ou autorisé normalement)
   const effectiveIsAuthorized = isAuthorized || isWhitelisted;
-  const effectiveIsAdmin = isAdmin || isAdminEmail(user?.email); // Admin garde toujours la priorité
+  const effectiveIsAdmin = isAdmin; // Admin déjà calculé dans useAuth
 
   useEffect(() => {
     if (requireAdmin && user && !effectiveIsAdmin && !checkingAdmin) {

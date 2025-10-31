@@ -9,7 +9,7 @@ import { Sparkles, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
-import { isVipOrAdmin, isAdmin as isAdminEmail } from '@/lib/access';
+import { hasRole } from '@/lib/access';
 
 const authSchema = z.object({
   email: z.string().email({ message: "Email invalide" }),
@@ -20,7 +20,7 @@ const authSchema = z.object({
 export default function Auth() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { signIn, signUp, user, isAdmin, isAuthorized, loading: authLoading } = useAuth();
+  const { signIn, signUp, user, isAdmin, isAuthorized, roles, loading: authLoading } = useAuth();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,11 +45,11 @@ export default function Auth() {
   // ============================================================================
   // LOGIQUE WHITELIST: Accès dashboard forcé pour comptes exceptionnels
   // ============================================================================
-  const isWhitelisted = isVipOrAdmin(user?.email);
+  const isWhitelisted = hasRole(roles, 'vip') || hasRole(roles, 'admin');
 
   // Flags effectifs pour la navigation (whitelist ou autorisé normalement)
   const effectiveIsAuthorized = isAuthorized || isWhitelisted;
-  const effectiveIsAdmin = isAdmin || isAdminEmail(user?.email); // Admin garde toujours la priorité
+  const effectiveIsAdmin = isAdmin; // Admin déjà calculé dans useAuth
 
   // Vérifier si l'utilisateur vient d'un paiement
   const sessionId = searchParams.get('session_id');
@@ -283,15 +283,8 @@ export default function Auth() {
             toast.error('Aucun compte trouvé avec cet email. Découvrez nos offres pour vous inscrire.');
             redirectToPricing();
           } else if (errorMsg.includes('no_active_subscription')) {
-            // Défense VIP: ne jamais rediriger un VIP/admin vers pricing
-            if (isVipOrAdmin(email)) {
-              console.debug('[Auth] VIP/Admin detected, bypassing pricing redirect');
-              toast.success('Connexion réussie !');
-              // La redirection sera gérée par navigateAfterAuth
-            } else {
-              toast.error("Votre abonnement n'est pas actif. Choisissez un plan pour accéder au dashboard.");
-              redirectToPricing('no-sub');
-            }
+            toast.error("Votre abonnement n'est pas actif. Choisissez un plan pour accéder au dashboard.");
+            redirectToPricing('no-sub');
           } else {
             toast.error(`Erreur de connexion: ${error.message}`);
           }

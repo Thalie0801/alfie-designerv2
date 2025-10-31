@@ -1,28 +1,74 @@
-// Hardcoded VIP and Admin emails for guaranteed client-side recognition
-const HARDCODED_VIPS = 'borderonpatricia7@gmail.com,sandrine.guedra54@gmail.com';
-const HARDCODED_ADMINS = 'nathaliestaelens@gmail.com';
+import { supabase } from '@/integrations/supabase/client';
 
-export const list = (value?: string) =>
-  (value ?? '')
-    .split(',')
-    .map((entry) => entry.trim().toLowerCase())
-    .filter(Boolean);
+// Cache pour éviter les appels répétés
+const roleCache = new Map<string, { roles: string[], timestamp: number }>();
+const CACHE_TTL = 60000; // 1 minute
 
-export const VIPS = list(HARDCODED_VIPS);
-export const ADMINS = list(HARDCODED_ADMINS);
+/**
+ * Récupère les rôles d'un utilisateur depuis la base de données
+ * Utilise un cache pour optimiser les performances
+ */
+export async function getUserRoles(userId: string): Promise<string[]> {
+  const cached = roleCache.get(userId);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.roles;
+  }
 
-const normalizeEmail = (email?: string | null) => (email ?? '').trim().toLowerCase();
+  const { data, error } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', userId);
 
-export const isVip = (email?: string | null) => {
-  const normalized = normalizeEmail(email);
-  return Boolean(normalized) && VIPS.includes(normalized);
-};
+  if (error || !data) {
+    console.error('[Access] Error fetching roles:', error);
+    return [];
+  }
 
-export const isAdmin = (email?: string | null) => {
-  const normalized = normalizeEmail(email);
-  return Boolean(normalized) && ADMINS.includes(normalized);
-};
+  const roles = data.map(r => r.role);
+  roleCache.set(userId, { roles, timestamp: Date.now() });
+  return roles;
+}
 
-export const isVipOrAdmin = (email?: string | null) => isVip(email) || isAdmin(email);
+/**
+ * Vérifie si un utilisateur a le rôle VIP
+ */
+export async function isVip(userId: string): Promise<boolean> {
+  const roles = await getUserRoles(userId);
+  return roles.includes('vip');
+}
 
-export { normalizeEmail };
+/**
+ * Vérifie si un utilisateur a le rôle Admin
+ */
+export async function isAdmin(userId: string): Promise<boolean> {
+  const roles = await getUserRoles(userId);
+  return roles.includes('admin');
+}
+
+/**
+ * Vérifie si un utilisateur a le rôle VIP ou Admin
+ */
+export async function isVipOrAdmin(userId: string): Promise<boolean> {
+  const roles = await getUserRoles(userId);
+  return roles.includes('vip') || roles.includes('admin');
+}
+
+/**
+ * Version synchrone pour vérifier si un rôle est présent
+ * À utiliser quand les rôles ont déjà été chargés
+ */
+export function hasRole(roles: string[], targetRole: string): boolean {
+  return roles.includes(targetRole);
+}
+
+/**
+ * Efface le cache des rôles pour un utilisateur
+ * Utile après une modification des rôles
+ */
+export function clearRoleCache(userId?: string) {
+  if (userId) {
+    roleCache.delete(userId);
+  } else {
+    roleCache.clear();
+  }
+}

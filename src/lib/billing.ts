@@ -17,10 +17,14 @@ export async function hasActiveSubscriptionByEmail(
   const normalizedEmail = (email ?? '').trim().toLowerCase();
   if (!normalizedEmail) return false;
 
-  // Si VIP par whitelist → accès garanti même sans profil
-  if (isVip(normalizedEmail)) {
-    console.debug('[billing] VIP email detected, granting access:', normalizedEmail);
-    return true;
+  // Si VIP par rôle DB → accès garanti même sans profil
+  const { userId } = options ?? {};
+  if (userId) {
+    const hasVipRole = await isVip(userId);
+    if (hasVipRole) {
+      console.debug('[billing] VIP role detected, granting access:', normalizedEmail);
+      return true;
+    }
   }
 
   try {
@@ -40,10 +44,6 @@ export async function hasActiveSubscriptionByEmail(
     }
 
     if (!profile) {
-      // Si VIP mais pas de profil, logger un warning
-      if (isVip(normalizedEmail)) {
-        console.warn('[billing] VIP user without profile detected:', normalizedEmail);
-      }
       return false;
     }
 
