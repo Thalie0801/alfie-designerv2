@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { AccessGuard } from "@/components/AccessGuard";
 import { AeditusCard } from "@/components/AeditusCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -304,8 +303,7 @@ export default function Creator() {
   const canGenerate = !loading && prompt.trim() !== "" && slides >= 1 && slides <= 20;
 
   return (
-    <AccessGuard>
-      <div className="mx-auto max-w-7xl p-5">
+    <div className="mx-auto max-w-7xl p-5">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Colonne gauche : Formulaire */}
           <div className="space-y-5">
@@ -618,6 +616,5 @@ export default function Creator() {
           </div>
         </div>
       </div>
-    </AccessGuard>
   );
 }
