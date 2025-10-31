@@ -11,9 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Toggle } from "@/components/ui/toggle";
-import { Download, Clock, Sparkles, Expand, ArrowUpFromLine } from "lucide-react";
+import { Clock, Sparkles } from "lucide-react";
 
 interface Artifact {
   id: string;
@@ -40,18 +39,14 @@ export default function Creator() {
   const [duration, setDuration] = useState(10);
   const [quality, setQuality] = useState<"draft" | "standard" | "premium">("standard");
   const [batchNight, setBatchNight] = useState(false);
-  const [overrideProvider, setOverrideProvider] = useState("");
-  const [availableProviders, setAvailableProviders] = useState<any[]>([]);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [decision, setDecision] = useState<any>(null);
   const [quotaInfo, setQuotaInfo] = useState({ remaining: 0, total: 0 });
-  const [transactions, setTransactions] = useState<any[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     if (user) {
       loadQuotaInfo();
-      loadProviders();
     }
   }, [user]);
 
@@ -59,13 +54,6 @@ export default function Creator() {
     if (!user) return;
     const { data: profile } = await supabase.from("profiles").select("quota_videos, woofs_consumed_this_month").eq("id", user.id).single();
     if (profile) setQuotaInfo({ remaining: (profile.quota_videos || 0) - (profile.woofs_consumed_this_month || 0), total: profile.quota_videos || 0 });
-    const { data: txs } = await supabase.from("transactions").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(5);
-    if (txs) setTransactions(txs);
-  };
-
-  const loadProviders = async () => {
-    const { data } = await supabase.from("providers").select("*").eq("enabled", true);
-    if (data) setAvailableProviders(data);
   };
 
   const handleGenerate = async () => {

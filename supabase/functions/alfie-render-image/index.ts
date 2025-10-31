@@ -38,10 +38,12 @@ serve(async (req) => {
 
     const { provider, prompt, format, brand_id } = await req.json();
 
+    console.log("[Alfie Render Image] Starting generation", { provider, prompt, format });
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY manquant");
 
-    // Appeler Gemini Image via Lovable AI
+    // Call Lovable AI Gateway with Nano Banana (Gemini 2.5 Flash Image)
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -62,15 +64,26 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`AI Gateway error: ${response.status} ${errorText}`);
+      console.error("[Alfie Render Image] AI Gateway error:", response.status, errorText);
+      throw new Error(`AI Gateway error: ${response.status}`);
     }
 
     const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    console.log("[Alfie Render Image] AI response received", { hasImages: !!data.choices?.[0]?.message?.images });
 
-    if (!imageUrl) throw new Error("Aucune image générée");
+    const images = data.choices?.[0]?.message?.images;
+    if (!images || images.length === 0) {
+      throw new Error("Aucune image générée par l'IA");
+    }
 
-    // Enregistrer dans media_generations
+    const imageUrl = images[0].image_url?.url;
+    if (!imageUrl) {
+      throw new Error("URL d'image manquante dans la réponse IA");
+    }
+
+    console.log("[Alfie Render Image] Image generated successfully");
+
+    // Store in media_generations
     const { data: generation, error: insertError } = await supabaseClient
       .from("media_generations")
       .insert({
@@ -89,7 +102,10 @@ serve(async (req) => {
       .select()
       .single();
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      console.error("[Alfie Render Image] Insert error:", insertError);
+      throw insertError;
+    }
 
     return new Response(
       JSON.stringify({
@@ -100,7 +116,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
-    console.error("Error:", error);
+    console.error("[Alfie Render Image] Error:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

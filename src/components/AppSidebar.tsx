@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
@@ -32,16 +31,12 @@ import { Separator } from '@/components/ui/separator';
 import alfieMain from '@/assets/alfie-main.png';
 
 export function AppSidebar() {
-  const { open, setOpen, isMobile } = useSidebar();
+  const { open, isMobile } = useSidebar();
   const location = useLocation();
   const { user, profile, isAdmin, signOut } = useAuth();
   const canSeeAdminToggle = user?.email ? ['nathaliestaelens@gmail.com','staelensnathalie@gmail.com'].includes(user.email) : false;
 
-  // Fermer sur mobile, ouvrir sur desktop
-  useEffect(() => {
-    if (isMobile && open) setOpen(false);
-    if (!isMobile && !open) setOpen(true);
-  }, [location.pathname, isMobile, open, setOpen]);
+  // Removed automatic sidebar toggle on route changes to prevent menu disappearing bug
 
   const navItems: Array<{
     path: string;
