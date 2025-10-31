@@ -673,6 +673,33 @@ export type Database = {
           },
         ]
       }
+      feature_flags: {
+        Row: {
+          allowed_plans: string[] | null
+          allowed_roles: string[] | null
+          created_at: string | null
+          enabled: boolean | null
+          feature: string
+          updated_at: string | null
+        }
+        Insert: {
+          allowed_plans?: string[] | null
+          allowed_roles?: string[] | null
+          created_at?: string | null
+          enabled?: boolean | null
+          feature: string
+          updated_at?: string | null
+        }
+        Update: {
+          allowed_plans?: string[] | null
+          allowed_roles?: string[] | null
+          created_at?: string | null
+          enabled?: boolean | null
+          feature?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       generation_logs: {
         Row: {
           brand_id: string | null

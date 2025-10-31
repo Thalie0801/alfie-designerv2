@@ -72,3 +72,28 @@ export function clearRoleCache(userId?: string) {
     roleCache.clear();
   }
 }
+
+/**
+ * Vérifie si un utilisateur peut utiliser une fonctionnalité
+ * Les VIP et Admin ont accès à TOUTES les fonctionnalités (bypass)
+ */
+export function canUseFeature(
+  feature: string,
+  user: { roles?: string[]; plan?: string } | null,
+  flags?: Record<string, any>
+): boolean {
+  // Bypass total pour VIP/Admin
+  const roles = new Set(user?.roles ?? []);
+  if (roles.has('admin') || roles.has('vip')) {
+    return true;
+  }
+
+  // Pour les autres utilisateurs, vérifier les feature flags
+  const ff = flags?.[feature];
+  if (!ff) return false;
+
+  return (
+    ff.allowed_plans?.includes(user?.plan ?? 'free') ||
+    ff.allowed_roles?.some((r: string) => roles.has(r))
+  );
+}

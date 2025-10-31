@@ -2,7 +2,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import { Sparkles, MessageSquare, Award } from 'lucide-react';
+import { hasRole } from '@/lib/access';
+import { Sparkles, MessageSquare, Award, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { NewsWidget } from '@/components/NewsWidget';
 import { FeatureRequestDialog } from '@/components/FeatureRequestDialog';
@@ -21,10 +22,24 @@ import { BrandPaymentSuccess } from '@/components/BrandPaymentSuccess';
 import { BrandManager } from '@/components/BrandManager';
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, roles } = useAuth();
   const navigate = useNavigate();
   const { affiliate } = useAffiliateStatus();
   const { activeBrandId } = useBrandKit();
+
+  const handleHardRefresh = async () => {
+    console.log('[HardRefresh] Clearing all caches...');
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    
+    // Force reload sans cache
+    window.location.reload();
+  };
 
   return (
     <AccessGuard>
@@ -48,6 +63,17 @@ export default function Dashboard() {
                   <Award className="h-4 w-4" />
                   Ambassadeur {affiliate.affiliate_status === 'leader' ? '· Leader' : affiliate.affiliate_status === 'mentor' ? '· Mentor' : ''}
                 </Badge>
+              )}
+              {hasRole(roles, 'admin') && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleHardRefresh}
+                  className="ml-auto"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Hard Refresh
+                </Button>
               )}
             </div>
             <p className="text-base text-muted-foreground max-w-2xl">

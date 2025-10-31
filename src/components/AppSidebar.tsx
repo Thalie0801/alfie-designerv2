@@ -1,6 +1,8 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import { canUseFeature } from '@/lib/access';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import {
   Sparkles, 
   LayoutDashboard, 
@@ -34,12 +36,14 @@ import alfieMain from '@/assets/alfie-main.png';
 export function AppSidebar() {
   const { open, isMobile } = useSidebar();
   const location = useLocation();
-  const { user, profile, isAdmin, signOut } = useAuth();
+  const { user, profile, isAdmin, signOut, roles } = useAuth();
+  const { flags } = useFeatureFlags();
   const canSeeAdminToggle = user?.email ? ['nathaliestaelens@gmail.com','staelensnathalie@gmail.com'].includes(user.email) : false;
 
   // Removed automatic sidebar toggle on route changes to prevent menu disappearing bug
 
-  const navItems: Array<{
+  // Construire la liste des items de navigation selon les droits
+  const baseNavItems: Array<{
     path: string;
     label: string;
     icon: any;
@@ -47,7 +51,6 @@ export function AppSidebar() {
     tourId?: string;
   }> = [
     { path: '/chat', label: 'Chat Alfie', icon: MessageCircle, tourId: 'chat' },
-    { path: '/app', label: 'Créer', icon: Sparkles },
     { path: '/templates', label: 'Catalogue', icon: Layers, badge: 'Bientôt' },
     { path: '/library', label: 'Bibliothèque', icon: FolderOpen, tourId: 'library' },
     { path: '/brand-kit-questionnaire', label: 'Brand Kit', icon: Palette },
@@ -56,6 +59,15 @@ export function AppSidebar() {
     { path: '/billing', label: 'Abonnement', icon: CreditCard },
     { path: '/affiliate', label: 'Affiliation', icon: TrendingUp, tourId: 'affiliate' },
   ];
+
+  // Ajouter "Créer" uniquement si autorisé (VIP/Admin)
+  const navItems = canUseFeature('new_generator', { roles }, flags)
+    ? [
+        baseNavItems[0], // Chat Alfie
+        { path: '/app', label: 'Créer', icon: Sparkles }, // Créateur (VIP/Admin only)
+        ...baseNavItems.slice(1), // Reste
+      ]
+    : baseNavItems;
 
   if (isAdmin || canSeeAdminToggle) {
     navItems.push({ path: '/admin', label: 'Admin', icon: Settings });

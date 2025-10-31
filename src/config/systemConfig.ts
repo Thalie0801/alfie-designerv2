@@ -1,6 +1,10 @@
 // Configuration système pour quotas et retention
 // Ces valeurs peuvent être ajustées par l'admin
 
+// Version de l'application pour le cache-busting
+export const APP_VERSION = '2025-10-31.1';
+export const CONFIG_VERSION = '2025-10-31.1';
+
 // Feature flags (produit)
 export const FEATURE_FLAGS = {
   VEO3_ENABLED: false,

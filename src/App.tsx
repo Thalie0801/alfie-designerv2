@@ -2,8 +2,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/hooks/useAuth";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { canUseFeature } from "@/lib/access";
+import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -33,13 +35,12 @@ import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <Toaster />
-    <Sonner />
-    <AuthProvider>
-      <TooltipProvider>
-        <Routes>
+const AppRoutes = () => {
+  const { roles } = useAuth();
+  const { flags } = useFeatureFlags();
+  
+  return (
+    <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/contact" element={<Contact />} />
@@ -70,11 +71,15 @@ const App = () => (
           <Route
             path="/app"
             element={
-              <ProtectedRoute>
-                <AppLayoutWithSidebar>
-                  <Creator />
-                </AppLayoutWithSidebar>
-              </ProtectedRoute>
+              canUseFeature('new_generator', { roles }, flags) ? (
+                <ProtectedRoute>
+                  <AppLayoutWithSidebar>
+                    <Creator />
+                  </AppLayoutWithSidebar>
+                </ProtectedRoute>
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
             }
           />
           <Route
@@ -209,6 +214,16 @@ const App = () => (
           />
           <Route path="*" element={<NotFound />} />
         </Routes>
+  );
+};
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <Toaster />
+    <Sonner />
+    <AuthProvider>
+      <TooltipProvider>
+        <AppRoutes />
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
