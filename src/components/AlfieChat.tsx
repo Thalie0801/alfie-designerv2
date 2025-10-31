@@ -780,6 +780,7 @@ export function AlfieChat() {
       const decoder = new TextDecoder();
       let assistantMessage = '';
       let textBuffer = '';
+      let toolCallsBuffer: Record<number, { name?: string; arguments: string }> = {};
 
       // Add empty assistant message that we'll update
       setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
@@ -806,17 +807,21 @@ export function AlfieChat() {
             const parsed = JSON.parse(jsonStr);
             const delta = parsed.choices?.[0]?.delta;
             
-            // Handle tool calls
+            // Handle tool calls - accumulate arguments incrementally
             if (delta?.tool_calls) {
               for (const toolCall of delta.tool_calls) {
-                if (toolCall.function?.name && toolCall.function?.arguments) {
-                  try {
-                    const args = JSON.parse(toolCall.function.arguments);
-                    const result = await handleToolCall(toolCall.function.name, args);
-                    console.log('Tool result:', result);
-                  } catch (e) {
-                    console.error('Tool call error:', e);
-                  }
+                const index = toolCall.index ?? 0;
+                
+                if (!toolCallsBuffer[index]) {
+                  toolCallsBuffer[index] = { arguments: '' };
+                }
+                
+                if (toolCall.function?.name) {
+                  toolCallsBuffer[index].name = toolCall.function.name;
+                }
+                
+                if (toolCall.function?.arguments) {
+                  toolCallsBuffer[index].arguments += toolCall.function.arguments;
                 }
               }
             }
@@ -836,6 +841,21 @@ export function AlfieChat() {
             }
           } catch (e) {
             // Ignore parse errors for incomplete JSON
+          }
+        }
+      }
+      
+      // Execute accumulated tool calls after stream completes
+      console.log('🔧 Tool calls buffer:', toolCallsBuffer);
+      for (const [, toolCall] of Object.entries(toolCallsBuffer)) {
+        if (toolCall.name && toolCall.arguments) {
+          try {
+            const args = JSON.parse(toolCall.arguments);
+            console.log('🔧 Executing tool:', toolCall.name, args);
+            const result = await handleToolCall(toolCall.name, args);
+            console.log('✅ Tool result:', result);
+          } catch (e) {
+            console.error('❌ Tool call execution error:', toolCall.name, e);
           }
         }
       }
