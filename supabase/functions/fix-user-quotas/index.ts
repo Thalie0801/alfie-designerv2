@@ -6,26 +6,30 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Plan quotas configuration
-const PLAN_QUOTAS = {
+// Import quotas from system config (single source of truth)
+const SYSTEM_QUOTAS = {
   starter: {
     quota_visuals_per_month: 150,
     quota_videos: 15,
+    quota_woofs: 15,
     quota_brands: 1,
   },
   pro: {
     quota_visuals_per_month: 450,
     quota_videos: 45,
+    quota_woofs: 45,
     quota_brands: 1,
   },
   studio: {
     quota_visuals_per_month: 1000,
     quota_videos: 100,
+    quota_woofs: 100,
     quota_brands: 1,
   },
   enterprise: {
     quota_visuals_per_month: 9999,
     quota_videos: 9999,
+    quota_woofs: 9999,
     quota_brands: 999,
   },
 } as const;
@@ -54,8 +58,8 @@ serve(async (req) => {
     const results: any[] = [];
 
     for (const profile of profiles || []) {
-      const plan = profile.plan as keyof typeof PLAN_QUOTAS;
-      const quotas = PLAN_QUOTAS[plan];
+      const plan = profile.plan as keyof typeof SYSTEM_QUOTAS;
+      const quotas = SYSTEM_QUOTAS[plan];
 
       if (!quotas) {
         console.log(`Unknown plan for ${profile.email}: ${plan}`);
@@ -129,8 +133,8 @@ serve(async (req) => {
 
       if (!userProfile?.plan) continue;
 
-      const plan = userProfile.plan as keyof typeof PLAN_QUOTAS;
-      const quotas = PLAN_QUOTAS[plan];
+      const plan = userProfile.plan as keyof typeof SYSTEM_QUOTAS;
+      const quotas = SYSTEM_QUOTAS[plan];
 
       if (!quotas) continue;
 
@@ -144,7 +148,7 @@ serve(async (req) => {
           .update({
             quota_images: quotas.quota_visuals_per_month,
             quota_videos: quotas.quota_videos,
-            quota_woofs: quotas.quota_videos, // Woofs = video quota
+            quota_woofs: quotas.quota_woofs, // Fixed: use actual woofs quota
           })
           .eq("id", brand.id);
 

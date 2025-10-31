@@ -133,16 +133,24 @@ export default function Dashboard() {
 
 ### Adding Tour Targets
 
-Mark elements with `data-tour-id` attributes:
+Mark elements with `data-tour-id` or `data-sidebar-id` attributes:
 
 ```tsx
 <div data-tour-id="nav-dashboard">
   <h1>Dashboard</h1>
 </div>
 
+<NavLink data-sidebar-id="chat">
+  Chat Alfie
+</NavLink>
+
 <Button data-tour-id="btn-create">
   Create Content
 </Button>
+
+<div data-tour-id="quotas">
+  <QuotasDisplay />
+</div>
 
 <div data-tour-id="brand-kit">
   <h2>Brand Kits</h2>
@@ -152,6 +160,20 @@ Mark elements with `data-tour-id` attributes:
   <QuickActions />
 </div>
 ```
+
+Current tour targets (in order):
+- `[data-tour-id="nav-dashboard"]` - Dashboard link
+- `[data-sidebar-id="chat"]` - Chat Alfie link (mode exploration)
+- `[data-tour-id="btn-create"]` - Créateur button (mode expert)
+- `center` - Central bubble for explanations (e.g., Chat vs Créateur)
+- `[data-tour-id="quotas"]` - Quotas & Woofs display
+- `[data-tour-id="quick-actions"]` - Quick actions section
+- `[data-tour-id="brand-kit"]` - Brand kit section
+- `[data-tour-id="add-brand"]` - Add brand button
+- `[data-sidebar-id="library"]` - Library link in sidebar
+- `[data-tour-id="news"]` - News section
+- `[data-tour-id="suggest"]` - Suggestion button
+- `[data-sidebar-id="affiliate"]` - Affiliate link in sidebar
 
 ### Custom Tour Steps
 
