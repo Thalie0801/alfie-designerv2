@@ -880,6 +880,39 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_verification_log: {
+        Row: {
+          created_at: string | null
+          error_details: string | null
+          id: string
+          ip_address: string | null
+          result: string
+          session_id: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_details?: string | null
+          id?: string
+          ip_address?: string | null
+          result: string
+          session_id: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_details?: string | null
+          id?: string
+          ip_address?: string | null
+          result?: string
+          session_id?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       plans_config: {
         Row: {
           created_at: string | null
