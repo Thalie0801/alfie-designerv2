@@ -30,7 +30,20 @@ serve(async (req) => {
 
     console.log(`[admin-delete-user] Suppression de l'utilisateur: ${targetUserId}`);
 
-    // 1. Supprimer l'entrée affiliates (si elle existe)
+    let authUserExists = false;
+    let deletedItems = [];
+
+    // 1. Vérifier si l'utilisateur auth existe
+    const { data: authUser, error: getUserError } = await admin.auth.admin.getUserById(targetUserId);
+    
+    if (!getUserError && authUser) {
+      authUserExists = true;
+      console.log(`[admin-delete-user] Utilisateur auth trouvé: ${authUser.user.email}`);
+    } else {
+      console.log(`[admin-delete-user] Utilisateur auth non trouvé (probablement déjà supprimé)`);
+    }
+
+    // 2. Supprimer l'entrée affiliates (si elle existe)
     const { error: affiliateError } = await admin
       .from("affiliates")
       .delete()
@@ -38,9 +51,11 @@ serve(async (req) => {
 
     if (affiliateError) {
       console.error("[admin-delete-user] Erreur suppression affiliates:", affiliateError);
+    } else {
+      deletedItems.push("affiliate");
     }
 
-    // 2. Supprimer le profil
+    // 3. Supprimer le profil
     const { error: profileError } = await admin
       .from("profiles")
       .delete()
@@ -50,20 +65,24 @@ serve(async (req) => {
       console.error("[admin-delete-user] Erreur suppression profil:", profileError);
       return json({ error: `Erreur suppression profil: ${profileError.message}` }, 500);
     }
+    deletedItems.push("profile");
 
-    // 3. Supprimer le compte auth
-    const { error: authError } = await admin.auth.admin.deleteUser(targetUserId);
+    // 4. Supprimer le compte auth seulement s'il existe
+    if (authUserExists) {
+      const { error: authError } = await admin.auth.admin.deleteUser(targetUserId);
 
-    if (authError) {
-      console.error("[admin-delete-user] Erreur suppression compte auth:", authError);
-      return json({ error: `Erreur suppression compte: ${authError.message}` }, 500);
+      if (authError) {
+        console.error("[admin-delete-user] Erreur suppression compte auth:", authError);
+        return json({ error: `Erreur suppression compte: ${authError.message}` }, 500);
+      }
+      deletedItems.push("auth");
     }
 
-    console.log(`[admin-delete-user] Utilisateur ${targetUserId} supprimé avec succès`);
+    console.log(`[admin-delete-user] Éléments supprimés: ${deletedItems.join(", ")}`);
 
     return json({ 
       success: true, 
-      message: "Utilisateur supprimé complètement (profil, affilié, compte)"
+      message: `Utilisateur supprimé (${deletedItems.join(", ")})`
     });
 
   } catch (e) {
