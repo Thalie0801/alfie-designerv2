@@ -84,6 +84,12 @@ export function ChatComposer({
     
     onSend();
     
+    // Vider le champ et supprimer le brouillon
+    onChange("");
+    if (conversationId) {
+      localStorage.removeItem(`draft-${conversationId}`);
+    }
+    
     // Scroll to bottom après envoi
     requestAnimationFrame(() => {
       const chatBottom = document.getElementById('chat-bottom');
