@@ -1417,7 +1417,7 @@ export type Database = {
       user_has_access: { Args: { user_id_param: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "user" | "admin" | "affiliate"
+      app_role: "user" | "admin" | "affiliate" | "vip"
       asset_engine: "nano" | "sora" | "veo3"
       brand_plan: "starter" | "pro" | "studio"
       plan_type: "starter" | "pro" | "studio"
@@ -1549,7 +1549,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["user", "admin", "affiliate"],
+      app_role: ["user", "admin", "affiliate", "vip"],
       asset_engine: ["nano", "sora", "veo3"],
       brand_plan: ["starter", "pro", "studio"],
       plan_type: ["starter", "pro", "studio"],
