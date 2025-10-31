@@ -34,14 +34,21 @@ serve(async (req) => {
       );
     }
 
+    // Create an RLS-bound client using the user's token
+    const supabaseRls = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
     const { brand_id } = await req.json().catch(() => ({}));
 
     // 1. Lire le profil utilisateur
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await supabaseRls
       .from('profiles')
       .select('quota_videos, woofs_consumed_this_month, quota_visuals_per_month, generations_this_month, plan, generations_reset_date')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     if (profileError || !profile) {
       return new Response(
@@ -59,11 +66,11 @@ serve(async (req) => {
     };
 
     if (brand_id) {
-      const { data: brand } = await supabase
+      const { data: brand } = await supabaseRls
         .from('brands')
         .select('quota_woofs, woofs_used, quota_images, images_used')
         .eq('id', brand_id)
-        .single();
+        .maybeSingle();
 
       if (brand) {
         finalQuotas = {
