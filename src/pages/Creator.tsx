@@ -153,7 +153,7 @@ export default function Creator() {
       <div className="max-w-[1800px] mx-auto">
         <div className="mb-6">
           <h1 className="text-3xl font-bold">Créer</h1>
-          <p className="text-muted-foreground">Phase 1 + Phase 2 intégrées</p>
+          <p className="text-muted-foreground">Générez vos visuels et vidéos en quelques clics</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
