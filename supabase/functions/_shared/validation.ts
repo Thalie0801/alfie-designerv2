@@ -77,6 +77,26 @@ export const deliverableSchema = z.object({
   brandId: z.string().uuid('ID de marque invalide'),
 });
 
+// Payment validation schemas
+export const CheckoutSchema = z.object({
+  plan: z.enum(['starter', 'pro', 'studio', 'enterprise'], { 
+    errorMap: () => ({ message: 'Plan invalide' })
+  }),
+  billing_period: z.enum(['monthly', 'annual']).default('monthly'),
+  affiliate_ref: z.string().uuid('Référence affilié invalide').optional().or(z.literal('')),
+  brand_name: z.string()
+    .trim()
+    .min(1, 'Nom de marque requis')
+    .max(100, 'Nom de marque trop long (max 100 caractères)')
+    .regex(/^[a-zA-Z0-9\s\-_'\.]+$/, 'Nom de marque contient des caractères non autorisés')
+    .optional()
+    .or(z.literal('')),
+});
+
+export const VerifyPaymentSchema = z.object({
+  session_id: z.string().min(1, 'Session ID requis'),
+});
+
 export function validateInput<T>(schema: z.ZodSchema<T>, data: unknown): { success: true; data: T } | { success: false; error: string } {
   try {
     const validated = schema.parse(data);

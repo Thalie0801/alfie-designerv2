@@ -1,11 +1,24 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { VerifyPaymentSchema, validateInput } from "../_shared/validation.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = [
+  'https://alfie-designer.lovable.app',
+  'http://localhost:5173',
+  'http://localhost:8080',
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get('origin');
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin || '') ? origin : ALLOWED_ORIGINS[0];
+  
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+}
 
 const PLAN_CONFIG = {
   starter: { 
@@ -35,6 +48,8 @@ const PLAN_CONFIG = {
 };
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -45,13 +60,42 @@ serve(async (req) => {
   );
 
   try {
-    const { session_id } = await req.json();
+    const body = await req.json();
     
-    if (!session_id) {
+    // Validate input with Zod
+    const validation = validateInput(VerifyPaymentSchema, body);
+    if (!validation.success) {
       return new Response(
         JSON.stringify({ 
-          code: 'SESSION_ID_REQUIRED',
-          message: 'Session ID is required' 
+          code: 'VALIDATION_ERROR',
+          message: validation.error 
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
+    }
+    
+    const { session_id } = validation.data;
+    
+    // Check if payment session already processed (prevent replay attacks)
+    const { data: existingSession, error: checkError } = await supabaseClient
+      .from('payment_sessions')
+      .select('id, verified')
+      .eq('session_id', session_id)
+      .maybeSingle();
+    
+    if (checkError) {
+      console.error('Error checking existing session:', checkError);
+    }
+    
+    if (existingSession?.verified) {
+      console.warn(`⚠️ Payment replay attempt detected for session: ${session_id}`);
+      return new Response(
+        JSON.stringify({ 
+          code: 'SESSION_ALREADY_USED',
+          message: 'Ce paiement a déjà été traité' 
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -185,18 +229,38 @@ serve(async (req) => {
     const planConfig = PLAN_CONFIG[plan as keyof typeof PLAN_CONFIG];
 
     // Store payment session for signup verification
+    // Using upsert with onConflict to prevent race conditions
     const { error: insertError } = await supabaseClient
       .from('payment_sessions')
-      .insert({
-        session_id,
-        email: customerEmail,
-        plan,
-        verified: true,
-        amount: session.amount_total ? session.amount_total / 100 : 0,
-      });
+      .upsert(
+        {
+          session_id,
+          email: customerEmail,
+          plan,
+          verified: true,
+          amount: session.amount_total ? session.amount_total / 100 : 0,
+        },
+        { 
+          onConflict: 'session_id',
+          ignoreDuplicates: false 
+        }
+      );
 
     if (insertError) {
       console.error('Error storing payment session:', insertError);
+      // If it's a duplicate key error, treat as replay attempt
+      if (insertError.code === '23505') {
+        return new Response(
+          JSON.stringify({ 
+            code: 'SESSION_ALREADY_USED',
+            message: 'Ce paiement a déjà été traité' 
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400,
+          }
+        );
+      }
       return new Response(
         JSON.stringify({ 
           code: 'STORAGE_ERROR',

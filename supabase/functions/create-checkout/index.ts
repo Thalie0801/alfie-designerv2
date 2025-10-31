@@ -1,11 +1,24 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { CheckoutSchema, validateInput } from "../_shared/validation.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = [
+  'https://alfie-designer.lovable.app',
+  'http://localhost:5173',
+  'http://localhost:8080',
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get('origin');
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin || '') ? origin : ALLOWED_ORIGINS[0];
+  
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+}
 
 const PRICE_IDS = {
   monthly: {
@@ -23,6 +36,8 @@ const PRICE_IDS = {
 // Plan configuration (quotas are applied in verify-payment after successful payment)
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -33,7 +48,21 @@ serve(async (req) => {
   );
 
   try {
-    const { plan, billing_period = 'monthly', affiliate_ref, brand_name } = await req.json();
+    const body = await req.json();
+    
+    // Validate input with Zod
+    const validation = validateInput(CheckoutSchema, body);
+    if (!validation.success) {
+      return new Response(
+        JSON.stringify({ error: validation.error }), 
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
+    }
+    
+    const { plan, billing_period, affiliate_ref, brand_name } = validation.data;
     
     const billingType = billing_period === 'annual' ? 'annual' : 'monthly';
     const planType = plan as 'starter' | 'pro' | 'studio';
