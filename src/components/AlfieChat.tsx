@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { useAlfieCredits } from '@/hooks/useAlfieCredits';
@@ -10,9 +10,10 @@ import { detectIntent, canHandleLocally, generateLocalResponse } from '@/utils/a
 import { getQuotaStatus, formatExpirationMessage } from '@/utils/quotaManager';
 import { JobPlaceholder, JobStatus } from '@/components/chat/JobPlaceholder';
 import { CreateHeader } from '@/components/create/CreateHeader';
-import { GeneratorCard } from '@/components/create/GeneratorCard';
+import { ChatComposer } from '@/components/create/ChatComposer';
+import { QuotaBar } from '@/components/create/QuotaBar';
 import { ChatBubble } from '@/components/create/ChatBubble';
-import type { GeneratorMode, RatioOption } from '@/components/create/Toolbar';
+import type { GeneratorMode } from '@/components/create/Toolbar';
 
 type VideoEngine = 'sora' | 'seededance' | 'kling';
 
@@ -122,12 +123,9 @@ export function AlfieChat() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<{ type: string; message: string } | null>(null);
-  const [selectedDuration, setSelectedDuration] = useState<'short' | 'medium' | 'long'>('short');
   const [selectedMode, setSelectedMode] = useState<GeneratorMode>('auto');
-  const [selectedRatio, setSelectedRatio] = useState<RatioOption>('1:1');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
   const { brandKit, activeBrandId } = useBrandKit();
   const { totalCredits, decrementCredits, hasCredits, incrementGenerations } = useAlfieCredits();
   const { searchTemplates } = useTemplateLibrary();
@@ -507,7 +505,7 @@ export function AlfieChat() {
               prompt: args.prompt,
               aspectRatio: args.aspectRatio || '16:9',
               imageUrl: args.imageUrl,
-              durationPreference: selectedDuration,
+              durationPreference: args.durationPreference || 'short',
               woofCost: 2
             },
           });
@@ -566,7 +564,7 @@ export function AlfieChat() {
                 providerStatus: providerInfo.statusProvider,
                 jobId: jobIdentifier ?? null,
                 jobShortId: jobShortId ?? null,
-                durationPreference: selectedDuration,
+                durationPreference: args.durationPreference || 'short',
                 aspectRatio: args.aspectRatio || '16:9',
                 woofCost: 2
               }
@@ -903,6 +901,7 @@ export function AlfieChat() {
 
     const forceVideo = options?.forceVideo ?? false;
     const forceImage = options?.forceImage ?? false;
+    const selectedDuration = 'short'; // Default duration
 
     const userMessage = input.trim();
     const imageUrl = uploadedImage;
@@ -1042,7 +1041,7 @@ export function AlfieChat() {
 
   const getModeOptions = (): { forceVideo?: boolean; forceImage?: boolean; aspectRatio?: string; skipMediaInference?: boolean } | undefined => {
     if (selectedMode === 'image') {
-      return { forceImage: true, aspectRatio: selectedRatio };
+      return { forceImage: true, aspectRatio: '1:1' }; // Default aspect ratio
     }
 
     if (selectedMode === 'video') {
@@ -1057,10 +1056,6 @@ export function AlfieChat() {
   };
 
   const sendWithCurrentMode = () => {
-    if (isSendDisabled) {
-      return;
-    }
-
     const options = getModeOptions();
     if (options) {
       handleSend(options);
@@ -1069,23 +1064,7 @@ export function AlfieChat() {
     }
   };
 
-  const handleKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key !== 'Enter' || e.shiftKey) {
-      return;
-    }
-
-    e.preventDefault();
-    sendWithCurrentMode();
-  };
-
-  const lowerInput = input.toLowerCase();
-  const showVideoDurationChips =
-    lowerInput.includes('vidéo') ||
-    lowerInput.includes('video') ||
-    lowerInput.includes('tiktok') ||
-    lowerInput.includes('reel');
   const isTextareaDisabled = isLoading || !loaded;
-  const isSendDisabled = isTextareaDisabled || !input.trim();
 
   const handleDownload = (url: string, type: 'image' | 'video') => {
     if (!url) return;
@@ -1095,57 +1074,23 @@ export function AlfieChat() {
     link.click();
   };
 
-  const latestMediaMessage = [...messages]
-    .reverse()
-    .find((message) => message.role === 'assistant' && (message.imageUrl || message.videoUrl));
-
-  const generatorPreview = latestMediaMessage
-    ? {
-        type: latestMediaMessage.videoUrl ? ('video' as const) : ('image' as const),
-        url: latestMediaMessage.videoUrl || latestMediaMessage.imageUrl!,
-        alt: latestMediaMessage.content || 'Aperçu généré par Alfie',
-        caption: latestMediaMessage.content,
-        onDownload: () => handleDownload(latestMediaMessage.videoUrl || latestMediaMessage.imageUrl!, latestMediaMessage.videoUrl ? 'video' : 'image'),
-      }
-    : null;
-
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] flex-col bg-gradient-to-b from-slate-50 via-white to-slate-50">
+    <div className="flex min-h-screen flex-col bg-background">
       <CreateHeader />
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-4 py-6">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="hidden"
-          />
-          <GeneratorCard
-            preview={generatorPreview}
-            mode={selectedMode}
-            onModeChange={(mode) => setSelectedMode(mode)}
-            ratio={selectedRatio}
-            onRatioChange={(ratio) => setSelectedRatio(ratio)}
-            inputValue={input}
-            onInputChange={(value) => setInput(value)}
-            onSend={sendWithCurrentMode}
-            onKeyDown={handleKeyDown}
-            isSendDisabled={isSendDisabled}
-            isTextareaDisabled={isTextareaDisabled}
-            isLoading={isLoading}
-            generationStatus={generationStatus}
-            onUploadClick={() => fileInputRef.current?.click()}
-            uploadingImage={uploadingImage}
-            uploadedImage={uploadedImage}
-            onRemoveUpload={removeUploadedImage}
-            showVideoDurationChips={showVideoDurationChips}
-            selectedDuration={selectedDuration}
-            onDurationChange={(duration) => setSelectedDuration(duration)}
-            onForceVideo={() => handleSend({ forceVideo: true })}
-            inputRef={inputRef}
-          />
-          <section className="flex flex-col gap-3 pb-10">
+      <QuotaBar activeBrandId={activeBrandId} />
+      
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageUpload}
+        className="hidden"
+      />
+      
+      {/* Messages area with bottom padding for fixed composer */}
+      <div className="flex-1 overflow-y-auto pb-64">
+        <div className="mx-auto w-full max-w-3xl px-4 py-6">
+          <section className="flex flex-col gap-4">
             {messages.map((message, index) => {
               if (message.jobId) {
                 return (
@@ -1188,10 +1133,27 @@ export function AlfieChat() {
               </div>
             )}
 
-            <div ref={messagesEndRef} />
+            {/* Scroll anchor */}
+            <div id="chat-bottom" ref={messagesEndRef} />
           </section>
         </div>
       </div>
+      
+      {/* Fixed composer at bottom */}
+      <ChatComposer
+        value={input}
+        onChange={setInput}
+        onSend={sendWithCurrentMode}
+        mode={selectedMode}
+        onModeChange={setSelectedMode}
+        disabled={isTextareaDisabled}
+        isLoading={isLoading}
+        onUploadClick={() => fileInputRef.current?.click()}
+        uploadingImage={uploadingImage}
+        conversationId={conversationId ?? undefined}
+        uploadedImage={uploadedImage}
+        onRemoveImage={removeUploadedImage}
+      />
     </div>
   );
 }
