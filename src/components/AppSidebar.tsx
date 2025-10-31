@@ -11,7 +11,8 @@ import {
   UserCircle,
   Layers,
   FolderOpen,
-  Palette
+  Palette,
+  MessageCircle
 } from 'lucide-react';
 import {
   Sidebar,
@@ -45,6 +46,7 @@ export function AppSidebar() {
     badge?: string;
     tourId?: string;
   }> = [
+    { path: '/chat', label: 'Chat Alfie', icon: MessageCircle },
     { path: '/app', label: 'Créer', icon: Sparkles },
     { path: '/templates', label: 'Catalogue', icon: Layers, badge: 'Bientôt' },
     { path: '/library', label: 'Bibliothèque', icon: FolderOpen, tourId: 'library' },

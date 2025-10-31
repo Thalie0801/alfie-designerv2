@@ -28,6 +28,7 @@ import Templates from "./pages/Templates";
 import Library from "./pages/Library";
 import Videos from "./pages/Videos";
 import ActivateAccess from "./pages/onboarding/Activate";
+import { AlfieChat } from "./components/AlfieChat";
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,16 @@ const App = () => (
               <ProtectedRoute>
                 <AppLayoutWithSidebar>
                   <BrandKitQuestionnaire />
+                </AppLayoutWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/chat"
+            element={
+              <ProtectedRoute>
+                <AppLayoutWithSidebar>
+                  <AlfieChat />
                 </AppLayoutWithSidebar>
               </ProtectedRoute>
             }
