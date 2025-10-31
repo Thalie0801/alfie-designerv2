@@ -104,3 +104,27 @@ verify_jwt = false
 
 [functions.chat-generate-video]
 verify_jwt = true
+
+[functions.alfie-select-provider]
+verify_jwt = true
+
+[functions.alfie-estimate-cost]
+verify_jwt = true
+
+[functions.alfie-check-quota]
+verify_jwt = true
+
+[functions.alfie-consume-woofs]
+verify_jwt = true
+
+[functions.alfie-refund-woofs]
+verify_jwt = true
+
+[functions.alfie-render-image]
+verify_jwt = true
+
+[functions.alfie-score-coherence]
+verify_jwt = true
+
+[functions.alfie-update-metrics]
+verify_jwt = false

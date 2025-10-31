@@ -736,9 +736,12 @@ export type Database = {
       media_generations: {
         Row: {
           brand_id: string | null
+          brand_score: number | null
+          cost_woofs: number | null
           created_at: string | null
           duration_seconds: number | null
           engine: Database["public"]["Enums"]["video_engine"] | null
+          error_json: Json | null
           expires_at: string | null
           file_size_bytes: number | null
           id: string
@@ -746,8 +749,12 @@ export type Database = {
           is_source_upload: boolean | null
           job_id: string | null
           metadata: Json | null
+          modality: string | null
           output_url: string
+          params_json: Json | null
           prompt: string | null
+          provider_id: string | null
+          render_url: string | null
           status: string
           thumbnail_url: string | null
           type: string
@@ -757,9 +764,12 @@ export type Database = {
         }
         Insert: {
           brand_id?: string | null
+          brand_score?: number | null
+          cost_woofs?: number | null
           created_at?: string | null
           duration_seconds?: number | null
           engine?: Database["public"]["Enums"]["video_engine"] | null
+          error_json?: Json | null
           expires_at?: string | null
           file_size_bytes?: number | null
           id?: string
@@ -767,8 +777,12 @@ export type Database = {
           is_source_upload?: boolean | null
           job_id?: string | null
           metadata?: Json | null
+          modality?: string | null
           output_url: string
+          params_json?: Json | null
           prompt?: string | null
+          provider_id?: string | null
+          render_url?: string | null
           status?: string
           thumbnail_url?: string | null
           type: string
@@ -778,9 +792,12 @@ export type Database = {
         }
         Update: {
           brand_id?: string | null
+          brand_score?: number | null
+          cost_woofs?: number | null
           created_at?: string | null
           duration_seconds?: number | null
           engine?: Database["public"]["Enums"]["video_engine"] | null
+          error_json?: Json | null
           expires_at?: string | null
           file_size_bytes?: number | null
           id?: string
@@ -788,8 +805,12 @@ export type Database = {
           is_source_upload?: boolean | null
           job_id?: string | null
           metadata?: Json | null
+          modality?: string | null
           output_url?: string
+          params_json?: Json | null
           prompt?: string | null
+          provider_id?: string | null
+          render_url?: string | null
           status?: string
           thumbnail_url?: string | null
           type?: string
@@ -810,6 +831,13 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_generations_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
             referencedColumns: ["id"]
           },
         ]
@@ -1074,6 +1102,48 @@ export type Database = {
           },
         ]
       }
+      providers: {
+        Row: {
+          avg_latency_s: number
+          cost_json: Json
+          enabled: boolean
+          fail_rate: number
+          family: string
+          formats: string[]
+          id: string
+          modalities: string[]
+          quality_score: number
+          strengths: string[]
+          updated_at: string
+        }
+        Insert: {
+          avg_latency_s?: number
+          cost_json: Json
+          enabled?: boolean
+          fail_rate?: number
+          family: string
+          formats: string[]
+          id: string
+          modalities: string[]
+          quality_score?: number
+          strengths: string[]
+          updated_at?: string
+        }
+        Update: {
+          avg_latency_s?: number
+          cost_json?: Json
+          enabled?: boolean
+          fail_rate?: number
+          family?: string
+          formats?: string[]
+          id?: string
+          modalities?: string[]
+          quality_score?: number
+          strengths?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       templates: {
         Row: {
           canva_template_id: string
@@ -1103,6 +1173,41 @@ export type Database = {
           variables?: Json | null
         }
         Relationships: []
+      }
+      transactions: {
+        Row: {
+          created_at: string
+          delta_woofs: number
+          meta: Json | null
+          reason: string
+          tx_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          delta_woofs: number
+          meta?: Json | null
+          reason: string
+          tx_id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          delta_woofs?: number
+          meta?: Json | null
+          reason?: string
+          tx_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       usage_event: {
         Row: {
