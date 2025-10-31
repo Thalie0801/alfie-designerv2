@@ -973,13 +973,15 @@ export function AlfieChat() {
     }
 
     // 2. Vérifier le quota mensuel
-    if (!checkQuota()) {
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: `Oups ! Tu as atteint ton quota mensuel (${quota} requêtes/mois) 🐾\n\nPasse à un plan supérieur pour continuer à utiliser Alfie !` 
-      }]);
-      return;
-    }
+    // ⚠️ ANCIEN SYSTÈME DÉSACTIVÉ - On utilise get-quota (Woofs/Visuels) maintenant
+    // Le blocage se fait via alfie-check-quota qui utilise get-quota
+    // if (!checkQuota()) {
+    //   setMessages(prev => [...prev, { 
+    //     role: 'assistant', 
+    //     content: `Oups ! Tu as atteint ton quota mensuel (${quota} requêtes/mois) 🐾\n\nPasse à un plan supérieur pour continuer à utiliser Alfie !` 
+    //   }]);
+    //   return;
+    // }
 
     if (forceImage) {
       const aspect = options?.aspectRatio || detectAspectRatioFromText(userMessage);

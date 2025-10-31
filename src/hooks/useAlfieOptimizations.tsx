@@ -30,12 +30,11 @@ export function useAlfieOptimizations() {
   };
 
   // Vérifie si le quota est atteint
+  // ⚠️ ANCIEN SYSTÈME DÉSACTIVÉ - On utilise get-quota (Woofs/Visuels) maintenant
+  // Ce hook sert uniquement au tracking des stats Alfie
   const checkQuota = (): boolean => {
-    if (requestsThisMonth >= quota) {
-      toast.error(`Quota Alfie atteint (${quota} requêtes/mois). Passe à un plan supérieur ! 🐾`);
-      return false;
-    }
-    return true;
+    console.log(`📊 Stats Alfie: ${requestsThisMonth}/${quota} requêtes ce mois`);
+    return true; // Ne plus bloquer ici - seul get-quota contrôle les quotas
   };
 
   // Recherche dans le cache
