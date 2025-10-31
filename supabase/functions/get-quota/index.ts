@@ -41,6 +41,21 @@ export default {
         visuals_used: profile.generations_this_month ?? 0,
       };
 
+      // Fallback sur plans_config si quotas = 0 mais plan défini
+      if (finalQuotas.woofs_quota === 0 && profile.plan) {
+        const { data: planConfig } = await supabaseRls
+          .from('plans_config')
+          .select('woofs_per_month, visuals_per_month')
+          .eq('plan', profile.plan)
+          .maybeSingle();
+        
+        if (planConfig) {
+          finalQuotas.woofs_quota = planConfig.woofs_per_month;
+          finalQuotas.visuals_quota = planConfig.visuals_per_month;
+          console.log(`[get-quota] Fallback to plans_config for plan ${profile.plan}`);
+        }
+      }
+
       // 2. Si brand_id fourni, override avec quotas de la marque
       if (brand_id) {
         const { data: brand } = await supabaseRls
