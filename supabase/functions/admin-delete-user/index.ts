@@ -34,11 +34,11 @@ serve(async (req) => {
     let deletedItems = [];
 
     // 1. Vérifier si l'utilisateur auth existe
-    const { data: authUser, error: getUserError } = await admin.auth.admin.getUserById(targetUserId);
+    const { data: userData, error: getUserError } = await admin.auth.admin.getUserById(targetUserId);
     
-    if (!getUserError && authUser) {
+    if (!getUserError && userData?.user) {
       authUserExists = true;
-      console.log(`[admin-delete-user] Utilisateur auth trouvé: ${authUser.user.email}`);
+      console.log(`[admin-delete-user] Utilisateur auth trouvé: ${userData.user.email}`);
     } else {
       console.log(`[admin-delete-user] Utilisateur auth non trouvé (probablement déjà supprimé)`);
     }
