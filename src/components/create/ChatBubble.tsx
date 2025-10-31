@@ -58,7 +58,7 @@ export function ChatBubble({
     <div className={cn('flex w-full gap-3 transition-all hover:scale-[1.01]', isUser ? 'justify-end' : 'justify-start')}>
       {!isUser && (
         <Avatar className="h-9 w-9 border-2 border-slate-200 shadow-sm">
-          <AvatarImage src={alfieMain} alt="Alfie" />
+          <AvatarImage src={`${alfieMain}?v=2`} alt="Alfie" />
           <AvatarFallback className="bg-blue-50 text-blue-700">AF</AvatarFallback>
         </Avatar>
       )}

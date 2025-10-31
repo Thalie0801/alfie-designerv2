@@ -38,7 +38,7 @@ export const AlfieHeader = () => {
             <div className="relative">
               <div className="absolute -inset-4 bg-gradient-to-r from-secondary to-accent rounded-3xl blur-2xl opacity-30 animate-pulse-soft" />
               <img 
-                src={alfieHero} 
+                src={`${alfieHero}?v=2`} 
                 alt="Alfie - Golden Retriever avec lunettes noires"
                 className="relative rounded-2xl shadow-strong w-full h-auto"
               />

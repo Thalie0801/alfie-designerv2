@@ -80,7 +80,7 @@ const Demo = () => {
         {/* Header */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-3 mb-6">
-            <img src={alfieLogo} alt="Alfie" className="w-16 h-16 rounded-full shadow-medium" />
+            <img src={`${alfieLogo}?v=2`} alt="Alfie" className="w-16 h-16 rounded-full shadow-medium" />
             <h1 className="text-4xl md:text-5xl font-bold text-foreground">
               Démo Alfie IA
             </h1>

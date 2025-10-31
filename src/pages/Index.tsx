@@ -115,7 +115,7 @@ export default function AlfieLanding() {
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-br from-primary via-secondary to-accent rounded-full blur-2xl opacity-60 animate-pulse-soft"></div>
               <div className="relative rounded-full border-2 sm:border-4 border-white shadow-strong overflow-hidden w-20 h-20 sm:w-32 sm:h-32 bg-gradient-to-br from-primary/20 to-secondary/20">
-                <img src={alfieMain} alt="Alfie" className="w-full h-full object-cover" />
+                <img src={`${alfieMain}?v=2`} alt="Alfie" className="w-full h-full object-cover" />
               </div>
               <div className="absolute -bottom-1 sm:-bottom-2 -right-1 sm:-right-2 bg-secondary text-white rounded-full px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-xs font-bold shadow-medium">
                 👋 Alfie
@@ -130,28 +130,28 @@ export default function AlfieLanding() {
                 title="Hero / Announcement"
                 subtitle="1:1 • 16:9"
                 onClick={createHero}
-                image="/images/hero-visual.jpg"
+                image="/images/hero-visual.jpg?v=2"
               />
               <MiniCard
                 icon={<Layers className="h-5 w-5" />}
                 title="Carousel / Educatif"
                 subtitle="4:5"
                 onClick={createCarousel}
-                image="/images/carousel-visual.jpg"
+                image="/images/carousel-visual.jpg?v=2"
               />
               <MiniCard
                 icon={<BarChart3 className="h-5 w-5" />}
                 title="Insight / Stats"
                 subtitle="1:1 • 4:5"
                 onClick={createInsight}
-                image="/images/insight-card.jpg"
+                image="/images/insight-card.jpg?v=2"
               />
               <MiniCard
                 icon={<Film className="h-5 w-5" />}
                 title="Reel / Short"
                 subtitle="9:16"
                 onClick={createReel}
-                image="/images/reel-visual.jpg"
+                image="/images/reel-visual.jpg?v=2"
               />
             </div>
             <div className="mt-4 sm:mt-6 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary/5 to-secondary/5 p-3 sm:p-4 border border-primary/10">
@@ -212,21 +212,21 @@ export default function AlfieLanding() {
             title="Hero"
             subtitle="Annonce, Cover, Citation"
             ratios="1:1 • 16:9"
-            image="/images/hero-preview.jpg"
+            image="/images/hero-preview.jpg?v=2"
           />
           <TemplateCard
             title="Carousel"
             subtitle="Tips, Storytelling"
             ratios="4:5"
-            image="/images/carousel-preview.jpg"
+            image="/images/carousel-preview.jpg?v=2"
           />
           <TemplateCard
             title="Insight"
             subtitle="Stat, Preuve, Donnée"
             ratios="1:1 • 4:5"
-            image="/images/insight-preview.jpg"
+            image="/images/insight-preview.jpg?v=2"
           />
-          <TemplateCard title="Reel" subtitle="Vidéo 8–20 s" ratios="9:16" image="/images/reel-preview.jpg" />
+          <TemplateCard title="Reel" subtitle="Vidéo 8–20 s" ratios="9:16" image="/images/reel-preview.jpg?v=2" />
         </div>
       </section>
 
