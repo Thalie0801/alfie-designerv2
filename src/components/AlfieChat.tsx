@@ -132,7 +132,6 @@ export function AlfieChat() {
   const { totalCredits, decrementCredits, hasCredits, incrementGenerations } = useAlfieCredits();
   const { searchTemplates } = useTemplateLibrary();
   const {
-    checkQuota,
     getCachedResponse,
     incrementRequests,
     requestsThisMonth,

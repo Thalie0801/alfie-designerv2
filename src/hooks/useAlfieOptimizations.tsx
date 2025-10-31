@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { toast } from 'sonner';
 
 // Quotas mensuels par plan
 const MONTHLY_QUOTAS = {
@@ -27,14 +26,6 @@ export function useAlfieOptimizations() {
   // Génère un hash simple du prompt pour le cache
   const hashPrompt = (prompt: string, type: string): string => {
     return `${type}:${prompt.toLowerCase().trim().replace(/\s+/g, ' ')}`;
-  };
-
-  // Vérifie si le quota est atteint
-  // ⚠️ ANCIEN SYSTÈME DÉSACTIVÉ - On utilise get-quota (Woofs/Visuels) maintenant
-  // Ce hook sert uniquement au tracking des stats Alfie
-  const checkQuota = (): boolean => {
-    console.log(`📊 Stats Alfie: ${requestsThisMonth}/${quota} requêtes ce mois`);
-    return true; // Ne plus bloquer ici - seul get-quota contrôle les quotas
   };
 
   // Recherche dans le cache
@@ -109,7 +100,6 @@ export function useAlfieOptimizations() {
   };
 
   return {
-    checkQuota,
     getCachedResponse,
     setCachedResponse,
     incrementRequests,
