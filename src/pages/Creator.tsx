@@ -1,620 +1,153 @@
-import { useState } from "react";
-import { AeditusCard } from "@/components/AeditusCard";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useBrandKit } from "@/hooks/useBrandKit";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { useBrandKit, BrandKit } from "@/hooks/useBrandKit";
+import { toast } from "sonner";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Toggle } from "@/components/ui/toggle";
+import { Download, Clock, Sparkles, Expand, ArrowUpFromLine } from "lucide-react";
 
-type Mode = "image" | "video";
-
-type Artifact = { 
-  kind: "image" | "video"; 
-  uri: string; 
-  meta?: { 
-    index?: number; 
-    resolution?: string; 
-    brandId?: string | null; 
-    brandName?: string | null;
-    overlay?: boolean;
-    duration?: number;
-    fps?: number;
-  } 
-};
-
-const RESOLUTIONS = [
-  { label: "Carré (1080x1080)", value: "1080x1080" },
-  { label: "Vertical (1080x1350)", value: "1080x1350" },
-  { label: "Story (1080x1920)", value: "1080x1920" },
-  { label: "Paysage (1920x1080)", value: "1920x1080" },
-  { label: "Ultra HD (3840x2160)", value: "3840x2160" }
-] as const;
-
-function parseWH(res: string): { w: number; h: number } {
-  const m = res.match(/^(\d+)\s*x\s*(\d+)$/i);
-  if (!m) return { w: 1080, h: 1350 };
-  const w = Math.max(1, parseInt(m[1], 10));
-  const h = Math.max(1, parseInt(m[2], 10));
-  return { w, h };
+interface Artifact {
+  id: string;
+  kind: "image" | "video";
+  uri: string;
+  meta?: any;
 }
 
-function buildBrandAwarePrompt(userPrompt: string, brand?: BrandKit | null): string {
-  if (!brand) return userPrompt?.trim() || "";
-
-  let paletteStr = "";
-  const pal = brand.palette as any;
-  if (Array.isArray(pal)) {
-    paletteStr = `primary ${pal[0] ?? "auto"}, accents ${pal.slice(1).filter(Boolean).join(", ") || "—"}`;
-  } else if (pal && typeof pal === "object") {
-    const accents = Array.isArray(pal.accents) ? pal.accents.filter(Boolean).join(", ") : "—";
-    paletteStr = `primary ${pal.primary ?? "auto"}, secondary ${pal.secondary ?? "auto"}, accents ${accents}`;
-  } else {
-    paletteStr = "auto";
-  }
-
-  const fontsStr = brand.fonts
-    ? `headings ${brand.fonts.primary || "sans-serif"}, body ${brand.fonts.secondary || "sans-serif"}`
-    : "cohérentes à la marque";
-
-  return [
-    userPrompt?.trim() || "",
-    `--- Brand Guidelines ---`,
-    `Brand: ${brand.name || "Non spécifiée"}`,
-    `Colors → ${paletteStr}`,
-    `Tone: ${brand.voice || "cohérent à la marque"}`,
-    `Typography vibe: ${fontsStr}`,
-    `Avoid: low contrast, off-brand colors, generic stock vibes`,
-  ].join("\n");
+function buildBrandAwarePrompt(prompt: string, brandKit: any): string {
+  if (!brandKit) return prompt;
+  let enriched = prompt;
+  if (brandKit.palette?.length > 0) enriched += `\nCouleurs: ${brandKit.palette.join(", ")}`;
+  if (brandKit.fonts?.primary) enriched += `\nTypo: ${brandKit.fonts.primary}`;
+  if (brandKit.voice) enriched += `\nTon: ${brandKit.voice}`;
+  return enriched;
 }
 
 export default function Creator() {
-  const { toast } = useToast();
-  const { brands, activeBrandId, setActiveBrand, brandKit } = useBrandKit();
-  
-  const [mode, setMode] = useState<Mode>("image");
+  const { user } = useAuth();
+  const { brandKit, brands, activeBrandId, setActiveBrand } = useBrandKit();
+  const [mode, setMode] = useState<"image" | "video">("image");
   const [prompt, setPrompt] = useState("");
-  const [headline, setHeadline] = useState("");
-  const [caption, setCaption] = useState("");
-  const [cta, setCta] = useState("");
-  const [socialCaption, setSocialCaption] = useState("");
-  const [resolution, setResolution] = useState("1080x1350");
-  const [slides, setSlides] = useState(1);
-  const [writeOnSlides, setWriteOnSlides] = useState(true);
+  const [format, setFormat] = useState("1080x1080");
   const [duration, setDuration] = useState(10);
-  const [fps, setFps] = useState(24);
-  const [loading, setLoading] = useState(false);
-
-  const [plan, setPlan] = useState<string[]>([]);
+  const [quality, setQuality] = useState<"draft" | "standard" | "premium">("standard");
+  const [batchNight, setBatchNight] = useState(false);
+  const [overrideProvider, setOverrideProvider] = useState("");
+  const [availableProviders, setAvailableProviders] = useState<any[]>([]);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [decision, setDecision] = useState<any>(null);
+  const [quotaInfo, setQuotaInfo] = useState({ remaining: 0, total: 0 });
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  const missingSocialCaption = socialCaption.trim() === "";
-  
-  const DEFAULT_PLAN = [
-    "1) Préparer prompt visuel",
-    `2) Générer ${slides} ${mode === "video" ? "vidéo(s)" : "image(s)"}`,
-    "3) (Option) Poser le texte fourni",
-    "4) Vérifier lisibilité & formats",
-    "5) Exporter & sauvegarder",
-  ];
+  useEffect(() => {
+    if (user) {
+      loadQuotaInfo();
+      loadProviders();
+    }
+  }, [user]);
 
-  async function generateSingleSlide(
-    index: number, 
-    templateUrl?: string, 
-    carouselId?: string, 
-    overlayText?: string
-  ): Promise<Artifact> {
-    const enrichedPrompt = buildBrandAwarePrompt(prompt, brandKit);
-    const { w, h } = parseWH(resolution);
-    
-    if (mode === "image") {
-      const { data, error: imgError } = await supabase.functions.invoke("alfie-generate-ai-image", {
-        body: {
-          prompt: enrichedPrompt,
-          templateImageUrl: templateUrl,
-          brandKit: brandKit ? {
-            id: brandKit.id,
-            name: brandKit.name,
-            palette: brandKit.palette,
-            logo_url: brandKit.logo_url,
-            fonts: brandKit.fonts,
-            voice: brandKit.voice
-          } : null,
-          resolution,
-          slideIndex: index,
-          totalSlides: slides,
-          overlayText,
-          carouselId
-        }
-      });
-      
-      if (imgError) throw new Error(`Image: ${imgError.message || "échec d'invocation"}`);
-      if (!data?.imageUrl) throw new Error("Image: aucune URL renvoyée par le backend");
-      
-      // Fallback client si l'insert backend a échoué
-      if (data.saved === false && data.imageUrl) {
-        console.log('Backend insert failed, attempting client-side insert...');
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            await supabase.from('media_generations').insert({
-              user_id: user.id,
-              brand_id: brandKit?.id || null,
-              type: 'image',
-              status: 'completed',
-              prompt: enrichedPrompt.substring(0, 500),
-              output_url: data.imageUrl,
-              thumbnail_url: data.imageUrl,
-              woofs: 1,
-              metadata: {
-                resolution,
-                slideIndex: index,
-                totalSlides: slides,
-                carouselId: carouselId || null,
-                overlayText: overlayText || null,
-                brandName: brandKit?.name,
-                generatedAt: new Date().toISOString()
-              }
-            });
-            console.log('Client-side insert successful');
-          }
-        } catch (e) {
-          console.error('Client-side insert failed:', e);
-        }
-      }
-      
-      return {
-        kind: "image",
-        uri: data.imageUrl,
-        meta: {
-          index,
-          resolution,
-          brandId: brandKit?.id ?? null,
-          brandName: brandKit?.name ?? null,
-          overlay: !!(writeOnSlides && (headline || caption || cta))
-        }
-      };
-    } else {
-      const aspectRatio = `${w}:${h}`;
-      const { data, error: videoError } = await supabase.functions.invoke("generate-video", {
-        body: {
-          prompt: enrichedPrompt,
-          aspectRatio,
-          provider: "replicate"
-        }
-      });
-      
-      if (videoError) throw new Error(`Vidéo: ${videoError.message || "échec d'invocation"}`);
-      const videoUrl: string | undefined = data?.videoUrl || data?.url;
-      if (!videoUrl) throw new Error("Vidéo: aucune URL renvoyée par le backend");
-      
-      return {
-        kind: "video",
-        uri: videoUrl,
-        meta: {
-          index,
-          resolution,
-          duration,
-          fps,
-          brandId: brandKit?.id ?? null,
-          brandName: brandKit?.name ?? null
-        }
-      };
-    }
-  }
+  const loadQuotaInfo = async () => {
+    if (!user) return;
+    const { data: profile } = await supabase.from("profiles").select("quota_videos, woofs_consumed_this_month").eq("id", user.id).single();
+    if (profile) setQuotaInfo({ remaining: (profile.quota_videos || 0) - (profile.woofs_consumed_this_month || 0), total: profile.quota_videos || 0 });
+    const { data: txs } = await supabase.from("transactions").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(5);
+    if (txs) setTransactions(txs);
+  };
 
-  async function handleGenerate() {
-    if (!resolution.match(/^\d+x\d+$/)) {
-      toast({ title: "Résolution invalide", description: "Format attendu: LxH (ex: 1080x1350)", variant: "destructive" });
-      return;
-    }
-    if (slides < 1 || slides > 20) {
-      toast({ 
-        title: "Erreur", 
-        description: "Le nombre de slides doit être entre 1 et 20", 
-        variant: "destructive" 
-      });
-      return;
-    }
-    
-    setLoading(true);
-    setError(null);
-    setArtifacts([]);
-    setPlan(DEFAULT_PLAN);
-    
+  const loadProviders = async () => {
+    const { data } = await supabase.from("providers").select("*").eq("enabled", true);
+    if (data) setAvailableProviders(data);
+  };
+
+  const handleGenerate = async () => {
+    if (!user || !prompt.trim()) return toast.error("Veuillez saisir un prompt");
+    setIsGenerating(true);
+    setDecision(null);
+
     try {
-      const results: Artifact[] = [];
-      
-      // Si carrousel (>1 slide), on génère d'abord le plan avec textes corrigés
-      let carouselPlan: any = null;
-      const carouselId = slides > 1 ? crypto.randomUUID() : undefined;
-      
-      if (slides > 1 && mode === "image") {
-        setPlan(prev => [...prev, "⏳ Planification du carrousel..."]);
-        
-        const { data: planData, error: planError } = await supabase.functions.invoke("alfie-plan-carousel", {
-          body: {
-            prompt: prompt || "Créer un carrousel engageant",
-            brandKit: brandKit ? {
-              name: brandKit.name,
-              palette: brandKit.palette,
-              voice: brandKit.voice
-            } : null,
-            slideCount: slides
-          }
-        });
-        
-        if (planError) {
-          console.warn('Carousel planning failed, continuing without plan:', planError);
-        } else if (planData?.slides) {
-          carouselPlan = planData;
-          setPlan(prev => [...prev, "✓ Plan du carrousel créé avec textes corrigés"]);
-        }
-      }
-      
-      let firstSlideUrl: string | undefined;
-      
-      for (let i = 0; i < slides; i++) {
-        console.log(`Génération slide ${i + 1}/${slides}...`);
-        
-        // Construire l'overlayText depuis le plan si disponible
-        let overlayText: string | undefined;
-        if (carouselPlan?.slides?.[i]) {
-          const slide = carouselPlan.slides[i];
-          const parts: string[] = [];
-          if (slide.title) parts.push(slide.title);
-          if (slide.subtitle) parts.push(slide.subtitle);
-          if (slide.bullets?.length) parts.push(...slide.bullets);
-          if (slide.cta) parts.push(slide.cta);
-          overlayText = parts.join('\n');
-        }
-        
-        // Pour les slides 2+, on passe la 1re slide comme référence visuelle
-        const templateUrl = (i > 0 && firstSlideUrl) ? firstSlideUrl : undefined;
-        
-        const artifact = await generateSingleSlide(i + 1, templateUrl, carouselId, overlayText);
-        
-        if (i === 0) {
-          firstSlideUrl = artifact.uri;
-        }
-        
-        results.push(artifact);
-        setArtifacts(prev => [...prev, artifact]);
-        
-        setPlan(prev => {
-          const updated = [...prev];
-          updated.push(`✓ Slide ${i + 1}/${slides} généré${overlayText ? ' (avec texte corrigé)' : ''}`);
-          return updated;
-        });
-      }
-      
-      setPlan(prev => [...prev, "✓ Tous les livrables prêts et enregistrés en bibliothèque"]);
-      toast({
-        title: "Génération réussie",
-        description: `${slides} slide(s) ${mode === "video" ? "vidéo" : "image"} généré(s) avec succès et enregistré(s) dans votre bibliothèque.`
+      const use_case = format.includes("1920") ? "story" : "ad_reel";
+      const { data: providerRes } = await supabase.functions.invoke("alfie-select-provider", {
+        body: { brief: { use_case, style: quality }, modality: mode, format, duration_s: mode === "video" ? duration : 0, quality, budget_woofs: quotaInfo.remaining }
       });
-    } catch (e: any) {
-      const errorMsg = e?.message ?? "Erreur inconnue";
-      setError(errorMsg);
-      toast({ title: "Erreur", description: errorMsg, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  }
+      
+      if (providerRes.decision === "KO") {
+        toast.error("Budget insuffisant", { description: providerRes?.suggestions?.join(", ") });
+        setIsGenerating(false);
+        return;
+      }
+      
+      setDecision(providerRes);
+      let finalCost = providerRes.cost_woofs;
 
-  const canGenerate = !loading && prompt.trim() !== "" && slides >= 1 && slides <= 20;
+      if (batchNight) {
+        await supabase.from("batch_requests").insert({ user_id: user.id, modality: mode, payload_json: { prompt, format, duration, quality }, process_after: new Date(Date.now() + 8 * 3600 * 1000).toISOString() });
+        toast.success("Planifié pour la nuit");
+        setIsGenerating(false);
+        return;
+      }
+
+      await supabase.functions.invoke("alfie-consume-woofs", { body: { cost_woofs: finalCost } });
+      
+      let renderUrl = "";
+      if (mode === "image") {
+        const { data: imgRes } = await supabase.functions.invoke("alfie-render-image", { body: { provider: providerRes.provider, prompt: buildBrandAwarePrompt(prompt, brandKit), assets: [], format } });
+        renderUrl = imgRes?.image_urls?.[0] || "";
+      } else {
+        const { data: vidRes } = await supabase.functions.invoke("alfie-render-video", { body: { provider: providerRes.provider, prompt: buildBrandAwarePrompt(prompt, brandKit), assets: [], params: { duration, resolution: format, style: quality } } });
+        renderUrl = vidRes?.video_url || "";
+      }
+
+      const { data: scoreRes } = await supabase.functions.invoke("alfie-score-coherence", { body: { render_url: renderUrl, brand_spec: brandKit ? JSON.stringify(brandKit) : null } });
+      await supabase.functions.invoke("alfie-update-metrics", { body: { provider: providerRes.provider, use_case, format, reward: scoreRes.score / 100, success: true } });
+
+      setArtifacts(prev => [...prev, { id: `${Date.now()}`, kind: mode, uri: renderUrl, meta: { resolution: format, brand_score: scoreRes.score, cost_woofs: finalCost } }]);
+      toast.success("Généré avec succès");
+      loadQuotaInfo();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   return (
-    <div className="mx-auto max-w-7xl p-5">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Colonne gauche : Formulaire */}
-          <div className="space-y-5">
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <div className="text-lg font-semibold text-card-foreground mb-4">Créer</div>
-              
-              {/* Section Brief */}
-              <div className="space-y-3">
-                <div className="text-sm font-semibold text-card-foreground">Brief</div>
-                
-                <div>
-                  <label htmlFor="mode" className="text-sm font-medium text-card-foreground">Mode</label>
-                  <div className="mt-1 flex gap-2">
-                    <button
-                      onClick={() => setMode("image")}
-                      className={`px-3 py-1 rounded-2xl border border-border transition-colors ${
-                        mode === "image" ? "bg-primary text-primary-foreground" : "bg-background text-foreground"
-                      }`}
-                      aria-pressed={mode === "image"}
-                    >
-                      Image
-                    </button>
-                    <button
-                      onClick={() => setMode("video")}
-                      className={`px-3 py-1 rounded-2xl border border-border transition-colors ${
-                        mode === "video" ? "bg-primary text-primary-foreground" : "bg-background text-foreground"
-                      }`}
-                      aria-pressed={mode === "video"}
-                    >
-                      Vidéo
-                    </button>
-                  </div>
-                </div>
+    <div className="min-h-screen bg-background p-4">
+      <div className="max-w-[1800px] mx-auto">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold">Créer</h1>
+          <p className="text-muted-foreground">Phase 1 + Phase 2 intégrées</p>
+        </div>
 
-                <div>
-                  <label htmlFor="brand" className="text-sm font-medium text-card-foreground">Marque (optionnel)</label>
-                  <select
-                    id="brand"
-                    value={activeBrandId || ""}
-                    onChange={(e) => setActiveBrand(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-input bg-background p-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                  <option value="">Aucune marque</option>
-                  {Array.isArray(brands) && brands.length > 0 ? (
-                    brands.map(b => (
-                      <option key={b.id} value={b.id}>{b.name}</option>
-                    ))
-                  ) : (
-                    <option disabled>Aucune marque disponible</option>
-                  )}
-                  </select>
-                  {brandKit && brandKit.palette.length > 0 && (
-                    <div className="mt-1 flex gap-1">
-                      {brandKit.palette.slice(0, 5).map((c, i) => (
-                        <div key={i} style={{ backgroundColor: c }} className="w-6 h-6 rounded-full border" />
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label htmlFor="prompt" className="text-sm font-medium text-card-foreground">
-                    Prompt visuel (décrit l'image/la vidéo)
-                  </label>
-                  <textarea
-                    id="prompt"
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    rows={4}
-                    className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    placeholder="Ex: Affiche énergique rentrée, fond coloré, style moderne, produits en avant-plan…"
-                  />
-                </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div className="lg:col-span-4 space-y-4">
+            <Card className="p-4">
+              <div className="space-y-4">
+                <div><Label>Mode</Label><Select value={mode} onValueChange={(v: any) => setMode(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="image">Image</SelectItem><SelectItem value="video">Vidéo</SelectItem></SelectContent></Select></div>
+                {brands.length > 0 && <div><Label>Marque</Label><Select value={activeBrandId || ""} onValueChange={setActiveBrand}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{brands.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent></Select></div>}
+                <div><Label>Prompt</Label><Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={4} /></div>
+                <div><Label>Format</Label><Select value={format} onValueChange={setFormat}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1080x1080">Carré</SelectItem><SelectItem value="1080x1920">Portrait</SelectItem><SelectItem value="1920x1080">Paysage</SelectItem></SelectContent></Select></div>
+                {mode === "video" && <div><Label>Durée (s)</Label><Input type="number" value={duration} onChange={(e) => setDuration(parseInt(e.target.value))} min={5} max={30} /></div>}
+                <div><Label>Qualité</Label><Select value={quality} onValueChange={(v: any) => setQuality(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="draft">Draft</SelectItem><SelectItem value="standard">Standard</SelectItem><SelectItem value="premium">Premium</SelectItem></SelectContent></Select></div>
+                <Toggle pressed={batchNight} onPressedChange={setBatchNight}>Batch nuit</Toggle>
+                <Button onClick={handleGenerate} disabled={isGenerating || !prompt.trim()} className="w-full" size="lg">{isGenerating ? <><Clock className="w-4 h-4 mr-2 animate-spin" />Génération...</> : <><Sparkles className="w-4 h-4 mr-2" />Générer</>}</Button>
               </div>
-
-              {/* Section Textes sur slides */}
-              <div className="mt-4 space-y-3">
-                <div className="text-sm font-semibold text-card-foreground">Textes sur slides</div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label htmlFor="headline" className="text-sm font-medium text-card-foreground">Headline (optionnel)</label>
-                    <input
-                      id="headline"
-                      value={headline}
-                      onChange={(e) => setHeadline(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      placeholder="Titre / Slogan"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="cta" className="text-sm font-medium text-card-foreground">CTA (optionnel)</label>
-                    <input
-                      id="cta"
-                      value={cta}
-                      onChange={(e) => setCta(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      placeholder="Ex: Découvrir"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label htmlFor="caption" className="text-sm font-medium text-card-foreground">Sous-titre (optionnel)</label>
-                    <input
-                      id="caption"
-                      value={caption}
-                      onChange={(e) => setCaption(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      placeholder="Courte description"
-                    />
-                  </div>
-                  <div className="col-span-2 flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="writeOnSlides"
-                      checked={writeOnSlides}
-                      onChange={(e) => setWriteOnSlides(e.target.checked)}
-                      className="rounded border-input"
-                    />
-                    <label htmlFor="writeOnSlides" className="text-xs text-muted-foreground">
-                      Écrire ces textes directement sur l'image/vidéo (V2)
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Section Légende d'accompagnement */}
-              <div className="mt-4 space-y-3">
-                <div className="text-sm font-semibold text-card-foreground">Légende d'accompagnement</div>
-                <div>
-                  <label htmlFor="socialCaption" className="text-sm font-medium text-card-foreground">
-                    Légende pour les réseaux sociaux (optionnel)
-                  </label>
-                  <textarea
-                    id="socialCaption"
-                    value={socialCaption}
-                    onChange={(e) => setSocialCaption(e.target.value)}
-                    rows={2}
-                    className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    placeholder="Caption pour accompagner votre visuel"
-                  />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    La légende d'accompagnement n'est pas rédigée par Alfie. Pour la légende : Aeditus.
-                  </p>
-                </div>
-              </div>
-
-              {/* Section Résolution & Nombre */}
-              <div className="mt-4 space-y-3">
-                <div className="text-sm font-semibold text-card-foreground">Résolution & Nombre</div>
-                
-                <div>
-                  <label htmlFor="resolution" className="text-sm font-medium text-card-foreground">Résolution</label>
-                  <select
-                    id="resolution"
-                    value={resolution}
-                    onChange={(e) => setResolution(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-input bg-background p-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {RESOLUTIONS.map(r => (
-                      <option key={r.value} value={r.value}>{r.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="slides" className="text-sm font-medium text-card-foreground">Nombre de slides</label>
-                  <input
-                    id="slides"
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={slides}
-                    onChange={(e) => setSlides(Math.max(1, Math.min(20, parseInt(e.target.value || "1", 10))))}
-                    className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
-                </div>
-
-                {mode === "video" && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label htmlFor="duration" className="text-sm font-medium text-card-foreground">Durée (s)</label>
-                      <input
-                        id="duration"
-                        type="number"
-                        min={1}
-                        value={duration}
-                        onChange={(e) => setDuration(parseInt(e.target.value, 10))}
-                        className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="fps" className="text-sm font-medium text-card-foreground">FPS</label>
-                      <input
-                        id="fps"
-                        type="number"
-                        min={1}
-                        value={fps}
-                        onChange={(e) => setFps(parseInt(e.target.value, 10))}
-                        className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-4">
-                <button
-                  disabled={!canGenerate}
-                  onClick={handleGenerate}
-                  className="w-full px-4 py-2 rounded-2xl bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  aria-busy={loading}
-                  aria-disabled={!canGenerate}
-                >
-                  {loading 
-                    ? `Génération ${Math.min(artifacts.length + 1, slides)}/${slides}…` 
-                    : `Générer ${slides} ${mode === "video" ? "vidéo(s)" : "image(s)"}`
-                  }
-                </button>
-                {error && <p className="mt-2 text-sm text-destructive" role="alert">{error}</p>}
-              </div>
-            </div>
-
-            {/* Promo Aeditus si légende manquante */}
-            {missingSocialCaption && (
-              <AeditusCard
-                title="Besoin d'une légende ?"
-                message="Votre visuel gagnera en impact avec une légende d'accompagnement. Utilisez Aeditus (SaaS dédié au contenu)."
-              />
-            )}
+            </Card>
           </div>
 
-          {/* Colonne centre : Plan */}
-          <div className="space-y-5">
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <div className="text-lg font-semibold text-card-foreground mb-3">Plan</div>
-              <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
-                {(plan.length === 0 && !loading && artifacts.length === 0) ? (
-                  DEFAULT_PLAN.map((step, idx) => <li key={idx} className="opacity-50">{step}</li>)
-                ) : (
-                  plan.map((step, idx) => (
-                    <li key={idx} className={step.startsWith("✓") ? "text-green-600 font-medium" : ""}>
-                      {step}
-                    </li>
-                  ))
-                )}
-              </ol>
-            </div>
-          </div>
+          <div className="lg:col-span-4"><Card className="p-4"><h3 className="font-semibold mb-4">Livrables</h3>{artifacts.length === 0 ? <div className="text-center py-12 text-muted-foreground"><Sparkles className="w-12 h-12 mx-auto mb-4 opacity-50" /><p>Vos créations ici</p></div> : <div className="grid grid-cols-2 gap-3">{artifacts.map(a => <div key={a.id} className="relative group">{a.kind === "image" ? <img src={a.uri} className="rounded-lg w-full" /> : <video src={a.uri} controls className="rounded-lg w-full" />}<div className="absolute bottom-2 left-2 flex gap-1">{a.meta?.brand_score && <Badge variant="outline" className="text-xs">{a.meta.brand_score}/100</Badge>}{a.meta?.cost_woofs && <Badge className="text-xs">{a.meta.cost_woofs} woofs</Badge>}</div></div>)}</div>}</Card></div>
 
-          {/* Colonne droite : Livrables */}
-          <div className="space-y-5">
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-lg font-semibold text-card-foreground">Livrables</div>
-                <div className="text-xs text-muted-foreground">
-                  {resolution} • {slides} slide(s) • {mode.toUpperCase()}
-                </div>
-              </div>
-
-              {artifacts.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Aucun livrable pour l'instant.</p>
-              ) : (
-                <div className="grid grid-cols-1 gap-3">
-                  {artifacts.map((a, i) => (
-                    <div key={i} className="rounded-xl border border-border p-2 bg-background">
-                      {a.kind === "image" ? (
-                        <img src={a.uri} alt={`Slide ${i + 1}`} className="w-full h-auto rounded-lg" />
-                      ) : (
-                        <video src={a.uri} controls className="w-full rounded-lg" />
-                      )}
-                      <div className="flex items-center justify-between mt-2 text-xs">
-                        <div className="flex gap-2">
-                          <span className={`px-2 py-1 rounded-full ${
-                            a.kind === "image" 
-                              ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200" 
-                              : "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-200"
-                          }`}>
-                            {a.kind.toUpperCase()}
-                          </span>
-                          {a.meta?.overlay && (
-                            <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200">
-                              Overlay
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
-                          <a
-                            href={a.uri}
-                            download
-                            className="underline text-primary hover:text-primary/80"
-                            aria-label={`Télécharger ${a.kind} ${i + 1}`}
-                          >
-                            Télécharger
-                          </a>
-                          <a
-                            href={a.uri}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="underline text-primary hover:text-primary/80"
-                            aria-label={`Ouvrir ${a.kind} ${i + 1} dans un nouvel onglet`}
-                          >
-                            Ouvrir
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          <div className="lg:col-span-4 space-y-4">{decision && <Card className="p-4"><h3 className="font-semibold mb-4">Décision IA</h3><div className="space-y-2 text-sm"><div className="flex justify-between"><span>Provider:</span><span className="font-mono">{decision.provider}</span></div><div className="flex justify-between"><span>Coût:</span><span className="font-semibold">{decision.cost_woofs} woofs</span></div></div></Card>}<Card className="p-4"><h3 className="font-semibold mb-4">Quota</h3><div className="space-y-2"><div className="flex justify-between text-sm"><span>Woofs:</span><span className="font-bold">{quotaInfo.remaining} / {quotaInfo.total}</span></div><Progress value={(quotaInfo.remaining / quotaInfo.total) * 100} /></div></Card></div>
         </div>
       </div>
+    </div>
   );
 }

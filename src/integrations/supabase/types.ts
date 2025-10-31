@@ -327,6 +327,47 @@ export type Database = {
           },
         ]
       }
+      batch_requests: {
+        Row: {
+          created_at: string | null
+          id: string
+          modality: string
+          payload_json: Json
+          process_after: string
+          result_json: Json | null
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          modality: string
+          payload_json: Json
+          process_after: string
+          result_json?: Json | null
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          modality?: string
+          payload_json?: Json
+          process_after?: string
+          result_json?: Json | null
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brands: {
         Row: {
           canva_access_token: string | null
@@ -1101,6 +1142,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      provider_metrics: {
+        Row: {
+          avg_reward: number | null
+          format: string
+          last_updated: string | null
+          provider_id: string
+          successes: number | null
+          total_reward: number | null
+          trials: number | null
+          use_case: string
+        }
+        Insert: {
+          avg_reward?: number | null
+          format: string
+          last_updated?: string | null
+          provider_id: string
+          successes?: number | null
+          total_reward?: number | null
+          trials?: number | null
+          use_case: string
+        }
+        Update: {
+          avg_reward?: number | null
+          format?: string
+          last_updated?: string | null
+          provider_id?: string
+          successes?: number | null
+          total_reward?: number | null
+          trials?: number | null
+          use_case?: string
+        }
+        Relationships: []
       }
       providers: {
         Row: {

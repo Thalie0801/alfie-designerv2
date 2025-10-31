@@ -126,5 +126,14 @@ verify_jwt = true
 [functions.alfie-score-coherence]
 verify_jwt = true
 
-[functions.alfie-update-metrics]
+[functions.alfie-render-video]
+verify_jwt = true
+
+[functions.alfie-video-upscale]
+verify_jwt = true
+
+[functions.alfie-video-extend]
+verify_jwt = true
+
+[functions.process-batch-queue]
 verify_jwt = false

@@ -27,7 +27,6 @@ import NotFound from "./pages/NotFound";
 import Templates from "./pages/Templates";
 import Library from "./pages/Library";
 import Videos from "./pages/Videos";
-import AlfieStudio from "./pages/AlfieStudio";
 import ActivateAccess from "./pages/onboarding/Activate";
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 
@@ -94,14 +93,6 @@ const App = () => (
                 <AppLayoutWithSidebar>
                   <Videos />
                 </AppLayoutWithSidebar>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/alfie-studio"
-            element={
-              <ProtectedRoute>
-                <AlfieStudio />
               </ProtectedRoute>
             }
           />

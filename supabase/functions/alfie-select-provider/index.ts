@@ -51,8 +51,17 @@ serve(async (req) => {
       );
     }
 
-    // Calculer le score pour chaque provider
-    const candidates = providers.map((p) => {
+    // Calculer le score pour chaque provider avec bandit UCB
+    const use_case = brief.use_case || 'general';
+    
+    // Get total trials for UCB calculation
+    const { data: allMetrics } = await supabase
+      .from('provider_metrics')
+      .select('trials');
+    
+    const totalTrials = (allMetrics || []).reduce((sum: number, m: any) => sum + (m.trials || 0), 0);
+
+    const candidates = await Promise.all(providers.map(async (p) => {
       const cost = estimateCost(p, modality, format, duration_s, quality);
       const qualityScore = p.quality_score as number;
       const latencyScore = 1 - Math.min((p.avg_latency_s as number) / 200, 1);
@@ -67,12 +76,32 @@ serve(async (req) => {
       }
 
       const normCost = Math.min(cost / budget_woofs, 2);
-      const score = wQ * qualityScore - wC * normCost + wL * latencyScore + wS * successScore;
+      let score = wQ * qualityScore - wC * normCost + wL * latencyScore + wS * successScore;
+
+      // UCB bonus (bandit algorithm)
+      const { data: metrics } = await supabase
+        .from('provider_metrics')
+        .select('trials, avg_reward')
+        .eq('provider_id', p.id)
+        .eq('use_case', use_case)
+        .eq('format', format)
+        .single();
+      
+      const trials = metrics?.trials || 0;
+      const avgReward = metrics?.avg_reward || 0;
+      const c = 1.5; // exploration parameter
+      const ucbBonus = trials > 0 
+        ? c * Math.sqrt(Math.log(totalTrials + 1) / trials)
+        : c * 2; // High bonus for untried providers
+      
+      score = score + avgReward + ucbBonus;
 
       return { ...p, cost, score };
-    }).filter((c) => c.cost <= budget_woofs);
+    }));
 
-    if (candidates.length === 0) {
+    const filteredCandidates = candidates.filter((c) => c.cost <= budget_woofs);
+
+    if (filteredCandidates.length === 0) {
       return new Response(
         JSON.stringify({
           decision: "KO",
@@ -87,7 +116,7 @@ serve(async (req) => {
     }
 
     // Meilleur candidat
-    const best = candidates.sort((a, b) => b.score - a.score)[0];
+    const best = filteredCandidates.sort((a, b) => b.score - a.score)[0];
 
     return new Response(
       JSON.stringify({
