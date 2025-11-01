@@ -462,6 +462,22 @@ export function AlfieChat() {
   const handleToolCall = async (toolName: string, args: any) => {
     console.log('Tool call:', toolName, args);
     
+    // ⚠️ PRE-ROUTING : Détecter si l'intention carrousel a été ignorée
+    if (toolName === 'generate_image') {
+      const lastUserMessage = messages[messages.length - 1]?.content || '';
+      const isCarouselIntent = /(carrousel|carousel|slides|série)/i.test(lastUserMessage);
+      
+      if (isCarouselIntent) {
+        console.error('[Routing] ❌ Carrousel détecté mais generate_image appelé !');
+        console.error('[Routing] Dernier message utilisateur:', lastUserMessage);
+        toast.error("⚠️ Tu as demandé un carrousel, pas une image unique. Reformule ta demande.");
+        return { 
+          error: "❌ Détection carrousel. Utilise le workflow carrousel (plan → validation → génération slide-by-slide).",
+          suggestion: "Demande plutôt : 'Crée un carrousel de X slides sur [thème]'"
+        };
+      }
+    }
+    
     switch (toolName) {
       case 'browse_templates': {
         const templates = await searchTemplates({
@@ -536,6 +552,8 @@ export function AlfieChat() {
           // ⚠️ GUARD : Si le prompt contient "carrousel", bloquer et forcer plan_carousel
           const promptLower = args.prompt?.toLowerCase() || '';
           if (/(carrousel|carousel|slides|série)/i.test(promptLower)) {
+            console.error('[Routing] ❌ BYPASS DETECTED: generate_image called with carousel keywords!');
+            console.error('[Routing] Prompt:', args.prompt);
             toast.error("⚠️ Détection carrousel ! Utilise plan_carousel au lieu de generate_image.");
             return { 
               error: "⚠️ Détection carrousel ! Utilise plan_carousel au lieu de generate_image." 
