@@ -1,5 +1,9 @@
 project_id = "itsjonazifiiikozengd"
 
+[functions.process-job-worker]
+verify_jwt = false
+schedule = "* * * * *"
+
 [functions.creations-api]
 verify_jwt = true
 

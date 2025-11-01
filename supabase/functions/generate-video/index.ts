@@ -183,6 +183,32 @@ serve(async (req) => {
   }
 
   try {
+    // 🔒 SECURITY: Verify authentication before processing
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return jsonResponse({ error: "Missing Authorization header" }, { status: 401 });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return jsonResponse({ error: "Server configuration error" }, { status: 500 });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      console.error("[generate-video] Authentication failed:", authError);
+      return jsonResponse({ error: "Authentication required" }, { status: 401 });
+    }
+
+    console.log(`[generate-video] ✅ Authenticated user: ${user.id}`);
+
     const body = await req.json();
     const prompt = typeof body?.prompt === "string" ? body.prompt : undefined;
     const aspectRatio = typeof body?.aspectRatio === "string" ? body.aspectRatio : "16:9";
