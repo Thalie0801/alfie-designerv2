@@ -1115,12 +1115,12 @@ export function AlfieChat() {
       
       if (error) {
         console.error('[CancelCarousel] Error:', error);
-        toast.error('Erreur lors de l\'annulation');
+        toast.error(`Impossible d'annuler: ${error.message || 'Erreur réseau. Vérifie que la fonction cancel-job-set est déployée.'}`);
         return;
       }
       
       console.log('[CancelCarousel] Success:', data);
-      toast.success(`Génération annulée (${data.refundedVisuals} visuels remboursés)`);
+      toast.success(`Génération annulée (${data?.canceledJobs || 0} jobs annulés, ${data?.refundedVisuals || 0} visuels remboursés)`);
       
       // Stop pumping
       if (pumpRef.current) {
