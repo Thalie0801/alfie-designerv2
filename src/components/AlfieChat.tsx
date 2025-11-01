@@ -1098,6 +1098,12 @@ export function AlfieChat() {
               .single();
 
             if (asset?.output_url) {
+              // Filtrer les images base64 (trop volumineuses et non valides)
+              if (!asset.output_url.startsWith('http')) {
+                console.warn('⚠️ [AlfieChat] Skipping base64 or invalid URL:', asset.output_url.slice(0, 100));
+                continue;
+              }
+              
               // Phase 9: Extraire info détaillée de cohérence
               const metadata = asset.metadata as any;
               const isKeyVisual = metadata?.role === 'key_visual';

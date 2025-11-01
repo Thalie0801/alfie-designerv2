@@ -109,6 +109,7 @@ serve(async (req) => {
     }
 
     // 4. Phase 3: Rendre le texte en SVG (typo contrôlée, pas d'IA)
+    console.log('🎨 [Worker] Step 1: Rendering SVG text layer...');
     const slideContent = {
       title: job.metadata?.title || job.prompt,
       subtitle: job.metadata?.subtitle || '',
@@ -123,15 +124,21 @@ serve(async (req) => {
     };
     
     const svgLayer = await renderSlideToSVG(slideContent, template, brandSnapshot);
-    console.log(`[Worker] SVG rendered (${svgLayer.length} chars)`);
+    console.log(`✅ [Worker] SVG rendered (${svgLayer.length} chars)`);
+    console.log('📝 SVG preview:', svgLayer.substring(0, 200) + '...');
 
     // 5. Phase 4: Générer le fond graphique pur (pas de texte)
+    console.log('🖼️ [Worker] Step 2: Generating AI background...');
     const correctedPrompt = correctFrenchSpelling(job.prompt);
     const enrichedPrompt = enrichPromptWithBrand(correctedPrompt, brandSnapshot);
     let backgroundPrompt = `${enrichedPrompt} Abstract background composition. NO TEXT, NO LETTERS, NO WORDS. Pure visual: gradients, shapes, textures only.`;
     
+    console.log('📝 Background prompt:', backgroundPrompt);
+    console.log('🌱 Seed:', seed?.slice(0, 12) + '...');
+    
     const aspectRatio = brandSnapshot?.aspectRatio || '4:5';
     const resolution = aspectRatio === '1:1' ? '1080x1080' : '1080x1350';
+    console.log('📐 Resolution:', resolution);
 
     const brandKit = brandSnapshot ? {
       id: job.job_sets.brand_id,
@@ -150,6 +157,9 @@ serve(async (req) => {
         negativePrompt: 'text, letters, words, typography, captions'
       }
     });
+    
+    const bgUrl = bgImageData?.imageUrl || bgImageData?.url;
+    console.log('✅ [Worker] Background generated:', bgUrl ? bgUrl.slice(0, 50) + '...' : 'FAILED');
 
     // Helper pour mettre à jour le statut du job_set
     const updateJobSetStatus = async () => {
@@ -175,9 +185,8 @@ serve(async (req) => {
       return jobSetStatus;
     };
 
-    const bgUrl = bgImageData?.imageUrl || bgImageData?.url;
-
     if (bgImageErr || !bgUrl) {
+      console.error('❌ [Worker] Background generation failed:', bgImageErr);
       // Échec → marquer et refund
       await supabase
         .from('jobs')
@@ -202,32 +211,47 @@ serve(async (req) => {
     }
 
     // 6. Phase 5: Composer background + SVG text
-    console.log(`[Worker] Compositing background + SVG...`);
+    console.log('🎭 [Worker] Step 3: Compositing background + SVG text...');
     const compositedBuffer = await compositeSlide(bgUrl, svgLayer);
+    console.log('✅ [Worker] Composition complete. Buffer size:', compositedBuffer.length, 'bytes');
     
     // 7. Upload vers Supabase Storage
-    const fileName = `carousel_${job.job_set_id}_slide_${job.index_in_set}.png`;
+    console.log('☁️ [Worker] Step 4: Uploading to storage...');
+    const fileName = `carousel/${job.job_set_id}/slide_${job.index_in_set}_${Date.now()}.png`;
+    console.log('📁 File path:', fileName);
+    
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('media-generations')
       .upload(fileName, compositedBuffer, {
         contentType: 'image/png',
-        upsert: true
+        upsert: true,
+        cacheControl: '3600'
       });
 
     if (uploadError) {
-      console.error('[Worker] Upload failed:', uploadError);
+      console.error('❌ [Worker] Upload failed:', uploadError);
+      console.error('❌ Upload error details:', JSON.stringify(uploadError));
       await supabase
         .from('jobs')
-        .update({ status: 'failed', error: 'Upload failed', finished_at: new Date().toISOString() })
+        .update({ status: 'failed', error: `Upload failed: ${uploadError.message}`, finished_at: new Date().toISOString() })
         .eq('id', job.id);
       throw uploadError;
     }
 
-    const publicUrl = supabase.storage
-      .from('media-generations')
-      .getPublicUrl(fileName).data.publicUrl;
+    console.log('✅ Upload success:', uploadData);
 
-    console.log(`[Worker] Image uploaded: ${publicUrl}`);
+    const { data: publicUrlData } = supabase.storage
+      .from('media-generations')
+      .getPublicUrl(fileName);
+    
+    const publicUrl = publicUrlData.publicUrl;
+
+    if (!publicUrl || !publicUrl.startsWith('http')) {
+      throw new Error(`Invalid public URL generated: ${publicUrl}`);
+    }
+
+    console.log('✅ [Worker] Image uploaded successfully!');
+    console.log('🔗 Public URL:', publicUrl);
 
     // 8. Phase 6: Vérifier cohérence réelle
     const referenceImageUrl = !isKeyVisual && job.job_sets.style_ref_url 

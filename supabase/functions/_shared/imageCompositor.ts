@@ -1,70 +1,49 @@
 // Phase 5: Compositeur d'images (background IA + SVG texte)
+import { createCanvas, loadImage } from 'https://deno.land/x/canvas@v1.4.1/mod.ts';
 
 export async function compositeSlide(
   backgroundUrl: string,
   svgTextLayer: string
 ): Promise<Uint8Array> {
-  // Pour l'instant, utiliser une approche simple via Canvas/fetch
-  // Dans un environnement Deno, on peut utiliser des libs comme:
-  // - https://esm.sh/sharp (si disponible)
-  // - Canvas API (si disponible)
-  // - Appeler un service externe
-  
-  // Pour MVP : convertir SVG en PNG et le superposer via fetch + Canvas
+  console.log('🎨 [imageCompositor] Starting composition...');
+  console.log('📥 Background URL:', backgroundUrl);
+  console.log('📝 SVG layer size:', svgTextLayer.length, 'chars');
   
   try {
-    // 1. Télécharger le background
-    const bgResponse = await fetch(backgroundUrl);
-    if (!bgResponse.ok) {
-      throw new Error(`Failed to fetch background: ${bgResponse.status}`);
-    }
-    const bgBlob = await bgResponse.blob();
-    const bgArrayBuffer = await bgBlob.arrayBuffer();
+    // 1. Charger le background
+    console.log('⬇️ Loading background image...');
+    const bgImage = await loadImage(backgroundUrl);
+    const width = bgImage.width();
+    const height = bgImage.height();
+    console.log('✅ Background loaded:', width, 'x', height);
     
-    // 2. Pour le MVP, on retourne le background tel quel
-    // Dans une implémentation complète, on utiliserait sharp ou Canvas pour composer
-    // const composited = await composeWithSharp(bgArrayBuffer, svgTextLayer);
+    // 2. Créer canvas
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
     
-    // TODO: Implémenter la composition réelle avec sharp ou Canvas
-    console.log('[imageCompositor] SVG overlay:', svgTextLayer.slice(0, 100) + '...');
-    console.log('[imageCompositor] Background size:', bgArrayBuffer.byteLength);
+    // 3. Dessiner le background
+    console.log('🖼️ Drawing background...');
+    ctx.drawImage(bgImage, 0, 0);
     
-    // Pour l'instant, retourner le background
-    // La vraie implémentation nécessiterait:
-    // 1. Convertir SVG en PNG via resvg ou similar
-    // 2. Composer avec sharp: background.composite([{ input: svgPng }])
+    // 4. Convertir SVG en data URL et le charger
+    console.log('🔄 Converting SVG to image...');
+    const svgDataUrl = `data:image/svg+xml;base64,${btoa(svgTextLayer)}`;
+    const svgImage = await loadImage(svgDataUrl);
+    console.log('✅ SVG converted to image');
     
-    return new Uint8Array(bgArrayBuffer);
+    // 5. Superposer le SVG
+    console.log('🎭 Compositing SVG overlay...');
+    ctx.drawImage(svgImage, 0, 0);
+    
+    // 6. Exporter en PNG
+    console.log('💾 Exporting to PNG buffer...');
+    const buffer = canvas.toBuffer('image/png');
+    console.log('✅ Composition complete:', buffer.length, 'bytes');
+    
+    return new Uint8Array(buffer);
     
   } catch (error) {
-    console.error('[imageCompositor] Composition failed:', error);
+    console.error('❌ [imageCompositor] Composition failed:', error);
     throw error;
   }
 }
-
-// Future implementation avec sharp:
-/*
-export async function compositeSlideWithSharp(
-  backgroundUrl: string,
-  svgTextLayer: string
-): Promise<Uint8Array> {
-  const sharp = (await import('https://esm.sh/sharp@0.33.0')).default;
-  
-  // 1. Télécharger le background
-  const bgResponse = await fetch(backgroundUrl);
-  const bgBuffer = new Uint8Array(await bgResponse.arrayBuffer());
-  
-  // 2. Convertir SVG en buffer
-  const svgBuffer = Buffer.from(svgTextLayer);
-  
-  // 3. Composer : background + SVG text layer
-  const composited = await sharp(bgBuffer)
-    .composite([
-      { input: svgBuffer, top: 0, left: 0, blend: 'over' }
-    ])
-    .png({ quality: 95 })
-    .toBuffer();
-  
-  return new Uint8Array(composited);
-}
-*/
