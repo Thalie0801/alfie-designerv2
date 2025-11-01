@@ -279,7 +279,7 @@ export function AlfieChat() {
           .from('job_sets')
           .select('id, total, status')
           .eq('brand_id', activeBrandId)
-          .in('status', ['queued', 'running', 'partial'])
+          .in('status', ['queued', 'processing'])  // ✅ Exclure 'done'
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -856,6 +856,18 @@ export function AlfieChat() {
             role: 'assistant',
             content: `🎨 Création d'un carrousel de ${count} slides en cours...\n\nCela va consommer ${count} visuels de ton quota.`
           }]);
+          
+          // ✅ Vérifier la marque active avant l'appel
+          console.log('[Carousel] Calling chat-create-carousel with:', { 
+            activeBrandId, 
+            slideCount: count, 
+            hasUser: !!user 
+          });
+          
+          if (!activeBrandId) {
+            toast.error('Aucune marque active. Sélectionne une marque d\'abord.');
+            return;
+          }
           
           const { data, error } = await supabase.functions.invoke('chat-create-carousel', {
             body: {
@@ -1660,6 +1672,13 @@ export function AlfieChat() {
                         console.log('[Carousel] Opening ZIP URL:', data.url);
                         window.open(data.url, '_blank');
                         toast.success('ZIP téléchargé ! 📦');
+                        
+                        // ✅ RÉINITIALISER l'état du carrousel après téléchargement
+                        console.log('[Carousel] Resetting state after download');
+                        setActiveJobSetId('');
+                        setCarouselTotal(0);
+                        localStorage.removeItem('activeJobSetId');
+                        localStorage.removeItem('carouselTotal');
                       } else {
                         throw new Error('No ZIP URL returned');
                       }

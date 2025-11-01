@@ -20,9 +20,18 @@ serve(async (req) => {
     }
 
     const idem = req.headers.get("x-idempotency-key") ?? crypto.randomUUID();
-    const { brandId, prompt, count, aspectRatio } = await req.json();
+    const body = await req.json();
+    const { brandId, prompt, count, aspectRatio } = body;
 
-    console.log(`[CreateCarousel] Request: brandId=${brandId}, count=${count}, prompt="${prompt}"`);
+    // ✅ LOG D'ENTRÉE COMPLET pour debug
+    console.log('[chat-create-carousel] START', {
+      brandId,
+      prompt: prompt?.substring(0, 100),
+      count,
+      aspectRatio,
+      hasAuth: !!authHeader,
+      idempotencyKey: idem
+    });
 
     // Admin client for service operations
     const adminClient = createClient(
