@@ -92,7 +92,7 @@ export function ChatComposer({
   };
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-20 bg-background/95 backdrop-blur-md border-t border-border">
+    <div className="fixed bottom-0 left-0 right-0 lg:left-64 z-20 bg-background/95 backdrop-blur-md border-t border-border">
       {/* Composer */}
       <div className="mx-auto max-w-3xl p-2 flex items-end gap-3">
         <div className="flex-1 relative">

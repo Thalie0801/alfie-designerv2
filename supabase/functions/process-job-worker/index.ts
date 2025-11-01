@@ -7,6 +7,39 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Correction orthographique française
+function correctFrenchSpelling(text: string): string {
+  const corrections: Record<string, string> = {
+    'puisence': 'puissance',
+    'décupèle': 'décuplée',
+    'décuplèe': 'décuplée',
+    'vidéos captatives': 'vidéos captivantes',
+    'Marktplace': 'Marketplace',
+    'Marketpace': 'Marketplace',
+    'libérze': 'libérez',
+    'automutéée': 'automatisée',
+    'automutée': 'automatisée',
+    'integration': 'intégration',
+    'créativ': 'créatif',
+    'visuals': 'visuels',
+    'captvatines': 'captivantes',
+    'est nouvel nouvel': 'est un nouvel',
+    'vidéos étans': 'vidéos uniques',
+    'en en quequess': 'en quelques',
+    'artifécralle': 'artificielle',
+    'partranaire': 'partenaire',
+    "d'éeil": "d'œil"
+  };
+
+  let corrected = text;
+  for (const [wrong, right] of Object.entries(corrections)) {
+    const regex = new RegExp(wrong, 'gi');
+    corrected = corrected.replace(regex, right);
+  }
+  
+  return corrected;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -52,9 +85,10 @@ serve(async (req) => {
       });
     }
 
-    // 3. Enrichir le prompt avec Brand Kit
+    // 3. Corriger l'orthographe puis enrichir le prompt avec Brand Kit
     const brandSnapshot = job.brand_snapshot;
-    const enrichedPrompt = enrichPromptWithBrand(job.prompt, brandSnapshot);
+    const correctedPrompt = correctFrenchSpelling(job.prompt);
+    const enrichedPrompt = enrichPromptWithBrand(correctedPrompt, brandSnapshot);
 
     // 4. Appeler alfie-generate-ai-image (ne nécessite pas de token utilisateur)
     const brandKit = brandSnapshot ? {

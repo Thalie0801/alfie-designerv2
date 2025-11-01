@@ -72,7 +72,7 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar>
+    <Sidebar className="z-30">
       <SidebarContent>
         {/* Logo */}
         <div className="p-4 flex items-center gap-3">
