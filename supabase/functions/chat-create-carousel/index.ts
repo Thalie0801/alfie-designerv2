@@ -45,6 +45,30 @@ serve(async (req) => {
 
     console.log(`[CreateCarousel] User authenticated: ${user.id}`);
 
+    // 🔒 SÉCURITÉ: Vérifier que la marque appartient bien à l'utilisateur
+    const { data: brandOwnership, error: brandCheckError } = await adminClient
+      .from("brands")
+      .select("user_id")
+      .eq("id", brandId)
+      .single();
+
+    if (brandCheckError || !brandOwnership) {
+      console.error(`[CreateCarousel] Brand ${brandId} not found`);
+      throw new Error("Brand not found");
+    }
+
+    if (brandOwnership.user_id !== user.id) {
+      console.error(`[CreateCarousel] ⛔ User ${user.id} tried to access brand ${brandId} owned by ${brandOwnership.user_id}`);
+      return new Response(JSON.stringify({ 
+        error: "Forbidden: you don't own this brand" 
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    console.log(`[CreateCarousel] ✅ Brand ownership verified for user ${user.id}`);
+
     // 1) Idempotency guard
     const { data: iKey } = await adminClient
       .from("idempotency_keys")

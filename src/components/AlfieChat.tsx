@@ -902,12 +902,13 @@ export function AlfieChat() {
     if (/4\s*:\s*5|portrait|feed/.test(t)) return "4:5";
     if (/16\s*:\s*9|youtube|horizontal|paysage/.test(t)) return "16:9";
     if (/1\s*:\s*1|carré|carre|square/.test(t)) return "1:1";
-    if (/carrousel|carousel/.test(t)) return "4:5";
+    if (/(carou?ss?el|carousel)/i.test(t)) return "4:5"; // Gère carrousel, carroussel, caroussel
     return "1:1";
   };
 
   const wantsImageFromText = (text: string): boolean => {
-    return /(image|visuel|carrousel|carousel|affiche|flyer)/i.test(text);
+    // Ne PAS inclure "carrousel" ici pour éviter la confusion avec la génération de carrousel
+    return /(image|visuel|affiche|flyer)/i.test(text);
   };
 
   const wantsVideoFromText = (t: string): boolean => {
@@ -1352,7 +1353,8 @@ export function AlfieChat() {
     // }
 
     // 🎯 DÉTECTION CARROUSEL (prioritaire) - Avec Realtime via Hook
-    const carouselMatch = userMessage.match(/carrousel|carousel/i);
+    // Gère toutes les variantes: carrousel, carroussel, caroussel, carousel
+    const carouselMatch = userMessage.match(/(carou?ss?el|carousel)/i);
     if (carouselMatch && !forceImage && !forceVideo) {
       const countMatch = userMessage.match(/\d+/);
       const slideCount = countMatch ? Math.min(10, Math.max(1, parseInt(countMatch[0]))) : 5;

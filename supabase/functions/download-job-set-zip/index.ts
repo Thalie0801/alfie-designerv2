@@ -33,12 +33,30 @@ serve(async (req) => {
     // Vérifier que le job_set appartient à l'utilisateur
     const { data: jobSet, error: jobSetErr } = await supabase
       .from('job_sets')
-      .select('*')
+      .select('brand_id, user_id, total, status')
       .eq('id', jobSetId)
-      .eq('user_id', user.id)
       .single();
 
-    if (jobSetErr || !jobSet) throw new Error('Job set not found');
+    if (jobSetErr || !jobSet) {
+      console.error('[download-zip] Job set not found:', jobSetErr);
+      throw new Error('Job set not found');
+    }
+
+    // 🔒 SÉCURITÉ: Vérifier que l'utilisateur possède le job_set OU la marque
+    if (jobSet.user_id !== user.id) {
+      const { data: brand } = await supabase
+        .from('brands')
+        .select('user_id')
+        .eq('id', jobSet.brand_id)
+        .single();
+      
+      if (!brand || brand.user_id !== user.id) {
+        console.error(`[download-zip] ⛔ User ${user.id} tried to download job_set ${jobSetId} from brand ${jobSet.brand_id}`);
+        throw new Error('Forbidden: you don\'t own this job set or brand');
+      }
+    }
+
+    console.log(`[download-zip] ✅ Ownership verified for user ${user.id}`);
 
     // Récupérer tous les jobs complétés
     const { data: jobs, error: jobsErr } = await supabase

@@ -62,6 +62,30 @@ serve(async (req) => {
 
     const { brandId, prompt, count, aspectRatio = '4:5' } = await req.json();
 
+    // 🔒 SÉCURITÉ: Vérifier que la marque appartient bien à l'utilisateur
+    const { data: brandOwnership, error: brandCheckError } = await supabase
+      .from("brands")
+      .select("user_id")
+      .eq("id", brandId)
+      .single();
+
+    if (brandCheckError || !brandOwnership) {
+      console.error(`[create-job-set] Brand ${brandId} not found`);
+      throw new Error("Brand not found");
+    }
+
+    if (brandOwnership.user_id !== user.id) {
+      console.error(`[create-job-set] ⛔ User ${user.id} tried to access brand ${brandId} owned by ${brandOwnership.user_id}`);
+      return new Response(JSON.stringify({ 
+        error: "Forbidden: you don't own this brand" 
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    console.log(`[create-job-set] ✅ Brand ownership verified for user ${user.id}`);
+
     // Normaliser le nombre de slides (1-10, défaut 5)
     const requestedCount = typeof count === 'number' ? count : 5;
     const normalizedCount = Math.max(1, Math.min(10, requestedCount));

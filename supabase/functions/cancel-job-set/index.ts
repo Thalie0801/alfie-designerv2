@@ -68,7 +68,7 @@ serve(async (req) => {
       });
     }
 
-    // Check permissions: user must own the job_set or the brand
+    // 🔒 SÉCURITÉ: Check permissions - user must own the job_set or the brand
     if (jobSet.user_id !== user.id) {
       const { data: brand } = await supabaseAdmin
         .from('brands')
@@ -77,12 +77,17 @@ serve(async (req) => {
         .maybeSingle();
       
       if (!brand || brand.user_id !== user.id) {
-        return new Response(JSON.stringify({ error: 'Forbidden: not your job set or brand' }), {
+        console.error(`[CancelJobSet] ⛔ User ${user.id} tried to cancel job_set ${jobSetId} from brand ${jobSet.brand_id}`);
+        return new Response(JSON.stringify({ 
+          error: 'Forbidden: you don\'t own this job set or brand' 
+        }), {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
     }
+
+    console.log(`[CancelJobSet] ✅ Ownership verified for user ${user.id}`);
 
     // If already canceled or completed, no-op
     if (['canceled', 'done', 'failed'].includes(jobSet.status)) {
