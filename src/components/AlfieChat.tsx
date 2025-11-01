@@ -533,6 +533,15 @@ export function AlfieChat() {
       
       case 'generate_image': {
         try {
+          // ⚠️ GUARD : Si le prompt contient "carrousel", bloquer et forcer plan_carousel
+          const promptLower = args.prompt?.toLowerCase() || '';
+          if (/(carrousel|carousel|slides|série)/i.test(promptLower)) {
+            toast.error("⚠️ Détection carrousel ! Utilise plan_carousel au lieu de generate_image.");
+            return { 
+              error: "⚠️ Détection carrousel ! Utilise plan_carousel au lieu de generate_image." 
+            };
+          }
+          
           setGenerationStatus({ type: 'image', message: 'Génération de ton image en cours... ✨' });
 
           const { data, error } = await supabase.functions.invoke('generate-ai-image', {
