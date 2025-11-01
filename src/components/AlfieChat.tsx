@@ -139,6 +139,24 @@ export function AlfieChat() {
     quota
   } = useAlfieOptimizations();
 
+  // Worker pumping state/refs
+  const pumpRef = useRef<number | null>(null);
+  const pumpStartRef = useRef<number>(0);
+  const latestRef = useRef({ done: 0, total: 0, jobSetId: '' });
+
+  useEffect(() => {
+    latestRef.current = { done: carouselDone, total: carouselTotal, jobSetId: activeJobSetId };
+    if (carouselTotal > 0 && carouselDone >= carouselTotal) {
+      if (pumpRef.current) {
+        clearInterval(pumpRef.current);
+        pumpRef.current = null;
+      }
+      // Success toast only once when reaching completion
+      if (carouselTotal > 0) {
+        toast.success('Carrousel terminé !');
+      }
+    }
+  }, [carouselDone, carouselTotal, activeJobSetId]);
   useEffect(() => {
     const init = async () => {
       try {
@@ -764,6 +782,7 @@ export function AlfieChat() {
           setCarouselTotal(count);
           
           await triggerWorker();
+          pumpWorker(count);
           
           return {
             success: true,
@@ -984,7 +1003,10 @@ export function AlfieChat() {
   const triggerWorker = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) return;
+      if (!session?.access_token) {
+        await supabase.functions.invoke('process-job-worker');
+        return;
+      }
 
       await supabase.functions.invoke('process-job-worker', {
         headers: { 'Authorization': `Bearer ${session.access_token}` }
@@ -995,6 +1017,52 @@ export function AlfieChat() {
     }
   };
 
+  // Pompe: relance périodiquement le worker jusqu'à complétion ou timeout
+  const pumpWorker = (expectedTotal?: number, intervalMs = 2000, timeoutMs = 120000) => {
+    if (pumpRef.current) {
+      clearInterval(pumpRef.current);
+      pumpRef.current = null;
+    }
+    pumpStartRef.current = Date.now();
+
+    pumpRef.current = window.setInterval(async () => {
+      const { done, total, jobSetId } = latestRef.current;
+      const goal = expectedTotal ?? total;
+
+      if (!jobSetId || goal <= 0) {
+        return; // en attente d'initialisation
+      }
+
+      if (done >= goal) {
+        if (pumpRef.current) {
+          clearInterval(pumpRef.current);
+          pumpRef.current = null;
+        }
+        return;
+      }
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          await supabase.functions.invoke('process-job-worker', {
+            headers: { 'Authorization': `Bearer ${session.access_token}` }
+          });
+        } else {
+          await supabase.functions.invoke('process-job-worker');
+        }
+      } catch (e) {
+        console.log('[Pump] worker error', e);
+      }
+
+      if (Date.now() - pumpStartRef.current > timeoutMs) {
+        if (pumpRef.current) {
+          clearInterval(pumpRef.current);
+          pumpRef.current = null;
+        }
+        toast.warning('Toujours rien, tu peux relancer le traitement.');
+      }
+    }, intervalMs);
+  };
   const handleSend = async (options?: { forceVideo?: boolean; forceImage?: boolean; aspectRatio?: string; skipMediaInference?: boolean }) => {
     if (!input.trim() || isLoading || !loaded) return;
 
@@ -1135,9 +1203,10 @@ export function AlfieChat() {
         setCarouselTotal(slideCount);
         setGenerationStatus(null);
 
-        // 4. Déclencher le premier worker
+        // 4. Déclencher le premier worker + pompe
         console.log('[Carousel] Triggering initial worker...');
         await triggerWorker();
+        pumpWorker(slideCount);
 
         return;
       } catch (err: any) {
@@ -1303,6 +1372,7 @@ export function AlfieChat() {
                       toast.error('Erreur lors du téléchargement du ZIP');
                     }
                   }}
+                  onRetry={() => pumpWorker(carouselTotal)}
                 />
               </div>
             )}

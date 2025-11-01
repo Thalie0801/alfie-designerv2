@@ -7,9 +7,10 @@ interface CarouselProgressCardProps {
   done: number;
   items: Array<{ id: string; url: string; index: number; }>;
   onDownloadZip?: () => void;
+  onRetry?: () => void;
 }
 
-export function CarouselProgressCard({ total, done, items, onDownloadZip }: CarouselProgressCardProps) {
+export function CarouselProgressCard({ total, done, items, onDownloadZip, onRetry }: CarouselProgressCardProps) {
   const safeTotal = Math.max(0, total);
   const safeDone = Math.min(done, safeTotal);
   const progress = safeTotal === 0 ? 0 : Math.round((safeDone / safeTotal) * 100);
@@ -30,14 +31,22 @@ export function CarouselProgressCard({ total, done, items, onDownloadZip }: Caro
             <span className="text-sm text-muted-foreground">
               {safeDone}/{safeTotal} ({progress}%)
             </span>
-            {onDownloadZip && isComplete && (
+            {isComplete && onDownloadZip ? (
               <button
                 onClick={onDownloadZip}
                 className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
               >
                 Télécharger le ZIP
               </button>
-            )}
+            ) : null}
+            {!isComplete && (typeof onRetry === 'function') ? (
+              <button
+                onClick={onRetry}
+                className="text-xs px-2 py-1 rounded border border-primary/30 text-primary hover:bg-primary/10 transition-colors"
+              >
+                Relancer le traitement
+              </button>
+            ) : null}
           </div>
         </div>
         
