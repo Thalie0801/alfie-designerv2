@@ -1925,6 +1925,16 @@ export type Database = {
         Args: { user_id_param: string; woofs_amount: number }
         Returns: boolean
       }
+      decrement_monthly_counters: {
+        Args: {
+          p_brand_id: string
+          p_images?: number
+          p_period_yyyymm: number
+          p_reels?: number
+          p_woofs?: number
+        }
+        Returns: undefined
+      }
       generate_short_job_id: { Args: never; Returns: string }
       has_active_plan: { Args: { user_id_param: string }; Returns: boolean }
       has_role: {

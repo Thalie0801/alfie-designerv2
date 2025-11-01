@@ -89,6 +89,30 @@ serve(async (req) => {
     }
 
     console.log(`[CreateCarousel] Quota reserved successfully`);
+    
+    // AUSSI incrémenter counters_monthly pour synchronisation
+    const now = new Date();
+    const periodYYYYMM = parseInt(
+      now.getFullYear().toString() + 
+      (now.getMonth() + 1).toString().padStart(2, '0')
+    );
+
+    console.log(`[CreateCarousel] Incrementing monthly counters for brand ${brandId} in period ${periodYYYYMM}`);
+    
+    const { error: monthlyCounterError } = await adminClient.rpc('increment_monthly_counters', {
+      p_brand_id: brandId,
+      p_period_yyyymm: periodYYYYMM,
+      p_images: count,
+      p_reels: 0,
+      p_woofs: 0
+    });
+
+    if (monthlyCounterError) {
+      console.error('[CreateCarousel] Failed to increment monthly counters:', monthlyCounterError);
+      // Non-fatal mais important à log
+    } else {
+      console.log('[CreateCarousel] Monthly counters incremented successfully');
+    }
 
     // 3) Créer le job_set
     const { data: set, error: setErr } = await adminClient

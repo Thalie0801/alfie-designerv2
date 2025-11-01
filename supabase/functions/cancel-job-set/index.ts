@@ -148,14 +148,41 @@ serve(async (req) => {
 
     // Refund quotas for remaining jobs
     if (remainingCount > 0) {
-      const { error: refundError } = await supabaseAdmin.rpc('refund_brand_quotas', {
+      const now = new Date();
+      const periodYYYYMM = parseInt(
+        now.getFullYear().toString() + 
+        (now.getMonth() + 1).toString().padStart(2, '0')
+      );
+      
+      console.log(`[CancelJobSet] Refunding ${remainingCount} visuals for brand ${jobSet.brand_id} in period ${periodYYYYMM}`);
+      
+      // Rembourser dans counters_monthly (système unifié)
+      const { error: refundMonthlyError } = await supabaseAdmin.rpc('decrement_monthly_counters', {
+        p_brand_id: jobSet.brand_id,
+        p_period_yyyymm: periodYYYYMM,
+        p_images: remainingCount,
+        p_reels: 0,
+        p_woofs: 0
+      });
+
+      if (refundMonthlyError) {
+        console.error('[CancelJobSet] Failed to refund monthly counters:', refundMonthlyError);
+        // Non-blocking mais important de log
+      } else {
+        console.log('[CancelJobSet] Monthly counters refunded successfully');
+      }
+      
+      // AUSSI rembourser dans brands (rétro-compatibilité pendant migration)
+      const { error: refundBrandError } = await supabaseAdmin.rpc('refund_brand_quotas', {
         p_brand_id: jobSet.brand_id,
         p_visuals_count: remainingCount
       });
 
-      if (refundError) {
-        console.error('[CancelJobSet] Failed to refund quotas:', refundError);
+      if (refundBrandError) {
+        console.error('[CancelJobSet] Failed to refund brand quotas:', refundBrandError);
         // Non-blocking: continue even if refund fails
+      } else {
+        console.log('[CancelJobSet] Brand quotas refunded successfully');
       }
     }
 
