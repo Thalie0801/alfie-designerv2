@@ -118,13 +118,43 @@ serve(async (req) => {
 
     console.log(`[CreateCarousel] Job set created: ${set.id}`);
 
-    // 4) Créer les jobs individuels
+    // 4) Récupérer les données de la marque pour brand_snapshot
+    const { data: brand, error: brandErr } = await adminClient
+      .from("brands")
+      .select("palette, voice, logo_url, name")
+      .eq("id", brandId)
+      .single();
+
+    if (brandErr || !brand) {
+      console.error("[CreateCarousel] Brand fetch failed:", brandErr);
+      await adminClient.rpc("refund_brand_quotas", {
+        p_brand_id: brandId,
+        p_visuals_count: count,
+      });
+      throw new Error(`Brand not found: ${brandErr?.message}`);
+    }
+
+    const brandSnapshot = {
+      palette: brand.palette || [],
+      colors: brand.palette || [],
+      brand_voice: brand.voice || null,
+      voice: brand.voice || null,
+      logo_url: brand.logo_url || null,
+      name: brand.name || "Brand",
+      aspectRatio: aspectRatio || "4:5",
+      master_seed: set.master_seed
+    };
+
+    console.log(`[CreateCarousel] Brand snapshot prepared for ${brand.name}`);
+
+    // 5) Créer les jobs individuels avec brand_snapshot
     const jobs = Array.from({ length: count }, (_, i) => ({
       job_set_id: set.id,
       index_in_set: i,
       status: "queued",
       prompt,
       slide_template: i === 0 ? "hero" : "variant",
+      brand_snapshot: brandSnapshot,
       metadata: {
         role: i === 0 ? "key_visual" : "variant",
         title: "",
@@ -136,12 +166,16 @@ serve(async (req) => {
 
     if (jobsErr) {
       console.error("[CreateCarousel] Jobs creation failed:", jobsErr);
+      await adminClient.rpc("refund_brand_quotas", {
+        p_brand_id: brandId,
+        p_visuals_count: count,
+      });
       throw new Error(`Jobs creation failed: ${jobsErr.message}`);
     }
 
     console.log(`[CreateCarousel] ${count} jobs created for set ${set.id}`);
 
-    // 5) Marquer l'idempotency comme appliquée
+    // 6) Marquer l'idempotency comme appliquée
     await adminClient
       .from("idempotency_keys")
       .update({ status: "applied", result_ref: set.id })
