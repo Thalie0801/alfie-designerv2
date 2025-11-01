@@ -423,12 +423,17 @@ serve(async (req) => {
                 .select('active_brand_id')
                 .eq('id', user.id)
                 .maybeSingle();
+
+              const brandId = profile?.active_brand_id;
+              if (!brandId) {
+                console.warn('[generate-video] No active brand for user', user.id);
+              }
               
               await supabase
                 .from('media_generations')
                 .insert({
                   user_id: user.id,
-                  brand_id: profile?.active_brand_id || null,
+                  brand_id: brandId!,
                   type: 'video',
                   engine: providerEngine || 'seededance',
                   status: 'processing',
@@ -512,12 +517,17 @@ serve(async (req) => {
                 .select('active_brand_id')
                 .eq('id', user.id)
                 .maybeSingle();
+
+              const brandId = profile?.active_brand_id;
+              if (!brandId) {
+                console.warn('[generate-video] No active brand for user', user.id);
+              }
               
               await supabase
                 .from('media_generations')
                 .insert({
                   user_id: user.id,
-                  brand_id: profile?.active_brand_id || null,
+                  brand_id: brandId!,
                   type: 'video',
                   engine: providerEngine || 'kling',
                   status: 'processing',

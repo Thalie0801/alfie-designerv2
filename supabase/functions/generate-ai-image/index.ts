@@ -54,6 +54,17 @@ serve(async (req) => {
       .eq('id', user.id)
       .single();
 
+    const brandId = profile?.active_brand_id;
+    if (!brandId) {
+      return new Response(
+        JSON.stringify({ error: 'No active brand selected. Please select a brand.' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
+    }
+
     // Vérifier l'accès (Stripe OU granted_by_admin)
     const hasAccess = await userHasAccess(req.headers.get('Authorization'));
     if (!hasAccess) {

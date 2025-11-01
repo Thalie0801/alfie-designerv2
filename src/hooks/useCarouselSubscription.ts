@@ -39,9 +39,16 @@ export function useCarouselSubscription(jobSetId: string, total: number) {
   const loadExistingAssets = useCallback(async () => {
     if (!jobSetId) return;
     
+    // Defensive: join job_sets to ensure we only see assets from our brands
     const { data, error } = await supabase
       .from('assets')
-      .select('id, index_in_set, storage_key, meta')
+      .select(`
+        id, 
+        storage_key, 
+        index_in_set, 
+        meta,
+        job_sets!inner(brand_id)
+      `)
       .eq('job_set_id', jobSetId)
       .order('index_in_set', { ascending: true });
 

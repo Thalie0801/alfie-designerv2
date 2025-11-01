@@ -15,7 +15,8 @@ async function generateCloudinarySignature(paramsToSign: Record<string, string>,
 export async function compositeSlide(
   backgroundUrl: string,
   svgTextLayer: string,
-  jobSetId?: string
+  jobSetId?: string,
+  brandId?: string
 ): Promise<string> {
   console.log('🎨 [imageCompositor] Starting Cloudinary composition...');
   console.log('📥 Background URL:', backgroundUrl);
@@ -44,7 +45,7 @@ export async function compositeSlide(
     // 1. Upload background image to Cloudinary with signed authentication
     console.log('⬇️ Uploading background to Cloudinary...');
     
-    const bgPublicId = `carousel/${jobSetId || 'temp'}/background_${Date.now()}`;
+    const bgPublicId = `alfie/${brandId || 'temp'}/${jobSetId || 'temp'}/background_${Date.now()}`;
     const bgTimestamp = Math.floor(Date.now() / 1000);
     
     const bgFormData = new FormData();
@@ -99,7 +100,7 @@ export async function compositeSlide(
     // 3. Upload SVG overlay to Cloudinary with signed authentication
     console.log('⬆️ Uploading SVG overlay...');
     
-    const svgPublicId = `carousel/${jobSetId || 'temp'}/overlay_${Date.now()}`;
+    const svgPublicId = `alfie/${brandId || 'temp'}/${jobSetId || 'temp'}/overlay_${Date.now()}`;
     const svgTimestamp = Math.floor(Date.now() / 1000);
     
     const svgFormData = new FormData();

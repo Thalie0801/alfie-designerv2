@@ -1073,7 +1073,7 @@ export type Database = {
       }
       media_generations: {
         Row: {
-          brand_id: string | null
+          brand_id: string
           brand_score: number | null
           cost_woofs: number | null
           created_at: string | null
@@ -1101,7 +1101,7 @@ export type Database = {
           woofs: number | null
         }
         Insert: {
-          brand_id?: string | null
+          brand_id: string
           brand_score?: number | null
           cost_woofs?: number | null
           created_at?: string | null
@@ -1129,7 +1129,7 @@ export type Database = {
           woofs?: number | null
         }
         Update: {
-          brand_id?: string | null
+          brand_id?: string
           brand_score?: number | null
           cost_woofs?: number | null
           created_at?: string | null

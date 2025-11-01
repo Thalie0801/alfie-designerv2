@@ -164,6 +164,21 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
     setLoading(true);
     
     try {
+      // Get active brand
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('active_brand_id')
+        .eq('id', userId)
+        .single();
+
+      const activeBrandId = profile?.active_brand_id;
+      if (!activeBrandId) {
+        console.warn('[useLibraryAssets] No active brand selected');
+        setAssets([]);
+        setLoading(false);
+        return;
+      }
+
       const assetType = type === 'images' ? 'image' : 'video';
       
       // Optimized query: exclude output_url to avoid loading large base64 images
