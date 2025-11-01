@@ -32,51 +32,42 @@ export interface QuotaStatus {
  */
 export async function getQuotaStatus(brandId: string): Promise<QuotaStatus | null> {
   try {
-    const { data: brand, error } = await supabase
-      .from('brands')
-      .select('name, plan, quota_images, quota_videos, quota_woofs, images_used, videos_used, woofs_used, resets_on')
-      .eq('id', brandId)
-      .single();
+    const { data, error } = await supabase
+      .from('v_brand_quota_current')
+      .select('*')
+      .eq('brand_id', brandId)
+      .maybeSingle();
 
     if (error) throw error;
-    if (!brand) return null;
-
-    const visualsUsed = brand.images_used || 0;
-    const visualsLimit = brand.quota_images || 0;
-    const visualsPercentage = visualsLimit > 0 ? (visualsUsed / visualsLimit) * 100 : 0;
-
-    const videosUsed = brand.videos_used || 0;
-    const videosLimit = brand.quota_videos || 0;
-    const videosPercentage = videosLimit > 0 ? (videosUsed / videosLimit) * 100 : 0;
-
-    const woofsConsumed = brand.woofs_used || 0;
-    const woofsLimit = brand.quota_woofs || 0;
-    const woofsRemaining = Math.max(0, woofsLimit - woofsConsumed);
+    if (!data) return null;
 
     const hardStopThreshold = SYSTEM_CONFIG.HARD_STOP_MULTIPLIER * 100; // 110%
 
     return {
       visuals: {
-        used: visualsUsed,
-        limit: visualsLimit,
-        percentage: visualsPercentage,
-        canGenerate: visualsPercentage < hardStopThreshold
+        used: data.images_used || 0,
+        limit: data.quota_images || 0,
+        percentage: data.images_usage_pct || 0,
+        canGenerate: (data.images_usage_pct || 0) < hardStopThreshold
       },
       videos: {
-        used: videosUsed,
-        limit: videosLimit,
-        percentage: videosPercentage,
-        canGenerate: videosPercentage < hardStopThreshold
+        used: data.videos_used || 0,
+        limit: data.quota_videos || 0,
+        percentage: data.videos_usage_pct || 0,
+        canGenerate: (data.videos_usage_pct || 0) < hardStopThreshold
       },
       woofs: {
-        consumed: woofsConsumed,
-        limit: woofsLimit,
-        remaining: woofsRemaining,
-        canUse: (cost: number) => woofsRemaining >= cost
+        consumed: data.woofs_used || 0,
+        limit: data.quota_woofs || 0,
+        remaining: Math.max(0, (data.quota_woofs || 0) - (data.woofs_used || 0)),
+        canUse: (cost: number) => {
+          const remaining = Math.max(0, (data.quota_woofs || 0) - (data.woofs_used || 0));
+          return remaining >= cost;
+        }
       },
-      brandName: brand.name,
-      plan: brand.plan ?? undefined,
-      resetsOn: brand.resets_on ?? undefined
+      brandName: data.name ?? undefined,
+      plan: data.plan ?? undefined,
+      resetsOn: data.resets_on ?? undefined
     };
   } catch (error) {
     console.error('Error fetching quota status:', error);

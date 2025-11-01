@@ -520,6 +520,13 @@ export type Database = {
             referencedRelation: "brands"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "chat_sessions_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
+          },
         ]
       }
       contact_requests: {
@@ -587,6 +594,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "brands"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "counters_monthly_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
           },
         ]
       }
@@ -706,6 +720,13 @@ export type Database = {
             referencedRelation: "brands"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "deliverable_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
+          },
         ]
       }
       feature_flags: {
@@ -786,6 +807,13 @@ export type Database = {
             referencedRelation: "brands"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "generation_logs_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
+          },
         ]
       }
       idempotency_keys: {
@@ -850,6 +878,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "brands"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_sets_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
           },
         ]
       }
@@ -995,6 +1030,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "brands"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_generations_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
           },
           {
             foreignKeyName: "media_generations_provider_id_fkey"
@@ -1263,6 +1305,13 @@ export type Database = {
             referencedRelation: "brands"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "profiles_active_brand_id_fkey"
+            columns: ["active_brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
+          },
         ]
       }
       provider_metrics: {
@@ -1439,6 +1488,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "usage_event_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
+          },
+          {
             foreignKeyName: "usage_event_deliverable_id_fkey"
             columns: ["deliverable_id"]
             isOneToOne: false
@@ -1581,6 +1637,13 @@ export type Database = {
             referencedRelation: "brands"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "videos_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
+          },
         ]
       }
       woof_pack_purchases: {
@@ -1656,7 +1719,65 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_brand_quota_current: {
+        Row: {
+          brand_id: string | null
+          images_usage_pct: number | null
+          images_used: number | null
+          name: string | null
+          plan: string | null
+          quota_images: number | null
+          quota_videos: number | null
+          quota_woofs: number | null
+          resets_on: string | null
+          user_id: string | null
+          videos_usage_pct: number | null
+          videos_used: number | null
+          woofs_usage_pct: number | null
+          woofs_used: number | null
+        }
+        Insert: {
+          brand_id?: string | null
+          images_usage_pct?: never
+          images_used?: number | null
+          name?: string | null
+          plan?: string | null
+          quota_images?: number | null
+          quota_videos?: number | null
+          quota_woofs?: number | null
+          resets_on?: string | null
+          user_id?: string | null
+          videos_usage_pct?: never
+          videos_used?: number | null
+          woofs_usage_pct?: never
+          woofs_used?: number | null
+        }
+        Update: {
+          brand_id?: string | null
+          images_usage_pct?: never
+          images_used?: number | null
+          name?: string | null
+          plan?: string | null
+          quota_images?: number | null
+          quota_videos?: number | null
+          quota_woofs?: number | null
+          resets_on?: string | null
+          user_id?: string | null
+          videos_usage_pct?: never
+          videos_used?: number | null
+          woofs_usage_pct?: never
+          woofs_used?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brands_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       calculate_mlm_commissions: {
