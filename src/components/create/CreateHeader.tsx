@@ -5,9 +5,13 @@ import { getQuotaStatus, QuotaStatus } from '@/utils/quotaManager';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
-import { Info, ChevronDown } from 'lucide-react';
+import { Info, ChevronDown, Eraser } from 'lucide-react';
 
-export function CreateHeader() {
+interface CreateHeaderProps {
+  onClearChat?: () => void;
+}
+
+export function CreateHeader({ onClearChat }: CreateHeaderProps) {
   const { brandKit, activeBrandId } = useBrandKit();
   const [quotaStatus, setQuotaStatus] = useState<QuotaStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,6 +65,17 @@ export function CreateHeader() {
               <span>·</span>
               <span>Reset&nbsp;: {resetDate}</span>
             </div>
+            {onClearChat && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onClearChat}
+                className="rounded-full border-slate-200 text-slate-700 hover:bg-slate-100"
+              >
+                <Eraser className="mr-2 h-4 w-4" />
+                Nettoyer le chat
+              </Button>
+            )}
             <Popover>
               <PopoverTrigger asChild>
                 <Button

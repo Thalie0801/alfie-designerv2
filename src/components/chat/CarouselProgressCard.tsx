@@ -10,6 +10,7 @@ interface CarouselProgressCardProps {
   items: Array<{ id: string; url: string; index: number; }>;
   onDownloadZip?: () => void;
   onRetry?: () => void;
+  onCancel?: () => void;
 }
 
 interface JobStatus {
@@ -20,7 +21,7 @@ interface JobStatus {
   retry_count?: number;
 }
 
-export function CarouselProgressCard({ total, done, items, onDownloadZip, onRetry }: CarouselProgressCardProps) {
+export function CarouselProgressCard({ total, done, items, onDownloadZip, onRetry, onCancel }: CarouselProgressCardProps) {
   const safeTotal = Math.max(0, total);
   const safeDone = Math.min(done, safeTotal);
   const progress = safeTotal === 0 ? 0 : Math.round((safeDone / safeTotal) * 100);
@@ -105,6 +106,14 @@ export function CarouselProgressCard({ total, done, items, onDownloadZip, onRetr
                 className="text-xs px-2 py-1 rounded border border-primary/30 text-primary hover:bg-primary/10 transition-colors"
               >
                 Relancer le traitement
+              </button>
+            ) : null}
+            {!isComplete && (typeof onCancel === 'function') ? (
+              <button
+                onClick={onCancel}
+                className="text-xs px-2 py-1 rounded border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                Annuler
               </button>
             ) : null}
           </div>

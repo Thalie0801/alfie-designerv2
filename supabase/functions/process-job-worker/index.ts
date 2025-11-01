@@ -57,7 +57,7 @@ serve(async (req) => {
     // 1. Récupérer 1 job en attente (FIFO) et le verrouiller atomiquement
     const { data: job, error: jobErr } = await supabase
       .from('jobs')
-      .select('*, job_sets!inner(brand_id, user_id, master_seed, constraints)')
+      .select('*, job_sets!inner(brand_id, user_id, master_seed, constraints, status)')
       .eq('status', 'queued')
       .order('created_at', { ascending: true })
       .limit(1)
@@ -74,6 +74,14 @@ serve(async (req) => {
       console.error('❌ [Worker] Job has no job_set join (missing FK?)');
       return new Response(JSON.stringify({ error: 'Invalid job_set FK' }), {
         status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // GUARD: Skip if job_set is canceled
+    if (['canceled', 'failed'].includes(job.job_sets.status)) {
+      console.log(`[Worker] ⏭️  Skipping job ${job.id} - job_set is ${job.job_sets.status}`);
+      return new Response(JSON.stringify({ message: 'Job set canceled or failed, skipping' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -135,29 +143,80 @@ serve(async (req) => {
       console.log(`[Worker] No master seed available, generating without seed control`);
     }
 
+    // Helper pour mettre à jour le statut du job_set
+    const updateJobSetStatus = async () => {
+      const { data: allJobs } = await supabase
+        .from('jobs')
+        .select('status')
+        .eq('job_set_id', job.job_set_id);
+
+      const statuses = allJobs?.map(j => j.status) || [];
+      const allDone = statuses.every(s => ['succeeded', 'failed'].includes(s));
+      const anyFailed = statuses.some(s => s === 'failed');
+
+      let jobSetStatus = 'running';
+      if (allDone) {
+        jobSetStatus = anyFailed ? 'partial' : 'done';
+      }
+
+      await supabase
+        .from('job_sets')
+        .update({ status: jobSetStatus, updated_at: new Date().toISOString() })
+        .eq('id', job.job_set_id);
+
+      return jobSetStatus;
+    };
+
     // 4. Construire overlayText à partir du slideContent structuré ou des métadonnées
     console.log('📝 [Worker] Step 1: Building overlayText from structured slideContent...');
     
     const metaSlideContent = job.metadata?.slideContent;
+    
+    // GUARD: Fail job if slideContent is missing (plan not executed)
+    if (!metaSlideContent) {
+      console.error('❌ [Worker] Missing slideContent in job metadata - plan was not executed properly');
+      
+      await supabase
+        .from('jobs')
+        .update({
+          status: 'failed',
+          error: 'Plan missing: slideContent not found in metadata',
+          finished_at: new Date().toISOString()
+        })
+        .eq('id', job.id);
+
+      await supabase.rpc('refund_brand_quotas', {
+        p_brand_id: job.job_sets.brand_id,
+        p_visuals_count: 1
+      });
+
+      const st = await updateJobSetStatus();
+      
+      return new Response(JSON.stringify({ 
+        success: false, 
+        jobId: job.id, 
+        error: 'plan_missing',
+        jobSetStatus: st 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
     const slideContent = {
-      title: metaSlideContent?.title || job.metadata?.title || job.prompt,
-      subtitle: metaSlideContent?.subtitle || job.metadata?.subtitle || '',
-      punchline: metaSlideContent?.punchline || job.metadata?.punchline || '',
-      bullets: metaSlideContent?.bullets || job.metadata?.bullets || [],
-      cta: metaSlideContent?.cta_primary || job.metadata?.cta || '',
-      cta_primary: metaSlideContent?.cta_primary || job.metadata?.cta_primary || '',
-      cta_secondary: metaSlideContent?.cta_secondary || job.metadata?.cta_secondary || '',
-      note: metaSlideContent?.note || job.metadata?.note || '',
-      badge: metaSlideContent?.badge || job.metadata?.badge || '',
-      kpis: metaSlideContent?.kpis || job.metadata?.kpis || [],
-      type: metaSlideContent?.type || 'variant'
+      title: metaSlideContent.title || job.prompt,
+      subtitle: metaSlideContent.subtitle || '',
+      punchline: metaSlideContent.punchline || '',
+      bullets: metaSlideContent.bullets || [],
+      cta: metaSlideContent.cta_primary || metaSlideContent.cta || '',
+      cta_primary: metaSlideContent.cta_primary || '',
+      cta_secondary: metaSlideContent.cta_secondary || '',
+      note: metaSlideContent.note || '',
+      badge: metaSlideContent.badge || '',
+      kpis: metaSlideContent.kpis || [],
+      type: metaSlideContent.type || 'variant'
     };
     
-    if (metaSlideContent) {
-      console.log(`[Worker] Using structured slideContent: type=${slideContent.type}, title="${slideContent.title}"`);
-    } else {
-      console.log(`[Worker] Using basic metadata fallback`);
-    }
+    console.log(`[Worker] Using structured slideContent: type=${slideContent.type}, title="${slideContent.title}"`);
     
     // Construire le texte exact à superposer
     let overlayText = slideContent.title;
@@ -248,30 +307,6 @@ serve(async (req) => {
       const dataStr = JSON.stringify(finalImageData);
       console.log('📦 [Worker] AI payload preview:', dataStr ? dataStr.slice(0, 500) : 'null');
     }
-
-    // Helper pour mettre à jour le statut du job_set
-    const updateJobSetStatus = async () => {
-      const { data: allJobs } = await supabase
-        .from('jobs')
-        .select('status')
-        .eq('job_set_id', job.job_set_id);
-
-      const statuses = allJobs?.map(j => j.status) || [];
-      const allDone = statuses.every(s => ['succeeded', 'failed'].includes(s));
-      const anyFailed = statuses.some(s => s === 'failed');
-
-      let jobSetStatus = 'running';
-      if (allDone) {
-        jobSetStatus = anyFailed ? 'partial' : 'done';
-      }
-
-      await supabase
-        .from('job_sets')
-        .update({ status: jobSetStatus, updated_at: new Date().toISOString() })
-        .eq('id', job.job_set_id);
-
-      return jobSetStatus;
-    };
 
     // === MULTI-FORMAT IMAGE EXTRACTOR ===
     function pickImage(gen: any): { kind: 'url'|'data'|'bytes', value: string|Uint8Array, mime: string } | null {

@@ -1103,6 +1103,110 @@ export function AlfieChat() {
       }
     }, intervalMs);
   };
+
+  const handleCancelCarousel = async () => {
+    if (!activeJobSetId) return;
+    
+    try {
+      console.log('[CancelCarousel] Canceling job_set:', activeJobSetId);
+      const { data, error } = await supabase.functions.invoke('cancel-job-set', {
+        body: { jobSetId: activeJobSetId }
+      });
+      
+      if (error) {
+        console.error('[CancelCarousel] Error:', error);
+        toast.error('Erreur lors de l\'annulation');
+        return;
+      }
+      
+      console.log('[CancelCarousel] Success:', data);
+      toast.success(`Génération annulée (${data.refundedVisuals} visuels remboursés)`);
+      
+      // Stop pumping
+      if (pumpRef.current) {
+        clearInterval(pumpRef.current);
+        pumpRef.current = null;
+      }
+      
+      // Clear state
+      localStorage.removeItem('activeJobSetId');
+      localStorage.removeItem('carouselTotal');
+      setActiveJobSetId('');
+      setCarouselTotal(0);
+      
+      // Refresh carousel to update UI
+      refreshCarousel();
+      
+      // Add assistant message
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: '❌ Carrousel annulé par l\'utilisateur. Les visuels restants ont été remboursés.'
+      }]);
+      
+      // Persist message to DB if we have a conversation
+      if (conversationId) {
+        await supabase.from('alfie_messages').insert({
+          conversation_id: conversationId,
+          role: 'assistant',
+          content: '❌ Carrousel annulé par l\'utilisateur. Les visuels restants ont été remboursés.'
+        });
+      }
+    } catch (error: any) {
+      console.error('[CancelCarousel] Exception:', error);
+      toast.error(`Erreur: ${error.message}`);
+    }
+  };
+
+  const clearChat = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      // Stop pumping if active
+      if (pumpRef.current) {
+        clearInterval(pumpRef.current);
+        pumpRef.current = null;
+      }
+      
+      // Clear local state
+      setMessages([{ role: 'assistant', content: INITIAL_ASSISTANT_MESSAGE }]);
+      setUploadedImage(null);
+      setActiveJobSetId('');
+      setCarouselTotal(0);
+      localStorage.removeItem('activeJobSetId');
+      localStorage.removeItem('carouselTotal');
+      
+      // Create new conversation
+      const { data: newConv, error: convError } = await supabase
+        .from('alfie_conversations')
+        .insert({ 
+          user_id: user.id, 
+          title: `Conversation ${new Date().toLocaleDateString('fr-FR')}` 
+        })
+        .select('id')
+        .maybeSingle();
+      
+      if (convError || !newConv) {
+        console.error('[ClearChat] Failed to create conversation:', convError);
+        toast.error('Erreur lors du nettoyage');
+        return;
+      }
+      
+      // Insert initial message
+      await supabase.from('alfie_messages').insert({
+        conversation_id: newConv.id,
+        role: 'assistant',
+        content: INITIAL_ASSISTANT_MESSAGE
+      });
+      
+      setConversationId(newConv.id);
+      toast.success('Chat nettoyé ! 🧹');
+    } catch (error: any) {
+      console.error('[ClearChat] Error:', error);
+      toast.error('Erreur lors du nettoyage');
+    }
+  };
+
   const handleSend = async (options?: { forceVideo?: boolean; forceImage?: boolean; aspectRatio?: string; skipMediaInference?: boolean }) => {
     if (!input.trim() || isLoading || !loaded) return;
 
@@ -1353,7 +1457,7 @@ export function AlfieChat() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <CreateHeader />
+      <CreateHeader onClearChat={clearChat} />
       <QuotaBar activeBrandId={activeBrandId} />
       
       <input
@@ -1473,6 +1577,7 @@ export function AlfieChat() {
               refreshCarousel();
               pumpWorker(carouselTotal);
             }}
+            onCancel={handleCancelCarousel}
                 />
               </div>
             )}
