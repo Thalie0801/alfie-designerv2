@@ -327,6 +327,80 @@ export type Database = {
           },
         ]
       }
+      assets: {
+        Row: {
+          brand_id: string | null
+          checksum: string | null
+          created_at: string
+          height: number | null
+          id: string
+          job_id: string | null
+          job_set_id: string | null
+          meta: Json | null
+          mime: string
+          org_id: string | null
+          storage_key: string
+          width: number | null
+        }
+        Insert: {
+          brand_id?: string | null
+          checksum?: string | null
+          created_at?: string
+          height?: number | null
+          id?: string
+          job_id?: string | null
+          job_set_id?: string | null
+          meta?: Json | null
+          mime?: string
+          org_id?: string | null
+          storage_key: string
+          width?: number | null
+        }
+        Update: {
+          brand_id?: string | null
+          checksum?: string | null
+          created_at?: string
+          height?: number | null
+          id?: string
+          job_id?: string | null
+          job_set_id?: string | null
+          meta?: Json | null
+          mime?: string
+          org_id?: string | null
+          storage_key?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assets_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assets_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
+          },
+          {
+            foreignKeyName: "assets_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assets_job_set_id_fkey"
+            columns: ["job_set_id"]
+            isOneToOne: false
+            referencedRelation: "job_sets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       batch_requests: {
         Row: {
           created_at: string | null
@@ -1808,6 +1882,18 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      v_unified_assets: {
+        Row: {
+          brand_id: string | null
+          created_at: string | null
+          id: string | null
+          job_set_id: string | null
+          meta: Json | null
+          output_url: string | null
+          type: string | null
+        }
+        Relationships: []
       }
     }
     Functions: {
