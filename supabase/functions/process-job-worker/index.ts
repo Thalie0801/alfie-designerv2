@@ -402,27 +402,34 @@ serve(async (req) => {
       return new Response(JSON.stringify({ retry: true, coherenceScore }), { headers: corsHeaders });
     }
 
-    // 10. D'ABORD créer l'asset dans media_generations AVANT de marquer le job succeeded
-    console.log('💾 [Worker] Step 5: Creating asset in media_generations...');
+    // 10. D'ABORD créer l'asset dans assets (nouvelle table Realtime)
+    console.log('💾 [Worker] Step 5: Creating asset in assets table...');
+    
+    const assetPayload = {
+      id: crypto.randomUUID(),
+      brand_id: job.job_sets.brand_id,
+      job_id: job.id,
+      job_set_id: job.job_set_id,
+      storage_key: fileName,
+      mime: 'image/png',
+      width: null,
+      height: null,
+      checksum: null,
+      meta: {
+        prompt: job.prompt,
+        role: isKeyVisual ? 'key_visual' : 'variant',
+        slide_template: slideTemplate,
+        coherence_score: coherenceScore,
+        coherence_mode: 'direct',
+        retry_count: retryCount,
+        public_url: publicUrl,
+        index_in_set: job.index_in_set
+      }
+    };
     
     const { data: asset, error: assetErr } = await supabase
-      .from('media_generations')
-      .insert({
-        user_id: job.job_sets.user_id,
-        brand_id: job.job_sets.brand_id,
-        type: 'image',
-        output_url: publicUrl,
-        status: 'completed',
-        prompt: job.prompt,
-        metadata: { 
-          job_id: job.id, 
-          job_set_id: job.job_set_id,
-          coherence_score: coherenceScore,
-          role: isKeyVisual ? 'key_visual' : 'variant',
-          slide_template: slideTemplate,
-          retry_count: retryCount
-        }
-      })
+      .from('assets')
+      .insert(assetPayload)
       .select()
       .single();
 

@@ -13,6 +13,8 @@ import { CreateHeader } from '@/components/create/CreateHeader';
 import { ChatComposer } from '@/components/create/ChatComposer';
 import { QuotaBar } from '@/components/create/QuotaBar';
 import { ChatBubble } from '@/components/create/ChatBubble';
+import { CarouselProgressCard } from '@/components/chat/CarouselProgressCard';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 type VideoEngine = 'sora' | 'seededance' | 'kling';
 
@@ -124,8 +126,13 @@ export function AlfieChat() {
   const [generationStatus, setGenerationStatus] = useState<{ type: string; message: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const addedAssetIdsRef = useRef<Set<string>>(new Set());
-  const zipDownloadedRef = useRef<boolean>(false);
+  const carouselChannelRef = useRef<RealtimeChannel | null>(null);
+  const [carouselState, setCarouselState] = useState<{
+    jobSetId: string;
+    total: number;
+    done: number;
+    items: Array<{ id: string; url: string; index: number; }>;
+  } | null>(null);
   const { brandKit, activeBrandId } = useBrandKit();
   const { totalCredits, decrementCredits, hasCredits, incrementGenerations } = useAlfieCredits();
   const { searchTemplates } = useTemplateLibrary();
@@ -219,7 +226,17 @@ export function AlfieChat() {
   // Scroll automatique avec scrollIntoView
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, generationStatus]);
+  }, [messages, generationStatus, carouselState]);
+
+  // Cleanup Realtime channel on unmount
+  useEffect(() => {
+    return () => {
+      if (carouselChannelRef.current) {
+        supabase.removeChannel(carouselChannelRef.current);
+        carouselChannelRef.current = null;
+      }
+    };
+  }, []);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1016,7 +1033,7 @@ export function AlfieChat() {
     //   return;
     // }
 
-    // 🎯 DÉTECTION CARROUSEL (prioritaire)
+    // 🎯 DÉTECTION CARROUSEL (prioritaire) - Avec Realtime
     const carouselMatch = userMessage.match(/carrousel|carousel/i);
     if (carouselMatch && !forceImage && !forceVideo) {
       const countMatch = userMessage.match(/\d+/);
@@ -1032,16 +1049,17 @@ export function AlfieChat() {
         return;
       }
 
-      const idempotencyKey = `${Date.now()}-${Math.random().toString(36)}`;
-
       try {
         setGenerationStatus({ type: 'image', message: `Planification du carrousel (${slideCount} slide${slideCount>1?'s':''})... 🎨` });
 
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.access_token) throw new Error('Non authentifié');
 
-        // Appeler create-job-set avec idempotency
-        const { data: jobSet, error } = await supabase.functions.invoke('create-job-set', {
+        const idempotencyKey = crypto.randomUUID();
+
+        // 1. Appeler la nouvelle edge function chat-create-carousel
+        console.log('[Carousel] Calling chat-create-carousel...');
+        const { data: jobSet, error } = await supabase.functions.invoke('chat-create-carousel', {
           body: {
             brandId: activeBrandId,
             prompt: userMessage,
@@ -1055,189 +1073,106 @@ export function AlfieChat() {
         });
 
         if (error) throw error;
+        if (!jobSet?.jobSetId) throw new Error('No jobSetId returned');
 
+        console.log('[Carousel] Job set created:', jobSet.jobSetId);
+
+        // 2. Afficher message de démarrage avec carte
         setMessages(prev => [...prev, {
           role: 'assistant',
           content: `✅ Carrousel de ${slideCount} slides en cours de génération...`
         }]);
 
-        // Déclencher immédiatement le premier worker
-        await triggerWorker();
+        // 3. Initialiser l'état carrousel
+        setCarouselState({
+          jobSetId: jobSet.jobSetId,
+          total: slideCount,
+          done: 0,
+          items: []
+        });
 
-        // Polling du job_set
-        const pollInterval = setInterval(async () => {
-          // Déclencher le worker à chaque poll
-          await triggerWorker();
+        setGenerationStatus(null);
 
-          const { data: currentJobSet } = await supabase
-            .from('job_sets')
-            .select('status, master_seed, style_ref_asset_id, jobs(status, index_in_set, asset_id)')
-            .eq('id', jobSet.id)
-            .single();
+        // 4. S'abonner au Realtime sur assets
+        console.log('[Carousel] Subscribing to Realtime for job_set:', jobSet.jobSetId);
+        
+        // Cleanup previous channel if exists
+        if (carouselChannelRef.current) {
+          await supabase.removeChannel(carouselChannelRef.current);
+        }
 
-          if (!currentJobSet) return;
-
-          const completedJobs = currentJobSet.jobs?.filter((j: any) => j.status === 'succeeded') || [];
-          const progress = Math.round((completedJobs.length / slideCount) * 100);
-
-          setGenerationStatus({
-            type: 'image',
-            message: `Génération en cours : ${completedJobs.length}/${slideCount} (${progress}%)`
-          });
-
-          // Ajouter les nouvelles images au chat
-          for (const job of completedJobs) {
-            if (!job.asset_id) continue;
-            if (addedAssetIdsRef.current.has(job.asset_id)) continue;
-
-            // Récupérer l'asset avec metadata
-            const { data: asset } = await supabase
-              .from('media_generations')
-              .select('output_url, metadata')
-              .eq('id', job.asset_id)
-              .single();
-
-            if (asset?.output_url) {
-              // Filtrer les images base64 (trop volumineuses et non valides)
-              if (!asset.output_url.startsWith('http')) {
-                console.warn('⚠️ [AlfieChat] Skipping base64 or invalid URL:', asset.output_url.slice(0, 100));
-                continue;
-              }
+        const channel = supabase
+          .channel(`jobset:${jobSet.jobSetId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'assets',
+              filter: `job_set_id=eq.${jobSet.jobSetId}`
+            },
+            (payload: any) => {
+              const newAsset = payload.new;
+              const publicUrl = newAsset.meta?.public_url || 
+                               `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/media-generations/${newAsset.storage_key}`;
               
-              // Phase 9: Extraire info détaillée de cohérence
-              const metadata = asset.metadata as any;
-              const isKeyVisual = metadata?.role === 'key_visual';
-              const coherenceScore = metadata?.coherence_score?.total || 0;
-              const coherenceBreakdown = metadata?.coherence_score?.breakdown;
-              const retryCount = metadata?.retry_count || 0;
-              const slideTemplate = metadata?.slide_template || 'hero';
+              console.log('📡 [Realtime] New asset received:', newAsset.id, publicUrl);
               
-              let content = `**Slide ${job.index_in_set + 1}/${slideCount}**`;
+              // Mettre à jour l'état carrousel
+              setCarouselState(prev => {
+                if (!prev || prev.jobSetId !== jobSet.jobSetId) return prev;
+                
+                // Éviter les doublons
+                if (prev.items.some(item => item.id === newAsset.id)) return prev;
+                
+                return {
+                  ...prev,
+                  done: prev.done + 1,
+                  items: [...prev.items, {
+                    id: newAsset.id,
+                    url: publicUrl,
+                    index: newAsset.meta?.index_in_set ?? prev.done
+                  }]
+                };
+              });
               
-              // Badge type de slide
+              // Badge template
               const templateEmojis: Record<string, string> = {
                 hero: '🎯',
                 problem: '❌',
-                solution: '✅', 
+                solution: '✅',
                 impact: '📊',
                 cta: '🎬'
               };
-              content += ` ${templateEmojis[slideTemplate] || '🎨'} ${slideTemplate.charAt(0).toUpperCase() + slideTemplate.slice(1)}`;
+              const slideTemplate = newAsset.meta?.slide_template || 'variant';
+              const emoji = templateEmojis[slideTemplate] || '🎨';
               
-              // Badge cohérence avec couleur
-              if (coherenceScore >= 75) {
-                content += ` | ✅ **Cohérence ${coherenceScore}/100**`;
-              } else if (coherenceScore >= 60) {
-                content += ` | ⚠️ **Cohérence ${coherenceScore}/100**`;
-              } else {
-                content += ` | ❌ **Cohérence ${coherenceScore}/100**`;
-              }
-              
-              // Détails breakdown si disponibles
-              if (coherenceBreakdown) {
-                const details = [];
-                if (coherenceBreakdown.palette_match !== undefined) {
-                  details.push(`Palette: ${Math.round(coherenceBreakdown.palette_match)}/100`);
-                }
-                if (coherenceBreakdown.no_text_detected !== undefined) {
-                  details.push(`Texte: ${coherenceBreakdown.no_text_detected ? '✅ Aucun' : '❌ Détecté'}`);
-                }
-                if (coherenceBreakdown.style_similarity !== undefined) {
-                  details.push(`Style: ${Math.round(coherenceBreakdown.style_similarity)}/100`);
-                }
-                if (details.length > 0) {
-                  content += `\n_${details.join(' • ')}_`;
-                }
-              }
-              
-              // Info retry si nécessaire
-              if (retryCount > 0) {
-                content += `\n🔄 Retry ${retryCount}/3`;
-              }
-              
-              // Info key visual
-              if (isKeyVisual && currentJobSet.master_seed) {
-                content += `\n🎨 _Référence visuelle (Seed: ${currentJobSet.master_seed.slice(0, 8)}...)_`;
-              }
-
+              // Ajouter un message avec l'image
               setMessages(prev => [...prev, {
                 role: 'assistant',
-                content,
-                imageUrl: asset.output_url,
-                assetId: job.asset_id || undefined,
-                assetType: 'image' as const
+                content: `**Slide ${(newAsset.meta?.index_in_set ?? 0) + 1}/${slideCount}** ${emoji} ${slideTemplate.charAt(0).toUpperCase() + slideTemplate.slice(1)}`,
+                imageUrl: publicUrl,
+                assetId: newAsset.id,
+                assetType: 'image'
               }]);
-              addedAssetIdsRef.current.add(job.asset_id);
             }
-          }
+          )
+          .subscribe((status) => {
+            console.log('[Carousel] Realtime subscription status:', status);
+          });
 
-          if (currentJobSet.status === 'done' || currentJobSet.status === 'partial') {
-            clearInterval(pollInterval);
-            setGenerationStatus(null);
+        carouselChannelRef.current = channel;
 
-            // Phase 9: Message final avec statistiques détaillées
-            const allJobs = currentJobSet.jobs || [];
-            const succeededJobs = allJobs.filter((j: any) => j.status === 'succeeded');
-            const failedJobs = allJobs.filter((j: any) => j.status === 'failed');
-            
-            // Message final avec info master_seed
-            let finalMessage = `🎉 **Carrousel terminé !**\n\n`;
-            finalMessage += `✅ ${succeededJobs.length} slide${succeededJobs.length > 1 ? 's' : ''} générée${succeededJobs.length > 1 ? 's' : ''} avec succès`;
-            if (failedJobs.length > 0) {
-              finalMessage += `\n❌ ${failedJobs.length} slide${failedJobs.length > 1 ? 's' : ''} échouée${failedJobs.length > 1 ? 's' : ''}`;
-            }
-            if (currentJobSet.master_seed) {
-              finalMessage += `\n🎨 Carrousel cohérent (Master Seed: ${currentJobSet.master_seed.slice(0, 8)}...)`;
-            }
-            finalMessage += '\nTélécharge le ZIP pour récupérer toutes les images d\'un coup.';
-
-            setMessages(prev => [...prev, {
-              role: 'assistant',
-              content: finalMessage
-            }]);
-
-            // Télécharger automatiquement le ZIP via fetch direct (binaire)
-            if (!zipDownloadedRef.current) {
-              zipDownloadedRef.current = true;
-              try {
-                const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/download-job-set-zip`;
-                
-                const resp = await fetch(fnUrl, {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${session.access_token}`,
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({ jobSetId: jobSet.id })
-                });
-
-                if (!resp.ok) {
-                  const t = await resp.text();
-                  console.error('[ZIP] Failed:', t);
-                  toast.error('Erreur lors du téléchargement du ZIP');
-                } else {
-                  const blob = await resp.blob();
-                  const url = window.URL.createObjectURL(blob);
-                  const link = document.createElement('a');
-                  link.href = url;
-                  link.download = `carrousel-${jobSet.id.slice(0, 8)}.zip`;
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                }
-              } catch (err) {
-                console.error('[ZIP] Error:', err);
-                toast.error('Erreur lors du téléchargement du ZIP');
-              }
-            }
-          }
-        }, 3000); // Poll toutes les 3s
+        // 5. Déclencher le premier worker
+        console.log('[Carousel] Triggering initial worker...');
+        await triggerWorker();
 
         return;
       } catch (err: any) {
         console.error('[Carousel] Error:', err);
         toast.error(err.message || 'Erreur lors de la génération du carrousel');
         setGenerationStatus(null);
+        setCarouselState(null);
         setMessages(prev => [...prev, {
           role: 'assistant',
           content: `❌ Erreur : ${err.message || 'Impossible de créer le carrousel'}`
@@ -1373,6 +1308,17 @@ export function AlfieChat() {
                   isStatus
                   generationType={generationStatus?.type === 'video' ? 'video' : generationStatus ? 'image' : 'text'}
                   isLoading={isLoading && !generationStatus}
+                />
+              </div>
+            )}
+
+            {/* Carte de progression carrousel */}
+            {carouselState && (
+              <div className="animate-fade-in">
+                <CarouselProgressCard
+                  total={carouselState.total}
+                  done={carouselState.done}
+                  items={carouselState.items}
                 />
               </div>
             )}
