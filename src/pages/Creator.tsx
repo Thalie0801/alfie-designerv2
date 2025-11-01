@@ -139,6 +139,7 @@ export default function Creator() {
         const { error: insertError } = await supabase
           .from("media_generations")
           .insert({
+            user_id: user.id,
             brand_id: activeBrandId,
             type: mode,
             prompt,
@@ -157,7 +158,7 @@ export default function Creator() {
             },
             woofs: finalCost,
             expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-          });
+          } as any);
 
         if (insertError) {
           console.error("Erreur insertion media_generations:", insertError);

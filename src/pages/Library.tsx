@@ -115,6 +115,7 @@ export default function Library() {
       await supabase
         .from('media_generations')
         .insert({
+          user_id: user.id,
           brand_id: profile.active_brand_id,
           type: 'video',
           engine: provider,
@@ -124,7 +125,7 @@ export default function Library() {
           output_url: '',
           job_id: null,
           metadata: { predictionId, provider, jobId, jobShortId }
-        });
+        } as any);
       toast.success(`Génération vidéo lancée (${provider})`);
     } catch (e: any) {
       console.error('Debug generate error:', e);

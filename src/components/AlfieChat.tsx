@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { useAlfieCredits } from '@/hooks/useAlfieCredits';
 import { useTemplateLibrary } from '@/hooks/useTemplateLibrary';
@@ -120,6 +121,7 @@ Alors, qu'est-ce qu'on crée ensemble aujourd'hui ? 😊`;
 
 export function AlfieChat() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
@@ -338,16 +340,17 @@ export function AlfieChat() {
       setUploadedImage(publicUrl);
       
       // Indexer l'image uploadée comme "source" (non comptée dans les quotas)
-      if (activeBrandId) {
+      if (activeBrandId && user?.id) {
         try {
           await supabase.from('media_generations').insert({
+            user_id: user.id,
             brand_id: activeBrandId,
             type: 'image',
             prompt: 'Upload source depuis le chat',
             output_url: publicUrl,
             is_source_upload: true,
             status: 'completed'
-          });
+          } as any);
         } catch (e) {
           console.warn('Insertion source upload échouée (non bloquant):', e);
         }
@@ -468,17 +471,22 @@ export function AlfieChat() {
           if (!activeBrandId) {
             throw new Error("No active brand. Please select a brand first.");
           }
+          
+          if (!user?.id) {
+            throw new Error("User not authenticated");
+          }
 
           // Stocker en DB et récupérer l'asset complet avec métadonnées
           const { data: insertedAsset, error: insertError } = await supabase
             .from('media_generations')
             .insert({
+              user_id: user.id,
               brand_id: activeBrandId,
               type: 'image',
               prompt: args.prompt,
               output_url: data.imageUrl,
               status: 'completed'
-            })
+            } as any)
             .select('id, type, output_url, expires_at, engine, woofs, cost_woofs')
             .single();
 
@@ -547,15 +555,20 @@ export function AlfieChat() {
           if (!activeBrandId) {
             throw new Error("No active brand. Please select a brand first.");
           }
+          
+          if (!user?.id) {
+            throw new Error("User not authenticated");
+          }
 
           await supabase.from('media_generations').insert({
+            user_id: user.id,
             brand_id: activeBrandId,
             type: 'image',
             prompt: args.instructions,
             input_url: args.image_url,
             output_url: data.imageUrl,
             status: 'completed'
-          });
+          } as any);
 
           // Déduire 1 crédit pour l'amélioration d'image
           await decrementCredits(1, 'image_improvement');
@@ -647,11 +660,16 @@ export function AlfieChat() {
           if (!activeBrandId) {
             throw new Error("No active brand. Please select a brand first.");
           }
+          
+          if (!user?.id) {
+            throw new Error("User not authenticated");
+          }
 
           // Créer l'asset en DB (status processing) — 2 Woofs / vidéo
           const { data: asset, error: assetError } = await supabase
             .from('media_generations')
             .insert([{ 
+              user_id: user.id,
               brand_id: activeBrandId,
               type: 'video',
               engine: providerInfo.engine,
@@ -672,7 +690,7 @@ export function AlfieChat() {
                 aspectRatio: args.aspectRatio || '16:9',
                 woofCost: 2
               }
-            }])
+            } as any])
             .select()
             .single();
 
