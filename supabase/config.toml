@@ -143,3 +143,12 @@ verify_jwt = true
 
 [functions.get-quota]
 verify_jwt = true
+
+[functions.create-job-set]
+verify_jwt = true
+
+[functions.process-job-worker]
+verify_jwt = false
+
+[functions.download-job-set-zip]
+verify_jwt = true

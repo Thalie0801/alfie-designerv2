@@ -999,6 +999,140 @@ export function AlfieChat() {
     //   return;
     // }
 
+    // 🎯 DÉTECTION CARROUSEL (prioritaire)
+    const carouselMatch = userMessage.match(/carrousel|carousel/i);
+    if (carouselMatch && !forceImage && !forceVideo) {
+      const countMatch = userMessage.match(/\d+/);
+      const slideCount = countMatch ? Math.min(10, Math.max(2, parseInt(countMatch[0]))) : 5;
+
+      if (!activeBrandId) {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `❌ Crée d'abord un Brand Kit pour générer des carrousels cohérents ! 🎨`
+        }]);
+        return;
+      }
+
+      const idempotencyKey = `${Date.now()}-${Math.random().toString(36)}`;
+
+      try {
+        setGenerationStatus({ type: 'image', message: `Planification du carrousel (${slideCount} slides)... 🎨` });
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) throw new Error('Non authentifié');
+
+        // Appeler create-job-set avec idempotency
+        const { data: jobSet, error } = await supabase.functions.invoke('create-job-set', {
+          body: {
+            brandId: activeBrandId,
+            prompt: userMessage,
+            count: slideCount,
+            aspectRatio: '4:5'
+          },
+          headers: {
+            'x-idempotency-key': idempotencyKey,
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        });
+
+        if (error) throw error;
+
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `✅ Carrousel de ${slideCount} slides en cours de génération...`
+        }]);
+
+        // Polling du job_set
+        const pollInterval = setInterval(async () => {
+          const { data: currentJobSet } = await supabase
+            .from('job_sets')
+            .select('status, jobs(status, index_in_set, asset_id)')
+            .eq('id', jobSet.id)
+            .single();
+
+          if (!currentJobSet) return;
+
+          const completedJobs = currentJobSet.jobs?.filter((j: any) => j.status === 'succeeded') || [];
+          const progress = Math.round((completedJobs.length / slideCount) * 100);
+
+          setGenerationStatus({
+            type: 'image',
+            message: `Génération en cours : ${completedJobs.length}/${slideCount} (${progress}%)`
+          });
+
+          // Ajouter les nouvelles images au chat
+          for (const job of completedJobs) {
+            if (!job.asset_id) continue;
+            const alreadyAdded = messages.some(m => m.assetId === job.asset_id);
+            if (alreadyAdded) continue;
+
+            // Récupérer l'asset séparément
+            const { data: asset } = await supabase
+              .from('media_generations')
+              .select('output_url')
+              .eq('id', job.asset_id)
+              .single();
+
+            if (asset?.output_url) {
+              setMessages(prev => [...prev, {
+                role: 'assistant',
+                content: `Slide ${job.index_in_set + 1}/${slideCount}`,
+                imageUrl: asset.output_url,
+                assetId: job.asset_id || undefined,
+                assetType: 'image' as const
+              }]);
+            }
+          }
+
+          if (currentJobSet.status === 'done' || currentJobSet.status === 'partial') {
+            clearInterval(pollInterval);
+            setGenerationStatus(null);
+
+            // Proposer le téléchargement ZIP
+            setMessages(prev => [...prev, {
+              role: 'assistant',
+              content: `🎉 Carrousel terminé ! Télécharge le ZIP pour récupérer toutes les images d'un coup.`
+            }]);
+
+            // Télécharger automatiquement le ZIP
+            try {
+              const { data: zipData, error: zipError } = await supabase.functions.invoke('download-job-set-zip', {
+                body: { jobSetId: jobSet.id },
+                headers: { 'Authorization': `Bearer ${session.access_token}` }
+              });
+
+              if (!zipError && zipData) {
+                // Créer un blob et le télécharger
+                const blob = new Blob([zipData], { type: 'application/zip' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `carousel-${jobSet.id}.zip`;
+                link.click();
+                URL.revokeObjectURL(url);
+
+                toast.success('ZIP téléchargé avec succès ! 📦');
+              }
+            } catch (zipErr) {
+              console.error('ZIP download error:', zipErr);
+              toast.error('Erreur lors du téléchargement du ZIP');
+            }
+          }
+        }, 3000); // Poll toutes les 3s
+
+        return;
+      } catch (err: any) {
+        console.error('[Carousel] Error:', err);
+        toast.error(err.message || 'Erreur lors de la génération du carrousel');
+        setGenerationStatus(null);
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `❌ Erreur : ${err.message || 'Impossible de créer le carrousel'}`
+        }]);
+        return;
+      }
+    }
+
     if (forceImage) {
       const aspect = options?.aspectRatio || detectAspectRatioFromText(userMessage);
       await handleToolCall('generate_image', { prompt: userMessage, aspect_ratio: aspect });

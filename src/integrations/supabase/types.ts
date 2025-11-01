@@ -487,6 +487,41 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_sessions: {
+        Row: {
+          brand_id: string | null
+          context: Json
+          created_at: string
+          id: string
+          last_interaction: string
+          user_id: string
+        }
+        Insert: {
+          brand_id?: string | null
+          context?: Json
+          created_at?: string
+          id?: string
+          last_interaction?: string
+          user_id: string
+        }
+        Update: {
+          brand_id?: string | null
+          context?: Json
+          created_at?: string
+          id?: string
+          last_interaction?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_sessions_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_requests: {
         Row: {
           company: string | null
@@ -753,53 +788,120 @@ export type Database = {
           },
         ]
       }
-      jobs: {
+      idempotency_keys: {
         Row: {
-          completed_at: string | null
-          created_at: string | null
-          error: string | null
+          created_at: string
+          expires_at: string
+          key: string
+          result_ref: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          key: string
+          result_ref?: string | null
+          status: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          key?: string
+          result_ref?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      job_sets: {
+        Row: {
+          brand_id: string
+          created_at: string
           id: string
-          input_data: Json | null
-          max_retries: number | null
-          output_data: Json | null
-          progress: number | null
-          retry_count: number | null
-          short_id: string | null
-          status: string | null
-          type: string
+          request_text: string
+          status: string
+          total: number
+          updated_at: string
           user_id: string
         }
         Insert: {
-          completed_at?: string | null
-          created_at?: string | null
-          error?: string | null
+          brand_id: string
+          created_at?: string
           id?: string
-          input_data?: Json | null
-          max_retries?: number | null
-          output_data?: Json | null
-          progress?: number | null
-          retry_count?: number | null
-          short_id?: string | null
-          status?: string | null
-          type: string
+          request_text: string
+          status?: string
+          total: number
+          updated_at?: string
           user_id: string
         }
         Update: {
-          completed_at?: string | null
-          created_at?: string | null
-          error?: string | null
+          brand_id?: string
+          created_at?: string
           id?: string
-          input_data?: Json | null
-          max_retries?: number | null
-          output_data?: Json | null
-          progress?: number | null
-          retry_count?: number | null
-          short_id?: string | null
-          status?: string | null
-          type?: string
+          request_text?: string
+          status?: string
+          total?: number
+          updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "job_sets_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jobs: {
+        Row: {
+          asset_id: string | null
+          brand_snapshot: Json
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          index_in_set: number
+          job_set_id: string
+          prompt: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          asset_id?: string | null
+          brand_snapshot: Json
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          index_in_set: number
+          job_set_id: string
+          prompt: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          asset_id?: string | null
+          brand_snapshot?: Json
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          index_in_set?: number
+          job_set_id?: string
+          prompt?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jobs_job_set_id_fkey"
+            columns: ["job_set_id"]
+            isOneToOne: false
+            referencedRelation: "job_sets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       media_generations: {
         Row: {
@@ -892,13 +994,6 @@ export type Database = {
             columns: ["brand_id"]
             isOneToOne: false
             referencedRelation: "brands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "media_generations_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
           {
@@ -1616,9 +1711,30 @@ export type Database = {
         Args: { p_delta?: number; p_profile_id: string }
         Returns: undefined
       }
+      refund_brand_quotas: {
+        Args: {
+          p_brand_id: string
+          p_reels_count?: number
+          p_visuals_count?: number
+          p_woofs_count?: number
+        }
+        Returns: boolean
+      }
       refund_woofs: {
         Args: { user_id_param: string; woofs_amount: number }
         Returns: boolean
+      }
+      reserve_brand_quotas: {
+        Args: {
+          p_brand_id: string
+          p_reels_count?: number
+          p_visuals_count?: number
+          p_woofs_count?: number
+        }
+        Returns: {
+          reason: string
+          success: boolean
+        }[]
       }
       update_affiliate_status: {
         Args: { affiliate_id_param: string }
