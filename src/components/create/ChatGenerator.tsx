@@ -545,7 +545,7 @@ export function ChatGenerator() {
                 {generatedAsset.type === 'image' ? (
                   <img
                     src={generatedAsset.url}
-                    alt={generatedAsset.prompt}
+                    alt="Création générée"
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -557,7 +557,6 @@ export function ChatGenerator() {
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent"></div>
                 <div className="absolute bottom-0 left-0 right-0 p-6 space-y-3">
-                  <p className="text-sm text-muted-foreground">{generatedAsset.prompt}</p>
                   <p className="text-xs text-muted-foreground">
                     Type : {generatedAsset.type === 'video' ? 'Vidéo' : 'Image'} • Format : {generatedAsset.format}
                   </p>

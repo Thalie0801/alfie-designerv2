@@ -142,12 +142,6 @@ export function AssetCard({
 
         {/* Info */}
         <div className="p-3 space-y-2">
-          {asset.prompt && (
-            <p className="text-sm line-clamp-2 text-muted-foreground">
-              {asset.prompt}
-            </p>
-          )}
-          
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>
               {formatDistanceToNow(new Date(asset.created_at), { 

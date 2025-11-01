@@ -918,8 +918,8 @@ export function AlfieChat() {
               // Reset complet de l'état
               setActiveJobSetId('');
               setCarouselTotal(0);
-              localStorage.removeItem('alfie-active-carousel');
-              localStorage.removeItem('alfie-carousel-total');
+              localStorage.removeItem('activeJobSetId');
+              localStorage.removeItem('carouselTotal');
               
               return { error: 'Échec de création du carrousel' };
             }
@@ -936,13 +936,13 @@ export function AlfieChat() {
             // ✅ Mettre à jour le state et vérifier immédiatement
             setActiveJobSetId(jobSetId);
             setCarouselTotal(count);
-            localStorage.setItem('alfie-active-carousel', jobSetId);
-            localStorage.setItem('alfie-carousel-total', count.toString());
+            localStorage.setItem('activeJobSetId', jobSetId);
+            localStorage.setItem('carouselTotal', count.toString());
             
             console.log('[Carousel] State updated:', { 
               activeJobSetId: jobSetId, 
               carouselTotal: count,
-              localStorage: localStorage.getItem('alfie-active-carousel')
+              localStorage: localStorage.getItem('activeJobSetId')
             });
           } catch (e) {
             console.error('[Carousel] create-job-set exception:', e);
@@ -951,8 +951,8 @@ export function AlfieChat() {
             // Reset complet de l'état
             setActiveJobSetId('');
             setCarouselTotal(0);
-            localStorage.removeItem('alfie-active-carousel');
-            localStorage.removeItem('alfie-carousel-total');
+            localStorage.removeItem('activeJobSetId');
+            localStorage.removeItem('carouselTotal');
             
             return { error: 'Exception lors de la création' };
           }
@@ -1100,8 +1100,8 @@ export function AlfieChat() {
             jobSetId = jobSetData.data.id;
             setActiveJobSetId(jobSetId);
             setCarouselTotal(carouselPlan.slides.length);
-            localStorage.setItem('alfie-active-carousel', jobSetId);
-            localStorage.setItem('alfie-carousel-total', carouselPlan.slides.length.toString());
+            localStorage.setItem('activeJobSetId', jobSetId);
+            localStorage.setItem('carouselTotal', carouselPlan.slides.length.toString());
             
             console.log('[Slide] ✅ Job set created:', jobSetId);
           }
@@ -1603,89 +1603,8 @@ export function AlfieChat() {
     //   return;
     // }
 
-    // 🎯 DÉTECTION CARROUSEL (prioritaire) - Avec Realtime via Hook
-    // Gère toutes les variantes: carrousel, carroussel, caroussel, carousel
-    const carouselMatch = userMessage.match(/(carou?ss?el|carousel)/i);
-    if (carouselMatch && !forceImage && !forceVideo) {
-      const countMatch = userMessage.match(/\d+/);
-      const slideCount = countMatch ? Math.min(10, Math.max(1, parseInt(countMatch[0]))) : 5;
-      const wantsSquare = /(1x1|1:1|carr[ée])/i.test(userMessage);
-      const aspect = wantsSquare ? '1:1' : '4:5';
-
-      if (!activeBrandId) {
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: `❌ Crée d'abord un Brand Kit pour générer des carrousels cohérents ! 🎨`
-        }]);
-        return;
-      }
-
-      try {
-        setGenerationStatus({ type: 'image', message: `Planification du carrousel (${slideCount} slide${slideCount>1?'s':''})... 🎨` });
-
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) throw new Error('Non authentifié');
-
-        const idempotencyKey = crypto.randomUUID();
-
-        // 1. Appeler la nouvelle edge function chat-create-carousel
-        console.log('[Carousel] Calling chat-create-carousel...');
-        const { data: jobSet, error } = await supabase.functions.invoke('chat-create-carousel', {
-          body: {
-            brandId: activeBrandId,
-            prompt: userMessage,
-            count: slideCount,
-            aspectRatio: aspect
-          },
-          headers: {
-            'x-idempotency-key': idempotencyKey,
-            'Authorization': `Bearer ${session.access_token}`
-          }
-        });
-
-        if (error) throw error;
-        if (!jobSet?.jobSetId) throw new Error('No jobSetId returned');
-
-        console.log('[Carousel] Job set created:', jobSet.jobSetId);
-
-        // 2. Afficher message de démarrage
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: `✅ Carrousel de ${slideCount} slides en cours de génération...`
-        }]);
-
-        // 3. Activer le hook en définissant jobSetId et total
-        setActiveJobSetId(jobSet.jobSetId);
-        setCarouselTotal(slideCount);
-        
-        // Persister dans localStorage pour restauration après refresh
-        localStorage.setItem('activeJobSetId', jobSet.jobSetId);
-        localStorage.setItem('carouselTotal', slideCount.toString());
-        
-        setGenerationStatus(null);
-
-        // 4. Refresh immédiat pour charger les assets existants (si déjà générés)
-        setTimeout(() => refreshCarousel(), 100);
-
-        // 5. Déclencher le premier worker + pompe
-        console.log('[Carousel] Triggering initial worker...');
-        await triggerWorker();
-        pumpWorker(slideCount);
-
-        return;
-      } catch (err: any) {
-        console.error('[Carousel] Error:', err);
-        toast.error(err.message || 'Erreur lors de la génération du carrousel');
-        setGenerationStatus(null);
-        setActiveJobSetId('');
-        setCarouselTotal(0);
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: `❌ Erreur : ${err.message || 'Impossible de créer le carrousel'}`
-        }]);
-        return;
-      }
-    }
+    // 🎯 Le flux carrousel est désormais géré par alfie-chat via les tools plan_carousel et generate_carousel_slide
+    // L'agent présente chaque slide en texte et attend validation avant de générer l'image
 
     if (forceImage) {
       const aspect = options?.aspectRatio || detectAspectRatioFromText(userMessage);

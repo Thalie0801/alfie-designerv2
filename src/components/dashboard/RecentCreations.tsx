@@ -84,7 +84,7 @@ export function RecentCreations() {
             >
               <img
                 src={creation.thumbnail_url || creation.output_url}
-                alt={creation.prompt || 'Création'}
+                alt="Création"
                 className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-all flex items-center justify-center">

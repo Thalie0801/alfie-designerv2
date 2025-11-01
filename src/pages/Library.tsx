@@ -36,7 +36,6 @@ export default function Library() {
 
   const filteredAssets = assets.filter(asset =>
     !searchQuery || 
-    asset.prompt?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     asset.engine?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
