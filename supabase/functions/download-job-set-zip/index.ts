@@ -102,14 +102,42 @@ serve(async (req) => {
     }
 
     // Générer le ZIP en blob
-    const zipData = await zip.generateAsync({ type: 'blob' });
-    const arrayBuffer = await zipData.arrayBuffer();
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const arrayBuffer = await zipBlob.arrayBuffer();
 
-    return new Response(arrayBuffer, {
+    // Uploader le ZIP dans le storage
+    const zipFileName = `zips/carousel-${jobSetId}-${Date.now()}.zip`;
+    console.log(`[download-zip] Uploading ZIP to storage: ${zipFileName}`);
+    
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('media-generations')
+      .upload(zipFileName, new Uint8Array(arrayBuffer), {
+        contentType: 'application/zip',
+        cacheControl: '3600',
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error('[download-zip] Upload failed:', uploadError);
+      throw uploadError;
+    }
+
+    // Obtenir l'URL publique
+    const { data: publicUrlData } = supabase.storage
+      .from('media-generations')
+      .getPublicUrl(zipFileName);
+
+    const zipUrl = publicUrlData.publicUrl;
+    console.log(`[download-zip] ZIP uploaded successfully: ${zipUrl}`);
+
+    return new Response(JSON.stringify({ 
+      url: zipUrl,
+      filename: `carousel-${jobSetId}.zip`,
+      size: arrayBuffer.byteLength
+    }), {
       headers: {
         ...corsHeaders,
-        'Content-Type': 'application/zip',
-        'Content-Disposition': `attachment; filename="carousel-${jobSetId}.zip"`
+        'Content-Type': 'application/json'
       }
     });
 

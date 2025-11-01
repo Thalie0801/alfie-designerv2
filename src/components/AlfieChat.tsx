@@ -1419,13 +1419,31 @@ export function AlfieChat() {
                   items={carouselItems}
                   onDownloadZip={async () => {
                     try {
+                      console.log('[Carousel] Downloading ZIP for job set:', activeJobSetId);
+                      toast.loading('Préparation du ZIP...');
+                      
                       const { data, error } = await supabase.functions.invoke('download-job-set-zip', {
                         body: { jobSetId: activeJobSetId }
                       });
-                      if (error) throw error;
-                      if (data?.url) window.location.href = data.url;
-                    } catch (err) {
-                      toast.error('Erreur lors du téléchargement du ZIP');
+                      
+                      toast.dismiss();
+                      
+                      if (error) {
+                        console.error('[Carousel] ZIP download error:', error);
+                        throw error;
+                      }
+                      
+                      // La fonction retourne maintenant une URL de storage
+                      if (data?.url) {
+                        console.log('[Carousel] Opening ZIP URL:', data.url);
+                        window.open(data.url, '_blank');
+                        toast.success('ZIP téléchargé ! 📦');
+                      } else {
+                        throw new Error('No ZIP URL returned');
+                      }
+                    } catch (err: any) {
+                      console.error('[Carousel] ZIP download failed:', err);
+                      toast.error(`Erreur lors du téléchargement: ${err.message || 'Erreur inconnue'}`);
                     }
                   }}
             onRetry={async () => {
