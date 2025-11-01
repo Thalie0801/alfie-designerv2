@@ -269,7 +269,7 @@ serve(async (req) => {
         },
         signal: ctrl.signal,
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash-image',
+          model: 'google/gemini-2.5-flash-image-preview',
           messages: [
             {
               role: 'user',
@@ -455,10 +455,29 @@ serve(async (req) => {
     console.log('✅ [Worker] Image uploaded successfully!');
     console.log('🔗 Public URL:', publicUrl);
 
-    // 8. HOTFIX: Vérifier cohérence avec seuil adapté pour génération directe
-    const referenceImageUrl = !isKeyVisual && job.job_sets.style_ref_url 
-      ? job.job_sets.style_ref_url 
-      : undefined;
+    // 8. Vérifier cohérence avec référence à la slide 0 pour cohérence du carrousel
+    let referenceImageUrl: string | undefined = undefined;
+    
+    // Si c'est une slide variant (pas key_visual), récupérer l'URL de la slide 0 du même job_set
+    if (!isKeyVisual && job.index_in_set > 0) {
+      const { data: keyVisualAsset } = await supabase
+        .from('assets')
+        .select('meta')
+        .eq('job_set_id', job.job_set_id)
+        .eq('index_in_set', 0)
+        .maybeSingle();
+      
+      if (keyVisualAsset?.meta?.public_url) {
+        referenceImageUrl = keyVisualAsset.meta.public_url;
+        console.log(`[Worker] Using key_visual as reference for style consistency: ${referenceImageUrl}`);
+      }
+    }
+    
+    // Fallback: utiliser style_ref_url si présent (upload manuel)
+    if (!referenceImageUrl && job.job_sets.style_ref_url) {
+      referenceImageUrl = job.job_sets.style_ref_url;
+      console.log(`[Worker] Using style_ref_url as reference: ${referenceImageUrl}`);
+    }
     
     const coherenceScore = await checkCoherence(publicUrl, {
       palette: job.job_sets.constraints?.palette || [],

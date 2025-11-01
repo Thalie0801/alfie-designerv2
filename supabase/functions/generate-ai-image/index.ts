@@ -293,7 +293,6 @@ serve(async (req) => {
           user_id: user.id,
           brand_id: brandId,
           type: 'image',
-          engine: 'gemini-2.5-flash-image',
           status: 'completed',
           prompt: prompt.substring(0, 500),
           output_url: finalUrl,
