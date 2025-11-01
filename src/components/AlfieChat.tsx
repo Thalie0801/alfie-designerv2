@@ -923,6 +923,18 @@ export function AlfieChat() {
 
             jobSetId = data.data.id;
             console.log('[Carousel] ✅ create-job-set succeeded, jobSetId:', jobSetId);
+            
+            // ✅ Mettre à jour le state et vérifier immédiatement
+            setActiveJobSetId(jobSetId);
+            setCarouselTotal(count);
+            localStorage.setItem('alfie-active-carousel', jobSetId);
+            localStorage.setItem('alfie-carousel-total', count.toString());
+            
+            console.log('[Carousel] State updated:', { 
+              activeJobSetId: jobSetId, 
+              carouselTotal: count,
+              localStorage: localStorage.getItem('alfie-active-carousel')
+            });
           } catch (e) {
             console.error('[Carousel] create-job-set exception:', e);
             toast.error('Erreur lors de la création du carrousel.');

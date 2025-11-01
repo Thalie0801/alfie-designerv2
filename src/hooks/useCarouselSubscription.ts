@@ -10,6 +10,8 @@ export interface CarouselItem {
 
 // Helper pour construire l'URL publique de manière robuste via l'API Supabase
 function makePublicUrlRobust(storageKey: string): string {
+  console.log('[makePublicUrlRobust] Input storageKey:', storageKey);
+  
   const bucket = 'media-generations';
   
   // Normaliser le chemin (retirer le préfixe bucket s'il existe)
@@ -20,6 +22,8 @@ function makePublicUrlRobust(storageKey: string): string {
   
   // Utiliser l'API officielle
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  
+  console.log('[makePublicUrlRobust] Generated URL:', data.publicUrl);
   return data.publicUrl;
 }
 
@@ -74,9 +78,15 @@ export function useCarouselSubscription(jobSetId: string, total: number) {
   }, [jobSetId]);
 
   useEffect(() => {
-    if (!jobSetId) return;
+    console.log('[useCarouselSubscription] Hook triggered with jobSetId:', jobSetId);
+    
+    if (!jobSetId) {
+      console.log('[useCarouselSubscription] No jobSetId, skipping');
+      return;
+    }
 
     // Charger les assets existants au montage
+    console.log('[useCarouselSubscription] Loading existing assets...');
     loadExistingAssets();
 
     // 2️⃣ S'abonner au Realtime
@@ -91,6 +101,8 @@ export function useCarouselSubscription(jobSetId: string, total: number) {
           filter: `job_set_id=eq.${jobSetId}`
         },
         (payload: any) => {
+          console.log('[useCarouselSubscription] New asset received:', payload.new);
+          
           const newAsset = payload.new;
           const meta = newAsset.meta as { public_url?: string } | null;
           const newItem: CarouselItem = {
@@ -101,16 +113,20 @@ export function useCarouselSubscription(jobSetId: string, total: number) {
 
           setItems(prev => {
             // Déduplication
-            if (prev.some(p => p.id === newItem.id)) return prev;
+            if (prev.some(p => p.id === newItem.id)) {
+              console.log('[useCarouselSubscription] Duplicate asset, skipping:', newItem.id);
+              return prev;
+            }
             
             const next = [...prev, newItem].sort((a, b) => a.index - b.index);
             setDone(next.length);
+            console.log('[useCarouselSubscription] Asset added, total:', next.length);
             return next;
           });
         }
       )
       .subscribe((status) => {
-        console.log('[Carousel] Realtime status:', status);
+        console.log('[useCarouselSubscription] Realtime channel status:', status);
       });
 
     channelRef.current = channel;
