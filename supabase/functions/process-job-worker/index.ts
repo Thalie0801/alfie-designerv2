@@ -69,7 +69,22 @@ serve(async (req) => {
       });
     }
 
+    // Fail-fast: verify job_sets join
+    if (!job.job_sets) {
+      console.error('❌ [Worker] Job has no job_set join (missing FK?)');
+      return new Response(JSON.stringify({ error: 'Invalid job_set FK' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     console.log(`[Worker] Processing job ${job.id} (index: ${job.index_in_set})`);
+
+    // Verify key_visual role for slide 0
+    const isKeyVisualCheck = job.metadata?.role === 'key_visual';
+    if (job.index_in_set === 0 && !isKeyVisualCheck) {
+      console.warn('⚠️ [Worker] Slide 0 should be key_visual but role is:', job.metadata?.role);
+    }
 
     // 2. Marquer comme "running" ATOMIQUEMENT (seulement si encore queued)
     const { data: lockedJob, error: lockErr } = await supabase
@@ -133,7 +148,7 @@ serve(async (req) => {
     
     console.log('✅ [Worker] overlayText built:', overlayText);
 
-    // 5. HOTFIX: Génération directe "image finale" avec texte inclus
+    // 5. Generate final image with text overlay (direct generation) - with timeout
     console.log('🖼️ [Worker] Step 2: Generating final image with text overlay...');
     const correctedPrompt = correctFrenchSpelling(job.prompt);
     const enrichedPrompt = enrichPromptWithBrand(correctedPrompt, brandSnapshot);
@@ -153,23 +168,40 @@ serve(async (req) => {
       logo_url: brandSnapshot.logo_url || null
     } : undefined;
 
-    const { data: finalImageData, error: finalImageErr } = await supabase.functions.invoke('alfie-generate-ai-image', {
-      body: {
-        prompt: enrichedPrompt,
-        resolution,
-        brandKit,
-        seed,
-        backgroundOnly: false, // HOTFIX: génération avec texte
-        overlayText, // HOTFIX: texte exact à inclure
-        negativePrompt: 'blurry, low quality, distorted'
-      }
-    });
+    // Add 60s timeout for slow providers
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 60000);
+
+    let finalImageData: any;
+    let finalImageErr: any;
     
-    console.log('🔍 [Worker] AI response:', finalImageErr ? 'ERROR' : 'SUCCESS');
-    console.log('📊 [Worker] Response data keys:', finalImageData ? Object.keys(finalImageData) : 'null');
+    try {
+      const response = await supabase.functions.invoke('alfie-generate-ai-image', {
+        body: {
+          prompt: enrichedPrompt,
+          resolution,
+          brandKit,
+          seed,
+          backgroundOnly: false,
+          overlayText,
+          negativePrompt: 'blurry, low quality, distorted'
+        }
+      });
+      
+      finalImageData = response.data;
+      finalImageErr = response.error;
+      
+    } catch (err: any) {
+      finalImageErr = err;
+    } finally {
+      clearTimeout(timeout);
+    }
     
-    const finalImageUrl = finalImageData?.imageUrl || finalImageData?.url;
-    console.log('✅ [Worker] Final image URL type:', finalImageUrl ? (finalImageUrl.startsWith('data:') ? 'BASE64' : 'HTTP') : 'NONE');
+    // Log AI payload for debugging
+    if (finalImageData) {
+      console.log('📦 [Worker] AI response keys:', Object.keys(finalImageData));
+      console.log('📦 [Worker] AI payload preview:', JSON.stringify(finalImageData).slice(0, 500));
+    }
 
     // Helper pour mettre à jour le statut du job_set
     const updateJobSetStatus = async () => {
@@ -195,14 +227,54 @@ serve(async (req) => {
       return jobSetStatus;
     };
 
-    if (finalImageErr || !finalImageUrl) {
-      console.error('❌ [Worker] Final image generation failed:', finalImageErr);
-      // Échec → marquer et refund
+    // === MULTI-FORMAT IMAGE EXTRACTOR ===
+    function pickImage(gen: any): { kind: 'url'|'data'|'bytes', value: string|Uint8Array, mime: string } | null {
+      if (!gen) return null;
+
+      // 1) URL direct (6 possible paths)
+      const url =
+        gen.imageUrl || gen.url ||
+        gen.image?.url || gen.image?.dataUrl ||
+        gen.images?.[0]?.url || gen.images?.[0]?.dataUrl;
+      
+      if (typeof url === 'string' && url.startsWith('http')) 
+        return { kind: 'url', value: url, mime: 'image/png' };
+      if (typeof url === 'string' && url.startsWith('data:image/')) 
+        return { kind: 'data', value: url, mime: 'image/png' };
+
+      // 2) Base64 (5 possible paths)
+      const b64 =
+        gen.base64 || gen.b64 || gen.b64_json ||
+        gen.image?.base64 || gen.images?.[0]?.base64 || gen.images?.[0]?.b64_json;
+      
+      if (typeof b64 === 'string') 
+        return { kind: 'data', value: `data:image/png;base64,${b64}`, mime: 'image/png' };
+
+      // 3) Octet stream (rare but possible)
+      if (gen.bytes && gen.mime) 
+        return { kind: 'bytes', value: gen.bytes, mime: gen.mime };
+
+      return null;
+    }
+
+    const picked = pickImage(finalImageData);
+
+    if (finalImageErr || !picked) {
+      if (!picked) {
+        console.error('❌ [Worker] Could not extract image. Available keys:', 
+                      finalImageData ? Object.keys(finalImageData) : 'null');
+        console.error('📦 [Worker] Full payload (first 500 chars):', 
+                      JSON.stringify(finalImageData).slice(0, 500));
+      } else {
+        console.error('❌ [Worker] Final image generation failed:', finalImageErr);
+      }
+      
+      // Mark job as failed + refund quota
       await supabase
         .from('jobs')
         .update({
           status: 'failed',
-          error: finalImageErr?.message || 'Final image generation failed',
+          error: finalImageErr?.message || 'No image returned by generator',
           finished_at: new Date().toISOString()
         })
         .eq('id', job.id);
@@ -212,54 +284,63 @@ serve(async (req) => {
         p_visuals_count: 1
       });
 
-      await updateJobSetStatus();
+      const st = await updateJobSetStatus();
 
-      console.error(`[Worker] Job ${job.id} failed:`, finalImageErr?.message);
-      return new Response(JSON.stringify({ success: false, jobId: job.id, error: finalImageErr?.message }), {
+      console.error(`[Worker] Job ${job.id} failed:`, finalImageErr?.message || 'no_image');
+      return new Response(JSON.stringify({ 
+        success: false, 
+        jobId: job.id, 
+        error: finalImageErr?.message || 'No image extracted',
+        jobSetStatus: st 
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // 6. HOTFIX: Gérer base64 → upload Storage
-    console.log('☁️ [Worker] Step 3: Processing image for upload...');
-    let uploadBuffer: Uint8Array;
-    
-    if (finalImageUrl.startsWith('data:image/png;base64,')) {
+    // 6. Normalize to Uint8Array (3 branches)
+    console.log('☁️ [Worker] Step 3: Preparing buffer for upload...');
+    let bytes: Uint8Array;
+
+    if (picked.kind === 'url') {
+      console.log('🔄 [Worker] Downloading from HTTP:', picked.value);
+      const r = await fetch(picked.value as string);
+      if (!r.ok) throw new Error(`Download failed: ${r.status}`);
+      bytes = new Uint8Array(await r.arrayBuffer());
+      
+    } else if (picked.kind === 'data') {
       console.log('🔄 [Worker] Converting base64 to buffer...');
-      const base64Data = finalImageUrl.replace(/^data:image\/png;base64,/, '');
-      const binaryString = atob(base64Data);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+      const dataUrl = picked.value as string;
+      const b64 = dataUrl.substring(dataUrl.indexOf(',') + 1);
+      const bin = atob(b64);
+      bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) {
+        bytes[i] = bin.charCodeAt(i);
       }
-      uploadBuffer = bytes;
-      console.log('✅ [Worker] Base64 converted to buffer:', uploadBuffer.length, 'bytes');
-    } else if (finalImageUrl.startsWith('http')) {
-      console.log('🔄 [Worker] Downloading image from HTTP URL...');
-      const imageResponse = await fetch(finalImageUrl);
-      const arrayBuffer = await imageResponse.arrayBuffer();
-      uploadBuffer = new Uint8Array(arrayBuffer);
-      console.log('✅ [Worker] Image downloaded:', uploadBuffer.length, 'bytes');
-    } else {
-      throw new Error(`Unsupported image URL format: ${finalImageUrl.substring(0, 50)}`);
+      
+    } else { // 'bytes'
+      bytes = picked.value as Uint8Array;
     }
-    
-    // 7. Upload vers Supabase Storage avec URL publique
+
+    console.log('✅ [Worker] Buffer ready:', bytes.length, 'bytes');
+
+    // 7. Upload directly (Deno supports Uint8Array) + validate public URL
     console.log('☁️ [Worker] Step 4: Uploading to storage...');
     const fileName = `carousel/${job.job_set_id}/slide_${job.index_in_set}_${Date.now()}.png`;
     console.log('📁 File path:', fileName);
-    
+
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('media-generations')
-      .upload(fileName, uploadBuffer, {
-        contentType: 'image/png',
-        upsert: true,
-        cacheControl: '3600'
+      .upload(fileName, bytes, { 
+        contentType: 'image/png', 
+        upsert: true, 
+        cacheControl: '3600' 
       });
 
     if (uploadError) {
       console.error('❌ [Worker] Upload failed:', uploadError);
       console.error('❌ Upload error details:', JSON.stringify(uploadError));
+      
+      // Refund quota + fail job
       await supabase
         .from('jobs')
         .update({ 
@@ -286,7 +367,7 @@ serve(async (req) => {
     const publicUrl = publicUrlData.publicUrl;
 
     if (!publicUrl || !publicUrl.startsWith('http')) {
-      throw new Error(`Invalid public URL generated: ${publicUrl}`);
+      throw new Error(`Invalid public URL: ${publicUrl}`);
     }
 
     console.log('✅ [Worker] Image uploaded successfully!');
