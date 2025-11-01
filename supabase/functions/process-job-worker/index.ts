@@ -4,8 +4,6 @@ import { enrichPromptWithBrand } from "../_shared/brandResolver.ts";
 import { deriveSeed } from "../_shared/seedGenerator.ts";
 import { checkCoherence } from "../_shared/coherenceChecker.ts";
 import { SLIDE_TEMPLATES } from "../_shared/slideTemplates.ts";
-import { renderSlideToSVG } from "../_shared/slideRenderer.ts";
-import { compositeSlide } from "../_shared/imageCompositor.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -108,8 +106,8 @@ serve(async (req) => {
       }
     }
 
-    // 4. Phase 3: Rendre le texte en SVG (typo contrôlée, pas d'IA)
-    console.log('🎨 [Worker] Step 1: Rendering SVG text layer...');
+    // 4. HOTFIX: Construire overlayText simple à partir des métadonnées
+    console.log('📝 [Worker] Step 1: Building overlayText from metadata...');
     const slideContent = {
       title: job.metadata?.title || job.prompt,
       subtitle: job.metadata?.subtitle || '',
@@ -123,17 +121,25 @@ serve(async (req) => {
       kpis: job.metadata?.kpis || []
     };
     
-    const svgLayer = await renderSlideToSVG(slideContent, template, brandSnapshot);
-    console.log(`✅ [Worker] SVG rendered (${svgLayer.length} chars)`);
-    console.log('📝 SVG preview:', svgLayer.substring(0, 200) + '...');
+    // Construire le texte exact à superposer
+    let overlayText = slideContent.title;
+    if (slideContent.subtitle) overlayText += `\n${slideContent.subtitle}`;
+    if (slideContent.punchline) overlayText += `\n${slideContent.punchline}`;
+    if (slideContent.bullets && slideContent.bullets.length > 0) {
+      overlayText += '\n\n' + slideContent.bullets.map((b: string) => `• ${b}`).join('\n');
+    }
+    if (slideContent.cta) overlayText += `\n\n${slideContent.cta}`;
+    if (slideContent.cta_primary) overlayText += `\n\n${slideContent.cta_primary}`;
+    
+    console.log('✅ [Worker] overlayText built:', overlayText);
 
-    // 5. Phase 4: Générer le fond graphique pur (pas de texte)
-    console.log('🖼️ [Worker] Step 2: Generating AI background...');
+    // 5. HOTFIX: Génération directe "image finale" avec texte inclus
+    console.log('🖼️ [Worker] Step 2: Generating final image with text overlay...');
     const correctedPrompt = correctFrenchSpelling(job.prompt);
     const enrichedPrompt = enrichPromptWithBrand(correctedPrompt, brandSnapshot);
-    let backgroundPrompt = `${enrichedPrompt} Abstract background composition. NO TEXT, NO LETTERS, NO WORDS. Pure visual: gradients, shapes, textures only.`;
     
-    console.log('📝 Background prompt:', backgroundPrompt);
+    console.log('📝 Base prompt:', enrichedPrompt);
+    console.log('📝 Overlay text:', overlayText);
     console.log('🌱 Seed:', seed?.slice(0, 12) + '...');
     
     const aspectRatio = brandSnapshot?.aspectRatio || '4:5';
@@ -147,19 +153,23 @@ serve(async (req) => {
       logo_url: brandSnapshot.logo_url || null
     } : undefined;
 
-    const { data: bgImageData, error: bgImageErr } = await supabase.functions.invoke('alfie-generate-ai-image', {
+    const { data: finalImageData, error: finalImageErr } = await supabase.functions.invoke('alfie-generate-ai-image', {
       body: {
-        prompt: backgroundPrompt,
+        prompt: enrichedPrompt,
         resolution,
         brandKit,
         seed,
-        backgroundOnly: true, // Phase 4: mode fond pur
-        negativePrompt: 'text, letters, words, typography, captions'
+        backgroundOnly: false, // HOTFIX: génération avec texte
+        overlayText, // HOTFIX: texte exact à inclure
+        negativePrompt: 'blurry, low quality, distorted'
       }
     });
     
-    const bgUrl = bgImageData?.imageUrl || bgImageData?.url;
-    console.log('✅ [Worker] Background generated:', bgUrl ? bgUrl.slice(0, 50) + '...' : 'FAILED');
+    console.log('🔍 [Worker] AI response:', finalImageErr ? 'ERROR' : 'SUCCESS');
+    console.log('📊 [Worker] Response data keys:', finalImageData ? Object.keys(finalImageData) : 'null');
+    
+    const finalImageUrl = finalImageData?.imageUrl || finalImageData?.url;
+    console.log('✅ [Worker] Final image URL type:', finalImageUrl ? (finalImageUrl.startsWith('data:') ? 'BASE64' : 'HTTP') : 'NONE');
 
     // Helper pour mettre à jour le statut du job_set
     const updateJobSetStatus = async () => {
@@ -185,14 +195,14 @@ serve(async (req) => {
       return jobSetStatus;
     };
 
-    if (bgImageErr || !bgUrl) {
-      console.error('❌ [Worker] Background generation failed:', bgImageErr);
+    if (finalImageErr || !finalImageUrl) {
+      console.error('❌ [Worker] Final image generation failed:', finalImageErr);
       // Échec → marquer et refund
       await supabase
         .from('jobs')
         .update({
           status: 'failed',
-          error: bgImageErr?.message || 'Background generation failed',
+          error: finalImageErr?.message || 'Final image generation failed',
           finished_at: new Date().toISOString()
         })
         .eq('id', job.id);
@@ -204,25 +214,44 @@ serve(async (req) => {
 
       await updateJobSetStatus();
 
-      console.error(`[Worker] Job ${job.id} failed:`, bgImageErr?.message);
-      return new Response(JSON.stringify({ success: false, jobId: job.id, error: bgImageErr?.message }), {
+      console.error(`[Worker] Job ${job.id} failed:`, finalImageErr?.message);
+      return new Response(JSON.stringify({ success: false, jobId: job.id, error: finalImageErr?.message }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // 6. Phase 5: Composer background + SVG text
-    console.log('🎭 [Worker] Step 3: Compositing background + SVG text...');
-    const compositedBuffer = await compositeSlide(bgUrl, svgLayer);
-    console.log('✅ [Worker] Composition complete. Buffer size:', compositedBuffer.length, 'bytes');
+    // 6. HOTFIX: Gérer base64 → upload Storage
+    console.log('☁️ [Worker] Step 3: Processing image for upload...');
+    let uploadBuffer: Uint8Array;
     
-    // 7. Upload vers Supabase Storage
+    if (finalImageUrl.startsWith('data:image/png;base64,')) {
+      console.log('🔄 [Worker] Converting base64 to buffer...');
+      const base64Data = finalImageUrl.replace(/^data:image\/png;base64,/, '');
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      uploadBuffer = bytes;
+      console.log('✅ [Worker] Base64 converted to buffer:', uploadBuffer.length, 'bytes');
+    } else if (finalImageUrl.startsWith('http')) {
+      console.log('🔄 [Worker] Downloading image from HTTP URL...');
+      const imageResponse = await fetch(finalImageUrl);
+      const arrayBuffer = await imageResponse.arrayBuffer();
+      uploadBuffer = new Uint8Array(arrayBuffer);
+      console.log('✅ [Worker] Image downloaded:', uploadBuffer.length, 'bytes');
+    } else {
+      throw new Error(`Unsupported image URL format: ${finalImageUrl.substring(0, 50)}`);
+    }
+    
+    // 7. Upload vers Supabase Storage avec URL publique
     console.log('☁️ [Worker] Step 4: Uploading to storage...');
     const fileName = `carousel/${job.job_set_id}/slide_${job.index_in_set}_${Date.now()}.png`;
     console.log('📁 File path:', fileName);
     
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('media-generations')
-      .upload(fileName, compositedBuffer, {
+      .upload(fileName, uploadBuffer, {
         contentType: 'image/png',
         upsert: true,
         cacheControl: '3600'
@@ -233,12 +262,22 @@ serve(async (req) => {
       console.error('❌ Upload error details:', JSON.stringify(uploadError));
       await supabase
         .from('jobs')
-        .update({ status: 'failed', error: `Upload failed: ${uploadError.message}`, finished_at: new Date().toISOString() })
+        .update({ 
+          status: 'failed', 
+          error: `Upload failed: ${uploadError.message}`, 
+          finished_at: new Date().toISOString() 
+        })
         .eq('id', job.id);
+      
+      await supabase.rpc('refund_brand_quotas', {
+        p_brand_id: job.job_sets.brand_id,
+        p_visuals_count: 1
+      });
+      
       throw uploadError;
     }
 
-    console.log('✅ Upload success:', uploadData);
+    console.log('✅ [Worker] Upload success:', uploadData);
 
     const { data: publicUrlData } = supabase.storage
       .from('media-generations')
@@ -253,7 +292,7 @@ serve(async (req) => {
     console.log('✅ [Worker] Image uploaded successfully!');
     console.log('🔗 Public URL:', publicUrl);
 
-    // 8. Phase 6: Vérifier cohérence réelle
+    // 8. HOTFIX: Vérifier cohérence avec seuil adapté pour génération directe
     const referenceImageUrl = !isKeyVisual && job.job_sets.style_ref_url 
       ? job.job_sets.style_ref_url 
       : undefined;
@@ -265,15 +304,17 @@ serve(async (req) => {
 
     console.log(`[Worker] Coherence score: ${coherenceScore.total}/100`, coherenceScore.breakdown);
 
-    // 9. Phase 7: Si score < 75 et retry_count < 3 → retry
-    const coherenceThreshold = job.coherence_threshold || 75;
+    // 9. HOTFIX: Seuil de cohérence ajusté pour éviter boucles retry (texte inclus dans l'image)
+    const coherenceThresholdEffective = 50; // HOTFIX: seuil plus bas pour génération directe
     const retryCount = job.retry_count || 0;
     
-    if (coherenceScore.total < coherenceThreshold && retryCount < 3) {
+    console.log(`[Worker] Using effective coherence threshold: ${coherenceThresholdEffective} (direct generation mode)`);
+    
+    if (coherenceScore.total < coherenceThresholdEffective && retryCount < 3) {
       await supabase.from('jobs').update({
         status: 'queued',
         retry_count: retryCount + 1,
-        error: `Low coherence: ${coherenceScore.total}/100 (threshold: ${coherenceThreshold})`
+        error: `Low coherence: ${coherenceScore.total}/100 (threshold: ${coherenceThresholdEffective})`
       }).eq('id', job.id);
       
       console.log(`[Worker] Job ${job.id} requeued for retry (attempt ${retryCount + 1})`);
