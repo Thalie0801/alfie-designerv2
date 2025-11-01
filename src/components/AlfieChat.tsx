@@ -1069,7 +1069,7 @@ export function AlfieChat() {
 
           const { data: currentJobSet } = await supabase
             .from('job_sets')
-            .select('status, jobs(status, index_in_set, asset_id)')
+            .select('status, master_seed, style_ref_asset_id, jobs(status, index_in_set, asset_id)')
             .eq('id', jobSet.id)
             .single();
 
@@ -1089,17 +1089,30 @@ export function AlfieChat() {
             const alreadyAdded = messages.some(m => m.assetId === job.asset_id);
             if (alreadyAdded) continue;
 
-            // Récupérer l'asset séparément
+            // Récupérer l'asset avec metadata
             const { data: asset } = await supabase
               .from('media_generations')
-              .select('output_url')
+              .select('output_url, metadata')
               .eq('id', job.asset_id)
               .single();
 
             if (asset?.output_url) {
+              // Extraire info de cohérence (type cast car metadata est Json)
+              const metadata = asset.metadata as any;
+              const isKeyVisual = metadata?.role === 'key_visual';
+              const coherenceScore = metadata?.coherence_score?.total;
+              
+              let content = `Slide ${job.index_in_set + 1}/${slideCount}`;
+              if (isKeyVisual && currentJobSet.master_seed) {
+                content += ` 🎨 (Key Visual, Seed: ${currentJobSet.master_seed.slice(0, 8)}...)`;
+              }
+              if (coherenceScore) {
+                content += ` | Cohérence: ${coherenceScore}/100`;
+              }
+
               setMessages(prev => [...prev, {
                 role: 'assistant',
-                content: `Slide ${job.index_in_set + 1}/${slideCount}`,
+                content,
                 imageUrl: asset.output_url,
                 assetId: job.asset_id || undefined,
                 assetType: 'image' as const
@@ -1111,10 +1124,16 @@ export function AlfieChat() {
             clearInterval(pollInterval);
             setGenerationStatus(null);
 
-            // Proposer le téléchargement ZIP
+            // Message final avec info master_seed
+            let finalMessage = '🎉 Carrousel terminé !';
+            if (currentJobSet.master_seed) {
+              finalMessage += `\n🎨 Carrousel cohérent (Master Seed: ${currentJobSet.master_seed.slice(0, 8)}...)`;
+            }
+            finalMessage += '\nTélécharge le ZIP pour récupérer toutes les images d\'un coup.';
+
             setMessages(prev => [...prev, {
               role: 'assistant',
-              content: `🎉 Carrousel terminé ! Télécharge le ZIP pour récupérer toutes les images d'un coup.`
+              content: finalMessage
             }]);
 
             // Télécharger automatiquement le ZIP via fetch direct (binaire)

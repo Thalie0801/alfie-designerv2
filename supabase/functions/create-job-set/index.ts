@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { withIdempotency } from "../_shared/idempotency.ts";
 import { userHasAccess } from "../_shared/accessControl.ts";
 import { resolveBrandKit } from "../_shared/brandResolver.ts";
+import { generateMasterSeed } from "../_shared/seedGenerator.ts";
 
 function correctFrenchSpelling(text: string): string {
   const corrections: Record<string, string> = {
@@ -85,10 +86,27 @@ serve(async (req) => {
         throw new Error(quotaResult?.[0]?.reason || 'Quota reservation failed');
       }
 
-      // 2. Récupérer le Brand Kit (snapshot)
+      // 2. Générer le master seed pour la cohérence du carrousel
+      const masterSeed = generateMasterSeed();
+      console.log(`[create-job-set] Generated master_seed: ${masterSeed}`);
+
+      // 3. Récupérer le Brand Kit (snapshot)
       const brandSnapshot = await resolveBrandKit(brandId);
 
-      // 3. Appeler alfie-plan-carousel
+      // 4. Construire les contraintes de cohérence
+      const constraints = {
+        palette: [
+          brandSnapshot.primary_color,
+          brandSnapshot.secondary_color,
+          brandSnapshot.accent_color
+        ].filter(Boolean),
+        voice: brandSnapshot.voice || 'professional',
+        layout_hint: aspectRatio === '1:1' ? 'centered_composition' : 'vertical_hero',
+        contrast_min: 4.5, // WCAG AA
+        no_text: true
+      };
+
+      // 5. Appeler alfie-plan-carousel
       const { data: plan, error: planErr } = await supabase.functions.invoke('alfie-plan-carousel', {
         body: { prompt, brandKit: brandSnapshot, slideCount: normalizedCount }
       });
@@ -102,7 +120,7 @@ serve(async (req) => {
         throw new Error('Carousel planning failed');
       }
 
-      // 4. Créer le job_set
+      // 6. Créer le job_set avec master_seed et constraints
       const { data: newJobSet, error: jobSetErr } = await supabase
         .from('job_sets')
         .insert({
@@ -110,15 +128,22 @@ serve(async (req) => {
           brand_id: brandId,
           request_text: prompt,
           total: normalizedCount,
-          status: 'queued'
+          status: 'queued',
+          master_seed: masterSeed,
+          constraints: constraints
         })
         .select()
         .single();
 
       if (jobSetErr) throw jobSetErr;
 
-      // 5. Créer les N jobs avec correction orthographique et propagation de l'aspect
-      const brandSnapshotWithAspect = { ...brandSnapshot, aspectRatio };
+      // 7. Créer les N jobs avec correction orthographique, propagation de l'aspect, master_seed et role
+      const brandSnapshotWithAspect = { 
+        ...brandSnapshot, 
+        aspectRatio,
+        master_seed: masterSeed // Propager le master_seed au worker
+      };
+      
       const jobsData = plan.slides.slice(0, normalizedCount).map((slide: any, i: number) => {
         const rawPrompt = `${slide.title}. ${slide.subtitle || ''}`;
         const correctedPrompt = correctFrenchSpelling(rawPrompt);
@@ -128,6 +153,7 @@ serve(async (req) => {
           index_in_set: i,
           prompt: correctedPrompt,
           brand_snapshot: brandSnapshotWithAspect,
+          metadata: i === 0 ? { role: 'key_visual' } : { role: 'variant' }, // Marquer le premier comme référence
           status: 'queued'
         };
       });

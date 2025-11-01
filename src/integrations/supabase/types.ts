@@ -843,30 +843,39 @@ export type Database = {
       job_sets: {
         Row: {
           brand_id: string
+          constraints: Json | null
           created_at: string
           id: string
+          master_seed: string | null
           request_text: string
           status: string
+          style_ref_asset_id: string | null
           total: number
           updated_at: string
           user_id: string
         }
         Insert: {
           brand_id: string
+          constraints?: Json | null
           created_at?: string
           id?: string
+          master_seed?: string | null
           request_text: string
           status?: string
+          style_ref_asset_id?: string | null
           total: number
           updated_at?: string
           user_id: string
         }
         Update: {
           brand_id?: string
+          constraints?: Json | null
           created_at?: string
           id?: string
+          master_seed?: string | null
           request_text?: string
           status?: string
+          style_ref_asset_id?: string | null
           total?: number
           updated_at?: string
           user_id?: string
@@ -885,6 +894,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_brand_quota_current"
             referencedColumns: ["brand_id"]
+          },
+          {
+            foreignKeyName: "job_sets_style_ref_asset_id_fkey"
+            columns: ["style_ref_asset_id"]
+            isOneToOne: false
+            referencedRelation: "media_generations"
+            referencedColumns: ["id"]
           },
         ]
       }
