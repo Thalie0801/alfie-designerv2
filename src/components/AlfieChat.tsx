@@ -1107,21 +1107,8 @@ export function AlfieChat() {
   const handleCancelCarousel = async () => {
     if (!activeJobSetId) return;
     
-    try {
-      console.log('[CancelCarousel] Canceling job_set:', activeJobSetId);
-      const { data, error } = await supabase.functions.invoke('cancel-job-set', {
-        body: { jobSetId: activeJobSetId }
-      });
-      
-      if (error) {
-        console.error('[CancelCarousel] Error:', error);
-        toast.error(`Impossible d'annuler: ${error.message || 'Erreur réseau. Vérifie que la fonction cancel-job-set est déployée.'}`);
-        return;
-      }
-      
-      console.log('[CancelCarousel] Success:', data);
-      toast.success(`Génération annulée (${data?.canceledJobs || 0} jobs annulés, ${data?.refundedVisuals || 0} visuels remboursés)`);
-      
+    // FILET DE SÉCURITÉ: Fonction de nettoyage UI réutilisable
+    const cleanupUI = () => {
       // Stop pumping
       if (pumpRef.current) {
         clearInterval(pumpRef.current);
@@ -1136,24 +1123,43 @@ export function AlfieChat() {
       
       // Refresh carousel to update UI
       refreshCarousel();
+    };
+    
+    try {
+      console.log('[CancelCarousel] Canceling job_set:', activeJobSetId);
+      const { data, error } = await supabase.functions.invoke('cancel-job-set', {
+        body: { jobSetId: activeJobSetId }
+      });
       
-      // Add assistant message
+      if (error) {
+        console.error('[CancelCarousel] Backend error:', error);
+        // Nettoyer l'UI même si le backend échoue
+        cleanupUI();
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: '⚠️ Carrousel annulé localement (impossible de contacter le backend). Les jobs peuvent continuer en arrière-plan.'
+        }]);
+        toast.error(`Annulé localement (backend: ${error.message})`);
+        return;
+      }
+      
+      console.log('[CancelCarousel] Backend success:', data);
+      cleanupUI();
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: '❌ Carrousel annulé par l\'utilisateur. Les visuels restants ont été remboursés.'
+        content: `✅ Carrousel annulé. ${data?.canceledJobs || 0} jobs annulés, ${data?.refundedVisuals || 0} visuels remboursés.`
       }]);
+      toast.success(`Génération annulée (${data?.canceledJobs || 0} jobs, ${data?.refundedVisuals || 0} visuels remboursés)`);
       
-      // Persist message to DB if we have a conversation
-      if (conversationId) {
-        await supabase.from('alfie_messages').insert({
-          conversation_id: conversationId,
-          role: 'assistant',
-          content: '❌ Carrousel annulé par l\'utilisateur. Les visuels restants ont été remboursés.'
-        });
-      }
-    } catch (error: any) {
-      console.error('[CancelCarousel] Exception:', error);
-      toast.error(`Erreur: ${error.message}`);
+    } catch (err: any) {
+      console.error('[CancelCarousel] Exception:', err);
+      // Nettoyer l'UI même en cas d'exception
+      cleanupUI();
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: '⚠️ Carrousel annulé localement (erreur réseau). Les jobs peuvent continuer en arrière-plan.'
+      }]);
+      toast.error('Annulé localement (impossible de contacter le backend)');
     }
   };
 
