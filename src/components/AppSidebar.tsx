@@ -37,7 +37,7 @@ export function AppSidebar() {
   const { open, isMobile } = useSidebar();
   const location = useLocation();
   const { user, profile, isAdmin, signOut, roles } = useAuth();
-  const { flags } = useFeatureFlags();
+  const { flags, loading: flagsLoading } = useFeatureFlags();
   const canSeeAdminToggle = user?.email ? ['nathaliestaelens@gmail.com','staelensnathalie@gmail.com'].includes(user.email) : false;
 
   // Removed automatic sidebar toggle on route changes to prevent menu disappearing bug
@@ -61,7 +61,7 @@ export function AppSidebar() {
   ];
 
   // Ajouter "Créer" uniquement si autorisé (VIP/Admin)
-  const navItems = canUseFeature('new_generator', { roles }, flags)
+  const navItems = (!flagsLoading && canUseFeature('new_generator', { roles, plan: profile?.plan }, flags))
     ? [
         baseNavItems[0], // Chat Alfie
         { path: '/app', label: 'Créer', icon: Sparkles }, // Créateur (VIP/Admin only)

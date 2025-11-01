@@ -36,8 +36,8 @@ import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 const queryClient = new QueryClient();
 
 const AppRoutes = () => {
-  const { roles } = useAuth();
-  const { flags } = useFeatureFlags();
+  const { roles, profile } = useAuth();
+  const { flags, loading: flagsLoading } = useFeatureFlags();
   
   return (
     <Routes>
@@ -71,7 +71,7 @@ const AppRoutes = () => {
           <Route
             path="/app"
             element={
-              canUseFeature('new_generator', { roles }, flags) ? (
+              !flagsLoading && canUseFeature('new_generator', { roles, plan: profile?.plan }, flags) ? (
                 <ProtectedRoute>
                   <AppLayoutWithSidebar>
                     <Creator />

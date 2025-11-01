@@ -84,7 +84,19 @@ export function canUseFeature(
 ): boolean {
   // Bypass total pour VIP/Admin
   const roles = new Set(user?.roles ?? []);
-  if (roles.has('admin') || roles.has('vip')) {
+  const willBypass = roles.has('admin') || roles.has('vip');
+  
+  console.log('[canUseFeature] Check:', {
+    feature,
+    roles: Array.from(roles),
+    plan: user?.plan,
+    hasAdmin: roles.has('admin'),
+    hasVip: roles.has('vip'),
+    willBypass,
+    flags: flags?.[feature]
+  });
+  
+  if (willBypass) {
     return true;
   }
 
