@@ -18,7 +18,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // 1. Récupérer 1 job en attente (FIFO)
+    // 1. Récupérer 1 job en attente (FIFO) et le verrouiller atomiquement
     const { data: job, error: jobErr } = await supabase
       .from('jobs')
       .select('*, job_sets!inner(brand_id, user_id)')
@@ -35,11 +35,22 @@ serve(async (req) => {
 
     console.log(`[Worker] Processing job ${job.id} (index: ${job.index_in_set})`);
 
-    // 2. Marquer comme "running"
-    await supabase
+    // 2. Marquer comme "running" ATOMIQUEMENT (seulement si encore queued)
+    const { data: lockedJob, error: lockErr } = await supabase
       .from('jobs')
       .update({ status: 'running', started_at: new Date().toISOString() })
-      .eq('id', job.id);
+      .eq('id', job.id)
+      .eq('status', 'queued') // CRITIQUE: ne mettre à jour que si toujours queued
+      .select()
+      .maybeSingle();
+
+    // Si le job a déjà été pris par un autre worker, on arrête
+    if (lockErr || !lockedJob) {
+      console.log(`[Worker] Job ${job.id} already taken by another worker, skipping`);
+      return new Response(JSON.stringify({ message: 'Job already taken' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     // 3. Enrichir le prompt avec Brand Kit
     const brandSnapshot = job.brand_snapshot;
