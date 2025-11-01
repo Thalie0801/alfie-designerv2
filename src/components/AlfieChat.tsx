@@ -221,7 +221,7 @@ export function AlfieChat() {
           // Charger les messages existants
           const { data: msgs } = await supabase
             .from('alfie_messages')
-            .select('role, content, image_url, video_url, created_at')
+            .select('role, content, image_url, video_url, created_at, asset_id, asset_type, output_url, expires_at, engine, woofs_consumed')
             .eq('conversation_id', convId)
             .order('created_at', { ascending: true });
           if (msgs && msgs.length > 0) {
@@ -230,7 +230,13 @@ export function AlfieChat() {
               content: m.content, 
               imageUrl: m.image_url,
               videoUrl: m.video_url,
-              created_at: m.created_at 
+              created_at: m.created_at,
+              assetId: m.asset_id,
+              assetType: m.asset_type as 'image' | 'video' | undefined,
+              outputUrl: m.output_url,
+              expiresAt: m.expires_at,
+              engine: m.engine,
+              woofsConsumed: m.woofs_consumed
             })));
           }
         }
@@ -501,7 +507,12 @@ export function AlfieChat() {
               role: 'assistant',
               content: imageMessage.content,
               image_url: insertedAsset.output_url,
-              asset_id: insertedAsset.id
+              asset_id: insertedAsset.id,
+              asset_type: 'image',
+              output_url: insertedAsset.output_url,
+              expires_at: imageMessage.expiresAt,
+              engine: imageMessage.engine,
+              woofs_consumed: imageMessage.woofsConsumed
             });
           }
           
@@ -1532,6 +1543,22 @@ export function AlfieChat() {
                       woofsConsumed={message.woofsConsumed}
                       onOpenInLibrary={() => navigate('/library')}
                     />
+                  </div>
+                );
+              }
+
+              // Fallback pour anciens messages avec imageUrl uniquement
+              if (message.imageUrl && !message.assetId) {
+                return (
+                  <div key={`legacy-${index}`} className="flex justify-start animate-fade-in">
+                    <div className="max-w-md space-y-2">
+                      <img 
+                        src={message.imageUrl} 
+                        alt="Generated content" 
+                        className="rounded-lg shadow-lg w-full"
+                      />
+                      <p className="text-xs text-muted-foreground">Ancien format</p>
+                    </div>
                   </div>
                 );
               }

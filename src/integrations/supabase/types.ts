@@ -291,33 +291,58 @@ export type Database = {
       }
       alfie_messages: {
         Row: {
+          asset_id: string | null
+          asset_type: string | null
           content: string
           conversation_id: string
           created_at: string
+          engine: string | null
+          expires_at: string | null
           id: string
           image_url: string | null
+          output_url: string | null
           role: string
           video_url: string | null
+          woofs_consumed: number | null
         }
         Insert: {
+          asset_id?: string | null
+          asset_type?: string | null
           content: string
           conversation_id: string
           created_at?: string
+          engine?: string | null
+          expires_at?: string | null
           id?: string
           image_url?: string | null
+          output_url?: string | null
           role: string
           video_url?: string | null
+          woofs_consumed?: number | null
         }
         Update: {
+          asset_id?: string | null
+          asset_type?: string | null
           content?: string
           conversation_id?: string
           created_at?: string
+          engine?: string | null
+          expires_at?: string | null
           id?: string
           image_url?: string | null
+          output_url?: string | null
           role?: string
           video_url?: string | null
+          woofs_consumed?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "alfie_messages_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "media_generations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "alfie_messages_conversation_id_fkey"
             columns: ["conversation_id"]
