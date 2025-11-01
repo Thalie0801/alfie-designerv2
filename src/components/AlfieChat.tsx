@@ -128,7 +128,7 @@ export function AlfieChat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeJobSetId, setActiveJobSetId] = useState<string>('');
   const [carouselTotal, setCarouselTotal] = useState(0);
-  const { items: carouselItems, done: carouselDone } = useCarouselSubscription(activeJobSetId, carouselTotal);
+  const { items: carouselItems, done: carouselDone, refresh: refreshCarousel } = useCarouselSubscription(activeJobSetId, carouselTotal);
   const { brandKit, activeBrandId } = useBrandKit();
   const { totalCredits, decrementCredits, hasCredits, incrementGenerations } = useAlfieCredits();
   const { searchTemplates } = useTemplateLibrary();
@@ -151,10 +151,10 @@ export function AlfieChat() {
         clearInterval(pumpRef.current);
         pumpRef.current = null;
       }
-      // Success toast only once when reaching completion
-      if (carouselTotal > 0) {
-        toast.success('Carrousel terminé !');
-      }
+      // Nettoyer localStorage quand le carrousel est terminé
+      localStorage.removeItem('activeJobSetId');
+      localStorage.removeItem('carouselTotal');
+      toast.success(`🎉 Carrousel terminé ! ${carouselTotal} slides générées`);
     }
   }, [carouselDone, carouselTotal, activeJobSetId]);
   useEffect(() => {
@@ -236,6 +236,46 @@ export function AlfieChat() {
 
     init();
   }, []);
+
+  // Restaurer le job set actif depuis localStorage (refresh/navigation)
+  useEffect(() => {
+    if (!loaded || activeJobSetId) return;
+    
+    // Tenter de restaurer le job set actif depuis localStorage
+    const savedJobSetId = localStorage.getItem('activeJobSetId');
+    const savedTotal = localStorage.getItem('carouselTotal');
+    
+    if (savedJobSetId && savedTotal) {
+      console.log('[Carousel] Restoring from localStorage:', savedJobSetId);
+      setActiveJobSetId(savedJobSetId);
+      setCarouselTotal(parseInt(savedTotal, 10));
+      // Refresh immédiat pour charger les images
+      setTimeout(() => refreshCarousel(), 200);
+    } else if (activeBrandId) {
+      // Fallback: chercher le dernier job_set en cours pour cette marque
+      const fetchLastJobSet = async () => {
+        const { data } = await supabase
+          .from('job_sets')
+          .select('id, total, status')
+          .eq('brand_id', activeBrandId)
+          .in('status', ['queued', 'running', 'partial'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (data) {
+          console.log('[Carousel] Found active job_set:', data.id);
+          setActiveJobSetId(data.id);
+          setCarouselTotal(data.total || 0);
+          localStorage.setItem('activeJobSetId', data.id);
+          localStorage.setItem('carouselTotal', (data.total || 0).toString());
+          setTimeout(() => refreshCarousel(), 200);
+        }
+      };
+      
+      fetchLastJobSet();
+    }
+  }, [loaded, activeJobSetId, activeBrandId, refreshCarousel]);
 
   // Scroll automatique avec scrollIntoView
   useEffect(() => {
@@ -1201,9 +1241,17 @@ export function AlfieChat() {
         // 3. Activer le hook en définissant jobSetId et total
         setActiveJobSetId(jobSet.jobSetId);
         setCarouselTotal(slideCount);
+        
+        // Persister dans localStorage pour restauration après refresh
+        localStorage.setItem('activeJobSetId', jobSet.jobSetId);
+        localStorage.setItem('carouselTotal', slideCount.toString());
+        
         setGenerationStatus(null);
 
-        // 4. Déclencher le premier worker + pompe
+        // 4. Refresh immédiat pour charger les assets existants (si déjà générés)
+        setTimeout(() => refreshCarousel(), 100);
+
+        // 5. Déclencher le premier worker + pompe
         console.log('[Carousel] Triggering initial worker...');
         await triggerWorker();
         pumpWorker(slideCount);
@@ -1286,6 +1334,14 @@ export function AlfieChat() {
   };
 
   const isTextareaDisabled = isLoading || !loaded;
+
+  // Logs de diagnostic
+  console.log('[Carousel Debug]', {
+    activeJobSetId,
+    carouselTotal,
+    carouselDone,
+    itemsCount: carouselItems.length
+  });
 
   const handleDownload = (url: string, type: 'image' | 'video') => {
     if (!url) return;
@@ -1372,7 +1428,12 @@ export function AlfieChat() {
                       toast.error('Erreur lors du téléchargement du ZIP');
                     }
                   }}
-                  onRetry={() => pumpWorker(carouselTotal)}
+                  onRetry={async () => {
+                    console.log('[Carousel] Manual retry triggered');
+                    await triggerWorker();
+                    refreshCarousel();
+                    pumpWorker(carouselTotal);
+                  }}
                 />
               </div>
             )}

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
@@ -8,41 +8,61 @@ export interface CarouselItem {
   index: number;
 }
 
+// Helper pour construire l'URL publique de manière robuste via l'API Supabase
+function makePublicUrlRobust(storageKey: string): string {
+  const bucket = 'media-generations';
+  
+  // Normaliser le chemin (retirer le préfixe bucket s'il existe)
+  let path = storageKey;
+  if (path.startsWith(`${bucket}/`)) {
+    path = path.replace(`${bucket}/`, '');
+  }
+  
+  // Utiliser l'API officielle
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  return data.publicUrl;
+}
+
 export function useCarouselSubscription(jobSetId: string, total: number) {
   const [items, setItems] = useState<CarouselItem[]>([]);
   const [done, setDone] = useState(0);
   const channelRef = useRef<RealtimeChannel | null>(null);
 
+  // 1️⃣ Fonction de chargement des assets existants (extractée pour être réutilisable)
+  const loadExistingAssets = useCallback(async () => {
+    if (!jobSetId) return;
+    
+    const { data, error } = await supabase
+      .from('assets')
+      .select('id, index_in_set, storage_key, meta')
+      .eq('job_set_id', jobSetId)
+      .order('index_in_set', { ascending: true });
+
+    if (error) {
+      console.error('[Carousel] Failed to load existing assets:', error);
+      return;
+    }
+
+    if (data && data.length > 0) {
+      const mapped: CarouselItem[] = data.map(row => {
+        const meta = row.meta as { public_url?: string } | null;
+        // Priorité à meta.public_url, sinon utiliser l'API robuste
+        const url = meta?.public_url || makePublicUrlRobust(row.storage_key);
+        return {
+          id: row.id,
+          index: row.index_in_set ?? 0,
+          url
+        };
+      });
+      setItems(mapped);
+      setDone(mapped.length);
+    }
+  }, [jobSetId]);
+
   useEffect(() => {
     if (!jobSetId) return;
 
-    // 1️⃣ Charger les assets existants (page refresh)
-    const loadExistingAssets = async () => {
-      const { data, error } = await supabase
-        .from('assets')
-        .select('id, index_in_set, storage_key, meta')
-        .eq('job_set_id', jobSetId)
-        .order('index_in_set', { ascending: true });
-
-      if (error) {
-        console.error('[Carousel] Failed to load existing assets:', error);
-        return;
-      }
-
-      if (data && data.length > 0) {
-        const mapped: CarouselItem[] = data.map(row => {
-          const meta = row.meta as { public_url?: string } | null;
-          return {
-            id: row.id,
-            index: row.index_in_set ?? 0,
-            url: meta?.public_url || makePublicUrl(row.storage_key)
-          };
-        });
-        setItems(mapped);
-        setDone(mapped.length);
-      }
-    };
-
+    // Charger les assets existants au montage
     loadExistingAssets();
 
     // 2️⃣ S'abonner au Realtime
@@ -62,7 +82,7 @@ export function useCarouselSubscription(jobSetId: string, total: number) {
           const newItem: CarouselItem = {
             id: newAsset.id,
             index: newAsset.index_in_set ?? 0,
-            url: meta?.public_url || makePublicUrl(newAsset.storage_key)
+            url: meta?.public_url || makePublicUrlRobust(newAsset.storage_key)
           };
 
           setItems(prev => {
@@ -88,21 +108,7 @@ export function useCarouselSubscription(jobSetId: string, total: number) {
         channelRef.current = null;
       }
     };
-  }, [jobSetId]);
+  }, [jobSetId, loadExistingAssets]);
 
-  return { items, done, total };
-}
-
-// Helper pour construire l'URL publique depuis storage_key
-function makePublicUrl(storageKey: string): string {
-  const bucket = 'media-generations';
-  const baseUrl = import.meta.env.VITE_SUPABASE_URL;
-  
-  if (storageKey?.startsWith(`${bucket}/`)) {
-    const path = storageKey.replace(`${bucket}/`, '');
-    return `${baseUrl}/storage/v1/object/public/${bucket}/${path}`;
-  }
-  
-  // Fallback
-  return `${baseUrl}/storage/v1/object/public/${bucket}/${storageKey}`;
+  return { items, done, total, refresh: loadExistingAssets };
 }
