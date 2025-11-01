@@ -545,8 +545,42 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('[Worker] Error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error('[Worker] Critical error:', error);
+    console.error('[Worker] Error stack:', error.stack);
+    
+    // Tenter de marquer le job comme failed si on a un job ID
+    try {
+      // Extraire le job ID du contexte si possible
+      const url = new URL(req.url);
+      const jobId = url.searchParams.get('job_id');
+      
+      if (jobId) {
+        console.log(`[Worker] Marking job ${jobId} as failed due to critical error`);
+        
+        const supabase = createClient(
+          Deno.env.get('SUPABASE_URL')!,
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        );
+        
+        await supabase
+          .from('jobs')
+          .update({
+            status: 'failed',
+            error: `Critical worker error: ${error.message}`,
+            finished_at: new Date().toISOString()
+          })
+          .eq('id', jobId);
+        
+        console.log(`[Worker] Job ${jobId} marked as failed`);
+      }
+    } catch (cleanupErr) {
+      console.error('[Worker] Failed to mark job as failed:', cleanupErr);
+    }
+    
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      stack: error.stack 
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

@@ -155,3 +155,6 @@ verify_jwt = false
 
 [functions.download-job-set-zip]
 verify_jwt = true
+
+[functions.cleanup-stuck-jobs]
+verify_jwt = false

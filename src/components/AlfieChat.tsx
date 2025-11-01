@@ -1428,12 +1428,33 @@ export function AlfieChat() {
                       toast.error('Erreur lors du téléchargement du ZIP');
                     }
                   }}
-                  onRetry={async () => {
-                    console.log('[Carousel] Manual retry triggered');
-                    await triggerWorker();
-                    refreshCarousel();
-                    pumpWorker(carouselTotal);
-                  }}
+            onRetry={async () => {
+              console.log('[Carousel] Manual retry triggered');
+              
+              // Réinitialiser les jobs bloqués en "running"
+              const { error: resetErr } = await supabase
+                .from('jobs')
+                .update({ 
+                  status: 'queued', 
+                  started_at: null
+                })
+                .eq('job_set_id', activeJobSetId)
+                .eq('status', 'running');
+              
+              if (resetErr) {
+                console.error('[Carousel] Failed to reset stuck jobs:', resetErr);
+                toast.error('Erreur lors de la réinitialisation des jobs bloqués');
+                return;
+              }
+              
+              console.log('[Carousel] Stuck jobs reset to queued');
+              toast.success('Traitement relancé ! 🔄');
+              
+              // Relancer le worker et rafraîchir
+              await triggerWorker();
+              refreshCarousel();
+              pumpWorker(carouselTotal);
+            }}
                 />
               </div>
             )}
