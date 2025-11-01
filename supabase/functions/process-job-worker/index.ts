@@ -125,12 +125,14 @@ serve(async (req) => {
       const base = toHash(masterSeedStr);
       if (isKeyVisual) {
         seed = base.toString(); // Image #0 = seed maître (numérique)
-        console.log(`[Worker] Generating KEY VISUAL with master seed ${seed.slice(0, 12)}...`);
+        console.log(`[Worker] Generating KEY VISUAL with master seed ${seed?.slice(0, 12) || 'none'}...`);
       } else {
         const derived = base + (BigInt(job.index_in_set) * 982451653n);
         seed = derived.toString();
-        console.log(`[Worker] Generating VARIANT #${job.index_in_set} with derived seed ${seed.slice(0, 12)}...`);
+        console.log(`[Worker] Generating VARIANT #${job.index_in_set} with derived seed ${seed?.slice(0, 12) || 'none'}...`);
       }
+    } else {
+      console.log(`[Worker] No master seed available, generating without seed control`);
     }
 
     // 4. HOTFIX: Construire overlayText simple à partir des métadonnées
@@ -234,7 +236,8 @@ serve(async (req) => {
     // Log AI payload for debugging
     if (finalImageData) {
       console.log('📦 [Worker] AI response keys:', Object.keys(finalImageData));
-      console.log('📦 [Worker] AI payload preview:', JSON.stringify(finalImageData).slice(0, 500));
+      const dataStr = JSON.stringify(finalImageData);
+      console.log('📦 [Worker] AI payload preview:', dataStr ? dataStr.slice(0, 500) : 'null');
     }
 
     // Helper pour mettre à jour le statut du job_set
@@ -297,8 +300,9 @@ serve(async (req) => {
       if (!picked) {
         console.error('❌ [Worker] Could not extract image. Available keys:', 
                       finalImageData ? Object.keys(finalImageData) : 'null');
+        const dataStr = finalImageData ? JSON.stringify(finalImageData) : 'null';
         console.error('📦 [Worker] Full payload (first 500 chars):', 
-                      JSON.stringify(finalImageData).slice(0, 500));
+                      dataStr && typeof dataStr === 'string' ? dataStr.slice(0, 500) : dataStr);
       } else {
         console.error('❌ [Worker] Final image generation failed:', finalImageErr);
       }
