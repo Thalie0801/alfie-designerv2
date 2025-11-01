@@ -716,6 +716,67 @@ export function AlfieChat() {
           return { error: error.message || "Erreur de préparation du package" };
         }
       }
+
+      case 'create_carousel': {
+        try {
+          const { prompt, count = 5, aspect_ratio = '1:1' } = args;
+          
+          if (!activeBrandId) {
+            return { error: "Aucune marque active. Crée d'abord un Brand Kit !" };
+          }
+          
+          const quotaStatus = await getQuotaStatus(activeBrandId);
+          const remaining = quotaStatus ? quotaStatus.visuals.limit - quotaStatus.visuals.used : 0;
+          if (!quotaStatus || remaining < count) {
+            return { 
+              error: `Quota insuffisant. Il te reste ${remaining} visuels, mais tu demandes ${count} slides.` 
+            };
+          }
+          
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `🎨 Création d'un carrousel de ${count} slides en cours...\n\nCela va consommer ${count} visuels de ton quota.`
+          }]);
+          
+          const { data, error } = await supabase.functions.invoke('chat-create-carousel', {
+            body: {
+              brandId: activeBrandId,
+              threadId: conversationId,
+              prompt,
+              count,
+              aspectRatio: aspect_ratio
+            },
+            headers: {
+              'x-idempotency-key': crypto.randomUUID()
+            }
+          });
+          
+          if (error) {
+            console.error('[create_carousel] Error:', error);
+            throw new Error(error.message || 'Erreur création carrousel');
+          }
+          
+          if (!data?.jobSetId) {
+            throw new Error('Aucun jobSetId retourné');
+          }
+          
+          setActiveJobSetId(data.jobSetId);
+          setCarouselTotal(count);
+          
+          await triggerWorker();
+          
+          return {
+            success: true,
+            jobSetId: data.jobSetId,
+            total: count,
+            message: `Carrousel lancé ! Suivi en temps réel ci-dessous. ⏳`
+          };
+        } catch (error: any) {
+          console.error('[create_carousel] Error:', error);
+          toast.error(`Erreur carrousel: ${error.message}`);
+          return { error: error.message || "Erreur création carrousel" };
+        }
+      }
       
       default:
         return { error: "Tool not found" };

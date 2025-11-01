@@ -181,8 +181,12 @@ Chaque réponse doit suivre :
   💰 Coût : "Coût : 5 visuels (quota marque) + 5 crédits IA"
 
 3️⃣ CARROUSELS
-Propose toujours 2 options claires :
-"Draft (5×1200×628) ou recyclage templates Canva ?"
+Quand l'utilisateur demande un carrousel :
+- Demande combien de slides (recommandé : 5-10)
+- Propose le format : carré 1:1 (Instagram post) ou portrait 4:5 (feed)
+- Appelle create_carousel avec le prompt en anglais
+- Coût = N visuels (1 par slide)
+Exemple : "Je te crée un carrousel de 5 slides en 1:1 pour Instagram. Ça consommera 5 visuels. C'est OK ?"
 
 4️⃣ ERREURS
 Message clair + bouton d'action mentale "Réessayer"
@@ -371,6 +375,34 @@ Template Canva :
               asset_ids: { type: "array", items: { type: "string" }, description: "Asset IDs to include in package (optional, all if empty)" },
               filter_type: { type: "string", description: "Filter by type: 'images', 'videos', or 'all' (default)" }
             }
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "create_carousel",
+          description: "Create a carousel of multiple images for Instagram/LinkedIn. Each slide respects Brand Kit. Cost: N visuals (1 per slide).",
+          parameters: {
+            type: "object",
+            properties: {
+              prompt: { 
+                type: "string", 
+                description: "Main theme/subject for the carousel (in English for best quality)" 
+              },
+              count: { 
+                type: "number", 
+                description: "Number of slides to generate (recommended: 5-10)",
+                minimum: 2,
+                maximum: 10
+              },
+              aspect_ratio: {
+                type: "string",
+                description: "Aspect ratio for carousel slides (default: 1:1 for Instagram, 4:5 for feed)",
+                enum: ["1:1", "4:5"]
+              }
+            },
+            required: ["prompt", "count"]
           }
         }
       }
