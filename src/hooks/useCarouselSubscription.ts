@@ -28,6 +28,13 @@ export function useCarouselSubscription(jobSetId: string, total: number) {
   const [done, setDone] = useState(0);
   const channelRef = useRef<RealtimeChannel | null>(null);
 
+  // 🔄 RÉINITIALISER quand jobSetId change
+  useEffect(() => {
+    console.log('[Carousel] jobSetId changed:', jobSetId);
+    setItems([]);
+    setDone(0);
+  }, [jobSetId]);
+
   // 1️⃣ Fonction de chargement des assets existants (extractée pour être réutilisable)
   const loadExistingAssets = useCallback(async () => {
     if (!jobSetId) return;

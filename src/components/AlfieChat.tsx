@@ -160,10 +160,14 @@ export function AlfieChat() {
         clearInterval(pumpRef.current);
         pumpRef.current = null;
       }
-      // Nettoyer localStorage quand le carrousel est terminé
+      // ✅ Nettoyer localStorage ET afficher le toast
       localStorage.removeItem('activeJobSetId');
       localStorage.removeItem('carouselTotal');
+      
       toast.success(`🎉 Carrousel terminé ! ${carouselTotal} slides générées`);
+      
+      // ⚠️ NE PAS réinitialiser activeJobSetId/carouselTotal ici
+      // pour permettre l'affichage du carrousel terminé
     }
   }, [carouselDone, carouselTotal, activeJobSetId]);
   useEffect(() => {
@@ -853,8 +857,22 @@ export function AlfieChat() {
             throw new Error('Aucun jobSetId retourné');
           }
           
-          setActiveJobSetId(data.jobSetId);
-          setCarouselTotal(count);
+          console.log('[Carousel] New jobSetId:', data.jobSetId);
+          
+          // ✅ Nettoyer l'ancien carrousel d'abord
+          setActiveJobSetId('');
+          setCarouselTotal(0);
+          
+          // ⏳ Puis après un court délai, charger le nouveau
+          setTimeout(() => {
+            setActiveJobSetId(data.jobSetId);
+            setCarouselTotal(count);
+            localStorage.setItem('activeJobSetId', data.jobSetId);
+            localStorage.setItem('carouselTotal', count.toString());
+            
+            // ⚡ Forcer le refresh immédiat
+            setTimeout(() => refreshCarousel(), 200);
+          }, 100);
           
           await triggerWorker();
           pumpWorker(count);

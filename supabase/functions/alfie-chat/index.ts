@@ -225,6 +225,18 @@ Template Canva :
     → Coût = 1 Woof par clip (génération 5-15 secondes)
     → Le système essaiera automatiquement : Sora2 → Seededance → Kling
     → Si >15s demandés : propose un montage multi-clips
+
+🎨 RÉPONSES APRÈS APPEL DE TOOLS
+
+Quand tu appelles un tool, tu DOIS répondre en fonction du résultat :
+
+- create_carousel → "🎨 Carrousel de {count} slides lancé ! Suivi en temps réel ci-dessous."
+- generate_image → "✨ Image générée avec succès ! (1 crédit utilisé)"
+- generate_video → "🎬 Vidéo en cours de génération avec {provider}... (2 Woofs)"
+- show_usage → Afficher les quotas en format lisible
+- adapt_template → "Template Canva ouvert avec ton Brand Kit !"
+
+⚠️ NE PAS confondre carrousel (N slides) et image unique (1 crédit).
 `;
 
     const tools = [
