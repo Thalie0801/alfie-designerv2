@@ -194,23 +194,93 @@ serve(async (req) => {
       console.warn(`[CreateCarousel] Plan generation error:`, planError);
     }
 
-    // 5.5) Si le plan a échoué, utiliser une structure de base
+    // 5.5) Si le plan a échoué, utiliser une structure cohérente et complète
     if (!carouselPlan || !carouselPlan.slides) {
-      console.warn(`[CreateCarousel] Using fallback slide structure`);
+      console.warn(`[CreateCarousel] Using coherent fallback slide structure`);
+      const fallbackGlobals = {
+        audience: "Directeurs Marketing & studios internes",
+        promise: "Des visuels toujours on-brand, plus vite.",
+        cta: "Essayer Alfie",
+        terminology: ["cohérence de marque", "variantes", "workflows"],
+        banned: ["révolutionnaire", "magique", "illimité"]
+      };
+      
       carouselPlan = {
-        globals: {
-          audience: "Directeurs Marketing & studios internes",
-          promise: "Des visuels toujours on-brand, plus vite.",
-          cta: "Rejoindre l'accès anticipé",
-          terminology: [],
-          banned: []
-        },
-        slides: Array(count).fill(null).map((_, i) => ({
+        globals: fallbackGlobals,
+        slides: count === 5 ? [
+          {
+            type: 'hero',
+            title: 'Créez des visuels cohérents',
+            subtitle: 'L\'IA qui garde vos créations on-brand',
+            punchline: 'Cohérence garantie',
+            badge: 'Cohérence 95/100',
+            cta_primary: fallbackGlobals.cta
+          },
+          {
+            type: 'problem',
+            title: 'Le défi de la cohérence',
+            bullets: [
+              'Visuels incohérents',
+              'Validations manuelles',
+              'Marque diluée'
+            ]
+          },
+          {
+            type: 'solution',
+            title: fallbackGlobals.promise,
+            bullets: [
+              'IA garde-fous',
+              'Variantes cohérentes',
+              'Workflows accélérés'
+            ]
+          },
+          {
+            type: 'impact',
+            title: 'Résultats mesurables',
+            kpis: [
+              { label: 'Cohérence', delta: '+92%' },
+              { label: 'Temps', delta: '-60%' },
+              { label: 'Production', delta: '×3' }
+            ]
+          },
+          {
+            type: 'cta',
+            title: 'Prêt à essayer ?',
+            subtitle: 'Rejoignez les équipes créatives',
+            cta_primary: fallbackGlobals.cta,
+            cta_secondary: 'En savoir plus',
+            note: 'Accès anticipé disponible pour studios et équipes marketing'
+          }
+        ] : count === 3 ? [
+          {
+            type: 'hero',
+            title: 'Visuels cohérents',
+            subtitle: fallbackGlobals.promise,
+            cta_primary: fallbackGlobals.cta
+          },
+          {
+            type: 'solution',
+            title: 'Solution complète',
+            bullets: [
+              'Cohérence garantie',
+              'Créations rapides',
+              'Workflows simples'
+            ]
+          },
+          {
+            type: 'cta',
+            title: fallbackGlobals.cta,
+            cta_primary: fallbackGlobals.cta,
+            note: 'Accès anticipé disponible'
+          }
+        ] : Array(count).fill(null).map((_, i) => ({
           type: i === 0 ? 'hero' : 'variant',
-          title: `Slide ${i + 1}`,
-          subtitle: prompt.slice(0, 60),
+          title: i === 0 ? 'Créez avec cohérence' : prompt.slice(0, 40),
+          subtitle: i === 0 ? fallbackGlobals.promise : prompt.slice(0, 60)
         })),
-        captions: []
+        captions: Array(Math.min(count, 3)).fill('').map((_, i) => 
+          `Post ${i + 1}: ${prompt.slice(0, 80)}... #coherence`
+        )
       };
     }
 

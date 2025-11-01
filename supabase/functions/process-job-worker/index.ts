@@ -4,6 +4,8 @@ import { enrichPromptWithBrand } from "../_shared/brandResolver.ts";
 import { deriveSeed } from "../_shared/seedGenerator.ts";
 import { checkCoherence } from "../_shared/coherenceChecker.ts";
 import { SLIDE_TEMPLATES } from "../_shared/slideTemplates.ts";
+import { renderSlideToSVG } from "../_shared/slideRenderer.ts";
+import { compositeSlide } from "../_shared/imageCompositor.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -230,32 +232,24 @@ serve(async (req) => {
     
     console.log('✅ [Worker] overlayText built:', overlayText);
 
-    // 5. Generate final image with text overlay (direct generation) - with timeout
-    console.log('🖼️ [Worker] Step 2: Generating final image with text overlay...');
+    // 5. Generate background WITHOUT text (text-first approach)
+    console.log('🖼️ [Worker] Step 2: Generating background image WITHOUT text...');
     const correctedPrompt = correctFrenchSpelling(job.prompt);
     const enrichedPrompt = enrichPromptWithBrand(correctedPrompt, brandSnapshot);
     
     console.log('📝 Base prompt:', enrichedPrompt);
-    console.log('📝 Overlay text:', overlayText);
     console.log('🌱 Seed:', seed ? seed.slice(0, 12) + '...' : 'none');
     
     const aspectRatio = brandSnapshot?.aspectRatio || '4:5';
     const resolution = aspectRatio === '1:1' ? '1080x1080' : '1080x1350';
     console.log('📐 Resolution:', resolution);
 
-    const brandKit = brandSnapshot ? {
-      id: job.job_sets.brand_id,
-      palette: brandSnapshot.palette || brandSnapshot.colors || null,
-      voice: brandSnapshot.brand_voice || brandSnapshot.voice || null,
-      logo_url: brandSnapshot.logo_url || null
-    } : undefined;
-
     // Add 60s timeout for slow providers
     const ctrl = new AbortController();
     const timeout = setTimeout(() => ctrl.abort(), 60000);
 
-    let finalImageData: any;
-    let finalImageErr: any;
+    let backgroundImageData: any;
+    let backgroundImageErr: any;
     
     try {
       const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -274,7 +268,7 @@ serve(async (req) => {
             {
               role: 'user',
               content: [
-                { type: 'text', text: `${enrichedPrompt}\n\nIMPORTANT: Create a polished marketing visual at ${resolution} (${aspectRatio}). Integrate this text directly into the design with strong legibility and balanced layout. Keep brand style consistent.\n\nText to include (preserve line breaks):\n${overlayText}` }
+                { type: 'text', text: `${enrichedPrompt}\n\nIMPORTANT: Create a clean marketing visual background at ${resolution} (${aspectRatio}). NO TEXT, NO LETTERS, NO TYPOGRAPHY, NO WORDS. Pure visual design only. Keep brand style consistent.\n\nNEGATIVE PROMPT: no text, no letters, no words, no typography, no captions, no labels` }
               ]
             }
           ],
@@ -293,18 +287,18 @@ serve(async (req) => {
         throw new Error('AI did not return an image URL');
       }
 
-      // Normalize to the structure expected by pickImage()
-      finalImageData = { images: [{ url: imgUrl }] };
+      backgroundImageData = { images: [{ url: imgUrl }] };
+      console.log('✅ [Worker] Background generated (no text)');
     } catch (err: any) {
-      finalImageErr = err;
+      backgroundImageErr = err;
     } finally {
       clearTimeout(timeout);
     }
     
     // Log AI payload for debugging
-    if (finalImageData) {
-      console.log('📦 [Worker] AI response keys:', Object.keys(finalImageData));
-      const dataStr = JSON.stringify(finalImageData);
+    if (backgroundImageData) {
+      console.log('📦 [Worker] AI response keys:', Object.keys(backgroundImageData));
+      const dataStr = JSON.stringify(backgroundImageData);
       console.log('📦 [Worker] AI payload preview:', dataStr ? dataStr.slice(0, 500) : 'null');
     }
 
@@ -338,17 +332,17 @@ serve(async (req) => {
       return null;
     }
 
-    const picked = pickImage(finalImageData);
+    const pickedBackground = pickImage(backgroundImageData);
 
-    if (finalImageErr || !picked) {
-      if (!picked) {
-        console.error('❌ [Worker] Could not extract image. Available keys:', 
-                      finalImageData ? Object.keys(finalImageData) : 'null');
-        const dataStr = finalImageData ? JSON.stringify(finalImageData) : 'null';
+    if (backgroundImageErr || !pickedBackground) {
+      if (!pickedBackground) {
+        console.error('❌ [Worker] Could not extract background image. Available keys:', 
+                      backgroundImageData ? Object.keys(backgroundImageData) : 'null');
+        const dataStr = backgroundImageData ? JSON.stringify(backgroundImageData) : 'null';
         console.error('📦 [Worker] Full payload (first 500 chars):', 
                       dataStr && typeof dataStr === 'string' ? dataStr.slice(0, 500) : dataStr);
       } else {
-        console.error('❌ [Worker] Final image generation failed:', finalImageErr);
+        console.error('❌ [Worker] Background image generation failed:', backgroundImageErr);
       }
       
       // Mark job as failed + refund quota
@@ -356,7 +350,7 @@ serve(async (req) => {
         .from('jobs')
         .update({
           status: 'failed',
-          error: finalImageErr?.message || 'No image returned by generator',
+          error: backgroundImageErr?.message || 'No background image returned',
           finished_at: new Date().toISOString()
         })
         .eq('id', job.id);
@@ -368,51 +362,102 @@ serve(async (req) => {
 
       const st = await updateJobSetStatus();
 
-      console.error(`[Worker] Job ${job.id} failed:`, finalImageErr?.message || 'no_image');
+      console.error(`[Worker] Job ${job.id} failed:`, backgroundImageErr?.message || 'no_image');
       return new Response(JSON.stringify({ 
         success: false, 
         jobId: job.id, 
-        error: finalImageErr?.message || 'No image extracted',
+        error: backgroundImageErr?.message || 'No background image extracted',
         jobSetStatus: st 
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // 6. Normalize to Uint8Array (3 branches)
-    console.log('☁️ [Worker] Step 3: Preparing buffer for upload...');
-    let bytes: Uint8Array;
+    // 6. Get background URL for composition
+    console.log('🔗 [Worker] Step 3: Getting background URL...');
+    let backgroundUrl: string;
 
-    if (picked.kind === 'url') {
-      console.log('🔄 [Worker] Downloading from HTTP:', picked.value);
-      const r = await fetch(picked.value as string);
-      if (!r.ok) throw new Error(`Download failed: ${r.status}`);
-      bytes = new Uint8Array(await r.arrayBuffer());
-      
-    } else if (picked.kind === 'data') {
-      console.log('🔄 [Worker] Converting base64 to buffer...');
-      const dataUrl = picked.value as string;
+    if (pickedBackground.kind === 'url') {
+      backgroundUrl = pickedBackground.value as string;
+      console.log('✅ [Worker] Using direct URL:', backgroundUrl);
+    } else if (pickedBackground.kind === 'data') {
+      // For data URLs, we need to upload to storage first to get a URL
+      console.log('🔄 [Worker] Converting base64 to buffer for temp upload...');
+      const dataUrl = pickedBackground.value as string;
       const b64 = dataUrl.substring(dataUrl.indexOf(',') + 1);
       const bin = atob(b64);
-      bytes = new Uint8Array(bin.length);
+      const tempBytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) {
-        bytes[i] = bin.charCodeAt(i);
+        tempBytes[i] = bin.charCodeAt(i);
       }
       
+      const tempFileName = `carousel/${job.job_set_id}/temp_bg_${job.index_in_set}_${Date.now()}.png`;
+      const { error: tempUploadError } = await supabase.storage
+        .from('media-generations')
+        .upload(tempFileName, tempBytes, { contentType: 'image/png', upsert: true });
+      
+      if (tempUploadError) throw new Error(`Temp upload failed: ${tempUploadError.message}`);
+      
+      const { data: tempUrlData } = supabase.storage
+        .from('media-generations')
+        .getPublicUrl(tempFileName);
+      
+      backgroundUrl = tempUrlData.publicUrl;
+      console.log('✅ [Worker] Temp background uploaded:', backgroundUrl);
     } else { // 'bytes'
-      bytes = picked.value as Uint8Array;
+      // Upload bytes to get a URL
+      const tempBytes = pickedBackground.value as Uint8Array;
+      const tempFileName = `carousel/${job.job_set_id}/temp_bg_${job.index_in_set}_${Date.now()}.png`;
+      const { error: tempUploadError } = await supabase.storage
+        .from('media-generations')
+        .upload(tempFileName, tempBytes, { contentType: 'image/png', upsert: true });
+      
+      if (tempUploadError) throw new Error(`Temp upload failed: ${tempUploadError.message}`);
+      
+      const { data: tempUrlData } = supabase.storage
+        .from('media-generations')
+        .getPublicUrl(tempFileName);
+      
+      backgroundUrl = tempUrlData.publicUrl;
+      console.log('✅ [Worker] Temp background uploaded:', backgroundUrl);
     }
 
-    console.log('✅ [Worker] Buffer ready:', bytes.length, 'bytes');
+    // 7. Generate SVG text layer
+    console.log('📝 [Worker] Step 4: Generating SVG text overlay...');
+    
+    const finalSlideContent = {
+      ...slideContent,
+      type: slideContent.type as 'hero' | 'problem' | 'solution' | 'impact' | 'cta'
+    };
+    
+    const finalBrandSnapshot = {
+      palette: brandSnapshot?.palette || brandSnapshot?.colors || [],
+      voice: brandSnapshot?.brand_voice || brandSnapshot?.voice || null,
+      logo_url: brandSnapshot?.logo_url || null,
+      name: brandSnapshot?.name || 'Brand'
+    };
+    
+    const svgTextLayer = await renderSlideToSVG(
+      finalSlideContent,
+      template,
+      finalBrandSnapshot
+    );
+    
+    console.log('✅ [Worker] SVG layer generated:', svgTextLayer.length, 'chars');
 
-    // 7. Upload directly (Deno supports Uint8Array) + validate public URL
-    console.log('☁️ [Worker] Step 4: Uploading to storage...');
+    // 8. Composite background + SVG text
+    console.log('🎨 [Worker] Step 5: Compositing background + text...');
+    const finalImageBytes = await compositeSlide(backgroundUrl, svgTextLayer);
+    console.log('✅ [Worker] Composition complete:', finalImageBytes.length, 'bytes');
+
+    // 9. Upload final composed image
+    console.log('☁️ [Worker] Step 6: Uploading final image...');
     const fileName = `carousel/${job.job_set_id}/slide_${job.index_in_set}_${Date.now()}.png`;
     console.log('📁 File path:', fileName);
 
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('media-generations')
-      .upload(fileName, bytes, { 
+      .upload(fileName, finalImageBytes, { 
         contentType: 'image/png', 
         upsert: true, 
         cacheControl: '3600' 

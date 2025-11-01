@@ -101,14 +101,32 @@ export function useCarouselSubscription(jobSetId: string, total: number) {
 
     channelRef.current = channel;
 
-    // 3️⃣ Cleanup
+    // 3️⃣ Polling fallback (every 2s for 2 minutes)
+    let pollCount = 0;
+    const maxPolls = 60; // 2 minutes (60 × 2s)
+    
+    const pollingInterval = setInterval(async () => {
+      pollCount++;
+      
+      // Stop polling if we've reached the total or max time
+      if (pollCount >= maxPolls || done >= total) {
+        clearInterval(pollingInterval);
+        return;
+      }
+      
+      console.log(`[Carousel] Polling fallback (${pollCount}/${maxPolls})...`);
+      await loadExistingAssets();
+    }, 2000);
+
+    // 4️⃣ Cleanup
     return () => {
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
+      clearInterval(pollingInterval);
     };
-  }, [jobSetId, loadExistingAssets]);
+  }, [jobSetId, loadExistingAssets, done, total]);
 
   return { items, done, total, refresh: loadExistingAssets };
 }

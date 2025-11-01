@@ -41,7 +41,7 @@ export const CHAR_LIMITS = {
 export const DEFAULT_GLOBALS: CarouselGlobals = {
   audience: "Directeurs Marketing & studios internes",
   promise: "Des visuels toujours on-brand, plus vite.",
-  cta: "Rejoindre l'accès anticipé",
+  cta: "Essayer Alfie",
   terminology: [
     "cohérence de marque",
     "variantes",
