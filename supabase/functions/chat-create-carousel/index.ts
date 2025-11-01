@@ -135,49 +135,7 @@ serve(async (req) => {
       throw new Error(`Brand not found: ${brandErr?.message}`);
     }
 
-    const brandSnapshot = {
-      palette: brand.palette || [],
-      colors: brand.palette || [],
-      brand_voice: brand.voice || null,
-      voice: brand.voice || null,
-      logo_url: brand.logo_url || null,
-      name: brand.name || "Brand",
-      aspectRatio: aspectRatio || "4:5",
-      master_seed: set.master_seed
-    } as Record<string, any>;
-
-    // Always ensure non-null JSON
-    const nonNullBrandSnapshot = brandSnapshot ?? {};
-
-    // 5) Créer les jobs individuels avec brand_snapshot
-    const jobs = Array.from({ length: count }, (_, i) => ({
-      job_set_id: set.id,
-      index_in_set: i,
-      status: "queued",
-      prompt,
-      slide_template: i === 0 ? "hero" : "variant",
-      brand_snapshot: nonNullBrandSnapshot,
-      metadata: {
-        role: i === 0 ? "key_visual" : "variant",
-        title: "",
-        bullets: [],
-      },
-    }));
-
-    const { error: jobsErr } = await adminClient.from("jobs").insert(jobs);
-
-    if (jobsErr) {
-      console.error("[CreateCarousel] Jobs creation failed:", jobsErr);
-      await adminClient.rpc("refund_brand_quotas", {
-        p_brand_id: brandId,
-        p_visuals_count: count,
-      });
-      throw new Error(`Jobs creation failed: ${jobsErr.message}`);
-    }
-
-    console.log(`[CreateCarousel] ${count} jobs created for set ${set.id}`);
-
-    // 5.5) Appeler alfie-plan-carousel pour obtenir un plan structuré
+    // 5) Appeler alfie-plan-carousel AVANT de créer les jobs pour obtenir un plan structuré
     let carouselPlan = null;
     try {
       console.log(`[CreateCarousel] Calling alfie-plan-carousel for structured content...`);
@@ -204,41 +162,76 @@ serve(async (req) => {
 
       if (planResponse.ok) {
         carouselPlan = await planResponse.json();
-        console.log(`[CreateCarousel] Plan received with ${carouselPlan.slides?.length} slides`);
-        
-        // Enrichir brand_snapshot avec globals
-        if (carouselPlan.globals) {
-          brandSnapshot.globals = carouselPlan.globals;
-        }
+        console.log(`[CreateCarousel] Plan received:`, JSON.stringify(carouselPlan, null, 2));
       } else {
-        console.warn(`[CreateCarousel] Plan generation failed, using basic structure`);
+        console.warn(`[CreateCarousel] Plan generation failed (${planResponse.status}), using fallback structure`);
       }
     } catch (planError) {
       console.warn(`[CreateCarousel] Plan generation error:`, planError);
     }
 
-    // 5.6) Mettre à jour les jobs avec le contenu structuré si disponible
-    if (carouselPlan?.slides) {
-      const updatePromises = jobs.map(async (job, i) => {
-        const slideContent = carouselPlan.slides[i];
-        if (!slideContent) return;
-
-        await adminClient
-          .from("jobs")
-          .update({
-            brand_snapshot: brandSnapshot,
-            metadata: {
-              role: i === 0 ? "key_visual" : "variant",
-              slideContent,
-            },
-          })
-          .eq("job_set_id", set.id)
-          .eq("index_in_set", i);
-      });
-
-      await Promise.all(updatePromises);
-      console.log(`[CreateCarousel] Jobs enriched with structured content`);
+    // 5.5) Si le plan a échoué, utiliser une structure de base
+    if (!carouselPlan || !carouselPlan.slides) {
+      console.warn(`[CreateCarousel] Using fallback slide structure`);
+      carouselPlan = {
+        globals: {
+          audience: "Directeurs Marketing & studios internes",
+          promise: "Des visuels toujours on-brand, plus vite.",
+          cta: "Rejoindre l'accès anticipé",
+          terminology: [],
+          banned: []
+        },
+        slides: Array(count).fill(null).map((_, i) => ({
+          type: i === 0 ? 'hero' : 'variant',
+          title: `Slide ${i + 1}`,
+          subtitle: prompt.slice(0, 60),
+        })),
+        captions: []
+      };
     }
+
+    // 6) Construire le brand_snapshot enrichi avec globals
+    const brandSnapshot = {
+      palette: brand.palette || [],
+      colors: brand.palette || [],
+      brand_voice: brand.voice || null,
+      voice: brand.voice || null,
+      logo_url: brand.logo_url || null,
+      name: brand.name || "Brand",
+      aspectRatio: aspectRatio || "4:5",
+      master_seed: set.master_seed,
+      globals: carouselPlan.globals,
+    } as Record<string, any>;
+
+    const nonNullBrandSnapshot = brandSnapshot ?? {};
+
+    // 7) Créer les jobs avec le contenu structuré DÈS LA CRÉATION
+    console.log(`[CreateCarousel] Creating jobs with slideContent from plan...`);
+    const jobs = Array.from({ length: count }, (_, i) => ({
+      job_set_id: set.id,
+      index_in_set: i,
+      status: "queued",
+      prompt,
+      slide_template: carouselPlan.slides[i]?.type || (i === 0 ? "hero" : "variant"),
+      brand_snapshot: nonNullBrandSnapshot,
+      metadata: {
+        role: i === 0 ? "key_visual" : "variant",
+        slideContent: carouselPlan.slides[i] || { type: 'variant', title: '' },
+      },
+    }));
+
+    const { error: jobsErr } = await adminClient.from("jobs").insert(jobs);
+
+    if (jobsErr) {
+      console.error("[CreateCarousel] Jobs creation failed:", jobsErr);
+      await adminClient.rpc("refund_brand_quotas", {
+        p_brand_id: brandId,
+        p_visuals_count: count,
+      });
+      throw new Error(`Jobs creation failed: ${jobsErr.message}`);
+    }
+
+    console.log(`[CreateCarousel] ${count} jobs created for set ${set.id} with structured content`)
 
     // 6) Marquer l'idempotency comme appliquée
     await adminClient

@@ -33,6 +33,8 @@ Deno.serve(async (req: Request) => {
 
     const { prompt, brandKit, slideCount }: PlanRequest = await req.json();
 
+    console.log('[Plan] Request:', { prompt, slideCount, brandName: brandKit?.name });
+
     if (!prompt || slideCount < 1 || slideCount > 10) {
       return new Response(
         JSON.stringify({ error: 'Invalid request: prompt required and slideCount must be 1-10' }),
@@ -174,6 +176,7 @@ ${brandContext}`;
 
       if (lintResult.valid) {
         console.log(`[Plan] ✅ Validation passed!`);
+        console.log('[Plan] Generated plan:', JSON.stringify(parsedPlan, null, 2));
         if (lintResult.warnings.length > 0) {
           console.log(`[Plan] ⚠️ Warnings: ${lintResult.warnings.join(', ')}`);
         }
