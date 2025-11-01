@@ -106,7 +106,7 @@ export function ChatComposer({
   return (
     <div className="fixed bottom-0 inset-x-0 z-20 bg-background/95 backdrop-blur-md border-t border-border">
       {/* Mode switcher */}
-      <div className="mx-auto max-w-3xl px-4 pt-3 flex gap-2 overflow-x-auto">
+      <div className="mx-auto max-w-3xl px-4 pt-2 flex gap-2 overflow-x-auto">
         {(Object.keys(MODE_LABELS) as GeneratorMode[]).map((m) => (
           <button
             key={m}
@@ -123,12 +123,12 @@ export function ChatComposer({
       </div>
 
       {/* Composer */}
-      <div className="mx-auto max-w-3xl p-4 flex items-end gap-3">
+      <div className="mx-auto max-w-3xl p-3 flex items-end gap-3">
         <div className="flex-1 relative">
           <TextareaAutosize
             ref={textareaRef}
             minRows={1}
-            maxRows={4}
+            maxRows={3}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -186,7 +186,7 @@ export function ChatComposer({
       </div>
 
       {/* Quick action chips */}
-      <div className="mx-auto max-w-3xl px-4 pb-3 flex gap-2 overflow-x-auto">
+      <div className="mx-auto max-w-3xl px-4 pb-2 flex gap-2 overflow-x-auto">
         {QUICK_CHIPS.map((chip) => (
           <button
             key={chip.label}

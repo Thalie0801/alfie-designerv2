@@ -63,8 +63,36 @@ export default function Creator() {
     setIsGenerating(true);
     setDecision(null);
 
+    // Si carrousel (quantity > 1), générer d'abord le plan
+    let carouselPlan: any = null;
+    if (quantity > 1 && mode === "image") {
+      try {
+        toast.info(`Planification du carrousel de ${quantity} visuels...`);
+        const { data: planRes, error: planError } = await supabase.functions.invoke("alfie-plan-carousel", {
+          body: { 
+            prompt, 
+            brandKit: brandKit || {}, 
+            slideCount: quantity 
+          }
+        });
+        
+        if (planError) throw planError;
+        carouselPlan = planRes;
+        toast.success("Plan du carrousel généré !");
+      } catch (err: any) {
+        toast.error(`Erreur lors de la planification : ${err.message}`);
+        setIsGenerating(false);
+        return;
+      }
+    }
+
     for (let i = 0; i < quantity; i++) {
       try {
+        // Utiliser le prompt du slide si on a un plan de carrousel
+        const slidePrompt = carouselPlan?.slides?.[i] 
+          ? `${carouselPlan.slides[i].title}. ${carouselPlan.slides[i].subtitle || ''}` 
+          : prompt;
+
         const use_case = format.includes("1920") ? "story" : "ad_reel";
         const { data: providerRes } = await supabase.functions.invoke("alfie-select-provider", {
           body: { brief: { use_case, style: quality }, modality: mode, format, duration_s: mode === "video" ? duration : 0, quality, budget_woofs: quotaInfo.remaining }
@@ -79,8 +107,8 @@ export default function Creator() {
         let finalCost = providerRes.cost_woofs;
 
         if (batchNight) {
-          await supabase.from("batch_requests").insert({ user_id: user.id, modality: mode, payload_json: { prompt, format, duration, quality }, process_after: new Date(Date.now() + 8 * 3600 * 1000).toISOString() });
-          toast.success(`Planifié ${i + 1}/${quantity} pour la nuit`);
+          await supabase.from("batch_requests").insert({ user_id: user.id, modality: mode, payload_json: { prompt: slidePrompt, format, duration, quality }, process_after: new Date(Date.now() + 8 * 3600 * 1000).toISOString() });
+          toast.success(`Planifié slide ${i + 1}/${quantity} pour la nuit`);
           continue;
         }
 
@@ -88,10 +116,11 @@ export default function Creator() {
         
         let renderUrl = "";
         if (mode === "image") {
-          const { data: imgRes } = await supabase.functions.invoke("alfie-render-image", { body: { provider: providerRes.provider, prompt: buildBrandAwarePrompt(prompt, brandKit), assets: [], format } });
+          toast.info(`Génération slide ${i + 1}/${quantity}...`);
+          const { data: imgRes } = await supabase.functions.invoke("alfie-render-image", { body: { provider: providerRes.provider, prompt: buildBrandAwarePrompt(slidePrompt, brandKit), assets: [], format } });
           renderUrl = imgRes?.image_urls?.[0] || "";
         } else {
-          const { data: vidRes } = await supabase.functions.invoke("alfie-render-video", { body: { provider: providerRes.provider, prompt: buildBrandAwarePrompt(prompt, brandKit), assets: [], params: { duration, resolution: format, style: quality } } });
+          const { data: vidRes } = await supabase.functions.invoke("alfie-render-video", { body: { provider: providerRes.provider, prompt: buildBrandAwarePrompt(slidePrompt, brandKit), assets: [], params: { duration, resolution: format, style: quality } } });
           renderUrl = vidRes?.video_url || "";
         }
 

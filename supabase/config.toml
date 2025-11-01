@@ -137,3 +137,9 @@ verify_jwt = true
 
 [functions.process-batch-queue]
 verify_jwt = false
+
+[functions.alfie-update-metrics]
+verify_jwt = true
+
+[functions.get-quota]
+verify_jwt = true

@@ -103,6 +103,18 @@ serve(async (req) => {
 
     console.log("Generating image with prompt:", prompt, "Aspect ratio:", aspectRatio);
 
+    // Reformuler les prompts conversationnels en prompts descriptifs
+    const reformulatePrompt = (userPrompt: string): string => {
+      // Si c'est une demande conversationnelle en français
+      if (/^(fais|fait|faire|cr[éeè]e|g[éeè]n[éeè]re|je veux|donne|montre)/i.test(userPrompt)) {
+        return userPrompt
+          .replace(/^(fais|fait|faire|cr[éeè]e|g[éeè]n[éeè]re|je veux|donne|montre)(-moi)?/i, '')
+          .replace(/visuels?|images?|un carrousel de \d+/gi, '')
+          .trim();
+      }
+      return userPrompt;
+    };
+
     // Ajouter le ratio au prompt pour Gemini
     const ratioDescriptions: Record<string, string> = {
       "1:1": "square format (1:1 aspect ratio, 1024x1024px)",
@@ -111,7 +123,8 @@ serve(async (req) => {
       "16:9": "horizontal format (16:9 aspect ratio, 1820x1024px)"
     };
 
-    const enhancedPrompt = `${prompt}. Create this image in ${ratioDescriptions[aspectRatio] || ratioDescriptions["1:1"]}. High quality, professional result.`;
+    const basePrompt = reformulatePrompt(prompt);
+    const enhancedPrompt = `Professional marketing visual: ${basePrompt}. ${ratioDescriptions[aspectRatio] || ratioDescriptions["1:1"]}. High quality, clean composition, brand-ready design.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
