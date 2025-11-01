@@ -99,6 +99,63 @@ interface Message {
   woofsConsumed?: number;
 }
 
+// Fonction utilitaire centralisée pour vérifier et consommer les quotas
+const checkAndConsumeQuota = async (
+  supabase: any,
+  type: 'visuals' | 'woofs',
+  amount: number,
+  brandId: string
+): Promise<{ ok: boolean; remaining?: number; error?: string }> => {
+  try {
+    // 1. Vérifier le quota
+    const headers = await getAuthHeader();
+    const { data: quotaData, error: quotaError } = await supabase.functions.invoke('get-quota', {
+      body: { brand_id: brandId },
+      headers
+    });
+    
+    if (quotaError || !quotaData) {
+      return { ok: false, error: 'Impossible de vérifier les quotas' };
+    }
+    
+    const quota = quotaData;
+    const remaining = type === 'visuals' 
+      ? quota.visuals_remaining 
+      : quota.woofs_remaining;
+    
+    if (remaining < amount) {
+      return { 
+        ok: false, 
+        remaining, 
+        error: `Quota insuffisant. Il te reste ${remaining} ${type === 'visuals' ? 'visuels' : 'woofs'}.` 
+      };
+    }
+    
+    // 2. Consommer le quota
+    const consumeEndpoint = type === 'woofs' 
+      ? 'alfie-consume-woofs'
+      : 'alfie-consume-visuals';
+    
+    const { error: consumeError } = await supabase.functions.invoke(consumeEndpoint, {
+      body: { 
+        cost_woofs: type === 'woofs' ? amount : undefined,
+        cost_visuals: type === 'visuals' ? amount : undefined,
+        brand_id: brandId 
+      },
+      headers
+    });
+    
+    if (consumeError) {
+      return { ok: false, error: 'Impossible de consommer les quotas' };
+    }
+    
+    return { ok: true, remaining: remaining - amount };
+  } catch (error: any) {
+    console.error('[Quota] Error:', error);
+    return { ok: false, error: error.message };
+  }
+};
+
 const INITIAL_ASSISTANT_MESSAGE = `Salut ! 🐾 Je suis Alfie Designer, ton compagnon créatif IA 🎨
 
 Je peux t'aider à :
@@ -1001,6 +1058,27 @@ export function AlfieChat() {
         }
       }
 
+      case 'classify_intent': {
+        try {
+          const msg = args.user_message?.toLowerCase() || '';
+          
+          let intent = 'other';
+          if (/(^|\s)(image|visuel|cover|post visuel|illustration)(\s|$)/i.test(msg)) {
+            intent = 'image';
+          } else if (/(carrousel|carousel|slides|série)/i.test(msg)) {
+            intent = 'carousel';
+          } else if (/(vidéo|reel|short|story vidéo|video)/i.test(msg)) {
+            intent = 'video';
+          }
+          
+          console.log('[Intent] Detected:', intent, 'from:', msg);
+          return { intent };
+        } catch (error: any) {
+          console.error('[Intent] Exception:', error);
+          return { error: error.message || "Erreur de classification" };
+        }
+      }
+
       case 'plan_carousel': {
         try {
           const { prompt, count = 5 } = args;
@@ -1065,12 +1143,19 @@ export function AlfieChat() {
           const { slideIndex, slideContent } = args;
           const aspect_ratio = args.aspect_ratio || '1:1';
           
+          // 1. Vérifier la marque active
           if (!activeBrandId) {
-            return { error: "Aucune marque active" };
+            return { error: "⚠️ Aucune marque active. Sélectionne d'abord une marque dans tes paramètres." };
           }
           
           if (!carouselPlan) {
             return { error: "Aucun plan de carrousel en cours. Crée d'abord un plan avec plan_carousel." };
+          }
+          
+          // 2. Vérifier et consommer le quota AVANT de créer le job
+          const quotaCheck = await checkAndConsumeQuota(supabase, 'visuals', 1, activeBrandId);
+          if (!quotaCheck.ok) {
+            return { error: quotaCheck.error };
           }
           
           // Créer un job_set pour cette slide unique (ou réutiliser un existant)
@@ -1094,6 +1179,11 @@ export function AlfieChat() {
             
             if (jobSetError || !jobSetData?.data?.id) {
               console.error('[Slide] create-job-set failed:', jobSetError);
+              // Recréditer le quota en cas d'échec
+              await supabase.functions.invoke('alfie-refund-woofs', {
+                body: { amount: 1, brand_id: activeBrandId },
+                headers: await getAuthHeader()
+              });
               return { error: 'Impossible de créer le carrousel' };
             }
             
@@ -1131,6 +1221,11 @@ export function AlfieChat() {
           
           if (jobError) {
             console.error('[Slide] Job insertion failed:', jobError);
+            // Recréditer le quota en cas d'échec
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: 1, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
             return { error: 'Impossible de créer la tâche de génération' };
           }
           
