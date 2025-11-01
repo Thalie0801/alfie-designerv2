@@ -366,19 +366,20 @@ export function ChatGenerator() {
             format: aspectRatio,
           });
 
-          await supabase.from('media_generations').insert({
-            user_id: user.id,
-            type: 'image',
-            prompt: prompt || 'Image transformation',
-            input_url: uploadedSource.url,
-            output_url: data.imageUrl,
-            status: 'completed',
-            brand_id: brandKit?.id || null,
-            metadata: {
-              aspectRatio,
-              sourceType: uploadedSource.type,
-            },
-          });
+          if (brandKit?.id) {
+            await supabase.from('media_generations').insert({
+              brand_id: brandKit.id,
+              type: 'image',
+              prompt: prompt || 'Image transformation',
+              input_url: uploadedSource.url,
+              output_url: data.imageUrl,
+              status: 'completed',
+              metadata: {
+                aspectRatio,
+                sourceType: uploadedSource.type,
+              },
+            });
+          }
 
           toast.success('Image générée avec succès ! ✨');
         } else {
@@ -402,18 +403,19 @@ export function ChatGenerator() {
             format: aspectRatio,
           });
 
-          await supabase.from('media_generations').insert({
-            user_id: user.id,
-            type: 'image',
-            prompt: prompt,
-            output_url: data.imageUrl,
-            status: 'completed',
-            brand_id: brandKit?.id || null,
-            metadata: {
-              aspectRatio,
-              sourceType: uploadedSource ? uploadedSource.type : 'prompt',
-            },
-          });
+          if (brandKit?.id) {
+            await supabase.from('media_generations').insert({
+              brand_id: brandKit.id,
+              type: 'image',
+              prompt: prompt,
+              output_url: data.imageUrl,
+              status: 'completed',
+              metadata: {
+                aspectRatio,
+                sourceType: uploadedSource ? uploadedSource.type : 'prompt',
+              },
+            });
+          }
 
           toast.success('Image générée avec succès ! ✨');
         }
@@ -431,20 +433,21 @@ export function ChatGenerator() {
           format: aspectRatio,
         });
 
-        await supabase.from('media_generations').insert({
-          user_id: user.id,
-          type: 'video',
-          prompt: prompt || 'Vidéo générée',
-          input_url: uploadedSource?.url ?? null,
-          output_url: videoUrl,
-          status: 'completed',
-          brand_id: brandKit?.id || null,
-          metadata: {
-            aspectRatio,
-            sourceType: uploadedSource ? uploadedSource.type : 'prompt',
-            engine: 'ffmpeg-backend',
-          },
-        });
+        if (brandKit?.id) {
+          await supabase.from('media_generations').insert({
+            brand_id: brandKit.id,
+            type: 'video',
+            prompt: prompt || 'Vidéo générée',
+            input_url: uploadedSource?.url ?? null,
+            output_url: videoUrl,
+            status: 'completed',
+            metadata: {
+              aspectRatio,
+              sourceType: uploadedSource ? uploadedSource.type : 'prompt',
+              engine: 'ffmpeg-backend',
+            },
+          });
+        }
 
         toast.success('Vidéo générée avec succès ! 🎬');
       }

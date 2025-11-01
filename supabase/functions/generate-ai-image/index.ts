@@ -77,17 +77,6 @@ serve(async (req) => {
       );
     }
 
-    const brandId = profile?.active_brand_id;
-    if (!brandId) {
-      return new Response(
-        JSON.stringify({ error: 'No active brand found. Please create a brand first.' }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
-        }
-      );
-    }
-
     // Récupérer le Brand Kit pour enrichir la génération
     const { data: brandKit } = await supabaseClient
       .from('brand_kits')
@@ -269,7 +258,7 @@ serve(async (req) => {
         }
 
         if (binary) {
-          const filePath = `generated/${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+          const filePath = `generated/${user.id}/${brandId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
           const { error: uploadError } = await assetClient.storage
             .from('media-generations')
             .upload(filePath, binary, {
@@ -301,7 +290,6 @@ serve(async (req) => {
       await supabaseClient
         .from('media_generations')
         .insert({
-          user_id: user.id,
           brand_id: brandId,
           type: 'image',
           status: 'completed',

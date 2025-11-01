@@ -80,6 +80,19 @@ export default function Library() {
       toast.error('Vous devez être connecté.');
       return;
     }
+    
+    // Get active brand
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('active_brand_id')
+      .eq('id', user.id)
+      .single();
+    
+    if (!profile?.active_brand_id) {
+      toast.error('No active brand. Please select a brand first.');
+      return;
+    }
+    
     const prompt = 'Golden retriever in a playful Halloween scene, cinematic';
     try {
       const { data, error } = await supabase.functions.invoke('generate-video', {
@@ -102,14 +115,14 @@ export default function Library() {
       await supabase
         .from('media_generations')
         .insert({
-          user_id: user.id,
+          brand_id: profile.active_brand_id,
           type: 'video',
           engine: provider,
           status: 'processing',
           prompt,
           woofs: 1,
           output_url: '',
-          job_id: null, // HOTFIX: éviter tout cast UUID pendant la migration
+          job_id: null,
           metadata: { predictionId, provider, jobId, jobShortId }
         });
       toast.success(`Génération vidéo lancée (${provider})`);

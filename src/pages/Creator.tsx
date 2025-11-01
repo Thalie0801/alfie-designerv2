@@ -131,11 +131,15 @@ export default function Creator() {
         setArtifacts(prev => [...prev, { id: `${Date.now()}-${i}`, kind: mode, uri: renderUrl, meta: { resolution: format, brand_score: scoreRes.score, cost_woofs: finalCost } }]);
 
         // Sauvegarder dans la base de données
+        if (!activeBrandId) {
+          toast.error("No active brand. Please select a brand first.");
+          break;
+        }
+        
         const { error: insertError } = await supabase
           .from("media_generations")
           .insert({
-            user_id: user.id,
-            brand_id: activeBrandId || null,
+            brand_id: activeBrandId,
             type: mode,
             prompt,
             output_url: renderUrl,

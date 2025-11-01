@@ -338,18 +338,19 @@ export function AlfieChat() {
       setUploadedImage(publicUrl);
       
       // Indexer l'image uploadée comme "source" (non comptée dans les quotas)
-      try {
-        await supabase.from('media_generations').insert({
-          user_id: user.id,
-          type: 'image',
-          prompt: 'Upload source depuis le chat',
-          output_url: publicUrl,
-          is_source_upload: true,
-          status: 'completed',
-          brand_id: activeBrandId || null
-        });
-      } catch (e) {
-        console.warn('Insertion source upload échouée (non bloquant):', e);
+      if (activeBrandId) {
+        try {
+          await supabase.from('media_generations').insert({
+            brand_id: activeBrandId,
+            type: 'image',
+            prompt: 'Upload source depuis le chat',
+            output_url: publicUrl,
+            is_source_upload: true,
+            status: 'completed'
+          });
+        } catch (e) {
+          console.warn('Insertion source upload échouée (non bloquant):', e);
+        }
       }
 
       toast.success('Image ajoutée ! Elle sera utilisée lors de la génération. 📸');
@@ -464,19 +465,19 @@ export function AlfieChat() {
             throw new Error("Aucune image générée");
           }
           
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) throw new Error("Not authenticated");
+          if (!activeBrandId) {
+            throw new Error("No active brand. Please select a brand first.");
+          }
 
           // Stocker en DB et récupérer l'asset complet avec métadonnées
           const { data: insertedAsset, error: insertError } = await supabase
             .from('media_generations')
             .insert({
-              user_id: user.id,
+              brand_id: activeBrandId,
               type: 'image',
               prompt: args.prompt,
               output_url: data.imageUrl,
-              status: 'completed',
-              brand_id: activeBrandId || null
+              status: 'completed'
             })
             .select('id, type, output_url, expires_at, engine, woofs, cost_woofs')
             .single();
@@ -543,17 +544,17 @@ export function AlfieChat() {
 
           if (error) throw error;
 
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) throw new Error("Not authenticated");
+          if (!activeBrandId) {
+            throw new Error("No active brand. Please select a brand first.");
+          }
 
           await supabase.from('media_generations').insert({
-            user_id: user.id,
+            brand_id: activeBrandId,
             type: 'image',
             prompt: args.instructions,
             input_url: args.image_url,
             output_url: data.imageUrl,
-            status: 'completed',
-            brand_id: activeBrandId || null
+            status: 'completed'
           });
 
           // Déduire 1 crédit pour l'amélioration d'image
@@ -643,11 +644,14 @@ export function AlfieChat() {
             throw new Error('Réponse vidéo invalide (id prédiction ou provider manquant). Vérifie les secrets Lovable Cloud.');
           }
 
+          if (!activeBrandId) {
+            throw new Error("No active brand. Please select a brand first.");
+          }
+
           // Créer l'asset en DB (status processing) — 2 Woofs / vidéo
           const { data: asset, error: assetError } = await supabase
             .from('media_generations')
             .insert([{ 
-              user_id: user.id,
               brand_id: activeBrandId,
               type: 'video',
               engine: providerInfo.engine,
