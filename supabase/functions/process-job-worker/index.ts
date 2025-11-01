@@ -402,8 +402,10 @@ serve(async (req) => {
       return new Response(JSON.stringify({ retry: true, coherenceScore }), { headers: corsHeaders });
     }
 
-    // 10. Créer l'asset dans media_generations
-    const { data: asset } = await supabase
+    // 10. D'ABORD créer l'asset dans media_generations AVANT de marquer le job succeeded
+    console.log('💾 [Worker] Step 5: Creating asset in media_generations...');
+    
+    const { data: asset, error: assetErr } = await supabase
       .from('media_generations')
       .insert({
         user_id: job.job_sets.user_id,
@@ -424,7 +426,45 @@ serve(async (req) => {
       .select()
       .single();
 
-    // 11. Marquer le job comme réussi
+    // CRITIQUE : Vérifier l'erreur AVANT de continuer
+    if (assetErr || !asset) {
+      console.error('❌ [Worker] Insert into media_generations failed:', assetErr);
+      console.error('❌ Asset data:', asset);
+      
+      // Marquer le job comme failed + refund quota
+      await supabase
+        .from('jobs')
+        .update({
+          status: 'failed',
+          error: `Asset creation failed: ${assetErr?.message || 'No asset returned'}`,
+          finished_at: new Date().toISOString()
+        })
+        .eq('id', job.id);
+      
+      await supabase.rpc('refund_brand_quotas', {
+        p_brand_id: job.job_sets.brand_id,
+        p_visuals_count: 1
+      });
+      
+      const st = await updateJobSetStatus();
+      
+      return new Response(JSON.stringify({ 
+        success: false, 
+        jobId: job.id,
+        error: assetErr?.message || 'Asset creation failed',
+        jobSetStatus: st 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    console.log('✅ [Worker] Asset created with ID:', asset.id);
+
+    // 11. ENSUITE marquer le job comme réussi avec asset_id
+    // → Garantit atomicité : quand le front voit asset_id, l'asset existe déjà
+    console.log('✅ [Worker] Step 6: Marking job as succeeded...');
+    
     await supabase
       .from('jobs')
       .update({
@@ -433,6 +473,8 @@ serve(async (req) => {
         finished_at: new Date().toISOString()
       })
       .eq('id', job.id);
+
+    console.log(`✅ [Worker] Job ${job.id} marked as succeeded with asset_id: ${asset.id}`);
 
     // 12. Si c'est le key visual, mettre à jour job_set.style_ref_url ET style_ref_asset_id
     if (isKeyVisual && asset) {
