@@ -106,7 +106,10 @@ serve(async (req) => {
     // 4. Corriger l'orthographe puis enrichir le prompt avec Brand Kit
     const correctedPrompt = correctFrenchSpelling(job.prompt);
     const enrichedPrompt = enrichPromptWithBrand(correctedPrompt, brandSnapshot);
-    const finalPrompt = `${enrichedPrompt} CRITICAL: Ne rends AUCUN mot ni texte dans l'image (no text). Composition uniquement graphique.`;
+    let finalPrompt = `${enrichedPrompt} CRITICAL: Ne rends AUCUN mot ni texte dans l'image (no text). Composition uniquement graphique.`;
+    if (brandSnapshot?.logo_url) {
+      finalPrompt += ` Ajoute systématiquement l'avatar/logo de la marque en bas à droite avec une marge de sécurité, même style et taille sur toutes les slides (cohérence branding).`;
+    }
 
     // 5. Déterminer la résolution selon l'aspect ratio propagé
     const aspectRatio = brandSnapshot?.aspectRatio || '4:5';

@@ -124,6 +124,8 @@ export function AlfieChat() {
   const [generationStatus, setGenerationStatus] = useState<{ type: string; message: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const addedAssetIdsRef = useRef<Set<string>>(new Set());
+  const zipDownloadedRef = useRef<boolean>(false);
   const { brandKit, activeBrandId } = useBrandKit();
   const { totalCredits, decrementCredits, hasCredits, incrementGenerations } = useAlfieCredits();
   const { searchTemplates } = useTemplateLibrary();
@@ -1086,8 +1088,7 @@ export function AlfieChat() {
           // Ajouter les nouvelles images au chat
           for (const job of completedJobs) {
             if (!job.asset_id) continue;
-            const alreadyAdded = messages.some(m => m.assetId === job.asset_id);
-            if (alreadyAdded) continue;
+            if (addedAssetIdsRef.current.has(job.asset_id)) continue;
 
             // Récupérer l'asset avec metadata
             const { data: asset } = await supabase
@@ -1117,6 +1118,7 @@ export function AlfieChat() {
                 assetId: job.asset_id || undefined,
                 assetType: 'image' as const
               }]);
+              addedAssetIdsRef.current.add(job.asset_id);
             }
           }
 
@@ -1137,36 +1139,38 @@ export function AlfieChat() {
             }]);
 
             // Télécharger automatiquement le ZIP via fetch direct (binaire)
-            try {
-              const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/download-job-set-zip`;
-              
-              const resp = await fetch(fnUrl, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${session.access_token}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ jobSetId: jobSet.id })
-              });
+            if (!zipDownloadedRef.current) {
+              zipDownloadedRef.current = true;
+              try {
+                const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/download-job-set-zip`;
+                
+                const resp = await fetch(fnUrl, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({ jobSetId: jobSet.id })
+                });
 
-              if (!resp.ok) {
-                throw new Error(`ZIP download failed: ${resp.statusText}`);
+                if (!resp.ok) {
+                  const t = await resp.text();
+                  console.error('[ZIP] Failed:', t);
+                  toast.error('Erreur lors du téléchargement du ZIP');
+                } else {
+                  const blob = await resp.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = `carrousel-${jobSet.id.slice(0, 8)}.zip`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }
+              } catch (err) {
+                console.error('[ZIP] Error:', err);
+                toast.error('Erreur lors du téléchargement du ZIP');
               }
-
-              const blob = await resp.blob();
-              const url = window.URL.createObjectURL(blob);
-              const link = document.createElement('a');
-              link.href = url;
-              link.download = `carrousel-${jobSet.id.slice(0, 8)}.zip`;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              window.URL.revokeObjectURL(url);
-
-              toast.success('ZIP téléchargé avec succès ! 📦');
-            } catch (zipErr: any) {
-              console.error('ZIP download error:', zipErr);
-              toast.error('Erreur lors du téléchargement du ZIP');
             }
           }
         }, 3000); // Poll toutes les 3s
