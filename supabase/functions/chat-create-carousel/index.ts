@@ -143,9 +143,10 @@ serve(async (req) => {
       name: brand.name || "Brand",
       aspectRatio: aspectRatio || "4:5",
       master_seed: set.master_seed
-    };
+    } as Record<string, any>;
 
-    console.log(`[CreateCarousel] Brand snapshot prepared for ${brand.name}`);
+    // Always ensure non-null JSON
+    const nonNullBrandSnapshot = brandSnapshot ?? {};
 
     // 5) Créer les jobs individuels avec brand_snapshot
     const jobs = Array.from({ length: count }, (_, i) => ({
@@ -154,7 +155,7 @@ serve(async (req) => {
       status: "queued",
       prompt,
       slide_template: i === 0 ? "hero" : "variant",
-      brand_snapshot: brandSnapshot,
+      brand_snapshot: nonNullBrandSnapshot,
       metadata: {
         role: i === 0 ? "key_visual" : "variant",
         title: "",
