@@ -48,12 +48,33 @@ export async function compositeSlide(
     console.log('🔄 Converting SVG to Blob...');
     const svgBlob = new Blob([svgTextLayer], { type: 'image/svg+xml' });
     
-    // 3. Upload SVG overlay to Cloudinary
+    // 3. Upload SVG overlay to Cloudinary with signed authentication
     console.log('⬆️ Uploading SVG overlay...');
     
     const svgFormData = new FormData();
     svgFormData.append('file', svgBlob, 'overlay.svg');
-    svgFormData.append('upload_preset', 'ml_default');
+    
+    // Use signed upload if API credentials are available
+    if (API_KEY && API_SECRET) {
+      console.log('🛡️ Using signed SVG upload');
+      const timestamp = Math.floor(Date.now() / 1000);
+      
+      // Generate signature: SHA-1 of "timestamp=TIMESTAMP" + API_SECRET
+      const stringToSign = `timestamp=${timestamp}${API_SECRET}`;
+      const encoder = new TextEncoder();
+      const data = encoder.encode(stringToSign);
+      const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      svgFormData.append('api_key', API_KEY);
+      svgFormData.append('timestamp', timestamp.toString());
+      svgFormData.append('signature', signature);
+      console.log('📝 Signature timestamp:', timestamp);
+    } else {
+      console.warn('⚠️ No API credentials, using unsigned upload (may fail for SVG)');
+      svgFormData.append('upload_preset', 'ml_default');
+    }
     
     const svgUploadResponse = await fetch(
       uploadEndpoint,
