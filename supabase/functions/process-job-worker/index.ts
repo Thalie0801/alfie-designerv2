@@ -112,11 +112,23 @@ serve(async (req) => {
     
     let seed: string | undefined;
     if (masterSeedStr) {
+      // Normalize any string (UUID, numeric, etc.) to a stable numeric seed
+      const toHash = (s: string): bigint => {
+        let h = 0n;
+        const MOD = (1n << 63n) - 1n;
+        for (let i = 0; i < s.length; i++) {
+          h = (h * 131n + BigInt(s.charCodeAt(i))) & MOD;
+        }
+        return h === 0n ? 1n : h;
+      };
+
+      const base = toHash(masterSeedStr);
       if (isKeyVisual) {
-        seed = masterSeedStr; // Image #0 = seed maître
+        seed = base.toString(); // Image #0 = seed maître (numérique)
         console.log(`[Worker] Generating KEY VISUAL with master seed ${seed?.slice(0, 12)}...`);
       } else {
-        seed = deriveSeed(masterSeedStr, job.index_in_set);
+        const derived = base + (BigInt(job.index_in_set) * 982451653n);
+        seed = derived.toString();
         console.log(`[Worker] Generating VARIANT #${job.index_in_set} with derived seed ${seed?.slice(0, 12)}...`);
       }
     }
