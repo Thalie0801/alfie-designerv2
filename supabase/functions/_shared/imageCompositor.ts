@@ -8,13 +8,17 @@ export async function compositeSlide(
   console.log('📥 Background URL:', backgroundUrl);
   console.log('📝 SVG layer size:', svgTextLayer.length, 'chars');
   
-  const CLOUD_NAME = Deno.env.get('CLOUDINARY_CLOUD_NAME');
-  const API_KEY = Deno.env.get('CLOUDINARY_API_KEY');
-  const API_SECRET = Deno.env.get('CLOUDINARY_API_SECRET');
+  const CLOUD_NAME = Deno.env.get('CLOUDINARY_CLOUD_NAME')?.trim();
+  const API_KEY = Deno.env.get('CLOUDINARY_API_KEY'); // optional for signed
+  const API_SECRET = Deno.env.get('CLOUDINARY_API_SECRET'); // optional for signed
   
-  if (!CLOUD_NAME || !API_KEY || !API_SECRET) {
-    throw new Error('Missing Cloudinary credentials');
+  if (!CLOUD_NAME) {
+    throw new Error('Missing Cloudinary cloud name');
   }
+  const cloudName = CLOUD_NAME.toLowerCase();
+  console.log('🌩️ Cloudinary cloud:', cloudName);
+  const uploadEndpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+  console.log('🔗 Upload endpoint:', uploadEndpoint);
   
   try {
     // 1. Upload background image to Cloudinary
@@ -25,7 +29,7 @@ export async function compositeSlide(
     bgFormData.append('upload_preset', 'ml_default');
     
     const bgUploadResponse = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+      uploadEndpoint,
       {
         method: 'POST',
         body: bgFormData
@@ -53,7 +57,7 @@ export async function compositeSlide(
     svgFormData.append('upload_preset', 'ml_default');
     
     const svgUploadResponse = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+      uploadEndpoint,
       {
         method: 'POST',
         body: svgFormData
@@ -70,7 +74,7 @@ export async function compositeSlide(
     
     // 4. Generate composed image URL with overlay transformation
     console.log('🎭 Generating composed URL...');
-    const composedUrl = `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/` +
+    const composedUrl = `https://res.cloudinary.com/${cloudName}/image/upload/` +
       `l_${svgPublicId.replace(/\//g, ':')},fl_layer_apply,g_center/` +
       `${bgPublicId}.png`;
     
