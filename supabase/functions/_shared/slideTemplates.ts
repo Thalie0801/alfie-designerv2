@@ -1,7 +1,10 @@
-// Phase 2: Templates de slides pour carrousels cohérents
+// Phase 2: Templates de slides pour carrousels cohérents avec contraintes éditoriales
 
 export interface SlideTemplate {
   type: 'hero' | 'problem' | 'solution' | 'impact' | 'cta';
+  requiredFields: string[];
+  optionalFields: string[];
+  charLimits: Record<string, { min: number; max: number }>;
   layout: {
     width: number;
     height: number;
@@ -27,6 +30,15 @@ export interface TextLayer {
 export const SLIDE_TEMPLATES: Record<string, SlideTemplate> = {
   hero: {
     type: 'hero',
+    requiredFields: ['title', 'cta_primary'],
+    optionalFields: ['subtitle', 'punchline', 'badge'],
+    charLimits: {
+      title: { min: 10, max: 40 },
+      subtitle: { min: 20, max: 70 },
+      punchline: { min: 20, max: 60 },
+      cta_primary: { min: 8, max: 22 },
+      badge: { min: 5, max: 30 },
+    },
     layout: { 
       width: 1080, 
       height: 1350, 
@@ -99,6 +111,12 @@ export const SLIDE_TEMPLATES: Record<string, SlideTemplate> = {
   
   problem: {
     type: 'problem',
+    requiredFields: ['title', 'bullets'],
+    optionalFields: [],
+    charLimits: {
+      title: { min: 10, max: 40 },
+      bullet: { min: 10, max: 44 },
+    },
     layout: { 
       width: 1080, 
       height: 1350, 
@@ -123,6 +141,12 @@ export const SLIDE_TEMPLATES: Record<string, SlideTemplate> = {
   
   solution: {
     type: 'solution',
+    requiredFields: ['title', 'bullets'],
+    optionalFields: [],
+    charLimits: {
+      title: { min: 10, max: 40 },
+      bullet: { min: 10, max: 44 },
+    },
     layout: { 
       width: 1080, 
       height: 1350, 
@@ -147,6 +171,13 @@ export const SLIDE_TEMPLATES: Record<string, SlideTemplate> = {
   
   impact: {
     type: 'impact',
+    requiredFields: ['title', 'kpis'],
+    optionalFields: [],
+    charLimits: {
+      title: { min: 10, max: 40 },
+      kpi_label: { min: 5, max: 22 },
+      kpi_delta: { min: 2, max: 8 },
+    },
     layout: { 
       width: 1080, 
       height: 1350, 
@@ -171,6 +202,15 @@ export const SLIDE_TEMPLATES: Record<string, SlideTemplate> = {
   
   cta: {
     type: 'cta',
+    requiredFields: ['title', 'cta_primary'],
+    optionalFields: ['subtitle', 'cta_secondary', 'note'],
+    charLimits: {
+      title: { min: 10, max: 40 },
+      subtitle: { min: 20, max: 70 },
+      cta_primary: { min: 8, max: 22 },
+      cta_secondary: { min: 8, max: 22 },
+      note: { min: 50, max: 120 },
+    },
     layout: { 
       width: 1080, 
       height: 1350, 

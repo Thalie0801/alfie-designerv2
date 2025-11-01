@@ -135,20 +135,29 @@ serve(async (req) => {
       console.log(`[Worker] No master seed available, generating without seed control`);
     }
 
-    // 4. HOTFIX: Construire overlayText simple à partir des métadonnées
-    console.log('📝 [Worker] Step 1: Building overlayText from metadata...');
+    // 4. Construire overlayText à partir du slideContent structuré ou des métadonnées
+    console.log('📝 [Worker] Step 1: Building overlayText from structured slideContent...');
+    
+    const metaSlideContent = job.metadata?.slideContent;
     const slideContent = {
-      title: job.metadata?.title || job.prompt,
-      subtitle: job.metadata?.subtitle || '',
-      punchline: job.metadata?.punchline || '',
-      bullets: job.metadata?.bullets || [],
-      cta: job.metadata?.cta || '',
-      cta_primary: job.metadata?.cta_primary || '',
-      cta_secondary: job.metadata?.cta_secondary || '',
-      note: job.metadata?.note || '',
-      badge: job.metadata?.badge || '',
-      kpis: job.metadata?.kpis || []
+      title: metaSlideContent?.title || job.metadata?.title || job.prompt,
+      subtitle: metaSlideContent?.subtitle || job.metadata?.subtitle || '',
+      punchline: metaSlideContent?.punchline || job.metadata?.punchline || '',
+      bullets: metaSlideContent?.bullets || job.metadata?.bullets || [],
+      cta: metaSlideContent?.cta_primary || job.metadata?.cta || '',
+      cta_primary: metaSlideContent?.cta_primary || job.metadata?.cta_primary || '',
+      cta_secondary: metaSlideContent?.cta_secondary || job.metadata?.cta_secondary || '',
+      note: metaSlideContent?.note || job.metadata?.note || '',
+      badge: metaSlideContent?.badge || job.metadata?.badge || '',
+      kpis: metaSlideContent?.kpis || job.metadata?.kpis || [],
+      type: metaSlideContent?.type || 'variant'
     };
+    
+    if (metaSlideContent) {
+      console.log(`[Worker] Using structured slideContent: type=${slideContent.type}, title="${slideContent.title}"`);
+    } else {
+      console.log(`[Worker] Using basic metadata fallback`);
+    }
     
     // Construire le texte exact à superposer
     let overlayText = slideContent.title;

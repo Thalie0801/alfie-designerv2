@@ -177,6 +177,69 @@ serve(async (req) => {
 
     console.log(`[CreateCarousel] ${count} jobs created for set ${set.id}`);
 
+    // 5.5) Appeler alfie-plan-carousel pour obtenir un plan structuré
+    let carouselPlan = null;
+    try {
+      console.log(`[CreateCarousel] Calling alfie-plan-carousel for structured content...`);
+      
+      const planResponse = await fetch(
+        `${Deno.env.get("SUPABASE_URL")}/functions/v1/alfie-plan-carousel`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt,
+            brandKit: {
+              name: brand.name,
+              palette: brand.palette,
+              voice: brand.voice,
+            },
+            slideCount: count,
+          }),
+        }
+      );
+
+      if (planResponse.ok) {
+        carouselPlan = await planResponse.json();
+        console.log(`[CreateCarousel] Plan received with ${carouselPlan.slides?.length} slides`);
+        
+        // Enrichir brand_snapshot avec globals
+        if (carouselPlan.globals) {
+          brandSnapshot.globals = carouselPlan.globals;
+        }
+      } else {
+        console.warn(`[CreateCarousel] Plan generation failed, using basic structure`);
+      }
+    } catch (planError) {
+      console.warn(`[CreateCarousel] Plan generation error:`, planError);
+    }
+
+    // 5.6) Mettre à jour les jobs avec le contenu structuré si disponible
+    if (carouselPlan?.slides) {
+      const updatePromises = jobs.map(async (job, i) => {
+        const slideContent = carouselPlan.slides[i];
+        if (!slideContent) return;
+
+        await adminClient
+          .from("jobs")
+          .update({
+            brand_snapshot: brandSnapshot,
+            metadata: {
+              role: i === 0 ? "key_visual" : "variant",
+              slideContent,
+            },
+          })
+          .eq("job_set_id", set.id)
+          .eq("index_in_set", i);
+      });
+
+      await Promise.all(updatePromises);
+      console.log(`[CreateCarousel] Jobs enriched with structured content`);
+    }
+
     // 6) Marquer l'idempotency comme appliquée
     await adminClient
       .from("idempotency_keys")

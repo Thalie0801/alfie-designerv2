@@ -1,4 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { CarouselGlobals, SlideContent, CarouselPlan, DEFAULT_GLOBALS } from "../_shared/carouselGlobals.ts";
+import { lintCarousel, generateCorrectionPrompt } from "../_shared/carouselLinter.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,13 +15,6 @@ interface PlanRequest {
     voice?: string;
   };
   slideCount: number;
-}
-
-interface SlideContent {
-  title: string;
-  subtitle?: string;
-  bullets?: string[];
-  cta?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -50,108 +45,158 @@ Deno.serve(async (req: Request) => {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
+    // Extraire ou construire les globals
+    const globals: CarouselGlobals = {
+      ...DEFAULT_GLOBALS,
+      audience: brandKit?.voice?.includes('professionnel') ? 'Directeurs Marketing & studios internes' : DEFAULT_GLOBALS.audience,
+    };
+
     // Construire le contexte de marque
     let brandContext = '';
     if (brandKit) {
       brandContext = `\nBrand Context:\n- Brand Name: ${brandKit.name || 'N/A'}\n- Colors: ${brandKit.palette?.join(', ') || 'N/A'}\n- Voice: ${brandKit.voice || 'professional'}`;
     }
 
-    // Prompt système strict pour l'orthographe française
-    const systemPrompt = `You are a French carousel content planner. Your task is to create a structured plan for ${slideCount} carousel slides based on the user's prompt.
+    // Définir les types de slides en fonction du slideCount
+    const slideTypes = slideCount === 5 
+      ? ['hero', 'problem', 'solution', 'impact', 'cta']
+      : slideCount === 3
+      ? ['hero', 'solution', 'cta']
+      : Array(slideCount).fill('variant');
+
+    // Prompt système enrichi avec globals et limites de caractères
+    const systemPrompt = `You are a French carousel content planner with strict editorial guidelines.
+
+GLOBALS (MUST BE RESPECTED):
+- Audience: ${globals.audience}
+- Promesse centrale: ${globals.promise}
+- CTA canonique: ${globals.cta}
+- Terminologie obligatoire: ${globals.terminology.join(', ')}
+- Mots INTERDITS: ${globals.banned.join(', ')}
 
 CRITICAL FRENCH SPELLING RULES:
 - Use PERFECT French spelling with proper accents: é, è, ê, à, ç, ù, etc.
-- Common corrections to apply:
-  * "puisence" → "puissance"
-  * "décupèle/décuplèe" → "décuplée"
-  * "vidéos captatives" → "vidéos captivantes"
-  * "Marktplace/Marketpace" → "Marketplace"
-  * "libérze" → "libérez"
-  * "automutéée/automutée" → "automatisée"
-  * "integration" → "intégration"
-  * "créativ" → "créatif/créative"
-  * "visuals" → "visuels"
-  * "captvatines" → "captivantes"
-  * "est nouvel nouvel" → "est un nouvel"
-  * "vidéos étans" → "vidéos uniques"
-  * "en en quequess" → "en quelques"
-  * "artifécralle" → "artificielle"
-  * "partranaire" → "partenaire"
-  * "d'éeil" → "d'œil"
+- Common corrections: "puisence" → "puissance", "vidéos captatives" → "vidéos captivantes", "integration" → "intégration"
 
-RESPONSE FORMAT:
-Return ONLY a valid JSON object (no markdown, no code blocks) with this exact structure:
+CHARACTER LIMITS (STRICT):
+- title: 10-40 caractères
+- subtitle: 20-70 caractères
+- punchline: 20-60 caractères
+- bullet: 10-44 caractères
+- cta: 8-22 caractères
+- kpi_label: 5-22 caractères
+- kpi_delta: 2-8 caractères (avec unité %, pts, ou ×)
+
+RESPONSE FORMAT (JSON STRICT):
 {
+  "globals": {
+    "audience": "${globals.audience}",
+    "promise": "${globals.promise}",
+    "cta": "${globals.cta}",
+    "terminology": ${JSON.stringify(globals.terminology)},
+    "banned": ${JSON.stringify(globals.banned)}
+  },
   "slides": [
-    {
-      "title": "MAIN TITLE HERE",
-      "subtitle": "Optional subtitle",
-      "bullets": ["Bullet 1", "Bullet 2"],
-      "cta": "Optional CTA"
-    }
-  ]
+    ${slideTypes.map((type, i) => `{
+      "type": "${type}",
+      "title": "...",
+      ${type === 'hero' ? '"subtitle": "...", "punchline": "...", "badge": "Cohérence 92/100", "cta_primary": "' + globals.cta + '",' : ''}
+      ${type === 'problem' || type === 'solution' ? '"bullets": ["...", "...", "..."],' : ''}
+      ${type === 'impact' ? '"kpis": [{"label": "...", "delta": "-60%"}],' : ''}
+      ${type === 'cta' ? '"subtitle": "...", "cta_primary": "' + globals.cta + '", "cta_secondary": "...", "note": "...",' : ''}
+    }`).join(',\n    ')}
+  ],
+  "captions": ["Légende post 1...", "Légende post 2..."]
 }
 
-Rules:
-- Create exactly ${slideCount} slides
-- Each slide should have a clear, impactful title
-- Use proper French grammar and accents
-- Maintain editorial coherence across all slides
-- Keep titles concise (max 6 words)
-- Bullets should be short and punchy (max 8 words each)
-- CTA should be action-oriented (max 4 words)
+EDITORIAL RULES (R1-R8):
+R1: Réutiliser la promesse "${globals.promise}" en slide solution ou cta
+R2: CTA identique sur hero et cta = "${globals.cta}"
+R3: Utiliser ≥1 terme du glossaire par slide, 0 mot banni
+R4: Pas de !!, pas de MAJUSCULES intégrales
+R5: Unités cohérentes dans KPIs (%, pts, ×)
+R6: Respecter les limites de caractères
+R7: T2 (problème) → T3 (solution) → T4 (impact) cohérents
+R8: Pas d'hyperboles ("révolutionnaire", "incroyable")
 ${brandContext}`;
 
-    const userMessage = `Create a ${slideCount}-slide carousel plan for:\n\n${prompt}`;
+    let userMessage = `Create a ${slideCount}-slide carousel plan for:\n\n${prompt}\n\nRespect ALL globals, character limits, and editorial rules.`;
 
-    console.log('Calling Lovable AI for carousel planning...');
-    
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage }
-        ],
-        temperature: 0.7,
-      }),
-    });
+    // Génération avec cycle de validation et correction
+    let plan: CarouselPlan | null = null;
+    let attempt = 0;
+    const maxAttempts = 2;
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('Lovable AI error:', aiResponse.status, errorText);
-      throw new Error(`AI planning failed: ${aiResponse.status}`);
+    while (!plan && attempt < maxAttempts) {
+      attempt++;
+      console.log(`[Plan] Attempt ${attempt}/${maxAttempts}...`);
+
+      const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage }
+          ],
+        }),
+      });
+
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text();
+        console.error('Lovable AI error:', aiResponse.status, errorText);
+        throw new Error(`AI planning failed: ${aiResponse.status}`);
+      }
+
+      const aiData = await aiResponse.json();
+      const content = aiData.choices?.[0]?.message?.content;
+
+      if (!content) {
+        throw new Error('No content returned from AI');
+      }
+
+      // Extraire le JSON
+      let jsonContent = content.trim();
+      if (jsonContent.startsWith('```json')) {
+        jsonContent = jsonContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (jsonContent.startsWith('```')) {
+        jsonContent = jsonContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+
+      const parsedPlan = JSON.parse(jsonContent);
+
+      // Valider avec le linter
+      const lintResult = lintCarousel(parsedPlan.globals || globals, parsedPlan.slides);
+
+      if (lintResult.valid) {
+        console.log(`[Plan] ✅ Validation passed!`);
+        if (lintResult.warnings.length > 0) {
+          console.log(`[Plan] ⚠️ Warnings: ${lintResult.warnings.join(', ')}`);
+        }
+        plan = parsedPlan;
+      } else {
+        console.log(`[Plan] ❌ Validation failed:`, lintResult.errors);
+        
+        if (attempt < maxAttempts) {
+          console.log(`[Plan] Retrying with corrections...`);
+          const correctionPrompt = generateCorrectionPrompt(lintResult.errors, parsedPlan);
+          // Injecter la correction dans le userMessage pour la prochaine tentative
+          userMessage = correctionPrompt;
+        } else {
+          throw new Error(`Plan validation failed after ${maxAttempts} attempts: ${lintResult.errors.join(', ')}`);
+        }
+      }
     }
 
-    const aiData = await aiResponse.json();
-    const content = aiData.choices?.[0]?.message?.content;
-
-    if (!content) {
-      throw new Error('No content returned from AI');
+    if (!plan) {
+      throw new Error('Failed to generate valid plan');
     }
 
-    console.log('AI response:', content);
-
-    // Extraire le JSON de la réponse (enlever les markdown code blocks si présents)
-    let jsonContent = content.trim();
-    if (jsonContent.startsWith('```json')) {
-      jsonContent = jsonContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-    } else if (jsonContent.startsWith('```')) {
-      jsonContent = jsonContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
-    }
-
-    const plan = JSON.parse(jsonContent);
-
-    if (!plan.slides || !Array.isArray(plan.slides) || plan.slides.length !== slideCount) {
-      throw new Error('Invalid plan structure returned from AI');
-    }
-
-    console.log(`Successfully created plan for ${slideCount} slides`);
+    console.log(`Successfully created validated plan for ${slideCount} slides`);
 
     return new Response(JSON.stringify(plan), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
