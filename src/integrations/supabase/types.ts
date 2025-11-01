@@ -1946,6 +1946,14 @@ export type Database = {
           woofs_needed: number
         }[]
       }
+      consume_visuals: {
+        Args: {
+          brand_id_param: string
+          user_id_param: string
+          visuals_amount: number
+        }
+        Returns: boolean
+      }
       consume_woofs: {
         Args: { user_id_param: string; woofs_amount: number }
         Returns: boolean
