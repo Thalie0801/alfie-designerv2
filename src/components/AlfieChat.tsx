@@ -1018,7 +1018,7 @@ export function AlfieChat() {
     const carouselMatch = userMessage.match(/carrousel|carousel/i);
     if (carouselMatch && !forceImage && !forceVideo) {
       const countMatch = userMessage.match(/\d+/);
-      const slideCount = countMatch ? Math.min(10, Math.max(1, parseInt(countMatch[0]))) : 1;
+      const slideCount = countMatch ? Math.min(10, Math.max(1, parseInt(countMatch[0]))) : 5;
       const wantsSquare = /(1x1|1:1|carr[ée])/i.test(userMessage);
       const aspect = wantsSquare ? '1:1' : '4:5';
 
@@ -1117,26 +1117,35 @@ export function AlfieChat() {
               content: `🎉 Carrousel terminé ! Télécharge le ZIP pour récupérer toutes les images d'un coup.`
             }]);
 
-            // Télécharger automatiquement le ZIP
+            // Télécharger automatiquement le ZIP via fetch direct (binaire)
             try {
-              const { data: zipData, error: zipError } = await supabase.functions.invoke('download-job-set-zip', {
-                body: { jobSetId: jobSet.id },
-                headers: { 'Authorization': `Bearer ${session.access_token}` }
+              const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/download-job-set-zip`;
+              
+              const resp = await fetch(fnUrl, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${session.access_token}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ jobSetId: jobSet.id })
               });
 
-              if (!zipError && zipData) {
-                // Créer un blob et le télécharger
-                const blob = new Blob([zipData], { type: 'application/zip' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `carousel-${jobSet.id}.zip`;
-                link.click();
-                URL.revokeObjectURL(url);
-
-                toast.success('ZIP téléchargé avec succès ! 📦');
+              if (!resp.ok) {
+                throw new Error(`ZIP download failed: ${resp.statusText}`);
               }
-            } catch (zipErr) {
+
+              const blob = await resp.blob();
+              const url = window.URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `carrousel-${jobSet.id.slice(0, 8)}.zip`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              window.URL.revokeObjectURL(url);
+
+              toast.success('ZIP téléchargé avec succès ! 📦');
+            } catch (zipErr: any) {
               console.error('ZIP download error:', zipErr);
               toast.error('Erreur lors du téléchargement du ZIP');
             }

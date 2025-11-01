@@ -4,6 +4,31 @@ import { withIdempotency } from "../_shared/idempotency.ts";
 import { userHasAccess } from "../_shared/accessControl.ts";
 import { resolveBrandKit } from "../_shared/brandResolver.ts";
 
+function correctFrenchSpelling(text: string): string {
+  const corrections: Record<string, string> = {
+    'developper': 'développer',
+    'developpe': 'développe',
+    'developpement': 'développement',
+    'apeller': 'appeler',
+    'apelle': 'appelle',
+    'reelement': 'réellement',
+    'reele': 'réelle',
+    'evenement': 'événement',
+    'evenements': 'événements',
+    'connexion': 'connexion',
+    'connection': 'connexion',
+    'addresse': 'adresse',
+    'language': 'langage',
+  };
+
+  let corrected = text;
+  for (const [wrong, right] of Object.entries(corrections)) {
+    const regex = new RegExp(`\\b${wrong}\\b`, 'gi');
+    corrected = corrected.replace(regex, right);
+  }
+  return corrected;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-idempotency-key',
@@ -36,22 +61,22 @@ serve(async (req) => {
 
     const { brandId, prompt, count, aspectRatio = '4:5' } = await req.json();
 
-    // Forcer un seul visuel si format carré 1:1 (carrousel 1×1)
-    const requestedCount = typeof count === 'number' ? count : 1;
-    const finalCount = aspectRatio === '1:1' ? 1 : Math.max(1, Math.min(10, requestedCount));
+    // Normaliser le nombre de slides (1-10, défaut 5)
+    const requestedCount = typeof count === 'number' ? count : 5;
+    const normalizedCount = Math.max(1, Math.min(10, requestedCount));
 
-    if (!brandId || !prompt || finalCount < 1 || finalCount > 10) {
+    if (!brandId || !prompt || normalizedCount < 1 || normalizedCount > 10) {
       throw new Error('Invalid request parameters');
     }
 
     // ✅ IDEMPOTENCY WRAPPER
     const jobSet = await withIdempotency(idempotencyKey, async () => {
-      console.log(`[create-job-set] Starting for brand ${brandId}, count=${count}`);
+      console.log(`[create-job-set] Starting for brand ${brandId}, count=${normalizedCount}, aspect=${aspectRatio}`);
 
       // 1. Réserver les quotas ATOMIQUEMENT
       const { data: quotaResult, error: quotaErr } = await supabase.rpc('reserve_brand_quotas', {
         p_brand_id: brandId,
-        p_visuals_count: count,
+        p_visuals_count: normalizedCount,
         p_reels_count: 0,
         p_woofs_count: 0
       });
@@ -65,14 +90,14 @@ serve(async (req) => {
 
       // 3. Appeler alfie-plan-carousel
       const { data: plan, error: planErr } = await supabase.functions.invoke('alfie-plan-carousel', {
-        body: { prompt, brandKit: brandSnapshot, slideCount: count }
+        body: { prompt, brandKit: brandSnapshot, slideCount: normalizedCount }
       });
 
       if (planErr || !plan?.slides) {
         // Refund quotas
         await supabase.rpc('refund_brand_quotas', {
           p_brand_id: brandId,
-          p_visuals_count: count
+          p_visuals_count: normalizedCount
         });
         throw new Error('Carousel planning failed');
       }
@@ -84,7 +109,7 @@ serve(async (req) => {
           user_id: user.id,
           brand_id: brandId,
           request_text: prompt,
-          total: count,
+          total: normalizedCount,
           status: 'queued'
         })
         .select()
@@ -92,14 +117,20 @@ serve(async (req) => {
 
       if (jobSetErr) throw jobSetErr;
 
-      // 5. Créer les N jobs
-      const jobsData = plan.slides.slice(0, count).map((slide: any, i: number) => ({
-        job_set_id: newJobSet.id,
-        index_in_set: i,
-        prompt: `${slide.title}. ${slide.subtitle || ''}`,
-        brand_snapshot: brandSnapshot,
-        status: 'queued'
-      }));
+      // 5. Créer les N jobs avec correction orthographique et propagation de l'aspect
+      const brandSnapshotWithAspect = { ...brandSnapshot, aspectRatio };
+      const jobsData = plan.slides.slice(0, normalizedCount).map((slide: any, i: number) => {
+        const rawPrompt = `${slide.title}. ${slide.subtitle || ''}`;
+        const correctedPrompt = correctFrenchSpelling(rawPrompt);
+        
+        return {
+          job_set_id: newJobSet.id,
+          index_in_set: i,
+          prompt: correctedPrompt,
+          brand_snapshot: brandSnapshotWithAspect,
+          status: 'queued'
+        };
+      });
 
       const { error: jobsErr } = await supabase
         .from('jobs')
@@ -107,7 +138,7 @@ serve(async (req) => {
 
       if (jobsErr) throw jobsErr;
 
-      console.log(`[create-job-set] Created job_set ${newJobSet.id} with ${count} jobs`);
+      console.log(`[create-job-set] Created job_set ${newJobSet.id} with ${normalizedCount} jobs`);
 
       return {
         ref: `job_set:${newJobSet.id}`,

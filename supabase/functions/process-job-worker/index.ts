@@ -91,6 +91,10 @@ serve(async (req) => {
     const enrichedPrompt = enrichPromptWithBrand(correctedPrompt, brandSnapshot);
     const finalPrompt = `${enrichedPrompt} CRITICAL: Ne rends AUCUN mot ni texte dans l'image (no text). Composition uniquement graphique.`;
 
+    // Déterminer la résolution selon l'aspect ratio propagé
+    const aspectRatio = brandSnapshot?.aspectRatio || '4:5';
+    const resolution = aspectRatio === '1:1' ? '1080x1080' : '1080x1350';
+
     // 4. Appeler alfie-generate-ai-image (ne nécessite pas de token utilisateur)
     const brandKit = brandSnapshot ? {
       id: job.job_sets.brand_id,
@@ -102,7 +106,7 @@ serve(async (req) => {
     const { data: imageData, error: imageErr } = await supabase.functions.invoke('alfie-generate-ai-image', {
       body: {
         prompt: finalPrompt,
-        resolution: '1080x1350', // 4:5 ratio par défaut
+        resolution,
         brandKit
       }
     });
