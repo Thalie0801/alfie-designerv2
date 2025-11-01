@@ -140,6 +140,9 @@ export function AlfieChat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeJobSetId, setActiveJobSetId] = useState<string>('');
   const [carouselTotal, setCarouselTotal] = useState(0);
+  const [carouselPlan, setCarouselPlan] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_currentSlideIndex, setCurrentSlideIndex] = useState<number>(0); // Used for tracking slide-by-slide validation flow
   const { items: carouselItems, done: carouselDone, refresh: refreshCarousel } = useCarouselSubscription(activeJobSetId, carouselTotal);
   const { brandKit, activeBrandId } = useBrandKit();
   const { totalCredits, decrementCredits, hasCredits, incrementGenerations } = useAlfieCredits();
@@ -995,6 +998,157 @@ export function AlfieChat() {
           console.error('[create_carousel] Error:', error);
           toast.error(`Erreur carrousel: ${error.message}`);
           return { error: error.message || "Erreur création carrousel" };
+        }
+      }
+
+      case 'plan_carousel': {
+        try {
+          const { prompt, count = 5 } = args;
+          // aspect_ratio will be passed later in generate_carousel_slide
+          
+          if (!activeBrandId) {
+            return { error: "Aucune marque active. Crée d'abord un Brand Kit !" };
+          }
+          
+          // Récupérer le Brand Kit
+          const { data: brand } = await supabase
+            .from('brands')
+            .select('name, palette, voice')
+            .eq('id', activeBrandId)
+            .single();
+          
+          if (!brand) {
+            return { error: "Brand Kit introuvable" };
+          }
+          
+          // Appeler alfie-plan-carousel
+          console.log('[Plan] Calling alfie-plan-carousel:', { prompt, count, brand: brand.name });
+          
+          const headers = await getAuthHeader();
+          const { data, error } = await supabase.functions.invoke('alfie-plan-carousel', {
+            body: { 
+              prompt, 
+              slideCount: count,
+              brandKit: {
+                name: brand.name,
+                palette: brand.palette,
+                voice: brand.voice
+              }
+            },
+            headers
+          });
+          
+          if (error || !data?.plan) {
+            console.error('[Plan] alfie-plan-carousel failed:', error);
+            return { error: 'Impossible de générer le plan. Réessaie.' };
+          }
+          
+          // Stocker le plan en state pour utilisation ultérieure
+          setCarouselPlan(data.plan);
+          setCurrentSlideIndex(0);
+          
+          console.log('[Plan] ✅ Plan generated:', data.plan);
+          
+          return { 
+            success: true, 
+            plan: data.plan,
+            message: `Plan de ${count} slides généré ! Voici la Slide 1 :`
+          };
+        } catch (error: any) {
+          console.error('[Plan] Exception:', error);
+          return { error: error.message || "Erreur de génération du plan" };
+        }
+      }
+
+      case 'generate_carousel_slide': {
+        try {
+          const { slideIndex, slideContent } = args;
+          const aspect_ratio = args.aspect_ratio || '1:1';
+          
+          if (!activeBrandId) {
+            return { error: "Aucune marque active" };
+          }
+          
+          if (!carouselPlan) {
+            return { error: "Aucun plan de carrousel en cours. Crée d'abord un plan avec plan_carousel." };
+          }
+          
+          // Créer un job_set pour cette slide unique (ou réutiliser un existant)
+          let jobSetId = activeJobSetId;
+          
+          if (!jobSetId) {
+            // Première slide : créer le job_set
+            const headers = await getAuthHeader();
+            const { data: jobSetData, error: jobSetError } = await supabase.functions.invoke('create-job-set', {
+              body: { 
+                brandId: activeBrandId, 
+                prompt: carouselPlan.globals?.promise || "Carousel",
+                count: carouselPlan.slides.length,
+                aspectRatio: aspect_ratio
+              },
+              headers: {
+                ...headers,
+                'x-idempotency-key': crypto.randomUUID()
+              }
+            });
+            
+            if (jobSetError || !jobSetData?.data?.id) {
+              console.error('[Slide] create-job-set failed:', jobSetError);
+              return { error: 'Impossible de créer le carrousel' };
+            }
+            
+            jobSetId = jobSetData.data.id;
+            setActiveJobSetId(jobSetId);
+            setCarouselTotal(carouselPlan.slides.length);
+            localStorage.setItem('alfie-active-carousel', jobSetId);
+            localStorage.setItem('alfie-carousel-total', carouselPlan.slides.length.toString());
+            
+            console.log('[Slide] ✅ Job set created:', jobSetId);
+          }
+          
+          // Créer le job pour cette slide spécifique
+          const { data: brand } = await supabase
+            .from('brands')
+            .select('name, palette, voice, logo_url')
+            .eq('id', activeBrandId)
+            .single();
+          
+          const brandSnapshot = {
+            name: brand?.name || '',
+            palette: brand?.palette || [],
+            voice: brand?.voice || '',
+            logo_url: brand?.logo_url || null
+          };
+          
+          const { error: jobError } = await supabase.from('jobs').insert({
+            job_set_id: jobSetId,
+            index_in_set: slideIndex,
+            prompt: `Slide ${slideIndex + 1}: ${slideContent.title}`,
+            brand_snapshot: brandSnapshot,
+            metadata: { slideContent },
+            status: 'queued'
+          });
+          
+          if (jobError) {
+            console.error('[Slide] Job insertion failed:', jobError);
+            return { error: 'Impossible de créer la tâche de génération' };
+          }
+          
+          console.log('[Slide] ✅ Job queued for slide', slideIndex);
+          
+          // Incrémenter l'index pour la prochaine slide
+          setCurrentSlideIndex(slideIndex + 1);
+          
+          // Déclencher le worker
+          await triggerWorker();
+          
+          return { 
+            success: true, 
+            message: `🎨 Génération de la Slide ${slideIndex + 1} lancée ! (en cours...)`
+          };
+        } catch (error: any) {
+          console.error('[Slide] Exception:', error);
+          return { error: error.message || "Erreur de génération de la slide" };
         }
       }
       

@@ -180,42 +180,63 @@ Chaque réponse doit suivre :
   📝 Étapes : "1. Extraction palette Brand Kit 2. Génération 3. Export ZIP"
   💰 Coût : "Coût : 5 visuels (quota marque) + 5 crédits IA"
 
-3️⃣ CARROUSELS - RÈGLE STRICTE : TOUJOURS APPELER create_carousel IMMÉDIATEMENT
+3️⃣ CARROUSELS - FLUX DE VALIDATION SLIDE PAR SLIDE
 
-Quand l'utilisateur demande un carrousel Instagram/LinkedIn :
+Quand l'utilisateur demande un carrousel :
 
-⚠️ TU NE DOIS PAS :
-- Expliquer ce que tu vas faire ("je vais créer un carrousel de 5 slides...")
-- Demander confirmation avant de lancer
-- Discuter du format ou du contenu
-
-✅ TU DOIS IMMÉDIATEMENT :
-- Appeler le tool create_carousel avec :
-  * prompt: description en anglais (translate if needed)
+ÉTAPE 1 : GÉNÉRATION DU PLAN TEXTUEL
+- Appeler immédiatement le tool plan_carousel avec :
+  * prompt: description en anglais (translate si besoin)
   * count: nombre de slides (default: 5)
   * aspect_ratio: "1:1" (Instagram post) ou "4:5" (feed)
-- Après le tool call, dire : "🎨 Carrousel de {count} slides lancé !"
+- Ce tool retourne un JSON structuré avec toutes les slides en texte
 
-EXEMPLES D'APPELS IMMÉDIATS (toutes variantes orthographiques) :
+ÉTAPE 2 : PRÉSENTER LA PREMIÈRE SLIDE
+- Afficher uniquement la Slide 1 dans le chat avec :
+  * Titre
+  * Sous-titre
+  * Bullets / KPIs (si présents)
+- Demander validation : "Slide 1 OK ? Si oui, je génère l'image 🎨"
 
-User: "Crée-moi un carrousel sur les 5 avantages de notre produit"
-→ Tool call IMMÉDIAT : create_carousel(prompt="5 benefits of our product", count=5, aspect_ratio="1:1")
-→ Réponse APRÈS tool call : "🎨 Carrousel de 5 slides lancé ! Suivi en temps réel ci-dessous."
+ÉTAPE 3 : GÉNÉRER L'IMAGE APRÈS VALIDATION
+- Quand user valide (dit "ok", "oui", "valide", "génère", "parfait", etc.)
+- Appeler generate_carousel_slide avec :
+  * slideIndex: 0 (pour slide 1), puis 1, 2, etc.
+  * slideContent: le JSON de la slide validée
+- Afficher l'image générée
 
-User: "fais moi un carroussel insta" (faute courante)
-→ Tool call IMMÉDIAT : create_carousel(prompt="Instagram carousel for brand", count=5, aspect_ratio="1:1")
-→ Réponse APRÈS tool call : "🎨 Carrousel de 5 slides lancé !"
+ÉTAPE 4 : PASSER À LA SLIDE SUIVANTE
+- Afficher Slide 2 en texte
+- Demander validation
+- Générer après validation
+- Et ainsi de suite jusqu'à la dernière slide
 
-User: "caroussel avec 8 slides" (autre variante)
-→ Tool call IMMÉDIAT : create_carousel(prompt="Carousel for social media", count=8, aspect_ratio="1:1")
-→ Réponse APRÈS tool call : "🎨 Carrousel de 8 slides lancé !"
+RÈGLES :
+- Ne JAMAIS générer toutes les images d'un coup
+- Toujours attendre la validation du client avant de générer
+- Si le client demande une modification (ex: "change le titre"), mettre à jour le plan et redemander validation
+- Garder en mémoire le plan complet pour référence
 
-User: "carousel" (anglais)
-→ Tool call IMMÉDIAT : create_carousel(prompt="Social media carousel", count=5, aspect_ratio="1:1")
-→ Réponse APRÈS tool call : "🎨 Carrousel de 5 slides lancé !"
+GESTION DES VALIDATIONS SLIDES :
 
-⚠️ RÈGLE ABSOLUE : Dès que tu détectes "carrousel", "carroussel", "caroussel", "carousel", "plusieurs slides", "série d'images" 
-→ APPELLE create_carousel IMMÉDIATEMENT (pas de discussion préalable)
+Quand l'utilisateur répond après avoir vu une slide en texte :
+- Si réponse positive ("ok", "oui", "valide", "génère", "parfait", "nickel", etc.)
+  → Appeler generate_carousel_slide avec l'index de la slide actuelle
+  → Dire : "🎨 Génération de la Slide X en cours..."
+  
+- Si demande de modification ("change le titre", "mets plutôt X", "reformule", etc.)
+  → Mettre à jour le plan en mémoire
+  → Réafficher la slide modifiée
+  → Redemander validation
+  
+- Si passage à la slide suivante après génération
+  → Afficher la Slide suivante en texte
+  → Redemander validation
+
+Garder en mémoire :
+- Le plan complet (carouselPlan)
+- L'index de la slide actuelle (currentSlideIndex)
+- Le job_set_id du carrousel en cours
 
 4️⃣ ERREURS
 Message clair + bouton d'action mentale "Réessayer"
@@ -458,6 +479,41 @@ Quand tu détectes une intention, appelle le tool AVANT de répondre :
               }
             },
             required: ["prompt", "count"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "plan_carousel",
+          description: "Generate a structured text plan for a carousel (returns JSON with all slides content, no images generated yet)",
+          parameters: {
+            type: "object",
+            properties: {
+              prompt: { type: "string", description: "Carousel theme/objective in English" },
+              count: { type: "number", description: "Number of slides (default: 5)" },
+              aspect_ratio: { type: "string", description: "Aspect ratio: '1:1' or '4:5'" }
+            },
+            required: ["prompt"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "generate_carousel_slide",
+          description: "Generate a single carousel slide image from validated text content",
+          parameters: {
+            type: "object",
+            properties: {
+              slideIndex: { type: "number", description: "Index of the slide (0-based)" },
+              slideContent: { 
+                type: "object", 
+                description: "Validated slide content (title, subtitle, bullets, kpis)" 
+              },
+              aspect_ratio: { type: "string", description: "Aspect ratio: '1:1' or '4:5'" }
+            },
+            required: ["slideIndex", "slideContent"]
           }
         }
       }
