@@ -275,21 +275,43 @@ export function AlfieChat() {
     } else if (activeBrandId) {
       // Fallback: chercher le dernier job_set en cours pour cette marque
       const fetchLastJobSet = async () => {
-        const { data } = await supabase
+        const { data: lastJobSet } = await supabase
           .from('job_sets')
-          .select('id, total, status')
+          .select('id, total, status, created_at')
           .eq('brand_id', activeBrandId)
-          .in('status', ['queued', 'processing'])  // ✅ Exclure 'done'
+          .in('status', ['queued', 'processing'])
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
         
-        if (data) {
-          console.log('[Carousel] Found active job_set:', data.id);
-          setActiveJobSetId(data.id);
-          setCarouselTotal(data.total || 0);
-          localStorage.setItem('activeJobSetId', data.id);
-          localStorage.setItem('carouselTotal', (data.total || 0).toString());
+        // ✅ GARDE: Vérifier si le job_set est "fantôme" (queued sans jobs depuis >5min)
+        if (lastJobSet) {
+          const { count } = await supabase
+            .from('jobs')
+            .select('*', { count: 'exact', head: true })
+            .eq('job_set_id', lastJobSet.id);
+          
+          const ageMinutes = (Date.now() - new Date(lastJobSet.created_at).getTime()) / 60000;
+          const isPhantom = (count ?? 0) === 0 && ageMinutes > 5;
+          
+          if (isPhantom) {
+            console.log('[Carousel] Detected phantom job_set, auto-canceling:', lastJobSet.id);
+            const { data: { session } } = await supabase.auth.getSession();
+            await supabase.functions.invoke('cancel-job-set', {
+              body: { jobSetId: lastJobSet.id },
+              headers: { Authorization: `Bearer ${session?.access_token}` }
+            });
+            localStorage.removeItem('activeJobSetId');
+            localStorage.removeItem('carouselTotal');
+            toast.info('Ancien carrousel bloqué nettoyé, prêt à relancer.');
+            return; // Ne pas restaurer
+          }
+          
+          console.log('[Carousel] Found active job_set:', lastJobSet.id);
+          setActiveJobSetId(lastJobSet.id);
+          setCarouselTotal(lastJobSet.total || 0);
+          localStorage.setItem('activeJobSetId', lastJobSet.id);
+          localStorage.setItem('carouselTotal', (lastJobSet.total || 0).toString());
           setTimeout(() => refreshCarousel(), 200);
         }
       };
@@ -852,11 +874,6 @@ export function AlfieChat() {
             };
           }
           
-          setMessages(prev => [...prev, {
-            role: 'assistant',
-            content: `🎨 Création d'un carrousel de ${count} slides en cours...\n\nCela va consommer ${count} visuels de ton quota.`
-          }]);
-          
           // ✅ Vérifier la marque active avant l'appel
           console.log('[Carousel] Calling chat-create-carousel with:', { 
             activeBrandId, 
@@ -869,29 +886,61 @@ export function AlfieChat() {
             return;
           }
           
-          const { data, error } = await supabase.functions.invoke('chat-create-carousel', {
-            body: {
-              brandId: activeBrandId,
-              threadId: conversationId,
-              prompt,
-              count,
-              aspectRatio: aspect_ratio
-            },
-            headers: {
-              'x-idempotency-key': crypto.randomUUID()
+          // ✅ ESSAYER chat-create-carousel, fallback vers create-job-set si échec
+          let jobSetId: string | null = null;
+          
+          try {
+            const { data, error } = await supabase.functions.invoke('chat-create-carousel', {
+              body: {
+                brandId: activeBrandId,
+                threadId: conversationId,
+                prompt,
+                count,
+                aspectRatio: aspect_ratio
+              },
+              headers: {
+                'x-idempotency-key': crypto.randomUUID()
+              }
+            });
+            
+            if (error || !data?.jobSetId) {
+              console.warn('[Carousel] chat-create-carousel failed, trying fallback:', error);
+              throw new Error('chat-create-carousel_failed');
             }
-          });
-          
-          if (error) {
-            console.error('[create_carousel] Error:', error);
-            throw new Error(error.message || 'Erreur création carrousel');
+            
+            jobSetId = data.jobSetId;
+          } catch (e) {
+            console.warn('[Carousel] Fallback to create-job-set:', e);
+            const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('create-job-set', {
+              body: {
+                brandId: activeBrandId,
+                prompt,
+                count,
+                aspectRatio: aspect_ratio
+              }
+            });
+            
+            if (fallbackError || !fallbackData?.data?.id) {
+              console.error('[Carousel] Both methods failed:', fallbackError);
+              toast.error('Échec de la création du carrousel. Réessaye.');
+              return { error: 'Échec de création du carrousel' };
+            }
+            
+            jobSetId = fallbackData.data.id;
           }
           
-          if (!data?.jobSetId) {
-            throw new Error('Aucun jobSetId retourné');
+          // ✅ NE MONTRER "génération en cours" QU'APRÈS SUCCÈS
+          if (!jobSetId) {
+            toast.error('Impossible de créer le carrousel.');
+            return { error: 'Pas de jobSetId' };
           }
           
-          console.log('[Carousel] New jobSetId:', data.jobSetId);
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `🎨 Création d'un carrousel de ${count} slides en cours...\n\nCela va consommer ${count} visuels de ton quota.`
+          }]);
+          
+          console.log('[Carousel] New jobSetId:', jobSetId);
           
           // ✅ Nettoyer l'ancien carrousel d'abord
           setActiveJobSetId('');
@@ -899,9 +948,9 @@ export function AlfieChat() {
           
           // ⏳ Puis après un court délai, charger le nouveau
           setTimeout(() => {
-            setActiveJobSetId(data.jobSetId);
+            setActiveJobSetId(jobSetId!);
             setCarouselTotal(count);
-            localStorage.setItem('activeJobSetId', data.jobSetId);
+            localStorage.setItem('activeJobSetId', jobSetId!);
             localStorage.setItem('carouselTotal', count.toString());
             
             // ⚡ Forcer le refresh immédiat
@@ -913,7 +962,7 @@ export function AlfieChat() {
           
           return {
             success: true,
-            jobSetId: data.jobSetId,
+            jobSetId: jobSetId,
             total: count,
             message: `Carrousel lancé ! Suivi en temps réel ci-dessous. ⏳`
           };
@@ -1195,6 +1244,8 @@ export function AlfieChat() {
   const handleCancelCarousel = async () => {
     if (!activeJobSetId) return;
     
+    console.log('[CancelCarousel] Resetting job_set:', activeJobSetId);
+    
     // FILET DE SÉCURITÉ: Fonction de nettoyage UI réutilisable
     const cleanupUI = () => {
       // Stop pumping
@@ -1203,51 +1254,38 @@ export function AlfieChat() {
         pumpRef.current = null;
       }
       
-      // Clear state
+      // Clear ALL carousel state
       localStorage.removeItem('activeJobSetId');
       localStorage.removeItem('carouselTotal');
       setActiveJobSetId('');
       setCarouselTotal(0);
       
-      // Refresh carousel to update UI
+      // Refresh carousel to update UI (will clear items/done via hook)
       refreshCarousel();
     };
     
     try {
-      console.log('[CancelCarousel] Canceling job_set:', activeJobSetId);
+      const { data: { session } } = await supabase.auth.getSession();
       const { data, error } = await supabase.functions.invoke('cancel-job-set', {
-        body: { jobSetId: activeJobSetId }
+        body: { jobSetId: activeJobSetId },
+        headers: { Authorization: `Bearer ${session?.access_token}` }
       });
       
       if (error) {
-        console.error('[CancelCarousel] Backend error:', error);
-        // Nettoyer l'UI même si le backend échoue
-        cleanupUI();
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: '⚠️ Carrousel annulé localement (impossible de contacter le backend). Les jobs peuvent continuer en arrière-plan.'
-        }]);
-        toast.error(`Annulé localement (backend: ${error.message})`);
-        return;
+        console.warn('[CancelCarousel] Backend error (ignoring):', error);
+      } else {
+        console.log('[CancelCarousel] Backend success:', data);
       }
       
-      console.log('[CancelCarousel] Backend success:', data);
+      // ✅ RÉINITIALISATION COMPLÈTE (même si le backend échoue)
       cleanupUI();
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `✅ Carrousel annulé. ${data?.canceledJobs || 0} jobs annulés, ${data?.refundedVisuals || 0} visuels remboursés.`
-      }]);
-      toast.success(`Génération annulée (${data?.canceledJobs || 0} jobs, ${data?.refundedVisuals || 0} visuels remboursés)`);
+      toast.success('Carrousel réinitialisé, prêt à relancer ! 🔄');
       
     } catch (err: any) {
       console.error('[CancelCarousel] Exception:', err);
       // Nettoyer l'UI même en cas d'exception
       cleanupUI();
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: '⚠️ Carrousel annulé localement (erreur réseau). Les jobs peuvent continuer en arrière-plan.'
-      }]);
-      toast.error('Annulé localement (impossible de contacter le backend)');
+      toast.success('Carrousel réinitialisé localement ! 🔄');
     }
   };
 
