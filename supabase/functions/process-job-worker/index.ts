@@ -176,21 +176,43 @@ serve(async (req) => {
     let finalImageErr: any;
     
     try {
-      const response = await supabase.functions.invoke('alfie-generate-ai-image', {
-        body: {
-          prompt: enrichedPrompt,
-          resolution,
-          brandKit,
-          seed,
-          backgroundOnly: false,
-          overlayText,
-          negativePrompt: 'blurry, low quality, distorted'
-        }
+      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+      if (!LOVABLE_API_KEY) throw new Error('Missing LOVABLE_API_KEY');
+
+      const gatewayResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        signal: ctrl.signal,
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash-image-preview',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: `${enrichedPrompt}\n\nIMPORTANT: Create a polished marketing visual at ${resolution} (${aspectRatio}). Integrate this text directly into the design with strong legibility and balanced layout. Keep brand style consistent.\n\nText to include (preserve line breaks):\n${overlayText}` }
+              ]
+            }
+          ],
+          modalities: ['image', 'text']
+        })
       });
-      
-      finalImageData = response.data;
-      finalImageErr = response.error;
-      
+
+      if (!gatewayResp.ok) {
+        const errText = await gatewayResp.text();
+        throw new Error(`AI gateway error ${gatewayResp.status}: ${errText}`);
+      }
+
+      const gatewayJson = await gatewayResp.json();
+      const imgUrl = gatewayJson?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      if (!imgUrl || typeof imgUrl !== 'string') {
+        throw new Error('AI did not return an image URL');
+      }
+
+      // Normalize to the structure expected by pickImage()
+      finalImageData = { images: [{ url: imgUrl }] };
     } catch (err: any) {
       finalImageErr = err;
     } finally {

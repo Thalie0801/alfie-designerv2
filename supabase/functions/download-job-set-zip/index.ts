@@ -61,24 +61,42 @@ serve(async (req) => {
     for (const job of jobs) {
       if (!job.asset_id) continue;
 
-      // Récupérer l'asset séparément
-      const { data: asset } = await supabase
-        .from('media_generations')
-        .select('output_url')
+      // Récupérer l'asset dans la table assets
+      const { data: assetRec, error: assetErr } = await supabase
+        .from('assets')
+        .select('storage_key, index_in_set, meta')
         .eq('id', job.asset_id)
         .single();
 
-      if (!asset?.output_url) {
-        console.warn(`[download-zip] No output_url for job ${job.id}`);
+      if (assetErr || !assetRec) {
+        console.warn(`[download-zip] Asset not found for job ${job.id}`);
         continue;
       }
 
-      const imageUrl = asset.output_url;
+      const meta = (assetRec.meta as any) || {};
+      let imageUrl: string | undefined = meta.public_url;
+      if (!imageUrl) {
+        const { data: pub } = supabase.storage
+          .from('media-generations')
+          .getPublicUrl(assetRec.storage_key);
+        imageUrl = pub.publicUrl;
+      }
+
+      if (!imageUrl) {
+        console.warn(`[download-zip] No public URL for asset of job ${job.id}`);
+        continue;
+      }
+
       const response = await fetch(imageUrl);
+      if (!response.ok) {
+        console.warn(`[download-zip] Failed to fetch ${imageUrl} for job ${job.id}`);
+        continue;
+      }
+
       const blob = await response.blob();
       const arrayBuffer = await blob.arrayBuffer();
 
-      const filename = `slide-${job.index_in_set + 1}.png`;
+      const filename = `slide-${(job.index_in_set ?? assetRec.index_in_set) + 1}.png`;
       zip.file(filename, new Uint8Array(arrayBuffer));
       console.log(`[download-zip] Added ${filename} to ZIP`);
     }
