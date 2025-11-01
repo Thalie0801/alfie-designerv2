@@ -1018,7 +1018,9 @@ export function AlfieChat() {
     const carouselMatch = userMessage.match(/carrousel|carousel/i);
     if (carouselMatch && !forceImage && !forceVideo) {
       const countMatch = userMessage.match(/\d+/);
-      const slideCount = countMatch ? Math.min(10, Math.max(2, parseInt(countMatch[0]))) : 5;
+      const slideCount = countMatch ? Math.min(10, Math.max(1, parseInt(countMatch[0]))) : 1;
+      const wantsSquare = /(1x1|1:1|carr[ée])/i.test(userMessage);
+      const aspect = wantsSquare ? '1:1' : '4:5';
 
       if (!activeBrandId) {
         setMessages(prev => [...prev, {
@@ -1031,7 +1033,7 @@ export function AlfieChat() {
       const idempotencyKey = `${Date.now()}-${Math.random().toString(36)}`;
 
       try {
-        setGenerationStatus({ type: 'image', message: `Planification du carrousel (${slideCount} slides)... 🎨` });
+        setGenerationStatus({ type: 'image', message: `Planification du carrousel (${slideCount} slide${slideCount>1?'s':''})... 🎨` });
 
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.access_token) throw new Error('Non authentifié');
@@ -1042,7 +1044,7 @@ export function AlfieChat() {
             brandId: activeBrandId,
             prompt: userMessage,
             count: slideCount,
-            aspectRatio: '4:5'
+            aspectRatio: aspect
           },
           headers: {
             'x-idempotency-key': idempotencyKey,

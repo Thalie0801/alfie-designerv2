@@ -89,6 +89,7 @@ serve(async (req) => {
     const brandSnapshot = job.brand_snapshot;
     const correctedPrompt = correctFrenchSpelling(job.prompt);
     const enrichedPrompt = enrichPromptWithBrand(correctedPrompt, brandSnapshot);
+    const finalPrompt = `${enrichedPrompt} CRITICAL: Ne rends AUCUN mot ni texte dans l'image (no text). Composition uniquement graphique.`;
 
     // 4. Appeler alfie-generate-ai-image (ne nécessite pas de token utilisateur)
     const brandKit = brandSnapshot ? {
@@ -100,8 +101,8 @@ serve(async (req) => {
 
     const { data: imageData, error: imageErr } = await supabase.functions.invoke('alfie-generate-ai-image', {
       body: {
-        prompt: enrichedPrompt,
-        resolution: '1080x1350', // 4:5 ratio
+        prompt: finalPrompt,
+        resolution: '1080x1350', // 4:5 ratio par défaut
         brandKit
       }
     });

@@ -36,7 +36,11 @@ serve(async (req) => {
 
     const { brandId, prompt, count, aspectRatio = '4:5' } = await req.json();
 
-    if (!brandId || !prompt || count < 1 || count > 10) {
+    // Forcer un seul visuel si format carré 1:1 (carrousel 1×1)
+    const requestedCount = typeof count === 'number' ? count : 1;
+    const finalCount = aspectRatio === '1:1' ? 1 : Math.max(1, Math.min(10, requestedCount));
+
+    if (!brandId || !prompt || finalCount < 1 || finalCount > 10) {
       throw new Error('Invalid request parameters');
     }
 
