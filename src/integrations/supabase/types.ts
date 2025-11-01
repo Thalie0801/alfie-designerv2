@@ -334,6 +334,7 @@ export type Database = {
           created_at: string
           height: number | null
           id: string
+          index_in_set: number | null
           job_id: string | null
           job_set_id: string | null
           meta: Json | null
@@ -348,6 +349,7 @@ export type Database = {
           created_at?: string
           height?: number | null
           id?: string
+          index_in_set?: number | null
           job_id?: string | null
           job_set_id?: string | null
           meta?: Json | null
@@ -362,6 +364,7 @@ export type Database = {
           created_at?: string
           height?: number | null
           id?: string
+          index_in_set?: number | null
           job_id?: string | null
           job_set_id?: string | null
           meta?: Json | null

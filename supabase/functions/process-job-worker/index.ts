@@ -412,6 +412,7 @@ serve(async (req) => {
       job_set_id: job.job_set_id,
       storage_key: fileName,
       mime: 'image/png',
+      index_in_set: job.index_in_set,
       width: null,
       height: null,
       checksum: null,
@@ -422,8 +423,7 @@ serve(async (req) => {
         coherence_score: coherenceScore,
         coherence_mode: 'direct',
         retry_count: retryCount,
-        public_url: publicUrl,
-        index_in_set: job.index_in_set
+        public_url: publicUrl
       }
     };
     

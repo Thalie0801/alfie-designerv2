@@ -4,6 +4,7 @@ import { useBrandKit } from '@/hooks/useBrandKit';
 import { useAlfieCredits } from '@/hooks/useAlfieCredits';
 import { useTemplateLibrary } from '@/hooks/useTemplateLibrary';
 import { useAlfieOptimizations } from '@/hooks/useAlfieOptimizations';
+import { useCarouselSubscription } from '@/hooks/useCarouselSubscription';
 import { openInCanva } from '@/services/canvaLinker';
 import { supabase } from '@/integrations/supabase/client';
 import { detectIntent, canHandleLocally, generateLocalResponse } from '@/utils/alfieIntentDetector';
@@ -14,7 +15,6 @@ import { ChatComposer } from '@/components/create/ChatComposer';
 import { QuotaBar } from '@/components/create/QuotaBar';
 import { ChatBubble } from '@/components/create/ChatBubble';
 import { CarouselProgressCard } from '@/components/chat/CarouselProgressCard';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 
 type VideoEngine = 'sora' | 'seededance' | 'kling';
 
@@ -126,13 +126,9 @@ export function AlfieChat() {
   const [generationStatus, setGenerationStatus] = useState<{ type: string; message: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const carouselChannelRef = useRef<RealtimeChannel | null>(null);
-  const [carouselState, setCarouselState] = useState<{
-    jobSetId: string;
-    total: number;
-    done: number;
-    items: Array<{ id: string; url: string; index: number; }>;
-  } | null>(null);
+  const [activeJobSetId, setActiveJobSetId] = useState<string>('');
+  const [carouselTotal, setCarouselTotal] = useState(0);
+  const { items: carouselItems, done: carouselDone } = useCarouselSubscription(activeJobSetId, carouselTotal);
   const { brandKit, activeBrandId } = useBrandKit();
   const { totalCredits, decrementCredits, hasCredits, incrementGenerations } = useAlfieCredits();
   const { searchTemplates } = useTemplateLibrary();
@@ -226,17 +222,7 @@ export function AlfieChat() {
   // Scroll automatique avec scrollIntoView
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, generationStatus, carouselState]);
-
-  // Cleanup Realtime channel on unmount
-  useEffect(() => {
-    return () => {
-      if (carouselChannelRef.current) {
-        supabase.removeChannel(carouselChannelRef.current);
-        carouselChannelRef.current = null;
-      }
-    };
-  }, []);
+  }, [messages, generationStatus]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1033,7 +1019,7 @@ export function AlfieChat() {
     //   return;
     // }
 
-    // 🎯 DÉTECTION CARROUSEL (prioritaire) - Avec Realtime
+    // 🎯 DÉTECTION CARROUSEL (prioritaire) - Avec Realtime via Hook
     const carouselMatch = userMessage.match(/carrousel|carousel/i);
     if (carouselMatch && !forceImage && !forceVideo) {
       const countMatch = userMessage.match(/\d+/);
@@ -1077,93 +1063,18 @@ export function AlfieChat() {
 
         console.log('[Carousel] Job set created:', jobSet.jobSetId);
 
-        // 2. Afficher message de démarrage avec carte
+        // 2. Afficher message de démarrage
         setMessages(prev => [...prev, {
           role: 'assistant',
           content: `✅ Carrousel de ${slideCount} slides en cours de génération...`
         }]);
 
-        // 3. Initialiser l'état carrousel
-        setCarouselState({
-          jobSetId: jobSet.jobSetId,
-          total: slideCount,
-          done: 0,
-          items: []
-        });
-
+        // 3. Activer le hook en définissant jobSetId et total
+        setActiveJobSetId(jobSet.jobSetId);
+        setCarouselTotal(slideCount);
         setGenerationStatus(null);
 
-        // 4. S'abonner au Realtime sur assets
-        console.log('[Carousel] Subscribing to Realtime for job_set:', jobSet.jobSetId);
-        
-        // Cleanup previous channel if exists
-        if (carouselChannelRef.current) {
-          await supabase.removeChannel(carouselChannelRef.current);
-        }
-
-        const channel = supabase
-          .channel(`jobset:${jobSet.jobSetId}`)
-          .on(
-            'postgres_changes',
-            {
-              event: 'INSERT',
-              schema: 'public',
-              table: 'assets',
-              filter: `job_set_id=eq.${jobSet.jobSetId}`
-            },
-            (payload: any) => {
-              const newAsset = payload.new;
-              const publicUrl = newAsset.meta?.public_url || 
-                               `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/media-generations/${newAsset.storage_key}`;
-              
-              console.log('📡 [Realtime] New asset received:', newAsset.id, publicUrl);
-              
-              // Mettre à jour l'état carrousel
-              setCarouselState(prev => {
-                if (!prev || prev.jobSetId !== jobSet.jobSetId) return prev;
-                
-                // Éviter les doublons
-                if (prev.items.some(item => item.id === newAsset.id)) return prev;
-                
-                return {
-                  ...prev,
-                  done: prev.done + 1,
-                  items: [...prev.items, {
-                    id: newAsset.id,
-                    url: publicUrl,
-                    index: newAsset.meta?.index_in_set ?? prev.done
-                  }]
-                };
-              });
-              
-              // Badge template
-              const templateEmojis: Record<string, string> = {
-                hero: '🎯',
-                problem: '❌',
-                solution: '✅',
-                impact: '📊',
-                cta: '🎬'
-              };
-              const slideTemplate = newAsset.meta?.slide_template || 'variant';
-              const emoji = templateEmojis[slideTemplate] || '🎨';
-              
-              // Ajouter un message avec l'image
-              setMessages(prev => [...prev, {
-                role: 'assistant',
-                content: `**Slide ${(newAsset.meta?.index_in_set ?? 0) + 1}/${slideCount}** ${emoji} ${slideTemplate.charAt(0).toUpperCase() + slideTemplate.slice(1)}`,
-                imageUrl: publicUrl,
-                assetId: newAsset.id,
-                assetType: 'image'
-              }]);
-            }
-          )
-          .subscribe((status) => {
-            console.log('[Carousel] Realtime subscription status:', status);
-          });
-
-        carouselChannelRef.current = channel;
-
-        // 5. Déclencher le premier worker
+        // 4. Déclencher le premier worker
         console.log('[Carousel] Triggering initial worker...');
         await triggerWorker();
 
@@ -1172,7 +1083,8 @@ export function AlfieChat() {
         console.error('[Carousel] Error:', err);
         toast.error(err.message || 'Erreur lors de la génération du carrousel');
         setGenerationStatus(null);
-        setCarouselState(null);
+        setActiveJobSetId('');
+        setCarouselTotal(0);
         setMessages(prev => [...prev, {
           role: 'assistant',
           content: `❌ Erreur : ${err.message || 'Impossible de créer le carrousel'}`
@@ -1313,12 +1225,23 @@ export function AlfieChat() {
             )}
 
             {/* Carte de progression carrousel */}
-            {carouselState && (
+            {activeJobSetId && carouselTotal > 0 && (
               <div className="animate-fade-in">
                 <CarouselProgressCard
-                  total={carouselState.total}
-                  done={carouselState.done}
-                  items={carouselState.items}
+                  total={carouselTotal}
+                  done={carouselDone}
+                  items={carouselItems}
+                  onDownloadZip={async () => {
+                    try {
+                      const { data, error } = await supabase.functions.invoke('download-job-set-zip', {
+                        body: { jobSetId: activeJobSetId }
+                      });
+                      if (error) throw error;
+                      if (data?.url) window.location.href = data.url;
+                    } catch (err) {
+                      toast.error('Erreur lors du téléchargement du ZIP');
+                    }
+                  }}
                 />
               </div>
             )}
