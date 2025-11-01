@@ -26,8 +26,7 @@ export async function compositeSlide(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           file: backgroundUrl,
-          upload_preset: 'ml_default',
-          api_key: API_KEY
+          upload_preset: 'ml_default'
         })
       }
     );
@@ -54,8 +53,7 @@ export async function compositeSlide(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           file: svgDataUri,
-          upload_preset: 'ml_default',
-          api_key: API_KEY
+          upload_preset: 'ml_default'
         })
       }
     );
