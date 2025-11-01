@@ -96,13 +96,23 @@ export function AssetMessage({
           ) : (
             <>
               {outputUrl && !imageError ? (
-                <img 
-                  src={outputUrl} 
-                  alt="Generated content" 
-                  className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition"
-                  onClick={() => window.open(outputUrl, '_blank')}
-                  onError={() => setImageError(true)}
-                />
+                <div className="relative group w-full h-full">
+                  <img 
+                    src={outputUrl} 
+                    alt="Generated content" 
+                    className="w-full h-full object-cover transition"
+                    onError={() => setImageError(true)}
+                  />
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button 
+                      onClick={handleDownload}
+                      className="bg-white rounded-full p-3 shadow-lg hover:scale-110 transition-transform"
+                      aria-label="Télécharger l'image"
+                    >
+                      <Download className="h-6 w-6 text-slate-900" />
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-secondary/10">
                   <ImageIcon className="h-16 w-16 text-muted-foreground" />

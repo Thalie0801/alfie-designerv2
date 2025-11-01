@@ -2,14 +2,11 @@ import { useEffect, useRef } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { Send, ImagePlus, Mic, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { GeneratorMode } from './Toolbar';
 
 interface ChatComposerProps {
   value: string;
   onChange: (value: string) => void;
   onSend: () => void;
-  mode: GeneratorMode;
-  onModeChange: (mode: GeneratorMode) => void;
   disabled?: boolean;
   isLoading?: boolean;
   onUploadClick?: () => void;
@@ -18,13 +15,6 @@ interface ChatComposerProps {
   uploadedImage?: string | null;
   onRemoveImage?: () => void;
 }
-
-const MODE_LABELS: Record<GeneratorMode, string> = {
-  auto: 'Auto',
-  image: 'Image',
-  video: 'Vidéo',
-  text: 'Texte'
-};
 
 const QUICK_CHIPS = [
   { label: 'Carrousel', fill: 'Fais-moi un carrousel de 5 visuels cohérents avec la marque.' },
@@ -36,8 +26,6 @@ export function ChatComposer({
   value,
   onChange,
   onSend,
-  mode,
-  onModeChange,
   disabled,
   isLoading,
   onUploadClick,
@@ -105,25 +93,8 @@ export function ChatComposer({
 
   return (
     <div className="fixed bottom-0 inset-x-0 z-20 bg-background/95 backdrop-blur-md border-t border-border">
-      {/* Mode switcher */}
-      <div className="mx-auto max-w-3xl px-4 pt-2 flex gap-2 overflow-x-auto">
-        {(Object.keys(MODE_LABELS) as GeneratorMode[]).map((m) => (
-          <button
-            key={m}
-            onClick={() => onModeChange(m)}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-              mode === m
-                ? 'bg-primary text-primary-foreground shadow-soft'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            }`}
-          >
-            {MODE_LABELS[m]}
-          </button>
-        ))}
-      </div>
-
       {/* Composer */}
-      <div className="mx-auto max-w-3xl p-3 flex items-end gap-3">
+      <div className="mx-auto max-w-3xl p-2 flex items-end gap-3">
         <div className="flex-1 relative">
           <TextareaAutosize
             ref={textareaRef}
@@ -186,19 +157,21 @@ export function ChatComposer({
       </div>
 
       {/* Quick action chips */}
-      <div className="mx-auto max-w-3xl px-4 pb-2 flex gap-2 overflow-x-auto">
-        {QUICK_CHIPS.map((chip) => (
-          <button
-            key={chip.label}
-            onClick={() => handleChipClick(chip.fill)}
-            disabled={disabled || isLoading}
-            className="px-3 py-1.5 rounded-full bg-muted text-muted-foreground text-sm hover:bg-muted/80 
-                       whitespace-nowrap transition-colors disabled:opacity-50"
-          >
-            {chip.label}
-          </button>
-        ))}
-      </div>
+      {QUICK_CHIPS.length > 0 && (
+        <div className="mx-auto max-w-3xl px-4 pb-1.5 flex gap-2 overflow-x-auto">
+          {QUICK_CHIPS.slice(0, 2).map((chip, idx) => (
+            <button
+              key={idx}
+              onClick={() => handleChipClick(chip.fill)}
+              disabled={disabled || isLoading}
+              className="px-3 py-1.5 rounded-full bg-muted text-muted-foreground text-sm hover:bg-muted/80 
+                         whitespace-nowrap transition-colors disabled:opacity-50"
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Uploaded image preview */}
       {uploadedImage && (

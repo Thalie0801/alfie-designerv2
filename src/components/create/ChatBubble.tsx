@@ -102,7 +102,7 @@ export function ChatBubble({
             )}
             {(!imageUrl && !videoUrl) && (
               <div className={bubbleClasses}>
-                <p className="whitespace-pre-wrap leading-relaxed">{content}</p>
+                <p className="whitespace-pre-wrap leading-relaxed">{content.replace(/\*\*(.*?)\*\*/g, '$1').replace(/__(.*?)__/g, '$1').replace(/\*(.*?)\*/g, '$1')}</p>
               </div>
             )}
           </div>

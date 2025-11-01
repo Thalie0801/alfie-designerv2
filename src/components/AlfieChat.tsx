@@ -13,7 +13,6 @@ import { CreateHeader } from '@/components/create/CreateHeader';
 import { ChatComposer } from '@/components/create/ChatComposer';
 import { QuotaBar } from '@/components/create/QuotaBar';
 import { ChatBubble } from '@/components/create/ChatBubble';
-import type { GeneratorMode } from '@/components/create/Toolbar';
 
 type VideoEngine = 'sora' | 'seededance' | 'kling';
 
@@ -123,7 +122,6 @@ export function AlfieChat() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<{ type: string; message: string } | null>(null);
-  const [selectedMode, setSelectedMode] = useState<GeneratorMode>('auto');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { brandKit, activeBrandId } = useBrandKit();
@@ -1059,29 +1057,8 @@ export function AlfieChat() {
     setIsLoading(false);
   };
 
-  const getModeOptions = (): { forceVideo?: boolean; forceImage?: boolean; aspectRatio?: string; skipMediaInference?: boolean } | undefined => {
-    if (selectedMode === 'image') {
-      return { forceImage: true, aspectRatio: '1:1' }; // Default aspect ratio
-    }
-
-    if (selectedMode === 'video') {
-      return { forceVideo: true };
-    }
-
-    if (selectedMode === 'text') {
-      return { skipMediaInference: true };
-    }
-
-    return undefined;
-  };
-
   const sendWithCurrentMode = () => {
-    const options = getModeOptions();
-    if (options) {
-      handleSend(options);
-    } else {
-      handleSend();
-    }
+    handleSend();
   };
 
   const isTextareaDisabled = isLoading || !loaded;
@@ -1108,7 +1085,7 @@ export function AlfieChat() {
       />
       
       {/* Messages area with bottom padding for fixed composer */}
-      <div className="flex-1 overflow-y-auto pb-40">
+      <div className="flex-1 overflow-y-auto pb-32">
         <div className="mx-auto w-full max-w-3xl px-4 py-6">
           <section className="flex flex-col gap-4">
             {messages.map((message, index) => {
@@ -1164,8 +1141,6 @@ export function AlfieChat() {
         value={input}
         onChange={setInput}
         onSend={sendWithCurrentMode}
-        mode={selectedMode}
-        onModeChange={setSelectedMode}
         disabled={isTextareaDisabled}
         isLoading={isLoading}
         onUploadClick={() => fileInputRef.current?.click()}

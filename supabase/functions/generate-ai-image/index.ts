@@ -77,6 +77,32 @@ serve(async (req) => {
       );
     }
 
+    // Récupérer le Brand Kit pour enrichir la génération
+    const { data: brandKit } = await supabaseClient
+      .from('brand_kits')
+      .select('primary_color, secondary_color, accent_color, logo_url, brand_voice')
+      .eq('brand_id', brandId)
+      .maybeSingle();
+
+    let brandContext = "";
+    if (brandKit) {
+      const colors = [brandKit.primary_color, brandKit.secondary_color, brandKit.accent_color]
+        .filter(Boolean)
+        .join(', ');
+      
+      if (colors) {
+        brandContext += `Brand identity: use these exact colors ${colors}. `;
+      }
+      
+      if (brandKit.brand_voice) {
+        brandContext += `Brand style: ${brandKit.brand_voice}. `;
+      }
+      
+      if (brandKit.logo_url) {
+        brandContext += `Include subtle brand logo elements. `;
+      }
+    }
+
     try {
       await consumeBrandQuotas(brandId);
     } catch (quotaError) {
@@ -124,7 +150,7 @@ serve(async (req) => {
     };
 
     const basePrompt = reformulatePrompt(prompt);
-    const enhancedPrompt = `Professional marketing visual: ${basePrompt}. ${ratioDescriptions[aspectRatio] || ratioDescriptions["1:1"]}. High quality, clean composition, brand-ready design.`;
+    const enhancedPrompt = `Professional marketing visual: ${basePrompt}. ${brandContext}${ratioDescriptions[aspectRatio] || ratioDescriptions["1:1"]}. High quality, clean composition, brand-ready design.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
