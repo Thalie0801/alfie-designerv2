@@ -1,10 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
-import { canUseFeature } from '@/lib/access';
-import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import {
-  Sparkles, 
   LayoutDashboard, 
   CreditCard,
   TrendingUp,
@@ -36,8 +33,7 @@ import alfieMain from '@/assets/alfie-main.png';
 export function AppSidebar() {
   const { open, isMobile } = useSidebar();
   const location = useLocation();
-  const { user, profile, isAdmin, signOut, roles } = useAuth();
-  const { flags, loading: flagsLoading } = useFeatureFlags();
+  const { user, profile, isAdmin, signOut } = useAuth();
   const canSeeAdminToggle = user?.email ? ['nathaliestaelens@gmail.com','staelensnathalie@gmail.com'].includes(user.email) : false;
 
   // Removed automatic sidebar toggle on route changes to prevent menu disappearing bug
@@ -60,14 +56,8 @@ export function AppSidebar() {
     { path: '/affiliate', label: 'Affiliation', icon: TrendingUp, tourId: 'affiliate' },
   ];
 
-  // Ajouter "Créer" uniquement si autorisé (VIP/Admin)
-  const navItems = (!flagsLoading && canUseFeature('new_generator', { roles, plan: profile?.plan }, flags))
-    ? [
-        baseNavItems[0], // Chat Alfie
-        { path: '/app', label: 'Créer', icon: Sparkles }, // Créateur (VIP/Admin only)
-        ...baseNavItems.slice(1), // Reste
-      ]
-    : baseNavItems;
+  // Navigation principale (sans "Créer")
+  const navItems = baseNavItems;
 
   if (isAdmin || canSeeAdminToggle) {
     navItems.push({ path: '/admin', label: 'Admin', icon: Settings });

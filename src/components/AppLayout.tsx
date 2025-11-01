@@ -32,7 +32,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   };
 
   const navItems = [
-    { path: '/app', label: 'Créer', icon: Sparkles },
+    { path: '/chat', label: 'Chat Alfie', icon: Sparkles },
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/billing', label: 'Abonnement', icon: CreditCard },
   ];
@@ -47,7 +47,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <header className="sticky top-0 z-20 backdrop-blur bg-white/70 border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-6">
-            <Link to="/app" className="flex items-center gap-1.5 sm:gap-2">
+            <Link to="/chat" className="flex items-center gap-1.5 sm:gap-2">
               <span className="inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
                 <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
               </span>
@@ -75,9 +75,9 @@ export function AppLayout({ children }: AppLayoutProps) {
             {/* Admin Quick Switch - Hidden on small mobile */}
             {canSeeAdminToggle && (
               <div className="hidden sm:flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg bg-slate-100 border border-slate-200">
-                <Link to="/app">
+                <Link to="/chat">
                   <Button 
-                    variant={location.pathname === '/app' ? 'default' : 'ghost'} 
+                    variant={location.pathname === '/chat' ? 'default' : 'ghost'} 
                     size="sm"
                     className="text-xs sm:text-sm px-2 sm:px-3"
                     aria-label="Basculer vers le mode Client"
@@ -140,9 +140,9 @@ export function AppLayout({ children }: AppLayoutProps) {
                     <div className="pt-4 border-t">
                       <p className="text-xs text-muted-foreground mb-2 px-2">Mode</p>
                       <div className="flex flex-col gap-2">
-                        <Link to="/app" onClick={() => setMobileMenuOpen(false)}>
+                        <Link to="/chat" onClick={() => setMobileMenuOpen(false)}>
                           <Button 
-                            variant={location.pathname === '/app' ? 'default' : 'outline'} 
+                            variant={location.pathname === '/chat' ? 'default' : 'outline'} 
                             className="w-full justify-start"
                           >
                             👤 Client

@@ -3,13 +3,11 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { canUseFeature } from "@/lib/access";
-import { useFeatureFlags } from "@/hooks/useFeatureFlags";
+import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import Creator from "./pages/Creator";
+
 import Dashboard from "./pages/Dashboard";
 import Billing from "./pages/Billing";
 import Contact from "./pages/Contact";
@@ -36,9 +34,6 @@ import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 const queryClient = new QueryClient();
 
 const AppRoutes = () => {
-  const { roles, profile } = useAuth();
-  const { flags, loading: flagsLoading } = useFeatureFlags();
-  
   return (
     <Routes>
           <Route path="/" element={<Index />} />
@@ -70,17 +65,7 @@ const AppRoutes = () => {
           />
           <Route
             path="/app"
-            element={
-              !flagsLoading && canUseFeature('new_generator', { roles, plan: profile?.plan }, flags) ? (
-                <ProtectedRoute>
-                  <AppLayoutWithSidebar>
-                    <Creator />
-                  </AppLayoutWithSidebar>
-                </ProtectedRoute>
-              ) : (
-                <Navigate to="/dashboard" replace />
-              )
-            }
+            element={<Navigate to="/chat" replace />}
           />
           <Route
             path="/templates"
