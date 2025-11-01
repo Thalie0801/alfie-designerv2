@@ -44,16 +44,15 @@ export async function compositeSlide(
     const bgPublicId = bgData.public_id;
     console.log('✅ Background uploaded:', bgPublicId);
     
-    // 2. Convert SVG to base64 data URI
-    console.log('🔄 Converting SVG to base64...');
-    const svgBase64 = btoa(svgTextLayer);
-    const svgDataUri = `data:image/svg+xml;base64,${svgBase64}`;
+    // 2. Convert SVG string to Blob
+    console.log('🔄 Converting SVG to Blob...');
+    const svgBlob = new Blob([svgTextLayer], { type: 'image/svg+xml' });
     
     // 3. Upload SVG overlay to Cloudinary
     console.log('⬆️ Uploading SVG overlay...');
     
     const svgFormData = new FormData();
-    svgFormData.append('file', svgDataUri);
+    svgFormData.append('file', svgBlob, 'overlay.svg');
     svgFormData.append('upload_preset', 'ml_default');
     
     const svgUploadResponse = await fetch(
