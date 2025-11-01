@@ -9,6 +9,7 @@ import { useAlfieOptimizations } from '@/hooks/useAlfieOptimizations';
 import { useCarouselSubscription } from '@/hooks/useCarouselSubscription';
 import { openInCanva } from '@/services/canvaLinker';
 import { supabase } from '@/integrations/supabase/client';
+import { getAuthHeader } from '@/lib/auth';
 import { detectIntent, canHandleLocally, generateLocalResponse } from '@/utils/alfieIntentDetector';
 import { getQuotaStatus, formatExpirationMessage } from '@/utils/quotaManager';
 import { JobPlaceholder, JobStatus } from '@/components/chat/JobPlaceholder';
@@ -886,47 +887,53 @@ export function AlfieChat() {
             return;
           }
           
-          // ✅ ESSAYER chat-create-carousel, fallback vers create-job-set si échec
+          // ✅ Appeler directement create-job-set (il crée le set + les jobs)
+          console.log('[Carousel] Calling create-job-set:', { brandId: activeBrandId, prompt, count, aspect_ratio });
+          
           let jobSetId: string | null = null;
           
           try {
-            const { data, error } = await supabase.functions.invoke('chat-create-carousel', {
-              body: {
-                brandId: activeBrandId,
-                threadId: conversationId,
-                prompt,
-                count,
-                aspectRatio: aspect_ratio
+            const headers = await getAuthHeader();
+            const { data, error } = await supabase.functions.invoke('create-job-set', {
+              body: { 
+                brandId: activeBrandId, 
+                prompt, 
+                count, 
+                aspectRatio: aspect_ratio,
+                ...(uploadedImage ? { styleRef: uploadedImage } : {})
               },
               headers: {
+                ...headers,
                 'x-idempotency-key': crypto.randomUUID()
               }
             });
-            
-            if (error || !data?.jobSetId) {
-              console.warn('[Carousel] chat-create-carousel failed, trying fallback:', error);
-              throw new Error('chat-create-carousel_failed');
-            }
-            
-            jobSetId = data.jobSetId;
-          } catch (e) {
-            console.warn('[Carousel] Fallback to create-job-set:', e);
-            const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('create-job-set', {
-              body: {
-                brandId: activeBrandId,
-                prompt,
-                count,
-                aspectRatio: aspect_ratio
-              }
-            });
-            
-            if (fallbackError || !fallbackData?.data?.id) {
-              console.error('[Carousel] Both methods failed:', fallbackError);
-              toast.error('Échec de la création du carrousel. Réessaye.');
+
+            if (error || !data?.data?.id) {
+              console.error('[Carousel] create-job-set failed:', error);
+              toast.error('Impossible de créer le carrousel. Veuillez réessayer.');
+              
+              // Reset complet de l'état
+              setActiveJobSetId('');
+              setCarouselTotal(0);
+              localStorage.removeItem('alfie-active-carousel');
+              localStorage.removeItem('alfie-carousel-total');
+              
               return { error: 'Échec de création du carrousel' };
             }
+
+            jobSetId = data.data.id;
+            console.log('[Carousel] ✅ create-job-set succeeded, jobSetId:', jobSetId);
+          } catch (e) {
+            console.error('[Carousel] create-job-set exception:', e);
+            toast.error('Erreur lors de la création du carrousel.');
             
-            jobSetId = fallbackData.data.id;
+            // Reset complet de l'état
+            setActiveJobSetId('');
+            setCarouselTotal(0);
+            localStorage.removeItem('alfie-active-carousel');
+            localStorage.removeItem('alfie-carousel-total');
+            
+            return { error: 'Exception lors de la création' };
           }
           
           // ✅ NE MONTRER "génération en cours" QU'APRÈS SUCCÈS

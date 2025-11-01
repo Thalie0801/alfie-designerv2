@@ -207,13 +207,17 @@ serve(async (req) => {
         };
       });
 
+      console.log(`[create-job-set] 🎨 Inserting ${jobsData.length} jobs into database...`);
       const { error: jobsErr } = await supabase
         .from('jobs')
         .insert(jobsData);
 
-      if (jobsErr) throw jobsErr;
+      if (jobsErr) {
+        console.error('[create-job-set] ❌ Failed to insert jobs:', jobsErr);
+        throw jobsErr;
+      }
 
-      console.log(`[create-job-set] Created job_set ${newJobSet.id} with ${normalizedCount} jobs`);
+      console.log(`[create-job-set] ✅ Successfully inserted ${jobsData.length} jobs for job_set ${newJobSet.id}`);
 
       return {
         ref: `job_set:${newJobSet.id}`,
