@@ -33,7 +33,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[Worker] Processing job ${job.id} (${job.index_in_set + 1}/${job.job_sets.total})`);
+    console.log(`[Worker] Processing job ${job.id} (index: ${job.index_in_set})`);
 
     // 2. Marquer comme "running"
     await supabase
@@ -45,16 +45,49 @@ serve(async (req) => {
     const brandSnapshot = job.brand_snapshot;
     const enrichedPrompt = enrichPromptWithBrand(job.prompt, brandSnapshot);
 
-    // 4. Appeler generate-ai-image
-    const { data: imageData, error: imageErr } = await supabase.functions.invoke('generate-ai-image', {
+    // 4. Appeler alfie-generate-ai-image (ne nécessite pas de token utilisateur)
+    const brandKit = brandSnapshot ? {
+      id: job.job_sets.brand_id,
+      palette: brandSnapshot.palette || brandSnapshot.colors || null,
+      voice: brandSnapshot.brand_voice || brandSnapshot.voice || null,
+      logo_url: brandSnapshot.logo_url || null
+    } : undefined;
+
+    const { data: imageData, error: imageErr } = await supabase.functions.invoke('alfie-generate-ai-image', {
       body: {
         prompt: enrichedPrompt,
-        aspectRatio: '4:5',
-        brandId: job.job_sets.brand_id
+        resolution: '1080x1350', // 4:5 ratio
+        brandKit
       }
     });
 
-    if (imageErr || !imageData?.url) {
+    // Helper pour mettre à jour le statut du job_set
+    const updateJobSetStatus = async () => {
+      const { data: allJobs } = await supabase
+        .from('jobs')
+        .select('status')
+        .eq('job_set_id', job.job_set_id);
+
+      const statuses = allJobs?.map(j => j.status) || [];
+      const allDone = statuses.every(s => ['succeeded', 'failed'].includes(s));
+      const anyFailed = statuses.some(s => s === 'failed');
+
+      let jobSetStatus = 'running';
+      if (allDone) {
+        jobSetStatus = anyFailed ? 'partial' : 'done';
+      }
+
+      await supabase
+        .from('job_sets')
+        .update({ status: jobSetStatus, updated_at: new Date().toISOString() })
+        .eq('id', job.job_set_id);
+
+      return jobSetStatus;
+    };
+
+    const outUrl = imageData?.imageUrl || imageData?.url;
+
+    if (imageErr || !outUrl) {
       // Échec → marquer et refund
       await supabase
         .from('jobs')
@@ -70,7 +103,13 @@ serve(async (req) => {
         p_visuals_count: 1
       });
 
-      throw imageErr;
+      // Mettre à jour le statut du set même en cas d'échec
+      await updateJobSetStatus();
+
+      console.error(`[Worker] Job ${job.id} failed:`, imageErr?.message);
+      return new Response(JSON.stringify({ success: false, jobId: job.id, error: imageErr?.message }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     // 5. Créer l'asset dans media_generations
@@ -80,7 +119,7 @@ serve(async (req) => {
         user_id: job.job_sets.user_id,
         brand_id: job.job_sets.brand_id,
         type: 'image',
-        output_url: imageData.url,
+        output_url: outUrl,
         status: 'completed',
         prompt: job.prompt,
         metadata: { job_id: job.id, job_set_id: job.job_set_id }
@@ -99,26 +138,9 @@ serve(async (req) => {
       .eq('id', job.id);
 
     // 7. Mettre à jour le statut du job_set
-    const { data: allJobs } = await supabase
-      .from('jobs')
-      .select('status')
-      .eq('job_set_id', job.job_set_id);
+    const finalStatus = await updateJobSetStatus();
 
-    const statuses = allJobs?.map(j => j.status) || [];
-    const allDone = statuses.every(s => ['succeeded', 'failed'].includes(s));
-    const anyFailed = statuses.some(s => s === 'failed');
-
-    let jobSetStatus = 'running';
-    if (allDone) {
-      jobSetStatus = anyFailed ? 'partial' : 'done';
-    }
-
-    await supabase
-      .from('job_sets')
-      .update({ status: jobSetStatus, updated_at: new Date().toISOString() })
-      .eq('id', job.job_set_id);
-
-    console.log(`[Worker] Job ${job.id} completed successfully`);
+    console.log(`[Worker] Job ${job.id} completed successfully (set status: ${finalStatus})`);
 
     return new Response(JSON.stringify({ success: true, jobId: job.id, assetId: asset.id }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
