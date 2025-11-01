@@ -50,7 +50,12 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let jobIdForCleanup: string | undefined;
+  const jobStartTime = Date.now();
+  const MAX_JOB_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+
   try {
+    console.log('🚀 [Worker] Starting job processing...');
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -66,10 +71,22 @@ serve(async (req) => {
       .maybeSingle();
 
     if (jobErr || !job) {
+      console.log('ℹ️ [Worker] No jobs to process');
       return new Response(JSON.stringify({ message: 'No jobs to process' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
+    jobIdForCleanup = job.id;
+    console.log(`📋 [Worker] Processing job ${job.id} (index: ${job.index_in_set})`);
+
+    // Vérifier le timeout avant chaque étape critique
+    const checkTimeout = () => {
+      const elapsed = Date.now() - jobStartTime;
+      if (elapsed > MAX_JOB_DURATION_MS) {
+        throw new Error(`Job timeout: exceeded ${MAX_JOB_DURATION_MS/1000}s maximum duration`);
+      }
+    };
 
     // Fail-fast: verify job_sets join
     if (!job.job_sets) {
@@ -88,8 +105,6 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[Worker] Processing job ${job.id} (index: ${job.index_in_set})`);
-
     // Verify key_visual role for slide 0
     const isKeyVisualCheck = job.metadata?.role === 'key_visual';
     if (job.index_in_set === 0 && !isKeyVisualCheck) {
@@ -97,6 +112,7 @@ serve(async (req) => {
     }
 
     // 2. Marquer comme "running" ATOMIQUEMENT (seulement si encore queued)
+    checkTimeout();
     const { data: lockedJob, error: lockErr } = await supabase
       .from('jobs')
       .update({ status: 'running', started_at: new Date().toISOString() })
@@ -233,6 +249,7 @@ serve(async (req) => {
     console.log('✅ [Worker] overlayText built:', overlayText);
 
     // 5. Generate background WITHOUT text (text-first approach)
+    checkTimeout();
     console.log('🖼️ [Worker] Step 2: Generating background image WITHOUT text...');
     const correctedPrompt = correctFrenchSpelling(job.prompt);
     const enrichedPrompt = enrichPromptWithBrand(correctedPrompt, brandSnapshot);
@@ -244,55 +261,95 @@ serve(async (req) => {
     const resolution = aspectRatio === '1:1' ? '1080x1080' : '1080x1350';
     console.log('📐 Resolution:', resolution);
 
-    // Add 60s timeout for slow providers
-    const ctrl = new AbortController();
-    const timeout = setTimeout(() => ctrl.abort(), 60000);
-
+    // Add 60s timeout for slow providers with retry mechanism
     let backgroundImageData: any;
     let backgroundImageErr: any;
+    let retryAttempt = 0;
+    const maxRetries = 1;
     
-    try {
-      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-      if (!LOVABLE_API_KEY) throw new Error('Missing LOVABLE_API_KEY');
+    while (retryAttempt <= maxRetries) {
+      try {
+        checkTimeout(); // Vérifier qu'on n'a pas dépassé le timeout global
+        
+        if (retryAttempt > 0) {
+          console.log(`🔄 [Worker] Retry attempt ${retryAttempt}/${maxRetries} for AI generation...`);
+        }
+        
+        const ctrl = new AbortController();
+        const timeout = setTimeout(() => ctrl.abort(), 60000);
 
-      const gatewayResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        signal: ctrl.signal,
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash-image-preview',
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: `${enrichedPrompt}\n\nIMPORTANT: Create a clean marketing visual background at ${resolution} (${aspectRatio}). NO TEXT, NO LETTERS, NO TYPOGRAPHY, NO WORDS. Pure visual design only. Keep brand style consistent.\n\nNEGATIVE PROMPT: no text, no letters, no words, no typography, no captions, no labels` }
-              ]
-            }
-          ],
-          modalities: ['image', 'text']
-        })
-      });
+        const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+        if (!LOVABLE_API_KEY) throw new Error('Missing LOVABLE_API_KEY');
 
-      if (!gatewayResp.ok) {
-        const errText = await gatewayResp.text();
-        throw new Error(`AI gateway error ${gatewayResp.status}: ${errText}`);
+        const gatewayResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          signal: ctrl.signal,
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash-image-preview',
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  { type: 'text', text: `${enrichedPrompt}\n\nIMPORTANT: Create a clean marketing visual background at ${resolution} (${aspectRatio}). NO TEXT, NO LETTERS, NO TYPOGRAPHY, NO WORDS. Pure visual design only. Keep brand style consistent.\n\nNEGATIVE PROMPT: no text, no letters, no words, no typography, no captions, no labels` }
+                ]
+              }
+            ],
+            modalities: ['image', 'text']
+          })
+        });
+
+        clearTimeout(timeout);
+
+        if (!gatewayResp.ok) {
+          const errText = await gatewayResp.text();
+          const statusCode = gatewayResp.status;
+          
+          // Ne pas retry sur les erreurs 4xx (client error)
+          if (statusCode >= 400 && statusCode < 500) {
+            console.error(`❌ [Worker] AI gateway client error ${statusCode}: ${errText}`);
+            throw new Error(`AI gateway error ${statusCode}: ${errText}`);
+          }
+          
+          // Retry sur erreurs 5xx (server error)
+          if (retryAttempt < maxRetries) {
+            console.warn(`⚠️ [Worker] AI gateway error ${statusCode}, will retry...`);
+            retryAttempt++;
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s before retry
+            continue;
+          }
+          
+          throw new Error(`AI gateway error ${statusCode}: ${errText}`);
+        }
+
+        const gatewayJson = await gatewayResp.json();
+        const imgUrl = gatewayJson?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+        if (!imgUrl || typeof imgUrl !== 'string') {
+          throw new Error('AI did not return an image URL');
+        }
+
+        backgroundImageData = { images: [{ url: imgUrl }] };
+        console.log('✅ [Worker] Background generated successfully' + (retryAttempt > 0 ? ` (after ${retryAttempt} retries)` : ''));
+        break; // Success, exit retry loop
+        
+      } catch (err: any) {
+        backgroundImageErr = err;
+        
+        // Si c'est une erreur de timeout ou réseau ET qu'on peut retry
+        if (retryAttempt < maxRetries && (err.name === 'AbortError' || err.message?.includes('network'))) {
+          console.warn(`⚠️ [Worker] Network/timeout error, will retry: ${err.message}`);
+          retryAttempt++;
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          continue;
+        }
+        
+        // Sinon, on arrête
+        console.error('❌ [Worker] AI generation failed:', err.message);
+        break;
       }
-
-      const gatewayJson = await gatewayResp.json();
-      const imgUrl = gatewayJson?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-      if (!imgUrl || typeof imgUrl !== 'string') {
-        throw new Error('AI did not return an image URL');
-      }
-
-      backgroundImageData = { images: [{ url: imgUrl }] };
-      console.log('✅ [Worker] Background generated (no text)');
-    } catch (err: any) {
-      backgroundImageErr = err;
-    } finally {
-      clearTimeout(timeout);
     }
     
     // Log AI payload for debugging
@@ -446,11 +503,13 @@ serve(async (req) => {
     console.log('✅ [Worker] SVG layer generated:', svgTextLayer.length, 'chars');
 
     // 8. Composite background + SVG text via Cloudinary (returns URL)
+    checkTimeout();
     console.log('🎨 [Worker] Step 5: Compositing background + text via Cloudinary...');
     const composedImageUrl = await compositeSlide(backgroundUrl, svgTextLayer);
     console.log('✅ [Worker] Composition complete, URL:', composedImageUrl);
 
     // 9. Download composed image from Cloudinary
+    checkTimeout();
     console.log('⬇️ [Worker] Downloading composed image from Cloudinary...');
     const imageResponse = await fetch(composedImageUrl);
     if (!imageResponse.ok) {
@@ -460,6 +519,7 @@ serve(async (req) => {
     console.log('✅ [Worker] Image downloaded:', finalImageBytes.length, 'bytes');
 
     // 10. Upload final composed image to Supabase Storage
+    checkTimeout();
     console.log('☁️ [Worker] Step 6: Uploading final image to Supabase...');
     const fileName = `carousel/${job.job_set_id}/slide_${job.index_in_set}_${Date.now()}.png`;
     console.log('📁 File path:', fileName);
@@ -666,41 +726,65 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('[Worker] Critical error:', error);
-    console.error('[Worker] Error stack:', error.stack);
+    console.error('❌ [Worker] Critical error:', error);
+    console.error('📍 [Worker] Error stack:', error.stack);
     
-    // Tenter de marquer le job comme failed si on a un job ID
-    try {
-      // Extraire le job ID du contexte si possible
-      const url = new URL(req.url);
-      const jobId = url.searchParams.get('job_id');
-      
-      if (jobId) {
-        console.log(`[Worker] Marking job ${jobId} as failed due to critical error`);
+    // Tenter de marquer le job comme failed
+    if (jobIdForCleanup) {
+      try {
+        console.log(`🔄 [Worker] Attempting to mark job ${jobIdForCleanup} as failed...`);
         
         const supabase = createClient(
           Deno.env.get('SUPABASE_URL')!,
           Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
         );
         
+        const errorMessage = error.message || 'Unknown error';
+        const isTimeout = errorMessage.includes('timeout') || errorMessage.includes('exceeded');
+        
         await supabase
           .from('jobs')
           .update({
             status: 'failed',
-            error: `Critical worker error: ${error.message}`,
+            error: isTimeout ? `Timeout: ${errorMessage}` : `Critical error: ${errorMessage}`,
             finished_at: new Date().toISOString()
           })
-          .eq('id', jobId);
+          .eq('id', jobIdForCleanup);
         
-        console.log(`[Worker] Job ${jobId} marked as failed`);
+        console.log(`✅ [Worker] Job ${jobIdForCleanup} marked as failed`);
+        
+        // Refund quota si c'est un échec critique (pas un timeout de lock)
+        if (!errorMessage.includes('already taken')) {
+          const { data: jobData } = await supabase
+            .from('jobs')
+            .select('job_sets!inner(brand_id)')
+            .eq('id', jobIdForCleanup)
+            .maybeSingle();
+          
+          if (jobData?.job_sets) {
+            const jobSets: any = jobData.job_sets;
+            const brandId = Array.isArray(jobSets) 
+              ? jobSets[0]?.brand_id 
+              : jobSets.brand_id;
+            
+            if (brandId) {
+              await supabase.rpc('refund_brand_quotas', {
+                p_brand_id: brandId,
+                p_visuals_count: 1
+              });
+              console.log(`💰 [Worker] Quota refunded for brand ${brandId}`);
+            }
+          }
+        }
+      } catch (cleanupErr) {
+        console.error('❌ [Worker] Failed to mark job as failed:', cleanupErr);
       }
-    } catch (cleanupErr) {
-      console.error('[Worker] Failed to mark job as failed:', cleanupErr);
     }
     
     return new Response(JSON.stringify({ 
       error: error.message,
-      stack: error.stack 
+      timeout: error.message?.includes('timeout') || false,
+      jobId: jobIdForCleanup
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

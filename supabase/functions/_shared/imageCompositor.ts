@@ -21,34 +21,49 @@ export async function compositeSlide(
   console.log('🔗 Upload endpoint:', uploadEndpoint);
   
   try {
-    // 1. Upload background image to Cloudinary
+    // 1. Upload background image to Cloudinary with 60s timeout
     console.log('⬇️ Uploading background to Cloudinary...');
     
     const bgFormData = new FormData();
     bgFormData.append('file', backgroundUrl);
     bgFormData.append('upload_preset', 'ml_default');
     
-    const bgUploadResponse = await fetch(
-      uploadEndpoint,
-      {
-        method: 'POST',
-        body: bgFormData
+    const bgController = new AbortController();
+    const bgTimeout = setTimeout(() => bgController.abort(), 60000);
+    
+    let bgPublicId: string;
+    try {
+      const bgUploadResponse = await fetch(
+        uploadEndpoint,
+        {
+          method: 'POST',
+          body: bgFormData,
+          signal: bgController.signal
+        }
+      );
+      
+      clearTimeout(bgTimeout);
+      
+      if (!bgUploadResponse.ok) {
+        const errorText = await bgUploadResponse.text();
+        console.error('❌ Background upload failed:', errorText);
+        throw new Error(`Background upload failed (${bgUploadResponse.status}): ${errorText}`);
       }
-    );
-    
-    if (!bgUploadResponse.ok) {
-      throw new Error(`Background upload failed: ${await bgUploadResponse.text()}`);
+      
+      const bgData = await bgUploadResponse.json();
+      bgPublicId = bgData.public_id;
+      console.log('✅ Background uploaded:', bgPublicId);
+    } catch (err) {
+      clearTimeout(bgTimeout);
+      console.error('❌ Background upload timeout or error:', err);
+      throw new Error(`Background upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
-    
-    const bgData = await bgUploadResponse.json();
-    const bgPublicId = bgData.public_id;
-    console.log('✅ Background uploaded:', bgPublicId);
     
     // 2. Convert SVG string to Blob
     console.log('🔄 Converting SVG to Blob...');
     const svgBlob = new Blob([svgTextLayer], { type: 'image/svg+xml' });
     
-    // 3. Upload SVG overlay to Cloudinary with signed authentication
+    // 3. Upload SVG overlay to Cloudinary with signed authentication and timeout
     console.log('⬆️ Uploading SVG overlay...');
     
     const svgFormData = new FormData();
@@ -70,27 +85,42 @@ export async function compositeSlide(
       svgFormData.append('api_key', API_KEY);
       svgFormData.append('timestamp', timestamp.toString());
       svgFormData.append('signature', signature);
-      console.log('📝 Signature timestamp:', timestamp);
+      console.log('📝 Signature generated at timestamp:', timestamp);
     } else {
       console.warn('⚠️ No API credentials, using unsigned upload (may fail for SVG)');
       svgFormData.append('upload_preset', 'ml_default');
     }
     
-    const svgUploadResponse = await fetch(
-      uploadEndpoint,
-      {
-        method: 'POST',
-        body: svgFormData
+    const svgController = new AbortController();
+    const svgTimeout = setTimeout(() => svgController.abort(), 60000);
+    
+    let svgPublicId: string;
+    try {
+      const svgUploadResponse = await fetch(
+        uploadEndpoint,
+        {
+          method: 'POST',
+          body: svgFormData,
+          signal: svgController.signal
+        }
+      );
+      
+      clearTimeout(svgTimeout);
+      
+      if (!svgUploadResponse.ok) {
+        const errorText = await svgUploadResponse.text();
+        console.error('❌ SVG upload failed:', errorText);
+        throw new Error(`SVG upload failed (${svgUploadResponse.status}): ${errorText}`);
       }
-    );
-    
-    if (!svgUploadResponse.ok) {
-      throw new Error(`SVG upload failed: ${await svgUploadResponse.text()}`);
+      
+      const svgData = await svgUploadResponse.json();
+      svgPublicId = svgData.public_id;
+      console.log('✅ SVG uploaded:', svgPublicId);
+    } catch (err) {
+      clearTimeout(svgTimeout);
+      console.error('❌ SVG upload timeout or error:', err);
+      throw new Error(`SVG upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
-    
-    const svgData = await svgUploadResponse.json();
-    const svgPublicId = svgData.public_id;
-    console.log('✅ SVG uploaded:', svgPublicId);
     
     // 4. Generate composed image URL with overlay transformation
     console.log('🎭 Generating composed URL...');
@@ -103,6 +133,10 @@ export async function compositeSlide(
     
   } catch (error) {
     console.error('❌ [imageCompositor] Cloudinary composition failed:', error);
+    if (error instanceof Error) {
+      console.error('📍 Error message:', error.message);
+      console.error('📍 Error stack:', error.stack);
+    }
     throw error;
   }
 }
