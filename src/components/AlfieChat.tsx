@@ -1098,17 +1098,60 @@ export function AlfieChat() {
               .single();
 
             if (asset?.output_url) {
-              // Extraire info de cohérence (type cast car metadata est Json)
+              // Phase 9: Extraire info détaillée de cohérence
               const metadata = asset.metadata as any;
               const isKeyVisual = metadata?.role === 'key_visual';
-              const coherenceScore = metadata?.coherence_score?.total;
+              const coherenceScore = metadata?.coherence_score?.total || 0;
+              const coherenceBreakdown = metadata?.coherence_score?.breakdown;
+              const retryCount = metadata?.retry_count || 0;
+              const slideTemplate = metadata?.slide_template || 'hero';
               
-              let content = `Slide ${job.index_in_set + 1}/${slideCount}`;
-              if (isKeyVisual && currentJobSet.master_seed) {
-                content += ` 🎨 (Key Visual, Seed: ${currentJobSet.master_seed.slice(0, 8)}...)`;
+              let content = `**Slide ${job.index_in_set + 1}/${slideCount}**`;
+              
+              // Badge type de slide
+              const templateEmojis: Record<string, string> = {
+                hero: '🎯',
+                problem: '❌',
+                solution: '✅', 
+                impact: '📊',
+                cta: '🎬'
+              };
+              content += ` ${templateEmojis[slideTemplate] || '🎨'} ${slideTemplate.charAt(0).toUpperCase() + slideTemplate.slice(1)}`;
+              
+              // Badge cohérence avec couleur
+              if (coherenceScore >= 75) {
+                content += ` | ✅ **Cohérence ${coherenceScore}/100**`;
+              } else if (coherenceScore >= 60) {
+                content += ` | ⚠️ **Cohérence ${coherenceScore}/100**`;
+              } else {
+                content += ` | ❌ **Cohérence ${coherenceScore}/100**`;
               }
-              if (coherenceScore) {
-                content += ` | Cohérence: ${coherenceScore}/100`;
+              
+              // Détails breakdown si disponibles
+              if (coherenceBreakdown) {
+                const details = [];
+                if (coherenceBreakdown.palette_match !== undefined) {
+                  details.push(`Palette: ${Math.round(coherenceBreakdown.palette_match)}/100`);
+                }
+                if (coherenceBreakdown.no_text_detected !== undefined) {
+                  details.push(`Texte: ${coherenceBreakdown.no_text_detected ? '✅ Aucun' : '❌ Détecté'}`);
+                }
+                if (coherenceBreakdown.style_similarity !== undefined) {
+                  details.push(`Style: ${Math.round(coherenceBreakdown.style_similarity)}/100`);
+                }
+                if (details.length > 0) {
+                  content += `\n_${details.join(' • ')}_`;
+                }
+              }
+              
+              // Info retry si nécessaire
+              if (retryCount > 0) {
+                content += `\n🔄 Retry ${retryCount}/3`;
+              }
+              
+              // Info key visual
+              if (isKeyVisual && currentJobSet.master_seed) {
+                content += `\n🎨 _Référence visuelle (Seed: ${currentJobSet.master_seed.slice(0, 8)}...)_`;
               }
 
               setMessages(prev => [...prev, {
@@ -1126,8 +1169,17 @@ export function AlfieChat() {
             clearInterval(pollInterval);
             setGenerationStatus(null);
 
+            // Phase 9: Message final avec statistiques détaillées
+            const allJobs = currentJobSet.jobs || [];
+            const succeededJobs = allJobs.filter((j: any) => j.status === 'succeeded');
+            const failedJobs = allJobs.filter((j: any) => j.status === 'failed');
+            
             // Message final avec info master_seed
-            let finalMessage = '🎉 Carrousel terminé !';
+            let finalMessage = `🎉 **Carrousel terminé !**\n\n`;
+            finalMessage += `✅ ${succeededJobs.length} slide${succeededJobs.length > 1 ? 's' : ''} générée${succeededJobs.length > 1 ? 's' : ''} avec succès`;
+            if (failedJobs.length > 0) {
+              finalMessage += `\n❌ ${failedJobs.length} slide${failedJobs.length > 1 ? 's' : ''} échouée${failedJobs.length > 1 ? 's' : ''}`;
+            }
             if (currentJobSet.master_seed) {
               finalMessage += `\n🎨 Carrousel cohérent (Master Seed: ${currentJobSet.master_seed.slice(0, 8)}...)`;
             }
