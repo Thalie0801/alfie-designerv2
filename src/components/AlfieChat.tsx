@@ -914,6 +914,21 @@ export function AlfieChat() {
     }
   };
 
+  // Déclencher le worker de traitement des jobs
+  const triggerWorker = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+
+      await supabase.functions.invoke('process-job-worker', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
+    } catch (err) {
+      // Silent fail - le worker sera retriggered au prochain poll
+      console.log('[Worker] Trigger attempt:', err);
+    }
+  };
+
   const handleSend = async (options?: { forceVideo?: boolean; forceImage?: boolean; aspectRatio?: string; skipMediaInference?: boolean }) => {
     if (!input.trim() || isLoading || !loaded) return;
 
@@ -1042,8 +1057,14 @@ export function AlfieChat() {
           content: `✅ Carrousel de ${slideCount} slides en cours de génération...`
         }]);
 
+        // Déclencher immédiatement le premier worker
+        await triggerWorker();
+
         // Polling du job_set
         const pollInterval = setInterval(async () => {
+          // Déclencher le worker à chaque poll
+          await triggerWorker();
+
           const { data: currentJobSet } = await supabase
             .from('job_sets')
             .select('status, jobs(status, index_in_set, asset_id)')
