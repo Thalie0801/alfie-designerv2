@@ -125,11 +125,11 @@ serve(async (req) => {
       const base = toHash(masterSeedStr);
       if (isKeyVisual) {
         seed = base.toString(); // Image #0 = seed maître (numérique)
-        console.log(`[Worker] Generating KEY VISUAL with master seed ${seed?.slice(0, 12)}...`);
+        console.log(`[Worker] Generating KEY VISUAL with master seed ${seed.slice(0, 12)}...`);
       } else {
         const derived = base + (BigInt(job.index_in_set) * 982451653n);
         seed = derived.toString();
-        console.log(`[Worker] Generating VARIANT #${job.index_in_set} with derived seed ${seed?.slice(0, 12)}...`);
+        console.log(`[Worker] Generating VARIANT #${job.index_in_set} with derived seed ${seed.slice(0, 12)}...`);
       }
     }
 
@@ -167,7 +167,7 @@ serve(async (req) => {
     
     console.log('📝 Base prompt:', enrichedPrompt);
     console.log('📝 Overlay text:', overlayText);
-    console.log('🌱 Seed:', seed?.slice(0, 12) + '...');
+    console.log('🌱 Seed:', seed ? seed.slice(0, 12) + '...' : 'none');
     
     const aspectRatio = brandSnapshot?.aspectRatio || '4:5';
     const resolution = aspectRatio === '1:1' ? '1080x1080' : '1080x1350';
