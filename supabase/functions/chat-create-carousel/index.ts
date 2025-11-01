@@ -13,18 +13,39 @@ serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      throw new Error("Missing Authorization header");
+    }
+
     const idem = req.headers.get("x-idempotency-key") ?? crypto.randomUUID();
     const { brandId, prompt, count, aspectRatio } = await req.json();
 
     console.log(`[CreateCarousel] Request: brandId=${brandId}, count=${count}, prompt="${prompt}"`);
 
-    const supabase = createClient(
+    // Admin client for service operations
+    const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // User client for auth
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    // Get user from JWT
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    if (authError || !user) {
+      throw new Error("Unauthorized");
+    }
+
+    console.log(`[CreateCarousel] User authenticated: ${user.id}`);
+
     // 1) Idempotency guard
-    const { data: iKey } = await supabase
+    const { data: iKey } = await adminClient
       .from("idempotency_keys")
       .insert({ key: idem, status: "pending" })
       .select()
@@ -32,7 +53,7 @@ serve(async (req) => {
 
     if (!iKey) {
       // Déjà créé, retourner le dernier job_set
-      const { data: reuse } = await supabase
+      const { data: reuse } = await adminClient
         .from("job_sets")
         .select("id")
         .order("created_at", { ascending: false })
@@ -46,7 +67,7 @@ serve(async (req) => {
     // 2) Vérifier et réserver les quotas
     console.log(`[CreateCarousel] Reserving ${count} visuals for brand ${brandId}`);
     
-    const { data: quotaResult, error: quotaErr } = await supabase.rpc(
+    const { data: quotaResult, error: quotaErr } = await adminClient.rpc(
       "reserve_brand_quotas",
       {
         p_brand_id: brandId,
@@ -69,11 +90,11 @@ serve(async (req) => {
     console.log(`[CreateCarousel] Quota reserved successfully`);
 
     // 3) Créer le job_set
-    const { data: set, error: setErr } = await supabase
+    const { data: set, error: setErr } = await adminClient
       .from("job_sets")
       .insert({
         brand_id: brandId,
-        user_id: (await supabase.auth.getUser()).data.user?.id,
+        user_id: user.id,
         request_text: prompt,
         total: count,
         status: "queued",
@@ -87,7 +108,7 @@ serve(async (req) => {
       console.error("[CreateCarousel] Job set creation failed:", setErr);
       
       // Refund quota
-      await supabase.rpc("refund_brand_quotas", {
+      await adminClient.rpc("refund_brand_quotas", {
         p_brand_id: brandId,
         p_visuals_count: count,
       });
@@ -111,7 +132,7 @@ serve(async (req) => {
       },
     }));
 
-    const { error: jobsErr } = await supabase.from("jobs").insert(jobs);
+    const { error: jobsErr } = await adminClient.from("jobs").insert(jobs);
 
     if (jobsErr) {
       console.error("[CreateCarousel] Jobs creation failed:", jobsErr);
@@ -121,7 +142,7 @@ serve(async (req) => {
     console.log(`[CreateCarousel] ${count} jobs created for set ${set.id}`);
 
     // 5) Marquer l'idempotency comme appliquée
-    await supabase
+    await adminClient
       .from("idempotency_keys")
       .update({ status: "applied", result_ref: set.id })
       .eq("key", idem);
