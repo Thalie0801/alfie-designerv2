@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { useAlfieCredits } from '@/hooks/useAlfieCredits';
@@ -10,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { detectIntent, canHandleLocally, generateLocalResponse } from '@/utils/alfieIntentDetector';
 import { getQuotaStatus, formatExpirationMessage } from '@/utils/quotaManager';
 import { JobPlaceholder, JobStatus } from '@/components/chat/JobPlaceholder';
+import { AssetMessage } from '@/components/chat/AssetMessage';
 import { CreateHeader } from '@/components/create/CreateHeader';
 import { ChatComposer } from '@/components/create/ChatComposer';
 import { QuotaBar } from '@/components/create/QuotaBar';
@@ -87,6 +89,12 @@ interface Message {
   progress?: number;
   assetId?: string;
   assetType?: 'image' | 'video';
+  outputUrl?: string;
+  width?: number;
+  height?: number;
+  expiresAt?: string;
+  engine?: string;
+  woofsConsumed?: number;
 }
 
 const INITIAL_ASSISTANT_MESSAGE = `Salut ! 🐾 Je suis Alfie Designer, ton compagnon créatif IA 🎨
@@ -111,6 +119,7 @@ Chaque marque a ses propres quotas qui se réinitialisent le 1er du mois (non re
 Alors, qu'est-ce qu'on crée ensemble aujourd'hui ? 😊`;
 
 export function AlfieChat() {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
@@ -448,15 +457,23 @@ export function AlfieChat() {
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) throw new Error("Not authenticated");
 
-          // Stocker en DB
-          await supabase.from('media_generations').insert({
-            user_id: user.id,
-            type: 'image',
-            prompt: args.prompt,
-            output_url: data.imageUrl,
-            status: 'completed',
-            brand_id: activeBrandId || null
-          });
+          // Stocker en DB et récupérer l'asset complet avec métadonnées
+          const { data: insertedAsset, error: insertError } = await supabase
+            .from('media_generations')
+            .insert({
+              user_id: user.id,
+              type: 'image',
+              prompt: args.prompt,
+              output_url: data.imageUrl,
+              status: 'completed',
+              brand_id: activeBrandId || null
+            })
+            .select('id, type, output_url, expires_at, engine, woofs, cost_woofs')
+            .single();
+
+          if (insertError || !insertedAsset) {
+            throw new Error("Erreur lors de l'enregistrement de l'image");
+          }
 
           // Débiter les crédits SEULEMENT si l'image a été générée et stockée
           await decrementCredits(1, 'image_generation');
@@ -467,24 +484,31 @@ export function AlfieChat() {
           const imageMessage = {
             role: 'assistant' as const,
             content: `Image générée avec succès ! (1 crédit utilisé) ✨`,
-            imageUrl: data.imageUrl
+            assetId: insertedAsset.id,
+            assetType: 'image' as const,
+            outputUrl: insertedAsset.output_url,
+            expiresAt: insertedAsset.expires_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            engine: insertedAsset.engine || 'gemini-2.5-flash-image',
+            woofsConsumed: insertedAsset.cost_woofs || insertedAsset.woofs || 0
           };
           
           setMessages(prev => [...prev, imageMessage]);
           
-          // Persister le message image en base
+          // Persister le message avec assetId en base
           if (conversationId) {
             await supabase.from('alfie_messages').insert({
               conversation_id: conversationId,
               role: 'assistant',
               content: imageMessage.content,
-              image_url: data.imageUrl
+              image_url: insertedAsset.output_url,
+              asset_id: insertedAsset.id
             });
           }
           
           return {
             success: true,
-            imageUrl: data.imageUrl
+            assetId: insertedAsset.id,
+            imageUrl: insertedAsset.output_url
           };
         } catch (error: any) {
           console.error('Image generation error:', error);
@@ -1488,6 +1512,25 @@ export function AlfieChat() {
                       status={message.jobStatus || 'processing'}
                       progress={message.progress}
                       type={message.assetType === 'image' ? 'image' : 'video'}
+                    />
+                  </div>
+                );
+              }
+
+              // Afficher AssetMessage pour les images/vidéos générées avec métadonnées complètes
+              if (message.assetId && message.assetType && message.outputUrl && message.expiresAt) {
+                return (
+                  <div key={`asset-${message.assetId}-${index}`} className="flex justify-start animate-fade-in">
+                    <AssetMessage
+                      assetId={message.assetId}
+                      type={message.assetType}
+                      outputUrl={message.outputUrl}
+                      expiresAt={message.expiresAt}
+                      width={message.width}
+                      height={message.height}
+                      engine={message.engine}
+                      woofsConsumed={message.woofsConsumed}
+                      onOpenInLibrary={() => navigate('/library')}
                     />
                   </div>
                 );
