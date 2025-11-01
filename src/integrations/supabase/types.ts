@@ -914,6 +914,7 @@ export type Database = {
           id: string
           index_in_set: number
           job_set_id: string
+          metadata: Json | null
           prompt: string
           started_at: string | null
           status: string
@@ -927,6 +928,7 @@ export type Database = {
           id?: string
           index_in_set: number
           job_set_id: string
+          metadata?: Json | null
           prompt: string
           started_at?: string | null
           status?: string
@@ -940,6 +942,7 @@ export type Database = {
           id?: string
           index_in_set?: number
           job_set_id?: string
+          metadata?: Json | null
           prompt?: string
           started_at?: string | null
           status?: string
