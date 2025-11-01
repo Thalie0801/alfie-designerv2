@@ -924,6 +924,12 @@ export function AlfieChat() {
             jobSetId = data.data.id;
             console.log('[Carousel] ✅ create-job-set succeeded, jobSetId:', jobSetId);
             
+            if (!jobSetId) {
+              console.error('[Carousel] jobSetId is null despite success');
+              toast.error('Erreur: ID du carrousel manquant.');
+              return { error: 'ID manquant' };
+            }
+            
             // ✅ Mettre à jour le state et vérifier immédiatement
             setActiveJobSetId(jobSetId);
             setCarouselTotal(count);
