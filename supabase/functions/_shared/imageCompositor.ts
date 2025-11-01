@@ -19,15 +19,16 @@ export async function compositeSlide(
   try {
     // 1. Upload background image to Cloudinary
     console.log('⬇️ Uploading background to Cloudinary...');
+    
+    const bgFormData = new FormData();
+    bgFormData.append('file', backgroundUrl);
+    bgFormData.append('upload_preset', 'ml_default');
+    
     const bgUploadResponse = await fetch(
       `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          file: backgroundUrl,
-          upload_preset: 'ml_default'
-        })
+        body: bgFormData
       }
     );
     
@@ -46,15 +47,16 @@ export async function compositeSlide(
     
     // 3. Upload SVG overlay to Cloudinary
     console.log('⬆️ Uploading SVG overlay...');
+    
+    const svgFormData = new FormData();
+    svgFormData.append('file', svgDataUri);
+    svgFormData.append('upload_preset', 'ml_default');
+    
     const svgUploadResponse = await fetch(
       `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          file: svgDataUri,
-          upload_preset: 'ml_default'
-        })
+        body: svgFormData
       }
     );
     
