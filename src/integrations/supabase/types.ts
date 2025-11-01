@@ -1612,6 +1612,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      increment_profile_visuals: {
+        Args: { p_delta?: number; p_profile_id: string }
+        Returns: undefined
+      }
       refund_woofs: {
         Args: { user_id_param: string; woofs_amount: number }
         Returns: boolean
