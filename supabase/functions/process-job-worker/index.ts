@@ -445,13 +445,22 @@ serve(async (req) => {
     
     console.log('✅ [Worker] SVG layer generated:', svgTextLayer.length, 'chars');
 
-    // 8. Composite background + SVG text
-    console.log('🎨 [Worker] Step 5: Compositing background + text...');
-    const finalImageBytes = await compositeSlide(backgroundUrl, svgTextLayer);
-    console.log('✅ [Worker] Composition complete:', finalImageBytes.length, 'bytes');
+    // 8. Composite background + SVG text via Cloudinary (returns URL)
+    console.log('🎨 [Worker] Step 5: Compositing background + text via Cloudinary...');
+    const composedImageUrl = await compositeSlide(backgroundUrl, svgTextLayer);
+    console.log('✅ [Worker] Composition complete, URL:', composedImageUrl);
 
-    // 9. Upload final composed image
-    console.log('☁️ [Worker] Step 6: Uploading final image...');
+    // 9. Download composed image from Cloudinary
+    console.log('⬇️ [Worker] Downloading composed image from Cloudinary...');
+    const imageResponse = await fetch(composedImageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to download composed image: ${imageResponse.status}`);
+    }
+    const finalImageBytes = new Uint8Array(await imageResponse.arrayBuffer());
+    console.log('✅ [Worker] Image downloaded:', finalImageBytes.length, 'bytes');
+
+    // 10. Upload final composed image to Supabase Storage
+    console.log('☁️ [Worker] Step 6: Uploading final image to Supabase...');
     const fileName = `carousel/${job.job_set_id}/slide_${job.index_in_set}_${Date.now()}.png`;
     console.log('📁 File path:', fileName);
 

@@ -1,49 +1,84 @@
-// Phase 5: Compositeur d'images (background IA + SVG texte)
-import { createCanvas, loadImage } from 'https://deno.land/x/canvas@v1.4.1/mod.ts';
+// Phase 5: Compositeur d'images via Cloudinary (Deno Deploy compatible)
 
 export async function compositeSlide(
   backgroundUrl: string,
   svgTextLayer: string
-): Promise<Uint8Array> {
-  console.log('🎨 [imageCompositor] Starting composition...');
+): Promise<string> {
+  console.log('🎨 [imageCompositor] Starting Cloudinary composition...');
   console.log('📥 Background URL:', backgroundUrl);
   console.log('📝 SVG layer size:', svgTextLayer.length, 'chars');
   
+  const CLOUD_NAME = Deno.env.get('CLOUDINARY_CLOUD_NAME');
+  const API_KEY = Deno.env.get('CLOUDINARY_API_KEY');
+  const API_SECRET = Deno.env.get('CLOUDINARY_API_SECRET');
+  
+  if (!CLOUD_NAME || !API_KEY || !API_SECRET) {
+    throw new Error('Missing Cloudinary credentials');
+  }
+  
   try {
-    // 1. Charger le background
-    console.log('⬇️ Loading background image...');
-    const bgImage = await loadImage(backgroundUrl);
-    const width = bgImage.width();
-    const height = bgImage.height();
-    console.log('✅ Background loaded:', width, 'x', height);
+    // 1. Upload background image to Cloudinary
+    console.log('⬇️ Uploading background to Cloudinary...');
+    const bgUploadResponse = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file: backgroundUrl,
+          upload_preset: 'ml_default',
+          api_key: API_KEY
+        })
+      }
+    );
     
-    // 2. Créer canvas
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext('2d');
+    if (!bgUploadResponse.ok) {
+      throw new Error(`Background upload failed: ${await bgUploadResponse.text()}`);
+    }
     
-    // 3. Dessiner le background
-    console.log('🖼️ Drawing background...');
-    ctx.drawImage(bgImage, 0, 0);
+    const bgData = await bgUploadResponse.json();
+    const bgPublicId = bgData.public_id;
+    console.log('✅ Background uploaded:', bgPublicId);
     
-    // 4. Convertir SVG en data URL et le charger
-    console.log('🔄 Converting SVG to image...');
-    const svgDataUrl = `data:image/svg+xml;base64,${btoa(svgTextLayer)}`;
-    const svgImage = await loadImage(svgDataUrl);
-    console.log('✅ SVG converted to image');
+    // 2. Convert SVG to base64 data URI
+    console.log('🔄 Converting SVG to base64...');
+    const svgBase64 = btoa(svgTextLayer);
+    const svgDataUri = `data:image/svg+xml;base64,${svgBase64}`;
     
-    // 5. Superposer le SVG
-    console.log('🎭 Compositing SVG overlay...');
-    ctx.drawImage(svgImage, 0, 0);
+    // 3. Upload SVG overlay to Cloudinary
+    console.log('⬆️ Uploading SVG overlay...');
+    const svgUploadResponse = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file: svgDataUri,
+          upload_preset: 'ml_default',
+          api_key: API_KEY
+        })
+      }
+    );
     
-    // 6. Exporter en PNG
-    console.log('💾 Exporting to PNG buffer...');
-    const buffer = canvas.toBuffer('image/png');
-    console.log('✅ Composition complete:', buffer.length, 'bytes');
+    if (!svgUploadResponse.ok) {
+      throw new Error(`SVG upload failed: ${await svgUploadResponse.text()}`);
+    }
     
-    return new Uint8Array(buffer);
+    const svgData = await svgUploadResponse.json();
+    const svgPublicId = svgData.public_id;
+    console.log('✅ SVG uploaded:', svgPublicId);
+    
+    // 4. Generate composed image URL with overlay transformation
+    console.log('🎭 Generating composed URL...');
+    const composedUrl = `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/` +
+      `l_${svgPublicId.replace(/\//g, ':')},fl_layer_apply,g_center/` +
+      `${bgPublicId}.png`;
+    
+    console.log('✅ Composition complete:', composedUrl);
+    return composedUrl;
     
   } catch (error) {
-    console.error('❌ [imageCompositor] Composition failed:', error);
+    console.error('❌ [imageCompositor] Cloudinary composition failed:', error);
     throw error;
   }
 }
