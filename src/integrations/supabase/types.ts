@@ -850,6 +850,7 @@ export type Database = {
           request_text: string
           status: string
           style_ref_asset_id: string | null
+          style_ref_url: string | null
           total: number
           updated_at: string
           user_id: string
@@ -863,6 +864,7 @@ export type Database = {
           request_text: string
           status?: string
           style_ref_asset_id?: string | null
+          style_ref_url?: string | null
           total: number
           updated_at?: string
           user_id: string
@@ -876,6 +878,7 @@ export type Database = {
           request_text?: string
           status?: string
           style_ref_asset_id?: string | null
+          style_ref_url?: string | null
           total?: number
           updated_at?: string
           user_id?: string
@@ -908,6 +911,7 @@ export type Database = {
         Row: {
           asset_id: string | null
           brand_snapshot: Json
+          coherence_threshold: number | null
           created_at: string
           error: string | null
           finished_at: string | null
@@ -916,12 +920,15 @@ export type Database = {
           job_set_id: string
           metadata: Json | null
           prompt: string
+          retry_count: number | null
+          slide_template: string | null
           started_at: string | null
           status: string
         }
         Insert: {
           asset_id?: string | null
           brand_snapshot: Json
+          coherence_threshold?: number | null
           created_at?: string
           error?: string | null
           finished_at?: string | null
@@ -930,12 +937,15 @@ export type Database = {
           job_set_id: string
           metadata?: Json | null
           prompt: string
+          retry_count?: number | null
+          slide_template?: string | null
           started_at?: string | null
           status?: string
         }
         Update: {
           asset_id?: string | null
           brand_snapshot?: Json
+          coherence_threshold?: number | null
           created_at?: string
           error?: string | null
           finished_at?: string | null
@@ -944,6 +954,8 @@ export type Database = {
           job_set_id?: string
           metadata?: Json | null
           prompt?: string
+          retry_count?: number | null
+          slide_template?: string | null
           started_at?: string | null
           status?: string
         }

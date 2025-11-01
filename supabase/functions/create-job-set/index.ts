@@ -137,7 +137,7 @@ serve(async (req) => {
 
       if (jobSetErr) throw jobSetErr;
 
-      // 7. Créer les N jobs avec correction orthographique, propagation de l'aspect, master_seed et role
+      // 7. Phase 8: Créer les N jobs avec correction orthographique, templates détectés automatiquement
       const brandSnapshotWithAspect = { 
         ...brandSnapshot, 
         aspectRatio,
@@ -148,12 +148,37 @@ serve(async (req) => {
         const rawPrompt = `${slide.title}. ${slide.subtitle || ''}`;
         const correctedPrompt = correctFrenchSpelling(rawPrompt);
         
+        // Déterminer le template automatiquement
+        let templateType = 'hero';
+        if (i === 0) {
+          templateType = 'hero';
+        } else if (slide.bullets && slide.bullets.length > 0) {
+          templateType = i === 1 ? 'problem' : 'solution';
+        } else if (slide.kpis && slide.kpis.length > 0) {
+          templateType = 'impact';
+        } else if (slide.cta && i === normalizedCount - 1) {
+          templateType = 'cta';
+        }
+        
         return {
           job_set_id: newJobSet.id,
           index_in_set: i,
           prompt: correctedPrompt,
+          slide_template: templateType, // Phase 2: nouveau champ
           brand_snapshot: brandSnapshotWithAspect,
-          metadata: i === 0 ? { role: 'key_visual' } : { role: 'variant' }, // Marquer le premier comme référence
+          metadata: { 
+            role: i === 0 ? 'key_visual' : 'variant',
+            title: slide.title,
+            subtitle: slide.subtitle,
+            punchline: slide.punchline,
+            bullets: slide.bullets,
+            cta: slide.cta,
+            cta_primary: slide.cta_primary,
+            cta_secondary: slide.cta_secondary,
+            note: slide.note,
+            badge: slide.badge,
+            kpis: slide.kpis
+          },
           status: 'queued'
         };
       });

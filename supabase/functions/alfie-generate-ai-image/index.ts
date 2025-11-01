@@ -22,6 +22,9 @@ interface GenerateRequest {
   totalSlides?: number;
   overlayText?: string;
   carouselId?: string;
+  backgroundOnly?: boolean; // Phase 4: nouveau flag pour fonds purs
+  seed?: string;
+  negativePrompt?: string;
 }
 
 serve(async (req) => {
@@ -31,7 +34,19 @@ serve(async (req) => {
 
   try {
     const body: GenerateRequest = await req.json();
-    const { templateImageUrl, brandKit, prompt, resolution, slideIndex, totalSlides, overlayText, carouselId } = body;
+    const { 
+      templateImageUrl, 
+      brandKit, 
+      prompt, 
+      resolution, 
+      slideIndex, 
+      totalSlides, 
+      overlayText, 
+      carouselId, 
+      backgroundOnly, 
+      seed,
+      negativePrompt 
+    } = body;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
@@ -41,12 +56,26 @@ serve(async (req) => {
     // Construire le prompt pour la génération
     let fullPrompt = prompt || "Create a high-quality marketing visual based on the description";
 
-    // Ajouter le texte exact à superposer si fourni
-    if (overlayText) {
-      fullPrompt += `\n\n--- EXACT TEXT TO OVERLAY ---`;
-      fullPrompt += `\nUse EXACTLY this French text, word-for-word, no additions, no modifications:`;
-      fullPrompt += `\n« ${overlayText} »`;
-      fullPrompt += `\n--- END EXACT TEXT ---`;
+    // Phase 4: Mode background pur (pas de texte)
+    if (backgroundOnly) {
+      fullPrompt = `Abstract background composition.
+Style: ${brandKit?.voice || 'modern, professional'}
+Colors ONLY: ${brandKit?.palette?.join(', ') || 'neutral tones'}
+
+CRITICAL RULES:
+- NO TEXT whatsoever
+- NO LETTERS, NO WORDS, NO TYPOGRAPHY
+- Pure visual: gradients, shapes, geometric patterns, textures
+- Clean, minimal, suitable as background layer
+- Leave center area lighter for text overlay`;
+    } else {
+      // Mode normal : ajouter le texte exact à superposer si fourni
+      if (overlayText) {
+        fullPrompt += `\n\n--- EXACT TEXT TO OVERLAY ---`;
+        fullPrompt += `\nUse EXACTLY this French text, word-for-word, no additions, no modifications:`;
+        fullPrompt += `\n« ${overlayText} »`;
+        fullPrompt += `\n--- END EXACT TEXT ---`;
+      }
     }
 
     // Si c'est une slide de carrousel, préciser au modèle de générer UNE SEULE image
@@ -61,13 +90,21 @@ serve(async (req) => {
       }
     }
 
-    if (brandKit?.palette && brandKit.palette.length > 0) {
-      fullPrompt += `\n\nBrand Colors: ${brandKit.palette.join(', ')}`;
+    // Ajouter brand info seulement si pas en mode backgroundOnly (déjà inclus)
+    if (!backgroundOnly) {
+      if (brandKit?.palette && brandKit.palette.length > 0) {
+        fullPrompt += `\n\nBrand Colors: ${brandKit.palette.join(', ')}`;
+      }
+      
+      if (brandKit?.voice) {
+        fullPrompt += `\nBrand Voice: ${brandKit.voice}`;
+      }
     }
-    
-    if (brandKit?.voice) {
-      fullPrompt += `\nBrand Voice: ${brandKit.voice}`;
-    }
+
+    // Ajouter negative prompt fort pour backgrounds
+    const finalNegativePrompt = backgroundOnly 
+      ? "text, letters, words, typography, captions, labels, signs, writing, alphabet, characters, numbers"
+      : (negativePrompt || "");
 
     // Construire le message en fonction de la présence d'une image modèle
     const userContent: any[] = [

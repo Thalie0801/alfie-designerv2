@@ -3,6 +3,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { enrichPromptWithBrand } from "../_shared/brandResolver.ts";
 import { deriveSeed } from "../_shared/seedGenerator.ts";
 import { checkCoherence } from "../_shared/coherenceChecker.ts";
+import { SLIDE_TEMPLATES } from "../_shared/slideTemplates.ts";
+import { renderSlideToSVG } from "../_shared/slideRenderer.ts";
+import { compositeSlide } from "../_shared/imageCompositor.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -87,10 +90,12 @@ serve(async (req) => {
       });
     }
 
-    // 3. Récupérer brand_snapshot et déterminer le seed selon le rôle
+    // 3. Récupérer brand_snapshot et déterminer le seed + template selon le rôle
     const brandSnapshot = job.brand_snapshot;
     const isKeyVisual = job.metadata?.role === 'key_visual';
     const masterSeedStr = brandSnapshot?.master_seed || job.job_sets.master_seed;
+    const slideTemplate = job.slide_template || 'hero';
+    const template = SLIDE_TEMPLATES[slideTemplate];
     
     let seed: string | undefined;
     if (masterSeedStr) {
@@ -103,19 +108,31 @@ serve(async (req) => {
       }
     }
 
-    // 4. Corriger l'orthographe puis enrichir le prompt avec Brand Kit
+    // 4. Phase 3: Rendre le texte en SVG (typo contrôlée, pas d'IA)
+    const slideContent = {
+      title: job.metadata?.title || job.prompt,
+      subtitle: job.metadata?.subtitle || '',
+      punchline: job.metadata?.punchline || '',
+      bullets: job.metadata?.bullets || [],
+      cta: job.metadata?.cta || '',
+      cta_primary: job.metadata?.cta_primary || '',
+      cta_secondary: job.metadata?.cta_secondary || '',
+      note: job.metadata?.note || '',
+      badge: job.metadata?.badge || '',
+      kpis: job.metadata?.kpis || []
+    };
+    
+    const svgLayer = await renderSlideToSVG(slideContent, template, brandSnapshot);
+    console.log(`[Worker] SVG rendered (${svgLayer.length} chars)`);
+
+    // 5. Phase 4: Générer le fond graphique pur (pas de texte)
     const correctedPrompt = correctFrenchSpelling(job.prompt);
     const enrichedPrompt = enrichPromptWithBrand(correctedPrompt, brandSnapshot);
-    let finalPrompt = `${enrichedPrompt} CRITICAL: Ne rends AUCUN mot ni texte dans l'image (no text). Composition uniquement graphique.`;
-    if (brandSnapshot?.logo_url) {
-      finalPrompt += ` Ajoute systématiquement l'avatar/logo de la marque en bas à droite avec une marge de sécurité, même style et taille sur toutes les slides (cohérence branding).`;
-    }
-
-    // 5. Déterminer la résolution selon l'aspect ratio propagé
+    let backgroundPrompt = `${enrichedPrompt} Abstract background composition. NO TEXT, NO LETTERS, NO WORDS. Pure visual: gradients, shapes, textures only.`;
+    
     const aspectRatio = brandSnapshot?.aspectRatio || '4:5';
     const resolution = aspectRatio === '1:1' ? '1080x1080' : '1080x1350';
 
-    // 6. Appeler alfie-generate-ai-image avec seed déterministe (si disponible)
     const brandKit = brandSnapshot ? {
       id: job.job_sets.brand_id,
       palette: brandSnapshot.palette || brandSnapshot.colors || null,
@@ -123,13 +140,14 @@ serve(async (req) => {
       logo_url: brandSnapshot.logo_url || null
     } : undefined;
 
-    const { data: imageData, error: imageErr } = await supabase.functions.invoke('alfie-generate-ai-image', {
+    const { data: bgImageData, error: bgImageErr } = await supabase.functions.invoke('alfie-generate-ai-image', {
       body: {
-        prompt: finalPrompt,
+        prompt: backgroundPrompt,
         resolution,
         brandKit,
-        seed, // Passer le seed pour la cohérence (key_visual = master, variants = dérivé)
-        guidance_scale: isKeyVisual ? 6.0 : 5.5 // Key visual légèrement plus fidèle au prompt
+        seed,
+        backgroundOnly: true, // Phase 4: mode fond pur
+        negativePrompt: 'text, letters, words, typography, captions'
       }
     });
 
@@ -157,15 +175,15 @@ serve(async (req) => {
       return jobSetStatus;
     };
 
-    const outUrl = imageData?.imageUrl || imageData?.url;
+    const bgUrl = bgImageData?.imageUrl || bgImageData?.url;
 
-    if (imageErr || !outUrl) {
+    if (bgImageErr || !bgUrl) {
       // Échec → marquer et refund
       await supabase
         .from('jobs')
         .update({
           status: 'failed',
-          error: imageErr?.message || 'Image generation failed',
+          error: bgImageErr?.message || 'Background generation failed',
           finished_at: new Date().toISOString()
         })
         .eq('id', job.id);
@@ -175,39 +193,92 @@ serve(async (req) => {
         p_visuals_count: 1
       });
 
-      // Mettre à jour le statut du set même en cas d'échec
       await updateJobSetStatus();
 
-      console.error(`[Worker] Job ${job.id} failed:`, imageErr?.message);
-      return new Response(JSON.stringify({ success: false, jobId: job.id, error: imageErr?.message }), {
+      console.error(`[Worker] Job ${job.id} failed:`, bgImageErr?.message);
+      return new Response(JSON.stringify({ success: false, jobId: job.id, error: bgImageErr?.message }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // 7. Vérifier la cohérence (optionnel, MVP retourne score fixe)
-    const coherenceScore = await checkCoherence(outUrl, job.job_sets.constraints || {});
+    // 6. Phase 5: Composer background + SVG text
+    console.log(`[Worker] Compositing background + SVG...`);
+    const compositedBuffer = await compositeSlide(bgUrl, svgLayer);
+    
+    // 7. Upload vers Supabase Storage
+    const fileName = `carousel_${job.job_set_id}_slide_${job.index_in_set}.png`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('media-generations')
+      .upload(fileName, compositedBuffer, {
+        contentType: 'image/png',
+        upsert: true
+      });
 
-    // 8. Créer l'asset dans media_generations avec score de cohérence
+    if (uploadError) {
+      console.error('[Worker] Upload failed:', uploadError);
+      await supabase
+        .from('jobs')
+        .update({ status: 'failed', error: 'Upload failed', finished_at: new Date().toISOString() })
+        .eq('id', job.id);
+      throw uploadError;
+    }
+
+    const publicUrl = supabase.storage
+      .from('media-generations')
+      .getPublicUrl(fileName).data.publicUrl;
+
+    console.log(`[Worker] Image uploaded: ${publicUrl}`);
+
+    // 8. Phase 6: Vérifier cohérence réelle
+    const referenceImageUrl = !isKeyVisual && job.job_sets.style_ref_url 
+      ? job.job_sets.style_ref_url 
+      : undefined;
+    
+    const coherenceScore = await checkCoherence(publicUrl, {
+      palette: job.job_sets.constraints?.palette || [],
+      referenceImageUrl
+    });
+
+    console.log(`[Worker] Coherence score: ${coherenceScore.total}/100`, coherenceScore.breakdown);
+
+    // 9. Phase 7: Si score < 75 et retry_count < 3 → retry
+    const coherenceThreshold = job.coherence_threshold || 75;
+    const retryCount = job.retry_count || 0;
+    
+    if (coherenceScore.total < coherenceThreshold && retryCount < 3) {
+      await supabase.from('jobs').update({
+        status: 'queued',
+        retry_count: retryCount + 1,
+        error: `Low coherence: ${coherenceScore.total}/100 (threshold: ${coherenceThreshold})`
+      }).eq('id', job.id);
+      
+      console.log(`[Worker] Job ${job.id} requeued for retry (attempt ${retryCount + 1})`);
+      return new Response(JSON.stringify({ retry: true, coherenceScore }), { headers: corsHeaders });
+    }
+
+    // 10. Créer l'asset dans media_generations
     const { data: asset } = await supabase
       .from('media_generations')
       .insert({
         user_id: job.job_sets.user_id,
         brand_id: job.job_sets.brand_id,
         type: 'image',
-        output_url: outUrl,
+        output_url: publicUrl,
         status: 'completed',
         prompt: job.prompt,
         metadata: { 
           job_id: job.id, 
           job_set_id: job.job_set_id,
           coherence_score: coherenceScore,
-          role: isKeyVisual ? 'key_visual' : 'variant'
+          role: isKeyVisual ? 'key_visual' : 'variant',
+          slide_template: slideTemplate,
+          retry_count: retryCount
         }
       })
       .select()
       .single();
 
-    // 9. Marquer le job comme réussi
+    // 11. Marquer le job comme réussi
     await supabase
       .from('jobs')
       .update({
@@ -217,21 +288,30 @@ serve(async (req) => {
       })
       .eq('id', job.id);
 
-    // 10. Si c'est le key visual, mettre à jour job_set.style_ref_asset_id
+    // 12. Si c'est le key visual, mettre à jour job_set.style_ref_url ET style_ref_asset_id
     if (isKeyVisual && asset) {
       await supabase
         .from('job_sets')
-        .update({ style_ref_asset_id: asset.id })
+        .update({ 
+          style_ref_url: publicUrl, // Phase 8: nouveau champ
+          style_ref_asset_id: asset.id 
+        })
         .eq('id', job.job_set_id);
-      console.log(`[Worker] Updated job_set ${job.job_set_id} with style_ref_asset_id ${asset.id}`);
+      console.log(`[Worker] Updated job_set ${job.job_set_id} with style_ref_url`);
     }
 
-    // 11. Mettre à jour le statut du job_set
+    // 13. Mettre à jour le statut du job_set
     const finalStatus = await updateJobSetStatus();
 
     console.log(`[Worker] Job ${job.id} completed successfully (set status: ${finalStatus}, coherence: ${coherenceScore.total}/100)`);
 
-    return new Response(JSON.stringify({ success: true, jobId: job.id, assetId: asset.id }), {
+    return new Response(JSON.stringify({ 
+      success: true, 
+      jobId: job.id, 
+      assetId: asset.id, 
+      coherenceScore: coherenceScore.total,
+      retryCount 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
