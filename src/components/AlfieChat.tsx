@@ -760,8 +760,9 @@ export function AlfieChat() {
         type: 'text'
       });
       
-      // ✅ Fallback élargi : si pas d'assets/jobSetId, tenter génération client
-      if (!data.assets?.length && !data.jobSetId) {
+      // ✅ Fallback élargi : si pas d'assets/jobSetId ET backend n'a pas géré, tenter génération client
+      // IMPORTANT : Ne pas déclencher si le backend a déjà tout géré (carrousels notamment)
+      if (!data.assets?.length && !data.jobSetId && data.noToolCalls) {
         console.warn('[Orchestrator] ⚠️ No generation triggered, text-only response received. Attempting client fallback...');
         
         let promptToUse = userMessage;
