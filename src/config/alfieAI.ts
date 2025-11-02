@@ -1,13 +1,15 @@
 // Configuration flexible du moteur IA pour Alfie
-// Permet de switcher facilement entre Gemini, OpenAI, Mistral
+// Permet de switcher facilement entre Gemini, OpenAI
+// Architecture avec fallback intelligent
 
-export type AIProvider = 'gemini' | 'openai' | 'mistral';
+export type AIProvider = 'gemini' | 'openai';
 
 export interface AIModelConfig {
   provider: AIProvider;
   model: string;
   endpoint: string;
   costPerRequest?: number; // Coût estimé en centimes
+  specialization?: string; // Domaine d'excellence
 }
 
 // Configuration active (facile à changer)
@@ -15,7 +17,8 @@ export const ACTIVE_AI_CONFIG: AIModelConfig = {
   provider: 'gemini',
   model: 'google/gemini-2.5-flash',
   endpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions',
-  costPerRequest: 0.05 // 0.05€ estimé par requête
+  costPerRequest: 0.05,
+  specialization: 'Génération visuelle, multimodal, Brand Kit'
 };
 
 // Configurations alternatives prêtes à l'emploi
@@ -24,25 +27,35 @@ export const AI_CONFIGS: Record<AIProvider, AIModelConfig> = {
     provider: 'gemini',
     model: 'google/gemini-2.5-flash',
     endpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions',
-    costPerRequest: 0.05
+    costPerRequest: 0.05,
+    specialization: 'Génération visuelle, multimodal, Brand Kit, composition détaillée'
   },
   openai: {
     provider: 'openai',
     model: 'openai/gpt-5-mini',
     endpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions',
-    costPerRequest: 0.15
-  },
-  mistral: {
-    provider: 'mistral',
-    model: 'mistral/mistral-medium', // À adapter selon disponibilité
-    endpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions',
-    costPerRequest: 0.08
+    costPerRequest: 0.15,
+    specialization: 'Raisonnement structuré, analyse complexe, JSON structuré'
   }
 };
 
 // Fonction utilitaire pour changer de provider
 export function switchAIProvider(provider: AIProvider): AIModelConfig {
   return AI_CONFIGS[provider];
+}
+
+// Fonction pour sélectionner le meilleur provider selon le type de tâche
+export function selectProviderForTask(taskType: 'image' | 'carousel' | 'video' | 'reasoning'): AIProvider {
+  switch (taskType) {
+    case 'image':
+    case 'carousel':
+    case 'video':
+      return 'gemini'; // Gemini excelle en génération visuelle
+    case 'reasoning':
+      return 'openai'; // OpenAI excelle en raisonnement
+    default:
+      return 'gemini'; // Default fallback
+  }
 }
 
 // Intent patterns pour détection rapide (évite appels IA inutiles)

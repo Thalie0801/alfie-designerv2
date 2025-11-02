@@ -20,10 +20,12 @@ interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  type?: 'text' | 'image' | 'video' | 'carousel';
+  type?: 'text' | 'image' | 'video' | 'carousel' | 'reasoning';
   assetUrl?: string;
   assetId?: string;
   metadata?: any;
+  reasoning?: string; // ✅ Nouveau : explications de l'agent
+  brandAlignment?: string; // ✅ Nouveau : comment ça respecte le Brand Kit
   timestamp: Date;
 }
 
@@ -860,7 +862,43 @@ export function AlfieChat() {
             >
               {/* Message texte */}
               {(!message.type || message.type === 'text') && (
-                <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+                <div className="space-y-2">
+                  <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+                  
+                  {/* Affichage du reasoning si présent */}
+                  {message.reasoning && (
+                    <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg mt-2 text-sm border border-purple-200 dark:border-purple-800">
+                      <div className="flex items-start gap-2">
+                        <span className="text-lg">💡</span>
+                        <div className="flex-1">
+                          <p className="font-semibold text-purple-900 dark:text-purple-100 mb-1">
+                            Pourquoi ce choix créatif ?
+                          </p>
+                          <p className="text-purple-700 dark:text-purple-300 text-xs leading-relaxed">
+                            {message.reasoning}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Affichage du Brand Kit alignment si présent */}
+                  {message.brandAlignment && (
+                    <div className="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-lg mt-2 text-sm border border-emerald-200 dark:border-emerald-800">
+                      <div className="flex items-start gap-2">
+                        <span className="text-lg">🎨</span>
+                        <div className="flex-1">
+                          <p className="font-semibold text-emerald-900 dark:text-emerald-100 mb-1">
+                            Cohérence Brand Kit
+                          </p>
+                          <p className="text-emerald-700 dark:text-emerald-300 text-xs leading-relaxed">
+                            {message.brandAlignment}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
               
               {/* Message image */}
@@ -872,6 +910,23 @@ export function AlfieChat() {
                     alt="Generated"
                     className="rounded-lg w-full"
                   />
+                  
+                  {/* Reasoning pour images */}
+                  {message.reasoning && (
+                    <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg text-sm border border-purple-200 dark:border-purple-800">
+                      <div className="flex items-start gap-2">
+                        <span className="text-lg">💡</span>
+                        <div className="flex-1">
+                          <p className="font-semibold text-purple-900 dark:text-purple-100 mb-1">
+                            Direction artistique
+                          </p>
+                          <p className="text-purple-700 dark:text-purple-300 text-xs leading-relaxed">
+                            {message.reasoning}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               

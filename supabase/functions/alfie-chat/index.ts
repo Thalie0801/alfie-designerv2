@@ -51,11 +51,58 @@ serve(async (req) => {
       });
     }
 
-    const { messages, brandId, stream = false } = await req.json();
+    const { messages, brandId, stream = false, expertMode = false } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
+    }
+
+    // Récupérer le Brand Kit si brandId fourni
+    let brandKit = null;
+    let brandContext = '';
+    
+    if (brandId) {
+      const { data: brand } = await supabase
+        .from('brands')
+        .select('name, palette, fonts, voice, niche')
+        .eq('id', brandId)
+        .single();
+      
+      if (brand) {
+        brandKit = {
+          name: brand.name,
+          colors: brand.palette || [],
+          fonts: brand.fonts || [],
+          voice: brand.voice,
+          niche: brand.niche
+        };
+        
+        // Construire le contexte Brand Kit enrichi
+        const colorList = brand.palette?.map((c: any) => 
+          typeof c === 'string' ? c : c.hex || c.value
+        ).filter(Boolean).join(', ') || 'non défini';
+        
+        brandContext = `
+📋 **BRAND KIT ACTIF - À RESPECTER DANS TOUTES LES CRÉATIONS:**
+
+**Identité de marque:**
+- Nom: ${brand.name}
+- Secteur/Niche: ${brand.niche || 'Non spécifié'}
+
+**Palette couleurs (À UTILISER SYSTÉMATIQUEMENT):**
+${colorList}
+
+**Typographie:**
+${brand.fonts?.length ? brand.fonts.join(', ') : 'Non définie'}
+
+**Style & Ton:**
+- Esthétique visuelle: ${brand.voice || 'professionnel moderne'}
+- Ton de communication: ${brand.voice || 'professionnel engageant'}
+
+⚠️ **RÈGLE CRITIQUE:** Tous les visuels générés DOIVENT intégrer ces couleurs et respecter ce style. Mentionne TOUJOURS les couleurs du Brand Kit dans tes prompts de génération.
+`;
+      }
     }
 
     // Transformer les messages pour supporter les images
@@ -80,6 +127,8 @@ serve(async (req) => {
 - Tutoiement friendly, phrases courtes et dynamiques
 - **Encouragements** : "Trop bien ton idée !", "On va faire un truc canon !"
 
+${brandContext}
+
 ## ⚡️ RÈGLE D'OR : 2 MESSAGES MAX AVANT ACTION
 
 Tu gères 3 types de créations : **image**, **carrousel**, **vidéo**.
@@ -87,14 +136,24 @@ Tu gères 3 types de créations : **image**, **carrousel**, **vidéo**.
 Avant de générer, tu dois figer :
 - **Canal/ratio** (1:1 IG, 9:16 Story, 16:9 YT, 4:5 LinkedIn)
 - **Objectif** (promo, éduquer, annoncer, lead-gen)
-- **Style** = toujours le Brand Kit de la marque
+- **Style** = toujours le Brand Kit de la marque${brandKit ? ` (${brandKit.voice || 'professionnel'})` : ''}
 - **Texte/hook** si utile
 
 Chaque création est **taggée** avec user_id et brand_id pour le suivi.
 
 ⚠️ **Si info manquante après 2 messages** → propose un choix par défaut et GO !
 
-Brand actif : ${brandId || 'aucune'}
+${expertMode ? `
+## 🧠 MODE EXPERT ACTIVÉ
+
+Tu dois TOUJOURS expliquer ton raisonnement créatif :
+- **Pourquoi** tu as choisi ce style/composition
+- **Comment** tu respectes le Brand Kit
+- **Quelle** stratégie visuelle tu appliques
+
+Exemple de reasoning :
+"J'ai choisi un angle dynamique 45° avec motion blur pour transmettre l'énergie du sport. Les couleurs ${brandKit?.colors?.[0] || '#FF5733'} et ${brandKit?.colors?.[1] || '#3498DB'} de ton Brand Kit créent un contraste punchy qui capte l'attention. Le lighting studio avec rim shadows ajoute du professionnalisme."
+` : ''}
 
 ---
 
@@ -104,9 +163,15 @@ Brand actif : ${brandId || 'aucune'}
 "Pour ton **image**, c'est pour quel canal ? (IG 1:1, Story 9:16, YT 16:9...) Et l'objectif ? (promo, annonce, éduquer)"
 
 **Message 2/2** :
-"Nickel ! Je pars sur **{ratio}**, style **marque**, objectif **{x}**. Un titre/texte à intégrer ?"
+"Nickel ! Je pars sur **{ratio}**, style **marque**${brandKit ? ` (${brandKit.voice})` : ''}, objectif **{x}**. Un titre/texte à intégrer ?"
 
 → Tool : **generate_image**
+
+**IMPORTANT - PROMPTS POUR IMAGES (Gemini NanoBanana):**
+- Sois ULTRA-DESCRIPTIF : couleurs précises (utilise les couleurs du Brand Kit : ${brandKit?.colors?.slice(0, 3).join(', ') || 'palette professionnelle'}), composition détaillée, mood, lighting
+- Spécifie : angles de caméra, hiérarchie visuelle, contraste, qualité technique (8K, professional)
+- Style artistique : photography, illustration, 3D render, etc.
+- Exemple : "Professional product photography, dynamic 45° angle, vibrant gradient background (${brandKit?.colors?.[0] || '#FF5733'}, ${brandKit?.colors?.[1] || '#3498DB'}), studio lighting with soft shadows, high energy mood, 8K quality"
 
 ---
 
@@ -149,6 +214,13 @@ Brand actif : ${brandId || 'aucune'}
 Sous-titres auto + musique neutre OK ? Je lance ? ⚡️"
 
 → Si "oui" : Tool **generate_video**
+
+**IMPORTANT - PROMPTS POUR VIDÉOS (Sora2/Seededance/Kling):**
+- Descriptions TEMPORELLES : mouvement de caméra (dolly, pan, zoom), actions dans la scène, transitions
+- Cinématographie : shallow DOF, stabilized, handheld, pacing (slow motion, real-time)
+- Couleurs du Brand Kit : ${brandKit?.colors?.slice(0, 2).join(', ') || 'tons professionnels'}
+- Style visuel : ${brandKit?.voice || 'professionnel cinématique'}
+- Exemple : "Smooth dolly tracking shot of running shoes hitting pavement, slow-motion, vibrant ${brandKit?.colors?.[0] || '#FF5733'} accents, cinematic depth of field, high-energy athletic mood, professional sports aesthetic"
 
 ---
 
@@ -255,15 +327,29 @@ Utilise **classify_intent** en premier pour bien comprendre ce que veut l'user !
         type: "function",
         function: {
           name: "generate_image",
-          description: "Generate an image from a text prompt (1 crédit). Supports different aspect ratios for social media.",
+          description: "Generate an image from a text prompt (1 crédit). Supports different aspect ratios for social media. CRITICAL: Always include Brand Kit colors in your prompt.",
           parameters: {
             type: "object",
             properties: {
-              prompt: { type: "string", description: "Detailed description of the image to generate" },
+              prompt: { 
+                type: "string", 
+                description: `Ultra-detailed description of the image. MUST include:
+- Composition details (angle, framing, rule of thirds)
+- Brand Kit colors (${brandKit?.colors?.slice(0, 3).join(', ') || 'use brand palette'})
+- Lighting (studio, natural, golden hour)
+- Mood/ambiance (energetic, calm, professional)
+- Quality (8K, high resolution, professional grade)
+- Style (photography, illustration, 3D render)
+Example: "Professional product photography, 45° angle, gradient background (${brandKit?.colors?.[0] || '#FF5733'}, ${brandKit?.colors?.[1] || '#3498DB'}), studio lighting, energetic mood, 8K"` 
+              },
               aspect_ratio: { 
                 type: "string", 
                 description: "Aspect ratio for the image (default: 1:1). Options: 1:1 (Instagram post), 4:5 (Instagram portrait), 9:16 (Instagram story/TikTok), 16:9 (YouTube/Twitter)", 
                 enum: ["1:1", "4:5", "9:16", "16:9"]
+              },
+              reasoning: {
+                type: "string",
+                description: "${expertMode ? 'REQUIRED: Explain your creative choices (composition, colors, Brand Kit alignment)' : 'Optional: Explain your creative choices'}"
               }
             },
             required: ["prompt"]
