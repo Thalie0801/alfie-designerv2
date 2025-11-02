@@ -157,10 +157,40 @@ export async function compositeSlide(
     
     console.log('✅ Composition complete:', composedUrl);
     
-    // 5. 🧹 CLEANUP: Delete temporary files from Cloudinary to avoid storage bloat
-    console.log('🧹 Cleaning up temporary Cloudinary files...');
+    // 4.5 🔍 VERIFY: Wait for composed image to be available before cleanup
+    console.log('🔍 Verifying composed image availability...');
+    const verifyController = new AbortController();
+    const verifyTimeout = setTimeout(() => verifyController.abort(), 30000);
     
-    const cleanupPromises = [];
+    try {
+      const verifyResponse = await fetch(composedUrl, { 
+        method: 'HEAD',
+        signal: verifyController.signal 
+      });
+      clearTimeout(verifyTimeout);
+      
+      if (!verifyResponse.ok) {
+        console.warn(`⚠️ Composed image not yet available (${verifyResponse.status}), retrying with GET...`);
+        // Cloudinary may need a GET to generate the image on first request
+        const getResponse = await fetch(composedUrl);
+        if (!getResponse.ok) {
+          throw new Error(`Composed image not accessible: ${getResponse.status}`);
+        }
+      }
+      console.log('✅ Composed image verified and accessible');
+    } catch (err) {
+      clearTimeout(verifyTimeout);
+      console.error('❌ Failed to verify composed image:', err);
+      throw new Error(`Composed image verification failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+    
+    // 5. 🧹 CLEANUP: Delete temporary files from Cloudinary to avoid storage bloat (AFTER verification)
+    console.log('🧹 Scheduling cleanup of temporary Cloudinary files in 5 seconds...');
+    
+    // Delay cleanup to ensure worker has time to download the composed image
+    setTimeout(async () => {
+      console.log('🧹 Executing delayed cleanup...');
+      const cleanupPromises = [];
     
     // Delete background
     if (bgUploadedPublicId) {
@@ -209,11 +239,12 @@ export async function compositeSlide(
         .catch(e => console.warn('⚠️ SVG cleanup error:', e.message))
       );
     }
-    
-    // Execute cleanup in background (don't await to avoid blocking response)
-    Promise.all(cleanupPromises).then(() => {
-      console.log('✅ Cloudinary cleanup complete');
-    });
+      
+      // Execute cleanup in background (don't await to avoid blocking response)
+      Promise.all(cleanupPromises).then(() => {
+        console.log('✅ Cloudinary cleanup complete');
+      });
+    }, 5000); // Wait 5 seconds before cleanup
     
     return composedUrl;
     
