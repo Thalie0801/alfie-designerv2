@@ -21,6 +21,7 @@ export default function Admin() {
   const [conversions, setConversions] = useState<any[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
   const [designs, setDesigns] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingUser, setEditingUser] = useState<any>(null);
@@ -34,7 +35,7 @@ export default function Admin() {
 
   const loadAdminData = async () => {
     try {
-      const [usersRes, affiliatesRes, conversionsRes, payoutsRes, designsRes] = await Promise.all([
+      const [usersRes, affiliatesRes, conversionsRes, payoutsRes, designsRes, suggestionsRes] = await Promise.all([
         supabase.from('profiles').select('*').order('created_at', { ascending: false }),
         supabase.from('affiliates').select('*').order('created_at', { ascending: false }),
         supabase
@@ -47,7 +48,12 @@ export default function Admin() {
           .select('*')
           .order('created_at', { ascending: false })
           .limit(50),
-        supabase.from('canva_designs').select('*').order('created_at', { ascending: false })
+        supabase.from('canva_designs').select('*').order('created_at', { ascending: false }),
+        supabase
+          .from('contact_requests')
+          .select('*')
+          .ilike('message', '[SUGGESTION DE FONCTIONNALITÉ]%')
+          .order('created_at', { ascending: false })
       ]);
 
       setUsers(usersRes.data || []);
@@ -55,6 +61,7 @@ export default function Admin() {
       setConversions(conversionsRes.data || []);
       setPayouts(payoutsRes.data || []);
       setDesigns(designsRes.data || []);
+      setSuggestions(suggestionsRes.data || []);
     } catch (error) {
       console.error('Error loading admin data:', error);
       toast.error('Erreur lors du chargement des données');
@@ -164,6 +171,51 @@ export default function Admin() {
     } catch (error: any) {
       console.error('User deletion error:', error);
       toast.error(error.message || 'Erreur lors de la suppression de l\'utilisateur');
+    }
+  };
+
+  const parseSuggestion = (message: string) => {
+    const titleMatch = message.match(/Titre:\s*(.+?)(?:\n|$)/);
+    const descMatch = message.match(/Description:\s*\n(.+)/s);
+    return {
+      title: titleMatch?.[1]?.trim() || 'Sans titre',
+      description: descMatch?.[1]?.trim() || message
+    };
+  };
+
+  const handleUpdateSuggestionStatus = async (id: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('contact_requests')
+        .update({ status: newStatus })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success('Statut mis à jour');
+      loadAdminData();
+    } catch (error) {
+      console.error('Update suggestion status error:', error);
+      toast.error('Erreur lors de la mise à jour');
+    }
+  };
+
+  const handleDeleteSuggestion = async (id: string) => {
+    if (!confirm('Supprimer cette suggestion ?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('contact_requests')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success('Suggestion supprimée');
+      loadAdminData();
+    } catch (error) {
+      console.error('Delete suggestion error:', error);
+      toast.error('Erreur lors de la suppression');
     }
   };
 
@@ -291,6 +343,14 @@ export default function Admin() {
           <TabsTrigger value="conversions">Conversions</TabsTrigger>
           <TabsTrigger value="payouts">Payouts</TabsTrigger>
           <TabsTrigger value="catalog">Catalogue Canva</TabsTrigger>
+          <TabsTrigger value="suggestions">
+            Suggestions
+            {suggestions.filter(s => s.status === 'pending').length > 0 && (
+              <Badge className="ml-2" variant="destructive">
+                {suggestions.filter(s => s.status === 'pending').length}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="news">Actualités</TabsTrigger>
           <TabsTrigger value="diagnostic">Diagnostic</TabsTrigger>
         </TabsList>
@@ -610,6 +670,107 @@ export default function Admin() {
                       </CardContent>
                     </Card>
                   ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Suggestions Tab */}
+        <TabsContent value="suggestions" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Suggestions de fonctionnalités</CardTitle>
+                  <CardDescription>Idées et demandes des utilisateurs</CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={loadAdminData}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <p className="text-center text-muted-foreground py-4">Chargement...</p>
+              ) : suggestions.length === 0 ? (
+                <div className="text-center py-12">
+                  <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Aucune suggestion</h3>
+                  <p className="text-muted-foreground">
+                    Les suggestions apparaîtront ici
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {suggestions.map((suggestion) => {
+                    const parsed = parseSuggestion(suggestion.message);
+                    return (
+                      <Card key={suggestion.id} className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-semibold text-lg">{parsed.title}</h4>
+                              <Badge variant={
+                                suggestion.status === 'pending' ? 'default' :
+                                suggestion.status === 'reviewed' ? 'secondary' :
+                                'outline'
+                              }>
+                                {suggestion.status === 'pending' ? '⏳ En attente' :
+                                 suggestion.status === 'reviewed' ? '✓ Vu' :
+                                 suggestion.status === 'implemented' ? '✅ Implémenté' :
+                                 suggestion.status}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                              {parsed.description}
+                            </p>
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2">
+                              <span>📧 {suggestion.email || 'Email non fourni'}</span>
+                              <span>📅 {new Date(suggestion.created_at).toLocaleDateString('fr-FR', {
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            {suggestion.status === 'pending' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleUpdateSuggestionStatus(suggestion.id, 'reviewed')}
+                              >
+                                Marquer vu
+                              </Button>
+                            )}
+                            {suggestion.status === 'reviewed' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleUpdateSuggestionStatus(suggestion.id, 'implemented')}
+                              >
+                                Marquer fait
+                              </Button>
+                            )}
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteSuggestion(suggestion.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
