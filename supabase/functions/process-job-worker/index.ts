@@ -5,7 +5,7 @@ import { deriveSeed } from "../_shared/seedGenerator.ts";
 import { checkCoherence } from "../_shared/coherenceChecker.ts";
 import { SLIDE_TEMPLATES } from "../_shared/slideTemplates.ts";
 import { renderSlideToSVG } from "../_shared/slideRenderer.ts";
-import { compositeSlide } from "../_shared/imageCompositor.ts";
+import { compositeSlide, cleanupCloudinaryResources } from "../_shared/imageCompositor.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -525,13 +525,13 @@ serve(async (req) => {
     // 8. Composite background + SVG text via Cloudinary (returns URL)
     checkTimeout();
     console.log('🎨 [Worker] Step 5: Compositing background + text via Cloudinary...');
-    const composedImageUrl = await compositeSlide(backgroundUrl, svgTextLayer, job.job_set_id);
-    console.log('✅ [Worker] Composition complete, URL:', composedImageUrl);
+    const composed = await compositeSlide(backgroundUrl, svgTextLayer, job.job_set_id, job.job_sets.brand_id);
+    console.log('✅ [Worker] Composition complete, URL:', composed.url);
 
     // 9. Download composed image from Cloudinary
     checkTimeout();
     console.log('⬇️ [Worker] Downloading composed image from Cloudinary...');
-    const imageResponse = await fetch(composedImageUrl);
+    const imageResponse = await fetch(composed.url);
     if (!imageResponse.ok) {
       throw new Error(`Failed to download composed image: ${imageResponse.status}`);
     }
@@ -576,6 +576,9 @@ serve(async (req) => {
     }
 
     console.log('✅ [Worker] Upload success:', uploadData);
+
+    // Cleanup Cloudinary temporary assets now that we have our copy
+    await cleanupCloudinaryResources({ bgPublicId: composed.bgPublicId, svgPublicId: composed.svgPublicId });
 
     const { data: publicUrlData } = supabase.storage
       .from('media-generations')

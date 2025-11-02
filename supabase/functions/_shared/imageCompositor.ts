@@ -17,7 +17,7 @@ export async function compositeSlide(
   svgTextLayer: string,
   jobSetId?: string,
   brandId?: string
-): Promise<string> {
+): Promise<{ url: string; bgPublicId: string; svgPublicId: string }> {
   console.log('🎨 [imageCompositor] Starting Cloudinary composition...');
   console.log('📥 Background URL:', backgroundUrl);
   console.log('📝 SVG layer size:', svgTextLayer.length, 'chars');
@@ -184,69 +184,8 @@ export async function compositeSlide(
       throw new Error(`Composed image verification failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
     
-    // 5. 🧹 CLEANUP: Delete temporary files from Cloudinary to avoid storage bloat (AFTER verification)
-    console.log('🧹 Scheduling cleanup of temporary Cloudinary files in 5 seconds...');
-    
-    // Delay cleanup to ensure worker has time to download the composed image
-    setTimeout(async () => {
-      console.log('🧹 Executing delayed cleanup...');
-      const cleanupPromises = [];
-    
-    // Delete background
-    if (bgUploadedPublicId) {
-      const bgCleanupTimestamp = Math.floor(Date.now() / 1000);
-      const bgCleanupFormData = new FormData();
-      bgCleanupFormData.append('public_id', bgUploadedPublicId);
-      bgCleanupFormData.append('api_key', API_KEY);
-      bgCleanupFormData.append('timestamp', bgCleanupTimestamp.toString());
-      
-      const bgCleanupSignature = await generateCloudinarySignature(
-        { public_id: bgUploadedPublicId, timestamp: bgCleanupTimestamp.toString() },
-        API_SECRET
-      );
-      bgCleanupFormData.append('signature', bgCleanupSignature);
-      
-      cleanupPromises.push(
-        fetch(deleteEndpoint, {
-          method: 'POST',
-          body: bgCleanupFormData
-        })
-        .then(r => r.ok ? console.log('✅ Deleted background:', bgUploadedPublicId) : console.warn('⚠️ Failed to delete background'))
-        .catch(e => console.warn('⚠️ Background cleanup error:', e.message))
-      );
-    }
-    
-    // Delete SVG overlay
-    if (svgUploadedPublicId) {
-      const svgCleanupTimestamp = Math.floor(Date.now() / 1000);
-      const svgCleanupFormData = new FormData();
-      svgCleanupFormData.append('public_id', svgUploadedPublicId);
-      svgCleanupFormData.append('api_key', API_KEY);
-      svgCleanupFormData.append('timestamp', svgCleanupTimestamp.toString());
-      
-      const svgCleanupSignature = await generateCloudinarySignature(
-        { public_id: svgUploadedPublicId, timestamp: svgCleanupTimestamp.toString() },
-        API_SECRET
-      );
-      svgCleanupFormData.append('signature', svgCleanupSignature);
-      
-      cleanupPromises.push(
-        fetch(deleteEndpoint, {
-          method: 'POST',
-          body: svgCleanupFormData
-        })
-        .then(r => r.ok ? console.log('✅ Deleted SVG overlay:', svgUploadedPublicId) : console.warn('⚠️ Failed to delete SVG'))
-        .catch(e => console.warn('⚠️ SVG cleanup error:', e.message))
-      );
-    }
-      
-      // Execute cleanup in background (don't await to avoid blocking response)
-      Promise.all(cleanupPromises).then(() => {
-        console.log('✅ Cloudinary cleanup complete');
-      });
-    }, 5000); // Wait 5 seconds before cleanup
-    
-    return composedUrl;
+    // 5. Return composed info and let caller handle cleanup after upload
+    return { url: composedUrl, bgPublicId: bgUploadedPublicId, svgPublicId: svgUploadedPublicId };
     
   } catch (error) {
     console.error('❌ [imageCompositor] Cloudinary composition failed:', error);
@@ -256,4 +195,37 @@ export async function compositeSlide(
     }
     throw error;
   }
+}
+
+// Cleanup helper to delete temporary Cloudinary resources AFTER upload is complete
+export async function cleanupCloudinaryResources({
+  bgPublicId,
+  svgPublicId,
+}: { bgPublicId?: string; svgPublicId?: string }) {
+  const CLOUD_NAME = Deno.env.get('CLOUDINARY_CLOUD_NAME')?.trim();
+  const API_KEY = Deno.env.get('CLOUDINARY_API_KEY');
+  const API_SECRET = Deno.env.get('CLOUDINARY_API_SECRET');
+  if (!CLOUD_NAME || !API_KEY || !API_SECRET) return; // silently skip if missing
+  const cloudName = CLOUD_NAME.toLowerCase();
+  const deleteEndpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/destroy`;
+
+  const doDelete = async (publicId?: string) => {
+    if (!publicId) return;
+    const ts = Math.floor(Date.now() / 1000);
+    const form = new FormData();
+    form.append('public_id', publicId);
+    form.append('api_key', API_KEY);
+    form.append('timestamp', ts.toString());
+    const sig = await generateCloudinarySignature({ public_id: publicId, timestamp: ts.toString() }, API_SECRET);
+    form.append('signature', sig);
+    try {
+      const resp = await fetch(deleteEndpoint, { method: 'POST', body: form });
+      if (resp.ok) console.log('🧹 Deleted Cloudinary asset:', publicId);
+      else console.warn('⚠️ Failed to delete Cloudinary asset:', publicId);
+    } catch (e: any) {
+      console.warn('⚠️ Cleanup error for', publicId, e?.message);
+    }
+  };
+
+  await Promise.all([doDelete(bgPublicId), doDelete(svgPublicId)]);
 }
