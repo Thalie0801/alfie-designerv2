@@ -49,8 +49,8 @@ export function AlfieChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   
-  // Tracking carrousel uniquement
-  const [carouselProgress, setCarouselProgress] = useState({ done: 0, total: 0 });
+  // Tracking carrousel (commenté pour l'instant)
+  // const [carouselProgress, setCarouselProgress] = useState({ done: 0, total: 0 });
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -198,18 +198,18 @@ export function AlfieChat() {
     }
   };
   
-  const refundVisuals = async (amount: number) => {
-    if (!activeBrandId) return;
-    try {
-      await supabase.rpc('refund_brand_quotas', {
-        p_brand_id: activeBrandId,
-        p_visuals_count: amount
-      });
-      console.log(`[Refund] ${amount} Visuels remboursés`);
-    } catch (error) {
-      console.error('[Refund] Error:', error);
-    }
-  };
+  // const _refundVisuals = async (amount: number) => {
+  //   if (!activeBrandId) return;
+  //   try {
+  //     await supabase.rpc('refund_brand_quotas', {
+  //       p_brand_id: activeBrandId,
+  //       p_visuals_count: amount
+  //     });
+  //     console.log(`[Refund] ${amount} Visuels remboursés`);
+  //   } catch (error) {
+  //     console.error('[Refund] Error:', error);
+  //   }
+  // };
   
   // ======
   // GÉNÉRATION D'IMAGES
@@ -398,13 +398,13 @@ export function AlfieChat() {
   // GÉNÉRATION DE CARROUSELS (NOUVEAU FLUX : PLAN TEXTUEL + BOUCLE IMAGE)
   // ======
   
-  export interface CarouselSlide {
-	    title: string;
-	    text: string;
-	    imagePrompt: string;
-	  }
-	  
-	  const generateCarouselPlan = async (prompt: string, count: number): Promise<CarouselSlide[] | null> => {
+  interface CarouselSlide {
+    title: string;
+    text: string;
+    imagePrompt: string;
+  }
+  
+  const generateCarouselPlan = async (prompt: string, count: number): Promise<CarouselSlide[] | null> => {
     // 1. Appel à l'IA pour générer le plan textuel (APPEL SUPABASE)
     addMessage({
       role: 'assistant',
@@ -415,25 +415,36 @@ export function AlfieChat() {
     try {
       const headers = await getAuthHeader();
       const { data, error } = await supabase.functions.invoke('alfie-plan-carousel', {
-        body: { prompt, count },
+        body: { prompt, slideCount: count },
         headers
       });
 
       if (error) throw error;
 
-      // Assurez-vous que la réponse est un tableau de CarouselSlide
-      if (!data || !Array.isArray(data)) {
+      // Extraire le plan depuis data.plan.slides
+      if (!data?.plan?.slides || !Array.isArray(data.plan.slides)) {
         throw new Error('Réponse invalide de alfie-plan-carousel');
       }
 
-      return data as CarouselSlide[];
+      // Mapper le format de retour vers CarouselSlide
+      const slides: CarouselSlide[] = data.plan.slides.map((slide: any, index: number) => ({
+        title: slide.title || `Slide ${index + 1}`,
+        text: slide.subtitle || slide.punchline || '',
+        imagePrompt: slide.note || `Image pour ${slide.title}`
+      }));
+
+      return slides;
 
     } catch (error: any) {
       console.error('[Carousel Plan] Error:', error);
       toast.error(`Échec de la planification : ${error.message}`);
       return null;
     }
-  };    const plan = await generateCarouselPlan(prompt, count);
+  };
+
+  const generateCarousel = async (prompt: string, count: number, aspectRatio: string) => {
+    // 1. Générer le plan textuel
+    const plan = await generateCarouselPlan(prompt, count);
     if (!plan) return;
     
     // 2. Afficher le plan et demander validation
@@ -456,95 +467,95 @@ export function AlfieChat() {
   
   // L'ancienne fonction generateCarousel est supprimée et remplacée par la logique de validation dans handleSend
   
-  const subscribeToCarousel = (jobSetId: string, total: number) => {
-    // Nettoyer l'ancien canal si présent
-    if (carouselChannelRef.current) {
-      supabase.removeChannel(carouselChannelRef.current);
-    }
-    
-    const channel = supabase
-      .channel(`carousel-${jobSetId}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'jobs',
-        filter: `job_set_id=eq.${jobSetId}`
-      }, () => {
-        // Recompter les jobs terminés
-        updateCarouselProgress(jobSetId, total);
-      })
-      .subscribe();
-    
-    carouselChannelRef.current = channel;
-    
-    // Polling de secours toutes les 10s
-    const pollInterval = setInterval(async () => {
-      await updateCarouselProgress(jobSetId, total);
-      
-      // Arrêter le polling si terminé
-      if (carouselProgress.done >= total) {
-        clearInterval(pollInterval);
-      }
-    }, 10000);
-  };
+  // const _subscribeToCarousel = (jobSetId: string, total: number) => {
+  //   // Nettoyer l'ancien canal si présent
+  //   if (carouselChannelRef.current) {
+  //     supabase.removeChannel(carouselChannelRef.current);
+  //   }
+  //   
+  //   const channel = supabase
+  //     .channel(`carousel-${jobSetId}`)
+  //     .on('postgres_changes', {
+  //       event: 'UPDATE',
+  //       schema: 'public',
+  //       table: 'jobs',
+  //       filter: `job_set_id=eq.${jobSetId}`
+  //     }, () => {
+  //       // Recompter les jobs terminés
+  //       updateCarouselProgress(jobSetId, total);
+  //     })
+  //     .subscribe();
+  //   
+  //   carouselChannelRef.current = channel;
+  //   
+  //   // Polling de secours toutes les 10s
+  //   const pollInterval = setInterval(async () => {
+  //     await updateCarouselProgress(jobSetId, total);
+  //     
+  //     // Arrêter le polling si terminé
+  //     if (carouselProgress.done >= total) {
+  //       clearInterval(pollInterval);
+  //     }
+  //   }, 10000);
+  // };
   
-  const updateCarouselProgress = async (jobSetId: string, total: number) => {
-    try {
-      const { data: jobs } = await supabase
-        .from('jobs')
-        .select('status')
-        .eq('job_set_id', jobSetId);
-      
-      if (!jobs) return;
-      
-      const done = jobs.filter(j => j.status === 'succeeded' || j.status === 'completed').length;
-      setCarouselProgress({ done, total });
-      
-      // Mettre à jour le message de progression
-      setMessages(prev => prev.map(m => {
-        if (m.type === 'carousel' && m.metadata?.jobSetId === jobSetId) {
-          return {
-            ...m,
-            content: done >= total 
-              ? `✅ Carrousel terminé (${done}/${total}) !`
-              : `⏳ Génération en cours (${done}/${total})...`,
-            metadata: { ...m.metadata, done }
-          };
-        }
-        return m;
-      }));
-      
-      // Si terminé, charger les assets
-      if (done >= total) {
-        const { data: assets } = await supabase
-          .from('assets')
-          .select('id, storage_key')
-          .eq('job_set_id', jobSetId)
-          .order('index_in_set', { ascending: true });
-        
-        if (assets && assets.length > 0) {
-          // Afficher les slides générées
-          addMessage({
-            role: 'assistant',
-            content: `✅ ${assets.length} slides générées avec succès !`,
-            type: 'text',
-            metadata: { 
-              jobSetId, 
-              assetIds: assets.map(a => a.id),
-              assetUrls: assets.map(a => {
-                const { data } = supabase.storage.from('media-generations').getPublicUrl(a.storage_key);
-                return data.publicUrl;
-              })
-            }
-          });
-          
-          toast.success(`Carrousel terminé ! ${assets.length} slides générées.`);
-        }
-      }
-    } catch (error) {
-      console.error('[Carousel] Progress update error:', error);
-    }
-  };
+  // const updateCarouselProgress = async (jobSetId: string, total: number) => {
+  //   try {
+  //     const { data: jobs } = await supabase
+  //       .from('jobs')
+  //       .select('status')
+  //       .eq('job_set_id', jobSetId);
+  //     
+  //     if (!jobs) return;
+  //     
+  //     const done = jobs.filter(j => j.status === 'succeeded' || j.status === 'completed').length;
+  //     setCarouselProgress({ done, total });
+  //     
+  //     // Mettre à jour le message de progression
+  //     setMessages(prev => prev.map(m => {
+  //       if (m.type === 'carousel' && m.metadata?.jobSetId === jobSetId) {
+  //         return {
+  //           ...m,
+  //           content: done >= total 
+  //             ? `✅ Carrousel terminé (${done}/${total}) !`
+  //             : `⏳ Génération en cours (${done}/${total})...`,
+  //           metadata: { ...m.metadata, done }
+  //         };
+  //       }
+  //       return m;
+  //     }));
+  //     
+  //     // Si terminé, charger les assets
+  //     if (done >= total) {
+  //       const { data: assets } = await supabase
+  //         .from('assets')
+  //         .select('id, storage_key')
+  //         .eq('job_set_id', jobSetId)
+  //         .order('index_in_set', { ascending: true });
+  //       
+  //       if (assets && assets.length > 0) {
+  //         // Afficher les slides générées
+  //         addMessage({
+  //           role: 'assistant',
+  //           content: `✅ ${assets.length} slides générées avec succès !`,
+  //           type: 'text',
+  //           metadata: { 
+  //             jobSetId, 
+  //             assetIds: assets.map(a => a.id),
+  //             assetUrls: assets.map(a => {
+  //               const { data } = supabase.storage.from('media-generations').getPublicUrl(a.storage_key);
+  //               return data.publicUrl;
+  //             })
+  //           }
+  //         });
+  //         
+  //         toast.success(`Carrousel terminé ! ${assets.length} slides générées.`);
+  //       }
+  //     }
+  //   } catch (error) {
+  //     console.error('[Carousel] Progress update error:', error);
+  //   }
+  // };
   
   // Cleanup des subscriptions et polling
   useEffect(() => {
