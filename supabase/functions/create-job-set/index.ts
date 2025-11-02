@@ -137,7 +137,8 @@ serve(async (req) => {
 
       // 5. Appeler alfie-plan-carousel
       const { data: planResponse, error: planErr } = await supabase.functions.invoke('alfie-plan-carousel', {
-        body: { prompt, brandKit: brandSnapshot, slideCount: normalizedCount }
+        body: { prompt, brandKit: brandSnapshot, slideCount: normalizedCount },
+        headers: { Authorization: authHeader }
       });
 
       if (planErr || !planResponse?.plan?.slides) {
