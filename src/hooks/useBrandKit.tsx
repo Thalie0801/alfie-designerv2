@@ -12,6 +12,7 @@ export interface BrandKit {
     secondary?: string;
   };
   voice?: string;
+  niche?: string;
 }
 
 interface Brand {
@@ -111,7 +112,8 @@ export function useBrandKit() {
     palette: Array.isArray(activeBrand.palette) ? activeBrand.palette : [],
     logo_url: activeBrand.logo_url,
     fonts: activeBrand.fonts,
-    voice: activeBrand.voice
+    voice: activeBrand.voice,
+    niche: (activeBrand as any).niche
   } : null;
 
   const canAddBrand = () => {

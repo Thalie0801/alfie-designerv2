@@ -483,6 +483,7 @@ export type Database = {
           is_addon: boolean | null
           logo_url: string | null
           name: string
+          niche: string | null
           palette: Json | null
           plan: string | null
           quota_images: number | null
@@ -508,6 +509,7 @@ export type Database = {
           is_addon?: boolean | null
           logo_url?: string | null
           name: string
+          niche?: string | null
           palette?: Json | null
           plan?: string | null
           quota_images?: number | null
@@ -533,6 +535,7 @@ export type Database = {
           is_addon?: boolean | null
           logo_url?: string | null
           name?: string
+          niche?: string | null
           palette?: Json | null
           plan?: string | null
           quota_images?: number | null

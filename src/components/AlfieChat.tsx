@@ -35,7 +35,7 @@ type IntentType = 'image' | 'video' | 'carousel' | 'unknown';
 
 export function AlfieChat() {
   const { user } = useAuth();
-  const { activeBrandId } = useBrandKit();
+  const { activeBrandId, brandKit } = useBrandKit();
   
   // États minimaux (6 au lieu de 15+)
   const [messages, setMessages] = useState<Message[]>([{
@@ -440,7 +440,16 @@ export function AlfieChat() {
     try {
       const headers = await getAuthHeader();
       const { data, error } = await supabase.functions.invoke('alfie-plan-carousel', {
-        body: { prompt, slideCount: count },
+        body: { 
+          prompt, 
+          slideCount: count,
+          brandKit: {
+            name: brandKit?.name,
+            palette: brandKit?.palette,
+            voice: brandKit?.voice,
+            niche: brandKit?.niche
+          }
+        },
         headers
       });
 

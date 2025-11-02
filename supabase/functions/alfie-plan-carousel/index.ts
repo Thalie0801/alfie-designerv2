@@ -1,0 +1,139 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface BrandKit {
+  name?: string;
+  palette?: string[];
+  voice?: string;
+  niche?: string;
+}
+
+interface CarouselSlide {
+  type: 'hero' | 'problem' | 'solution' | 'impact' | 'cta';
+  title: string;
+  subtitle?: string;
+  punchline?: string;
+  bullets?: string[];
+  kpis?: { label: string; delta: string }[];
+  note: string; // Prompt image en anglais
+}
+
+interface CarouselPlan {
+  slides: CarouselSlide[];
+}
+
+serve(async (req) => {
+  console.log('[alfie-plan-carousel] v1.0.0 - Function invoked');
+
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { prompt, slideCount, brandKit } = await req.json();
+
+    if (!prompt || !slideCount) {
+      throw new Error('Missing prompt or slideCount');
+    }
+
+    const brandInfo = brandKit as BrandKit;
+    
+    // Extraire les couleurs de la palette
+    const primary_color = brandInfo?.palette?.[0] || 'Non spécifié';
+    const secondary_color = brandInfo?.palette?.[1] || 'Non spécifié';
+    
+    // Construire le prompt système
+    const systemPrompt = `
+Tu es Alfie, un expert en stratégie de contenu et en conception de carrousels pour les réseaux sociaux.
+Ton objectif est de générer un plan de carrousel de ${slideCount} slides basé sur la demande de l'utilisateur.
+
+**Règles Cruciales :**
+1. **Qualité et Correction :** Le contenu doit être impeccable. **Corrige toutes les fautes de frappe et de grammaire.** Assure-toi que les titres commencent par une majuscule et que le français est parfait.
+2. **Cohérence de Marque :** Le contenu doit être aligné avec la marque.
+    * **Nom de la Marque :** ${brandInfo?.name || 'Non spécifié'}
+    * **Niche/Secteur :** ${brandInfo?.niche || 'Non spécifié'}
+    * **Tonalité :** ${brandInfo?.voice || 'Professionnelle et engageante'}
+    * **Couleurs Principales :** ${primary_color} et ${secondary_color}
+3. **Structure :** Le plan doit être un tableau JSON avec exactement ${slideCount} objets.
+4. **Prompt Image (note) :** Le champ \`note\` doit contenir un prompt détaillé pour la génération d'image, en anglais, décrivant le visuel de la slide. Il doit inclure des références au Brand Kit (couleurs, style).
+5. **Types de Slides :** Utilise les types suivants pour structurer le carrousel : 'hero', 'problem', 'solution', 'impact', 'cta'.
+
+**Format de Réponse (JSON Schema) :**
+{
+  "plan": {
+    "slides": [
+      {
+        "type": "hero",
+        "title": "Titre accrocheur",
+        "subtitle": "Sous-titre ou phrase d'introduction",
+        "punchline": "Phrase clé (optionnel)",
+        "bullets": ["Point 1", "Point 2"],
+        "kpis": [{"label": "KPI", "delta": "+X%"}],
+        "note": "Detailed image prompt in English, including brand colors ${primary_color} and ${secondary_color}."
+      }
+    ]
+  }
+}
+`;
+
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY not configured");
+    }
+
+    // Appeler l'IA via Lovable AI Gateway
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: prompt },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[alfie-plan-carousel] AI Gateway error:', response.status, errorText);
+      throw new Error(`AI Gateway error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const jsonResponse = data.choices?.[0]?.message?.content;
+    
+    if (!jsonResponse) {
+      throw new Error('AI returned an empty response');
+    }
+
+    const plan = JSON.parse(jsonResponse) as { plan: CarouselPlan };
+
+    // Validation
+    if (!plan.plan || !Array.isArray(plan.plan.slides) || plan.plan.slides.length !== slideCount) {
+      console.error('[alfie-plan-carousel] Invalid plan structure:', plan);
+      throw new Error('AI returned an invalid plan structure or incorrect slide count');
+    }
+
+    console.log('[alfie-plan-carousel] Plan generated successfully with', plan.plan.slides.length, 'slides');
+
+    return new Response(JSON.stringify(plan), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error: any) {
+    console.error('[alfie-plan-carousel] Error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+});
