@@ -107,8 +107,11 @@ serve(async (req) => {
       });
 
       if (quotaErr || !quotaResult?.[0]?.success) {
+        console.error('[create-job-set] ❌ Quota reservation failed:', quotaResult?.[0]?.reason);
         throw new Error(quotaResult?.[0]?.reason || 'Quota reservation failed');
       }
+
+      console.log(`[create-job-set] ✅ Quotas reserved: ${normalizedCount} visuals for brand ${brandId}`);
 
       // 2. Générer le master seed pour la cohérence du carrousel
       const masterSeed = generateMasterSeed();

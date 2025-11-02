@@ -271,7 +271,38 @@ serve(async (req) => {
     // 5. Generate background WITHOUT text (text-first approach)
     checkTimeout();
     console.log('🖼️ [Worker] Step 2: Generating background image WITHOUT text...');
-    const correctedPrompt = correctFrenchSpelling(job.prompt);
+    
+    // 🔥 NEW: Build rich prompt from full slideContent (bullets, KPIs, punchline)
+    let fullPrompt = slideContent.title || '';
+    if (slideContent.subtitle) fullPrompt += `. ${slideContent.subtitle}`;
+    if (slideContent.punchline) fullPrompt += `. ${slideContent.punchline}`;
+
+    // Add bullets context to guide image generation
+    if (slideContent.bullets && slideContent.bullets.length > 0) {
+      fullPrompt += `. Key points: ${slideContent.bullets.join(', ')}`;
+    }
+    
+    // Add KPIs context for data-driven visuals
+    if (slideContent.kpis && slideContent.kpis.length > 0) {
+      const kpiSummary = slideContent.kpis
+        .map((k: any) => `${k.label} ${k.delta}`)
+        .join(', ');
+      fullPrompt += `. Metrics: ${kpiSummary}`;
+    }
+
+    // Add visual style hints based on slide type
+    const slideTypeHints: Record<string, string> = {
+      hero: 'Hero visual with strong impact, professional and engaging',
+      problem: 'Visual representing challenges or pain points',
+      solution: 'Visual showing solutions, tools, or positive outcomes',
+      impact: 'Visual with data visualization elements, metrics, success indicators',
+      cta: 'Call-to-action visual, motivational and action-oriented'
+    };
+    
+    const styleHint = slideTypeHints[slideContent.type || slideTemplate] || '';
+    if (styleHint) fullPrompt += `. Style: ${styleHint}`;
+
+    const correctedPrompt = correctFrenchSpelling(fullPrompt);
     const enrichedPrompt = enrichPromptWithBrand(correctedPrompt, brandSnapshot);
     
     console.log('📝 Base prompt:', enrichedPrompt);
@@ -706,6 +737,9 @@ serve(async (req) => {
     }
 
     console.log('✅ [Worker] Asset created with ID:', asset.id);
+
+    // 🔥 Quota consumption confirmed (reserve_brand_quotas already incremented images_used)
+    console.log(`💰 [Worker] Quota consumption confirmed for brand ${job.job_sets.brand_id} (1 visual)`);
 
     // 11. ENSUITE marquer le job comme réussi avec asset_id
     // → Garantit atomicité : quand le front voit asset_id, l'asset existe déjà
