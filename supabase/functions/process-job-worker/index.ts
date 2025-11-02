@@ -316,7 +316,7 @@ serve(async (req) => {
               {
                 role: 'user',
                 content: [
-                  { type: 'text', text: `${enrichedPrompt}\n\nIMPORTANT: Create a clean marketing visual background at ${resolution} (${aspectRatio}). NO TEXT, NO LETTERS, NO TYPOGRAPHY, NO WORDS. Pure visual design only. Keep brand style consistent.\n\nNEGATIVE PROMPT: no text, no letters, no words, no typography, no captions, no labels` }
+                  { type: 'text', text: `${enrichedPrompt}\n\nIMPORTANT: Create a professional marketing visual at ${resolution} (${aspectRatio}) that represents this content. The image should visually communicate the message and leave strategic space for text overlay. Use brand colors and style. Focus on visual storytelling that complements the text content.\n\nContext: This image will have text overlaid, so ensure the composition allows for readable text placement. Avoid cluttered designs.` }
                 ]
               }
             ],
