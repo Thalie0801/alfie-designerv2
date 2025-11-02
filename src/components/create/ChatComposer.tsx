@@ -92,108 +92,102 @@ export function ChatComposer({
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 lg:left-64 z-20 bg-background/95 backdrop-blur-md border-t border-border">
-      {/* Composer */}
-      <div className="mx-auto max-w-3xl p-2 flex items-end gap-3">
-        <div className="flex-1 relative">
-          <TextareaAutosize
-            ref={textareaRef}
-            minRows={1}
-            maxRows={3}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Décris ton idée à Alfie… (Shift+Entrée = nouvelle ligne)"
-            disabled={disabled || isLoading}
-            className="w-full resize-none rounded-2xl border border-input bg-card px-4 py-3 pr-24 text-[15px] text-foreground 
-                       placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring 
-                       disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-          
-          {/* Action buttons inline */}
-          <div className="absolute right-2 bottom-2 flex gap-1">
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 rounded-full"
-              onClick={onUploadClick}
-              disabled={uploadingImage || disabled}
-              title="Ajouter une image"
-            >
-              <ImagePlus className="h-4 w-4" />
-            </Button>
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 rounded-full"
-              disabled={disabled}
-              title="Dicter (bientôt disponible)"
-            >
-              <Mic className="h-4 w-4" />
-            </Button>
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 rounded-full"
-              disabled={disabled}
-              title="Suggestions créatives"
-            >
-              <Wand2 className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Send button */}
-        <Button
-          onClick={handleSend}
-          disabled={disabled || isLoading || !value.trim()}
-          className="shrink-0 h-11 w-11 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-medium disabled:opacity-40"
-        >
-          <Send className="h-5 w-5" />
-        </Button>
-      </div>
-
-      {/* Quick action chips */}
-      {QUICK_CHIPS.length > 0 && (
-        <div className="mx-auto max-w-3xl px-4 pb-1.5 flex gap-2 overflow-x-auto">
-          {QUICK_CHIPS.slice(0, 2).map((chip, idx) => (
-            <button
-              key={idx}
-              onClick={() => handleChipClick(chip.fill)}
+    <div className="fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur border-t p-3 sm:p-4 z-10 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-4">
+      <div className="max-w-4xl mx-auto space-y-2 sm:space-y-3">
+        
+        <div className="flex items-end gap-1.5 sm:gap-2">
+          <div className="flex-1 relative">
+            <TextareaAutosize
+              ref={textareaRef}
+              minRows={1}
+              maxRows={5}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Décris ton idée à Alfie… (Shift+Entrée = nouvelle ligne)"
               disabled={disabled || isLoading}
-              className="px-3 py-1.5 rounded-full bg-muted text-muted-foreground text-sm hover:bg-muted/80 
-                         whitespace-nowrap transition-colors disabled:opacity-50"
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
-      )}
+              className="w-full resize-none bg-background border rounded-xl px-3 py-2.5 pr-11 sm:px-4 sm:py-3 sm:pr-12 focus:outline-none focus:ring-2 focus:ring-primary text-sm touch-manipulation"
+            />
+            
+            <div className="absolute right-1.5 bottom-1.5 sm:right-2 sm:bottom-2 flex gap-0.5 sm:gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 touch-target"
+                onClick={onUploadClick}
+                disabled={uploadingImage || disabled}
+              >
+                <ImagePlus className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 touch-target"
+                disabled
+              >
+                <Mic className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 touch-target"
+                disabled
+              >
+                <Wand2 className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
+            </div>
+          </div>
 
-      {/* Uploaded image preview */}
-      {uploadedImage && (
-        <div className="mx-auto max-w-3xl px-4 pb-3">
+          <Button
+            type="button"
+            size="icon"
+            className="h-12 w-12 shrink-0 touch-target"
+            onClick={handleSend}
+            disabled={disabled || isLoading || (!value.trim() && !uploadedImage)}
+          >
+            <Send className="h-5 w-5 sm:h-6 sm:w-6" />
+          </Button>
+        </div>
+
+        {QUICK_CHIPS.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-1">
+            {QUICK_CHIPS.map((chip) => (
+              <Button
+                key={chip.label}
+                type="button"
+                variant="outline"
+                size="sm"
+                className="text-xs shrink-0 snap-start min-h-[44px]"
+                onClick={() => handleChipClick(chip.fill)}
+                disabled={disabled || isLoading}
+              >
+                {chip.label}
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {uploadedImage && (
           <div className="relative inline-block">
             <img
               src={uploadedImage}
-              alt="Image uploadée"
-              className="h-20 w-20 rounded-lg object-cover border border-border"
+              alt="Aperçu"
+              className="h-16 w-16 sm:h-20 sm:w-20 rounded-lg object-cover border"
             />
             {onRemoveImage && (
               <button
                 onClick={onRemoveImage}
-                className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive text-destructive-foreground 
-                           flex items-center justify-center text-xs font-bold hover:bg-destructive/90"
+                className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-sm font-bold touch-target"
               >
                 ×
               </button>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

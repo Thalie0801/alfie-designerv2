@@ -1998,8 +1998,7 @@ export function AlfieChat() {
           </section>
         </div>
       </div>
-      
-      {/* Fixed composer at bottom */}
+
       <ChatComposer
         value={input}
         onChange={setInput}

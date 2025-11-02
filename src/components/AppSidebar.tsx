@@ -94,14 +94,14 @@ export function AppSidebar() {
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.path}>
-                  <SidebarMenuButton asChild isActive={location.pathname === item.path}>
+                  <SidebarMenuButton asChild isActive={location.pathname === item.path} className="min-h-[44px] touch-target">
                     <NavLink 
                       to={item.path} 
                       end 
                       className={getNavCls}
                       data-sidebar-id={item.tourId}
                     >
-                      <item.icon className={cn(open && !isMobile ? "mr-2" : "mx-auto")} size={20} />
+                      <item.icon className={cn(open && !isMobile ? "mr-2" : "mx-auto")} size={isMobile ? 22 : 20} />
                       {(open || isMobile) && (
                         <div className="flex items-center gap-2 flex-1">
                           <span>{item.label}</span>
@@ -142,9 +142,9 @@ export function AppSidebar() {
             variant="ghost" 
             size="sm" 
             onClick={handleSignOut}
-            className="w-full justify-start"
+            className="w-full justify-start min-h-[44px] touch-target"
           >
-            <LogOut className={cn(open && !isMobile ? "mr-2" : "mx-auto")} size={16} />
+            <LogOut className={cn(open && !isMobile ? "mr-2" : "mx-auto")} size={isMobile ? 22 : 16} />
             {(open || isMobile) && <span>Déconnexion</span>}
           </Button>
         </div>
