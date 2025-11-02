@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { userHasAccess } from "../_shared/accessControl.ts";
-import { callAIWithFallback, type AgentContext } from "../_shared/aiOrchestrator.ts";
+import { callAIWithFallback, type AgentContext, type AIResponse } from "../_shared/aiOrchestrator.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -496,80 +496,286 @@ Example: "Professional product photography, 45° angle, gradient background (${b
       userMessage: transformedMessages[transformedMessages.length - 1]?.content || ''
     };
 
-    // Appel avec fallback intelligent Gemini → OpenAI
-    const aiResponse = await callAIWithFallback(
-      [{ role: "system", content: systemPrompt }, ...transformedMessages],
-      context,
-      tools,
-      'gemini' // Gemini prioritaire, OpenAI en fallback
-    );
+    // ======
+    // BOUCLE D'EXÉCUTION DE TOOLS (max 4 itérations)
+    // ======
+    
+    let conversationMessages = [{ role: "system", content: systemPrompt }, ...transformedMessages];
+    let aiResponse: AIResponse;
+    let iterationCount = 0;
+    const maxIterations = 4;
+    const collectedAssets: any[] = [];
+    let finalJobSetId: string | undefined;
 
-    // Simuler l'objet Response pour compatibilité avec le code existant
-    const response = {
-      ok: true,
-      status: 200,
-      body: null, // Pas de streaming via l'orchestrateur pour l'instant
-      json: async () => aiResponse,
-      text: async () => JSON.stringify(aiResponse)
-    } as Response;
+    while (iterationCount < maxIterations) {
+      iterationCount++;
+      console.log(`[Tool Loop] Iteration ${iterationCount}/${maxIterations}`);
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ 
-            ok: false, 
-            error: "Trop de requêtes, patiente un instant ! ⏳" 
-          }), 
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ 
-            ok: false, 
-            error: "Crédit insuffisant. Recharge tes crédits pour continuer ! 💳" 
-          }), 
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-      
-      // Autres erreurs AI Gateway
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      return new Response(
-        JSON.stringify({ 
-          ok: false, 
-          error: `Erreur AI Gateway (${response.status})` 
-        }), 
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+      // Appel avec fallback intelligent Gemini → OpenAI
+      aiResponse = await callAIWithFallback(
+        conversationMessages,
+        context,
+        tools,
+        'gemini'
       );
+
+      const assistantMessage = aiResponse.choices[0]?.message;
+      if (!assistantMessage) {
+        throw new Error('No assistant message in AI response');
+      }
+
+      // Vérifier s'il y a des tool_calls
+      const toolCalls = assistantMessage.tool_calls;
+      
+      if (!toolCalls || toolCalls.length === 0) {
+        // Pas de tools à exécuter, on sort de la boucle
+        console.log('[Tool Loop] No more tool calls, finishing');
+        break;
+      }
+
+      console.log(`[Tool Loop] Executing ${toolCalls.length} tool(s)`);
+
+      // Ajouter le message assistant avec tool_calls à l'historique
+      conversationMessages.push({
+        role: 'assistant',
+        content: assistantMessage.content || '',
+        tool_calls: toolCalls
+      });
+
+      // Exécuter chaque tool call
+      for (const toolCall of toolCalls) {
+        const toolName = toolCall.function?.name;
+        const toolArgs = JSON.parse(toolCall.function?.arguments || '{}');
+        
+        console.log(`[Tool Execution] ${toolName}`, toolArgs);
+
+        let toolResult: any = { error: 'Tool not implemented' };
+
+        try {
+          switch (toolName) {
+            case 'classify_intent': {
+              const { data: intentData } = await supabase.functions.invoke('alfie-classify-intent', {
+                body: { user_message: toolArgs.user_message }
+              });
+              toolResult = intentData || { intent: 'autre' };
+              break;
+            }
+
+            case 'plan_carousel': {
+              const { data: planData, error: planError } = await supabase.functions.invoke('alfie-plan-carousel', {
+                body: {
+                  prompt: toolArgs.prompt,
+                  slideCount: toolArgs.count || 5,
+                  brandKit: brandKit || {}
+                }
+              });
+              if (planError) throw planError;
+              toolResult = planData?.plan || planData || { slides: [] };
+              break;
+            }
+
+            case 'create_carousel': {
+              // Option A (simple): Générer chaque slide en boucle
+              const slideCount = toolArgs.count || 5;
+              const aspectRatio = toolArgs.aspect_ratio || '1:1';
+              
+              // D'abord générer le plan si pas fourni
+              let carouselPlan = toolArgs.plan;
+              if (!carouselPlan) {
+                const { data: planData } = await supabase.functions.invoke('alfie-plan-carousel', {
+                  body: {
+                    prompt: toolArgs.prompt,
+                    slideCount,
+                    brandKit: brandKit || {}
+                  }
+                });
+                carouselPlan = planData?.plan || planData;
+              }
+
+              const slides = carouselPlan?.slides || [];
+              const generatedImages: string[] = [];
+
+              for (let i = 0; i < slides.length; i++) {
+                const slide = slides[i];
+                const overlayText = `${slide.title}\n${slide.subtitle || slide.text || ''}`;
+                
+                const { data: imageData } = await supabase.functions.invoke('alfie-render-image', {
+                  body: {
+                    provider: 'gemini-nano',
+                    prompt: slide.note || slide.imagePrompt || `Image for ${slide.title}`,
+                    format: aspectRatio === '4:5' ? '1024x1280' : '1024x1024',
+                    brand_id: brandId,
+                    backgroundOnly: false,
+                    slideIndex: i,
+                    totalSlides: slides.length,
+                    overlayText,
+                    negativePrompt: "logos de marques tierces, filigranes, artefacts"
+                  }
+                });
+
+                if (imageData?.ok && imageData.data?.image_urls?.[0]) {
+                  generatedImages.push(imageData.data.image_urls[0]);
+                  collectedAssets.push({
+                    type: 'image',
+                    url: imageData.data.image_urls[0],
+                    slideIndex: i,
+                    title: slide.title
+                  });
+                }
+              }
+
+              toolResult = {
+                success: true,
+                slideCount: generatedImages.length,
+                images: generatedImages
+              };
+              break;
+            }
+
+            case 'generate_image': {
+              // Optimiser le prompt si nécessaire
+              let optimizedPrompt = toolArgs.prompt;
+              if (brandKit) {
+                const { data: optimizeData } = await supabase.functions.invoke('alfie-optimize-prompt', {
+                  body: {
+                    prompt: toolArgs.prompt,
+                    brandKit: {
+                      palette: brandKit.colors || [],
+                      voice: brandKit.voice,
+                      niche: brandKit.niche
+                    }
+                  }
+                });
+                optimizedPrompt = optimizeData?.optimizedPrompt || toolArgs.prompt;
+              }
+
+              const aspectRatio = toolArgs.aspect_ratio || '1:1';
+              const format = aspectRatio === '9:16' ? '1024x1820' 
+                           : aspectRatio === '16:9' ? '1820x1024'
+                           : aspectRatio === '4:5' ? '1024x1280'
+                           : '1024x1024';
+
+              const { data: imageData, error: imageError } = await supabase.functions.invoke('alfie-render-image', {
+                body: {
+                  provider: 'gemini-nano',
+                  prompt: optimizedPrompt,
+                  format,
+                  brand_id: brandId
+                }
+              });
+
+              if (imageError) throw imageError;
+
+              if (imageData?.ok && imageData.data?.image_urls?.[0]) {
+                collectedAssets.push({
+                  type: 'image',
+                  url: imageData.data.image_urls[0],
+                  reasoning: toolArgs.reasoning,
+                  brandAlignment: 'Brand Kit applied'
+                });
+
+                toolResult = {
+                  success: true,
+                  imageUrl: imageData.data.image_urls[0],
+                  generationId: imageData.data.generation_id
+                };
+              } else {
+                throw new Error('No image generated');
+              }
+              break;
+            }
+
+            case 'generate_video': {
+              const { data: videoData, error: videoError } = await supabase.functions.invoke('generate-video', {
+                body: {
+                  prompt: toolArgs.prompt,
+                  aspectRatio: toolArgs.aspectRatio || '16:9',
+                  brandId,
+                  imageUrl: toolArgs.imageUrl
+                }
+              });
+
+              if (videoError) throw videoError;
+
+              toolResult = {
+                success: true,
+                jobId: videoData?.jobId,
+                status: 'processing'
+              };
+              break;
+            }
+
+            case 'check_credits':
+            case 'show_usage': {
+              const { data: quotaData } = await supabase.functions.invoke('get-quota', {
+                body: { brand_id: brandId }
+              });
+
+              toolResult = {
+                woofs_remaining: quotaData?.woofs_remaining || 0,
+                woofs_quota: quotaData?.woofs_quota || 0,
+                visuals_remaining: quotaData?.visuals_remaining || 0,
+                visuals_quota: quotaData?.visuals_quota || 0,
+                plan: quotaData?.plan || 'free'
+              };
+              break;
+            }
+
+            case 'show_brandkit': {
+              toolResult = {
+                name: brandKit?.name,
+                colors: brandKit?.colors || [],
+                fonts: brandKit?.fonts || [],
+                voice: brandKit?.voice,
+                niche: brandKit?.niche
+              };
+              break;
+            }
+
+            default:
+              console.warn(`[Tool Execution] Unknown tool: ${toolName}`);
+              toolResult = { error: `Tool ${toolName} not implemented` };
+          }
+        } catch (error: any) {
+          console.error(`[Tool Execution] Error in ${toolName}:`, error);
+          toolResult = { error: error.message || 'Tool execution failed' };
+        }
+
+        // Ajouter le résultat du tool à l'historique
+        conversationMessages.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          name: toolName,
+          content: JSON.stringify(toolResult)
+        });
+      }
     }
 
-    // Return response based on stream mode
-    if (stream) {
-      return new Response(response.body, {
-        headers: { 
-          ...corsHeaders, 
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          "Connection": "keep-alive"
-        },
-      });
-    } else {
-      const jsonResponse = await response.json();
-      return new Response(JSON.stringify(jsonResponse), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Construire la réponse finale
+    const finalMessage = aiResponse!.choices[0]?.message;
+    const responsePayload: any = {
+      ok: true,
+      choices: [{
+        message: {
+          role: 'assistant',
+          content: finalMessage?.content || ''
+        }
+      }]
+    };
+
+    // Ajouter les assets collectés s'il y en a
+    if (collectedAssets.length > 0) {
+      responsePayload.assets = collectedAssets;
     }
+
+    if (finalJobSetId) {
+      responsePayload.jobSetId = finalJobSetId;
+    }
+
+    // Return response
+    return new Response(JSON.stringify(responsePayload), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error) {
     console.error("Error in alfie-chat:", error);
     return new Response(

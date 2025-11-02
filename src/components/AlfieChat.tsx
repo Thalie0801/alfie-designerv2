@@ -691,6 +691,105 @@ export function AlfieChat() {
   }, []);
   
   // ======
+  // ORCHESTRATOR BACKEND
+  // ======
+  
+  const orchestratorSend = async (userMessage: string): Promise<boolean> => {
+    try {
+      const headers = await getAuthHeader();
+      
+      // Construire l'historique complet
+      const conversationHistory = messages.map(m => ({
+        role: m.role,
+        content: m.content
+      }));
+      
+      conversationHistory.push({
+        role: 'user',
+        content: userMessage
+      });
+      
+      // Appeler l'orchestrateur backend
+      const { data, error } = await supabase.functions.invoke('alfie-chat', {
+        body: {
+          messages: conversationHistory,
+          brandId: activeBrandId,
+          expertMode: true,
+          stream: false
+        },
+        headers
+      });
+      
+      if (error) throw error;
+      
+      // Parser la réponse
+      const assistantMessage = data?.choices?.[0]?.message;
+      if (!assistantMessage) {
+        throw new Error('No assistant message in response');
+      }
+      
+      // Afficher le message de l'assistant
+      addMessage({
+        role: 'assistant',
+        content: assistantMessage.content || '',
+        type: 'text'
+      });
+      
+      // Traiter les assets s'il y en a
+      if (data.assets && Array.isArray(data.assets)) {
+        for (const asset of data.assets) {
+          if (asset.type === 'image') {
+            addMessage({
+              role: 'assistant',
+              content: asset.title ? `✅ ${asset.title}` : '✅ Image générée !',
+              type: 'image',
+              assetUrl: asset.url,
+              reasoning: asset.reasoning,
+              brandAlignment: asset.brandAlignment
+            });
+          }
+        }
+      }
+      
+      // Traiter le jobSetId si présent (pour les carrousels via job system)
+      if (data.jobSetId) {
+        addMessage({
+          role: 'assistant',
+          content: '⏳ Génération en cours...',
+          type: 'carousel',
+          metadata: { jobSetId: data.jobSetId, status: 'processing' }
+        });
+      }
+      
+      return true;
+    } catch (error: any) {
+      console.error('[Orchestrator] Error:', error);
+      
+      // Gérer les erreurs spécifiques
+      const errorMsg = error.message?.toLowerCase() || '';
+      if (errorMsg.includes('429') || errorMsg.includes('rate')) {
+        toast.error('⏳ Trop de requêtes, patiente un instant !');
+        addMessage({
+          role: 'assistant',
+          content: '⏳ Trop de requêtes en ce moment. Patiente quelques secondes et réessaye !',
+          type: 'text'
+        });
+      } else if (errorMsg.includes('402') || errorMsg.includes('credit')) {
+        toast.error('💳 Crédits insuffisants');
+        addMessage({
+          role: 'assistant',
+          content: '💳 Crédit insuffisant. Recharge tes crédits pour continuer !',
+          type: 'text'
+        });
+      } else {
+        toast.error('Échec de l\'orchestrateur');
+      }
+      
+      return false;
+    }
+  };
+  
+  // ======
   // HANDLER PRINCIPAL
   // ======
   
@@ -765,7 +864,18 @@ export function AlfieChat() {
         }
       }
       
-      // 3. Détecter l'intention
+      // 3. Essayer l'orchestrateur backend
+      console.log('[Chat] Trying orchestrator...');
+      const orchestratorSuccess = await orchestratorSend(userMessage);
+      
+      // Si l'orchestrateur a fonctionné, on s'arrête ici
+      if (orchestratorSuccess) {
+        console.log('[Chat] ✅ Orchestrator success');
+        return;
+      }
+      
+      // 4. FALLBACK LOCAL si l'orchestrateur échoue
+      console.log('[Chat] Orchestrator failed, using local fallback');
       const intent = detectIntent(userMessage);
       
       switch (intent) {
