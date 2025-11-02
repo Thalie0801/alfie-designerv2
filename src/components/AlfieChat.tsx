@@ -694,6 +694,16 @@ export function AlfieChat() {
   // ORCHESTRATOR BACKEND
   // ======
   
+  // Détection d'approbation
+  const isApproval = (msg: string): boolean => {
+    const lower = msg.trim().toLowerCase();
+    const approvalPhrases = [
+      'oui', 'ok', 'd\'accord', 'go', 'je valide', 'lance', 'vas-y', 
+      'parfait', 'c\'est bon', 'yes', 'yep', 'ouais', 'exact', 'carrément'
+    ];
+    return approvalPhrases.some(phrase => lower === phrase || lower.startsWith(phrase + ' '));
+  };
+  
   const orchestratorSend = async (userMessage: string): Promise<boolean> => {
     try {
       const headers = await getAuthHeader();
@@ -750,28 +760,44 @@ export function AlfieChat() {
         type: 'text'
       });
       
-      // ✅ Si noToolCalls=true ET intent local détecté → déclencher génération directe
-      if (data.noToolCalls === true && !data.assets && !data.jobSetId) {
+      // ✅ Fallback élargi : si pas d'assets/jobSetId, tenter génération client
+      if (!data.assets?.length && !data.jobSetId) {
         console.warn('[Orchestrator] ⚠️ No generation triggered, text-only response received. Attempting client fallback...');
         
-        const localIntent = detectIntent(userMessage);
-        console.log('[Client Fallback] Detected local intent:', localIntent);
+        let promptToUse = userMessage;
+        
+        // Si c'est une approbation, chercher le dernier message d'intention
+        if (isApproval(userMessage)) {
+          console.log('[Client Fallback][Approval] Detected approval, searching for previous intent...');
+          
+          for (let i = messages.length - 1; i >= 0; i--) {
+            const msg = messages[i];
+            if (msg.role === 'user' && detectIntent(msg.content) !== 'unknown') {
+              promptToUse = msg.content;
+              console.log('[Client Fallback][Approval] Using previous intent message:', promptToUse.substring(0, 50));
+              break;
+            }
+          }
+        }
+        
+        const localIntent = detectIntent(promptToUse);
+        console.log('[Client Fallback] Detected local intent:', localIntent, 'from prompt:', promptToUse.substring(0, 50));
         
         if (localIntent === 'image') {
-          const aspectRatio = detectAspectRatio(userMessage);
+          const aspectRatio = detectAspectRatio(promptToUse);
           console.log('[Client Fallback] Triggering direct image generation');
-          await generateImage(userMessage, aspectRatio);
+          await generateImage(promptToUse, aspectRatio);
           return true;
         } else if (localIntent === 'video') {
-          const aspectRatio = detectAspectRatio(userMessage);
+          const aspectRatio = detectAspectRatio(promptToUse);
           console.log('[Client Fallback] Triggering direct video generation');
-          await generateVideo(userMessage, aspectRatio);
+          await generateVideo(promptToUse, aspectRatio);
           return true;
         } else if (localIntent === 'carousel') {
-          const count = extractCount(userMessage);
-          const aspectRatio = detectAspectRatio(userMessage);
+          const count = extractCount(promptToUse);
+          const aspectRatio = detectAspectRatio(promptToUse);
           console.log('[Client Fallback] Triggering direct carousel generation');
-          await generateCarousel(userMessage, count, aspectRatio);
+          await generateCarousel(promptToUse, count, aspectRatio);
           return true;
         }
         

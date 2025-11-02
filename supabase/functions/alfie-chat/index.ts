@@ -30,6 +30,19 @@ function detectIntent(message: string): string {
   return 'autre';
 }
 
+/**
+ * Détecte si un message est une approbation (oui, ok, d'accord, etc.)
+ */
+function isApproval(message: string): boolean {
+  const lower = message.trim().toLowerCase();
+  const approvalPhrases = [
+    'oui', 'ok', 'd\'accord', 'go', 'je valide', 'lance', 'vas-y', 
+    'parfait', 'c\'est bon', 'yes', 'yep', 'ouais', 'exact', 'carrément',
+    'absolument', 'très bien', 'impec', 'nickel', 'top'
+  ];
+  return approvalPhrases.some(phrase => lower === phrase || lower.startsWith(phrase + ' '));
+}
+
 import { type AgentContext, type AIResponse } from "../_shared/aiOrchestrator.ts";
 
 // --- AI config (ASCII only) ---
@@ -650,8 +663,151 @@ Example: "Professional product photography, 45° angle, gradient background (${b
           
           // Détecter l'intent manuellement
           const lastUserMessage = conversationMessages.filter(m => m.role === 'user').pop()?.content || '';
-          const detectedIntent = detectIntent(lastUserMessage);
           
+          // ✅ CHECK: Est-ce une approbation ?
+          if (isApproval(lastUserMessage)) {
+            console.log('[FALLBACK][Approval] Detected approval:', lastUserMessage);
+            
+            // Chercher le dernier message utilisateur avec un intent
+            let intentMessage = '';
+            let detectedIntent = '';
+            
+            for (let i = conversationMessages.length - 2; i >= 0; i--) {
+              const msg = conversationMessages[i];
+              if (msg.role === 'user') {
+                const content = msg.content || '';
+                const match = content.match(/(carrousel|carousel|image|vidéo|video)/i);
+                if (match) {
+                  intentMessage = content;
+                  detectedIntent = match[1].toLowerCase();
+                  break;
+                }
+              }
+            }
+            
+            console.log('[FALLBACK][Approval] Previous intent:', detectedIntent, 'Message:', intentMessage.substring(0, 50));
+            
+            // Si carrousel trouvé, générer plan + images immédiatement
+            if ((detectedIntent === 'carrousel' || detectedIntent === 'carousel') && intentMessage) {
+              console.log('[FALLBACK][Approval] Generating carousel plan and images...');
+              
+              try {
+                // 1. Générer le plan
+                const { data: planData, error: planError } = await supabase.functions.invoke('alfie-plan-carousel', {
+                  body: {
+                    prompt: intentMessage,
+                    slideCount: 5,
+                    brandKit: brandKit
+                  },
+                  headers: functionHeaders
+                });
+                
+                if (planError || !planData?.plan?.slides) {
+                  throw new Error(planError?.message || 'Plan generation failed');
+                }
+                
+                console.log('[FALLBACK][Approval] Plan fetched:', planData.plan.slides.length, 'slides');
+                
+                // 2. Générer les images pour chaque slide
+                const slides = planData.plan.slides;
+                const collectedAssets: any[] = [];
+                
+                for (let i = 0; i < slides.length; i++) {
+                  const slide = slides[i];
+                  const overlayText = `${slide.title}\n${slide.subtitle || slide.punchline || ''}`;
+                  
+                  console.log(`[FALLBACK][Approval] Generating slide ${i + 1}/${slides.length}...`);
+                  
+                  const { data: imageData, error: imageError } = await supabase.functions.invoke('alfie-render-image', {
+                    body: {
+                      provider: 'gemini-nano',
+                      prompt: slide.note || `Image pour ${slide.title}`,
+                      format: '1024x1280',
+                      brand_id: brandId,
+                      cost_woofs: 1,
+                      backgroundOnly: false,
+                      slideIndex: i,
+                      totalSlides: slides.length,
+                      overlayText: overlayText,
+                      negativePrompt: 'logos de marques tierces, filigranes, artefacts, texte illisible'
+                    },
+                    headers: functionHeaders
+                  });
+                  
+                  if (!imageError && imageData?.data?.image_urls?.[0]) {
+                    collectedAssets.push({
+                      type: 'image',
+                      url: imageData.data.image_urls[0],
+                      title: `Slide ${i + 1}/${slides.length}`,
+                      reasoning: slide.note || '',
+                      brandAlignment: brandKit ? 'Aligned with brand colors and voice' : ''
+                    });
+                    console.log(`[FALLBACK][Approval] Slide ${i + 1}/${slides.length} generated:`, imageData.data.image_urls[0]);
+                  } else {
+                    console.error(`[FALLBACK][Approval] Slide ${i + 1}/${slides.length} failed:`, imageError);
+                  }
+                }
+                
+                // Retourner la réponse avec tous les assets
+                return new Response(
+                  JSON.stringify({
+                    choices: [{
+                      message: {
+                        role: 'assistant',
+                        content: `✅ Carrousel généré ! Voici tes ${slides.length} slides.`
+                      }
+                    }],
+                    assets: collectedAssets,
+                    noToolCalls: false
+                  }),
+                  { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                );
+              } catch (approvalError: any) {
+                console.error('[FALLBACK][Approval] Error:', approvalError);
+                // Continuer avec le flux normal
+              }
+            }
+            
+            // Pour les intents image/vidéo, forcer la classification
+            if (detectedIntent === 'image') {
+              console.log('[FALLBACK][Approval] Forcing image classification...');
+              conversationMessages.push({
+                role: 'assistant',
+                content: 'Je vais générer cette image pour toi !',
+                tool_calls: [{
+                  id: 'fallback-classify',
+                  type: 'function',
+                  function: { name: 'classify_intent', arguments: JSON.stringify({ intent: 'image' }) }
+                }]
+              });
+              conversationMessages.push({
+                role: 'tool',
+                tool_call_id: 'fallback-classify',
+                content: JSON.stringify({ intent: 'image' })
+              });
+              continue;
+            } else if (detectedIntent === 'vidéo' || detectedIntent === 'video') {
+              console.log('[FALLBACK][Approval] Forcing video classification...');
+              conversationMessages.push({
+                role: 'assistant',
+                content: 'Je vais générer cette vidéo pour toi !',
+                tool_calls: [{
+                  id: 'fallback-classify',
+                  type: 'function',
+                  function: { name: 'classify_intent', arguments: JSON.stringify({ intent: 'video' }) }
+                }]
+              });
+              conversationMessages.push({
+                role: 'tool',
+                tool_call_id: 'fallback-classify',
+                content: JSON.stringify({ intent: 'video' })
+              });
+              continue;
+            }
+          }
+          
+          // ✅ Fallback normal pour les messages non-approbation
+          const detectedIntent = detectIntent(lastUserMessage);
           console.log(`[FALLBACK] Detected intent: ${detectedIntent}`);
           
           // ✅ Si carrousel → appeler directement alfie-plan-carousel
