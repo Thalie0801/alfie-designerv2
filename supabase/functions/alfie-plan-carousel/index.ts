@@ -62,6 +62,26 @@ Ton objectif est de générer un plan de carrousel de ${slideCount} slides basé
 4. **Prompt Image (note) :** Le champ \`note\` doit contenir un prompt détaillé pour la génération d'image, en anglais, décrivant le visuel de la slide. Il doit inclure des références au Brand Kit (couleurs, style).
 5. **Types de Slides :** Utilise les types suivants pour structurer le carrousel : 'hero', 'problem', 'solution', 'impact', 'cta'.
 
+**Limites de Caractères (STRICT - RESPECTE-LES ABSOLUMENT) :**
+- **Title** : Entre 15 et 60 caractères maximum
+- **Subtitle** : Entre 25 et 100 caractères maximum
+- **Punchline** : Entre 25 et 80 caractères maximum
+- **Bullet** : Entre 15 et 60 caractères chacun
+- **KPI Label** : Entre 8 et 30 caractères
+- **KPI Delta** : Entre 2 et 12 caractères (ex: "+45%", "-12pts")
+- **CTA** : Entre 10 et 30 caractères
+- **Note (prompt image)** : Entre 80 et 180 caractères
+
+**Exemples de Contenu Correct :**
+✅ Title: "Créez des visuels parfaits en quelques clics" (48 caractères)
+❌ Title: "Visuels AI rapides" (19 caractères - trop court)
+
+✅ Bullet: "Automatisation complète des workflows créatifs" (52 caractères)
+❌ Bullet: "Auto workflows" (15 caractères - trop court et imprécis)
+
+✅ Subtitle: "Transformez vos idées en designs professionnels avec l'intelligence artificielle" (82 caractères)
+❌ Subtitle: "Design AI rapide" (16 caractères - trop court)
+
 **Format de Réponse (JSON Schema) :**
 {
   "plan": {
@@ -121,6 +141,40 @@ Ton objectif est de générer un plan de carrousel de ${slideCount} slides basé
     if (!plan.plan || !Array.isArray(plan.plan.slides) || plan.plan.slides.length !== slideCount) {
       console.error('[alfie-plan-carousel] Invalid plan structure:', plan);
       throw new Error('AI returned an invalid plan structure or incorrect slide count');
+    }
+
+    // Validation des limites de caractères
+    const LIMITS = {
+      title: { min: 15, max: 60 },
+      subtitle: { min: 25, max: 100 },
+      punchline: { min: 25, max: 80 },
+      bullet: { min: 15, max: 60 },
+    };
+
+    for (const slide of plan.plan.slides) {
+      // Valider title
+      if (slide.title.length < LIMITS.title.min || slide.title.length > LIMITS.title.max) {
+        console.warn(`[alfie-plan-carousel] ⚠️ Title length violation: ${slide.title.length} chars - "${slide.title}"`);
+      }
+      
+      // Valider subtitle
+      if (slide.subtitle && (slide.subtitle.length < LIMITS.subtitle.min || slide.subtitle.length > LIMITS.subtitle.max)) {
+        console.warn(`[alfie-plan-carousel] ⚠️ Subtitle length violation: ${slide.subtitle.length} chars - "${slide.subtitle}"`);
+      }
+      
+      // Valider punchline
+      if (slide.punchline && (slide.punchline.length < LIMITS.punchline.min || slide.punchline.length > LIMITS.punchline.max)) {
+        console.warn(`[alfie-plan-carousel] ⚠️ Punchline length violation: ${slide.punchline.length} chars - "${slide.punchline}"`);
+      }
+      
+      // Valider bullets
+      if (slide.bullets) {
+        for (const bullet of slide.bullets) {
+          if (bullet.length < LIMITS.bullet.min || bullet.length > LIMITS.bullet.max) {
+            console.warn(`[alfie-plan-carousel] ⚠️ Bullet length violation: ${bullet.length} chars - "${bullet}"`);
+          }
+        }
+      }
     }
 
     console.log('[alfie-plan-carousel] Plan generated successfully with', plan.plan.slides.length, 'slides');

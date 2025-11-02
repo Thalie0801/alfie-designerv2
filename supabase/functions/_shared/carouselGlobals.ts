@@ -28,14 +28,14 @@ export interface CarouselPlan {
 }
 
 export const CHAR_LIMITS = {
-  title: { min: 10, max: 40 },
-  subtitle: { min: 20, max: 70 },
-  punchline: { min: 20, max: 60 },
-  bullet: { min: 10, max: 44 },
-  kpi_label: { min: 5, max: 22 },
-  kpi_delta: { min: 2, max: 8 },
-  cta: { min: 8, max: 22 },
-  note: { min: 50, max: 120 }
+  title: { min: 15, max: 60 },
+  subtitle: { min: 25, max: 100 },
+  punchline: { min: 25, max: 80 },
+  bullet: { min: 15, max: 60 },
+  kpi_label: { min: 8, max: 30 },
+  kpi_delta: { min: 2, max: 12 },
+  cta: { min: 10, max: 30 },
+  note: { min: 80, max: 180 }
 };
 
 export const DEFAULT_GLOBALS: CarouselGlobals = {
