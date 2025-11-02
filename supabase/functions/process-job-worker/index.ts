@@ -316,7 +316,7 @@ serve(async (req) => {
               {
                 role: 'user',
                 content: [
-                  { type: 'text', text: `${enrichedPrompt}\n\nIMPORTANT: Create a professional marketing visual at ${resolution} (${aspectRatio}) that represents this content. The image should visually communicate the message and leave strategic space for text overlay. Use brand colors and style. Focus on visual storytelling that complements the text content.\n\nContext: This image will have text overlaid, so ensure the composition allows for readable text placement. Avoid cluttered designs.` }
+                  { type: 'text', text: `${enrichedPrompt}\n\nIMPORTANT: Create a professional marketing visual at ${resolution} (${aspectRatio}) that represents this content. The image should visually communicate the message and leave strategic space for text overlay. Use brand colors and style. Focus on visual storytelling that complements the text content.\n\nLANGUAGE: All visual elements, if any text appears, MUST be in FRENCH. The content is in French, so any labels, captions, or text elements should be in French.\n\nContext: This image will have text overlaid, so ensure the composition allows for readable text placement. Avoid cluttered designs.` }
                 ]
               }
             ],
