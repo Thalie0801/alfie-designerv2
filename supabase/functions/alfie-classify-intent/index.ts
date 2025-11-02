@@ -24,13 +24,16 @@ serve(async (req) => {
     const msg = user_message.toLowerCase();
     let intent = 'autre';
 
-    // Classifier simple basé sur regex
-    if (/carrousel|carousel|slides?|diaporama/i.test(msg)) {
+    // Classifier avec mots-clés précis de la spec
+    if (/carrousel|carousel|slides?|diaporama|série/i.test(msg)) {
       intent = 'carousel';
-    } else if (/vid[eé]o|video|reel|short|story vid[eé]o|clip/i.test(msg)) {
+      console.log(`[Classifier] Détection carousel via mots-clés: carrousel|carousel|slides|diaporama`);
+    } else if (/vid[eé]o|video|reel|short|story\s*vid[eé]o|clip/i.test(msg)) {
       intent = 'video';
+      console.log(`[Classifier] Détection video via mots-clés: vidéo|video|reel|short|clip`);
     } else if (/image|visuel|cover|miniature|photo|illustration/i.test(msg)) {
       intent = 'image';
+      console.log(`[Classifier] Détection image via mots-clés: image|visuel|cover|miniature`);
     }
 
     console.log(`[Classifier] "${user_message}" → ${intent}`);
