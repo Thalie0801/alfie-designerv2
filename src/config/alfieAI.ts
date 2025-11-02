@@ -48,7 +48,7 @@ export function switchAIProvider(provider: AIProvider): AIModelConfig {
 // Intent patterns pour détection rapide (évite appels IA inutiles)
 export const QUICK_INTENTS = {
   // Détection de demandes simples qui n'ont pas besoin de l'IA
-  openCanva: /ouvr(e|ir)|lance|va (dans|sur) canva/i,
+  openCanva: /\b(ouvr(e|ir)|lance)\s+(dans|sur)?\s*canva\b/i,
   showBrandKit: /montre.*(brand|kit|marque)|affiche.*(couleurs|logo)/i,
   checkCredits: /(combien|check|vérifie).*(crédit|reste)/i,
   showUsage: /(montre|affiche|check).*(quota|usage|consommation|compteur)/i,

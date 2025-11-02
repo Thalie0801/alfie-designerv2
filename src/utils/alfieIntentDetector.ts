@@ -22,7 +22,12 @@ export function wantsImageFromText(text: string): boolean {
 export function detectIntent(userMessage: string): DetectedIntent {
   const msg = userMessage.toLowerCase().trim();
 
-  // Open Canva
+  // 🚨 PRIORITÉ 1: Si "carrousel" est mentionné, on passe TOUJOURS à l'IA
+  if (/(carrousel|carousel|slides?|série|diaporama)/i.test(msg)) {
+    return { type: 'unknown', confidence: 0 };
+  }
+
+  // Open Canva (maintenant sécurisé après le check carrousel)
   if (QUICK_INTENTS.openCanva.test(msg)) {
     return { type: 'open_canva', confidence: 0.9 };
   }
@@ -98,7 +103,8 @@ export function canHandleLocally(intent: DetectedIntent): boolean {
 export function generateLocalResponse(intent: DetectedIntent): string | null {
   switch (intent.type) {
     case 'open_canva':
-      return "Pour ouvrir un template dans Canva, choisis d'abord un template que je vais te proposer ! 🎨";
+      // Laisser l'IA gérer le contexte (carrousel vs template)
+      return null;
     
     case 'show_brandkit':
       return "Je vais te montrer ton Brand Kit actuel 🐾";
