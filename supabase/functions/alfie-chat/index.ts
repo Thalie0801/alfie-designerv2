@@ -743,7 +743,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                     headers: functionHeaders
                   });
                   
-                const url = imageData?.image_urls?.[0];
+                const url = imageData?.data?.image_urls?.[0];
                 if (!imageError && url) {
                   collectedAssets.push({
                     type: 'image',
@@ -867,15 +867,15 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                   headers: functionHeaders
                 });
                 
-                if (!imageError && imageData?.image_urls?.[0]) {
+                if (!imageError && imageData?.data?.image_urls?.[0]) {
                   collectedAssets.push({
                     type: 'image',
-                    url: imageData.image_urls[0],
+                    url: imageData.data.image_urls[0],
                     title: `Slide ${i + 1}/${slides.length}`,
                     reasoning: slide.note || '',
                     brandAlignment: brandKit ? 'Aligned with brand colors and voice' : ''
                   });
-                  console.log(`[FALLBACK] Slide ${i + 1}/${slides.length} generated:`, imageData.image_urls[0]);
+                  console.log(`[FALLBACK] Slide ${i + 1}/${slides.length} generated:`, imageData.data.image_urls[0]);
                 } else {
                   console.error(`[FALLBACK] Slide ${i + 1}/${slides.length} failed:`, imageError);
                 }
@@ -1021,15 +1021,15 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                   headers: { Authorization: authHeader },
                 });
 
-                const url = imageData?.image_urls?.[0];
+                const url = imageData?.data?.image_urls?.[0];
                 if (!imageError && url) {
                   console.log('[Tool Execution] Image generated URL:', url);
-                  generatedImages.push(url);
                   collectedAssets.push({
                     type: 'image',
-                    url,
-                    slideIndex: i,
-                    title: slide.title ?? `Slide ${i + 1}`,
+                    url: url,
+                    title: `Slide ${i + 1}/${slides.length}`,
+                    reasoning: slide.note || '',
+                    brandAlignment: brandKit ? 'Aligned with brand colors and voice' : ''
                   });
                 } else {
                   console.warn('[Tool Execution] Missing image URL for slide', i, 'response keys:', Object.keys(imageData || {}));
@@ -1084,7 +1084,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
 
             if (imageError) throw imageError;
 
-            const url = imageData?.image_urls?.[0];
+            const url = imageData?.data?.image_urls?.[0];
             if (!url) {
               console.warn('[Tool Execution] Missing image URL, response keys:', Object.keys(imageData || {}));
               throw new Error('Image generation returned no URL');
