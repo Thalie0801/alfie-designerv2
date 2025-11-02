@@ -244,7 +244,17 @@ export function AlfieChat() {
         headers
       });
 
-      if (error) throw error;
+          if (error) {
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            throw error;
+          }
 
       setActiveJobSetId(data.jobSetId);
       setCarouselTotal(carouselPlan.slides.length);
@@ -504,19 +514,69 @@ export function AlfieChat() {
     // New tool calls from alfie-chat
     switch (toolName) {
       case 'generate_video': {
+        const woofCost = args.woofCost || 2;
+        if (!activeBrandId) {
+          return { error: "⚠️ Aucune marque active. Sélectionne d'abord une marque dans tes paramètres." };
+        }
+        const quotaCheck = await checkAndConsumeQuota(supabase, 'woofs', woofCost, activeBrandId);
+        if (!quotaCheck.ok) {
+          toast.error(quotaCheck.error);
+          return { error: quotaCheck.error };
+        }
         console.log('[Video] Generating video with:', args);
         
         try {
+          // 1. Vérifier et consommer le quota (coût estimé à 2 Woofs pour une vidéo courte)
+          const woofCost = args.woofCost || 2;
+          const quotaCheck = await checkAndConsumeQuota(supabase, 'woofs', woofCost, activeBrandId);
+          if (!quotaCheck.ok) {
+            toast.error(quotaCheck.error);
+            return { error: quotaCheck.error };
+          }
+
           const { data, error } = await supabase.functions.invoke('generate-video', {
             body: {
               prompt: args.prompt || args.script,
               aspectRatio: args.ratio || args.aspectRatio || '16:9',
               imageUrl: args.imageUrl,
-              brandId: activeBrandId
+              brandId: activeBrandId,
+              woofCost: woofCost // Passer le coût pour la fonction edge
             }
           });
           
-          if (error) throw error;
+          if (error) {
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            
+            console.error('[Image] Improvement error:', error);
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            
+            console.error('[Image] Improvement error:', error);
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            
+            console.error('[Image] Generation error:', error);
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            throw error;
+          }
           
           _setVideoJobId(data.jobId);
           setGenerationStatus({ 
@@ -599,9 +659,44 @@ export function AlfieChat() {
             },
           });
           
-          if (error) throw error;
+          if (error) {
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            
+            console.error('[Image] Improvement error:', error);
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            
+            console.error('[Image] Improvement error:', error);
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            
+            console.error('[Image] Generation error:', error);
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            throw error;
+          }
           
-          await decrementCredits(creditCost, 'ai_adaptation');
+               // La consommation est déjà faite par checkAndConsumeQuota, on ne décrémente que les crédits si l'API le demande
+          // // La consommation est déjà faite par checkAndConsumeQuota, on ne décrémente que les crédits si l'API le demande
+          // // La consommation est déjà faite par checkAndConsumeQuota, on ne décrémente que les crédits si l'API le demande
+          // await decrementCredits(1, 'ai_adaptation');n');
           const remainingCredits = totalCredits - creditCost;
           
           return {
@@ -620,6 +715,15 @@ export function AlfieChat() {
       }
       
       case 'generate_image': {
+        const woofCost = 1;
+        if (!activeBrandId) {
+          return { error: "⚠️ Aucune marque active. Sélectionne d'abord une marque dans tes paramètres." };
+        }
+        const quotaCheck = await checkAndConsumeQuota(supabase, 'woofs', woofCost, activeBrandId);
+        if (!quotaCheck.ok) {
+          toast.error(quotaCheck.error);
+          return { error: quotaCheck.error };
+        }
         console.log('[Image] generate_image called with:', args);
         
         try {
@@ -672,17 +776,50 @@ export function AlfieChat() {
             brand_id: activeBrandId
           });
 
+          // 1. Vérifier et consommer le quota (coût fixé à 1 Woof pour une image)
+          const woofCost = 1;
+          const quotaCheck = await checkAndConsumeQuota(supabase, 'woofs', woofCost, activeBrandId);
+          if (!quotaCheck.ok) {
+            toast.error(quotaCheck.error);
+            return { error: quotaCheck.error };
+          }
+
           const { data, error } = await supabase.functions.invoke('alfie-render-image', {
             body: {
               provider: 'gemini-nano',
               prompt: args.prompt,
               format: mapAspectRatio(args.aspect_ratio || '1:1'),
               brand_id: activeBrandId,
-              cost_woofs: 1
+              cost_woofs: woofCost
             },
           });
 
           if (error) {
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            
+            console.error('[Image] Improvement error:', error);
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            
+            console.error('[Image] Improvement error:', error);
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            
+            console.error('[Image] Generation error:', error);
             console.error('[Image] Generation error:', error);
             const errorMsg = error.message || 'Erreur inconnue';
             
@@ -798,6 +935,39 @@ export function AlfieChat() {
       }
       
       case 'improve_image': {
+        const woofCost = 1;
+        if (!activeBrandId) {
+          return { error: "⚠️ Aucune marque active. Sélectionne d'abord une marque dans tes paramètres." };
+        }
+        const quotaCheck = await checkAndConsumeQuota(supabase, 'woofs', woofCost, activeBrandId);
+        if (!quotaCheck.ok) {
+          toast.error(quotaCheck.error);
+          return { error: quotaCheck.error };
+        }
+        const woofCost = 1; // Coût pour l'amélioration d'image
+        
+        if (!activeBrandId) {
+          return { error: "⚠️ Aucune marque active. Sélectionne d'abord une marque dans tes paramètres." };
+        }
+        
+        // 1. Vérifier et consommer le quota
+        const quotaCheck = await checkAndConsumeQuota(supabase, 'woofs', woofCost, activeBrandId);
+        if (!quotaCheck.ok) {
+          toast.error(quotaCheck.error);
+          return { error: quotaCheck.error };
+        }
+        const woofCost = 1; // Coût pour l'amélioration d'image
+        
+        if (!activeBrandId) {
+          return { error: "⚠️ Aucune marque active. Sélectionne d'abord une marque dans tes paramètres." };
+        }
+        
+        // 1. Vérifier et consommer le quota
+        const quotaCheck = await checkAndConsumeQuota(supabase, 'woofs', woofCost, activeBrandId);
+        if (!quotaCheck.ok) {
+          toast.error(quotaCheck.error);
+          return { error: quotaCheck.error };
+        }
         try {
           setGenerationStatus({ type: 'image', message: 'Amélioration de ton image en cours... 🪄' });
 
@@ -805,7 +975,39 @@ export function AlfieChat() {
             body: { imageUrl: args.image_url, prompt: args.instructions },
           });
 
-          if (error) throw error;
+          if (error) {
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            
+            console.error('[Image] Improvement error:', error);
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            
+            console.error('[Image] Improvement error:', error);
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            
+            console.error('[Image] Generation error:', error);
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            throw error;
+          }
 
           if (!activeBrandId) {
             throw new Error("No active brand. Please select a brand first.");
@@ -862,6 +1064,15 @@ export function AlfieChat() {
       }
       
       case 'generate_video': {
+        const woofCost = args.woofCost || 2;
+        if (!activeBrandId) {
+          return { error: "⚠️ Aucune marque active. Sélectionne d'abord une marque dans tes paramètres." };
+        }
+        const quotaCheck = await checkAndConsumeQuota(supabase, 'woofs', woofCost, activeBrandId);
+        if (!quotaCheck.ok) {
+          toast.error(quotaCheck.error);
+          return { error: quotaCheck.error };
+        }
         try {
           console.log('🎬 [generate_video] Starting with args:', args);
 
@@ -869,6 +1080,14 @@ export function AlfieChat() {
           if (!user) throw new Error("Not authenticated");
 
           // Appel backend (Edge Function)
+          // 1. Vérifier et consommer le quota (coût estimé à 2 Woofs pour une vidéo courte)
+          const woofCost = args.woofCost || 2;
+          const quotaCheck = await checkAndConsumeQuota(supabase, 'woofs', woofCost, activeBrandId);
+          if (!quotaCheck.ok) {
+            toast.error(quotaCheck.error);
+            return { error: quotaCheck.error };
+          }
+
           const { data, error } = await supabase.functions.invoke('generate-video', {
             body: {
               prompt: args.prompt,
@@ -1064,7 +1283,39 @@ export function AlfieChat() {
           }
 
           const { data: assets, error } = await query;
-          if (error) throw error;
+          if (error) {
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            
+            console.error('[Image] Improvement error:', error);
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            
+            console.error('[Image] Improvement error:', error);
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            
+            console.error('[Image] Generation error:', error);
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            throw error;
+          }
 
           // Ajouter les messages d'expiration
           const assetsWithExpiration = assets?.map(a => ({
@@ -1318,6 +1569,31 @@ export function AlfieChat() {
           });
           
           if (error) {
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            
+            console.error('[Image] Improvement error:', error);
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            
+            console.error('[Image] Improvement error:', error);
+            // Rembourser les woofs en cas d'échec de l'appel à la fonction edge
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            
+            console.error('[Image] Generation error:', error);
             console.error('[Plan] Edge function error:', error);
             return { error: 'Impossible de générer le plan. Réessaie.' };
           }
