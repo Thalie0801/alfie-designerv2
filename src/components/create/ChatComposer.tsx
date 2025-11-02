@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useLayoutEffect } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { Send, ImagePlus, Mic, Wand2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ interface ChatComposerProps {
   uploadedImage?: string | null;
   onRemoveImage?: () => void;
   onQuickGenerate?: () => void;
+  onHeightChange?: (height: number) => void;
 }
 
 const QUICK_CHIPS = [
@@ -35,10 +36,31 @@ export function ChatComposer({
   conversationId,
   uploadedImage,
   onRemoveImage,
-  onQuickGenerate
+  onQuickGenerate,
+  onHeightChange
 }: ChatComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const showQuickGenerate = onQuickGenerate && wantsImageFromText(value) && value.trim().length > 10;
+
+  // Observer pour transmettre la hauteur réelle du composer au parent
+  useLayoutEffect(() => {
+    if (!rootRef.current || !onHeightChange) return;
+
+    const updateHeight = () => {
+      const h = rootRef.current?.offsetHeight ?? 0;
+      console.log('[Composer] height', h);
+      onHeightChange(h);
+    };
+
+    const ro = new ResizeObserver(updateHeight);
+    ro.observe(rootRef.current);
+    
+    // Mesure initiale
+    updateHeight();
+
+    return () => ro.disconnect();
+  }, [onHeightChange]);
 
   // Persister le brouillon dans localStorage
   useEffect(() => {
@@ -96,7 +118,10 @@ export function ChatComposer({
   };
 
   return (
-    <div className="fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur border-t pt-4 px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pt-4 sm:px-4 sm:pb-4 z-10">
+    <div 
+      ref={rootRef}
+      className="fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur border-t pt-4 px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pt-4 sm:px-4 sm:pb-4 z-10"
+    >
       <div className="max-w-4xl mx-auto space-y-3">
         
         <div className="flex items-end gap-1.5 sm:gap-2">

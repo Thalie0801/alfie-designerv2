@@ -194,6 +194,7 @@ export function AlfieChat() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<{ type: string; message: string } | null>(null);
+  const [composerHeight, setComposerHeight] = useState(192);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeJobSetId, setActiveJobSetId] = useState<string>('');
@@ -1900,7 +1901,7 @@ export function AlfieChat() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-background">
       <CreateHeader onClearChat={clearChat} />
       <QuotaBar activeBrandId={activeBrandId} />
       
@@ -1912,9 +1913,12 @@ export function AlfieChat() {
         className="hidden"
       />
       
-      {/* Messages area with bottom padding for fixed composer */}
-        <div className="flex-1 overflow-y-auto pb-48 sm:pb-44">
-          <div className="mx-auto w-full max-w-3xl px-3 py-4 sm:px-4 sm:py-6">
+      {/* Messages area with dynamic bottom padding based on composer height */}
+      <div 
+        className="flex-1 overflow-y-auto" 
+        style={{ paddingBottom: `${composerHeight + 8}px` }}
+      >
+        <div className="mx-auto w-full max-w-3xl px-3 py-4 sm:px-4 sm:py-6">
           <section className="flex flex-col gap-4">
             {messages.map((message, index) => {
               if (message.jobId) {
@@ -2085,6 +2089,7 @@ export function AlfieChat() {
         conversationId={conversationId ?? undefined}
         uploadedImage={uploadedImage}
         onRemoveImage={removeUploadedImage}
+        onHeightChange={setComposerHeight}
         onQuickGenerate={() => {
           if (!activeBrandId) {
             toast.error("Sélectionne une marque d'abord ! 🐾");
