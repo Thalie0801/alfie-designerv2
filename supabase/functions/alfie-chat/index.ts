@@ -972,7 +972,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                   messages,
                   brandId,
                   aspect_ratio: '4:5',
-                  totalSlides: toolArgs.count || 5,
+                  slideCount: toolArgs.count || 5,
                   brandKit: brandKit ?? {},
                   prompt: toolArgs.prompt,
                 },
