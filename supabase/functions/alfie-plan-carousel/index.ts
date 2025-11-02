@@ -178,10 +178,9 @@ Exemples :
       throw new Error('AI returned an invalid plan structure');
     }
 
-    // Validation du nombre de slides
+    // Validation du nombre de slides (warning seulement, on ajustera après)
     if (!Array.isArray(slides) || slides.length !== slideCount) {
-      console.error(`[alfie-plan-carousel] Expected ${slideCount} slides, got ${slides?.length || 0}`);
-      throw new Error(`AI returned incorrect slide count: expected ${slideCount}, got ${slides?.length || 0}`);
+      console.warn(`[alfie-plan-carousel] Expected ${slideCount} slides, got ${slides?.length || 0} - will adjust with pad/truncate`);
     }
     
     // Ajuster le nombre de slides (pad/truncate)

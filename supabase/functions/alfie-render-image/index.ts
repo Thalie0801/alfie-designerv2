@@ -265,6 +265,30 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
           });
         }
 
+        // ✅ NOUVEAU : Incrémenter le compteur visuals si brand_id présent
+        if (brand_id) {
+          const now = new Date();
+          const periodYYYYMM = parseInt(
+            now.getFullYear().toString() + 
+            (now.getMonth() + 1).toString().padStart(2, '0')
+          );
+          
+          const { error: counterError } = await supabaseAdmin.rpc('increment_monthly_counters', {
+            p_brand_id: brand_id,
+            p_period_yyyymm: periodYYYYMM,
+            p_images: 1,
+            p_reels: 0,
+            p_woofs: 0
+          });
+          
+          if (counterError) {
+            console.error('[Render] Failed to increment visuals counter:', counterError);
+            // Ne pas bloquer la réponse
+          } else {
+            console.log('[Render] Incremented visuals counter for brand', brand_id);
+          }
+        }
+
         return {
           image_urls: [imageUrl],
           generation_id: generation?.id,

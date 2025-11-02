@@ -873,7 +873,6 @@ Example: "Professional product photography, 45° angle, gradient background (${b
               
               for (let i = 0; i < slides.length; i++) {
                 const slide = slides[i];
-                const overlayText = `${slide.title}\n${slide.subtitle || slide.punchline || ''}`;
                 
                 console.log(`[FALLBACK] Generating slide ${i + 1}/${slides.length}...`);
                 
@@ -888,6 +887,8 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                     backgroundOnly: true, // ← PAS DE TEXTE
                     slideIndex: i,
                     totalSlides: slides.length,
+                    backgroundStyle: slide.backgroundStyle || 'gradient',
+                    textContrast: slide.textContrast || 'dark',
                     negativePrompt: 'logos de marques tierces, filigranes, artefacts, texte, typography, letters'
                   },
                   headers: functionHeaders
@@ -899,6 +900,12 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                   continue;
                 }
                 console.log(`[FALLBACK] Background for slide ${i + 1}:`, bgUrl.substring(0, 80) + '...');
+                
+                // ✅ NOUVEAU : Construire overlayText depuis le slide AVANT l'appel à alfie-add-text-overlay
+                const overlayText = [
+                  slide.title || '',
+                  slide.subtitle || slide.punchline || ''
+                ].filter(Boolean).join('\n');
                 
                 // ÉTAPE 2: Ajouter le texte en overlay
                 const { data: textData, error: textError } = await supabase.functions.invoke('alfie-add-text-overlay', {

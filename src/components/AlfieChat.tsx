@@ -163,22 +163,27 @@ export function AlfieChat() {
         return false;
       }
       
-      // 2. Consommer le quota
-      const endpoint = type === 'woofs' ? 'alfie-consume-woofs' : 'alfie-consume-visuals';
-      const { error: consumeError } = await supabase.functions.invoke(endpoint, {
-        body: { 
-          [type === 'woofs' ? 'cost_woofs' : 'cost_visuals']: amount,
-          brand_id: activeBrandId 
-        },
-        headers
-      });
-      
-      if (consumeError) {
-        toast.error('Impossible de consommer le quota');
-        return false;
+      // 2. Consommer le quota (seulement pour visuals, pas pour woofs)
+      if (type === 'visuals') {
+        const { error: consumeError } = await supabase.functions.invoke('alfie-consume-visuals', {
+          body: { 
+            cost_visuals: amount,
+            brand_id: activeBrandId 
+          },
+          headers
+        });
+        
+        if (consumeError) {
+          toast.error('Impossible de consommer le quota');
+          return false;
+        }
+        
+        console.log(`[Quota] Consumed ${amount} visuals for brand ${activeBrandId}`);
+      } else {
+        // Pour woofs : vérification seulement, le backend consommera
+        console.log(`[Quota] Woofs verified (${amount} available), backend will consume`);
       }
       
-      console.log(`[Quota] Consumed ${amount} ${type} for brand ${activeBrandId}`);
       return true;
     } catch (error: any) {
       console.error('[Quota] Error:', error);
