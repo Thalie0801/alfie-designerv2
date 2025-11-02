@@ -272,37 +272,8 @@ serve(async (req) => {
     checkTimeout();
     console.log('🖼️ [Worker] Step 2: Generating background image WITHOUT text...');
     
-    // 🔥 NEW: Build rich prompt from full slideContent (bullets, KPIs, punchline)
-    let fullPrompt = slideContent.title || '';
-    if (slideContent.subtitle) fullPrompt += `. ${slideContent.subtitle}`;
-    if (slideContent.punchline) fullPrompt += `. ${slideContent.punchline}`;
-
-    // Add bullets context to guide image generation
-    if (slideContent.bullets && slideContent.bullets.length > 0) {
-      fullPrompt += `. Key points: ${slideContent.bullets.join(', ')}`;
-    }
-    
-    // Add KPIs context for data-driven visuals
-    if (slideContent.kpis && slideContent.kpis.length > 0) {
-      const kpiSummary = slideContent.kpis
-        .map((k: any) => `${k.label} ${k.delta}`)
-        .join(', ');
-      fullPrompt += `. Metrics: ${kpiSummary}`;
-    }
-
-    // Add visual style hints based on slide type
-    const slideTypeHints: Record<string, string> = {
-      hero: 'Hero visual with strong impact, professional and engaging',
-      problem: 'Visual representing challenges or pain points',
-      solution: 'Visual showing solutions, tools, or positive outcomes',
-      impact: 'Visual with data visualization elements, metrics, success indicators',
-      cta: 'Call-to-action visual, motivational and action-oriented'
-    };
-    
-    const styleHint = slideTypeHints[slideContent.type || slideTemplate] || '';
-    if (styleHint) fullPrompt += `. Style: ${styleHint}`;
-
-    const correctedPrompt = correctFrenchSpelling(fullPrompt);
+    // Prompt is already enriched by create-job-set with full content (bullets, KPIs, style hints)
+    const correctedPrompt = correctFrenchSpelling(job.prompt);
     const enrichedPrompt = enrichPromptWithBrand(correctedPrompt, brandSnapshot);
     
     console.log('📝 Base prompt:', enrichedPrompt);

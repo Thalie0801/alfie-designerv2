@@ -172,8 +172,40 @@ serve(async (req) => {
       };
       
       const jobsData = plan.slides.slice(0, normalizedCount).map((slide: any, i: number) => {
-        const rawPrompt = `${slide.title}. ${slide.subtitle || ''}`;
-        const correctedPrompt = correctFrenchSpelling(rawPrompt);
+        // 🔥 BUILD RICH PROMPT FROM FULL SLIDE CONTENT
+        let fullPrompt = slide.title || '';
+        if (slide.subtitle) fullPrompt += `. ${slide.subtitle}`;
+        if (slide.punchline) fullPrompt += `. ${slide.punchline}`;
+        
+        // Add bullets context
+        if (slide.bullets && slide.bullets.length > 0) {
+          fullPrompt += `. Key points: ${slide.bullets.join(', ')}`;
+        }
+        
+        // Add KPIs context
+        if (slide.kpis && slide.kpis.length > 0) {
+          const kpiText = slide.kpis.map((k: any) => `${k.label} ${k.delta}`).join(', ');
+          fullPrompt += `. Metrics: ${kpiText}`;
+        }
+        
+        // Add badge context
+        if (slide.badge) fullPrompt += `. Badge: ${slide.badge}`;
+        
+        // Add note context
+        if (slide.note) fullPrompt += `. Note: ${slide.note}`;
+        
+        // Add visual style hint based on slide type
+        const styleHints: Record<string, string> = {
+          hero: 'Hero visual with strong impact, professional and engaging',
+          problem: 'Visual representing challenges or pain points',
+          solution: 'Visual showing solutions, tools, or positive outcomes',
+          impact: 'Visual with data visualization elements, metrics, success indicators',
+          cta: 'Call-to-action visual, motivational and action-oriented'
+        };
+        const styleHint = styleHints[slide.type] || '';
+        if (styleHint) fullPrompt += `. Style: ${styleHint}`;
+        
+        const correctedPrompt = correctFrenchSpelling(fullPrompt);
         
         // Déterminer le template automatiquement
         let templateType = 'hero';
@@ -190,8 +222,8 @@ serve(async (req) => {
         return {
           job_set_id: newJobSet.id,
           index_in_set: i,
-          prompt: correctedPrompt,
-          slide_template: templateType, // Phase 2: nouveau champ
+          prompt: correctedPrompt, // 🔥 NOW CONTAINS FULL CONTEXT
+          slide_template: templateType,
           brand_snapshot: brandSnapshotWithAspect,
           metadata: { 
             role: i === 0 ? 'key_visual' : 'variant',
