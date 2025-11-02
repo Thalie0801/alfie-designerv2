@@ -58,16 +58,22 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
         if (error) throw error;
         toast.success('Marque mise à jour !');
       } else {
-        // CHECK QUOTA BEFORE CREATING - Max 5 brands
+        // CHECK QUOTA BEFORE CREATING - Vérifier quota_brands depuis profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('quota_brands')
+          .eq('id', user.id)
+          .single();
+
         const { count: currentBrands } = await supabase
           .from('brands')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id);
 
-        const MAX_BRANDS = 5;
+        const maxAllowedBrands = profile?.quota_brands || 1;
         
-        if ((currentBrands || 0) >= MAX_BRANDS) {
-          toast.error(`Limite atteinte (${MAX_BRANDS} marques max). Contactez-nous pour ajouter une marque supplémentaire (39€/mois).`);
+        if ((currentBrands || 0) >= maxAllowedBrands) {
+          toast.error(`Vous avez atteint votre limite de ${maxAllowedBrands} marque(s). Pour ajouter une marque supplémentaire, utilisez le bouton "Ajouter une marque + 39€".`);
           setLoading(false);
           return;
         }

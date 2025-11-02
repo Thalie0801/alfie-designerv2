@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Palette, AlertCircle } from 'lucide-react';
@@ -8,6 +9,13 @@ import { BrandDialog } from '@/components/BrandDialog';
 
 export function ActiveBrandCard() {
   const { activeBrand, totalBrands, quotaBrands, loadBrands } = useBrandKit();
+
+  // Auto-refresh quand la marque active change
+  useEffect(() => {
+    if (activeBrand?.id) {
+      loadBrands();
+    }
+  }, [activeBrand?.id]);
 
   return (
     <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
@@ -22,7 +30,9 @@ export function ActiveBrandCard() {
           </Badge>
         </div>
         <CardDescription>
-          Gère ta marque et consulte tes quotas
+          {totalBrands === 0 && "Crée ta première marque gratuite"}
+          {totalBrands === 1 && quotaBrands === 1 && "Tu as utilisé ta marque gratuite"}
+          {totalBrands > quotaBrands && `${totalBrands - quotaBrands} marque(s) payante(s)`}
         </CardDescription>
       </CardHeader>
 

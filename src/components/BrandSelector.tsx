@@ -93,13 +93,12 @@ export function BrandSelector() {
                 className="cursor-pointer text-primary"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Créer une marque
+                Créer une marque gratuite
               </DropdownMenuItem>
             </BrandDialog>
           ) : (
-            <DropdownMenuItem disabled className="text-muted-foreground">
-              <Plus className="h-4 w-4 mr-2" />
-              Quota atteint
+            <DropdownMenuItem disabled className="text-muted-foreground text-xs">
+              Limite atteinte. Utilisez "Ajouter une marque + 39€" pour une marque payante.
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>
