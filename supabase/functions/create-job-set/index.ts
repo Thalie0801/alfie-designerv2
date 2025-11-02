@@ -136,11 +136,12 @@ serve(async (req) => {
       };
 
       // 5. Appeler alfie-plan-carousel
-      const { data: plan, error: planErr } = await supabase.functions.invoke('alfie-plan-carousel', {
+      const { data: planResponse, error: planErr } = await supabase.functions.invoke('alfie-plan-carousel', {
         body: { prompt, brandKit: brandSnapshot, slideCount: normalizedCount }
       });
 
-      if (planErr || !plan?.slides) {
+      if (planErr || !planResponse?.plan?.slides) {
+        console.error('[create-job-set] ❌ Planning failed:', planErr || 'No slides in response');
         // Refund quotas
         await supabase.rpc('refund_brand_quotas', {
           p_brand_id: brandId,
@@ -148,6 +149,8 @@ serve(async (req) => {
         });
         throw new Error('Carousel planning failed');
       }
+
+      const plan = planResponse.plan;
 
       // 6. Créer le job_set avec master_seed et constraints
       const { data: newJobSet, error: jobSetErr } = await supabase
