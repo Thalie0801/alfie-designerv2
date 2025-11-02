@@ -238,22 +238,32 @@ export function AlfieChat() {
     // 2. Message de génération
     addMessage({
       role: 'assistant',
-      content: '🎨 Génération de ton image en cours...',
+      content: uploadedImage 
+        ? '🎨 Génération basée sur ton image...' 
+        : '🎨 Génération de ton image en cours...',
       type: 'text'
     });
     
     try {
       const headers = await getAuthHeader();
       
+      // 3. Préparer le body avec l'image uploadée si présente
+      const body: any = {
+        provider: 'gemini-nano',
+        prompt,
+        format: mapAspectRatio(aspectRatio),
+        brand_id: activeBrandId,
+        cost_woofs: woofCost
+      };
+      
+      // ✅ Ajouter l'image de référence si uploadée
+      if (uploadedImage) {
+        body.templateImageUrl = uploadedImage;
+      }
+      
       // 3. Appeler alfie-render-image
       const { data, error } = await supabase.functions.invoke('alfie-render-image', {
-        body: {
-          provider: 'gemini-nano',
-          prompt,
-          format: mapAspectRatio(aspectRatio),
-          brand_id: activeBrandId,
-          cost_woofs: woofCost
-        },
+        body,
         headers
       });
       
@@ -273,6 +283,9 @@ export function AlfieChat() {
       });
       
       toast.success('Image générée !');
+      
+      // ✅ Réinitialiser uploadedImage après génération
+      setUploadedImage(null);
       
     } catch (error: any) {
       console.error('[Image] Error:', error);
@@ -295,6 +308,75 @@ export function AlfieChat() {
         type: 'text'
       });
       toast.error('Échec de la génération d\'image');
+    }
+  };
+  
+  // ======
+  // GÉNÉRATION DE CARROUSEL SLIDE (avec texte overlay)
+  // ======
+  
+  const generateCarouselSlide = async (
+    slide: CarouselSlide, 
+    slideIndex: number, 
+    totalSlides: number, 
+    aspectRatio: string
+  ) => {
+    const woofCost = 1;
+    
+    // 1. Vérifier et consommer quota
+    const quotaOk = await checkAndConsumeQuota('woofs', woofCost);
+    if (!quotaOk) return;
+    
+    // 2. Construire le texte overlay à partir du slide validé
+    const overlayText = `${slide.title}\n${slide.text}`;
+    
+    try {
+      const headers = await getAuthHeader();
+      
+      // 3. Appeler alfie-render-image avec TOUS les paramètres carrousel
+      const { data, error } = await supabase.functions.invoke('alfie-render-image', {
+        body: {
+          provider: 'gemini-nano',
+          prompt: slide.imagePrompt, // ✅ Prompt visuel du plan
+          format: mapAspectRatio(aspectRatio),
+          brand_id: activeBrandId,
+          cost_woofs: woofCost,
+          // ✅ NOUVEAUX PARAMS CARROUSEL
+          backgroundOnly: false, // On veut le texte intégré
+          slideIndex: slideIndex,
+          totalSlides: totalSlides,
+          overlayText: overlayText, // ✅ Texte à intégrer
+          negativePrompt: "logos de marques tierces, filigranes, artefacts, texte illisible, tuiles, grille, multi-cadres, collage",
+          resolution: mapAspectRatio(aspectRatio)
+        },
+        headers
+      });
+      
+      if (error) throw error;
+      
+      if (!data?.ok || !data?.data?.image_urls?.[0]) {
+        throw new Error(data?.error || 'Aucune image générée');
+      }
+      
+      // 4. Afficher l'image
+      addMessage({
+        role: 'assistant',
+        content: `✅ Slide ${slideIndex + 1}/${totalSlides} générée !`,
+        type: 'image',
+        assetUrl: data.data.image_urls[0],
+        assetId: data.data.generation_id
+      });
+      
+    } catch (error: any) {
+      console.error(`[Carousel Slide ${slideIndex + 1}] Error:`, error);
+      await refundWoofs(woofCost);
+      
+      addMessage({
+        role: 'assistant',
+        content: `❌ Échec de la slide ${slideIndex + 1}/${totalSlides}`,
+        type: 'text'
+      });
+      toast.error(`Échec de la slide ${slideIndex + 1}`);
     }
   };
   
@@ -658,8 +740,8 @@ export function AlfieChat() {
               type: 'text'
             });
             
-            // Appeler la fonction generateImage existante
-            await generateImage(slide.imagePrompt, aspectRatio);
+            // ✅ Appeler generateCarouselSlide avec toutes les données du slide
+            await generateCarouselSlide(slide, i, count, aspectRatio);
           }
           
           addMessage({
