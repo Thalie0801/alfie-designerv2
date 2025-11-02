@@ -1566,6 +1566,25 @@ export function AlfieChat() {
       }
 
       // Execute tool calls
+      if (toolCalls.length > 0) {
+        // Ajouter un message de confirmation avant d'exécuter les tools
+        const toolNames = toolCalls.map((tc: any) => tc.function?.name).join(', ');
+        const confirmationMessage: Message = {
+          role: 'assistant',
+          content: `🎨 Génération en cours (${toolNames})...`
+        };
+        setMessages(prev => [...prev, confirmationMessage]);
+        
+        // Persist confirmation message
+        if (conversationId) {
+          await supabase.from('alfie_messages').insert({
+            conversation_id: conversationId,
+            role: 'assistant',
+            content: confirmationMessage.content
+          });
+        }
+      }
+
       for (const toolCall of toolCalls) {
         const toolName = toolCall.function?.name;
         const toolArgs = JSON.parse(toolCall.function?.arguments || '{}');
@@ -1575,9 +1594,41 @@ export function AlfieChat() {
         try {
           const result = await handleToolCall(toolName, toolArgs);
           console.log('[Chat] Tool result:', result);
+          
+          // Afficher le résultat dans le chat si erreur
+          if (result?.error) {
+            const errorMessage: Message = {
+              role: 'assistant',
+              content: `❌ Erreur : ${result.error}`
+            };
+            setMessages(prev => [...prev, errorMessage]);
+            
+            if (conversationId) {
+              await supabase.from('alfie_messages').insert({
+                conversation_id: conversationId,
+                role: 'assistant',
+                content: errorMessage.content
+              });
+            }
+          }
         } catch (err) {
           console.error('[Chat] Tool execution error:', toolName, err);
+          const errorMsg = err instanceof Error ? err.message : 'Erreur inconnue';
           toast.error(`Erreur lors de l'exécution de ${toolName}`);
+          
+          const errorMessage: Message = {
+            role: 'assistant',
+            content: `❌ Erreur technique lors de l'exécution de ${toolName}: ${errorMsg}`
+          };
+          setMessages(prev => [...prev, errorMessage]);
+          
+          if (conversationId) {
+            await supabase.from('alfie_messages').insert({
+              conversation_id: conversationId,
+              role: 'assistant',
+              content: errorMessage.content
+            });
+          }
         }
       }
 
