@@ -527,7 +527,22 @@ serve(async (req) => {
     // 8. Composite background + SVG text via Cloudinary (returns URL)
     checkTimeout();
     console.log('🎨 [Worker] Step 5: Compositing background + text via Cloudinary...');
-    const composed = await compositeSlide(backgroundUrl, svgTextLayer, job.job_set_id, job.job_sets.brand_id);
+    
+    // Extract primary and secondary colors from brand for tint
+    const primaryColor = brandSnapshot?.primary_color || brandSnapshot?.palette?.[0];
+    const secondaryColor = brandSnapshot?.secondary_color || brandSnapshot?.palette?.[1];
+    
+    const composed = await compositeSlide(
+      backgroundUrl, 
+      svgTextLayer, 
+      job.job_set_id, 
+      job.job_sets.brand_id,
+      primaryColor && secondaryColor ? {
+        primaryColor,
+        secondaryColor,
+        tintStrength: 60
+      } : undefined
+    );
     console.log('✅ [Worker] Composition complete, URL:', composed.url);
 
     // 9. Download composed image from Cloudinary
@@ -586,7 +601,7 @@ serve(async (req) => {
       .from('media-generations')
       .getPublicUrl(fileName);
     
-    const publicUrl = publicUrlData.publicUrl;
+    let publicUrl = publicUrlData.publicUrl;
 
     if (!publicUrl || !publicUrl.startsWith('http')) {
       throw new Error(`Invalid public URL: ${publicUrl}`);
@@ -622,25 +637,79 @@ serve(async (req) => {
     const coherenceScore = await checkCoherence(publicUrl, {
       palette: job.job_sets.constraints?.palette || [],
       referenceImageUrl
-    });
+    }, composed.bgPublicId);
 
     console.log(`[Worker] Coherence score: ${coherenceScore.total}/100`, coherenceScore.breakdown);
 
-    // 9. HOTFIX: Seuil de cohérence ajusté pour éviter boucles retry (texte inclus dans l'image)
-    const coherenceThresholdEffective = 50; // HOTFIX: seuil plus bas pour génération directe
+    // 9. If coherence is low, retry with stronger tint
+    const coherenceThresholdEffective = 60;
     const retryCount = job.retry_count || 0;
     
-    console.log(`[Worker] Using effective coherence threshold: ${coherenceThresholdEffective} (direct generation mode)`);
+    console.log(`[Worker] Using effective coherence threshold: ${coherenceThresholdEffective} (with brand tint)`);
     
-    if (coherenceScore.total < coherenceThresholdEffective && retryCount < 3) {
-      await supabase.from('jobs').update({
-        status: 'queued',
-        retry_count: retryCount + 1,
-        error: `Low coherence: ${coherenceScore.total}/100 (threshold: ${coherenceThresholdEffective})`
-      }).eq('id', job.id);
+    if (coherenceScore.total < coherenceThresholdEffective && retryCount === 0) {
+      // ONE TIME retry with stronger tint
+      console.log(`[Worker] Low coherence (${coherenceScore.total}), retrying with stronger tint...`);
       
-      console.log(`[Worker] Job ${job.id} requeued for retry (attempt ${retryCount + 1})`);
-      return new Response(JSON.stringify({ retry: true, coherenceScore }), { headers: corsHeaders });
+      // Re-composite with stronger tint
+      const strongerTint = await compositeSlide(
+        backgroundUrl,
+        svgTextLayer,
+        job.job_set_id,
+        job.job_sets.brand_id,
+        primaryColor && secondaryColor ? {
+          primaryColor,
+          secondaryColor,
+          tintStrength: 80 // Stronger tint
+        } : undefined
+      );
+      
+      // Re-download and upload
+      const retryImageResponse = await fetch(strongerTint.url);
+      if (retryImageResponse.ok) {
+        const retryImageBytes = new Uint8Array(await retryImageResponse.arrayBuffer());
+        const retryFileName = `carousel/${brandId}/${job.job_set_id}/slide_${job.index_in_set}_retry_${Date.now()}.png`;
+        
+        const { data: retryUploadData, error: retryUploadError } = await supabase.storage
+          .from('media-generations')
+          .upload(retryFileName, retryImageBytes, { 
+            contentType: 'image/png', 
+            upsert: true, 
+            cacheControl: '3600' 
+          });
+        
+        if (!retryUploadError && retryUploadData) {
+          const { data: retryPublicUrlData } = supabase.storage
+            .from('media-generations')
+            .getPublicUrl(retryFileName);
+          
+          const retryPublicUrl = retryPublicUrlData.publicUrl;
+          
+          // Re-check coherence
+          const retryCoherenceScore = await checkCoherence(retryPublicUrl, {
+            palette: job.job_sets.constraints?.palette || [],
+            referenceImageUrl
+          }, strongerTint.bgPublicId);
+          
+          console.log(`[Worker] Retry coherence score: ${retryCoherenceScore.total}/100`);
+          
+          // Use retry image if better
+          if (retryCoherenceScore.total > coherenceScore.total) {
+            console.log(`[Worker] Using retry image (better score: ${retryCoherenceScore.total} > ${coherenceScore.total})`);
+            // Cleanup old upload
+            await supabase.storage.from('media-generations').remove([fileName]);
+            // Update to use retry
+            composed.url = strongerTint.url;
+            composed.bgPublicId = strongerTint.bgPublicId;
+            composed.svgPublicId = strongerTint.svgPublicId;
+            publicUrl = retryPublicUrl;
+            coherenceScore.total = retryCoherenceScore.total;
+            coherenceScore.breakdown = retryCoherenceScore.breakdown;
+          }
+        }
+        
+        await cleanupCloudinaryResources({ bgPublicId: strongerTint.bgPublicId, svgPublicId: strongerTint.svgPublicId });
+      }
     }
 
     // 10. D'ABORD créer l'asset dans assets (nouvelle table Realtime)

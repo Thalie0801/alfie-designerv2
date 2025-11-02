@@ -16,7 +16,12 @@ export async function compositeSlide(
   backgroundUrl: string,
   svgTextLayer: string,
   jobSetId?: string,
-  brandId?: string
+  brandId?: string,
+  options?: {
+    primaryColor?: string;
+    secondaryColor?: string;
+    tintStrength?: number;
+  }
 ): Promise<{ url: string; bgPublicId: string; svgPublicId: string }> {
   console.log('🎨 [imageCompositor] Starting Cloudinary composition...');
   console.log('📥 Background URL:', backgroundUrl);
@@ -149,9 +154,24 @@ export async function compositeSlide(
       throw new Error(`SVG upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
     
-    // 4. Generate composed image URL with overlay transformation
+    // 4. Generate composed image URL with overlay transformation + optional tint
     console.log('🎭 Generating composed URL...');
+    
+    // Build transformation pipeline with brand color tint if provided
+    let transformations = '';
+    if (options?.primaryColor && options?.secondaryColor) {
+      const tintStrength = options.tintStrength || 60;
+      // Convert hex colors to RGB for Cloudinary
+      const primary = options.primaryColor.replace('#', '');
+      const secondary = options.secondaryColor.replace('#', '');
+      
+      // Apply subtle tint to ensure color consistency across slides
+      transformations = `e_grayscale:40/e_tint:${tintStrength}:co_rgb:${primary}:co_rgb:${secondary}/`;
+      console.log(`🎨 [imageCompositor] Applying brand tint: ${transformations}`);
+    }
+    
     const composedUrl = `https://res.cloudinary.com/${cloudName}/image/upload/` +
+      transformations +
       `l_${svgUploadedPublicId.replace(/\//g, ':')},fl_layer_apply,g_center/` +
       `${bgUploadedPublicId}.png`;
     

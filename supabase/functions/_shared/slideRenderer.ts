@@ -28,13 +28,17 @@ export async function renderSlideToSVG(
   // Fond transparent (sera composité avec l'image IA)
   svg += `<rect width="${width}" height="${height}" fill="transparent"/>`;
   
+  // Normalize font settings across all layers for consistency
+  const baseFontFamily = brandSnapshot.fonts?.default || 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  const textShadow = '0 2px 4px rgba(0,0,0,0.1)';
+  
   // Couche de texte (typo contrôlée, pas d'IA)
   for (const layer of template.textLayers) {
     let text = getTextForLayer(layer, slideContent);
     if (!text) continue;
     
-    // Utiliser les fonts du brand kit si disponibles
-    const fontFamily = brandSnapshot.fonts?.[layer.type] || layer.font;
+    // Use consistent font from brand kit
+    const fontFamily = baseFontFamily;
     let textColor = layer.color;
     
     // Utiliser couleurs brand si disponibles

@@ -15,13 +15,14 @@ export async function checkCoherence(
   constraints: {
     palette: string[];
     referenceImageUrl?: string;
-  }
+  },
+  publicId?: string
 ): Promise<CoherenceScore> {
   console.log('[coherenceChecker] Checking coherence for:', imageUrl);
   console.log('[coherenceChecker] Constraints:', constraints);
   
   // 1. Extraire palette dominante (via color analysis)
-  const dominantColors = await extractDominantColors(imageUrl);
+  const dominantColors = await extractDominantColors(imageUrl, publicId);
   console.log('[coherenceChecker] Dominant colors:', dominantColors);
   
   // 2. Calculer ∆E vs palette brand
@@ -73,9 +74,39 @@ export async function checkCoherence(
   return result;
 }
 
-async function extractDominantColors(imageUrl: string): Promise<string[]> {
-  // Pour MVP : retourner estimation basique
-  // Implémentation complète utiliserait color-thief ou sharp histogram
+async function extractDominantColors(imageUrl: string, publicId?: string): Promise<string[]> {
+  // Use Cloudinary Admin API to extract real dominant colors
+  if (publicId) {
+    try {
+      const CLOUD_NAME = Deno.env.get('CLOUDINARY_CLOUD_NAME')?.trim();
+      const API_KEY = Deno.env.get('CLOUDINARY_API_KEY');
+      const API_SECRET = Deno.env.get('CLOUDINARY_API_SECRET');
+      
+      if (CLOUD_NAME && API_KEY && API_SECRET) {
+        const cloudName = CLOUD_NAME.toLowerCase();
+        const encodedPublicId = encodeURIComponent(publicId);
+        const url = `https://api.cloudinary.com/v1_1/${cloudName}/resources/image/upload/${encodedPublicId}?colors=true`;
+        
+        const auth = btoa(`${API_KEY}:${API_SECRET}`);
+        const response = await fetch(url, {
+          headers: { 'Authorization': `Basic ${auth}` }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.colors && Array.isArray(data.colors)) {
+            const dominantColors = data.colors.slice(0, 5).map((c: any) => c[0]);
+            console.log('[coherenceChecker] Extracted colors from Cloudinary:', dominantColors);
+            return dominantColors;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[coherenceChecker] Failed to extract colors from Cloudinary:', err);
+    }
+  }
+  
+  // Fallback: Use simplified color extraction
   return ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8'];
 }
 

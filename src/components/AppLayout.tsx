@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { useVersionRefresh } from '@/hooks/useVersionRefresh';
 import { 
   Sparkles, 
   LayoutDashboard, 
@@ -23,6 +24,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const navigate = useNavigate();
   const { user, profile, isAdmin, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const appVersion = useVersionRefresh();
 
   const canSeeAdminToggle = isAdmin;
 
@@ -184,6 +186,13 @@ export function AppLayout({ children }: AppLayoutProps) {
       <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
         {children}
       </main>
+      
+      {/* Version badge */}
+      <div className="fixed bottom-2 right-2 z-10">
+        <Badge variant="outline" className="text-[10px] opacity-50 hover:opacity-100 transition-opacity">
+          v{appVersion.slice(-8)}
+        </Badge>
+      </div>
     </div>
   );
 }

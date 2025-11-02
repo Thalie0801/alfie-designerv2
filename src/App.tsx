@@ -2,9 +2,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { hasRole } from "@/lib/access";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 
@@ -34,6 +37,22 @@ import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 const queryClient = new QueryClient();
 
 const AppRoutes = () => {
+  const { roles, loading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Redirect VIP/Admin users to /chat from root or /dashboard
+  useEffect(() => {
+    if (loading) return;
+    
+    const isVipOrAdmin = hasRole(roles, 'vip') || hasRole(roles, 'admin');
+    
+    if (isVipOrAdmin && (location.pathname === '/' || location.pathname === '/dashboard')) {
+      console.log('[App] Redirecting VIP/Admin to /chat');
+      navigate('/chat', { replace: true });
+    }
+  }, [roles, loading, location.pathname, navigate]);
+  
   return (
     <Routes>
           <Route path="/" element={<Index />} />
