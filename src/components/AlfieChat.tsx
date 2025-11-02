@@ -710,6 +710,12 @@ export function AlfieChat() {
       });
       
       // Appeler l'orchestrateur backend
+      console.log('[Orchestrator] Sending to backend:', {
+        messageCount: conversationHistory.length,
+        lastMessage: conversationHistory[conversationHistory.length - 1],
+        brandId: activeBrandId
+      });
+
       const { data, error } = await supabase.functions.invoke('alfie-chat', {
         body: {
           messages: conversationHistory,
@@ -718,6 +724,15 @@ export function AlfieChat() {
           stream: false
         },
         headers
+      });
+      
+      console.log('[Orchestrator] Backend response:', {
+        hasData: !!data,
+        error: error,
+        hasAssets: !!data?.assets,
+        assetsCount: data?.assets?.length || 0,
+        hasJobSetId: !!data?.jobSetId,
+        messageContent: data?.choices?.[0]?.message?.content?.substring(0, 200)
       });
       
       if (error) throw error;
@@ -734,6 +749,11 @@ export function AlfieChat() {
         content: assistantMessage.content || '',
         type: 'text'
       });
+      
+      // Avertir si aucune génération n'a été lancée
+      if (!data.assets && !data.jobSetId) {
+        console.warn('[Orchestrator] ⚠️ No generation triggered, text-only response received. This might indicate the AI did not call any tools.');
+      }
       
       // Traiter les assets s'il y en a
       if (data.assets && Array.isArray(data.assets)) {

@@ -122,6 +122,18 @@ ${brand.fonts?.length ? brand.fonts.join(', ') : 'Non définie'}
 
     const systemPrompt = `Tu es **Alfie** 🐾, le golden retriever designer IA, toujours enjoué et prêt à créer !
 
+🚨 **RÈGLE ABSOLUE - UTILISATION OBLIGATOIRE DES TOOLS:**
+Tu DOIS TOUJOURS utiliser les tools disponibles. JAMAIS de réponse texte seule sans tool call.
+
+**Actions obligatoires par type de demande:**
+- Si l'user demande une image → Tool "classify_intent" PUIS "generate_image"
+- Si l'user demande un carrousel → Tool "classify_intent" PUIS "plan_carousel" (attendre validation "oui") PUIS "create_carousel"
+- Si l'user demande une vidéo → Tool "classify_intent" PUIS "generate_video"
+- Si l'user demande ses crédits/quota → Tool "show_usage"
+- Si l'user demande son Brand Kit → Tool "show_brandkit"
+
+⛔ **INTERDIT:** Répondre en texte libre sans appeler de tool pour les demandes de génération !
+
 ## 🎯 TON STYLE
 - Ton **chaleureux** et **motivant**, comme un pote qui t'aide à créer
 - Emojis naturels : 🎨 ✨ 🐾 💡 🪄 ⚡️ 🎬
@@ -511,6 +523,14 @@ Example: "Professional product photography, 45° angle, gradient background (${b
       iterationCount++;
       console.log(`[Tool Loop] Iteration ${iterationCount}/${maxIterations}`);
 
+      // DEBUG: Log des messages envoyés à l'IA
+      console.log('[DEBUG] Messages sent to AI:', JSON.stringify(conversationMessages.map(m => ({
+        role: m.role,
+        content: typeof m.content === 'string' ? m.content.substring(0, 200) + '...' : m.content,
+        tool_calls: m.tool_calls?.length || 0
+      })), null, 2));
+      console.log('[DEBUG] Tools available:', tools.map(t => t.function.name).join(', '));
+
       // Appel avec fallback intelligent Gemini → OpenAI
       aiResponse = await callAIWithFallback(
         conversationMessages,
@@ -518,6 +538,13 @@ Example: "Professional product photography, 45° angle, gradient background (${b
         tools,
         'gemini'
       );
+
+      // DEBUG: Log de la réponse de l'IA
+      console.log('[DEBUG] AI Response:', JSON.stringify({
+        content: aiResponse.choices[0]?.message?.content?.substring(0, 200) + '...',
+        tool_calls_count: aiResponse.choices[0]?.message?.tool_calls?.length || 0,
+        tool_calls: aiResponse.choices[0]?.message?.tool_calls?.map(tc => tc.function?.name)
+      }, null, 2));
 
       const assistantMessage = aiResponse.choices[0]?.message;
       if (!assistantMessage) {
@@ -530,10 +557,11 @@ Example: "Professional product photography, 45° angle, gradient background (${b
       if (!toolCalls || toolCalls.length === 0) {
         // Pas de tools à exécuter, on sort de la boucle
         console.log('[Tool Loop] No more tool calls, finishing');
+        console.warn('[Tool Loop] ⚠️ AI returned text-only response without tool calls. This should not happen for generation requests.');
         break;
       }
 
-      console.log(`[Tool Loop] Executing ${toolCalls.length} tool(s)`);
+      console.log(`[Tool Loop] ✅ Executing ${toolCalls.length} tool(s):`, toolCalls.map(tc => tc.function?.name).join(', '));
 
       // Ajouter le message assistant avec tool_calls à l'historique
       conversationMessages.push({
