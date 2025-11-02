@@ -62,13 +62,15 @@ serve(async (req) => {
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    
+
     if (userError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
+    const functionHeaders = { Authorization: authHeader as string };
 
     // Vérifier l'accès (Stripe OU granted_by_admin)
     const hasAccess = await userHasAccess(req.headers.get('Authorization'));
@@ -787,7 +789,8 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                     totalSlides: slides.length,
                     overlayText,
                     negativePrompt: "logos de marques tierces, filigranes, artefacts"
-                  }
+                  },
+                  headers: functionHeaders
                 });
 
                 if (imageData?.ok && imageData.data?.image_urls?.[0]) {
@@ -821,7 +824,8 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                       voice: brandKit.voice,
                       niche: brandKit.niche
                     }
-                  }
+                  },
+                  headers: functionHeaders
                 });
                 optimizedPrompt = optimizeData?.optimizedPrompt || toolArgs.prompt;
               }
@@ -838,7 +842,8 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                   prompt: optimizedPrompt,
                   format,
                   brand_id: brandId
-                }
+                },
+                headers: functionHeaders
               });
 
               if (imageError) throw imageError;
@@ -869,7 +874,8 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                   aspectRatio: toolArgs.aspectRatio || '16:9',
                   brandId,
                   imageUrl: toolArgs.imageUrl
-                }
+                },
+                headers: functionHeaders
               });
 
               if (videoError) throw videoError;
@@ -885,7 +891,8 @@ Example: "Professional product photography, 45° angle, gradient background (${b
             case 'check_credits':
             case 'show_usage': {
               const { data: quotaData } = await supabase.functions.invoke('get-quota', {
-                body: { brand_id: brandId }
+                body: { brand_id: brandId },
+                headers: functionHeaders
               });
 
               toolResult = {
