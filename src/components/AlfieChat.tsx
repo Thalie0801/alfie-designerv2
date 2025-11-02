@@ -2015,7 +2015,25 @@ export function AlfieChat() {
                 );
               }
 
-              return null;
+              // Messages texte normaux (user et assistant)
+              return (
+                <div 
+                  key={`msg-${index}`} 
+                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
+                >
+                  <div 
+                    className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                      message.role === 'user' 
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'bg-muted'
+                    }`}
+                  >
+                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                      {message.content}
+                    </div>
+                  </div>
+                </div>
+              );
             })}
 
             {/* Scroll anchor */}
