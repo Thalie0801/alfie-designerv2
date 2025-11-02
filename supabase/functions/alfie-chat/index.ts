@@ -64,8 +64,6 @@ serve(async (req) => {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser(token);
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -78,10 +76,6 @@ serve(async (req) => {
 
     // --- Access gate (Stripe or admin) ---
     const hasAccess = await userHasAccess(authHeader);
-    const functionHeaders = { Authorization: authHeader as string };
-
-    // Vérifier l'accès (Stripe OU granted_by_admin)
-    const hasAccess = await userHasAccess(req.headers.get('Authorization'));
     if (!hasAccess) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
@@ -819,9 +813,6 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                       'logos de marques tierces, filigranes, artefacts, texte illisible',
                   },
                   headers: { Authorization: authHeader },
-                    negativePrompt: "logos de marques tierces, filigranes, artefacts"
-                  },
-                  headers: functionHeaders
                 });
 
                 const url = imageData?.data?.image_urls?.[0];
@@ -858,10 +849,6 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                     },
                   },
                   headers: { Authorization: authHeader },
-                      niche: brandKit.niche
-                    }
-                  },
-                  headers: functionHeaders
                 });
                 optimizedPrompt = opt?.optimizedPrompt ?? toolArgs.prompt;
               }
@@ -884,9 +871,6 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                   brand_id: brandId,
                 },
                 headers: { Authorization: authHeader },
-                  brand_id: brandId
-                },
-                headers: functionHeaders
               });
 
               if (imageError) throw imageError;
@@ -918,11 +902,6 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                   imageUrl: toolArgs.imageUrl ?? null,
                 },
                 headers: { Authorization: authHeader },
-                  aspectRatio: toolArgs.aspectRatio || '16:9',
-                  brandId,
-                  imageUrl: toolArgs.imageUrl
-                },
-                headers: functionHeaders
               });
 
               if (videoError) throw videoError;
@@ -940,9 +919,6 @@ Example: "Professional product photography, 45° angle, gradient background (${b
               const { data: quota } = await supabase.functions.invoke('get-quota', {
                 body: { brand_id: brandId },
                 headers: { Authorization: authHeader },
-              const { data: quotaData } = await supabase.functions.invoke('get-quota', {
-                body: { brand_id: brandId },
-                headers: functionHeaders
               });
 
               toolResult = {
