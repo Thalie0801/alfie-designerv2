@@ -41,13 +41,8 @@ export async function renderSlideToSVG(
     const fontFamily = baseFontFamily;
     let textColor = layer.color;
     
-    // Utiliser couleurs brand si disponibles
-    if (layer.type === 'title' && brandSnapshot.primary_color) {
-      textColor = brandSnapshot.primary_color;
-    } else if (layer.type === 'cta' && brandSnapshot.accent_color) {
-      // CTA garde sa couleur de fond, texte blanc
-      textColor = '#FFFFFF';
-    }
+  // 1. Base SVG structure with viewBox for better compatibility
+  let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">`;
     
     // Vérifier contraste WCAG AA (4.5:1 minimum)
     const contrastRatio = calculateContrast(textColor, '#FFFFFF');
@@ -131,7 +126,23 @@ export async function renderSlideToSVG(
       href="${brandSnapshot.logo_url}" preserveAspectRatio="xMidYMid meet"/>`;
   }
   
+  // Close SVG
   svg += '</svg>';
+
+  // Validate SVG structure before returning
+  if (!svg.includes('</svg>') || !svg.startsWith('<svg')) {
+    console.error('[slideRenderer] Invalid SVG structure detected');
+    throw new Error('Generated SVG is malformed');
+  }
+
+  // Check for unclosed tags or common issues
+  const openTags = (svg.match(/<text[^>]*>/g) || []).length;
+  const closeTags = (svg.match(/<\/text>/g) || []).length;
+  if (openTags !== closeTags) {
+    console.error('[slideRenderer] Unbalanced text tags:', { openTags, closeTags });
+    throw new Error('SVG has unbalanced tags');
+  }
+
   return svg;
 }
 
@@ -231,5 +242,7 @@ function escapeXml(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+    .replace(/'/g, '&apos;')
+    // Échapper tous les caractères non-ASCII pour Cloudinary
+    .replace(/[^\x00-\x7F]/g, (char) => `&#${char.charCodeAt(0)};`);
 }

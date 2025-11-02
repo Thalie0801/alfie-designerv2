@@ -524,7 +524,8 @@ serve(async (req) => {
     
     console.log('✅ [Worker] SVG layer generated:', svgTextLayer.length, 'chars');
 
-    // 8. Composite background + SVG text via Cloudinary (returns URL)
+    // 8. Composite background + SVG text via Cloudinary with retry
+    // Implement retry with fallback to background-only if SVG fails
     checkTimeout();
     console.log('🎨 [Worker] Step 5: Compositing background + text via Cloudinary...');
     
@@ -532,25 +533,70 @@ serve(async (req) => {
     const primaryColor = brandSnapshot?.primary_color || brandSnapshot?.palette?.[0];
     const secondaryColor = brandSnapshot?.secondary_color || brandSnapshot?.palette?.[1];
     
-    const composed = await compositeSlide(
-      backgroundUrl, 
-      svgTextLayer, 
-      job.job_set_id, 
-      job.job_sets.brand_id,
-      primaryColor && secondaryColor ? {
-        primaryColor,
-        secondaryColor,
-        tintStrength: 60
-      } : undefined
-    );
-    console.log('✅ [Worker] Composition complete, URL:', composed.url);
+    let finalUrl = backgroundUrl; // Default to background if everything fails
+    let compositionFailed = false;
+    let compositionAttempts = 0;
+    const maxCompositionAttempts = 2;
+    let composedResult: { url: string; bgPublicId: string; svgPublicId: string } | null = null;
+    
+    while (compositionAttempts < maxCompositionAttempts) {
+      try {
+        compositionAttempts++;
+        console.log(`🎨 [Worker] Composition attempt ${compositionAttempts}/${maxCompositionAttempts}`);
+        
+        composedResult = await compositeSlide(
+          backgroundUrl, 
+          svgTextLayer, 
+          job.job_set_id, 
+          job.job_sets.brand_id,
+          primaryColor && secondaryColor ? {
+            primaryColor,
+            secondaryColor,
+            tintStrength: 60
+          } : undefined
+        );
+        
+        finalUrl = composedResult.url;
+        console.log('✅ [Worker] Composition complete, URL:', finalUrl);
+        break; // Success
+        
+      } catch (compositionError: unknown) {
+        const errorMessage = compositionError instanceof Error ? compositionError.message : String(compositionError);
+        console.error(`❌ [Worker] Composition attempt ${compositionAttempts} failed:`, errorMessage);
+        
+        if (compositionAttempts >= maxCompositionAttempts) {
+          // Fallback: use background-only (without text overlay)
+          console.warn('⚠️ [Worker] Using background-only fallback (no text overlay)');
+          finalUrl = backgroundUrl;
+          compositionFailed = true;
+          
+          // Update job metadata to warn about missing text
+          await supabase
+            .from('jobs')
+            .update({
+              metadata: {
+                ...job.metadata,
+                composition_warning: 'Text overlay failed, using background only',
+                composition_error: errorMessage
+              }
+            })
+            .eq('id', job.id);
+          
+          break;
+        }
+        
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
 
-    // 9. Download composed image from Cloudinary
+    // 9. Download composed/background image
     checkTimeout();
-    console.log('⬇️ [Worker] Downloading composed image from Cloudinary...');
-    const imageResponse = await fetch(composed.url);
+    const imageSource = compositionFailed ? 'background (fallback)' : 'composed image';
+    console.log(`⬇️ [Worker] Downloading ${imageSource}...`);
+    const imageResponse = await fetch(finalUrl);
     if (!imageResponse.ok) {
-      throw new Error(`Failed to download composed image: ${imageResponse.status}`);
+      throw new Error(`Failed to download ${imageSource}: ${imageResponse.status}`);
     }
     const finalImageBytes = new Uint8Array(await imageResponse.arrayBuffer());
     console.log('✅ [Worker] Image downloaded:', finalImageBytes.length, 'bytes');
@@ -594,14 +640,19 @@ serve(async (req) => {
 
     console.log('✅ [Worker] Upload success:', uploadData);
 
-    // Cleanup Cloudinary temporary assets now that we have our copy
-    await cleanupCloudinaryResources({ bgPublicId: composed.bgPublicId, svgPublicId: composed.svgPublicId });
+    // Cleanup Cloudinary temporary assets if composition succeeded
+    if (composedResult) {
+      await cleanupCloudinaryResources({ 
+        bgPublicId: composedResult.bgPublicId, 
+        svgPublicId: composedResult.svgPublicId 
+      });
+    }
 
     const { data: publicUrlData } = supabase.storage
       .from('media-generations')
       .getPublicUrl(fileName);
     
-    let publicUrl = publicUrlData.publicUrl;
+    const publicUrl = publicUrlData.publicUrl;
 
     if (!publicUrl || !publicUrl.startsWith('http')) {
       throw new Error(`Invalid public URL: ${publicUrl}`);
@@ -637,18 +688,19 @@ serve(async (req) => {
     const coherenceScore = await checkCoherence(publicUrl, {
       palette: job.job_sets.constraints?.palette || [],
       referenceImageUrl
-    }, composed.bgPublicId);
+    }, composedResult?.bgPublicId || '');
 
     console.log(`[Worker] Coherence score: ${coherenceScore.total}/100`, coherenceScore.breakdown);
 
-    // 9. If coherence is low, retry with stronger tint
+    // 9. If coherence is low and composition succeeded, retry with stronger tint
     const coherenceThresholdEffective = 60;
     const retryCount = job.retry_count || 0;
+    let updatedPublicUrl = publicUrl; // Track potentially updated URL
     
     console.log(`[Worker] Using effective coherence threshold: ${coherenceThresholdEffective} (with brand tint)`);
     
-    if (coherenceScore.total < coherenceThresholdEffective && retryCount === 0) {
-      // ONE TIME retry with stronger tint
+    if (coherenceScore.total < coherenceThresholdEffective && retryCount === 0 && composedResult) {
+      // ONE TIME retry with stronger tint (only if composition succeeded initially)
       console.log(`[Worker] Low coherence (${coherenceScore.total}), retrying with stronger tint...`);
       
       // Re-composite with stronger tint
@@ -699,10 +751,10 @@ serve(async (req) => {
             // Cleanup old upload
             await supabase.storage.from('media-generations').remove([fileName]);
             // Update to use retry
-            composed.url = strongerTint.url;
-            composed.bgPublicId = strongerTint.bgPublicId;
-            composed.svgPublicId = strongerTint.svgPublicId;
-            publicUrl = retryPublicUrl;
+            composedResult.url = strongerTint.url;
+            composedResult.bgPublicId = strongerTint.bgPublicId;
+            composedResult.svgPublicId = strongerTint.svgPublicId;
+            updatedPublicUrl = retryPublicUrl;
             coherenceScore.total = retryCoherenceScore.total;
             coherenceScore.breakdown = retryCoherenceScore.breakdown;
           }
@@ -733,7 +785,7 @@ serve(async (req) => {
         coherence_score: coherenceScore,
         coherence_mode: 'direct',
         retry_count: retryCount,
-        public_url: publicUrl
+        public_url: updatedPublicUrl
       }
     };
     

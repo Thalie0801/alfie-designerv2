@@ -98,11 +98,28 @@ export async function compositeSlide(
       throw new Error(`Background upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
     
-    // 2. Convert SVG string to Blob
-    console.log('🔄 Converting SVG to Blob...');
-    const svgBlob = new Blob([svgTextLayer], { type: 'image/svg+xml' });
+    // 2. Validate SVG before uploading
+    console.log('🔍 Validating SVG structure...');
+    if (!svgTextLayer.includes('xmlns')) {
+      console.error('❌ SVG missing xmlns declaration');
+      throw new Error('SVG missing required xmlns attribute');
+    }
     
-    // 3. Upload SVG overlay to Cloudinary with signed authentication
+    // Check for common issues
+    if (svgTextLayer.length < 100) {
+      console.error('❌ SVG suspiciously short:', svgTextLayer.length, 'chars');
+      throw new Error('SVG appears to be incomplete');
+    }
+
+    // Log SVG snippet for debugging (first 300 chars)
+    console.log('📝 SVG preview:', svgTextLayer.substring(0, 300).replace(/\n/g, ' '));
+    console.log('📏 SVG size:', svgTextLayer.length, 'chars');
+    
+    // 3. Convert SVG string to Blob with proper charset
+    console.log('🔄 Converting SVG to Blob...');
+    const svgBlob = new Blob([svgTextLayer], { type: 'image/svg+xml;charset=utf-8' });
+    
+    // 4. Upload SVG overlay to Cloudinary with signed authentication
     console.log('⬆️ Uploading SVG overlay...');
     
     const svgPublicId = `alfie/${brandId || 'temp'}/${jobSetId || 'temp'}/overlay_${Date.now()}`;
