@@ -1,7 +1,9 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { callAIWithFallback } from '../_shared/aiOrchestrator.ts';
-import { userHasAccess } from '../_shared/accessControl.ts';
+// --- imports ---
+import { serve } from "https://deno.land/std/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { corsHeaders } from "../_shared/cors.ts";
+import { userHasAccess } from "../_shared/access.ts";
+import { callAIWithFallback } from "../_shared/aiOrchestrator.ts";
 
 /**
  * Détecte l'intent d'un message utilisateur de manière simple (fallback si l'IA ne call pas classify_intent)
@@ -30,58 +32,66 @@ function detectIntent(message: string): string {
 
 import { type AgentContext, type AIResponse } from "../_shared/aiOrchestrator.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Configuration flexible du modèle IA (facile à changer)
+// --- AI config (ASCII only) ---
 const AI_CONFIG = {
-  model: Deno.env.get("ALFIE_AI_MODEL") || "google/gemini-2.5-flash",
-  endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions"
+  model: Deno.env.get("ALFIE_AI_MODEL") ?? "google/gemini-2.5-flash",
+  endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions",
 };
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Authenticate user
-    const authHeader = req.headers.get('Authorization');
+    // --- Auth header ---
+    const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing authorization' }), {
+      return new Response(JSON.stringify({ error: "Missing Authorization" }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    // --- Supabase service client ---
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // --- Validate user token ---
+    const token = authHeader.replace("Bearer ", "").trim();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(token);
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    const functionHeaders = { Authorization: authHeader };
+
+    // --- Access gate (Stripe or admin) ---
+    const hasAccess = await userHasAccess(authHeader);
     const functionHeaders = { Authorization: authHeader as string };
 
     // Vérifier l'accès (Stripe OU granted_by_admin)
     const hasAccess = await userHasAccess(req.headers.get('Authorization'));
     if (!hasAccess) {
-      return new Response(JSON.stringify({ error: 'Access denied' }), {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { messages, brandId, stream = false, expertMode = false } = await req.json();
+    // --- Parse body (ASCII keys) ---
+    const { messages, brandId, stream = false, expertMode = false } =
+      await req.json();
     
     // ✅ [TRACE] Log précoce de parsing
     console.log('[TRACE] Parsed request body:', {
@@ -660,7 +670,8 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                   prompt: lastUserMessage,
                   slideCount: 5,
                   brandKit: brandKit || {}
-                }
+                },
+                headers: functionHeaders
               });
               
               // Ajouter le tool call et le résultat dans l'historique
@@ -734,7 +745,8 @@ Example: "Professional product photography, 45° angle, gradient background (${b
           switch (toolName) {
             case 'classify_intent': {
               const { data: intentData } = await supabase.functions.invoke('alfie-classify-intent', {
-                body: { user_message: toolArgs.user_message }
+                body: { user_message: toolArgs.user_message },
+                headers: functionHeaders
               });
               toolResult = intentData || { intent: 'autre' };
               break;
@@ -746,7 +758,8 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                   prompt: toolArgs.prompt,
                   slideCount: toolArgs.count || 5,
                   brandKit: brandKit || {}
-                }
+                },
+                headers: functionHeaders
               });
               if (planError) throw planError;
               toolResult = planData?.plan || planData || { slides: [] };
@@ -754,52 +767,71 @@ Example: "Professional product photography, 45° angle, gradient background (${b
             }
 
             case 'create_carousel': {
-              // Option A (simple): Générer chaque slide en boucle
-              const slideCount = toolArgs.count || 5;
-              const aspectRatio = toolArgs.aspect_ratio || '1:1';
-              
-              // D'abord générer le plan si pas fourni
-              let carouselPlan = toolArgs.plan;
-              if (!carouselPlan) {
-                const { data: planData } = await supabase.functions.invoke('alfie-plan-carousel', {
-                  body: {
-                    prompt: toolArgs.prompt,
-                    slideCount,
-                    brandKit: brandKit || {}
-                  }
-                });
-                carouselPlan = planData?.plan || planData;
-              }
+              const { data: planResp } = await supabase.functions.invoke('alfie-plan-carousel', {
+                body: {
+                  messages,
+                  brandId,
+                  aspect_ratio: '4:5',
+                  totalSlides: toolArgs.count || 5,
+                  brandKit: brandKit ?? {},
+                  prompt: toolArgs.prompt,
+                },
+                headers: { Authorization: authHeader },
+              });
 
-              const slides = carouselPlan?.slides || [];
+              const carouselPlan = toolArgs.plan
+                ?? planResp?.plan
+                ?? planResp
+                ?? { slides: [] };
+
+              const slides: any[] = Array.isArray(carouselPlan?.slides)
+                ? carouselPlan.slides
+                : [];
+
               const generatedImages: string[] = [];
 
               for (let i = 0; i < slides.length; i++) {
                 const slide = slides[i];
-                const overlayText = `${slide.title}\n${slide.subtitle || slide.text || ''}`;
-                
+
+                const overlayText = `${slide.title ?? ''}\n${slide.subtitle ?? slide.text ?? ''}`.trim();
+
+                const aspectRatio = carouselPlan?.globals?.aspect_ratio ?? '4:5';
+                const format =
+                  aspectRatio === '9:16'
+                    ? '1024x1820'
+                    : aspectRatio === '16:9'
+                    ? '1820x1024'
+                    : aspectRatio === '4:5'
+                    ? '1024x1280'
+                    : '1024x1024';
+
                 const { data: imageData } = await supabase.functions.invoke('alfie-render-image', {
                   body: {
                     provider: 'gemini-nano',
-                    prompt: slide.note || slide.imagePrompt || `Image for ${slide.title}`,
-                    format: aspectRatio === '4:5' ? '1024x1280' : '1024x1024',
+                    prompt: slide.imagePrompt ?? `Image pour: ${slide.title ?? 'Slide'}`,
+                    format,
                     brand_id: brandId,
                     backgroundOnly: false,
                     slideIndex: i,
                     totalSlides: slides.length,
                     overlayText,
+                    negativePrompt:
+                      'logos de marques tierces, filigranes, artefacts, texte illisible',
+                  },
+                  headers: { Authorization: authHeader },
                     negativePrompt: "logos de marques tierces, filigranes, artefacts"
                   },
                   headers: functionHeaders
                 });
 
-                if (imageData?.ok && imageData.data?.image_urls?.[0]) {
-                  generatedImages.push(imageData.data.image_urls[0]);
+                const url = imageData?.data?.image_urls?.[0];
+                if (url) {
+                  generatedImages.push(url);
                   collectedAssets.push({
                     type: 'image',
-                    url: imageData.data.image_urls[0],
+                    url,
                     slideIndex: i,
-                    title: slide.title
+                    title: slide.title ?? `Slide ${i + 1}`,
                   });
                 }
               }
@@ -807,40 +839,51 @@ Example: "Professional product photography, 45° angle, gradient background (${b
               toolResult = {
                 success: true,
                 slideCount: generatedImages.length,
-                images: generatedImages
+                images: generatedImages,
               };
               break;
             }
 
             case 'generate_image': {
-              // Optimiser le prompt si nécessaire
               let optimizedPrompt = toolArgs.prompt;
+
               if (brandKit) {
-                const { data: optimizeData } = await supabase.functions.invoke('alfie-optimize-prompt', {
+                const { data: opt } = await supabase.functions.invoke('alfie-optimize-prompt', {
                   body: {
                     prompt: toolArgs.prompt,
                     brandKit: {
-                      palette: brandKit.colors || [],
+                      palette: brandKit.colors ?? [],
                       voice: brandKit.voice,
+                      niche: brandKit.niche,
+                    },
+                  },
+                  headers: { Authorization: authHeader },
                       niche: brandKit.niche
                     }
                   },
                   headers: functionHeaders
                 });
-                optimizedPrompt = optimizeData?.optimizedPrompt || toolArgs.prompt;
+                optimizedPrompt = opt?.optimizedPrompt ?? toolArgs.prompt;
               }
 
-              const aspectRatio = toolArgs.aspect_ratio || '1:1';
-              const format = aspectRatio === '9:16' ? '1024x1820' 
-                           : aspectRatio === '16:9' ? '1820x1024'
-                           : aspectRatio === '4:5' ? '1024x1280'
-                           : '1024x1024';
+              const aspectRatio = toolArgs.aspect_ratio ?? '1:1';
+              const format =
+                aspectRatio === '9:16'
+                  ? '1024x1820'
+                  : aspectRatio === '16:9'
+                  ? '1820x1024'
+                  : aspectRatio === '4:5'
+                  ? '1024x1280'
+                  : '1024x1024';
 
               const { data: imageData, error: imageError } = await supabase.functions.invoke('alfie-render-image', {
                 body: {
                   provider: 'gemini-nano',
                   prompt: optimizedPrompt,
                   format,
+                  brand_id: brandId,
+                },
+                headers: { Authorization: authHeader },
                   brand_id: brandId
                 },
                 headers: functionHeaders
@@ -848,22 +891,21 @@ Example: "Professional product photography, 45° angle, gradient background (${b
 
               if (imageError) throw imageError;
 
-              if (imageData?.ok && imageData.data?.image_urls?.[0]) {
-                collectedAssets.push({
-                  type: 'image',
-                  url: imageData.data.image_urls[0],
-                  reasoning: toolArgs.reasoning,
-                  brandAlignment: 'Brand Kit applied'
-                });
+              const url = imageData?.data?.image_urls?.[0];
+              if (!url) throw new Error('Image generation returned no URL');
 
-                toolResult = {
-                  success: true,
-                  imageUrl: imageData.data.image_urls[0],
-                  generationId: imageData.data.generation_id
-                };
-              } else {
-                throw new Error('No image generated');
-              }
+              collectedAssets.push({
+                type: 'image',
+                url,
+                rationale: toolArgs.rationale ?? toolArgs.reasoning,
+                brandAlignment: 'Brand kit applied',
+              });
+
+              toolResult = {
+                success: true,
+                imageUrl: url,
+                generationId: imageData?.data?.generation_id,
+              };
               break;
             }
 
@@ -871,6 +913,11 @@ Example: "Professional product photography, 45° angle, gradient background (${b
               const { data: videoData, error: videoError } = await supabase.functions.invoke('generate-video', {
                 body: {
                   prompt: toolArgs.prompt,
+                  aspect_ratio: toolArgs.aspect_ratio ?? '16:9',
+                  brand_id: brandId,
+                  imageUrl: toolArgs.imageUrl ?? null,
+                },
+                headers: { Authorization: authHeader },
                   aspectRatio: toolArgs.aspectRatio || '16:9',
                   brandId,
                   imageUrl: toolArgs.imageUrl
@@ -883,35 +930,38 @@ Example: "Professional product photography, 45° angle, gradient background (${b
               toolResult = {
                 success: true,
                 jobId: videoData?.jobId,
-                status: 'processing'
+                status: 'processing',
               };
               break;
             }
 
             case 'check_credits':
             case 'show_usage': {
+              const { data: quota } = await supabase.functions.invoke('get-quota', {
+                body: { brand_id: brandId },
+                headers: { Authorization: authHeader },
               const { data: quotaData } = await supabase.functions.invoke('get-quota', {
                 body: { brand_id: brandId },
                 headers: functionHeaders
               });
 
               toolResult = {
-                woofs_remaining: quotaData?.woofs_remaining || 0,
-                woofs_quota: quotaData?.woofs_quota || 0,
-                visuals_remaining: quotaData?.visuals_remaining || 0,
-                visuals_quota: quotaData?.visuals_quota || 0,
-                plan: quotaData?.plan || 'free'
+                woofs_remaining: quota?.woofs_remaining ?? 0,
+                woofs_quota: quota?.woofs_quota ?? 0,
+                visuals_remaining: quota?.visuals_remaining ?? 0,
+                visuals_quota: quota?.visuals_quota ?? 0,
+                plan: quota?.plan ?? 'free',
               };
               break;
             }
 
             case 'show_brandkit': {
               toolResult = {
-                name: brandKit?.name,
-                colors: brandKit?.colors || [],
-                fonts: brandKit?.fonts || [],
-                voice: brandKit?.voice,
-                niche: brandKit?.niche
+                name: brandKit?.name ?? null,
+                colors: brandKit?.colors ?? [],
+                fonts: brandKit?.fonts ?? [],
+                voice: brandKit?.voice ?? null,
+                niche: brandKit?.niche ?? null,
               };
               break;
             }
