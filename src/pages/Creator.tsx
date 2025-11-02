@@ -131,18 +131,18 @@ export default function Creator() {
           
           let enhancedPrompt = buildBrandAwarePrompt(slidePrompt, brandKit);
           
-          // Enrichir avec contexte carrousel
-          if (isCarousel && slide) {
-            enhancedPrompt = `Single-slide visual for an Instagram/LinkedIn carousel (slide ${i + 1}/${quantity}).
-Goal: ${prompt}
-Aspect ratio: 4:5 (1080x1350). One independent slide (no grid, no collage).
-Maintain brand look & feel and consistency across slides.
-Design guardrails:
-- Strong hierarchy, ample margins, high contrast (≥ WCAG AA).
-- Iconography minimal, focus on typographic rhythm and shapes.
-- Keep focal area clear around title.
-Brand colors: ${brandKit?.palette?.join(', ') || 'default'}
-Brand voice: ${brandKit?.voice || 'professional'}`;
+          // Utiliser le prompt visuel du plan généré par l'IA pour carrousel
+          if (isCarousel && slide?.note) {
+            enhancedPrompt = slide.note;
+            // Ajouter contexte technique
+            enhancedPrompt += `\nAspect ratio: ${format}. Professional photography quality, editorial style.`;
+            enhancedPrompt += `\nNO TEXT, NO TYPOGRAPHY, NO LETTERS on the image - text will be added separately.`;
+          } else if (!isCarousel) {
+            // Pour une image unique (non-carrousel), enrichir avec le brand kit
+            enhancedPrompt = `${enhancedPrompt}
+Aspect ratio: ${format}.
+Professional photography quality, editorial style.
+Colors: ${brandKit?.palette?.join(', ') || 'default'}`;
           }
           
           // Construire overlayText à partir du plan
@@ -259,7 +259,7 @@ Brand voice: ${brandKit?.voice || 'professional'}`;
 </SelectContent></Select></div>
                 {mode === "video" && <div><Label>Durée (s)</Label><Input type="number" value={duration} onChange={(e) => setDuration(parseInt(e.target.value))} min={5} max={30} /></div>}
                 <div><Label>Qualité</Label><Select value={quality} onValueChange={(v: any) => setQuality(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="draft">Draft</SelectItem><SelectItem value="standard">Standard</SelectItem><SelectItem value="premium">Premium</SelectItem></SelectContent></Select></div>
-                <div><Label>Quantité (carrousel)</Label><Select value={quantity.toString()} onValueChange={(v) => setQuantity(parseInt(v))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1">1 visuel</SelectItem><SelectItem value="2">2 visuels</SelectItem><SelectItem value="3">3 visuels</SelectItem><SelectItem value="4">4 visuels</SelectItem><SelectItem value="5">5 visuels</SelectItem></SelectContent></Select></div>
+                <div><Label>Quantité (carrousel)</Label><Select value={quantity.toString()} onValueChange={(v) => setQuantity(parseInt(v))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1">1 visuel</SelectItem><SelectItem value="2">2 visuels</SelectItem><SelectItem value="3">3 visuels</SelectItem><SelectItem value="4">4 visuels</SelectItem><SelectItem value="5">5 visuels</SelectItem><SelectItem value="6">6 visuels</SelectItem><SelectItem value="7">7 visuels</SelectItem><SelectItem value="8">8 visuels</SelectItem><SelectItem value="9">9 visuels</SelectItem><SelectItem value="10">10 visuels</SelectItem></SelectContent></Select></div>
                 <Toggle pressed={batchNight} onPressedChange={setBatchNight}>Batch nuit</Toggle>
                 <Button onClick={handleGenerate} disabled={isGenerating || !prompt.trim()} className="w-full" size="lg">{isGenerating ? <><Clock className="w-4 h-4 mr-2 animate-spin" />Génération...</> : <><Sparkles className="w-4 h-4 mr-2" />Générer</>}</Button>
               </div>

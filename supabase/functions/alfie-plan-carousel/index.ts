@@ -93,7 +93,7 @@ Ton objectif est de générer un plan de carrousel de ${slideCount} slides basé
         "punchline": "Phrase clé (optionnel)",
         "bullets": ["Point 1", "Point 2"],
         "kpis": [{"label": "KPI", "delta": "+X%"}],
-        "note": "Detailed image prompt in English, including brand colors ${primary_color} and ${secondary_color}."
+        "note": "Professional background image for slide. High-quality photography or illustration. Include visual elements related to the slide theme. Use brand colors ${primary_color} and ${secondary_color} as accents. Clean composition with space for text overlay in center. NO TEXT in the image itself, only visual background."
       }
     ]
   }
