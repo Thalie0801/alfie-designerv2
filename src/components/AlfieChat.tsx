@@ -57,6 +57,7 @@ export function AlfieChat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoPollingRef = useRef<Record<string, NodeJS.Timeout>>({});
   const carouselChannelRef = useRef<any>(null);
+  const carouselPollingRef = useRef<NodeJS.Timeout | null>(null);
   
   // ======
   // UTILITAIRES
@@ -460,7 +461,8 @@ export function AlfieChat() {
         awaitingValidation: true,
         action: 'carousel_plan_validation',
         plan,
-        aspectRatio
+        aspectRatio,
+        originalPrompt: prompt
       }
     });
   };
@@ -563,6 +565,11 @@ export function AlfieChat() {
       // Nettoyer le polling des vidéos
       Object.values(videoPollingRef.current).forEach(clearInterval);
       
+      // Nettoyer le polling du carrousel
+      if (carouselPollingRef.current) {
+        clearInterval(carouselPollingRef.current);
+      }
+      
       // Nettoyer le canal carrousel
       if (carouselChannelRef.current) {
         supabase.removeChannel(carouselChannelRef.current);
@@ -601,38 +608,166 @@ export function AlfieChat() {
           
           const { plan, aspectRatio } = lastMessage.metadata;
           const count = plan.length;
+          const originalPrompt = lastMessage.metadata.originalPrompt || userMessage;
           
-          // 2.1. Vérifier et consommer quota (count visuels)
-          const quotaOk = await checkAndConsumeQuota('visuals', count);
-          if (!quotaOk) {
+          if (!activeBrandId) {
+            toast.error('Aucune marque active. Veuillez sélectionner une marque.');
             setIsLoading(false);
             return;
           }
           
           addMessage({
             role: 'assistant',
-            content: `✅ Plan validé ! Lancement de la génération des ${count} images...`,
+            content: `✅ Plan validé ! Lancement de la génération des ${count} slides avec texte et images...`,
             type: 'text'
           });
           
-          // 2.2. Lancer la boucle de génération d'images (le nouveau flux)
-          for (let i = 0; i < count; i++) {
-            const slide = plan[i];
-            addMessage({
-              role: 'assistant',
-              content: `🎨 Génération de la slide ${i + 1}/${count} : *${slide.title}*`,
-              type: 'text'
+          try {
+            // 2.1. Créer le job_set avec create-job-set
+            const headers = await getAuthHeader();
+            const idempotencyKey = `carousel-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            
+            const { data: jobSetData, error: jobSetError } = await supabase.functions.invoke('create-job-set', {
+              body: { 
+                brandId: activeBrandId,
+                prompt: originalPrompt,
+                count,
+                aspectRatio
+              },
+              headers: {
+                ...headers,
+                'x-idempotency-key': idempotencyKey
+              }
             });
             
-            // Appeler la fonction generateImage existante
-            await generateImage(slide.imagePrompt, aspectRatio);
+            if (jobSetError || !jobSetData?.data?.id) {
+              console.error('[Carousel] create-job-set error:', jobSetError);
+              toast.error('Erreur lors de la création du carrousel');
+              await refundWoofs(count);
+              return;
+            }
+            
+            const jobSetId = jobSetData.data.id;
+            console.log(`[Carousel] Job set created: ${jobSetId}`);
+            
+            addMessage({
+              role: 'assistant',
+              content: `⏳ Carrousel en cours de génération (0/${count})...`,
+              type: 'text',
+              metadata: { jobSetId, totalSlides: count, completedSlides: 0 }
+            });
+            
+            // 2.2. Récupérer tous les jobs créés
+            const { data: jobs, error: jobsError } = await supabase
+              .from('jobs')
+              .select('id')
+              .eq('job_set_id', jobSetId)
+              .order('index_in_set', { ascending: true });
+            
+            if (jobsError || !jobs || jobs.length === 0) {
+              console.error('[Carousel] Failed to fetch jobs:', jobsError);
+              toast.error('Erreur lors de la récupération des tâches');
+              return;
+            }
+            
+            console.log(`[Carousel] Found ${jobs.length} jobs to process`);
+            
+            // 2.3. Traiter chaque job
+            console.log(`[Carousel] Triggering processing for ${jobs.length} jobs...`);
+            
+            // Lancer tous les workers en parallèle (sans attendre)
+            Promise.all(
+              jobs.map((job) =>
+                supabase.functions.invoke('process-job-worker', {
+                  body: { job_id: job.id },
+                  headers
+                }).catch(err => console.error(`[Carousel] Worker error for job ${job.id}:`, err))
+              )
+            );
+            
+            // 2.4. Polling pour vérifier la progression
+            let completedCount = 0;
+            let pollAttempts = 0;
+            const maxPollAttempts = 60; // 60 * 5s = 5 minutes max
+            
+            carouselPollingRef.current = setInterval(async () => {
+              pollAttempts++;
+              
+              const { data: currentJobs } = await supabase
+                .from('jobs')
+                .select('status')
+                .eq('job_set_id', jobSetId);
+              
+              if (!currentJobs) return;
+              
+              const completed = currentJobs.filter(j => 
+                j.status === 'succeeded' || j.status === 'completed'
+              ).length;
+              
+              const failed = currentJobs.filter(j => j.status === 'failed').length;
+              
+              if (completed !== completedCount) {
+                completedCount = completed;
+                
+                // Mettre à jour le message de progression
+                setMessages(prev => prev.map(m => {
+                  if (m.metadata?.jobSetId === jobSetId && !m.metadata?.assetUrls) {
+                    return {
+                      ...m,
+                      content: `⏳ Carrousel en cours de génération (${completed}/${count})...`
+                    };
+                  }
+                  return m;
+                }));
+              }
+              
+              // Si tous terminés ou timeout
+              if (completed + failed >= count || pollAttempts >= maxPollAttempts) {
+                clearInterval(carouselPollingRef.current!);
+                
+                // Récupérer les assets finaux
+                const { data: assets } = await supabase
+                  .from('assets')
+                  .select('id, storage_key')
+                  .eq('job_set_id', jobSetId)
+                  .order('index_in_set', { ascending: true });
+                
+                if (assets && assets.length > 0) {
+                  const assetUrls = assets.map(a => {
+                    const { data } = supabase.storage.from('media-generations').getPublicUrl(a.storage_key);
+                    return data.publicUrl;
+                  });
+                  
+                  // Supprimer le message de progression et ajouter le résultat final
+                  setMessages(prev => {
+                    const filtered = prev.filter(m => m.metadata?.jobSetId !== jobSetId);
+                    return [...filtered, {
+                      id: `carousel-result-${Date.now()}`,
+                      role: 'assistant' as const,
+                      content: `🎉 Carrousel terminé ! ${assets.length} slides générées avec succès.`,
+                      type: 'carousel' as const,
+                      metadata: { 
+                        jobSetId, 
+                        assetIds: assets.map(a => a.id),
+                        assetUrls
+                      },
+                      timestamp: new Date()
+                    }];
+                  });
+                  
+                  toast.success(`Carrousel prêt ! ${assets.length} slides générées.`);
+                } else {
+                  toast.error('Aucune slide générée. Veuillez réessayer.');
+                }
+              }
+            }, 5000); // Vérifier toutes les 5 secondes
+            
+            
+          } catch (error: any) {
+            console.error('[Carousel] Generation error:', error);
+            toast.error(`Erreur: ${error.message}`);
+            await refundWoofs(count);
           }
-          
-          addMessage({
-            role: 'assistant',
-            content: `🎉 Carrousel de ${count} slides terminé !`,
-            type: 'text'
-          });
           
           return;
         } else if (userMessage.toLowerCase().includes('non')) {
