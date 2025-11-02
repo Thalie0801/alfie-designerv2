@@ -7,7 +7,6 @@ import { useAlfieCredits } from '@/hooks/useAlfieCredits';
 import { useTemplateLibrary } from '@/hooks/useTemplateLibrary';
 import { useAlfieOptimizations } from '@/hooks/useAlfieOptimizations';
 import { useCarouselSubscription } from '@/hooks/useCarouselSubscription';
-import { openInCanva } from '@/services/canvaLinker';
 import { supabase } from '@/integrations/supabase/client';
 import { getAuthHeader } from '@/lib/auth';
 import { detectIntent, canHandleLocally, generateLocalResponse } from '@/utils/alfieIntentDetector';
@@ -541,12 +540,11 @@ export function AlfieChat() {
       }
       
       case 'open_canva': {
-        openInCanva({
-          templateUrl: args.template_url,
-          generatedImageUrl: args.generated_image_url,
-          brandKit: brandKit || undefined
-        });
-        return { success: true, message: "Canva ouvert dans un nouvel onglet" };
+        // 🔥 Désactivé: Canva sera disponible via API bientôt
+        return { 
+          success: true, 
+          message: "🎨 Canva sera bientôt disponible via API ! Pour l'instant, tu peux télécharger ton image et l'importer manuellement dans Canva." 
+        };
       }
       
       case 'generate_ai_version': {
@@ -998,14 +996,10 @@ export function AlfieChat() {
       }
 
       case 'adapt_template': {
-        // Adaptation Canva = GRATUIT, pas de quota consommé
-        openInCanva({
-          templateUrl: args.template_url || '',
-          brandKit: brandKit || undefined
-        });
+        // 🔥 Désactivé: Canva sera disponible via API bientôt
         return { 
           success: true, 
-          message: "Template ouvert dans Canva avec ton Brand Kit appliqué ! (Gratuit, pas comptabilisé) 🎨" 
+          message: "🎨 L'adaptation de templates Canva sera bientôt disponible via API ! En attendant, tu peux utiliser les templates directement sur Canva." 
         };
       }
 
@@ -1254,7 +1248,6 @@ export function AlfieChat() {
           }
 
           const { prompt, count = 5 } = args;
-          // aspect_ratio will be passed later in generate_carousel_slide
           
           if (!activeBrandId) {
             return { error: "Aucune marque active. Crée d'abord un Brand Kit !" };
@@ -1299,10 +1292,61 @@ export function AlfieChat() {
           
           console.log('[Plan] ✅ Plan generated:', data.plan);
           
+          // 🔥 Formater et afficher le plan immédiatement
+          const formatPlanPreview = (plan: any): string => {
+            const lines: string[] = [];
+            
+            // Résumé globals/promise
+            if (plan?.globals?.promise) {
+              lines.push(`🎯 **Objectif**: ${plan.globals.promise}`);
+            }
+            if (plan?.globals?.target) {
+              lines.push(`👥 **Cible**: ${plan.globals.target}`);
+            }
+            
+            lines.push('\n**📋 Plan des slides:**');
+            
+            // Liste des slides avec titre + 2 bullets max
+            if (Array.isArray(plan?.slides)) {
+              plan.slides.forEach((slide: any, i: number) => {
+                lines.push(`\n**Slide ${i + 1}**: ${slide.title || '(sans titre)'}`);
+                if (slide.subtitle) {
+                  lines.push(`*${slide.subtitle}*`);
+                }
+                if (Array.isArray(slide.bullets) && slide.bullets.length > 0) {
+                  slide.bullets.slice(0, 2).forEach((bullet: string) => {
+                    lines.push(`  • ${bullet}`);
+                  });
+                }
+              });
+            }
+            
+            lines.push('\n✅ **Ça te va ?** Réponds **"oui"** pour lancer la génération en 4:5 !');
+            
+            return lines.join('\n');
+          };
+          
+          const planPreview = formatPlanPreview(data.plan);
+          
+          // Afficher le plan dans le chat
+          const planMessage: Message = {
+            role: 'assistant',
+            content: planPreview
+          };
+          setMessages(prev => [...prev, planMessage]);
+          
+          if (conversationId) {
+            await supabase.from('alfie_messages').insert({
+              conversation_id: conversationId,
+              role: 'assistant',
+              content: planPreview
+            });
+          }
+          
           return { 
             success: true, 
             plan: data.plan,
-            message: `Plan de ${count} slides généré ! Voici la Slide 1 :`
+            message: planPreview
           };
         } catch (error: any) {
           console.error('[Plan] Exception:', error);
@@ -1542,6 +1586,23 @@ export function AlfieChat() {
         try {
           const result = await handleToolCall(toolName, toolArgs);
           console.log('[Chat] Tool result:', result);
+          
+          // 🔥 Afficher AUSSI les messages de succès (pas que les erreurs)
+          if (result?.success && result.message) {
+            const successMessage: Message = {
+              role: 'assistant',
+              content: result.message
+            };
+            setMessages(prev => [...prev, successMessage]);
+            
+            if (conversationId) {
+              await supabase.from('alfie_messages').insert({
+                conversation_id: conversationId,
+                role: 'assistant',
+                content: result.message
+              });
+            }
+          }
           
           // Afficher le résultat dans le chat si erreur
           if (result?.error) {
