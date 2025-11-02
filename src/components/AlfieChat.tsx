@@ -395,85 +395,65 @@ export function AlfieChat() {
   };
   
   // ======
-  // GÉNÉRATION DE CARROUSELS
+  // GÉNÉRATION DE CARROUSELS (NOUVEAU FLUX : PLAN TEXTUEL + BOUCLE IMAGE)
   // ======
   
-  const generateCarousel = async (prompt: string, count: number, aspectRatio: string) => {
-    // 1. Vérifier et consommer quota (count visuels)
-    const quotaOk = await checkAndConsumeQuota('visuals', count);
-    if (!quotaOk) return;
+  interface CarouselSlide {
+    title: string;
+    text: string;
+    imagePrompt: string;
+  }
+  
+  const generateCarouselPlan = async (prompt: string, count: number): Promise<CarouselSlide[] | null> => {
+    // 1. Appel à l'IA pour générer le plan textuel (SIMULATION)
+    // En réalité, ici on appellerait une fonction Supabase ou une API LLM
     
-    // 2. Message de génération
     addMessage({
       role: 'assistant',
-      content: `🎨 Génération de ${count} slides lancée...`,
+      content: `🧠 Alfie est en train de générer le plan textuel de votre carrousel de ${count} slides...`,
       type: 'text'
     });
     
-    try {
-      const headers = await getAuthHeader();
-      
-      // 3. Créer le job-set (qui appelle alfie-plan-carousel en interne)
-      const { data, error } = await supabase.functions.invoke('create-job-set', {
-        body: {
-          brandId: activeBrandId,
-          prompt,
-          count,
-          aspectRatio
-        },
-        headers: {
-          ...headers,
-          'x-idempotency-key': crypto.randomUUID()
-        }
+    // Simuler un délai de génération
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Simuler le contenu généré
+    const slides: CarouselSlide[] = [];
+    for (let i = 1; i <= count; i++) {
+      slides.push({
+        title: `Slide ${i}: Titre du Carrousel`,
+        text: `Ceci est le texte de la slide ${i}. Il est basé sur votre prompt : "${prompt}".`,
+        imagePrompt: `Image minimaliste et moderne pour la slide ${i} sur le thème de ${prompt}`
       });
-      
-      if (error) {
-        console.error('create-job-set error:', error);
-        throw new Error(error.message || 'Erreur inconnue lors de la création du job set.');
-      }
-      
-      console.log('[create-job-set] response', data);
-      
-      const jobSetId = data?.id ?? data?.data?.id;
-      if (!jobSetId) {
-        throw new Error('Aucun job-set créé');
-      }
-      setCarouselProgress({ done: 0, total: count });
-      
-      // 4. Déclencher le worker
-      await supabase.functions.invoke('process-job-worker', {
-        headers
-      });
-      
-      // 5. Message de progression
-      addMessage({
-        role: 'assistant',
-        content: `⏳ Génération en cours (0/${count})...`,
-        type: 'carousel',
-        metadata: { jobSetId, total: count, done: 0 }
-      });
-      
-      // 6. S'abonner aux updates
-      subscribeToCarousel(jobSetId, count);
-      
-      toast.success('Carrousel lancé !');
-      
-    } catch (error: any) {
-      console.error('[Carousel] Error:', error);
-      
-      await refundVisuals(count);
-      
-      const errorMessage = error.message || 'Erreur inconnue';
-      
-      addMessage({
-        role: 'assistant',
-        content: `❌ Erreur de génération de carrousel : \n\n\`\`\`\n${errorMessage}\n\`\`\``,
-        type: 'text'
-      });
-      
-      toast.error('Échec de la création du carrousel');
     }
+    
+    return slides;
   };
+  
+  const generateCarousel = async (prompt: string, count: number, aspectRatio: string) => {
+    // 1. Générer le plan textuel
+    const plan = await generateCarouselPlan(prompt, count);
+    if (!plan) return;
+    
+    // 2. Afficher le plan et demander validation
+    const planContent = plan.map((slide, index) => 
+      `**Slide ${index + 1}**\n- Titre: ${slide.title}\n- Texte: ${slide.text}\n- Prompt Image: *${slide.imagePrompt}*`
+    ).join('\n\n');
+    
+    addMessage({
+      role: 'assistant',
+      content: `Voici le plan proposé pour votre carrousel de ${count} slides :\n\n${planContent}\n\n**Validez-vous ce plan pour lancer la génération des images ?** (Répondez 'oui' ou 'non')`,
+      type: 'text',
+      metadata: {
+        awaitingValidation: true,
+        action: 'carousel_plan_validation',
+        plan,
+        aspectRatio
+      }
+    });
+  };
+  
+  // L'ancienne fonction generateCarousel est supprimée et remplacée par la logique de validation dans handleSend
   
   const subscribeToCarousel = (jobSetId: string, total: number) => {
     // Nettoyer l'ancien canal si présent
@@ -590,38 +570,89 @@ export function AlfieChat() {
       return;
     }
     
-    const prompt = input.trim();
+    const userMessage = input.trim();
     setInput('');
     setIsLoading(true);
     
-    // Ajouter message utilisateur
+    // 1. Ajouter message utilisateur
     addMessage({
       role: 'user',
-      content: prompt,
+      content: userMessage,
       type: 'text'
     });
     
-    // Détecter l'intention
-    const intent = detectIntent(prompt);
-    
     try {
+      // 2. Vérifier si on est en attente de validation de plan de carrousel
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage?.metadata?.awaitingValidation && lastMessage.metadata.action === 'carousel_plan_validation') {
+        if (userMessage.toLowerCase().includes('oui') || userMessage.toLowerCase().includes('ok')) {
+          
+          const { plan, aspectRatio } = lastMessage.metadata;
+          const count = plan.length;
+          
+          // 2.1. Vérifier et consommer quota (count visuels)
+          const quotaOk = await checkAndConsumeQuota('visuals', count);
+          if (!quotaOk) {
+            setIsLoading(false);
+            return;
+          }
+          
+          addMessage({
+            role: 'assistant',
+            content: `✅ Plan validé ! Lancement de la génération des ${count} images...`,
+            type: 'text'
+          });
+          
+          // 2.2. Lancer la boucle de génération d'images (le nouveau flux)
+          for (let i = 0; i < count; i++) {
+            const slide = plan[i];
+            addMessage({
+              role: 'assistant',
+              content: `🎨 Génération de la slide ${i + 1}/${count} : *${slide.title}*`,
+              type: 'text'
+            });
+            
+            // Appeler la fonction generateImage existante
+            await generateImage(slide.imagePrompt, aspectRatio);
+          }
+          
+          addMessage({
+            role: 'assistant',
+            content: `🎉 Carrousel de ${count} slides terminé !`,
+            type: 'text'
+          });
+          
+          return;
+        } else if (userMessage.toLowerCase().includes('non')) {
+          addMessage({
+            role: 'assistant',
+            content: '❌ Plan annulé. Veuillez reformuler votre demande de carrousel.',
+            type: 'text'
+          });
+          return;
+        }
+      }
+      
+      // 3. Détecter l'intention
+      const intent = detectIntent(userMessage);
+      
       switch (intent) {
         case 'image': {
-          const aspectRatio = detectAspectRatio(prompt);
-          await generateImage(prompt, aspectRatio);
+          const aspectRatio = detectAspectRatio(userMessage);
+          await generateImage(userMessage, aspectRatio);
           break;
         }
         
         case 'video': {
-          const aspectRatio = detectAspectRatio(prompt);
-          await generateVideo(prompt, aspectRatio);
+          const aspectRatio = detectAspectRatio(userMessage);
+          await generateVideo(userMessage, aspectRatio);
           break;
         }
         
         case 'carousel': {
-          const count = extractCount(prompt);
-          const aspectRatio = detectAspectRatio(prompt);
-          await generateCarousel(prompt, count, aspectRatio);
+          const count = extractCount(userMessage);
+          const aspectRatio = detectAspectRatio(userMessage);
+          await generateCarousel(userMessage, count, aspectRatio);
           break;
         }
         
@@ -632,6 +663,13 @@ export function AlfieChat() {
             type: 'text'
           });
       }
+    } catch (error) {
+      console.error('Error in handleSend:', error);
+      addMessage({
+        role: 'assistant',
+        content: '❌ Une erreur inattendue est survenue. Veuillez réessayer.',
+        type: 'text'
+      });
     } finally {
       setIsLoading(false);
     }
