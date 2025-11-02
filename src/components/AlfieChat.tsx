@@ -1322,13 +1322,15 @@ export function AlfieChat() {
             return { error: 'Impossible de générer le plan. Réessaie.' };
           }
 
-          if (!data?.plan) {
-            console.error('[Plan] Missing plan in response:', data);
-            return { error: '⚠️ Plan instable détecté : utilisation d\'un plan standard. Tu pourras ajuster ensuite.' };
+          // Vérifier si le plan est vraiment invalide (pas de slides ou plan vide)
+          if (!data?.plan?.slides || data.plan.slides.length === 0) {
+            console.error('[Plan] Invalid or empty plan:', data);
+            return { error: 'Le plan n\'a pas pu être généré. Réessaie avec plus de détails sur ton objectif.' };
           }
           
+          // Si c'est un fallback mais qu'il contient des slides valides, continuer
           if (data?.fallback) {
-            console.warn('[Plan] ⚠️ Using fallback plan from backend');
+            console.warn('[Plan] ⚠️ Using fallback plan, but continuing with valid slides');
           }
           
           // Stocker le plan en state pour utilisation ultérieure
