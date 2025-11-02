@@ -560,12 +560,47 @@ export function AlfieChat() {
             };
           }
           
+          // Vérifier qu'une marque est active
+          if (!activeBrandId) {
+            const errorMsg = "⚠️ Aucune marque active. Sélectionne d'abord une marque.";
+            setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }]);
+            toast.error(errorMsg);
+            return { error: errorMsg };
+          }
+          
+          if (!user?.id) {
+            throw new Error("User not authenticated");
+          }
+          
           setGenerationStatus({ type: 'image', message: 'Génération de ton image en cours... ✨' });
 
-          const { data, error } = await supabase.functions.invoke('generate-ai-image', {
+          // Mapper les aspect ratios vers les formats attendus par alfie-render-image
+          const mapAspectRatio = (ratio: string): string => {
+            const mapping: Record<string, string> = {
+              '1:1': '1024x1024',
+              '4:5': '1024x1280',
+              '9:16': '1024x1820',
+              '16:9': '1820x1024',
+              '3:4': '1024x1365',
+              '4:3': '1365x1024'
+            };
+            return mapping[ratio] || '1024x1024';
+          };
+
+          console.log('[Image] Calling alfie-render-image with:', {
+            provider: 'gemini-nano',
+            prompt: args.prompt,
+            format: mapAspectRatio(args.aspect_ratio || '1:1'),
+            brand_id: activeBrandId
+          });
+
+          const { data, error } = await supabase.functions.invoke('alfie-render-image', {
             body: {
+              provider: 'gemini-nano',
               prompt: args.prompt,
-              aspectRatio: args.aspect_ratio || '1:1'
+              format: mapAspectRatio(args.aspect_ratio || '1:1'),
+              brand_id: activeBrandId,
+              cost_woofs: 1
             },
           });
 
@@ -574,80 +609,85 @@ export function AlfieChat() {
             throw error;
           }
 
-          if (!data?.imageUrl) {
-            throw new Error("Aucune image générée");
-          }
-          
-          if (!activeBrandId) {
-            throw new Error("No active brand. Please select a brand first.");
-          }
-          
-          if (!user?.id) {
-            throw new Error("User not authenticated");
+          // alfie-render-image renvoie { ok, data: { image_urls, generation_id, meta } }
+          if (!data?.ok || !data?.data?.image_urls?.[0]) {
+            throw new Error(data?.error || "Aucune image générée");
           }
 
-          // Stocker en DB et récupérer l'asset complet avec métadonnées
-          const { data: insertedAsset, error: insertError } = await supabase
-            .from('media_generations')
-            .insert({
-              user_id: user.id,
-              brand_id: activeBrandId,
-              type: 'image',
-              prompt: args.prompt,
-              output_url: data.imageUrl,
-              status: 'completed'
-            } as any)
-            .select('id, type, output_url, expires_at, engine, woofs, cost_woofs')
-            .single();
-
-          if (insertError || !insertedAsset) {
-            throw new Error("Erreur lors de l'enregistrement de l'image");
-          }
-
-          // Débiter les crédits SEULEMENT si l'image a été générée et stockée
-          await decrementCredits(1, 'image_generation');
-          await incrementGenerations();
+          const imageUrl = data.data.image_urls[0];
+          const generationId = data.data.generation_id;
 
           setGenerationStatus(null);
-          
-          const imageMessage = {
+
+          // Si un generation_id est retourné, charger l'asset depuis la DB (déjà inséré par la fonction)
+          if (generationId) {
+            const { data: existingAsset, error: fetchError } = await supabase
+              .from('media_generations')
+              .select('id, output_url, expires_at, engine, cost_woofs')
+              .eq('id', generationId)
+              .single();
+
+            if (fetchError || !existingAsset) {
+              console.warn('Failed to fetch existing asset, using fallback');
+            } else {
+              const imageMessage = {
+                role: 'assistant' as const,
+                content: `Image générée avec succès ! ✨`,
+                assetId: existingAsset.id,
+                assetType: 'image' as const,
+                outputUrl: existingAsset.output_url,
+                expiresAt: existingAsset.expires_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                engine: existingAsset.engine || 'gemini-nano',
+                woofsConsumed: existingAsset.cost_woofs || 1
+              };
+              
+              setMessages(prev => [...prev, imageMessage]);
+              
+              // Persister le message avec assetId en base
+              if (conversationId) {
+                await supabase.from('alfie_messages').insert({
+                  conversation_id: conversationId,
+                  role: 'assistant',
+                  content: imageMessage.content,
+                  image_url: existingAsset.output_url,
+                  asset_id: existingAsset.id,
+                  asset_type: 'image',
+                  output_url: existingAsset.output_url,
+                  expires_at: imageMessage.expiresAt,
+                  engine: imageMessage.engine,
+                  woofs_consumed: imageMessage.woofsConsumed
+                });
+              }
+              
+              await incrementGenerations();
+              
+              return {
+                success: true,
+                assetId: existingAsset.id,
+                imageUrl: existingAsset.output_url
+              };
+            }
+          }
+
+          // Fallback : afficher l'image même si generation_id manque
+          const fallbackMessage = {
             role: 'assistant' as const,
-            content: `Image générée avec succès ! (1 crédit utilisé) ✨`,
-            assetId: insertedAsset.id,
-            assetType: 'image' as const,
-            outputUrl: insertedAsset.output_url,
-            expiresAt: insertedAsset.expires_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-            engine: insertedAsset.engine || 'gemini-2.5-flash-image',
-            woofsConsumed: insertedAsset.cost_woofs || insertedAsset.woofs || 0
+            content: `Image générée avec succès ! ✨`,
+            imageUrl: imageUrl
           };
           
-          setMessages(prev => [...prev, imageMessage]);
+          setMessages(prev => [...prev, fallbackMessage]);
           
-          // Persister le message avec assetId en base
-          if (conversationId) {
-            await supabase.from('alfie_messages').insert({
-              conversation_id: conversationId,
-              role: 'assistant',
-              content: imageMessage.content,
-              image_url: insertedAsset.output_url,
-              asset_id: insertedAsset.id,
-              asset_type: 'image',
-              output_url: insertedAsset.output_url,
-              expires_at: imageMessage.expiresAt,
-              engine: imageMessage.engine,
-              woofs_consumed: imageMessage.woofsConsumed
-            });
-          }
+          await incrementGenerations();
           
           return {
             success: true,
-            assetId: insertedAsset.id,
-            imageUrl: insertedAsset.output_url
+            imageUrl: imageUrl
           };
         } catch (error: any) {
           console.error('Image generation error:', error);
           setGenerationStatus(null);
-          toast.error("Erreur lors de la génération. Crédits non débités.");
+          toast.error("Erreur lors de la génération.");
           return { error: error.message || "Erreur de génération" };
         }
       }
@@ -1290,15 +1330,6 @@ export function AlfieChat() {
     return "1:1";
   };
 
-  const wantsImageFromText = (text: string): boolean => {
-    // Ne PAS inclure "carrousel" ici pour éviter la confusion avec la génération de carrousel
-    return /(image|visuel|affiche|flyer)/i.test(text);
-  };
-
-  const wantsVideoFromText = (t: string): boolean => {
-    return /(vid[ée]o|video|reel|reels|tiktok|story|anime|animation|clip)/i.test(t);
-  };
-
   const streamChat = async (userMessage: string) => {
     const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/alfie-chat`;
     
@@ -1746,23 +1777,8 @@ export function AlfieChat() {
       return;
     }
 
-    if (!options?.skipMediaInference && wantsImageFromText(userMessage)) {
-      const aspect = detectAspectRatioFromText(userMessage);
-      await handleToolCall('generate_image', { prompt: userMessage, aspect_ratio: aspect });
-      return;
-    }
-
-    if (!options?.skipMediaInference && wantsVideoFromText(userMessage)) {
-      const aspect = detectAspectRatioFromText(userMessage);
-      await handleToolCall('generate_video', {
-        prompt: userMessage,
-        aspectRatio: aspect,
-        imageUrl,
-        durationPreference: selectedDuration,
-        woofCost: 2
-      });
-      return;
-    }
+    // ✅ Supprimer les raccourcis locaux : tout passe par streamChat pour que l'agent pose ses questions
+    // Les boutons forceImage/forceVideo explicites (lignes 1731-1747) sont conservés
 
     // 3. Vérifier le cache pour les templates
     if (intent.type === 'browse_templates') {

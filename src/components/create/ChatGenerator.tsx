@@ -344,6 +344,18 @@ export function ChatGenerator() {
       }
 
       if (contentType === 'image') {
+        // Mapper les aspect ratios vers les formats attendus par alfie-render-image
+        const mapAspectRatio = (ratio: AspectRatio): string => {
+          const mapping: Record<string, string> = {
+            '1:1': '1024x1024',
+            '9:16': '1024x1820',
+            '16:9': '1820x1024',
+            '3:4': '1024x1365',
+            '4:3': '1365x1024'
+          };
+          return mapping[ratio] || '1024x1024';
+        };
+
         if (uploadedSource?.type === 'image') {
           const { data, error } = await supabase.functions.invoke('alfie-generate-ai-image', {
             body: {
@@ -384,40 +396,31 @@ export function ChatGenerator() {
 
           toast.success('Image générée avec succès ! ✨');
         } else {
-          const { data, error } = await supabase.functions.invoke('generate-ai-image', {
+          const { data, error } = await supabase.functions.invoke('alfie-render-image', {
             body: {
+              provider: 'gemini-nano',
               prompt: prompt,
-              aspectRatio: aspectRatio,
+              format: mapAspectRatio(aspectRatio),
+              brand_id: brandKit?.id,
+              cost_woofs: 1
             },
           });
 
           if (error) throw error;
 
-          if (!data?.imageUrl) {
-            throw new Error('Aucune image générée');
+          // alfie-render-image renvoie { ok, data: { image_urls, generation_id } }
+          if (!data?.ok || !data?.data?.image_urls?.[0]) {
+            throw new Error(data?.error || 'Aucune image générée');
           }
+
+          const imageUrl = data.data.image_urls[0];
 
           setGeneratedAsset({
             type: 'image',
-            url: data.imageUrl,
+            url: imageUrl,
             prompt: prompt,
             format: aspectRatio,
           });
-
-          if (brandKit?.id) {
-            await supabase.from('media_generations').insert({
-              user_id: user.id,
-              brand_id: brandKit.id,
-              type: 'image',
-              prompt: prompt,
-              output_url: data.imageUrl,
-              status: 'completed',
-              metadata: {
-                aspectRatio,
-                sourceType: uploadedSource ? uploadedSource.type : 'prompt',
-              },
-            } as any);
-          }
 
           toast.success('Image générée avec succès ! ✨');
         }
