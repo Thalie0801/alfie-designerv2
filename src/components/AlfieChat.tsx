@@ -18,6 +18,8 @@ import { ChatComposer } from '@/components/create/ChatComposer';
 import { QuotaBar } from '@/components/create/QuotaBar';
 import { ChatBubble } from '@/components/create/ChatBubble';
 import { CarouselProgressCard } from '@/components/chat/CarouselProgressCard';
+import { PlanEditor, type CarouselPlan as NewCarouselPlan } from '@/components/carousel/PlanEditor';
+import { BriefForm, type BriefFormData } from '@/components/carousel/BriefForm';
 
 type VideoEngine = 'sora' | 'seededance' | 'kling';
 
@@ -199,6 +201,14 @@ export function AlfieChat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeJobSetId, setActiveJobSetId] = useState<string>('');
   const [carouselTotal, setCarouselTotal] = useState(0);
+  
+  // New carousel flow states
+  const [showBriefForm, setShowBriefForm] = useState(false);
+  const [showPlanEditor, setShowPlanEditor] = useState(false);
+  const [planOptions, setPlanOptions] = useState<{
+    backgroundOnly?: boolean;
+    templateImageUrl?: string | null;
+  }>({});
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_videoJobId, _setVideoJobId] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -214,10 +224,35 @@ export function AlfieChat() {
     quota
   } = useAlfieOptimizations();
 
-  // Worker pumping state/refs
-  const pumpRef = useRef<number | null>(null);
-  const pumpStartRef = useRef<number>(0);
-  const latestRef = useRef({ done: 0, total: 0, jobSetId: '' });
+  const handleCreateCarousel = async () => {
+    if (!carouselPlan || !activeBrandId) return;
+
+    try {
+      const headers = await getAuthHeader();
+      const { data, error } = await supabase.functions.invoke('chat-create-carousel', {
+        body: {
+          prompt: input,
+          carouselPlan,
+          brandId: activeBrandId,
+          options: {
+            backgroundOnly: planOptions.backgroundOnly ?? false,
+            templateImageUrl: planOptions.templateImageUrl ?? null,
+            aspectRatio: carouselPlan.globals.aspect_ratio
+          }
+        },
+        headers
+      });
+
+      if (error) throw error;
+
+      setActiveJobSetId(data.jobSetId);
+      setCarouselTotal(carouselPlan.slides.length);
+      toast.success(`🎨 Génération de ${carouselPlan.slides.length} slides lancée !`);
+    } catch (error: any) {
+      console.error('[Carousel] Error:', error);
+      toast.error(error.message || 'Erreur lors de la génération');
+    }
+  };
 
   useEffect(() => {
     latestRef.current = { done: carouselDone, total: carouselTotal, jobSetId: activeJobSetId };
@@ -1301,61 +1336,36 @@ export function AlfieChat() {
           
           console.log('[Plan] ✅ Plan generated:', data.plan);
           
-          // 🔥 Formater et afficher le plan immédiatement
-          const formatPlanPreview = (plan: any): string => {
-            const lines: string[] = [];
-            
-            // Résumé globals/promise
-            if (plan?.globals?.promise) {
-              lines.push(`🎯 **Objectif**: ${plan.globals.promise}`);
-            }
-            if (plan?.globals?.target) {
-              lines.push(`👥 **Cible**: ${plan.globals.target}`);
-            }
-            
-            lines.push('\n**📋 Plan des slides:**');
-            
-            // Liste des slides avec titre + 2 bullets max
-            if (Array.isArray(plan?.slides)) {
-              plan.slides.forEach((slide: any, i: number) => {
-                lines.push(`\n**Slide ${i + 1}**: ${slide.title || '(sans titre)'}`);
-                if (slide.subtitle) {
-                  lines.push(`*${slide.subtitle}*`);
-                }
-                if (Array.isArray(slide.bullets) && slide.bullets.length > 0) {
-                  slide.bullets.slice(0, 2).forEach((bullet: string) => {
-                    lines.push(`  • ${bullet}`);
-                  });
-                }
-              });
-            }
-            
-            lines.push('\n✅ **Ça te va ?** Réponds **"oui"** pour lancer la génération en 4:5 !');
-            
-            return lines.join('\n');
+          // Convertir le plan au nouveau format si nécessaire
+          const newFormatPlan: NewCarouselPlan = {
+            globals: {
+              aspect_ratio: '4:5',
+              totalSlides: data.plan.slides?.length || 5,
+              locale: 'fr-FR'
+            },
+            slides: data.plan.slides?.map((slide: any) => ({
+              type: slide.type || 'solution',
+              title: slide.title || '',
+              subtitle: slide.subtitle || '',
+              bullets: slide.bullets || [],
+              cta: slide.cta_primary || slide.cta || ''
+            })) || []
           };
           
-          const planPreview = formatPlanPreview(data.plan);
+          setCarouselPlan(newFormatPlan);
+          setShowPlanEditor(true);
           
-          // Afficher le plan dans le chat
-          const planMessage: Message = {
+          // Message contextuel
+          const editorMessage: Message = {
             role: 'assistant',
-            content: planPreview
+            content: '✅ Plan généré ! Tu peux maintenant **l\'éditer** avant de générer les visuels.'
           };
-          setMessages(prev => [...prev, planMessage]);
+          setMessages(prev => [...prev, editorMessage]);
           
-          if (conversationId) {
-            await supabase.from('alfie_messages').insert({
-              conversation_id: conversationId,
-              role: 'assistant',
-              content: planPreview
-            });
-          }
-          
-          return { 
-            success: true, 
-            plan: data.plan,
-            message: planPreview
+          return {
+            success: true,
+            plan: newFormatPlan,
+            message: '✅ Plan généré ! Tu peux maintenant l\'éditer avant de générer les visuels.'
           };
         } catch (error: any) {
           console.error('[Plan] Exception:', error);
@@ -2060,107 +2070,8 @@ export function AlfieChat() {
                 );
               }
 
-              return (
-                <div key={index} className="animate-fade-in">
-                  <ChatBubble
-                    role={message.role}
-                    content={message.content}
-                    imageUrl={message.imageUrl}
-                    videoUrl={message.videoUrl}
-                    timestamp={message.created_at}
-                    onDownloadImage={message.imageUrl ? () => handleDownload(message.imageUrl!, 'image') : undefined}
-                    onDownloadVideo={message.videoUrl ? () => handleDownload(message.videoUrl!, 'video') : undefined}
-                  />
-                </div>
-              );
+              return null;
             })}
-
-            {(isLoading || isAlfieThinking || generationStatus) && (
-              <div className="animate-fade-in">
-                <ChatBubble
-                  role="assistant"
-                  content={generationStatus?.message || 'Alfie réfléchit à ta demande...'}
-                  isStatus
-                  generationType={generationStatus?.type === 'video' ? 'video' : generationStatus ? 'image' : 'text'}
-                  isLoading={isLoading || isAlfieThinking && !generationStatus}
-                />
-              </div>
-            )}
-
-            {/* Carte de progression carrousel */}
-            {activeJobSetId && carouselTotal > 0 && (
-              <div className="animate-fade-in">
-                <CarouselProgressCard
-                  total={carouselTotal}
-                  done={carouselDone}
-                  items={carouselItems}
-                  onDownloadZip={async () => {
-                    try {
-                      console.log('[Carousel] Downloading ZIP for job set:', activeJobSetId);
-                      toast.loading('Préparation du ZIP...');
-                      
-                      const { data, error } = await supabase.functions.invoke('download-job-set-zip', {
-                        body: { jobSetId: activeJobSetId }
-                      });
-                      
-                      toast.dismiss();
-                      
-                      if (error) {
-                        console.error('[Carousel] ZIP download error:', error);
-                        throw error;
-                      }
-                      
-                      // La fonction retourne maintenant une URL de storage
-                      if (data?.url) {
-                        console.log('[Carousel] Opening ZIP URL:', data.url);
-                        window.open(data.url, '_blank');
-                        toast.success('ZIP téléchargé ! 📦');
-                        
-                        // ✅ RÉINITIALISER l'état du carrousel après téléchargement
-                        console.log('[Carousel] Resetting state after download');
-                        setActiveJobSetId('');
-                        setCarouselTotal(0);
-                        localStorage.removeItem('activeJobSetId');
-                        localStorage.removeItem('carouselTotal');
-                      } else {
-                        throw new Error('No ZIP URL returned');
-                      }
-                    } catch (err: any) {
-                      console.error('[Carousel] ZIP download failed:', err);
-                      toast.error(`Erreur lors du téléchargement: ${err.message || 'Erreur inconnue'}`);
-                    }
-                  }}
-            onRetry={async () => {
-              console.log('[Carousel] Manual retry triggered');
-              
-              // Réinitialiser les jobs bloqués en "running"
-              const { error: resetErr } = await supabase
-                .from('jobs')
-                .update({ 
-                  status: 'queued', 
-                  started_at: null
-                })
-                .eq('job_set_id', activeJobSetId)
-                .eq('status', 'running');
-              
-              if (resetErr) {
-                console.error('[Carousel] Failed to reset stuck jobs:', resetErr);
-                toast.error('Erreur lors de la réinitialisation des jobs bloqués');
-                return;
-              }
-              
-              console.log('[Carousel] Stuck jobs reset to queued');
-              toast.success('Traitement relancé ! 🔄');
-              
-              // Relancer le worker et rafraîchir
-              await triggerWorker();
-              refreshCarousel();
-              pumpWorker(carouselTotal);
-            }}
-            onCancel={handleCancelCarousel}
-                />
-              </div>
-            )}
 
             {/* Scroll anchor */}
             <div id="chat-bottom" ref={messagesEndRef} />
@@ -2193,6 +2104,45 @@ export function AlfieChat() {
           });
         }}
       />
+
+      {/* Plan Editor Modal */}
+      {showPlanEditor && carouselPlan && (
+        <div className="fixed inset-0 bg-background/95 z-50 overflow-y-auto">
+          <PlanEditor
+            plan={carouselPlan}
+            onPlanChange={(updated) => {
+              setCarouselPlan(updated);
+              const optionsInput = document.querySelector('[data-plan-options]') as HTMLInputElement;
+              if (optionsInput) {
+                setPlanOptions(JSON.parse(optionsInput.value));
+              }
+            }}
+            onValidate={async () => {
+              setShowPlanEditor(false);
+              await handleCreateCarousel();
+            }}
+            onCancel={() => {
+              setShowPlanEditor(false);
+              setCarouselPlan(null);
+            }}
+          />
+        </div>
+      )}
+
+      {/* Brief Form Modal */}
+      {showBriefForm && (
+        <div className="fixed inset-0 bg-background/95 z-50 overflow-y-auto">
+          <BriefForm
+            onSubmit={async (brief) => {
+              setShowBriefForm(false);
+              const prompt = `Objectif: ${brief.objective}\nAudience: ${brief.audience}\nOffre: ${brief.offer}\nPreuves: ${brief.proofs.join(', ')}\nCTA: ${brief.cta}\nTon: ${brief.tone}\nLangue: ${brief.locale}`;
+              setInput(prompt);
+              await sendMessage(prompt);
+            }}
+            onCancel={() => setShowBriefForm(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }

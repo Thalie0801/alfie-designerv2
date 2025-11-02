@@ -22,7 +22,9 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
   const [formData, setFormData] = useState({
     name: brand?.name || '',
     logo_url: brand?.logo_url || '',
-    voice: brand?.voice || ''
+    voice: brand?.voice || '',
+    font_primary: brand?.fonts?.primary || '',
+    font_secondary: brand?.fonts?.secondary || ''
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,6 +46,10 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
             name: formData.name,
             logo_url: formData.logo_url || null,
             voice: formData.voice || null,
+            fonts: {
+              primary: formData.font_primary || null,
+              secondary: formData.font_secondary || null
+            },
             updated_at: new Date().toISOString()
           })
           .eq('id', brand.id)
@@ -74,6 +80,10 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
             name: formData.name,
             logo_url: formData.logo_url || null,
             voice: formData.voice || null,
+            fonts: {
+              primary: formData.font_primary || null,
+              secondary: formData.font_secondary || null
+            },
             palette: []
           });
 
@@ -82,7 +92,7 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
       }
 
       setOpen(false);
-      setFormData({ name: '', logo_url: '', voice: '' });
+      setFormData({ name: '', logo_url: '', voice: '', font_primary: '', font_secondary: '' });
       onSuccess();
     } catch (error: any) {
       console.error('Error saving brand:', error);
@@ -140,6 +150,29 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
             />
             <p className="text-xs text-muted-foreground">
               Lien vers votre logo (optionnel)
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="font_primary">Police principale</Label>
+            <Input
+              id="font_primary"
+              placeholder="Ex: Montserrat, Inter, Roboto..."
+              value={formData.font_primary || ''}
+              onChange={(e) => setFormData({ ...formData, font_primary: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="font_secondary">Police secondaire</Label>
+            <Input
+              id="font_secondary"
+              placeholder="Ex: Open Sans, Lato..."
+              value={formData.font_secondary || ''}
+              onChange={(e) => setFormData({ ...formData, font_secondary: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Police pour les textes secondaires (optionnel)
             </p>
           </div>
 
