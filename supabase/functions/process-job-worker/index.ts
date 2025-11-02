@@ -56,7 +56,6 @@ serve(async (req) => {
 
   try {
     console.log('🚀 [Worker] Starting job processing...');
-    console.log('[Worker] Invoked with method:', req.method);
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -80,7 +79,6 @@ serve(async (req) => {
 
     jobIdForCleanup = job.id;
     console.log(`📋 [Worker] Processing job ${job.id} (index: ${job.index_in_set})`);
-    console.log(`[Worker] Job details - retry: ${job.retry_count || 0}, status: ${job.status}, brand_id: ${job.job_sets?.brand_id}`);
 
     // Vérifier le timeout avant chaque étape critique
     const checkTimeout = () => {
@@ -318,7 +316,7 @@ serve(async (req) => {
               {
                 role: 'user',
                 content: [
-                  { type: 'text', text: `${enrichedPrompt}\n\nCRITICAL COLOR PALETTE - USE ONLY THESE EXACT COLORS:\n- Primary: #0047AB (royal blue / "bleu")\n- Secondary: #F5F5DC (cream / "crème")\nDO NOT use: red, orange, pink, purple, bright green, or any other colors.\nStick strictly to blue and cream tones.\n\nIMPORTANT: Create a clean marketing visual background at ${resolution} (${aspectRatio}). NO TEXT, NO LETTERS, NO TYPOGRAPHY, NO WORDS. Pure visual design only. Keep brand style consistent.\n\nNEGATIVE PROMPT: no text, no letters, no words, no typography, no captions, no labels` }
+                  { type: 'text', text: `${enrichedPrompt}\n\nIMPORTANT: Create a clean marketing visual background at ${resolution} (${aspectRatio}). NO TEXT, NO LETTERS, NO TYPOGRAPHY, NO WORDS. Pure visual design only. Keep brand style consistent.\n\nNEGATIVE PROMPT: no text, no letters, no words, no typography, no captions, no labels` }
                 ]
               }
             ],
@@ -629,51 +627,20 @@ serve(async (req) => {
     console.log(`[Worker] Coherence score: ${coherenceScore.total}/100`, coherenceScore.breakdown);
 
     // 9. HOTFIX: Seuil de cohérence ajusté pour éviter boucles retry (texte inclus dans l'image)
-    const coherenceThresholdEffective = 30; // HOTFIX: seuil abaissé temporairement pour palette_match faible
+    const coherenceThresholdEffective = 50; // HOTFIX: seuil plus bas pour génération directe
     const retryCount = job.retry_count || 0;
-    const MAX_RETRY_ATTEMPTS = 3;
     
     console.log(`[Worker] Using effective coherence threshold: ${coherenceThresholdEffective} (direct generation mode)`);
     
-    if (coherenceScore.total < coherenceThresholdEffective) {
-      if (retryCount >= MAX_RETRY_ATTEMPTS) {
-        // Trop de tentatives, marquer comme échoué définitivement
-        await supabase.from('jobs').update({
-          status: 'failed',
-          retry_count: retryCount,
-          error: `Max retries exceeded (${MAX_RETRY_ATTEMPTS}): coherence score ${coherenceScore.total}/100 (threshold: ${coherenceThresholdEffective})`,
-          finished_at: new Date().toISOString()
-        }).eq('id', job.id);
-        
-        // Refund quota
-        await supabase.rpc('refund_brand_quotas', {
-          p_brand_id: job.job_sets.brand_id,
-          p_visuals_count: 1
-        });
-        
-        console.error(`[Worker] Job ${job.id} failed after ${retryCount} attempts (coherence too low)`);
-        const st = await updateJobSetStatus();
-        
-        return new Response(JSON.stringify({ 
-          success: false, 
-          error: 'Max retries exceeded', 
-          coherenceScore,
-          jobSetStatus: st 
-        }), { 
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      } else {
-        // Requeuer pour retry
-        await supabase.from('jobs').update({
-          status: 'queued',
-          retry_count: retryCount + 1,
-          error: `Low coherence: ${coherenceScore.total}/100 (threshold: ${coherenceThresholdEffective})`
-        }).eq('id', job.id);
-        
-        console.log(`[Worker] Job ${job.id} requeued for retry (attempt ${retryCount + 1})`);
-        return new Response(JSON.stringify({ retry: true, coherenceScore }), { headers: corsHeaders });
-      }
+    if (coherenceScore.total < coherenceThresholdEffective && retryCount < 3) {
+      await supabase.from('jobs').update({
+        status: 'queued',
+        retry_count: retryCount + 1,
+        error: `Low coherence: ${coherenceScore.total}/100 (threshold: ${coherenceThresholdEffective})`
+      }).eq('id', job.id);
+      
+      console.log(`[Worker] Job ${job.id} requeued for retry (attempt ${retryCount + 1})`);
+      return new Response(JSON.stringify({ retry: true, coherenceScore }), { headers: corsHeaders });
     }
 
     // 10. D'ABORD créer l'asset dans assets (nouvelle table Realtime)

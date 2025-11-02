@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { edgeHandler } from "../_shared/edgeHandler.ts";
 import { withIdempotency } from "../_shared/idempotency.ts";
 import { userHasAccess } from "../_shared/accessControl.ts";
 import { resolveBrandKit } from "../_shared/brandResolver.ts";
@@ -31,27 +30,39 @@ function correctFrenchSpelling(text: string): string {
   return corrected;
 }
 
-serve((req) => edgeHandler(req, async ({ jwt, input, req }) => {
-  console.log('[create-job-set] v1.0.2 - Function invoked');
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-idempotency-key',
+};
+
+serve(async (req) => {
+  console.log('[create-job-set] v1.0.1 - Function invoked');
   
-  if (!jwt) throw new Error('Missing authorization');
-  
-  const idempotencyKey = req.headers.get('x-idempotency-key');
-  if (!idempotencyKey) throw new Error('Missing x-idempotency-key header');
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
+  try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) throw new Error('Missing authorization');
 
-  const { data: { user }, error: userError } = await supabase.auth.getUser(jwt);
-  if (userError || !user) throw new Error('Unauthorized');
+    const idempotencyKey = req.headers.get('x-idempotency-key');
+    if (!idempotencyKey) throw new Error('Missing x-idempotency-key header');
 
-  const authHeader = `Bearer ${jwt}`;
-  const hasAccess = await userHasAccess(authHeader);
-  if (!hasAccess) throw new Error('Access denied');
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
 
-  const { brandId, prompt, count, aspectRatio = '4:5' } = input;
+    const { data: { user }, error: userError } = await supabase.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+    if (userError || !user) throw new Error('Unauthorized');
+
+    const hasAccess = await userHasAccess(authHeader);
+    if (!hasAccess) throw new Error('Access denied');
+
+    const { brandId, prompt, count, aspectRatio = '4:5' } = await req.json();
 
     // 🔒 SÉCURITÉ: Vérifier que la marque appartient bien à l'utilisateur
     const { data: brandOwnership, error: brandCheckError } = await supabase
@@ -67,7 +78,12 @@ serve((req) => edgeHandler(req, async ({ jwt, input, req }) => {
 
     if (brandOwnership.user_id !== user.id) {
       console.error(`[create-job-set] ⛔ User ${user.id} tried to access brand ${brandId} owned by ${brandOwnership.user_id}`);
-      throw new Error("Forbidden: you don't own this brand");
+      return new Response(JSON.stringify({ 
+        error: "Forbidden: you don't own this brand" 
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
 
     console.log(`[create-job-set] ✅ Brand ownership verified for user ${user.id}`);
@@ -247,8 +263,21 @@ serve((req) => edgeHandler(req, async ({ jwt, input, req }) => {
 
       console.log(`[create-job-set] ✅ Successfully inserted ${jobsData.length} jobs for job_set ${newJobSet.id}`);
 
-      return newJobSet;
+      return {
+        ref: `job_set:${newJobSet.id}`,
+        data: newJobSet
+      };
     });
 
-    return jobSet;
-}));
+    return new Response(JSON.stringify(jobSet), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error: any) {
+    console.error('[create-job-set] Error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: error.message === 'Unauthorized' ? 401 : 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+});
