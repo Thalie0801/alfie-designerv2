@@ -619,6 +619,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
     const maxIterations = 4;
     const collectedAssets: any[] = [];
     let finalJobSetId: string | undefined;
+    let fallbackAttempted = false; // ✅ Flag pour éviter double fallback client/backend
 
     console.log('[TRACE] About to enter tool execution loop');
     console.log('[TRACE] Initial conversation:', {
@@ -697,6 +698,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
             // Si carrousel trouvé, générer plan + images immédiatement
             if ((detectedIntent === 'carrousel' || detectedIntent === 'carousel') && intentMessage) {
               console.log('[FALLBACK][Approval] Generating carousel plan and images...');
+              fallbackAttempted = true; // ✅ Marquer qu'on a tenté le fallback
               
               try {
                 // 1. Générer le plan
@@ -820,6 +822,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
           // ✅ Si carrousel → générer plan ET images immédiatement
           if (detectedIntent === 'carousel') {
             console.log('[FALLBACK] Generating carousel plan and images...');
+            fallbackAttempted = true; // ✅ Marquer qu'on a tenté le fallback
             
             try {
               // 1. Générer le plan
@@ -1175,8 +1178,8 @@ Example: "Professional product photography, 45° angle, gradient background (${b
       }]
     };
 
-    // ✅ Surfacer si aucun tool n'a été appelé
-    if (collectedAssets.length === 0 && !finalJobSetId) {
+    // ✅ Surfacer si aucun tool n'a été appelé ET qu'aucun fallback n'a été tenté
+    if (collectedAssets.length === 0 && !finalJobSetId && !fallbackAttempted) {
       responsePayload.noToolCalls = true;
       console.warn('[Response] Surfacing noToolCalls=true (no generation triggered)');
     }
