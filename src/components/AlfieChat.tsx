@@ -1281,9 +1281,14 @@ export function AlfieChat() {
             headers
           });
           
-          if (error || !data?.plan) {
-            console.error('[Plan] alfie-plan-carousel failed:', error);
+          if (error) {
+            console.error('[Plan] Edge function error:', error);
             return { error: 'Impossible de générer le plan. Réessaie.' };
+          }
+
+          if (!data?.plan) {
+            console.error('[Plan] Missing plan in response:', data);
+            return { error: 'Plan généré mais mal formaté. Réessaie.' };
           }
           
           // Stocker le plan en state pour utilisation ultérieure

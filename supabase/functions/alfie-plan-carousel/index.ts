@@ -337,7 +337,7 @@ ${brandContext}`;
 
     console.log(`Successfully created validated plan for ${slideCount} slides`);
 
-    return new Response(JSON.stringify(plan), {
+    return new Response(JSON.stringify({ plan }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
