@@ -817,44 +817,83 @@ Example: "Professional product photography, 45° angle, gradient background (${b
           const detectedIntent = detectIntent(lastUserMessage);
           console.log(`[FALLBACK] Detected intent: ${detectedIntent}`);
           
-          // ✅ Si carrousel → appeler directement alfie-plan-carousel
+          // ✅ Si carrousel → générer plan ET images immédiatement
           if (detectedIntent === 'carousel') {
-            console.log('[FALLBACK] Forcing plan_carousel call...');
+            console.log('[FALLBACK] Generating carousel plan and images...');
             
             try {
-              const { data: planData } = await supabase.functions.invoke('alfie-plan-carousel', {
+              // 1. Générer le plan
+              const { data: planData, error: planError } = await supabase.functions.invoke('alfie-plan-carousel', {
                 body: {
                   prompt: lastUserMessage,
                   slideCount: 5,
-                  brandKit: brandKit || {}
+                  brandKit: brandKit
                 },
                 headers: functionHeaders
               });
               
-              // Ajouter le tool call et le résultat dans l'historique
-              conversationMessages.push({
-                role: 'assistant',
-                content: null,
-                tool_calls: [{
-                  id: 'fallback_plan',
-                  type: 'function',
-                  function: {
-                    name: 'plan_carousel',
-                    arguments: JSON.stringify({ prompt: lastUserMessage, count: 5 })
-                  }
-                }]
-              });
+              if (planError || !planData?.plan?.slides) {
+                throw new Error(planError?.message || 'Plan generation failed');
+              }
               
-              conversationMessages.push({
-                role: 'tool',
-                tool_call_id: 'fallback_plan',
-                content: JSON.stringify(planData?.plan || { slides: [] })
-              });
+              console.log('[FALLBACK] Plan fetched:', planData.plan.slides.length, 'slides');
               
-              // Reboucler
-              continue;
+              // 2. Générer les images pour chaque slide
+              const slides = planData.plan.slides;
+              
+              for (let i = 0; i < slides.length; i++) {
+                const slide = slides[i];
+                const overlayText = `${slide.title}\n${slide.subtitle || slide.punchline || ''}`;
+                
+                console.log(`[FALLBACK] Generating slide ${i + 1}/${slides.length}...`);
+                
+                const { data: imageData, error: imageError } = await supabase.functions.invoke('alfie-render-image', {
+                  body: {
+                    provider: 'gemini_image',
+                    prompt: slide.note || `Image pour ${slide.title}`,
+                    format: '1024x1280',
+                    brand_id: brandId,
+                    cost_woofs: 1,
+                    backgroundOnly: false,
+                    slideIndex: i,
+                    totalSlides: slides.length,
+                    overlayText: overlayText,
+                    negativePrompt: 'logos de marques tierces, filigranes, artefacts, texte illisible'
+                  },
+                  headers: functionHeaders
+                });
+                
+                if (!imageError && imageData?.image_urls?.[0]) {
+                  collectedAssets.push({
+                    type: 'image',
+                    url: imageData.image_urls[0],
+                    title: `Slide ${i + 1}/${slides.length}`,
+                    reasoning: slide.note || '',
+                    brandAlignment: brandKit ? 'Aligned with brand colors and voice' : ''
+                  });
+                  console.log(`[FALLBACK] Slide ${i + 1}/${slides.length} generated:`, imageData.image_urls[0]);
+                } else {
+                  console.error(`[FALLBACK] Slide ${i + 1}/${slides.length} failed:`, imageError);
+                }
+              }
+              
+              // Retourner la réponse avec tous les assets
+              return new Response(
+                JSON.stringify({
+                  choices: [{
+                    message: {
+                      role: 'assistant',
+                      content: `✅ Carrousel généré ! Voici tes ${slides.length} slides.`
+                    }
+                  }],
+                  assets: collectedAssets,
+                  noToolCalls: false
+                }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
             } catch (error) {
-              console.error('[FALLBACK] Error calling plan_carousel:', error);
+              console.error('[FALLBACK] Error generating carousel:', error);
+              // Continuer avec le flux normal en cas d'erreur
             }
           }
           
