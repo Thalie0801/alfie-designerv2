@@ -1,5 +1,6 @@
 import { edgeHandler } from '../_shared/edgeHandler.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
+import { enrichPromptWithBrandKit } from '../_shared/aiOrchestrator.ts';
 
 export default {
   async fetch(req: Request) {
@@ -102,8 +103,38 @@ Ensure strong typographic hierarchy, ample margins, and WCAG AA contrast.`;
 A reference image is provided. Mirror its composition rhythm, spacing, and text placement to maintain visual consistency across slides.`;
         }
 
+        // Récupérer le Brand Kit et enrichir le prompt automatiquement
+        let enrichedPrompt = prompt;
+
+        if (brand_id) {
+          const { data: brand } = await supabaseAdmin
+            .from('brands')
+            .select('name, palette, fonts, voice, niche')
+            .eq('id', brand_id)
+            .single();
+            
+          if (brand) {
+            const brandKitData = {
+              name: brand.name,
+              colors: brand.palette || [],
+              fonts: brand.fonts || [],
+              voice: brand.voice,
+              style: brand.voice || 'modern professional',
+              niche: brand.niche
+            };
+            
+            enrichedPrompt = enrichPromptWithBrandKit(prompt, brandKitData);
+            
+            console.log('[Render] Brand Kit auto-injected:', {
+              originalPromptLength: prompt.length,
+              enrichedPromptLength: enrichedPrompt.length,
+              brandColors: brandKitData.colors.slice(0, 2)
+            });
+          }
+        }
+
         // Construire le prompt utilisateur final
-        let finalPrompt = prompt;
+        let finalPrompt = enrichedPrompt;
 
         // Ajouter le format si résolution fournie
         const targetFormat = resolution || format;

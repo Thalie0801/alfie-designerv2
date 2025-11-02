@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { userHasAccess } from "../_shared/accessControl.ts";
+import { callAIWithFallback, type AgentContext } from "../_shared/aiOrchestrator.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -481,22 +482,36 @@ Example: "Professional product photography, 45° angle, gradient background (${b
       },
     ];
 
-    const response = await fetch(AI_CONFIG.endpoint, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: AI_CONFIG.model, // Modèle configurable via env variable
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...transformedMessages
-        ],
-        tools: tools,
-        stream: stream,
-      }),
-    });
+    // Construire le contexte pour l'orchestrateur
+    const context: AgentContext = {
+      brandKit: brandKit ? {
+        name: brandKit.name,
+        colors: brandKit.colors,
+        fonts: brandKit.fonts,
+        voice: brandKit.voice,
+        style: brandKit.voice || 'modern professional',
+        niche: brandKit.niche
+      } : undefined,
+      conversationHistory: transformedMessages,
+      userMessage: transformedMessages[transformedMessages.length - 1]?.content || ''
+    };
+
+    // Appel avec fallback intelligent Gemini → OpenAI
+    const aiResponse = await callAIWithFallback(
+      [{ role: "system", content: systemPrompt }, ...transformedMessages],
+      context,
+      tools,
+      'gemini' // Gemini prioritaire, OpenAI en fallback
+    );
+
+    // Simuler l'objet Response pour compatibilité avec le code existant
+    const response = {
+      ok: true,
+      status: 200,
+      body: null, // Pas de streaming via l'orchestrateur pour l'instant
+      json: async () => aiResponse,
+      text: async () => JSON.stringify(aiResponse)
+    } as Response;
 
     if (!response.ok) {
       if (response.status === 429) {
