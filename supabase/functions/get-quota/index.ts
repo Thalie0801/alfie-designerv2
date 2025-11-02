@@ -39,6 +39,8 @@ export default {
         woofs_used: profile.woofs_consumed_this_month ?? 0,
         visuals_quota: profile.quota_visuals_per_month ?? 0,
         visuals_used: profile.generations_this_month ?? 0,
+        videos_quota: 0,
+        videos_used: 0,
       };
 
       // Fallback sur plans_config si quotas = 0 mais plan défini
@@ -60,7 +62,7 @@ export default {
       if (brand_id) {
         const { data: brand } = await supabaseRls
           .from('brands')
-          .select('quota_woofs, woofs_used, quota_images, images_used')
+          .select('quota_woofs, woofs_used, quota_images, images_used, quota_videos, videos_used')
           .eq('id', brand_id)
           .maybeSingle();
 
@@ -70,12 +72,15 @@ export default {
             woofs_used: brand.woofs_used ?? 0,
             visuals_quota: brand.quota_images ?? finalQuotas.visuals_quota,
             visuals_used: brand.images_used ?? 0,
+            videos_quota: brand.quota_videos ?? 0,
+            videos_used: brand.videos_used ?? 0,
           };
         }
       }
 
       const woofs_remaining = Math.max(0, finalQuotas.woofs_quota - finalQuotas.woofs_used);
       const visuals_remaining = Math.max(0, finalQuotas.visuals_quota - finalQuotas.visuals_used);
+      const videos_remaining = Math.max(0, finalQuotas.videos_quota - finalQuotas.videos_used);
 
       const resetDate = profile.generations_reset_date || 
         new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString();
@@ -87,6 +92,9 @@ export default {
         visuals_quota: finalQuotas.visuals_quota,
         visuals_used: finalQuotas.visuals_used,
         visuals_remaining,
+        videos_quota: finalQuotas.videos_quota,
+        videos_used: finalQuotas.videos_used,
+        videos_remaining,
         plan: profile.plan || 'starter',
         reset_date: resetDate,
       };

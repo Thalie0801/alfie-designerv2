@@ -460,22 +460,17 @@ export function AlfieChat() {
       
     } catch (error: any) {
       console.error('[Carousel] Error:', error);
-
+      
       await refundVisuals(count);
-      addMessage({
-        role: 'assistant',
-        content: `❌ Erreur : ${error.message}`,
-
-      // Refund des visuels (à implémenter si nécessaire)
       
       const errorMessage = error.message || 'Erreur inconnue';
       
       addMessage({
         role: 'assistant',
         content: `❌ Erreur de génération de carrousel : \n\n\`\`\`\n${errorMessage}\n\`\`\``,
-
         type: 'text'
       });
+      
       toast.error('Échec de la création du carrousel');
     }
   };

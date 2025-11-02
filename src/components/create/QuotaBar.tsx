@@ -10,6 +10,9 @@ interface QuotaData {
   visuals_quota: number;
   visuals_used: number;
   visuals_remaining: number;
+  videos_quota: number;
+  videos_used: number;
+  videos_remaining: number;
   plan: string;
   reset_date: string | null;
 }
@@ -75,6 +78,7 @@ export function QuotaBar({ activeBrandId }: QuotaBarProps) {
   }
 
   const visualsPercent = Math.round((quota.visuals_used / quota.visuals_quota) * 100);
+  const videosPercent = Math.round((quota.videos_used / quota.videos_quota) * 100);
   const woofsPercent = Math.round((quota.woofs_used / quota.woofs_quota) * 100);
 
   const getQuotaColor = (percent: number) => {
@@ -109,6 +113,26 @@ export function QuotaBar({ activeBrandId }: QuotaBarProps) {
                   'bg-green-500'
                 }`}
                 style={{ width: `${visualsPercent}%` }}
+              />
+            </div>
+          </div>
+          
+          {/* Badge Vidéos avec barre de progression */}
+          <div className="flex flex-col gap-1">
+            <div className={`flex items-center gap-2 px-3 py-1 rounded-lg bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 text-sm font-semibold ${getQuotaColor(videosPercent)} border border-purple-200 dark:border-purple-800 shadow-sm`}>
+              <span className="text-xs">🎬</span>
+              <span className="text-xs">
+                {quota.videos_remaining}/{quota.videos_quota}
+              </span>
+            </div>
+            <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div 
+                className={`h-full transition-all duration-500 ${
+                  videosPercent >= 90 ? 'bg-red-500' : 
+                  videosPercent >= 70 ? 'bg-yellow-500' : 
+                  'bg-green-500'
+                }`}
+                style={{ width: `${videosPercent}%` }}
               />
             </div>
           </div>
