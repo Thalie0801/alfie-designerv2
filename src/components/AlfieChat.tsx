@@ -432,12 +432,12 @@ export function AlfieChat() {
         throw new Error(error.message || 'Erreur inconnue lors de la création du job set.');
       }
       
-
-      if (!data?.data?.id) {
+      console.log('[create-job-set] response', data);
+      
+      const jobSetId = data?.id ?? data?.data?.id;
+      if (!jobSetId) {
         throw new Error('Aucun job-set créé');
       }
-
-      const jobSetId = data.data.id;
       setCarouselProgress({ done: 0, total: count });
       
       // 4. Déclencher le worker
@@ -516,7 +516,7 @@ export function AlfieChat() {
       
       if (!jobs) return;
       
-      const done = jobs.filter(j => j.status === 'completed').length;
+      const done = jobs.filter(j => j.status === 'succeeded' || j.status === 'completed').length;
       setCarouselProgress({ done, total });
       
       // Mettre à jour le message de progression
@@ -539,7 +539,7 @@ export function AlfieChat() {
           .from('assets')
           .select('id, storage_key')
           .eq('job_set_id', jobSetId)
-          .order('index', { ascending: true });
+          .order('index_in_set', { ascending: true });
         
         if (assets && assets.length > 0) {
           // Afficher les slides générées
