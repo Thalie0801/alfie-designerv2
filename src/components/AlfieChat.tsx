@@ -480,7 +480,7 @@ export function AlfieChat() {
     }).join('\n\n');
   };
 
-  const handleToolCall = async (toolName: string, args: any) => {
+  const handleToolCall = async (toolName: string, args: any): Promise<any> => {
     console.log('Tool call:', toolName, args);
     
     // New tool calls from alfie-chat
@@ -1296,6 +1296,36 @@ export function AlfieChat() {
           }
           
           console.log('[Intent] Detected:', intent, 'from:', msg);
+          
+          // 🔥 AUTO-TRIGGER: Si intent = carousel, déclencher automatiquement plan_carousel
+          if (intent === 'carousel') {
+            console.log('[Intent] Auto-triggering plan_carousel with prompt:', args.user_message);
+            
+            // Afficher un message de confirmation
+            const confirmMsg: Message = {
+              role: 'assistant',
+              content: '🎨 Carrousel détecté ! Je prépare ton plan de 5 slides...'
+            };
+            setMessages(prev => [...prev, confirmMsg]);
+            
+            if (conversationId) {
+              await supabase.from('alfie_messages').insert({
+                conversation_id: conversationId,
+                role: 'assistant',
+                content: confirmMsg.content
+              });
+            }
+            
+            // Déclencher plan_carousel automatiquement
+            const planResult: any = await handleToolCall('plan_carousel', {
+              prompt: args.user_message,
+              count: 5
+            });
+            
+            console.log('[Intent] plan_carousel result:', planResult);
+            return { intent, auto_triggered: true, plan_result: planResult };
+          }
+          
           return { intent };
         } catch (error: any) {
           console.error('[Intent] Exception:', error);
