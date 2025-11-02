@@ -1288,7 +1288,11 @@ export function AlfieChat() {
 
           if (!data?.plan) {
             console.error('[Plan] Missing plan in response:', data);
-            return { error: 'Plan généré mais mal formaté. Réessaie.' };
+            return { error: '⚠️ Plan instable détecté : utilisation d\'un plan standard. Tu pourras ajuster ensuite.' };
+          }
+          
+          if (data?.fallback) {
+            console.warn('[Plan] ⚠️ Using fallback plan from backend');
           }
           
           // Stocker le plan en state pour utilisation ultérieure

@@ -218,17 +218,23 @@ serve(async (req) => {
       );
 
       if (planResponse.ok) {
-        carouselPlan = await planResponse.json();
+        const planData = await planResponse.json();
+        carouselPlan = planData?.plan ?? planData; // compat legacy
+        
+        if (planData?.fallback) {
+          console.warn(`[CreateCarousel] ⚠️ Using fallback plan from alfie-plan-carousel`);
+        }
+        
         console.log(`[CreateCarousel] Plan received:`, JSON.stringify(carouselPlan, null, 2));
       } else {
-        console.warn(`[CreateCarousel] Plan generation failed (${planResponse.status}), using fallback structure`);
+        console.warn(`[CreateCarousel] Plan generation failed (${planResponse.status}), using local fallback`);
       }
     } catch (planError) {
       console.warn(`[CreateCarousel] Plan generation error:`, planError);
     }
 
-    // 5.5) Si le plan a échoué, utiliser une structure cohérente et complète
-    if (!carouselPlan || !carouselPlan.slides) {
+    // 5.5) Si le plan a échoué OU slides vides, utiliser une structure cohérente et complète
+    if (!carouselPlan?.slides || carouselPlan.slides.length === 0) {
       console.warn(`[CreateCarousel] Using coherent fallback slide structure`);
       const fallbackGlobals = {
         audience: "Directeurs Marketing & studios internes",
@@ -332,20 +338,34 @@ serve(async (req) => {
 
     const nonNullBrandSnapshot = brandSnapshot ?? {};
 
-    // 7) Créer les jobs avec le contenu structuré DÈS LA CRÉATION
+    // 7) Créer les jobs avec le contenu structuré DÈS LA CRÉATION + guards null-safety
     console.log(`[CreateCarousel] Creating jobs with slideContent from plan...`);
-    const jobs = Array.from({ length: count }, (_, i) => ({
-      job_set_id: set.id,
-      index_in_set: i,
-      status: "queued",
-      prompt,
-      slide_template: carouselPlan.slides[i]?.type || (i === 0 ? "hero" : "variant"),
-      brand_snapshot: nonNullBrandSnapshot,
-      metadata: {
-        role: i === 0 ? "key_visual" : "variant",
-        slideContent: carouselPlan.slides[i] || { type: 'variant', title: '' },
-      },
-    }));
+    const jobs = Array.from({ length: count }, (_, i) => {
+      const slide = carouselPlan.slides[i] || {};
+      return {
+        job_set_id: set.id,
+        index_in_set: i,
+        status: "queued",
+        prompt,
+        slide_template: slide.type || (i === 0 ? "hero" : i === count-1 ? "cta" : "body"),
+        brand_snapshot: nonNullBrandSnapshot,
+        metadata: {
+          role: i === 0 ? "key_visual" : "variant",
+          slideContent: {
+            type: slide.type || (i === 0 ? "hero" : i === count-1 ? "cta" : "body"),
+            title: slide.title ?? `Slide ${i + 1}`,
+            subtitle: slide.subtitle ?? "",
+            punchline: slide.punchline ?? "",
+            bullets: Array.isArray(slide.bullets) ? slide.bullets : [],
+            cta_primary: slide.cta_primary ?? slide.cta ?? "",
+            cta_secondary: slide.cta_secondary ?? "",
+            badge: slide.badge ?? "",
+            kpis: Array.isArray(slide.kpis) ? slide.kpis : [],
+            note: slide.note ?? ""
+          },
+        },
+      };
+    });
 
     const { error: jobsErr } = await adminClient.from("jobs").insert(jobs);
 

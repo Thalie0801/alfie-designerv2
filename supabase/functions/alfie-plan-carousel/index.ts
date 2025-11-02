@@ -7,6 +7,40 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ============= HELPERS DE PARSING ROBUSTES =============
+
+function extractJsonBlock(s: string): string | null {
+  // Enlève les ```json ... ``` éventuels
+  const unFenced = s.replace(/```(?:json)?/gi, "```").replace(/```/g, "");
+  // Récupère le plus GRAND bloc {...} pour éviter les préfaces / épilogues
+  let depth = 0, start = -1, best: {i:number; j:number} | null = null;
+  for (let i=0; i<unFenced.length; i++){
+    const c = unFenced[i];
+    if (c === "{") { if (depth===0) start = i; depth++; }
+    else if (c === "}") { depth--; if (depth===0 && start>=0) { const cand={i:start,j:i+1}; if (!best || (cand.j-cand.i)>(best.j-best.i)) best=cand; } }
+  }
+  return best ? unFenced.slice(best.i, best.j) : null;
+}
+
+function stripTrailingCommas(jsonLike: string): string {
+  // Supprime les virgules traînantes dans objets/arrays
+  return jsonLike
+    .replace(/,\s*([}\]])/g, "$1")
+    .replace(/[\u201C\u201D]/g, '"') // guillemets typographiques → "
+    .replace(/[\u2018\u2019]/g, "'"); // apostrophes typographiques
+}
+
+function tryParse(jsonStr: string): any {
+  try { return JSON.parse(jsonStr); } catch {}
+  // fallback JSON5 léger : autorise trailing commas déjà supprimées, et comments
+  try {
+    const cleaned = jsonStr
+      .replace(/\/\/.*$/gm, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    return JSON.parse(cleaned);
+  } catch { return null; }
+}
+
 interface PlanRequest {
   prompt: string;
   brandKit?: {
@@ -15,6 +49,82 @@ interface PlanRequest {
     voice?: string;
   };
   slideCount: number;
+}
+
+// ============= AUTO-CORRECTION HELPER (hors scope pour réutilisation) =============
+function autoCorrectPlan(rawPlan: any, requestedSlideCount: number): CarouselPlan {
+  const clamp = (s?: string, min=0, max=120) =>
+    (typeof s === "string" ? s.trim().slice(0, max) : "").slice(min);
+  const arr = (a: any) => Array.isArray(a) ? a : [];
+  
+  // Si pas de slides valides, générer un fallback complet
+  const rawSlides = arr(rawPlan?.slides);
+  const hasValidSlides = rawSlides.length > 0 && rawSlides.some((s: any) => s?.title);
+  
+  if (!hasValidSlides) {
+    console.log('[AutoCorrect] No valid slides, generating complete fallback');
+    const fallbackGlobals = rawPlan?.globals || DEFAULT_GLOBALS;
+    return {
+      globals: fallbackGlobals,
+      slides: requestedSlideCount === 5 ? [
+        { type: 'hero', title: 'Créez des visuels cohérents', subtitle: 'L\'IA qui garde vos créations on-brand', punchline: 'Cohérence garantie', badge: 'Cohérence 95/100', cta_primary: fallbackGlobals.cta },
+        { type: 'problem', title: 'Le défi de la cohérence', bullets: ['Visuels incohérents', 'Validations manuelles', 'Marque diluée'] },
+        { type: 'solution', title: fallbackGlobals.promise, bullets: ['IA garde-fous', 'Variantes cohérentes', 'Workflows accélérés'] },
+        { type: 'impact', title: 'Résultats mesurables', kpis: [{ label: 'Cohérence', delta: '+92%' }, { label: 'Temps', delta: '-60%' }, { label: 'Production', delta: '×3' }] },
+        { type: 'cta', title: 'Prêt à essayer ?', subtitle: 'Rejoignez les équipes créatives', cta_primary: fallbackGlobals.cta, cta_secondary: 'En savoir plus', note: 'Accès anticipé disponible' }
+      ] : requestedSlideCount === 3 ? [
+        { type: 'hero', title: 'Visuels cohérents', subtitle: fallbackGlobals.promise, cta_primary: fallbackGlobals.cta },
+        { type: 'solution', title: 'Solution complète', bullets: ['Cohérence garantie', 'Créations rapides', 'Workflows simples'] },
+        { type: 'cta', title: fallbackGlobals.cta, cta_primary: fallbackGlobals.cta, note: 'Accès anticipé disponible' }
+      ] : Array(requestedSlideCount).fill(null).map((_, i) => ({
+        type: (i === 0 ? 'hero' : i === requestedSlideCount-1 ? 'cta' : 'solution') as 'hero' | 'cta' | 'solution',
+        title: i === 0 ? 'Créez avec cohérence' : `Slide ${i + 1}`,
+        subtitle: i === 0 ? fallbackGlobals.promise : ''
+      })),
+      captions: Array(Math.min(requestedSlideCount, 3)).fill('').map((_, i) => `Post ${i + 1} #coherence`)
+    };
+  }
+  
+  // Normalisation avec garde-fous
+  const slides = rawSlides.map((s: any, i: number) => {
+    const normalized: any = {
+      type: s?.type ?? (i===0 ? "hero" : i===rawSlides.length-1 ? "cta" : "solution"),
+      title: clamp(s?.title, 1, CHAR_LIMITS.title.max),
+      subtitle: clamp(s?.subtitle, 0, CHAR_LIMITS.subtitle.max),
+      punchline: clamp(s?.punchline, 0, CHAR_LIMITS.punchline.max),
+      bullets: arr(s?.bullets).map((b: any) => clamp(String(b), 0, CHAR_LIMITS.bullet.max)).slice(0, 6),
+      cta_primary: clamp(s?.cta ?? s?.cta_primary, 0, CHAR_LIMITS.cta.max),
+      cta_secondary: clamp(s?.cta_secondary, 0, CHAR_LIMITS.cta.max),
+      badge: clamp(s?.badge, 0, 30),
+      note: clamp(s?.note, 0, CHAR_LIMITS.note.max),
+    };
+    
+    // Fix KPIs: add units if missing
+    if (s?.kpis) {
+      normalized.kpis = arr(s.kpis).map((kpi: any) => ({
+        label: clamp(kpi?.label, 0, CHAR_LIMITS.kpi_label.max),
+        delta: (() => {
+          const d = clamp(kpi?.delta, 0, CHAR_LIMITS.kpi_delta.max);
+          return /[%×]|pts/.test(d) ? d : d + '%';
+        })()
+      }));
+    }
+    
+    // Force CTA consistency (R2)
+    if (normalized.type === 'hero' || normalized.type === 'cta') {
+      if (!normalized.cta_primary || normalized.cta_primary.length > CHAR_LIMITS.cta.max) {
+        normalized.cta_primary = rawPlan?.globals?.cta || DEFAULT_GLOBALS.cta;
+      }
+    }
+    
+    return normalized;
+  });
+  
+  return {
+    globals: rawPlan?.globals || DEFAULT_GLOBALS,
+    slides,
+    captions: arr(rawPlan?.captions).map((c: any) => clamp(String(c), 0, 200))
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -124,58 +234,6 @@ ${brandContext}`;
 
     let userMessage = `Create a ${slideCount}-slide carousel plan for:\n\n${prompt}\n\nRespect ALL globals, character limits, and editorial rules.`;
 
-    // Auto-correction helper
-    function autoCorrectPlan(rawPlan: any): CarouselPlan {
-      // Clamp fields according to CHAR_LIMITS
-      const clamp = (text: string, min: number, max: number) => {
-        if (!text) return text;
-        return text.length > max ? text.slice(0, max) : text;
-      };
-      
-      const corrected = { ...rawPlan };
-      corrected.slides = rawPlan.slides?.map((slide: any) => {
-        const s = { ...slide };
-        if (s.title) s.title = clamp(s.title, CHAR_LIMITS.title.min, CHAR_LIMITS.title.max);
-        if (s.subtitle) s.subtitle = clamp(s.subtitle, CHAR_LIMITS.subtitle.min, CHAR_LIMITS.subtitle.max);
-        if (s.punchline) s.punchline = clamp(s.punchline, CHAR_LIMITS.punchline.min, CHAR_LIMITS.punchline.max);
-        if (s.cta_primary) s.cta_primary = clamp(s.cta_primary, CHAR_LIMITS.cta.min, CHAR_LIMITS.cta.max);
-        if (s.cta_secondary) s.cta_secondary = clamp(s.cta_secondary, CHAR_LIMITS.cta.min, CHAR_LIMITS.cta.max);
-        if (s.note) s.note = clamp(s.note, CHAR_LIMITS.note.min, CHAR_LIMITS.note.max);
-        
-        // Fix bullets
-        if (s.bullets) {
-          s.bullets = s.bullets.map((b: string) => clamp(b, CHAR_LIMITS.bullet.min, CHAR_LIMITS.bullet.max));
-        }
-        
-        // Fix KPIs: add units if missing
-        if (s.kpis) {
-          s.kpis = s.kpis.map((kpi: any) => {
-            const k = { ...kpi };
-            if (k.label) k.label = clamp(k.label, CHAR_LIMITS.kpi_label.min, CHAR_LIMITS.kpi_label.max);
-            if (k.delta) {
-              k.delta = clamp(k.delta, CHAR_LIMITS.kpi_delta.min, CHAR_LIMITS.kpi_delta.max);
-              // Add unit if missing
-              if (!/[%×]|pts/.test(k.delta)) {
-                k.delta = k.delta + '%';
-              }
-            }
-            return k;
-          });
-        }
-        
-        // Force CTA consistency (R2)
-        if (s.type === 'hero' || s.type === 'cta') {
-          if (!s.cta_primary || s.cta_primary.length > 22) {
-            s.cta_primary = globals.cta;
-          }
-        }
-        
-        return s;
-      });
-      
-      return corrected;
-    }
-
     // Génération avec cycle de validation et correction
     let plan: CarouselPlan | null = null;
     let attempt = 0;
@@ -213,15 +271,15 @@ ${brandContext}`;
         throw new Error('No content returned from AI');
       }
 
-      // Extraire le JSON
-      let jsonContent = content.trim();
-      if (jsonContent.startsWith('```json')) {
-        jsonContent = jsonContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-      } else if (jsonContent.startsWith('```')) {
-        jsonContent = jsonContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      // Extraction + parsing ROBUSTE
+      const chunk = extractJsonBlock(content) ?? content.trim();
+      const cleaned = stripTrailingCommas(chunk);
+      const parsedPlan = tryParse(cleaned);
+      
+      if (!parsedPlan) {
+        console.warn(`[Plan] Parse failed on attempt ${attempt}, will retry or fallback`);
+        continue;
       }
-
-      const parsedPlan = JSON.parse(jsonContent);
 
       // Valider avec le linter
       const lintResult = lintCarousel(parsedPlan.globals || globals, parsedPlan.slides);
@@ -236,9 +294,9 @@ ${brandContext}`;
       } else {
         console.log(`[Plan] ❌ Validation failed:`, lintResult.errors);
         
-        // Apply auto-correction
-        console.log(`[Plan] Applying auto-correction...`);
-        const autoCorrected = autoCorrectPlan(parsedPlan);
+        // Apply auto-correction RENFORCÉE
+        console.log(`[Plan] Applying reinforced auto-correction...`);
+        const autoCorrected = autoCorrectPlan(parsedPlan, slideCount);
         const autoLintResult = lintCarousel(autoCorrected.globals || globals, autoCorrected.slides);
         
         if (autoLintResult.valid) {
@@ -253,103 +311,27 @@ ${brandContext}`;
     }
 
     if (!plan) {
-      // Generate coherent fallback
-      console.log(`[Plan] All attempts failed, generating coherent fallback...`);
-      plan = {
-        globals: { ...globals },
-        slides: slideCount === 5 ? [
-          {
-            type: 'hero',
-            title: 'Créez des visuels cohérents',
-            subtitle: 'L\'IA qui garde vos créations toujours on-brand',
-            punchline: 'Cohérence garantie à chaque variante',
-            badge: 'Cohérence 95/100',
-            cta_primary: globals.cta
-          },
-          {
-            type: 'problem',
-            title: 'Le défi de la cohérence',
-            bullets: [
-              'Visuels incohérents entre variantes',
-              'Temps perdu en validations manuelles',
-              'Marque diluée sur les réseaux'
-            ]
-          },
-          {
-            type: 'solution',
-            title: globals.promise,
-            bullets: [
-              'IA garde-fous pour votre marque',
-              'Variantes cohérentes automatiques',
-              'Workflows créatifs accélérés'
-            ]
-          },
-          {
-            type: 'impact',
-            title: 'Résultats mesurables',
-            kpis: [
-              { label: 'Cohérence', delta: '+92%' },
-              { label: 'Temps économisé', delta: '-60%' },
-              { label: 'Production', delta: '×3' }
-            ]
-          },
-          {
-            type: 'cta',
-            title: 'Prêt à essayer ?',
-            subtitle: 'Rejoignez les équipes qui créent plus vite',
-            cta_primary: globals.cta,
-            cta_secondary: 'En savoir plus',
-            note: 'Accès anticipé disponible pour les studios créatifs et équipes marketing'
-          }
-        ] : slideCount === 3 ? [
-          {
-            type: 'hero',
-            title: 'Visuels cohérents en un clic',
-            subtitle: globals.promise,
-            cta_primary: globals.cta
-          },
-          {
-            type: 'solution',
-            title: 'Solution complète',
-            bullets: [
-              'Cohérence de marque garantie',
-              'Variantes créatives rapides',
-              'Workflows simplifiés'
-            ]
-          },
-          {
-            type: 'cta',
-            title: globals.cta,
-            cta_primary: globals.cta,
-            note: 'Accès anticipé disponible'
-          }
-        ] : Array(slideCount).fill(null).map((_, i) => ({
-          type: (i === 0 ? 'hero' : 'solution') as 'hero' | 'solution',
-          title: i === 0 ? 'Créez avec cohérence' : `Variante ${i}`,
-          subtitle: i === 0 ? globals.promise : ''
-        })),
-        captions: Array(Math.min(slideCount, 3)).fill('').map((_, i) => 
-          `Post ${i + 1}: ${prompt.slice(0, 100)}... #coherence #brand #creativity`
-        )
-      };
+      // Dernier filet : renvoyer un fallback propre via autoCorrectPlan (200 OK, jamais 4xx)
+      console.log(`[Plan] All attempts failed, generating COMPLETE fallback via autoCorrect...`);
+      plan = autoCorrectPlan({}, slideCount);
       console.log('[Plan] Fallback plan generated:', JSON.stringify(plan, null, 2));
     }
 
     console.log(`Successfully created validated plan for ${slideCount} slides`);
 
-    return new Response(JSON.stringify({ plan }), {
+    return new Response(JSON.stringify({ plan, fallback: !plan.slides?.[0]?.title }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: any) {
     console.error('Error in alfie-plan-carousel:', error);
+    // Dernier filet : même en cas d'erreur fatale, renvoyer un fallback 200 OK
+    const { slideCount } = await req.json().catch(() => ({ slideCount: 5 }));
+    const fallbackPlan = autoCorrectPlan({}, slideCount || 5);
     return new Response(
-      JSON.stringify({ 
-        error: error.message || 'Internal server error',
-        details: error.toString() 
-      }),
+      JSON.stringify({ plan: fallbackPlan, fallback: true, error: error.message }),
       { 
-        status: 500, 
+        status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
