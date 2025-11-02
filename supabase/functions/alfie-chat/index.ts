@@ -743,15 +743,16 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                     headers: functionHeaders
                   });
                   
-                  if (!imageError && imageData?.data?.image_urls?.[0]) {
-                    collectedAssets.push({
-                      type: 'image',
-                      url: imageData.data.image_urls[0],
-                      title: `Slide ${i + 1}/${slides.length}`,
-                      reasoning: slide.note || '',
-                      brandAlignment: brandKit ? 'Aligned with brand colors and voice' : ''
-                    });
-                    console.log(`[FALLBACK][Approval] Slide ${i + 1}/${slides.length} generated:`, imageData.data.image_urls[0]);
+                const url = imageData?.image_urls?.[0];
+                if (!imageError && url) {
+                  collectedAssets.push({
+                    type: 'image',
+                    url: url,
+                    title: `Slide ${i + 1}/${slides.length}`,
+                    reasoning: slide.note || '',
+                    brandAlignment: brandKit ? 'Aligned with brand colors and voice' : ''
+                  });
+                  console.log(`[FALLBACK][Approval] Slide ${i + 1}/${slides.length} generated:`, url);
                   } else {
                     console.error(`[FALLBACK][Approval] Slide ${i + 1}/${slides.length} failed:`, imageError);
                   }
@@ -1004,7 +1005,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                     ? '1024x1280'
                     : '1024x1024';
 
-                const { data: imageData } = await supabase.functions.invoke('alfie-render-image', {
+                const { data: imageData, error: imageError } = await supabase.functions.invoke('alfie-render-image', {
                   body: {
                     provider: 'gemini_image',
                     prompt: slide.imagePrompt ?? `Image pour: ${slide.title ?? 'Slide'}`,
@@ -1020,8 +1021,9 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                   headers: { Authorization: authHeader },
                 });
 
-                const url = imageData?.data?.image_urls?.[0];
-                if (url) {
+                const url = imageData?.image_urls?.[0];
+                if (!imageError && url) {
+                  console.log('[Tool Execution] Image generated URL:', url);
                   generatedImages.push(url);
                   collectedAssets.push({
                     type: 'image',
@@ -1029,6 +1031,8 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                     slideIndex: i,
                     title: slide.title ?? `Slide ${i + 1}`,
                   });
+                } else {
+                  console.warn('[Tool Execution] Missing image URL for slide', i, 'response keys:', Object.keys(imageData || {}));
                 }
               }
 
@@ -1068,33 +1072,38 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                   ? '1024x1280'
                   : '1024x1024';
 
-              const { data: imageData, error: imageError } = await supabase.functions.invoke('alfie-render-image', {
-                body: {
-                  provider: 'gemini_image',
-                  prompt: optimizedPrompt,
-                  format,
-                  brand_id: brandId,
-                },
-                headers: { Authorization: authHeader },
-              });
+            const { data: imageData, error: imageError } = await supabase.functions.invoke('alfie-render-image', {
+              body: {
+                provider: 'gemini_image',
+                prompt: optimizedPrompt,
+                format,
+                brand_id: brandId,
+              },
+              headers: { Authorization: authHeader },
+            });
 
-              if (imageError) throw imageError;
+            if (imageError) throw imageError;
 
-              const url = imageData?.data?.image_urls?.[0];
-              if (!url) throw new Error('Image generation returned no URL');
+            const url = imageData?.image_urls?.[0];
+            if (!url) {
+              console.warn('[Tool Execution] Missing image URL, response keys:', Object.keys(imageData || {}));
+              throw new Error('Image generation returned no URL');
+            }
+            
+            console.log('[Tool Execution] Image generated URL:', url);
 
-              collectedAssets.push({
-                type: 'image',
-                url,
-                rationale: toolArgs.rationale ?? toolArgs.reasoning,
-                brandAlignment: 'Brand kit applied',
-              });
+            collectedAssets.push({
+              type: 'image',
+              url,
+              rationale: toolArgs.rationale ?? toolArgs.reasoning,
+              brandAlignment: 'Brand kit applied',
+            });
 
-              toolResult = {
-                success: true,
-                imageUrl: url,
-                generationId: imageData?.data?.generation_id,
-              };
+            toolResult = {
+              success: true,
+              imageUrl: url,
+              generationId: imageData?.generation_id,
+            };
               break;
             }
 
