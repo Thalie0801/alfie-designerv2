@@ -750,9 +750,33 @@ export function AlfieChat() {
         type: 'text'
       });
       
-      // Avertir si aucune génération n'a été lancée
-      if (!data.assets && !data.jobSetId) {
-        console.warn('[Orchestrator] ⚠️ No generation triggered, text-only response received. This might indicate the AI did not call any tools.');
+      // ✅ Si noToolCalls=true ET intent local détecté → déclencher génération directe
+      if (data.noToolCalls === true && !data.assets && !data.jobSetId) {
+        console.warn('[Orchestrator] ⚠️ No generation triggered, text-only response received. Attempting client fallback...');
+        
+        const localIntent = detectIntent(userMessage);
+        console.log('[Client Fallback] Detected local intent:', localIntent);
+        
+        if (localIntent === 'image') {
+          const aspectRatio = detectAspectRatio(userMessage);
+          console.log('[Client Fallback] Triggering direct image generation');
+          await generateImage(userMessage, aspectRatio);
+          return true;
+        } else if (localIntent === 'video') {
+          const aspectRatio = detectAspectRatio(userMessage);
+          console.log('[Client Fallback] Triggering direct video generation');
+          await generateVideo(userMessage, aspectRatio);
+          return true;
+        } else if (localIntent === 'carousel') {
+          const count = extractCount(userMessage);
+          const aspectRatio = detectAspectRatio(userMessage);
+          console.log('[Client Fallback] Triggering direct carousel generation');
+          await generateCarousel(userMessage, count, aspectRatio);
+          return true;
+        }
+        
+        // Si aucun intent détecté, afficher quand même le message de l'assistant
+        console.warn('[Client Fallback] No fallback action triggered');
       }
       
       // Traiter les assets s'il y en a

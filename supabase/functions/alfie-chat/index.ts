@@ -80,6 +80,23 @@ serve(async (req) => {
     }
 
     const { messages, brandId, stream = false, expertMode = false } = await req.json();
+    
+    // ✅ [TRACE] Log précoce de parsing
+    console.log('[TRACE] Parsed request body:', {
+      messagesCount: messages?.length || 0,
+      brandId: brandId || 'none',
+      expertMode
+    });
+    
+    // ✅ Contrôle de garde : messages obligatoire
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      console.error('[TRACE] ❌ Missing or empty messages array');
+      return new Response(JSON.stringify({ error: 'Messages array is required and must not be empty' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
@@ -105,6 +122,14 @@ serve(async (req) => {
           voice: brand.voice,
           niche: brand.niche
         };
+        
+        // ✅ [TRACE] Log du Brand Kit chargé
+        console.log('[TRACE] BrandKit loaded:', {
+          name: brand.name,
+          colorsCount: brand.palette?.length || 0,
+          fontsCount: brand.fonts?.length || 0,
+          voice: brand.voice
+        });
         
         // Construire le contexte Brand Kit enrichi
         const colorList = brand.palette?.map((c: any) => 
@@ -588,12 +613,12 @@ Example: "Professional product photography, 45° angle, gradient background (${b
       })), null, 2));
       console.log('[DEBUG] Tools available:', tools.map(t => t.function.name).join(', '));
 
-      // Appel avec fallback intelligent OpenAI → Gemini (OpenAI est plus fiable pour les tool_calls)
+      // ✅ Appel avec fallback intelligent Gemini → OpenAI (Gemini en priorité)
       aiResponse = await callAIWithFallback(
         conversationMessages,
         context,
         tools,
-        'openai',
+        'gemini', // ✅ Gemini en priorité
         iterationCount - 1 // iterationCount commence à 1, mais on veut 0 pour la première itération
       );
 
@@ -613,9 +638,9 @@ Example: "Professional product photography, 45° angle, gradient background (${b
       const toolCalls = assistantMessage.tool_calls;
       
       if (!toolCalls || toolCalls.length === 0) {
-        // FALLBACK: Si c'est la première itération et qu'aucun tool n'est appelé, forcer classify_intent
+        // ✅ FALLBACK DUR: Si c'est la première itération et qu'aucun tool n'est appelé
         if (iterationCount === 1) {
-          console.warn('[FALLBACK] AI did not call any tool on first iteration, forcing classify_intent manually');
+          console.warn('[FALLBACK] AI did not call any tool on first iteration, forcing manual intervention');
           
           // Détecter l'intent manuellement
           const lastUserMessage = conversationMessages.filter(m => m.role === 'user').pop()?.content || '';
@@ -623,34 +648,65 @@ Example: "Professional product photography, 45° angle, gradient background (${b
           
           console.log(`[FALLBACK] Detected intent: ${detectedIntent}`);
           
-          // Ajouter un faux tool_call dans l'historique
-          conversationMessages.push({
-            role: 'assistant',
-            content: null,
-            tool_calls: [{
-              id: 'fallback_classify',
-              type: 'function',
-              function: {
-                name: 'classify_intent',
-                arguments: JSON.stringify({ user_message: lastUserMessage })
-              }
-            }]
-          });
+          // ✅ Si carrousel → appeler directement alfie-plan-carousel
+          if (detectedIntent === 'carousel') {
+            console.log('[FALLBACK] Forcing plan_carousel call...');
+            
+            try {
+              const { data: planData } = await supabase.functions.invoke('alfie-plan-carousel', {
+                body: {
+                  prompt: lastUserMessage,
+                  slideCount: 5,
+                  brandKit: brandKit || {}
+                }
+              });
+              
+              // Ajouter le tool call et le résultat dans l'historique
+              conversationMessages.push({
+                role: 'assistant',
+                content: null,
+                tool_calls: [{
+                  id: 'fallback_plan',
+                  type: 'function',
+                  function: {
+                    name: 'plan_carousel',
+                    arguments: JSON.stringify({ prompt: lastUserMessage, count: 5 })
+                  }
+                }]
+              });
+              
+              conversationMessages.push({
+                role: 'tool',
+                tool_call_id: 'fallback_plan',
+                content: JSON.stringify(planData?.plan || { slides: [] })
+              });
+              
+              // Reboucler
+              continue;
+            } catch (error) {
+              console.error('[FALLBACK] Error calling plan_carousel:', error);
+            }
+          }
           
-          // Ajouter le résultat du tool
-          conversationMessages.push({
-            role: 'tool',
-            tool_call_id: 'fallback_classify',
-            content: JSON.stringify({ intent: detectedIntent })
-          });
-          
-          // Reboucler pour que l'IA réagisse à l'intent
-          continue;
+          // ✅ Si image/vidéo → pousser un message assistant minimal et reboucler
+          if (detectedIntent === 'image' || detectedIntent === 'video') {
+            console.log(`[FALLBACK] Priming ${detectedIntent} generation...`);
+            
+            conversationMessages.push({
+              role: 'assistant',
+              content: detectedIntent === 'image' 
+                ? 'Je vais générer une image pour toi. Quel format ? (1:1, 9:16, 16:9, 4:5)' 
+                : 'Je vais générer une vidéo. Quelle durée et quel format ? (9:16 Reel, 1:1, 16:9)'
+            });
+            
+            // Reboucler
+            continue;
+          }
         }
         
         // Pas de tools à exécuter, on sort de la boucle
         console.log('[Tool Loop] No more tool calls, finishing');
-        console.warn('[Tool Loop] ⚠️ AI returned text-only response without tool calls. This should not happen for generation requests.');
+        console.warn('[Tool Loop] ⚠️ AI returned text-only response without tool calls. Surfacing noToolCalls flag.');
         break;
       }
 
@@ -883,6 +939,12 @@ Example: "Professional product photography, 45° angle, gradient background (${b
         }
       }]
     };
+
+    // ✅ Surfacer si aucun tool n'a été appelé
+    if (collectedAssets.length === 0 && !finalJobSetId) {
+      responsePayload.noToolCalls = true;
+      console.warn('[Response] Surfacing noToolCalls=true (no generation triggered)');
+    }
 
     // Ajouter les assets collectés s'il y en a
     if (collectedAssets.length > 0) {

@@ -42,7 +42,7 @@ export const AI_CONFIGS: Record<AIProvider, AIConfig> = {
   },
   openai: {
     provider: 'openai',
-    model: 'openai/gpt-4o',
+    model: 'openai/gpt-5-mini', // ✅ Modèle supporté par Lovable AI
     endpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions'
   }
 };
@@ -91,19 +91,26 @@ export async function callAIWithFallback(
         }
       }
       
+      // ✅ Construire le body selon le provider (GPT-5 n'accepte pas temperature)
+      const requestBody: any = {
+        model: config.model,
+        messages: enrichedMessages,
+        tools: tools,
+        tool_choice: toolChoice
+      };
+      
+      // ✅ Ajouter temperature seulement pour Gemini
+      if (provider === 'gemini') {
+        requestBody.temperature = 0.7;
+      }
+      
       const response = await fetch(config.endpoint, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${LOVABLE_API_KEY}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          model: config.model,
-          messages: enrichedMessages,
-          tools: tools,
-          tool_choice: toolChoice,
-          temperature: 0.7
-        })
+        body: JSON.stringify(requestBody)
       });
       
       if (!response.ok) {
