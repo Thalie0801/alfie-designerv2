@@ -694,16 +694,6 @@ export function AlfieChat() {
   // ORCHESTRATOR BACKEND
   // ======
   
-  // Détection d'approbation
-  const isApproval = (msg: string): boolean => {
-    const lower = msg.trim().toLowerCase();
-    const approvalPhrases = [
-      'oui', 'ok', 'd\'accord', 'go', 'je valide', 'lance', 'vas-y', 
-      'parfait', 'c\'est bon', 'yes', 'yep', 'ouais', 'exact', 'carrément'
-    ];
-    return approvalPhrases.some(phrase => lower === phrase || lower.startsWith(phrase + ' '));
-  };
-  
   const orchestratorSend = async (userMessage: string): Promise<boolean> => {
     try {
       const headers = await getAuthHeader();
@@ -759,52 +749,6 @@ export function AlfieChat() {
         content: assistantMessage.content || '',
         type: 'text'
       });
-      
-      // ✅ Fallback élargi : si pas d'assets/jobSetId ET backend n'a pas géré, tenter génération client
-      // IMPORTANT : Ne pas déclencher si le backend a déjà tout géré (carrousels notamment)
-      if (!data.assets?.length && !data.jobSetId && data.noToolCalls) {
-        console.warn('[Orchestrator] ⚠️ No generation triggered, text-only response received. Attempting client fallback...');
-        
-        let promptToUse = userMessage;
-        
-        // Si c'est une approbation, chercher le dernier message d'intention
-        if (isApproval(userMessage)) {
-          console.log('[Client Fallback][Approval] Detected approval, searching for previous intent...');
-          
-          for (let i = messages.length - 1; i >= 0; i--) {
-            const msg = messages[i];
-            if (msg.role === 'user' && detectIntent(msg.content) !== 'unknown') {
-              promptToUse = msg.content;
-              console.log('[Client Fallback][Approval] Using previous intent message:', promptToUse.substring(0, 50));
-              break;
-            }
-          }
-        }
-        
-        const localIntent = detectIntent(promptToUse);
-        console.log('[Client Fallback] Detected local intent:', localIntent, 'from prompt:', promptToUse.substring(0, 50));
-        
-        if (localIntent === 'image') {
-          const aspectRatio = detectAspectRatio(promptToUse);
-          console.log('[Client Fallback] Triggering direct image generation');
-          await generateImage(promptToUse, aspectRatio);
-          return true;
-        } else if (localIntent === 'video') {
-          const aspectRatio = detectAspectRatio(promptToUse);
-          console.log('[Client Fallback] Triggering direct video generation');
-          await generateVideo(promptToUse, aspectRatio);
-          return true;
-        } else if (localIntent === 'carousel') {
-          const count = extractCount(promptToUse);
-          const aspectRatio = detectAspectRatio(promptToUse);
-          console.log('[Client Fallback] Triggering direct carousel generation');
-          await generateCarousel(promptToUse, count, aspectRatio);
-          return true;
-        }
-        
-        // Si aucun intent détecté, afficher quand même le message de l'assistant
-        console.warn('[Client Fallback] No fallback action triggered');
-      }
       
       // Traiter les assets s'il y en a
       if (data.assets && Array.isArray(data.assets)) {
