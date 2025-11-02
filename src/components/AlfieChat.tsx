@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Send, ImagePlus, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -398,41 +398,42 @@ export function AlfieChat() {
   // GÉNÉRATION DE CARROUSELS (NOUVEAU FLUX : PLAN TEXTUEL + BOUCLE IMAGE)
   // ======
   
-  interface CarouselSlide {
-    title: string;
-    text: string;
-    imagePrompt: string;
-  }
-  
-  const generateCarouselPlan = async (prompt: string, count: number): Promise<CarouselSlide[] | null> => {
-    // 1. Appel à l'IA pour générer le plan textuel (SIMULATION)
-    // En réalité, ici on appellerait une fonction Supabase ou une API LLM
-    
+  export interface CarouselSlide {
+	    title: string;
+	    text: string;
+	    imagePrompt: string;
+	  }
+	  
+	  const generateCarouselPlan = async (prompt: string, count: number): Promise<CarouselSlide[] | null> => {
+    // 1. Appel à l'IA pour générer le plan textuel (APPEL SUPABASE)
     addMessage({
       role: 'assistant',
       content: `🧠 Alfie est en train de générer le plan textuel de votre carrousel de ${count} slides...`,
       type: 'text'
     });
-    
-    // Simuler un délai de génération
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Simuler le contenu généré
-    const slides: CarouselSlide[] = [];
-    for (let i = 1; i <= count; i++) {
-      slides.push({
-        title: `Slide ${i}: Titre du Carrousel`,
-        text: `Ceci est le texte de la slide ${i}. Il est basé sur votre prompt : "${prompt}".`,
-        imagePrompt: `Image minimaliste et moderne pour la slide ${i} sur le thème de ${prompt}`
+
+    try {
+      const headers = await getAuthHeader();
+      const { data, error } = await supabase.functions.invoke('alfie-plan-carousel', {
+        body: { prompt, count },
+        headers
       });
+
+      if (error) throw error;
+
+      // Assurez-vous que la réponse est un tableau de CarouselSlide
+      if (!data || !Array.isArray(data)) {
+        throw new Error('Réponse invalide de alfie-plan-carousel');
+      }
+
+      return data as CarouselSlide[];
+
+    } catch (error: any) {
+      console.error('[Carousel Plan] Error:', error);
+      toast.error(`Échec de la planification : ${error.message}`);
+      return null;
     }
-    
-    return slides;
-  };
-  
-  const generateCarousel = async (prompt: string, count: number, aspectRatio: string) => {
-    // 1. Générer le plan textuel
-    const plan = await generateCarouselPlan(prompt, count);
+  };    const plan = await generateCarouselPlan(prompt, count);
     if (!plan) return;
     
     // 2. Afficher le plan et demander validation
