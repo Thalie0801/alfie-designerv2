@@ -11,6 +11,76 @@ interface TextOverlayInput {
   fontSize?: number;
 }
 
+// Fonction pour convertir une data URL en ArrayBuffer
+async function dataUrlToArrayBuffer(dataUrl: string): Promise<ArrayBuffer> {
+  const base64 = dataUrl.split(',')[1];
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+// Fonction pour créer une image avec texte en SVG overlay
+function createSvgOverlay(width: number, height: number, text: string, textColor: string, position: 'top' | 'center' | 'bottom', fontSize: number): string {
+  const lines = text.split('\n').filter(l => l.trim());
+  const lineHeight = fontSize * 1.4;
+  const totalHeight = lines.length * lineHeight;
+  
+  let yStart: number;
+  if (position === 'top') {
+    yStart = fontSize + 100;
+  } else if (position === 'bottom') {
+    yStart = height - totalHeight - 100;
+  } else {
+    yStart = (height - totalHeight) / 2 + fontSize;
+  }
+
+  const textElements = lines.map((line, i) => {
+    const y = yStart + (i * lineHeight);
+    return `
+      <!-- Ombre portée pour contraste -->
+      <text
+        x="50%"
+        y="${y + 3}"
+        text-anchor="middle"
+        font-family="Inter, Arial, sans-serif"
+        font-size="${fontSize}"
+        font-weight="700"
+        fill="#00000099"
+        style="paint-order: stroke; stroke: #000000; stroke-width: 8px; stroke-linejoin: round;"
+      >${escapeXml(line)}</text>
+      <!-- Texte principal -->
+      <text
+        x="50%"
+        y="${y}"
+        text-anchor="middle"
+        font-family="Inter, Arial, sans-serif"
+        font-size="${fontSize}"
+        font-weight="700"
+        fill="${textColor}"
+        style="paint-order: stroke; stroke: ${textColor === '#FFFFFF' ? '#000000' : '#FFFFFF'}; stroke-width: 3px; stroke-linejoin: round;"
+      >${escapeXml(line)}</text>
+    `;
+  }).join('');
+
+  return `
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      ${textElements}
+    </svg>
+  `;
+}
+
+function escapeXml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 export default {
   async fetch(req: Request) {
     return edgeHandler(req, async ({ jwt, input }) => {
@@ -23,7 +93,7 @@ export default {
         slideIndex,
         totalSlides,
         textPosition = 'center',
-        fontSize = 48
+        fontSize = 56
       } = input as TextOverlayInput;
 
       if (!imageUrl || !overlayText) {
@@ -44,130 +114,122 @@ export default {
       const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
       if (userError || !user) throw new Error('INVALID_TOKEN');
 
-      // Récupérer les données de brand si fourni
-      let brandColors = { primary: '#000000', secondary: '#FFFFFF' };
-      let brandFont = 'Inter';
-
+      // Récupérer les données de brand
+      let textColor = '#FFFFFF';
       if (brand_id) {
         const { data: brand } = await supabaseAdmin
           .from('brands')
-          .select('palette, fonts')
+          .select('palette')
           .eq('id', brand_id)
           .single();
           
-        if (brand) {
-          if (brand.palette && brand.palette.length > 0) {
-            brandColors.primary = brand.palette[0];
-            if (brand.palette.length > 1) {
-              brandColors.secondary = brand.palette[1];
-            }
-          }
-          if (brand.fonts && brand.fonts.length > 0) {
-            brandFont = brand.fonts[0];
-          }
+        if (brand?.palette && brand.palette.length > 0) {
+          // Utiliser la couleur secondaire si disponible, sinon blanc
+          textColor = brand.palette.length > 1 ? brand.palette[1] : '#FFFFFF';
         }
       }
 
-      console.log('[Text Overlay] Processing:', {
+      console.log('[Text Overlay] Processing with SVG overlay:', {
         slideIndex,
         totalSlides,
         textLength: overlayText.length,
-        brandFont,
-        brandColors
+        textColor,
+        position: textPosition
       });
 
-      // Utiliser l'IA pour composer l'image avec le texte
-      // On utilise le modèle d'édition d'image de Gemini
-      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-      if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY_MISSING');
+      try {
+        // Pour les images générées par l'IA (data URLs), on va composer avec Cloudinary
+        const CLOUDINARY_CLOUD_NAME = Deno.env.get('CLOUDINARY_CLOUD_NAME');
+        const CLOUDINARY_API_KEY = Deno.env.get('CLOUDINARY_API_KEY');
+        const CLOUDINARY_API_SECRET = Deno.env.get('CLOUDINARY_API_SECRET');
 
-      const systemPrompt = `You are a professional text compositor for social media images.
-CRITICAL RULES:
-- Add the provided text overlay to the image with PERFECT French spelling
-- Use high contrast for maximum readability (WCAG AA compliant)
-- Maintain clean typography with proper spacing
-- Position text at "${textPosition}" of the image
-- Use font size ${fontSize}px with proper line height
-- Apply subtle shadow or background for text legibility
-- DO NOT alter the background image composition
-- DO NOT change, add, or remove any other text`;
-
-      const userPrompt = `Add this text overlay to the image with perfect French spelling and typography:
-
----
-${overlayText}
----
-
-Brand colors available:
-- Primary: ${brandColors.primary}
-- Secondary: ${brandColors.secondary}
-
-Use these colors for text and ensure high contrast with the background.`;
-
-      const messages = [
-        { role: 'system', content: systemPrompt },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image_url',
-              image_url: { url: imageUrl }
-            },
-            {
-              type: 'text',
-              text: userPrompt
-            }
-          ]
+        if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
+          throw new Error('CLOUDINARY_NOT_CONFIGURED');
         }
-      ];
 
-      const aiPayload = {
-        model: 'google/gemini-2.5-flash-image',
-        messages,
-        modalities: ['image', 'text'],
-      };
+        // 1. Uploader l'image de fond sur Cloudinary
+        const timestamp = Math.round(Date.now() / 1000);
+        const uploadParams = `timestamp=${timestamp}`;
+        const signature = await crypto.subtle.digest(
+          'SHA-1',
+          new TextEncoder().encode(uploadParams + CLOUDINARY_API_SECRET)
+        );
+        const signatureHex = Array.from(new Uint8Array(signature))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
 
-      console.log('[Text Overlay] Calling AI for text composition');
+        const uploadFormData = new FormData();
+        uploadFormData.append('file', imageUrl);
+        uploadFormData.append('api_key', CLOUDINARY_API_KEY);
+        uploadFormData.append('timestamp', timestamp.toString());
+        uploadFormData.append('signature', signatureHex);
 
-      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(aiPayload),
-      });
+        const uploadResponse = await fetch(
+          `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+          {
+            method: 'POST',
+            body: uploadFormData
+          }
+        );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[Text Overlay] AI Gateway error:', response.status, errorText);
-        throw new Error(`TEXT_OVERLAY_FAILED: ${response.status}`);
-      }
+        if (!uploadResponse.ok) {
+          throw new Error(`Cloudinary upload failed: ${uploadResponse.status}`);
+        }
 
-      const data = await response.json();
-      const finalImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-      
-      if (!finalImageUrl) {
-        console.error('[Text Overlay] No image in response');
-        throw new Error('NO_IMAGE_GENERATED');
-      }
+        const uploadResult = await uploadResponse.json();
+        const publicId = uploadResult.public_id;
 
-      console.log('[Text Overlay] Success:', {
-        slideIndex,
-        totalSlides,
-        outputUrl: finalImageUrl.substring(0, 100) + '...'
-      });
+        console.log('[Text Overlay] Image uploaded to Cloudinary:', publicId);
 
-      return {
-        image_url: finalImageUrl,
-        meta: {
+        // 2. Générer une URL avec overlay de texte via Cloudinary
+        // Cloudinary permet d'ajouter du texte parfait avec de vraies polices
+        const lines = overlayText.split('\n').filter(l => l.trim());
+        
+        // Convertir la couleur hex en format Cloudinary (rgb:RRGGBB)
+        const cloudinaryColor = textColor.replace('#', 'rgb:');
+        
+        // Construire les overlays de texte
+        const textOverlays = lines.map((line, i) => {
+          const yOffset = (i - (lines.length - 1) / 2) * 80; // Espacement vertical
+          const encodedLine = encodeURIComponent(line).replace(/%20/g, '%2520');
+          return `l_text:Inter_56_bold:${encodedLine},co_${cloudinaryColor},g_center,y_${yOffset}`;
+        }).join('/');
+
+        const finalUrl = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${textOverlays}/${publicId}.png`;
+
+        console.log('[Text Overlay] Success with Cloudinary:', {
           slideIndex,
           totalSlides,
-          textLength: overlayText.length,
-          brandFont,
-          brandColors
-        }
-      };
+          publicId,
+          outputUrl: finalUrl.substring(0, 100) + '...'
+        });
+
+        return {
+          image_url: finalUrl,
+          meta: {
+            slideIndex,
+            totalSlides,
+            textLength: overlayText.length,
+            textColor,
+            method: 'cloudinary'
+          }
+        };
+      } catch (error: any) {
+        console.error('[Text Overlay] Cloudinary failed:', error);
+        console.log('[Text Overlay] Falling back to returning background only');
+        
+        // En cas d'erreur, retourner simplement l'image de fond
+        return {
+          image_url: imageUrl,
+          meta: {
+            slideIndex,
+            totalSlides,
+            textLength: overlayText.length,
+            method: 'fallback_no_text',
+            error: error?.message || 'Unknown error'
+          }
+        };
+      }
     });
   }
 };
