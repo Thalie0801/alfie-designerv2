@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { callAIWithFallback } from '../_shared/aiOrchestrator.ts';
+import { userHasAccess } from '../_shared/accessControl.ts';
 
 /**
  * Détecte l'intent d'un message utilisateur de manière simple (fallback si l'IA ne call pas classify_intent)
