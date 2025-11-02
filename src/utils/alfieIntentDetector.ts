@@ -1,9 +1,18 @@
 import { QUICK_INTENTS } from '@/config/alfieAI';
 
 export interface DetectedIntent {
-  type: 'open_canva' | 'show_brandkit' | 'check_credits' | 'show_usage' | 'package_download' | 'browse_templates' | 'unknown';
+  type: 'open_canva' | 'show_brandkit' | 'check_credits' | 'show_usage' | 'package_download' | 'browse_templates' | 'generate_image' | 'unknown';
   confidence: number;
   params?: Record<string, any>;
+}
+
+/**
+ * Détecte si le texte contient une demande de génération d'image
+ */
+export function wantsImageFromText(text: string): boolean {
+  const t = text.toLowerCase();
+  return /\b(image|visuel|cover|miniature|photo|illustration|vignette|bannière|banner)\b/.test(t) &&
+         !/\b(carrou?ss?el|carousel|vidéo|video|reel|story)\b/i.test(t);
 }
 
 /**
@@ -36,6 +45,15 @@ export function detectIntent(userMessage: string): DetectedIntent {
   // Package download
   if (QUICK_INTENTS.packageDownload.test(msg)) {
     return { type: 'package_download', confidence: 0.9 };
+  }
+
+  // Detect image generation request
+  if (wantsImageFromText(msg)) {
+    return {
+      type: 'generate_image',
+      confidence: 0.8,
+      params: { prompt: msg }
+    };
   }
 
   // Browse templates avec catégorie détectée

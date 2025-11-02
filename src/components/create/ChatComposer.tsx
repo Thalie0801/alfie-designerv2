@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
-import { Send, ImagePlus, Mic, Wand2 } from 'lucide-react';
+import { Send, ImagePlus, Mic, Wand2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { wantsImageFromText } from '@/utils/alfieIntentDetector';
 
 interface ChatComposerProps {
   value: string;
@@ -14,6 +15,7 @@ interface ChatComposerProps {
   conversationId?: string;
   uploadedImage?: string | null;
   onRemoveImage?: () => void;
+  onQuickGenerate?: () => void;
 }
 
 const QUICK_CHIPS = [
@@ -32,9 +34,11 @@ export function ChatComposer({
   uploadingImage,
   conversationId,
   uploadedImage,
-  onRemoveImage
+  onRemoveImage,
+  onQuickGenerate
 }: ChatComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const showQuickGenerate = onQuickGenerate && wantsImageFromText(value) && value.trim().length > 10;
 
   // Persister le brouillon dans localStorage
   useEffect(() => {
@@ -140,6 +144,21 @@ export function ChatComposer({
               </Button>
             </div>
           </div>
+
+          {showQuickGenerate && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={onQuickGenerate}
+              disabled={disabled || isLoading}
+              className="gap-2 touch-target shrink-0 h-12"
+              variant="secondary"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">Générer maintenant</span>
+              <span className="sm:hidden">Générer</span>
+            </Button>
+          )}
 
           <Button
             type="button"

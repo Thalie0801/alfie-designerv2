@@ -8,6 +8,7 @@ import { useTemplateLibrary } from '@/hooks/useTemplateLibrary';
 import { useAlfieOptimizations } from '@/hooks/useAlfieOptimizations';
 import { useCarouselSubscription } from '@/hooks/useCarouselSubscription';
 import { openInCanva } from '@/services/canvaLinker';
+import { wantsImageFromText } from '@/utils/alfieIntentDetector';
 import { supabase } from '@/integrations/supabase/client';
 import { getAuthHeader } from '@/lib/auth';
 import { detectIntent, canHandleLocally, generateLocalResponse } from '@/utils/alfieIntentDetector';
@@ -548,6 +549,8 @@ export function AlfieChat() {
       }
       
       case 'generate_image': {
+        console.log('[Image] generate_image called with:', args);
+        
         try {
           // ⚠️ GUARD : Si le prompt contient "carrousel", bloquer et forcer plan_carousel
           const promptLower = args.prompt?.toLowerCase() || '';
@@ -555,6 +558,10 @@ export function AlfieChat() {
             console.error('[Routing] ❌ BYPASS DETECTED: generate_image called with carousel keywords!');
             console.error('[Routing] Prompt:', args.prompt);
             toast.error("⚠️ Détection carrousel ! Utilise plan_carousel au lieu de generate_image.");
+            setMessages(prev => [...prev, {
+              role: 'assistant',
+              content: "⚠️ Pour créer un carousel, utilise plutôt la commande 'Crée-moi un carousel' avec ta description."
+            }]);
             return { 
               error: "⚠️ Détection carrousel ! Utilise plan_carousel au lieu de generate_image." 
             };
@@ -562,10 +569,10 @@ export function AlfieChat() {
           
           // Vérifier qu'une marque est active
           if (!activeBrandId) {
-            const errorMsg = "⚠️ Aucune marque active. Sélectionne d'abord une marque.";
+            const errorMsg = "⚠️ Aucune marque active. Tu dois d'abord sélectionner ou créer une marque pour générer des images. Va dans ton profil pour configurer ta marque.";
             setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }]);
-            toast.error(errorMsg);
-            return { error: errorMsg };
+            toast.error("Aucune marque active. Sélectionne ou crée une marque d'abord ! 🐾");
+            return { error: "No active brand" };
           }
           
           if (!user?.id) {
@@ -605,13 +612,40 @@ export function AlfieChat() {
           });
 
           if (error) {
-            console.error('Generate image error:', error);
-            throw error;
+            console.error('[Image] Generation error:', error);
+            const errorMsg = error.message || 'Erreur inconnue';
+            
+            // User-friendly error messages
+            let friendlyMsg = "❌ Génération échouée. ";
+            if (errorMsg.includes('INSUFFICIENT_QUOTA')) {
+              friendlyMsg += "Tu as atteint ton quota. Consulte ton quota dans ton profil.";
+            } else if (errorMsg.includes('MISSING_AUTH')) {
+              friendlyMsg += "Problème d'authentification. Reconnecte-toi.";
+            } else if (errorMsg.includes('DEBIT_FAILED')) {
+              friendlyMsg += "Impossible de débiter les Woofs. Vérifie ton solde.";
+            } else {
+              friendlyMsg += "Réessaie ou contacte le support.";
+            }
+            
+            toast.error(friendlyMsg);
+            setMessages(prev => [...prev, {
+              role: 'assistant',
+              content: friendlyMsg
+            }]);
+            setGenerationStatus(null);
+            return { error: errorMsg };
           }
 
           // alfie-render-image renvoie { ok, data: { image_urls, generation_id, meta } }
           if (!data?.ok || !data?.data?.image_urls?.[0]) {
-            throw new Error(data?.error || "Aucune image générée");
+            const errMsg = data?.error || "Aucune image générée";
+            toast.error(`Échec: ${errMsg}`);
+            setMessages(prev => [...prev, {
+              role: 'assistant',
+              content: `❌ Échec de génération: ${errMsg}`
+            }]);
+            setGenerationStatus(null);
+            return { error: errMsg };
           }
 
           const imageUrl = data.data.image_urls[0];
@@ -1372,7 +1406,8 @@ export function AlfieChat() {
       const decoder = new TextDecoder();
       let assistantMessage = '';
       let textBuffer = '';
-      let toolCallsBuffer: Record<number, { name?: string; arguments: string }> = {};
+      let toolCallsBuffer: Record<number, { name?: string; arguments: string; executed?: boolean }> = {};
+      let toolExecutionCount = 0;
 
       // Add empty assistant message that we'll update
       setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
@@ -1399,13 +1434,15 @@ export function AlfieChat() {
             const parsed = JSON.parse(jsonStr);
             const delta = parsed.choices?.[0]?.delta;
             
-            // Handle tool calls - accumulate arguments incrementally
+            // Handle tool calls - accumulate and execute immediately when valid
             if (delta?.tool_calls) {
+              console.log('[SSE] delta.tool_calls received:', delta.tool_calls);
+              
               for (const toolCall of delta.tool_calls) {
                 const index = toolCall.index ?? 0;
                 
                 if (!toolCallsBuffer[index]) {
-                  toolCallsBuffer[index] = { arguments: '' };
+                  toolCallsBuffer[index] = { arguments: '', executed: false };
                 }
                 
                 if (toolCall.function?.name) {
@@ -1414,6 +1451,26 @@ export function AlfieChat() {
                 
                 if (toolCall.function?.arguments) {
                   toolCallsBuffer[index].arguments += toolCall.function.arguments;
+                }
+                
+                // Try to execute immediately if we have valid JSON and haven't executed yet
+                const buffered = toolCallsBuffer[index];
+                if (buffered.name && buffered.arguments && !buffered.executed) {
+                  try {
+                    const args = JSON.parse(buffered.arguments);
+                    console.log('🔧 Executing tool NOW (streaming):', buffered.name, args);
+                    buffered.executed = true;
+                    toolExecutionCount++;
+                    
+                    // Execute in background to not block stream
+                    handleToolCall(buffered.name, args).then(result => {
+                      console.log('✅ Tool executed:', buffered.name, result);
+                    }).catch(err => {
+                      console.error('❌ Tool execution error:', buffered.name, err);
+                    });
+                  } catch (e) {
+                    // JSON not complete yet, will retry on next delta
+                  }
                 }
               }
             }
@@ -1437,18 +1494,36 @@ export function AlfieChat() {
         }
       }
       
-      // Execute accumulated tool calls after stream completes
-      console.log('🔧 Tool calls buffer:', toolCallsBuffer);
+      // Execute any remaining tool calls that weren't executed during streaming
+      console.log('🔧 Stream ended. Tool calls buffer:', toolCallsBuffer, 'Executed count:', toolExecutionCount);
+      
       for (const [, toolCall] of Object.entries(toolCallsBuffer)) {
-        if (toolCall.name && toolCall.arguments) {
+        if (toolCall.name && toolCall.arguments && !toolCall.executed) {
           try {
             const args = JSON.parse(toolCall.arguments);
-            console.log('🔧 Executing tool:', toolCall.name, args);
+            console.log('🔧 Executing remaining tool:', toolCall.name, args);
             const result = await handleToolCall(toolCall.name, args);
             console.log('✅ Tool result:', result);
+            toolExecutionCount++;
           } catch (e) {
             console.error('❌ Tool call execution error:', toolCall.name, e);
           }
+        }
+      }
+      
+      // Fallback: if no tool was executed and message looks like image request, auto-generate
+      if (toolExecutionCount === 0 && wantsImageFromText(userMessage)) {
+        const aspectRatio = detectAspectRatioFromText(userMessage);
+        console.log('⚠️ No tool executed but image detected. Triggering fallback generate_image with aspect:', aspectRatio);
+        
+        try {
+          const result = await handleToolCall('generate_image', {
+            prompt: userMessage,
+            aspect_ratio: aspectRatio
+          });
+          console.log('✅ Fallback image generation:', result);
+        } catch (e) {
+          console.error('❌ Fallback generation error:', e);
         }
       }
 
@@ -2010,6 +2085,18 @@ export function AlfieChat() {
         conversationId={conversationId ?? undefined}
         uploadedImage={uploadedImage}
         onRemoveImage={removeUploadedImage}
+        onQuickGenerate={() => {
+          if (!activeBrandId) {
+            toast.error("Sélectionne une marque d'abord ! 🐾");
+            return;
+          }
+          const aspectRatio = detectAspectRatioFromText(input);
+          console.log('[QuickGenerate] Triggering immediate image generation with aspect:', aspectRatio);
+          handleToolCall('generate_image', {
+            prompt: input,
+            aspect_ratio: aspectRatio
+          });
+        }}
       />
     </div>
   );
