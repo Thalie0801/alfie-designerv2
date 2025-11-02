@@ -135,13 +135,32 @@ Ton objectif est de générer un plan de carrousel de ${slideCount} slides basé
       throw new Error('AI returned an empty response');
     }
 
-    const plan = JSON.parse(jsonResponse) as { plan: CarouselPlan };
-
-    // Validation
-    if (!plan.plan || !Array.isArray(plan.plan.slides) || plan.plan.slides.length !== slideCount) {
-      console.error('[alfie-plan-carousel] Invalid plan structure:', plan);
-      throw new Error('AI returned an invalid plan structure or incorrect slide count');
+    const parsed = JSON.parse(jsonResponse);
+    
+    // Accepter deux formats : { plan: { slides: [...] } } OU directement un tableau de slides
+    let slides: CarouselSlide[];
+    
+    if (parsed.plan?.slides) {
+      // Format attendu : { plan: { slides: [...] } }
+      slides = parsed.plan.slides;
+    } else if (Array.isArray(parsed.slides)) {
+      // Format alternatif : { slides: [...] }
+      slides = parsed.slides;
+    } else if (Array.isArray(parsed)) {
+      // Format direct : [{slide1}, {slide2}, ...]
+      slides = parsed;
+    } else {
+      console.error('[alfie-plan-carousel] Invalid plan structure:', parsed);
+      throw new Error('AI returned an invalid plan structure');
     }
+
+    // Validation du nombre de slides
+    if (!Array.isArray(slides) || slides.length !== slideCount) {
+      console.error(`[alfie-plan-carousel] Expected ${slideCount} slides, got ${slides?.length || 0}`);
+      throw new Error(`AI returned incorrect slide count: expected ${slideCount}, got ${slides?.length || 0}`);
+    }
+    
+    const plan = { plan: { slides } };
 
     // Validation des limites de caractères
     const LIMITS = {
