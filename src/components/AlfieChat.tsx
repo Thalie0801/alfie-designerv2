@@ -8,7 +8,6 @@ import { useTemplateLibrary } from '@/hooks/useTemplateLibrary';
 import { useAlfieOptimizations } from '@/hooks/useAlfieOptimizations';
 import { useCarouselSubscription } from '@/hooks/useCarouselSubscription';
 import { openInCanva } from '@/services/canvaLinker';
-import { wantsImageFromText } from '@/utils/alfieIntentDetector';
 import { supabase } from '@/integrations/supabase/client';
 import { getAuthHeader } from '@/lib/auth';
 import { detectIntent, canHandleLocally, generateLocalResponse } from '@/utils/alfieIntentDetector';
@@ -189,9 +188,11 @@ export function AlfieChat() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isAlfieThinking, setIsAlfieThinking] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [carouselPlan, setCarouselPlan] = useState<any>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<{ type: string; message: string } | null>(null);
   const [composerHeight, setComposerHeight] = useState(192);
@@ -199,7 +200,8 @@ export function AlfieChat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeJobSetId, setActiveJobSetId] = useState<string>('');
   const [carouselTotal, setCarouselTotal] = useState(0);
-  const [carouselPlan, setCarouselPlan] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_videoJobId, _setVideoJobId] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_currentSlideIndex, setCurrentSlideIndex] = useState<number>(0); // Used for tracking slide-by-slide validation flow
   const { items: carouselItems, done: carouselDone, refresh: refreshCarousel } = useCarouselSubscription(activeJobSetId, carouselTotal);
@@ -461,8 +463,128 @@ export function AlfieChat() {
     toast.info('Image retirée');
   };
 
+  // Helper function to format carousel plan for display
+  const formatCarouselPlan = (plan: any): string => {
+    if (!plan?.slides) return "Plan non disponible";
+    
+    return plan.slides.map((slide: any, idx: number) => {
+      const num = idx + 1;
+      if (slide.type === 'hook') {
+        return `**Slide ${num} (Hook)** : ${slide.title || slide.text}`;
+      }
+      if (slide.type === 'cta') {
+        return `**Slide ${num} (CTA)** : ${slide.title || slide.text}`;
+      }
+      const bullets = slide.bullets?.map((b: string) => `  • ${b}`).join('\n') || '';
+      return `**Slide ${num}** : ${slide.title}\n${bullets}`;
+    }).join('\n\n');
+  };
+
   const handleToolCall = async (toolName: string, args: any) => {
     console.log('Tool call:', toolName, args);
+    
+    // New tool calls from alfie-chat
+    switch (toolName) {
+      case 'plan_carousel': {
+        console.log('[Carousel] Planning carousel with:', args);
+        
+        try {
+          const { data, error } = await supabase.functions.invoke('alfie-plan-carousel', {
+            body: {
+              prompt: args.prompt || args.topic,
+              slideCount: args.slides || 5,
+              brandKit: brandKit
+            }
+          });
+          
+          if (error) throw error;
+          
+          // Stocker le plan pour validation utilisateur
+          setCarouselPlan(data);
+          
+          // Afficher le plan dans le chat
+          const planMessage = formatCarouselPlan(data);
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `📋 **Plan carrousel proposé** :\n\n${planMessage}\n\nJe lance la génération ? (réponds "oui" pour valider)`
+          }]);
+          
+          return { success: true, plan: data };
+        } catch (error: any) {
+          console.error('[Carousel] Planning error:', error);
+          toast.error("Erreur lors de la planification du carrousel");
+          return { error: error.message };
+        }
+      }
+
+      case 'create_carousel': {
+        console.log('[Carousel] Creating carousel with plan:', carouselPlan);
+        
+        if (!carouselPlan) {
+          toast.error("Aucun plan de carrousel à exécuter");
+          return { error: "No carousel plan available" };
+        }
+        
+        try {
+          const { data, error } = await supabase.functions.invoke('chat-create-carousel', {
+            body: {
+              brandId: activeBrandId,
+              prompt: carouselPlan.prompt,
+              count: carouselPlan.slides?.length || 5,
+              aspectRatio: args.aspectRatio || '1:1'
+            }
+          });
+          
+          if (error) throw error;
+          
+          setActiveJobSetId(data.jobSetId);
+          setGenerationStatus({ 
+            type: 'carousel', 
+            message: '🎨 Génération du carrousel lancée...' 
+          });
+          
+          // Trigger worker
+          await triggerWorker();
+          
+          return { success: true, jobSetId: data.jobSetId };
+        } catch (error: any) {
+          console.error('[Carousel] Creation error:', error);
+          toast.error("Erreur lors de la création du carrousel");
+          return { error: error.message };
+        }
+      }
+
+      case 'generate_video': {
+        console.log('[Video] Generating video with:', args);
+        
+        try {
+          const { data, error } = await supabase.functions.invoke('generate-video', {
+            body: {
+              prompt: args.prompt || args.script,
+              aspectRatio: args.ratio || args.aspectRatio || '16:9',
+              imageUrl: args.imageUrl,
+              brandId: activeBrandId
+            }
+          });
+          
+          if (error) throw error;
+          
+          _setVideoJobId(data.jobId);
+          setGenerationStatus({ 
+            type: 'video', 
+            message: '🎬 Génération vidéo en cours...' 
+          });
+          
+          toast.success("Vidéo en cours de génération !");
+          
+          return { success: true, jobId: data.jobId };
+        } catch (error: any) {
+          console.error('[Video] Generation error:', error);
+          toast.error("Erreur lors de la génération vidéo");
+          return { error: error.message };
+        }
+      }
+    }
     
     // ⚠️ PRE-ROUTING : Détecter si l'intention carrousel a été ignorée
     if (toolName === 'generate_image') {
@@ -1366,157 +1488,103 @@ export function AlfieChat() {
   };
 
   const streamChat = async (userMessage: string) => {
-    const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/alfie-chat`;
+    console.log('[Chat] Starting chat with alfie-chat edge function:', userMessage);
     
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
+      setIsLoading(true);
+      setIsAlfieThinking(true);
+      
+      // Add user message to conversation
+      const userMsg = { 
+        role: 'user' as const, 
+        content: userMessage,
+        ...(uploadedImage && { imageUrl: uploadedImage })
       };
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
+      
+      setMessages(prev => [...prev, userMsg]);
+      
+      // Persist user message
+      if (conversationId) {
+        await supabase.from('alfie_messages').insert({
+          conversation_id: conversationId,
+          role: 'user',
+          content: userMessage,
+          ...(uploadedImage && { image_url: uploadedImage })
+        });
       }
 
-      const response = await fetch(CHAT_URL, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          messages: [...messages, { role: 'user', content: userMessage, imageUrl: uploadedImage }],
-          brandId: brandKit?.id // Pass active brand ID
-        }),
+      // Call alfie-chat edge function
+      const headers = await getAuthHeader();
+      const { data: chatResponse, error: chatError } = await supabase.functions.invoke('alfie-chat', {
+        body: {
+          messages: messages.map(m => ({
+            role: m.role,
+            content: m.content,
+            ...(m.imageUrl && { imageUrl: m.imageUrl })
+          })).concat([userMsg]),
+          brandId: activeBrandId || brandKit?.id,
+          stream: false
+        },
+        headers
       });
 
-      if (!response.ok) {
-        if (response.status === 429) {
+      if (chatError) {
+        console.error('[Chat] alfie-chat error:', chatError);
+        if (chatError.message?.includes('429')) {
           toast.error("Trop de requêtes, patiente un instant !");
           return;
         }
-        if (response.status === 402) {
+        if (chatError.message?.includes('402')) {
           toast.error("Crédit insuffisant.");
           return;
         }
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw chatError;
       }
 
-      if (!response.body) {
-        throw new Error('No response body');
-      }
+      // Parse response from alfie-chat
+      const lastChoice = chatResponse?.choices?.[0];
+      const assistantMessage = lastChoice?.message?.content || '';
+      const toolCalls = lastChoice?.message?.tool_calls || [];
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let assistantMessage = '';
-      let textBuffer = '';
-      let toolCallsBuffer: Record<number, { name?: string; arguments: string; executed?: boolean }> = {};
-      let toolExecutionCount = 0;
+      console.log('[Chat] alfie-chat response:', { assistantMessage, toolCalls });
 
-      // Add empty assistant message that we'll update
-      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        textBuffer += decoder.decode(value, { stream: true });
+      // Add assistant message if present
+      if (assistantMessage) {
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: assistantMessage 
+        }]);
         
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
-
-          if (line.endsWith('\r')) line = line.slice(0, -1);
-          if (line.startsWith(':') || line.trim() === '') continue;
-          if (!line.startsWith('data: ')) continue;
-
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === '[DONE]') break;
-
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const delta = parsed.choices?.[0]?.delta;
-            
-            // Handle tool calls - accumulate and execute immediately when valid
-            if (delta?.tool_calls) {
-              console.log('[SSE] delta.tool_calls received:', delta.tool_calls);
-              
-              for (const toolCall of delta.tool_calls) {
-                const index = toolCall.index ?? 0;
-                
-                if (!toolCallsBuffer[index]) {
-                  toolCallsBuffer[index] = { arguments: '', executed: false };
-                }
-                
-                if (toolCall.function?.name) {
-                  toolCallsBuffer[index].name = toolCall.function.name;
-                }
-                
-                if (toolCall.function?.arguments) {
-                  toolCallsBuffer[index].arguments += toolCall.function.arguments;
-                }
-                
-                // Try to execute immediately if we have valid JSON and haven't executed yet
-                const buffered = toolCallsBuffer[index];
-                if (buffered.name && buffered.arguments && !buffered.executed) {
-                  try {
-                    const args = JSON.parse(buffered.arguments);
-                    console.log('🔧 Executing tool NOW (streaming):', buffered.name, args);
-                    buffered.executed = true;
-                    toolExecutionCount++;
-                    
-                    // Execute in background to not block stream
-                    handleToolCall(buffered.name, args).then(result => {
-                      console.log('✅ Tool executed:', buffered.name, result);
-                    }).catch(err => {
-                      console.error('❌ Tool execution error:', buffered.name, err);
-                    });
-                  } catch (e) {
-                    // JSON not complete yet, will retry on next delta
-                  }
-                }
-              }
-            }
-            
-            // Handle regular content
-            const content = delta?.content;
-            if (content) {
-              assistantMessage += content;
-              setMessages(prev => {
-                const newMessages = [...prev];
-                newMessages[newMessages.length - 1] = {
-                  role: 'assistant',
-                  content: assistantMessage
-                };
-                return newMessages;
-              });
-            }
-          } catch (e) {
-            // Ignore parse errors for incomplete JSON
-          }
+        // Persist assistant message
+        if (conversationId) {
+          await supabase.from('alfie_messages').insert({
+            conversation_id: conversationId,
+            role: 'assistant',
+            content: assistantMessage
+          });
         }
       }
-      
-      // Execute any remaining tool calls that weren't executed during streaming
-      console.log('🔧 Stream ended. Tool calls buffer:', toolCallsBuffer, 'Executed count:', toolExecutionCount);
-      
-      for (const [, toolCall] of Object.entries(toolCallsBuffer)) {
-        if (toolCall.name && toolCall.arguments && !toolCall.executed) {
-          try {
-            const args = JSON.parse(toolCall.arguments);
-            console.log('🔧 Executing remaining tool:', toolCall.name, args);
-            const result = await handleToolCall(toolCall.name, args);
-            console.log('✅ Tool result:', result);
-            toolExecutionCount++;
-          } catch (e) {
-            console.error('❌ Tool call execution error:', toolCall.name, e);
-          }
+
+      // Execute tool calls
+      for (const toolCall of toolCalls) {
+        const toolName = toolCall.function?.name;
+        const toolArgs = JSON.parse(toolCall.function?.arguments || '{}');
+        
+        console.log('[Chat] Executing tool from alfie-chat:', toolName, toolArgs);
+        
+        try {
+          const result = await handleToolCall(toolName, toolArgs);
+          console.log('[Chat] Tool result:', result);
+        } catch (err) {
+          console.error('[Chat] Tool execution error:', toolName, err);
+          toast.error(`Erreur lors de l'exécution de ${toolName}`);
         }
       }
-      
-      // Fallback: if no tool was executed and message looks like image request, auto-generate
-      if (toolExecutionCount === 0 && wantsImageFromText(userMessage)) {
+
+      // Fallback: if image in context but no tool called, trigger image generation
+      if (uploadedImage && toolCalls.length === 0 && !assistantMessage) {
+        console.log('[Chat] Image in context but no tool called, triggering fallback generation');
         const aspectRatio = detectAspectRatioFromText(userMessage);
-        console.log('⚠️ No tool executed but image detected. Triggering fallback generate_image with aspect:', aspectRatio);
-        
         try {
           const result = await handleToolCall('generate_image', {
             prompt: userMessage,
@@ -1528,59 +1596,12 @@ export function AlfieChat() {
         }
       }
 
-      // Flush remaining buffer
-      if (textBuffer.trim()) {
-        const lines = textBuffer.split('\n');
-        for (let line of lines) {
-          if (line.endsWith('\r')) line = line.slice(0, -1);
-          if (line.startsWith(':') || line.trim() === '') continue;
-          if (!line.startsWith('data: ')) continue;
-          
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === '[DONE]') continue;
-          
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) {
-              assistantMessage += content;
-              setMessages(prev => {
-                const newMessages = [...prev];
-                newMessages[newMessages.length - 1] = {
-                  role: 'assistant',
-                  content: assistantMessage
-                };
-                return newMessages;
-              });
-            }
-          } catch (e) {
-            // Ignore
-          }
-        }
-      }
-
-      // Persister le message assistant à la fin du stream
-      try {
-        if (assistantMessage.trim() && conversationId) {
-          await supabase.from('alfie_messages').insert({
-            conversation_id: conversationId,
-            role: 'assistant',
-            content: assistantMessage
-          });
-          await supabase
-            .from('alfie_conversations')
-            .update({ updated_at: new Date().toISOString() })
-            .eq('id', conversationId);
-        }
-      } catch (e) {
-        console.error('Persist assistant message error:', e);
-      }
-
-    } catch (error) {
-      console.error('Chat error:', error);
-      toast.error("Oups, une erreur est survenue !");
-      // Remove the empty assistant message if error
-      setMessages(prev => prev.slice(0, -1));
+    } catch (error: any) {
+      console.error('[Chat] alfie-chat error:', error);
+      toast.error(error.message || "Erreur lors de la communication avec Alfie");
+    } finally {
+      setIsLoading(false);
+      setIsAlfieThinking(false);
     }
   };
 
@@ -1985,14 +2006,14 @@ export function AlfieChat() {
               );
             })}
 
-            {(isLoading || generationStatus) && (
+            {(isLoading || isAlfieThinking || generationStatus) && (
               <div className="animate-fade-in">
                 <ChatBubble
                   role="assistant"
                   content={generationStatus?.message || 'Alfie réfléchit à ta demande...'}
                   isStatus
                   generationType={generationStatus?.type === 'video' ? 'video' : generationStatus ? 'image' : 'text'}
-                  isLoading={isLoading && !generationStatus}
+                  isLoading={isLoading || isAlfieThinking && !generationStatus}
                 />
               </div>
             )}

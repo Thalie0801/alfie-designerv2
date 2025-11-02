@@ -51,7 +51,7 @@ serve(async (req) => {
       });
     }
 
-    const { messages, brandId } = await req.json();
+    const { messages, brandId, stream = false } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
@@ -381,7 +381,7 @@ Sois concis, pédagogue, et appuie-toi sur **classify_intent** avant d'agir.`;
           ...transformedMessages
         ],
         tools: tools,
-        stream: true,
+        stream: stream,
       }),
     });
 
@@ -410,14 +410,22 @@ Sois concis, pédagogue, et appuie-toi sur **classify_intent** avant d'agir.`;
       throw new Error(`AI gateway error: ${response.status}`);
     }
 
-    return new Response(response.body, {
-      headers: { 
-        ...corsHeaders, 
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive"
-      },
-    });
+    // Return response based on stream mode
+    if (stream) {
+      return new Response(response.body, {
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive"
+        },
+      });
+    } else {
+      const jsonResponse = await response.json();
+      return new Response(JSON.stringify(jsonResponse), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
   } catch (error) {
     console.error("Error in alfie-chat:", error);
     return new Response(
