@@ -90,27 +90,55 @@ export function QuotaBar({ activeBrandId }: QuotaBarProps) {
   };
 
   return (
-    <details className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border group">
-      <summary className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors list-none">
-        <div className="flex items-center gap-4">
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted text-sm font-medium ${getQuotaColor(visualsPercent)}`}>
-            <span className="text-xs">📸</span>
-            <span>
-              Visuels : {quota.visuals_remaining}/{quota.visuals_quota}
-            </span>
+    <details className="sticky top-0 z-30 bg-gradient-to-r from-background via-background/98 to-background backdrop-blur-xl border-b border-border/50 shadow-sm group">
+      <summary className="flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-muted/30 transition-all duration-200 list-none">
+        <div className="flex items-center gap-3">
+          {/* Badge Visuels avec barre de progression */}
+          <div className="flex flex-col gap-1">
+            <div className={`flex items-center gap-2 px-3 py-1 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 text-sm font-semibold ${getQuotaColor(visualsPercent)} border border-blue-200 dark:border-blue-800 shadow-sm`}>
+              <span className="text-xs">📸</span>
+              <span className="text-xs">
+                {quota.visuals_remaining}/{quota.visuals_quota}
+              </span>
+            </div>
+            <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div 
+                className={`h-full transition-all duration-500 ${
+                  visualsPercent >= 90 ? 'bg-red-500' : 
+                  visualsPercent >= 70 ? 'bg-yellow-500' : 
+                  'bg-green-500'
+                }`}
+                style={{ width: `${visualsPercent}%` }}
+              />
+            </div>
           </div>
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted text-sm font-medium ${getQuotaColor(woofsPercent)}`}>
-            <span className="text-xs">🐾</span>
-            <span>
-              Woofs : {quota.woofs_remaining}/{quota.woofs_quota}
-            </span>
+          
+          {/* Badge Woofs avec barre de progression */}
+          <div className="flex flex-col gap-1">
+            <div className={`flex items-center gap-2 px-3 py-1 rounded-lg bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 text-sm font-semibold ${getQuotaColor(woofsPercent)} border border-orange-200 dark:border-orange-800 shadow-sm`}>
+              <span className="text-xs">🐾</span>
+              <span className="text-xs">
+                {quota.woofs_remaining}/{quota.woofs_quota}
+              </span>
+            </div>
+            <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div 
+                className={`h-full transition-all duration-500 ${
+                  woofsPercent >= 90 ? 'bg-red-500' : 
+                  woofsPercent >= 70 ? 'bg-yellow-500' : 
+                  'bg-green-500'
+                }`}
+                style={{ width: `${woofsPercent}%` }}
+              />
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">
+        
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-medium text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">
             Reset : {formatResetDate(quota.reset_date)}
           </span>
-          <span className="text-xs text-muted-foreground group-open:rotate-180 transition-transform">
+          <span className="text-xs text-muted-foreground group-open:rotate-180 transition-transform duration-200">
             ▼
           </span>
         </div>
