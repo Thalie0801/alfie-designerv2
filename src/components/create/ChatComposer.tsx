@@ -96,8 +96,8 @@ export function ChatComposer({
   };
 
   return (
-    <div className="fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur border-t p-3 sm:p-4 z-10 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-4">
-      <div className="max-w-4xl mx-auto space-y-2 sm:space-y-3">
+    <div className="fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur border-t pt-4 px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pt-4 sm:px-4 sm:pb-4 z-10">
+      <div className="max-w-4xl mx-auto space-y-3">
         
         <div className="flex items-end gap-1.5 sm:gap-2">
           <div className="flex-1 relative">
@@ -172,7 +172,7 @@ export function ChatComposer({
         </div>
 
         {QUICK_CHIPS.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-1">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-2">
             {QUICK_CHIPS.map((chip) => (
               <Button
                 key={chip.label}

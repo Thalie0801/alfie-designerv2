@@ -1913,8 +1913,8 @@ export function AlfieChat() {
       />
       
       {/* Messages area with bottom padding for fixed composer */}
-      <div className="flex-1 overflow-y-auto pb-32">
-        <div className="mx-auto w-full max-w-3xl px-4 py-6">
+        <div className="flex-1 overflow-y-auto pb-48 sm:pb-44">
+          <div className="mx-auto w-full max-w-3xl px-3 py-4 sm:px-4 sm:py-6">
           <section className="flex flex-col gap-4">
             {messages.map((message, index) => {
               if (message.jobId) {
