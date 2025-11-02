@@ -187,6 +187,7 @@ export function AlfieChat() {
   const [loaded, setLoaded] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [carouselPlan, setCarouselPlan] = useState<any>(null);
+  const [originalCarouselPrompt, setOriginalCarouselPrompt] = useState<string>('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<{ type: string; message: string } | null>(null);
   const [composerHeight, setComposerHeight] = useState(192);
@@ -1388,6 +1389,7 @@ export function AlfieChat() {
           
           // Stocker le plan en state pour utilisation ultérieure
           setCarouselPlan(data.plan);
+          setOriginalCarouselPrompt(prompt); // Stocker le prompt original
           setCurrentSlideIndex(0);
           
           console.log('[Plan] ✅ Plan generated:', data.plan);
@@ -1458,7 +1460,7 @@ export function AlfieChat() {
             const { data: jobSetData, error: jobSetError } = await supabase.functions.invoke('create-job-set', {
               body: { 
                 brandId: activeBrandId, 
-                prompt: carouselPlan.globals?.promise || "Carousel",
+                prompt: originalCarouselPrompt || carouselPlan.globals?.promise || "Carousel",
                 count: carouselPlan.slides.length,
                 aspectRatio: aspect_ratio
               },
@@ -1590,7 +1592,7 @@ export function AlfieChat() {
         console.log('[Chat] User validation detected, auto-triggering create_carousel');
         
         await handleToolCall('create_carousel', {
-          prompt: carouselPlan.globals?.promise || 'Carousel',
+          prompt: originalCarouselPrompt || carouselPlan.globals?.promise || 'Carousel',
           count: carouselPlan.slides?.length || 5,
           aspect_ratio: '4:5'
         });
@@ -1821,6 +1823,7 @@ export function AlfieChat() {
       setUploadedImage(null);
       setActiveJobSetId('');
       setCarouselTotal(0);
+      setOriginalCarouselPrompt(''); // Réinitialiser le prompt original
       localStorage.removeItem('activeJobSetId');
       localStorage.removeItem('carouselTotal');
       
