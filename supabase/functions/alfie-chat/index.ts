@@ -1005,34 +1005,63 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                     ? '1024x1280'
                     : '1024x1024';
 
-                const { data: imageData, error: imageError } = await supabase.functions.invoke('alfie-render-image', {
+                // NOUVELLE APPROCHE 2 ÉTAPES: Fond sans texte + Overlay texte
+                // ÉTAPE 1: Générer le fond visuel (sans texte)
+                const { data: bgData, error: bgError } = await supabase.functions.invoke('alfie-render-image', {
                   body: {
                     provider: 'gemini_image',
                     prompt: slide.imagePrompt ?? `Image pour: ${slide.title ?? 'Slide'}`,
                     format,
                     brand_id: brandId,
-                    backgroundOnly: false,
+                    backgroundOnly: true, // ← PAS DE TEXTE généré par l'IA
                     slideIndex: i,
                     totalSlides: slides.length,
-                    overlayText,
-                    negativePrompt:
-                      'logos de marques tierces, filigranes, artefacts, texte illisible',
+                    negativePrompt: 'logos de marques tierces, filigranes, artefacts, texte, typography, letters',
                   },
                   headers: { Authorization: authHeader },
                 });
 
-                const url = imageData?.data?.image_urls?.[0];
-                if (!imageError && url) {
-                  console.log('[Tool Execution] Image generated URL:', url);
+                const bgUrl = bgData?.data?.image_urls?.[0];
+                if (bgError || !bgUrl) {
+                  console.error(`[Tool Execution] Background generation failed for slide ${i + 1}:`, bgError);
+                  continue;
+                }
+                console.log(`[Tool Execution] Background generated for slide ${i + 1}:`, bgUrl.substring(0, 80) + '...');
+
+                // ÉTAPE 2: Ajouter le texte en overlay (orthographe parfaite)
+                const { data: finalData, error: textError } = await supabase.functions.invoke('alfie-add-text-overlay', {
+                  body: {
+                    imageUrl: bgUrl,
+                    overlayText,
+                    brand_id: brandId,
+                    slideIndex: i,
+                    totalSlides: slides.length,
+                    textPosition: 'center',
+                    fontSize: 48
+                  },
+                  headers: { Authorization: authHeader },
+                });
+
+                const finalUrl = finalData?.data?.image_url;
+                if (textError || !finalUrl) {
+                  console.error(`[Tool Execution] Text overlay failed for slide ${i + 1}:`, textError);
+                  // En cas d'échec du texte, on utilise quand même le fond
                   collectedAssets.push({
                     type: 'image',
-                    url: url,
-                    title: `Slide ${i + 1}/${slides.length}`,
+                    url: bgUrl,
+                    title: `Slide ${i + 1}/${slides.length} (background only)`,
                     reasoning: slide.note || '',
                     brandAlignment: brandKit ? 'Aligned with brand colors and voice' : ''
                   });
                 } else {
-                  console.warn('[Tool Execution] Missing image URL for slide', i, 'response keys:', Object.keys(imageData || {}));
+                  console.log(`[Tool Execution] Final image with text for slide ${i + 1}:`, finalUrl.substring(0, 80) + '...');
+                  collectedAssets.push({
+                    type: 'image',
+                    url: finalUrl,
+                    title: `Slide ${i + 1}/${slides.length}`,
+                    reasoning: slide.note || '',
+                    brandAlignment: brandKit ? 'Aligned with brand colors and voice' : ''
+                  });
                 }
               }
 
