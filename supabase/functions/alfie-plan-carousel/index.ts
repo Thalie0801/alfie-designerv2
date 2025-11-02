@@ -184,6 +184,42 @@ Exemples :
       throw new Error(`AI returned incorrect slide count: expected ${slideCount}, got ${slides?.length || 0}`);
     }
     
+    // Ajuster le nombre de slides (pad/truncate)
+    if (slides.length > slideCount) {
+      slides.length = slideCount;
+      console.warn(`[Plan Carousel] Truncated to ${slideCount} slides`);
+    } else if (slides.length < slideCount) {
+      while (slides.length < slideCount) {
+        const missingIndex = slides.length + 1;
+        slides.push({
+          type: 'impact',
+          title: `Point ${missingIndex}`,
+          subtitle: '',
+          bullets: [],
+          note: 'Minimalist solid background, high-contrast, NO TEXT',
+          slideNumber: `${missingIndex}/${slideCount}`,
+          backgroundStyle: 'solid',
+          textContrast: 'dark'
+        });
+      }
+      console.warn(`[Plan Carousel] Padded to ${slideCount} slides`);
+    }
+
+    // Auto-fill metadata manquantes
+    for (let i = 0; i < slides.length; i++) {
+      if (!slides[i].slideNumber) {
+        slides[i].slideNumber = `${i + 1}/${slideCount}`;
+      }
+      if (!slides[i].backgroundStyle) {
+        slides[i].backgroundStyle = i === 0 ? 'gradient' : 'solid';
+      }
+      if (!slides[i].textContrast) {
+        slides[i].textContrast = 'dark';
+      }
+      if (i === 0) slides[i].type = 'hero';
+      if (i === slides.length - 1) slides[i].type = 'cta';
+    }
+    
     const plan = { plan: { slides } };
 
     // Validation des limites de caractères

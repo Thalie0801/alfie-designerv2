@@ -183,35 +183,35 @@ export default {
         const title = lines[0] || '';
         const subtitle = lines.slice(1).join(' ') || '';
         
-        // Convertir la couleur hex en format Cloudinary (rgb:RRGGBB)
-        const cloudinaryColor = textColor.replace('#', 'rgb:');
-        const shadowColor = textContrast === 'light' ? 'rgb:000000' : 'rgb:FFFFFF';
+        // Convertir la couleur hex en format Cloudinary
+        const cloudinaryColor = textColor.replace('#', '');
+        const strokeColor = textContrast === 'light' ? '000000' : 'FFFFFF';
         
-        // 3. Construire les overlays de texte avec numérotation et indicateurs
+        // 3. Construire les overlays de texte avec Arial, wrapping, shadow
         const overlays = [];
         
         // Layer 1: Numéro de slide (coin supérieur droit)
         if (slideNumber) {
-          const encodedNumber = encodeURIComponent(slideNumber).replace(/%20/g, '%2520');
-          overlays.push(`l_text:Inter_40_bold:${encodedNumber},co_${cloudinaryColor},g_north_east,x_60,y_60`);
+          const encodedNumber = encodeURIComponent(slideNumber);
+          overlays.push(`l_text:Arial_40_bold:${encodedNumber},co_rgb:${cloudinaryColor},g_north_east,x_60,y_60,e_shadow:50,e_stroke:co_rgb:${strokeColor},e_stroke:inner:2`);
         }
         
-        // Layer 2: Titre principal (centré)
+        // Layer 2: Titre principal (centré avec wrapping)
         if (title) {
-          const encodedTitle = encodeURIComponent(title).replace(/%20/g, '%2520');
-          overlays.push(`l_text:Inter_72_bold:${encodedTitle},co_${cloudinaryColor},g_center,y_-100`);
+          const encodedTitle = encodeURIComponent(title);
+          overlays.push(`l_text:Arial_72_bold:${encodedTitle},co_rgb:${cloudinaryColor},g_center,y_-100,w_900,c_fit,e_shadow:50,e_stroke:co_rgb:${strokeColor},e_stroke:inner:3`);
         }
         
-        // Layer 3: Sous-titre (en dessous du titre)
+        // Layer 3: Sous-titre (en dessous avec wrapping)
         if (subtitle) {
-          const encodedSubtitle = encodeURIComponent(subtitle).replace(/%20/g, '%2520');
-          overlays.push(`l_text:Inter_36:${encodedSubtitle},co_${cloudinaryColor},g_center,y_50`);
+          const encodedSubtitle = encodeURIComponent(subtitle);
+          overlays.push(`l_text:Arial_36:${encodedSubtitle},co_rgb:${cloudinaryColor},g_center,y_50,w_1100,c_fit,e_shadow:50,e_stroke:co_rgb:${strokeColor},e_stroke:inner:2`);
         }
         
-        // Layer 4: Indicateur "Swipe →" (dernière slide seulement)
+        // Layer 4: Indicateur "Swipe →" (dernière slide)
         if (isLastSlide) {
-          const swipeText = encodeURIComponent('Swipe →').replace(/%20/g, '%2520');
-          overlays.push(`l_text:Inter_48_bold:${swipeText},co_${cloudinaryColor},g_south,y_100`);
+          const swipeText = encodeURIComponent('Swipe →');
+          overlays.push(`l_text:Arial_48_bold:${swipeText},co_rgb:${cloudinaryColor},g_south,y_100,e_shadow:50,e_stroke:co_rgb:${strokeColor},e_stroke:inner:2`);
         }
         
         const textOverlays = overlays.join('/');

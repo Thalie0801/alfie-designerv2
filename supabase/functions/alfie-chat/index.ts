@@ -1024,12 +1024,13 @@ Example: "Professional product photography, 45° angle, gradient background (${b
             }
 
             case 'create_carousel': {
+              const count = toolArgs.count || 5;
               const { data: planResp } = await supabase.functions.invoke('alfie-plan-carousel', {
                 body: {
                   messages,
                   brandId,
                   aspect_ratio: '4:5',
-                  slideCount: toolArgs.count || 5,
+                  slideCount: count,
                   brandKit: brandKit ?? {},
                   prompt: toolArgs.prompt,
                 },
@@ -1049,8 +1050,8 @@ Example: "Professional product photography, 45° angle, gradient background (${b
 
               for (let i = 0; i < slides.length; i++) {
                 const slide = slides[i];
-
-                const overlayText = `${slide.title ?? ''}\n${slide.subtitle ?? slide.text ?? ''}`.trim();
+                let bgUrl: string | null = null;
+                let finalUrl: string | null = null;
 
                 const aspectRatio = carouselPlan?.globals?.aspect_ratio ?? '4:5';
                 const format =
@@ -1062,70 +1063,136 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                     ? '1024x1280'
                     : '1024x1024';
 
-                // NOUVELLE APPROCHE 2 ÉTAPES: Fond sans texte + Overlay texte
-                // ÉTAPE 1: Générer le fond visuel (sans texte)
-                const { data: bgData, error: bgError } = await supabase.functions.invoke('alfie-render-image', {
-                  body: {
-                    provider: 'gemini_image',
-                    prompt: slide.note ?? slide.imagePrompt ?? `Image pour: ${slide.title ?? 'Slide'}`,
-                    format,
-                    brand_id: brandId,
-                    backgroundOnly: true, // ← PAS DE TEXTE généré par l'IA
-                    slideIndex: i,
-                    totalSlides: slides.length,
-                    backgroundStyle: slide.backgroundStyle || 'gradient',
-                    textContrast: slide.textContrast || 'dark',
-                    negativePrompt: 'logos de marques tierces, filigranes, artefacts, texte, typography, letters',
-                  },
-                  headers: { Authorization: authHeader },
-                });
+                // Proofread titre/subtitle AVANT overlay
+                let correctedTitle = slide.title || '';
+                let correctedSubtitle = slide.subtitle || '';
+                try {
+                  const { data: proofData } = await supabase.functions.invoke('alfie-proofread-fr', {
+                    body: { title: slide.title, subtitle: slide.subtitle },
+                    headers: { Authorization: authHeader },
+                  });
+                  if (proofData?.data) {
+                    correctedTitle = proofData.data.title || correctedTitle;
+                    correctedSubtitle = proofData.data.subtitle || correctedSubtitle;
+                  }
+                } catch (e) {
+                  console.warn(`[Tool Execution] Proofread failed for slide ${i + 1}, using original`);
+                }
 
-                const bgUrl = bgData?.data?.image_urls?.[0];
-                if (bgError || !bgUrl) {
-                  console.error(`[Tool Execution] Background generation failed for slide ${i + 1}:`, bgError);
+                const overlayText = `${correctedTitle}\n${correctedSubtitle}`.trim();
+
+                // ÉTAPE 1: Générer le fond avec retries
+                let retryCount = 0;
+                const maxRetries = 2;
+                while (!bgUrl && retryCount <= maxRetries) {
+                  const { data: bgData, error: bgError } = await supabase.functions.invoke('alfie-render-image', {
+                    body: {
+                      provider: 'gemini_image',
+                      prompt: slide.note ?? `Minimalist solid background, high-contrast center safe area, NO TEXT.`,
+                      format,
+                      brand_id: brandId,
+                      backgroundOnly: true,
+                      slideIndex: i,
+                      totalSlides: count,
+                      backgroundStyle: slide.backgroundStyle || 'gradient',
+                      textContrast: slide.textContrast || 'dark',
+                      negativePrompt: 'text, typography, letters, watermarks',
+                    },
+                    headers: { Authorization: authHeader },
+                  });
+
+                  if (!bgError && bgData?.data?.image_urls?.[0]) {
+                    bgUrl = bgData.data.image_urls[0];
+                    console.log(`[Tool Execution] Background OK for slide ${i + 1} (retry ${retryCount})`);
+                  } else {
+                    retryCount++;
+                    if (retryCount <= maxRetries) {
+                      await new Promise(r => setTimeout(r, 500 + retryCount * 400));
+                    }
+                  }
+                }
+
+                if (!bgUrl) {
+                  console.warn(`[Tool Execution] No background for slide ${i + 1}, will generate fallback`);
                   continue;
                 }
-                console.log(`[Tool Execution] Background generated for slide ${i + 1}:`, bgUrl.substring(0, 80) + '...');
 
-                // ÉTAPE 2: Ajouter le texte en overlay (orthographe parfaite)
-                const { data: finalData, error: textError } = await supabase.functions.invoke('alfie-add-text-overlay', {
+                // ÉTAPE 2: Ajouter le texte en overlay avec retries
+                retryCount = 0;
+                while (!finalUrl && retryCount <= maxRetries) {
+                  const { data: overlayData, error: overlayError } = await supabase.functions.invoke('alfie-add-text-overlay', {
+                    body: {
+                      imageUrl: bgUrl,
+                      overlayText,
+                      brand_id: brandId,
+                      slideIndex: i,
+                      totalSlides: count,
+                      slideNumber: slide.slideNumber || `${i + 1}/${count}`,
+                      textContrast: slide.textContrast || 'dark',
+                      isLastSlide: i === count - 1,
+                      textPosition: 'center',
+                      fontSize: 48
+                    },
+                    headers: { Authorization: authHeader },
+                  });
+
+                  if (!overlayError && overlayData?.data?.image_url) {
+                    finalUrl = overlayData.data.image_url;
+                    console.log(`[Tool Execution] Overlay OK for slide ${i + 1} (retry ${retryCount})`);
+                  } else {
+                    retryCount++;
+                    if (retryCount <= maxRetries) {
+                      await new Promise(r => setTimeout(r, 500 + retryCount * 400));
+                    } else {
+                      console.warn(`[Tool Execution] Overlay failed after retries for slide ${i + 1}, using bg only`);
+                      finalUrl = bgUrl;
+                    }
+                  }
+                }
+
+                generatedImages.push(finalUrl!);
+                collectedAssets.push({
+                  type: 'image',
+                  url: finalUrl!,
+                  title: `Slide ${i + 1}/${count}${finalUrl === bgUrl ? ' (bg only)' : ''}`,
+                  reasoning: slide.note || '',
+                  brandAlignment: brandKit ? 'Aligned with brand colors and voice' : ''
+                });
+              }
+
+              // Compléter si manque des slides
+              while (generatedImages.length < count) {
+                const missingIndex = generatedImages.length;
+                console.log(`[Tool Execution] Generating fallback slide ${missingIndex + 1}/${count}`);
+                
+                const { data: fallbackBg } = await supabase.functions.invoke('alfie-render-image', {
                   body: {
-                    imageUrl: bgUrl,
-                    overlayText,
+                    provider: 'gemini_image',
+                    prompt: `Minimalist solid background, high-contrast center, NO TEXT`,
+                    format: '1024x1280',
                     brand_id: brandId,
-                    slideIndex: i,
-                    totalSlides: slides.length,
-                    slideNumber: slide.slideNumber || `${i + 1}/${slides.length}`,
-                    textContrast: slide.textContrast || 'dark',
-                    isLastSlide: i === slides.length - 1,
-                    textPosition: 'center',
-                    fontSize: 48
+                    backgroundOnly: true,
+                    slideIndex: missingIndex,
+                    totalSlides: count,
+                    backgroundStyle: 'solid',
+                    textContrast: 'dark',
+                    negativePrompt: 'text, typography, letters',
                   },
                   headers: { Authorization: authHeader },
                 });
 
-                const finalUrl = finalData?.data?.image_url;
-                if (textError || !finalUrl) {
-                  console.error(`[Tool Execution] Text overlay failed for slide ${i + 1}:`, textError);
-                  // En cas d'échec du texte, on utilise quand même le fond
-                  generatedImages.push(bgUrl); // ← FIX: Ajouter l'URL au tableau
+                const fallbackUrl = fallbackBg?.data?.image_urls?.[0] || '';
+                if (fallbackUrl) {
+                  generatedImages.push(fallbackUrl);
                   collectedAssets.push({
                     type: 'image',
-                    url: bgUrl,
-                    title: `Slide ${i + 1}/${slides.length} (background only)`,
-                    reasoning: slide.note || '',
-                    brandAlignment: brandKit ? 'Aligned with brand colors and voice' : ''
+                    url: fallbackUrl,
+                    title: `Slide ${missingIndex + 1}/${count} (fallback)`,
+                    reasoning: 'Fallback background',
+                    brandAlignment: ''
                   });
                 } else {
-                  console.log(`[Tool Execution] Final image with text for slide ${i + 1}:`, finalUrl.substring(0, 80) + '...');
-                  generatedImages.push(finalUrl); // ← FIX: Ajouter l'URL au tableau
-                  collectedAssets.push({
-                    type: 'image',
-                    url: finalUrl,
-                    title: `Slide ${i + 1}/${slides.length}`,
-                    reasoning: slide.note || '',
-                    brandAlignment: brandKit ? 'Aligned with brand colors and voice' : ''
-                  });
+                  generatedImages.push('');
                 }
               }
 
