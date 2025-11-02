@@ -36,6 +36,8 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log('[create-job-set] v1.0.1 - Function invoked');
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
