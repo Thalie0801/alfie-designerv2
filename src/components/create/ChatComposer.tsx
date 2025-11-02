@@ -120,7 +120,7 @@ export function ChatComposer({
   return (
     <div 
       ref={rootRef}
-      className="fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur border-t pt-4 px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pt-4 sm:px-4 sm:pb-4 z-10"
+      className="fixed bottom-0 inset-x-0 bg-gradient-to-t from-background via-background/98 to-background/95 backdrop-blur-xl border-t border-border/50 shadow-2xl pt-4 px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pt-4 sm:px-4 sm:pb-4 z-10"
     >
       <div className="max-w-4xl mx-auto space-y-3">
         
@@ -135,37 +135,37 @@ export function ChatComposer({
               onKeyDown={handleKeyDown}
               placeholder="Décris ton idée à Alfie… (Shift+Entrée = nouvelle ligne)"
               disabled={disabled || isLoading}
-              className="w-full resize-none bg-background border rounded-xl px-3 py-2.5 pr-11 sm:px-4 sm:py-3 sm:pr-12 focus:outline-none focus:ring-2 focus:ring-primary text-sm touch-manipulation"
+              className="w-full resize-none bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 pr-32 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm shadow-sm transition-all duration-200 hover:shadow-md touch-manipulation"
             />
             
-            <div className="absolute right-1.5 bottom-1.5 sm:right-2 sm:bottom-2 flex gap-0.5 sm:gap-1">
+            <div className="absolute right-2 bottom-2 flex gap-1">
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 touch-target"
+                className="h-8 w-8 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors touch-target"
                 onClick={onUploadClick}
                 disabled={uploadingImage || disabled}
               >
-                <ImagePlus className="h-4 w-4 sm:h-5 sm:w-5" />
+                <ImagePlus className="h-4 w-4 text-gray-600 dark:text-gray-400" />
               </Button>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 touch-target"
+                className="h-8 w-8 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors touch-target"
                 disabled
               >
-                <Mic className="h-4 w-4 sm:h-5 sm:w-5" />
+                <Mic className="h-4 w-4 text-gray-400 dark:text-gray-600" />
               </Button>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 touch-target"
+                className="h-8 w-8 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors touch-target"
                 disabled
               >
-                <Wand2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                <Wand2 className="h-4 w-4 text-gray-400 dark:text-gray-600" />
               </Button>
             </div>
           </div>
@@ -188,11 +188,11 @@ export function ChatComposer({
           <Button
             type="button"
             size="icon"
-            className="h-12 w-12 shrink-0 touch-target"
+            className="h-12 w-12 shrink-0 touch-target bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-200 rounded-xl"
             onClick={handleSend}
             disabled={disabled || isLoading || (!value.trim() && !uploadedImage)}
           >
-            <Send className="h-5 w-5 sm:h-6 sm:w-6" />
+            <Send className="h-5 w-5 text-white" />
           </Button>
         </div>
 
@@ -204,7 +204,7 @@ export function ChatComposer({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="text-xs shrink-0 snap-start min-h-[44px]"
+                className="text-xs shrink-0 snap-start min-h-[44px] rounded-xl border-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-200 shadow-sm"
                 onClick={() => handleChipClick(chip.fill)}
                 disabled={disabled || isLoading}
               >

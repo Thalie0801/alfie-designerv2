@@ -2125,19 +2125,41 @@ export function AlfieChat() {
               return (
                 <div 
                   key={`msg-${index}`} 
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
+                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in gap-3`}
                 >
+                  {/* Avatar Alfie (assistant seulement) */}
+                  {message.role === 'assistant' && (
+                    <div className="flex-shrink-0 mt-1">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center shadow-md">
+                        <span className="text-white text-sm font-bold">🐾</span>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div 
-                    className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                    className={`max-w-[75%] rounded-2xl px-4 py-3 shadow-sm transition-all duration-200 hover:shadow-md ${
                       message.role === 'user' 
-                        ? 'bg-primary text-primary-foreground' 
-                        : 'bg-muted'
+                        ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-br-sm' 
+                        : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-tl-sm'
                     }`}
                   >
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <div className={`prose prose-sm max-w-none leading-relaxed ${
+                      message.role === 'user' 
+                        ? 'prose-invert' 
+                        : 'dark:prose-invert'
+                    }`}>
                       {message.content}
                     </div>
                   </div>
+                  
+                  {/* Avatar User (utilisateur seulement) */}
+                  {message.role === 'user' && (
+                    <div className="flex-shrink-0 mt-1">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center shadow-md">
+                        <span className="text-white text-sm font-semibold">{user?.email?.[0]?.toUpperCase() || 'U'}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
