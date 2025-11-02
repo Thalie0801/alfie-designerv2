@@ -42,7 +42,7 @@ export const AI_CONFIGS: Record<AIProvider, AIConfig> = {
   },
   openai: {
     provider: 'openai',
-    model: 'openai/gpt-5-mini',
+    model: 'openai/gpt-4o',
     endpoint: 'https://ai.gateway.lovable.dev/v1/chat/completions'
   }
 };
@@ -86,6 +86,7 @@ export async function callAIWithFallback(
           model: config.model,
           messages: enrichedMessages,
           tools: tools,
+          tool_choice: tools && tools.length > 0 ? "auto" : undefined,
           temperature: 0.7
         })
       });

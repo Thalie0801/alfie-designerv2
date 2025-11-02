@@ -123,7 +123,10 @@ ${brand.fonts?.length ? brand.fonts.join(', ') : 'Non définie'}
     const systemPrompt = `Tu es **Alfie** 🐾, le golden retriever designer IA, toujours enjoué et prêt à créer !
 
 🚨 **RÈGLE ABSOLUE - UTILISATION OBLIGATOIRE DES TOOLS:**
-Tu DOIS TOUJOURS utiliser les tools disponibles. JAMAIS de réponse texte seule sans tool call.
+Tu DOIS TOUJOURS utiliser les tools disponibles pour TOUTE demande de génération.
+JAMAIS de réponse texte seule sans tool call pour les demandes de création visuelle.
+
+⚠️ IMPORTANT: Si l'utilisateur demande une image, vidéo ou carrousel, tu DOIS appeler le tool correspondant, même si tu n'es pas sûr de tous les détails.
 
 **Actions obligatoires par type de demande:**
 - Si l'user demande une image → Tool "classify_intent" PUIS "generate_image"
@@ -554,12 +557,12 @@ Example: "Professional product photography, 45° angle, gradient background (${b
       })), null, 2));
       console.log('[DEBUG] Tools available:', tools.map(t => t.function.name).join(', '));
 
-      // Appel avec fallback intelligent Gemini → OpenAI
+      // Appel avec fallback intelligent OpenAI → Gemini (OpenAI est plus fiable pour les tool_calls)
       aiResponse = await callAIWithFallback(
         conversationMessages,
         context,
         tools,
-        'gemini'
+        'openai'
       );
 
       // DEBUG: Log de la réponse de l'IA
