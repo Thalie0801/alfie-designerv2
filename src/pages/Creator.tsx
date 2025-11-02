@@ -97,6 +97,7 @@ export default function Creator() {
         const formatToUseCase: Record<string, string> = {
           "1080x1080": "post",           // Carré → post classique
           "1080x1920": "story",          // Portrait 9:16 → story/reel
+            "1080x1350": "post", // Portrait 4:5 (IG/LinkedIn)
           "1920x1080": "ad_landscape",   // Paysage → pub/bannière
         };
         const use_case = formatToUseCase[format] || "post";
@@ -253,7 +254,9 @@ Brand voice: ${brandKit?.voice || 'professional'}`;
                 <div><Label>Mode</Label><Select value={mode} onValueChange={(v: any) => setMode(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="image">Image</SelectItem><SelectItem value="video">Vidéo</SelectItem></SelectContent></Select></div>
                 {brands.length > 0 && <div><Label>Marque</Label><Select value={activeBrandId || ""} onValueChange={setActiveBrand}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{brands.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent></Select></div>}
                 <div><Label>Prompt</Label><Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={4} /></div>
-                <div><Label>Format</Label><Select value={format} onValueChange={setFormat}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1080x1080">Carré</SelectItem><SelectItem value="1080x1920">Portrait</SelectItem><SelectItem value="1920x1080">Paysage</SelectItem></SelectContent></Select></div>
+                <div><Label>Format</Label><Select value={format} onValueChange={setFormat}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1080x1080">Carré</SelectItem><SelectItem value="1080x1920">Portrait</SelectItem><SelectItem value="1920x1080">Paysage</SelectItem>
+                                <SelectItem value="1080x1350">Portrait 4:5</SelectItem>
+</SelectContent></Select></div>
                 {mode === "video" && <div><Label>Durée (s)</Label><Input type="number" value={duration} onChange={(e) => setDuration(parseInt(e.target.value))} min={5} max={30} /></div>}
                 <div><Label>Qualité</Label><Select value={quality} onValueChange={(v: any) => setQuality(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="draft">Draft</SelectItem><SelectItem value="standard">Standard</SelectItem><SelectItem value="premium">Premium</SelectItem></SelectContent></Select></div>
                 <div><Label>Quantité (carrousel)</Label><Select value={quantity.toString()} onValueChange={(v) => setQuantity(parseInt(v))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1">1 visuel</SelectItem><SelectItem value="2">2 visuels</SelectItem><SelectItem value="3">3 visuels</SelectItem><SelectItem value="4">4 visuels</SelectItem><SelectItem value="5">5 visuels</SelectItem></SelectContent></Select></div>
