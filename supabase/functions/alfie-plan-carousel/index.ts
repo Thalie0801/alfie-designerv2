@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { CarouselGlobals, SlideContent, CarouselPlan, DEFAULT_GLOBALS } from "../_shared/carouselGlobals.ts";
+import { CarouselGlobals, SlideContent, CarouselPlan, DEFAULT_GLOBALS, CHAR_LIMITS } from "../_shared/carouselGlobals.ts";
 import { lintCarousel, generateCorrectionPrompt } from "../_shared/carouselLinter.ts";
 
 const corsHeaders = {
@@ -126,8 +126,6 @@ ${brandContext}`;
 
     // Auto-correction helper
     function autoCorrectPlan(rawPlan: any): CarouselPlan {
-      const { CHAR_LIMITS } = require('../_shared/carouselGlobals.ts');
-      
       // Clamp fields according to CHAR_LIMITS
       const clamp = (text: string, min: number, max: number) => {
         if (!text) return text;
