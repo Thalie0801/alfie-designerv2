@@ -640,12 +640,12 @@ Example: "Professional product photography, 45° angle, gradient background (${b
       })), null, 2));
       console.log('[DEBUG] Tools available:', tools.map(t => t.function.name).join(', '));
 
-      // ✅ Appel avec fallback intelligent Gemini → OpenAI (Gemini en priorité)
+      // ✅ Appel avec fallback intelligent OpenAI → Gemini (OpenAI est plus fiable pour les tool_calls)
       aiResponse = await callAIWithFallback(
         conversationMessages,
         context,
         tools,
-        'gemini', // ✅ Gemini en priorité
+        'openai', // ✅ OpenAI en priorité pour les tool_calls
         iterationCount - 1 // iterationCount commence à 1, mais on veut 0 pour la première itération
       );
 
