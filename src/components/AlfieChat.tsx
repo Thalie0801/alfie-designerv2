@@ -1833,9 +1833,32 @@ export function AlfieChat() {
     const intent = detectIntent(userMessage);
     console.log('🔍 Intent détecté:', intent);
 
-    if (canHandleLocally(intent) && intent.type !== 'browse_templates') {
-      // Gestion locale sans IA (économie)
-      const localResponse = generateLocalResponse(intent);
+      if (canHandleLocally(intent) && intent.type !== 'browse_templates') {
+        // Ajouter le message utilisateur (flux local uniquement)
+        setMessages(prev => [
+          ...prev,
+          { role: 'user', content: userMessage, ...(imageUrl ? { imageUrl } : {}) }
+        ]);
+
+        try {
+          if (convId) {
+            await supabase.from('alfie_messages').insert({
+              conversation_id: convId,
+              role: 'user',
+              content: userMessage,
+              ...(imageUrl ? { image_url: imageUrl } : {})
+            });
+            await supabase
+              .from('alfie_conversations')
+              .update({ updated_at: new Date().toISOString() })
+              .eq('id', convId);
+          }
+        } catch (e) {
+          console.error('Persist user message (local) error:', e);
+        }
+
+        // Gestion locale sans IA (économie)
+        const localResponse = generateLocalResponse(intent);
       if (localResponse) {
         setMessages(prev => [...prev, { role: 'assistant', content: localResponse }]);
         
@@ -1869,23 +1892,67 @@ export function AlfieChat() {
     // 🎯 Le flux carrousel est désormais géré par alfie-chat via les tools plan_carousel et generate_carousel_slide
     // L'agent présente chaque slide en texte et attend validation avant de générer l'image
 
-    if (forceImage) {
-      const aspect = options?.aspectRatio || detectAspectRatioFromText(userMessage);
-      await handleToolCall('generate_image', { prompt: userMessage, aspect_ratio: aspect });
-      return;
-    }
+      if (forceImage) {
+        // Ajouter message utilisateur (flux image forcé)
+        setMessages(prev => [
+          ...prev,
+          { role: 'user', content: userMessage, ...(imageUrl ? { imageUrl } : {}) }
+        ]);
+        try {
+          if (convId) {
+            await supabase.from('alfie_messages').insert({
+              conversation_id: convId,
+              role: 'user',
+              content: userMessage,
+              ...(imageUrl ? { image_url: imageUrl } : {})
+            });
+            await supabase
+              .from('alfie_conversations')
+              .update({ updated_at: new Date().toISOString() })
+              .eq('id', convId);
+          }
+        } catch (e) {
+          console.error('Persist user message (forceImage) error:', e);
+        }
 
-    if (forceVideo) {
-      const aspect = detectAspectRatioFromText(userMessage);
-      await handleToolCall('generate_video', {
-        prompt: userMessage,
-        aspectRatio: aspect,
-        imageUrl,
-        durationPreference: selectedDuration,
-        woofCost: 2
-      });
-      return;
-    }
+        const aspect = options?.aspectRatio || detectAspectRatioFromText(userMessage);
+        await handleToolCall('generate_image', { prompt: userMessage, aspect_ratio: aspect });
+        return;
+      }
+
+      if (forceVideo) {
+        // Ajouter message utilisateur (flux vidéo forcé)
+        setMessages(prev => [
+          ...prev,
+          { role: 'user', content: userMessage, ...(imageUrl ? { imageUrl } : {}) }
+        ]);
+        try {
+          if (convId) {
+            await supabase.from('alfie_messages').insert({
+              conversation_id: convId,
+              role: 'user',
+              content: userMessage,
+              ...(imageUrl ? { image_url: imageUrl } : {})
+            });
+            await supabase
+              .from('alfie_conversations')
+              .update({ updated_at: new Date().toISOString() })
+              .eq('id', convId);
+          }
+        } catch (e) {
+          console.error('Persist user message (forceVideo) error:', e);
+        }
+
+        const aspect = detectAspectRatioFromText(userMessage);
+        await handleToolCall('generate_video', {
+          prompt: userMessage,
+          aspectRatio: aspect,
+          imageUrl,
+          durationPreference: selectedDuration,
+          woofCost: 2
+        });
+        return;
+      }
 
     // ✅ Supprimer les raccourcis locaux : tout passe par streamChat pour que l'agent pose ses questions
     // Les boutons forceImage/forceVideo explicites (lignes 1731-1747) sont conservés
