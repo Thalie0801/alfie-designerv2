@@ -54,7 +54,8 @@ export async function callAIWithFallback(
   messages: any[],
   context: AgentContext,
   tools?: any[],
-  preferredProvider: AIProvider = 'gemini'
+  preferredProvider: AIProvider = 'gemini',
+  iterationCount: number = 0
 ): Promise<AIResponse> {
   
   const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -76,6 +77,20 @@ export async function callAIWithFallback(
       const config = AI_CONFIGS[provider];
       const enrichedMessages = buildMessagesForProvider(messages, context, provider);
       
+      console.log(`[AI] Sending ${tools?.length || 0} tools to ${provider}`);
+      
+      // Pour OpenAI, forcer classify_intent en première itération
+      let toolChoice: any = undefined;
+      if (tools && tools.length > 0) {
+        if (provider === 'openai' && iterationCount === 0) {
+          // Forcer classify_intent en première itération pour OpenAI
+          toolChoice = { type: "function", function: { name: "classify_intent" } };
+          console.log('[AI] Forcing tool_choice: classify_intent (first iteration)');
+        } else {
+          toolChoice = "auto";
+        }
+      }
+      
       const response = await fetch(config.endpoint, {
         method: 'POST',
         headers: {
@@ -86,7 +101,7 @@ export async function callAIWithFallback(
           model: config.model,
           messages: enrichedMessages,
           tools: tools,
-          tool_choice: tools && tools.length > 0 ? "auto" : undefined,
+          tool_choice: toolChoice,
           temperature: 0.7
         })
       });

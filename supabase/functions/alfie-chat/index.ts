@@ -1,7 +1,33 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { userHasAccess } from "../_shared/accessControl.ts";
-import { callAIWithFallback, type AgentContext, type AIResponse } from "../_shared/aiOrchestrator.ts";
+import { callAIWithFallback } from '../_shared/aiOrchestrator.ts';
+
+/**
+ * Détecte l'intent d'un message utilisateur de manière simple (fallback si l'IA ne call pas classify_intent)
+ */
+function detectIntent(message: string): string {
+  const lowerMessage = message.toLowerCase();
+  
+  if (lowerMessage.includes('carrousel') || lowerMessage.includes('carousel') || lowerMessage.includes('slides')) {
+    return 'carousel';
+  }
+  if (lowerMessage.includes('vidéo') || lowerMessage.includes('video')) {
+    return 'video';
+  }
+  if (lowerMessage.includes('image') || lowerMessage.includes('visuel') || lowerMessage.includes('photo')) {
+    return 'image';
+  }
+  if (lowerMessage.includes('crédit') || lowerMessage.includes('quota') || lowerMessage.includes('woofs')) {
+    return 'credits';
+  }
+  if (lowerMessage.includes('brand kit') || lowerMessage.includes('marque')) {
+    return 'brandkit';
+  }
+  
+  return 'autre';
+}
+
+import { type AgentContext, type AIResponse } from "../_shared/aiOrchestrator.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -566,7 +592,8 @@ Example: "Professional product photography, 45° angle, gradient background (${b
         conversationMessages,
         context,
         tools,
-        'openai'
+        'openai',
+        iterationCount - 1 // iterationCount commence à 1, mais on veut 0 pour la première itération
       );
 
       // DEBUG: Log de la réponse de l'IA
@@ -585,6 +612,41 @@ Example: "Professional product photography, 45° angle, gradient background (${b
       const toolCalls = assistantMessage.tool_calls;
       
       if (!toolCalls || toolCalls.length === 0) {
+        // FALLBACK: Si c'est la première itération et qu'aucun tool n'est appelé, forcer classify_intent
+        if (iterationCount === 1) {
+          console.warn('[FALLBACK] AI did not call any tool on first iteration, forcing classify_intent manually');
+          
+          // Détecter l'intent manuellement
+          const lastUserMessage = conversationMessages.filter(m => m.role === 'user').pop()?.content || '';
+          const detectedIntent = detectIntent(lastUserMessage);
+          
+          console.log(`[FALLBACK] Detected intent: ${detectedIntent}`);
+          
+          // Ajouter un faux tool_call dans l'historique
+          conversationMessages.push({
+            role: 'assistant',
+            content: null,
+            tool_calls: [{
+              id: 'fallback_classify',
+              type: 'function',
+              function: {
+                name: 'classify_intent',
+                arguments: JSON.stringify({ user_message: lastUserMessage })
+              }
+            }]
+          });
+          
+          // Ajouter le résultat du tool
+          conversationMessages.push({
+            role: 'tool',
+            tool_call_id: 'fallback_classify',
+            content: JSON.stringify({ intent: detectedIntent })
+          });
+          
+          // Reboucler pour que l'IA réagisse à l'intent
+          continue;
+        }
+        
         // Pas de tools à exécuter, on sort de la boucle
         console.log('[Tool Loop] No more tool calls, finishing');
         console.warn('[Tool Loop] ⚠️ AI returned text-only response without tool calls. This should not happen for generation requests.');
