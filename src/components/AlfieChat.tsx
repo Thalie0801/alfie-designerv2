@@ -12,9 +12,9 @@ import { QuotaBar } from '@/components/create/QuotaBar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 
-// ============================================================================
+// ======
 // TYPES
-// ============================================================================
+// ======
 
 interface Message {
   id: string;
@@ -29,9 +29,9 @@ interface Message {
 
 type IntentType = 'image' | 'video' | 'carousel' | 'unknown';
 
-// ============================================================================
+// ======
 // COMPOSANT PRINCIPAL
-// ============================================================================
+// ======
 
 export function AlfieChat() {
   const { user } = useAuth();
@@ -58,9 +58,9 @@ export function AlfieChat() {
   const videoPollingRef = useRef<Record<string, NodeJS.Timeout>>({});
   const carouselChannelRef = useRef<any>(null);
   
-  // ============================================================================
+  // ======
   // UTILITAIRES
-  // ============================================================================
+  // ======
   
   const addMessage = (message: Omit<Message, 'id' | 'timestamp'>): string => {
     const id = crypto.randomUUID();
@@ -84,9 +84,9 @@ export function AlfieChat() {
     scrollToBottom();
   }, [messages]);
   
-  // ============================================================================
+  // ======
   // DÉTECTION D'INTENTION LOCALE
-  // ============================================================================
+  // ======
   
   const detectIntent = (prompt: string): IntentType => {
     const lower = prompt.toLowerCase();
@@ -122,9 +122,9 @@ export function AlfieChat() {
     return '1:1';
   };
   
-  // ============================================================================
+  // ======
   // GESTION DES QUOTAS
-  // ============================================================================
+  // ======
   
   const checkAndConsumeQuota = async (
     type: 'woofs' | 'visuals',
@@ -211,9 +211,9 @@ export function AlfieChat() {
     }
   };
   
-  // ============================================================================
+  // ======
   // GÉNÉRATION D'IMAGES
-  // ============================================================================
+  // ======
   
   const mapAspectRatio = (ratio: string): string => {
     const mapping: Record<string, string> = {
@@ -285,9 +285,9 @@ export function AlfieChat() {
     }
   };
   
-  // ============================================================================
+  // ======
   // GÉNÉRATION DE VIDÉOS
-  // ============================================================================
+  // ======
   
   const generateVideo = async (prompt: string, aspectRatio: string) => {
     // Déterminer le coût en Woofs (1-3 selon durée détectée)
@@ -394,9 +394,9 @@ export function AlfieChat() {
     videoPollingRef.current[jobId] = interval;
   };
   
-  // ============================================================================
+  // ======
   // GÉNÉRATION DE CARROUSELS
-  // ============================================================================
+  // ======
   
   const generateCarousel = async (prompt: string, count: number, aspectRatio: string) => {
     // 1. Vérifier et consommer quota (count visuels)
@@ -427,12 +427,16 @@ export function AlfieChat() {
         }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('create-job-set error:', error);
+        throw new Error(error.message || 'Erreur inconnue lors de la création du job set.');
+      }
       
+
       if (!data?.data?.id) {
         throw new Error('Aucun job-set créé');
       }
-      
+
       const jobSetId = data.data.id;
       setCarouselProgress({ done: 0, total: count });
       
@@ -456,10 +460,20 @@ export function AlfieChat() {
       
     } catch (error: any) {
       console.error('[Carousel] Error:', error);
+
       await refundVisuals(count);
       addMessage({
         role: 'assistant',
         content: `❌ Erreur : ${error.message}`,
+
+      // Refund des visuels (à implémenter si nécessaire)
+      
+      const errorMessage = error.message || 'Erreur inconnue';
+      
+      addMessage({
+        role: 'assistant',
+        content: `❌ Erreur de génération de carrousel : \n\n\`\`\`\n${errorMessage}\n\`\`\``,
+
         type: 'text'
       });
       toast.error('Échec de la création du carrousel');
@@ -569,9 +583,9 @@ export function AlfieChat() {
     };
   }, []);
   
-  // ============================================================================
+  // ======
   // HANDLER PRINCIPAL
-  // ============================================================================
+  // ======
   
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -628,9 +642,9 @@ export function AlfieChat() {
     }
   };
   
-  // ============================================================================
+  // ======
   // UPLOAD D'IMAGE
-  // ============================================================================
+  // ======
   
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -649,9 +663,9 @@ export function AlfieChat() {
     }
   };
   
-  // ============================================================================
+  // ======
   // RENDU
-  // ============================================================================
+  // ======
   
   return (
     <div className="flex flex-col h-screen bg-background">
