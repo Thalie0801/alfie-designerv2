@@ -1067,12 +1067,14 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                 const { data: bgData, error: bgError } = await supabase.functions.invoke('alfie-render-image', {
                   body: {
                     provider: 'gemini_image',
-                    prompt: slide.imagePrompt ?? `Image pour: ${slide.title ?? 'Slide'}`,
+                    prompt: slide.note ?? slide.imagePrompt ?? `Image pour: ${slide.title ?? 'Slide'}`,
                     format,
                     brand_id: brandId,
                     backgroundOnly: true, // ← PAS DE TEXTE généré par l'IA
                     slideIndex: i,
                     totalSlides: slides.length,
+                    backgroundStyle: slide.backgroundStyle || 'gradient',
+                    textContrast: slide.textContrast || 'dark',
                     negativePrompt: 'logos de marques tierces, filigranes, artefacts, texte, typography, letters',
                   },
                   headers: { Authorization: authHeader },
@@ -1093,6 +1095,9 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                     brand_id: brandId,
                     slideIndex: i,
                     totalSlides: slides.length,
+                    slideNumber: slide.slideNumber || `${i + 1}/${slides.length}`,
+                    textContrast: slide.textContrast || 'dark',
+                    isLastSlide: i === slides.length - 1,
                     textPosition: 'center',
                     fontSize: 48
                   },
@@ -1103,6 +1108,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                 if (textError || !finalUrl) {
                   console.error(`[Tool Execution] Text overlay failed for slide ${i + 1}:`, textError);
                   // En cas d'échec du texte, on utilise quand même le fond
+                  generatedImages.push(bgUrl); // ← FIX: Ajouter l'URL au tableau
                   collectedAssets.push({
                     type: 'image',
                     url: bgUrl,
@@ -1112,6 +1118,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                   });
                 } else {
                   console.log(`[Tool Execution] Final image with text for slide ${i + 1}:`, finalUrl.substring(0, 80) + '...');
+                  generatedImages.push(finalUrl); // ← FIX: Ajouter l'URL au tableau
                   collectedAssets.push({
                     type: 'image',
                     url: finalUrl,

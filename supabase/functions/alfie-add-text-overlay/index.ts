@@ -7,6 +7,9 @@ interface TextOverlayInput {
   brand_id?: string;
   slideIndex?: number;
   totalSlides?: number;
+  slideNumber?: string;
+  textContrast?: 'light' | 'dark';
+  isLastSlide?: boolean;
   textPosition?: 'top' | 'center' | 'bottom';
   fontSize?: number;
 }
@@ -92,6 +95,9 @@ export default {
         brand_id,
         slideIndex,
         totalSlides,
+        slideNumber,
+        textContrast = 'dark',
+        isLastSlide = false,
         textPosition = 'center',
         fontSize = 56
       } = input as TextOverlayInput;
@@ -114,26 +120,17 @@ export default {
       const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
       if (userError || !user) throw new Error('INVALID_TOKEN');
 
-      // Récupérer les données de brand
-      let textColor = '#FFFFFF';
-      if (brand_id) {
-        const { data: brand } = await supabaseAdmin
-          .from('brands')
-          .select('palette')
-          .eq('id', brand_id)
-          .single();
-          
-        if (brand?.palette && brand.palette.length > 0) {
-          // Utiliser la couleur secondaire si disponible, sinon blanc
-          textColor = brand.palette.length > 1 ? brand.palette[1] : '#FFFFFF';
-        }
-      }
+      // Déterminer la couleur du texte selon textContrast
+      const textColor = textContrast === 'light' ? '#FFFFFF' : '#000000';
 
-      console.log('[Text Overlay] Processing with SVG overlay:', {
+      console.log('[Text Overlay] Processing with Cloudinary overlay:', {
         slideIndex,
         totalSlides,
+        slideNumber,
         textLength: overlayText.length,
         textColor,
+        textContrast,
+        isLastSlide,
         position: textPosition
       });
 
@@ -181,20 +178,43 @@ export default {
 
         console.log('[Text Overlay] Image uploaded to Cloudinary:', publicId);
 
-        // 2. Générer une URL avec overlay de texte via Cloudinary
-        // Cloudinary permet d'ajouter du texte parfait avec de vraies polices
+        // 2. Parser le texte en titre/subtitle
         const lines = overlayText.split('\n').filter(l => l.trim());
+        const title = lines[0] || '';
+        const subtitle = lines.slice(1).join(' ') || '';
         
         // Convertir la couleur hex en format Cloudinary (rgb:RRGGBB)
         const cloudinaryColor = textColor.replace('#', 'rgb:');
+        const shadowColor = textContrast === 'light' ? 'rgb:000000' : 'rgb:FFFFFF';
         
-        // Construire les overlays de texte
-        const textOverlays = lines.map((line, i) => {
-          const yOffset = (i - (lines.length - 1) / 2) * 80; // Espacement vertical
-          const encodedLine = encodeURIComponent(line).replace(/%20/g, '%2520');
-          return `l_text:Inter_56_bold:${encodedLine},co_${cloudinaryColor},g_center,y_${yOffset}`;
-        }).join('/');
-
+        // 3. Construire les overlays de texte avec numérotation et indicateurs
+        const overlays = [];
+        
+        // Layer 1: Numéro de slide (coin supérieur droit)
+        if (slideNumber) {
+          const encodedNumber = encodeURIComponent(slideNumber).replace(/%20/g, '%2520');
+          overlays.push(`l_text:Inter_40_bold:${encodedNumber},co_${cloudinaryColor},g_north_east,x_60,y_60`);
+        }
+        
+        // Layer 2: Titre principal (centré)
+        if (title) {
+          const encodedTitle = encodeURIComponent(title).replace(/%20/g, '%2520');
+          overlays.push(`l_text:Inter_72_bold:${encodedTitle},co_${cloudinaryColor},g_center,y_-100`);
+        }
+        
+        // Layer 3: Sous-titre (en dessous du titre)
+        if (subtitle) {
+          const encodedSubtitle = encodeURIComponent(subtitle).replace(/%20/g, '%2520');
+          overlays.push(`l_text:Inter_36:${encodedSubtitle},co_${cloudinaryColor},g_center,y_50`);
+        }
+        
+        // Layer 4: Indicateur "Swipe →" (dernière slide seulement)
+        if (isLastSlide) {
+          const swipeText = encodeURIComponent('Swipe →').replace(/%20/g, '%2520');
+          overlays.push(`l_text:Inter_48_bold:${swipeText},co_${cloudinaryColor},g_south,y_100`);
+        }
+        
+        const textOverlays = overlays.join('/');
         const finalUrl = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${textOverlays}/${publicId}.png`;
 
         console.log('[Text Overlay] Success with Cloudinary:', {

@@ -20,6 +20,9 @@ interface CarouselSlide {
   bullets?: string[];
   kpis?: { label: string; delta: string }[];
   note: string; // Prompt image en anglais
+  slideNumber: string; // "1/7", "2/7", etc.
+  backgroundStyle: 'solid' | 'gradient' | 'illustration' | 'photo';
+  textContrast: 'light' | 'dark';
 }
 
 interface CarouselPlan {
@@ -48,39 +51,58 @@ serve(async (req) => {
     
     // Construire le prompt système
     const systemPrompt = `
-Tu es Alfie, un expert en stratégie de contenu et en conception de carrousels pour les réseaux sociaux.
-Ton objectif est de générer un plan de carrousel de ${slideCount} slides basé sur la demande de l'utilisateur.
+Tu es Alfie, un expert en stratégie de contenu pour réseaux sociaux.
 
-**Règles Cruciales :**
-1. **Qualité et Correction :** Le contenu doit être impeccable. **Corrige toutes les fautes de frappe et de grammaire.** Assure-toi que les titres commencent par une majuscule et que le français est parfait.
-2. **Cohérence de Marque :** Le contenu doit être aligné avec la marque.
-    * **Nom de la Marque :** ${brandInfo?.name || 'Non spécifié'}
-    * **Niche/Secteur :** ${brandInfo?.niche || 'Non spécifié'}
-    * **Tonalité :** ${brandInfo?.voice || 'Professionnelle et engageante'}
-    * **Couleurs Principales :** ${primary_color} et ${secondary_color}
-3. **Structure :** Le plan doit être un tableau JSON avec exactement ${slideCount} objets.
-4. **Prompt Image (note) :** Le champ \`note\` doit contenir un prompt détaillé pour la génération d'image, en anglais, décrivant le visuel de la slide. Il doit inclure des références au Brand Kit (couleurs, style).
-5. **Types de Slides :** Utilise les types suivants pour structurer le carrousel : 'hero', 'problem', 'solution', 'impact', 'cta'.
+**STRUCTURE OBLIGATOIRE DU CARROUSEL :**
 
-**Limites de Caractères (STRICT - RESPECTE-LES ABSOLUMENT) :**
-- **Title** : Entre 15 et 60 caractères maximum
-- **Subtitle** : Entre 25 et 100 caractères maximum
-- **Punchline** : Entre 25 et 80 caractères maximum
-- **Bullet** : Entre 15 et 60 caractères chacun
-- **KPI Label** : Entre 8 et 30 caractères
-- **KPI Delta** : Entre 2 et 12 caractères (ex: "+45%", "-12pts")
-- **CTA** : Entre 10 et 30 caractères
-- **Note (prompt image)** : Entre 80 et 180 caractères
+Slide 1 (COVER) - Type 'hero' :
+- Titre accrocheur et court (20-40 caractères)
+- Indication du nombre de slides : "1/${slideCount}"
+- Badge ou punchline qui promet la valeur
+- Design qui attire l'œil immédiatement
 
-**Exemples de Contenu Correct :**
-✅ Title: "Créez des visuels parfaits en quelques clics" (48 caractères)
-❌ Title: "Visuels AI rapides" (19 caractères - trop court)
+Slides 2 à ${slideCount - 1} (CONTENU) - Types 'problem', 'solution', 'impact' :
+- UN SEUL point/conseil/info par slide
+- Titre clair (15-40 caractères)
+- Maximum 3 bullets courts (15-44 caractères chacun)
+- Cohérence visuelle entre toutes les slides
 
-✅ Bullet: "Automatisation complète des workflows créatifs" (52 caractères)
-❌ Bullet: "Auto workflows" (15 caractères - trop court et imprécis)
+Slide ${slideCount} (CONCLUSION) - Type 'cta' :
+- Titre récapitulatif ou conclusion
+- Call-to-action clair (ex: "Sauvegarde ce post", "Partage à ton réseau")
+- Note/résumé final (optionnel)
 
-✅ Subtitle: "Transformez vos idées en designs professionnels avec l'intelligence artificielle" (82 caractères)
-❌ Subtitle: "Design AI rapide" (16 caractères - trop court)
+**RÈGLES VISUELLES CRITIQUES :**
+- Chaque slide doit avoir un numéro visible : "1/${slideCount}", "2/${slideCount}", etc.
+- Arrière-plans recommandés (par ordre de préférence) :
+  1. Couleurs unies avec dégradé subtil (meilleur contraste) → backgroundStyle: 'solid'
+  2. Dégradés doux (moderne et élégant) → backgroundStyle: 'gradient'
+  3. Illustrations légères (ne pas écraser le texte) → backgroundStyle: 'illustration'
+  4. Photos avec overlay sombre (garantir contraste) → backgroundStyle: 'photo'
+- Palette cohérente : 2-3 couleurs max de ${primary_color} et ${secondary_color}
+- Éviter absolument : arrière-plans trop chargés, photos sans overlay
+
+**PROMPT IMAGE (note) - INSTRUCTIONS STRICTES :**
+Le champ \`note\` doit être un prompt en anglais pour générer le FOND UNIQUEMENT (sans texte).
+Format : "Clean [type] background with [style]. Use [colors] palette. High contrast area in center for text overlay. No text, no typography."
+
+Exemples :
+- Slide 1 (hero) : "Clean gradient background with vibrant ${primary_color} to ${secondary_color}. Modern abstract shapes. High contrast center area. No text."
+- Slide 2-N (contenu) : "Minimalist solid color background ${primary_color}. Subtle geometric patterns. Clean and professional. No text."
+- Slide ${slideCount} (cta) : "Energetic gradient background with ${primary_color}. Call-to-action mood. High contrast. No text."
+
+**BRAND KIT :**
+- Nom: ${brandInfo?.name || 'Non spécifié'}
+- Niche: ${brandInfo?.niche || 'Non spécifié'}
+- Tonalité: ${brandInfo?.voice || 'Professionnelle et engageante'}
+- Couleurs: ${primary_color} et ${secondary_color}
+
+**Limites de Caractères (STRICT) :**
+- **Title** : 15-60 caractères
+- **Subtitle** : 25-100 caractères
+- **Punchline** : 25-80 caractères
+- **Bullet** : 15-60 caractères
+- **Note** : 80-180 caractères
 
 **Format de Réponse (JSON Schema) :**
 {
@@ -89,11 +111,13 @@ Ton objectif est de générer un plan de carrousel de ${slideCount} slides basé
       {
         "type": "hero",
         "title": "Titre accrocheur",
-        "subtitle": "Sous-titre ou phrase d'introduction",
+        "subtitle": "Sous-titre",
         "punchline": "Phrase clé (optionnel)",
         "bullets": ["Point 1", "Point 2"],
-        "kpis": [{"label": "KPI", "delta": "+X%"}],
-        "note": "Professional background image for slide. High-quality photography or illustration. Include visual elements related to the slide theme. Use brand colors ${primary_color} and ${secondary_color} as accents. Clean composition with space for text overlay in center. NO TEXT in the image itself, only visual background."
+        "note": "Clean gradient background...",
+        "slideNumber": "1/${slideCount}",
+        "backgroundStyle": "gradient",
+        "textContrast": "dark"
       }
     ]
   }

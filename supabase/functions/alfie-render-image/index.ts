@@ -7,7 +7,7 @@ export default {
     return edgeHandler(req, async ({ jwt, input }) => {
       if (!jwt) throw new Error('MISSING_AUTH');
 
-      const { 
+        const { 
         provider, 
         prompt, 
         format = '1024x1024', 
@@ -20,7 +20,9 @@ export default {
         overlayText,
         negativePrompt,
         templateImageUrl,
-        resolution
+        resolution,
+        backgroundStyle = 'gradient',
+        textContrast = 'dark'
       } = input;
 
       const supabaseAdmin = createClient(
@@ -59,7 +61,31 @@ export default {
       }
 
       try {
-        // 3. Génération IA
+        // 3. Récupérer le Brand Kit si nécessaire (avant de construire les prompts)
+        let brandKitData = null;
+        let brandColors: string[] = [];
+        
+        if (brand_id) {
+          const { data: brand } = await supabaseAdmin
+            .from('brands')
+            .select('name, palette, fonts, voice, niche')
+            .eq('id', brand_id)
+            .single();
+            
+          if (brand) {
+            brandKitData = {
+              name: brand.name,
+              colors: brand.palette || [],
+              fonts: brand.fonts || [],
+              voice: brand.voice,
+              style: brand.voice || 'modern professional',
+              niche: brand.niche
+            };
+            brandColors = brand.palette || [];
+          }
+        }
+
+        // 4. Génération IA
         const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
         if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY_MISSING');
 
@@ -81,10 +107,18 @@ CRITICAL RULES:
 
         // Mode "fond" (pas de texte)
         if (backgroundOnly) {
-          systemPrompt += `\n\nBACKGROUND MODE:
-- Generate a clean background composition with NO TEXT.
-- Keep center area lighter for readability of future overlay text.
-- Strong edges for framing, minimal distractions.`;
+          systemPrompt += `\n\nBACKGROUND GENERATION RULES:
+- PRIORITY: ${backgroundStyle === 'solid' ? 'Solid colors or subtle gradients' : backgroundStyle === 'gradient' ? 'Smooth gradients' : backgroundStyle === 'illustration' ? 'Light illustrations' : 'Photos with dark overlay'} (best readability)
+- Center area MUST be 20% ${textContrast === 'light' ? 'darker' : 'lighter'} than edges for text contrast
+- Safe zones: Keep 80px margins on all sides clear
+- NO decorative elements in center 60% of composition
+- Use brand colors: ${brandColors[0] || 'vibrant'}, ${brandColors[1] || 'accent'}
+- Style: ${backgroundStyle}
+- NO TEXT, NO TYPOGRAPHY, NO LETTERS anywhere in the image
+
+CONTRAST REQUIREMENTS:
+- Background contrast mode: ${textContrast} text (generate ${textContrast === 'light' ? 'dark' : 'light'} background)
+- Ensure WCAG AA compliance (4.5:1 contrast ratio minimum)`;
         }
 
         // Mode typographique (avec texte exact)
@@ -106,31 +140,14 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
         // Récupérer le Brand Kit et enrichir le prompt automatiquement
         let enrichedPrompt = prompt;
 
-        if (brand_id) {
-          const { data: brand } = await supabaseAdmin
-            .from('brands')
-            .select('name, palette, fonts, voice, niche')
-            .eq('id', brand_id)
-            .single();
-            
-          if (brand) {
-            const brandKitData = {
-              name: brand.name,
-              colors: brand.palette || [],
-              fonts: brand.fonts || [],
-              voice: brand.voice,
-              style: brand.voice || 'modern professional',
-              niche: brand.niche
-            };
-            
+        if (brandKitData) {
             enrichedPrompt = enrichPromptWithBrandKit(prompt, brandKitData);
             
             console.log('[Render] Brand Kit auto-injected:', {
               originalPromptLength: prompt.length,
               enrichedPromptLength: enrichedPrompt.length,
-              brandColors: brandKitData.colors.slice(0, 2)
+              brandColors: brandColors.slice(0, 2)
             });
-          }
         }
 
         // Construire le prompt utilisateur final
@@ -149,6 +166,8 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
 
         // Si backgroundOnly, forcer l'instruction "NO TEXT"
         if (backgroundOnly) {
+          finalPrompt += `\n\nBackground style: ${backgroundStyle}`;
+          finalPrompt += `\n\nText contrast mode: ${textContrast}`;
           finalPrompt += `\n\nCRITICAL: Generate a background composition with NO TEXT, NO TYPOGRAPHY, NO LETTERS.`;
         }
 
