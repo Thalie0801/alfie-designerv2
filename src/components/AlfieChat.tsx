@@ -361,10 +361,13 @@ export function AlfieChat() {
         }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('create-job-set error:', error);
+        throw new Error(error.message || 'Erreur inconnue lors de la création du job set.');
+      }
       
       const jobSetId = data?.data?.id || data?.id;
-      if (!jobSetId) throw new Error('Job set ID manquant');
+      if (!jobSetId) throw new Error('Job set ID manquant. Réponse du serveur : ' + JSON.stringify(data));
       
       // 4. Tracker le job set
       setActiveJobSetId(jobSetId);
@@ -391,9 +394,11 @@ export function AlfieChat() {
       console.error('[Carousel] Error:', error);
       // Refund des visuels (à implémenter si nécessaire)
       
+      const errorMessage = error.message || 'Erreur inconnue';
+      
       addMessage({
         role: 'assistant',
-        content: `❌ Erreur de génération : ${error.message || 'Erreur inconnue'}`,
+        content: `❌ Erreur de génération de carrousel : \n\n\`\`\`\n${errorMessage}\n\`\`\``,
         type: 'text'
       });
       
