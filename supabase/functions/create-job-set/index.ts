@@ -130,7 +130,7 @@ serve(async (req) => {
         voice: brandSnapshot.voice || 'professional',
         layout_hint: aspectRatio === '1:1' ? 'centered_composition' : 'vertical_hero',
         contrast_min: 4.5, // WCAG AA
-        no_text: true
+        no_text: false // ✅ Activer la typo pour carrousels typographiques
       };
 
       // 5. Appeler alfie-plan-carousel

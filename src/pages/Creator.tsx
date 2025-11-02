@@ -93,7 +93,13 @@ export default function Creator() {
           ? `${carouselPlan.slides[i].title}. ${carouselPlan.slides[i].subtitle || ''}` 
           : prompt;
 
-        const use_case = format.includes("1920") ? "story" : "ad_reel";
+        // ✅ Mapping explicite format → use_case
+        const formatToUseCase: Record<string, string> = {
+          "1080x1080": "post",           // Carré → post classique
+          "1080x1920": "story",          // Portrait 9:16 → story/reel
+          "1920x1080": "ad_landscape",   // Paysage → pub/bannière
+        };
+        const use_case = formatToUseCase[format] || "post";
         const { data: providerRes } = await supabase.functions.invoke("alfie-select-provider", {
           body: { brief: { use_case, style: quality }, modality: mode, format, duration_s: mode === "video" ? duration : 0, quality, budget_woofs: quotaInfo.remaining }
         });
@@ -117,7 +123,16 @@ export default function Creator() {
         let renderUrl = "";
         if (mode === "image") {
           toast.info(`Génération slide ${i + 1}/${quantity}...`);
-          const { data: imgRes } = await supabase.functions.invoke("alfie-render-image", { body: { provider: providerRes.provider, prompt: buildBrandAwarePrompt(slidePrompt, brandKit), assets: [], format } });
+          const { data: imgRes } = await supabase.functions.invoke("alfie-render-image", { 
+            body: { 
+              provider: providerRes.provider, 
+              prompt: buildBrandAwarePrompt(slidePrompt, brandKit), 
+              assets: [], 
+              format,
+              brand_id: activeBrandId,   // ✅ Ajouter brand_id pour attribution correcte
+              cost_woofs: finalCost       // ✅ Ajouter coût pour quotas cohérents
+            } 
+          });
           renderUrl = imgRes?.image_urls?.[0] || "";
         } else {
           const { data: vidRes } = await supabase.functions.invoke("alfie-render-video", { body: { provider: providerRes.provider, prompt: buildBrandAwarePrompt(slidePrompt, brandKit), assets: [], params: { duration, resolution: format, style: quality } } });
