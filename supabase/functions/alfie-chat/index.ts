@@ -155,6 +155,12 @@ serve(async (req) => {
           typeof c === 'string' ? c : c.hex || c.value
         ).filter(Boolean).join(', ') || 'non défini';
         
+        const fontsText = Array.isArray(brand.fonts)
+          ? brand.fonts.map((f: any) => typeof f === 'string' ? f : f?.family || f?.name || String(f)).join(', ')
+          : (typeof brand.fonts === 'object' && brand.fonts !== null)
+            ? [brand.fonts?.primary, brand.fonts?.secondary, brand.fonts?.tertiary, brand.fonts?.headline, brand.fonts?.body].filter(Boolean).join(', ')
+            : (typeof brand.fonts === 'string' ? brand.fonts : '');
+        
         brandContext = `
 📋 **BRAND KIT ACTIF - À RESPECTER DANS TOUTES LES CRÉATIONS:**
 
@@ -166,7 +172,8 @@ serve(async (req) => {
 ${colorList}
 
 **Typographie:**
-${brand.fonts?.length ? brand.fonts.join(', ') : 'Non définie'}
+${fontsText || 'Non définie'}
+
 
 **Style & Ton:**
 - Esthétique visuelle: ${brand.voice || 'professionnel moderne'}

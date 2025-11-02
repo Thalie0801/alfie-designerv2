@@ -202,6 +202,42 @@ ${specialization}`
 }
 
 /**
+ * Normalise diverses formes possibles de "fonts" vers une chaîne lisible
+ */
+function normalizeFonts(fonts: any): string {
+  if (!fonts) return '';
+
+  // Tableau de chaînes
+  if (Array.isArray(fonts)) {
+    const items = fonts
+      .map((f: any) => {
+        if (typeof f === 'string') return f;
+        if (f?.family) return f.family;
+        if (f?.name) return f.name;
+        return String(f);
+      })
+      .filter(Boolean);
+    return items.join(', ');
+  }
+
+  // Objet { primary, secondary, ... }
+  if (typeof fonts === 'object') {
+    const candidates = [fonts.primary, fonts.secondary, fonts.tertiary, fonts.headline, fonts.body].filter(Boolean);
+    if (candidates.length) return candidates.join(', ');
+    // Dernier recours: concat des valeurs propres
+    try {
+      const values = Object.values(fonts).filter(v => typeof v === 'string');
+      if (values.length) return values.join(', ');
+    } catch (_) {}
+  }
+
+  // Chaîne simple
+  if (typeof fonts === 'string') return fonts;
+
+  return '';
+}
+
+/**
  * Construit le contexte Brand Kit enrichi
  */
 function buildBrandContext(brandKit?: AgentContext['brandKit']): string {
@@ -210,7 +246,7 @@ function buildBrandContext(brandKit?: AgentContext['brandKit']): string {
   }
   
   const colors = brandKit.colors || brandKit.palette || [];
-  const fonts = brandKit.fonts || [];
+  const fontsText = normalizeFonts(brandKit.fonts);
   
   return `
 📋 **BRAND KIT ACTIF:**
@@ -223,7 +259,7 @@ function buildBrandContext(brandKit?: AgentContext['brandKit']): string {
 ${colors.length > 0 ? colors.map((c: any) => `  • ${typeof c === 'string' ? c : c.hex || c.value}`).join('\n') : '  • (Non définie)'}
 
 **Typographie:**
-${fonts.length > 0 ? fonts.map(f => `  • ${f}`).join('\n') : '  • (Non définie)'}
+${fontsText ? fontsText.split(', ').map(line => `  • ${line}`).join('\n') : '  • (Non définie)'}
 
 **Style visuel:**
 - Esthétique: ${brandKit.style || 'moderne professionnel'}
@@ -246,6 +282,7 @@ export function enrichPromptWithBrandKit(
   
   const colors = brandKit.colors || brandKit.palette || [];
   const colorHex = colors.map((c: any) => typeof c === 'string' ? c : c.hex || c.value).filter(Boolean);
+  const fontsText = normalizeFonts(brandKit.fonts);
   
   return `${basePrompt}
 
@@ -253,7 +290,7 @@ export function enrichPromptWithBrandKit(
 - Primary color palette: ${colorHex.join(', ') || 'professional neutral tones'}
 - Visual aesthetic: ${brandKit.style || 'modern professional'}
 - Mood/Tone: ${brandKit.voice || 'professional engaging'}
-- Typography vibe: ${brandKit.fonts?.join(', ') || 'clean sans-serif'}
+- Typography vibe: ${fontsText || 'clean sans-serif'}
 - Industry context: ${brandKit.niche || 'business'}
 
 **Quality requirements:**
