@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Download, Trash2, Eye } from 'lucide-react';
+import { Search, Download, Trash2, Eye, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useLibraryAssets } from '@/hooks/useLibraryAssets';
 import { AssetCard } from '@/components/library/AssetCard';
@@ -24,7 +24,8 @@ export default function Library() {
     deleteAsset, 
     downloadAsset,
     downloadMultiple,
-    cleanupProcessingVideos
+    cleanupProcessingVideos,
+    refetch
   } = useLibraryAssets(user?.id, activeTab);
 
   // Auto cleanup when switching to videos tab
@@ -165,6 +166,18 @@ export default function Library() {
               />
             </div>
           </div>
+
+          <Button 
+            size="sm" 
+            variant="outline"
+            onClick={() => {
+              setSelectedAssets([]);
+              refetch();
+            }}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Actualiser
+          </Button>
 
           {activeTab === 'videos' && (
             <>
