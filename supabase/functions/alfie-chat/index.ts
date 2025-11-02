@@ -357,6 +357,26 @@ Utilise **classify_intent** en premier pour bien comprendre ce que veut l'user !
       {
         type: "function",
         function: {
+          name: "create_carousel",
+          description: "Create and generate the carousel slides after user validates the plan (costs 1 crédit per slide + quota visuel)",
+          parameters: {
+            type: "object",
+            properties: {
+              prompt: { type: "string", description: "Carousel theme/objective" },
+              count: { type: "number", description: "Number of slides (default: 5)" },
+              aspect_ratio: { 
+                type: "string", 
+                description: "Aspect ratio: '1:1' (Instagram), '4:5' (portrait), '9:16' (Story)", 
+                enum: ["1:1", "4:5", "9:16"]
+              }
+            },
+            required: ["prompt", "count"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
           name: "generate_carousel_slide",
           description: "Generate a single carousel slide image from validated text content",
           parameters: {

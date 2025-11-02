@@ -463,97 +463,11 @@ export function AlfieChat() {
     toast.info('Image retirée');
   };
 
-  // Helper function to format carousel plan for display
-  const formatCarouselPlan = (plan: any): string => {
-    if (!plan?.slides) return "Plan non disponible";
-    
-    return plan.slides.map((slide: any, idx: number) => {
-      const num = idx + 1;
-      if (slide.type === 'hook') {
-        return `**Slide ${num} (Hook)** : ${slide.title || slide.text}`;
-      }
-      if (slide.type === 'cta') {
-        return `**Slide ${num} (CTA)** : ${slide.title || slide.text}`;
-      }
-      const bullets = slide.bullets?.map((b: string) => `  • ${b}`).join('\n') || '';
-      return `**Slide ${num}** : ${slide.title}\n${bullets}`;
-    }).join('\n\n');
-  };
-
   const handleToolCall = async (toolName: string, args: any): Promise<any> => {
     console.log('Tool call:', toolName, args);
     
     // New tool calls from alfie-chat
     switch (toolName) {
-      case 'plan_carousel': {
-        console.log('[Carousel] Planning carousel with:', args);
-        
-        try {
-          const { data, error } = await supabase.functions.invoke('alfie-plan-carousel', {
-            body: {
-              prompt: args.prompt || args.topic,
-              slideCount: args.slides || 5,
-              brandKit: brandKit
-            }
-          });
-          
-          if (error) throw error;
-          
-          // Stocker le plan pour validation utilisateur
-          setCarouselPlan(data);
-          
-          // Afficher le plan dans le chat
-          const planMessage = formatCarouselPlan(data);
-          setMessages(prev => [...prev, {
-            role: 'assistant',
-            content: `📋 **Plan carrousel proposé** :\n\n${planMessage}\n\nJe lance la génération ? (réponds "oui" pour valider)`
-          }]);
-          
-          return { success: true, plan: data };
-        } catch (error: any) {
-          console.error('[Carousel] Planning error:', error);
-          toast.error("Erreur lors de la planification du carrousel");
-          return { error: error.message };
-        }
-      }
-
-      case 'create_carousel': {
-        console.log('[Carousel] Creating carousel with plan:', carouselPlan);
-        
-        if (!carouselPlan) {
-          toast.error("Aucun plan de carrousel à exécuter");
-          return { error: "No carousel plan available" };
-        }
-        
-        try {
-          const { data, error } = await supabase.functions.invoke('chat-create-carousel', {
-            body: {
-              brandId: activeBrandId,
-              prompt: carouselPlan.prompt,
-              count: carouselPlan.slides?.length || 5,
-              aspectRatio: args.aspectRatio || '1:1'
-            }
-          });
-          
-          if (error) throw error;
-          
-          setActiveJobSetId(data.jobSetId);
-          setGenerationStatus({ 
-            type: 'carousel', 
-            message: '🎨 Génération du carrousel lancée...' 
-          });
-          
-          // Trigger worker
-          await triggerWorker();
-          
-          return { success: true, jobSetId: data.jobSetId };
-        } catch (error: any) {
-          console.error('[Carousel] Creation error:', error);
-          toast.error("Erreur lors de la création du carrousel");
-          return { error: error.message };
-        }
-      }
-
       case 'generate_video': {
         console.log('[Video] Generating video with:', args);
         
@@ -1542,6 +1456,20 @@ export function AlfieChat() {
           ...(uploadedImage && { image_url: uploadedImage })
         });
       }
+      
+      // ⚡️ FALLBACK LOCAL : Validation "oui" pour carrousel
+      const isValidation = /^(oui|go|vas[- ]?y|on y va|ok|let'?s go|yes)/i.test(userMessage);
+      if (isValidation && carouselPlan && !activeJobSetId) {
+        console.log('[Chat] User validation detected, auto-triggering create_carousel');
+        
+        await handleToolCall('create_carousel', {
+          prompt: carouselPlan.globals?.promise || 'Carousel',
+          count: carouselPlan.slides?.length || 5,
+          aspect_ratio: '4:5'
+        });
+        
+        return; // Ne pas continuer avec l'appel alfie-chat
+      }
 
       // Call alfie-chat edge function
       const headers = await getAuthHeader();
@@ -1578,8 +1506,8 @@ export function AlfieChat() {
 
       console.log('[Chat] alfie-chat response:', { assistantMessage, toolCalls });
 
-      // Add assistant message if present
-      if (assistantMessage) {
+      // Add assistant message if present (only if no tool calls)
+      if (assistantMessage && toolCalls.length === 0) {
         setMessages(prev => [...prev, { 
           role: 'assistant', 
           content: assistantMessage 
