@@ -1301,22 +1301,7 @@ export function AlfieChat() {
           if (intent === 'carousel') {
             console.log('[Intent] Auto-triggering plan_carousel with prompt:', args.user_message);
             
-            // Afficher un message de confirmation
-            const confirmMsg: Message = {
-              role: 'assistant',
-              content: '🎨 Carrousel détecté ! Je prépare ton plan de 5 slides...'
-            };
-            setMessages(prev => [...prev, confirmMsg]);
-            
-            if (conversationId) {
-              await supabase.from('alfie_messages').insert({
-                conversation_id: conversationId,
-                role: 'assistant',
-                content: confirmMsg.content
-              });
-            }
-            
-            // Déclencher plan_carousel automatiquement
+            // Déclencher plan_carousel automatiquement (le message sera affiché dans le case)
             const planResult: any = await handleToolCall('plan_carousel', {
               prompt: args.user_message,
               count: 5
@@ -1335,6 +1320,21 @@ export function AlfieChat() {
 
       case 'plan_carousel': {
         try {
+          // 🎨 Afficher un message de confirmation
+          const confirmMsg: Message = {
+            role: 'assistant',
+            content: '🎨 Je prépare ton plan de carrousel...'
+          };
+          setMessages(prev => [...prev, confirmMsg]);
+          
+          if (conversationId) {
+            await supabase.from('alfie_messages').insert({
+              conversation_id: conversationId,
+              role: 'assistant',
+              content: confirmMsg.content
+            });
+          }
+
           const { prompt, count = 5 } = args;
           // aspect_ratio will be passed later in generate_carousel_slide
           
@@ -1560,15 +1560,15 @@ export function AlfieChat() {
 
       if (chatError) {
         console.error('[Chat] alfie-chat error:', chatError);
-        if (chatError.message?.includes('429')) {
-          toast.error("Trop de requêtes, patiente un instant !");
-          return;
-        }
-        if (chatError.message?.includes('402')) {
-          toast.error("Crédit insuffisant.");
-          return;
-        }
-        throw chatError;
+        toast.error(chatError.message || "Erreur technique, réessaie !");
+        return;
+      }
+
+      // Vérifier si la réponse indique une erreur métier
+      if (chatResponse && !chatResponse.ok && chatResponse.error) {
+        console.error('[Chat] alfie-chat business error:', chatResponse.error);
+        toast.error(chatResponse.error);
+        return;
       }
 
       // Parse response from alfie-chat
@@ -1595,25 +1595,7 @@ export function AlfieChat() {
         }
       }
 
-      // Execute tool calls
-      if (toolCalls.length > 0) {
-        // Ajouter un message de confirmation avant d'exécuter les tools
-        const toolNames = toolCalls.map((tc: any) => tc.function?.name).join(', ');
-        const confirmationMessage: Message = {
-          role: 'assistant',
-          content: `🎨 Génération en cours (${toolNames})...`
-        };
-        setMessages(prev => [...prev, confirmationMessage]);
-        
-        // Persist confirmation message
-        if (conversationId) {
-          await supabase.from('alfie_messages').insert({
-            conversation_id: conversationId,
-            role: 'assistant',
-            content: confirmationMessage.content
-          });
-        }
-      }
+      // Execute tool calls (sans message générique, chaque tool gère son propre message)
 
       for (const toolCall of toolCalls) {
         const toolName = toolCall.function?.name;
