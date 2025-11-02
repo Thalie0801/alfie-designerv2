@@ -16,10 +16,8 @@ import { AssetMessage } from '@/components/chat/AssetMessage';
 import { CreateHeader } from '@/components/create/CreateHeader';
 import { ChatComposer } from '@/components/create/ChatComposer';
 import { QuotaBar } from '@/components/create/QuotaBar';
-import { ChatBubble } from '@/components/create/ChatBubble';
-import { CarouselProgressCard } from '@/components/chat/CarouselProgressCard';
 import { PlanEditor, type CarouselPlan as NewCarouselPlan } from '@/components/carousel/PlanEditor';
-import { BriefForm, type BriefFormData } from '@/components/carousel/BriefForm';
+import { BriefForm } from '@/components/carousel/BriefForm';
 
 type VideoEngine = 'sora' | 'seededance' | 'kling';
 
@@ -189,7 +187,7 @@ export function AlfieChat() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isAlfieThinking, setIsAlfieThinking] = useState(false);
+  const [_isAlfieThinking, setIsAlfieThinking] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -199,6 +197,9 @@ export function AlfieChat() {
   const [composerHeight, setComposerHeight] = useState(192);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const latestRef = useRef<{ done: number; total: number; jobSetId: string }>({ done: 0, total: 0, jobSetId: '' });
+  const pumpRef = useRef<number | null>(null);
+  const pumpStartRef = useRef<number>(0);
   const [activeJobSetId, setActiveJobSetId] = useState<string>('');
   const [carouselTotal, setCarouselTotal] = useState(0);
   
@@ -1749,54 +1750,6 @@ export function AlfieChat() {
     }, intervalMs);
   };
 
-  const handleCancelCarousel = async () => {
-    if (!activeJobSetId) return;
-    
-    console.log('[CancelCarousel] Resetting job_set:', activeJobSetId);
-    
-    // FILET DE SÉCURITÉ: Fonction de nettoyage UI réutilisable
-    const cleanupUI = () => {
-      // Stop pumping
-      if (pumpRef.current) {
-        clearInterval(pumpRef.current);
-        pumpRef.current = null;
-      }
-      
-      // Clear ALL carousel state
-      localStorage.removeItem('activeJobSetId');
-      localStorage.removeItem('carouselTotal');
-      setActiveJobSetId('');
-      setCarouselTotal(0);
-      
-      // Refresh carousel to update UI (will clear items/done via hook)
-      refreshCarousel();
-    };
-    
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const { data, error } = await supabase.functions.invoke('cancel-job-set', {
-        body: { jobSetId: activeJobSetId },
-        headers: { Authorization: `Bearer ${session?.access_token}` }
-      });
-      
-      if (error) {
-        console.warn('[CancelCarousel] Backend error (ignoring):', error);
-      } else {
-        console.log('[CancelCarousel] Backend success:', data);
-      }
-      
-      // ✅ RÉINITIALISATION COMPLÈTE (même si le backend échoue)
-      cleanupUI();
-      toast.success('Carrousel réinitialisé, prêt à relancer ! 🔄');
-      
-    } catch (err: any) {
-      console.error('[CancelCarousel] Exception:', err);
-      // Nettoyer l'UI même en cas d'exception
-      cleanupUI();
-      toast.success('Carrousel réinitialisé localement ! 🔄');
-    }
-  };
-
   const clearChat = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -1992,14 +1945,6 @@ export function AlfieChat() {
     itemsCount: carouselItems.length
   });
 
-  const handleDownload = (url: string, type: 'image' | 'video') => {
-    if (!url) return;
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `alfie-${type}-${Date.now()}.${type === 'image' ? 'png' : 'mp4'}`;
-    link.click();
-  };
-
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-background">
       <CreateHeader onClearChat={clearChat} />
@@ -2137,7 +2082,7 @@ export function AlfieChat() {
               setShowBriefForm(false);
               const prompt = `Objectif: ${brief.objective}\nAudience: ${brief.audience}\nOffre: ${brief.offer}\nPreuves: ${brief.proofs.join(', ')}\nCTA: ${brief.cta}\nTon: ${brief.tone}\nLangue: ${brief.locale}`;
               setInput(prompt);
-              await sendMessage(prompt);
+              await handleSend();
             }}
             onCancel={() => setShowBriefForm(false)}
           />
