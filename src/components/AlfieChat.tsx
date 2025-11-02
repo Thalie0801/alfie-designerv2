@@ -112,42 +112,37 @@ const checkAndConsumeQuota = async (
       body: { brand_id: brandId },
       headers
     });
-    
+
     if (quotaError || !quotaData) {
       return { ok: false, error: 'Impossible de vérifier les quotas' };
     }
-    
+
     const quota = quotaData;
-    const remaining = type === 'visuals' 
-      ? quota.visuals_remaining 
-      : quota.woofs_remaining;
-    
+    const remaining = type === 'visuals' ? quota.visuals_remaining : quota.woofs_remaining;
+
     if (remaining < amount) {
-      return { 
-        ok: false, 
-        remaining, 
-        error: `Quota insuffisant. Il te reste ${remaining} ${type === 'visuals' ? 'visuels' : 'woofs'}.` 
+      return {
+        ok: false,
+        remaining,
+        error: `Quota insuffisant. Il te reste ${remaining} ${type === 'visuals' ? 'visuels' : 'woofs'}.`
       };
     }
-    
+
     // 2. Consommer le quota
-    const consumeEndpoint = type === 'woofs' 
-      ? 'alfie-consume-woofs'
-      : 'alfie-consume-visuals';
-    
+    const consumeEndpoint = type === 'woofs' ? 'alfie-consume-woofs' : 'alfie-consume-visuals';
     const { error: consumeError } = await supabase.functions.invoke(consumeEndpoint, {
-      body: { 
+      body: {
         cost_woofs: type === 'woofs' ? amount : undefined,
         cost_visuals: type === 'visuals' ? amount : undefined,
-        brand_id: brandId 
+        brand_id: brandId
       },
       headers
     });
-    
+
     if (consumeError) {
       return { ok: false, error: 'Impossible de consommer les quotas' };
     }
-    
+
     return { ok: true, remaining: remaining - amount };
   } catch (error: any) {
     console.error('[Quota] Error:', error);
@@ -620,6 +615,18 @@ export function AlfieChat() {
       }
       
       case 'generate_image': {
+        const woofCost = 1;
+        
+        if (!activeBrandId) {
+          return { error: "⚠️ Aucune marque active. Sélectionne d'abord une marque dans tes paramètres." };
+        }
+
+        const quotaCheck = await checkAndConsumeQuota(supabase, 'woofs', woofCost, activeBrandId);
+        if (!quotaCheck.ok) {
+          toast.error(quotaCheck.error);
+          return { error: quotaCheck.error };
+        }
+
         console.log('[Image] generate_image called with:', args);
         
         try {
@@ -678,11 +685,17 @@ export function AlfieChat() {
               prompt: args.prompt,
               format: mapAspectRatio(args.aspect_ratio || '1:1'),
               brand_id: activeBrandId,
-              cost_woofs: 1
+              cost_woofs: woofCost
             },
           });
 
           if (error) {
+            // Rembourser les Woofs en cas d'échec
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+
             console.error('[Image] Generation error:', error);
             const errorMsg = error.message || 'Erreur inconnue';
             
@@ -798,6 +811,18 @@ export function AlfieChat() {
       }
       
       case 'improve_image': {
+        const woofCost = 1;
+        
+        if (!activeBrandId) {
+          return { error: "⚠️ Aucune marque active. Sélectionne d'abord une marque dans tes paramètres." };
+        }
+
+        const quotaCheck = await checkAndConsumeQuota(supabase, 'woofs', woofCost, activeBrandId);
+        if (!quotaCheck.ok) {
+          toast.error(quotaCheck.error);
+          return { error: quotaCheck.error };
+        }
+
         try {
           setGenerationStatus({ type: 'image', message: 'Amélioration de ton image en cours... 🪄' });
 
@@ -805,7 +830,16 @@ export function AlfieChat() {
             body: { imageUrl: args.image_url, prompt: args.instructions },
           });
 
-          if (error) throw error;
+          if (error) {
+            // Rembourser les Woofs en cas d'échec
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+
+            console.error('[Image] Improvement error:', error);
+            throw error;
+          }
 
           if (!activeBrandId) {
             throw new Error("No active brand. Please select a brand first.");
@@ -862,6 +896,18 @@ export function AlfieChat() {
       }
       
       case 'generate_video': {
+        const woofCost = 2;
+        
+        if (!activeBrandId) {
+          return { error: "⚠️ Aucune marque active. Sélectionne d'abord une marque dans tes paramètres." };
+        }
+
+        const quotaCheck = await checkAndConsumeQuota(supabase, 'woofs', woofCost, activeBrandId);
+        if (!quotaCheck.ok) {
+          toast.error(quotaCheck.error);
+          return { error: quotaCheck.error };
+        }
+
         try {
           console.log('🎬 [generate_video] Starting with args:', args);
 
@@ -875,11 +921,18 @@ export function AlfieChat() {
               aspectRatio: args.aspectRatio || '16:9',
               imageUrl: args.imageUrl,
               durationPreference: args.durationPreference || 'short',
-              woofCost: 2
+              woofCost: woofCost
             },
           });
 
-          if (error) throw new Error(error.message || 'Erreur backend');
+          if (error) {
+            // Rembourser les Woofs en cas d'échec
+            await supabase.functions.invoke('alfie-refund-woofs', {
+              body: { amount: woofCost, brand_id: activeBrandId },
+              headers: await getAuthHeader()
+            });
+            throw new Error(error.message || 'Erreur backend');
+          }
           if (!data) throw new Error('Payload backend vide');
 
           // Helpers pour typer proprement des champs "souvent pas propres"
