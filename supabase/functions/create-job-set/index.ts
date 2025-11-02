@@ -192,16 +192,19 @@ serve(async (req) => {
           brand_snapshot: brandSnapshotWithAspect,
           metadata: { 
             role: i === 0 ? 'key_visual' : 'variant',
-            title: slide.title,
-            subtitle: slide.subtitle,
-            punchline: slide.punchline,
-            bullets: slide.bullets,
-            cta: slide.cta,
-            cta_primary: slide.cta_primary,
-            cta_secondary: slide.cta_secondary,
-            note: slide.note,
-            badge: slide.badge,
-            kpis: slide.kpis
+            slideContent: {
+              type: slide.type || templateType,
+              title: slide.title,
+              subtitle: slide.subtitle,
+              punchline: slide.punchline,
+              bullets: slide.bullets,
+              cta: slide.cta,
+              cta_primary: slide.cta_primary,
+              cta_secondary: slide.cta_secondary,
+              note: slide.note,
+              badge: slide.badge,
+              kpis: slide.kpis
+            }
           },
           status: 'queued'
         };
