@@ -6,7 +6,21 @@ export default {
     return edgeHandler(req, async ({ jwt, input }) => {
       if (!jwt) throw new Error('MISSING_AUTH');
 
-      const { provider, prompt, format = '1024x1024', brand_id, cost_woofs = 1 } = input;
+      const { 
+        provider, 
+        prompt, 
+        format = '1024x1024', 
+        brand_id, 
+        cost_woofs = 1,
+        // Nouveaux params carrousel (optionnels)
+        backgroundOnly = false,
+        slideIndex,
+        totalSlides,
+        overlayText,
+        negativePrompt,
+        templateImageUrl,
+        resolution
+      } = input;
 
       const supabaseAdmin = createClient(
         Deno.env.get('SUPABASE_URL')!,
@@ -48,7 +62,103 @@ export default {
         const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
         if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY_MISSING');
 
-        console.log('Generating image with prompt:', prompt);
+        // System prompt de base (orthographe FR, 1 seule image)
+        let systemPrompt = `You are a professional image generator for social media content.
+CRITICAL RULES:
+- Generate EXACTLY ONE single image (no grid, no collage, no multiple frames).
+- Use perfect French spelling with proper accents: é, è, ê, à, ç, ù.
+- Maintain high visual hierarchy and readability.`;
+
+        // Enrichissement si carrousel
+        if (typeof slideIndex === 'number' && totalSlides) {
+          systemPrompt += `\n\nCARROUSEL CONTEXT:
+- This is slide ${slideIndex + 1}/${totalSlides} of a cohesive carousel.
+- Each slide is independent but must maintain visual consistency across the set.
+- DO NOT create grids, tiles, or multi-frame layouts.
+- Keep composition rhythm and spacing consistent.`;
+        }
+
+        // Mode "fond" (pas de texte)
+        if (backgroundOnly) {
+          systemPrompt += `\n\nBACKGROUND MODE:
+- Generate a clean background composition with NO TEXT.
+- Keep center area lighter for readability of future overlay text.
+- Strong edges for framing, minimal distractions.`;
+        }
+
+        // Mode typographique (avec texte exact)
+        if (overlayText && !backgroundOnly) {
+          systemPrompt += `\n\nTEXT OVERLAY:
+The following text MUST be integrated into the image with high contrast and readability:
+---
+${overlayText}
+---
+Ensure strong typographic hierarchy, ample margins, and WCAG AA contrast.`;
+        }
+
+        // Cohérence avec image de référence
+        if (templateImageUrl) {
+          systemPrompt += `\n\nREFERENCE IMAGE:
+A reference image is provided. Mirror its composition rhythm, spacing, and text placement to maintain visual consistency across slides.`;
+        }
+
+        // Construire le prompt utilisateur final
+        let finalPrompt = prompt;
+
+        // Ajouter le format si résolution fournie
+        const targetFormat = resolution || format;
+        if (targetFormat && targetFormat !== '1024x1024') {
+          finalPrompt += `\nAspect ratio: ${targetFormat}.`;
+        }
+
+        // Ajouter negative prompt si fourni
+        if (negativePrompt) {
+          finalPrompt += `\n\nAVOID: ${negativePrompt}`;
+        }
+
+        // Si backgroundOnly, forcer l'instruction "NO TEXT"
+        if (backgroundOnly) {
+          finalPrompt += `\n\nCRITICAL: Generate a background composition with NO TEXT, NO TYPOGRAPHY, NO LETTERS.`;
+        }
+
+        console.log('[Render] Generating image with carousel context:', {
+          slideIndex,
+          totalSlides,
+          backgroundOnly,
+          hasOverlayText: !!overlayText,
+          hasTemplate: !!templateImageUrl
+        });
+
+        // Construire les messages
+        const messages: any[] = [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: finalPrompt }
+        ];
+
+        // Si image de référence fournie, l'ajouter en multimodal
+        if (templateImageUrl) {
+          messages.push({
+            role: 'user',
+            content: [
+              {
+                type: 'image_url',
+                image_url: { url: templateImageUrl }
+              },
+              {
+                type: 'text',
+                text: 'Use this image as a composition reference for visual consistency.'
+              }
+            ]
+          });
+        }
+
+        const aiPayload = {
+          model: 'google/gemini-2.5-flash-image-preview',
+          messages,
+          modalities: ['image', 'text'],
+        };
+
+        console.log('[Render] AI Payload:', JSON.stringify(aiPayload, null, 2));
 
         const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
@@ -56,11 +166,7 @@ export default {
             Authorization: `Bearer ${LOVABLE_API_KEY}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-flash-image-preview',
-            messages: [{ role: 'user', content: prompt }],
-            modalities: ['image', 'text'],
-          }),
+          body: JSON.stringify(aiPayload),
         });
 
         if (!response.ok) {
@@ -98,7 +204,15 @@ export default {
 
         if (insertError) {
           console.error('Failed to insert generation:', insertError);
-          // Continue quand même, pas besoin de refund
+        } else {
+          console.log('[Render] Generation stored:', {
+            generation_id: generation?.id,
+            slideIndex,
+            totalSlides,
+            backgroundOnly,
+            hasOverlayText: !!overlayText,
+            hasTemplate: !!templateImageUrl
+          });
         }
 
         return {

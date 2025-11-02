@@ -123,14 +123,55 @@ export default function Creator() {
         let renderUrl = "";
         if (mode === "image") {
           toast.info(`Génération slide ${i + 1}/${quantity}...`);
+          
+          // Construire le prompt enrichi pour carrousel
+          const isCarousel = quantity > 1;
+          const slide = carouselPlan?.slides?.[i];
+          
+          let enhancedPrompt = buildBrandAwarePrompt(slidePrompt, brandKit);
+          
+          // Enrichir avec contexte carrousel
+          if (isCarousel && slide) {
+            enhancedPrompt = `Single-slide visual for an Instagram/LinkedIn carousel (slide ${i + 1}/${quantity}).
+Goal: ${prompt}
+Aspect ratio: 4:5 (1080x1350). One independent slide (no grid, no collage).
+Maintain brand look & feel and consistency across slides.
+Design guardrails:
+- Strong hierarchy, ample margins, high contrast (≥ WCAG AA).
+- Iconography minimal, focus on typographic rhythm and shapes.
+- Keep focal area clear around title.
+Brand colors: ${brandKit?.palette?.join(', ') || 'default'}
+Brand voice: ${brandKit?.voice || 'professional'}`;
+          }
+          
+          // Construire overlayText à partir du plan
+          let overlayText = '';
+          if (isCarousel && slide) {
+            overlayText = `${slide.title}\n${slide.subtitle || ''}`;
+            if (slide.bullets && slide.bullets.length > 0) {
+              overlayText += `\n${slide.bullets.map((b: string) => `• ${b}`).join('\n')}`;
+            }
+            if (slide.cta) {
+              overlayText += `\n${slide.cta}`;
+            }
+          }
+          
           const { data: imgRes } = await supabase.functions.invoke("alfie-render-image", { 
             body: { 
               provider: providerRes.provider, 
-              prompt: buildBrandAwarePrompt(slidePrompt, brandKit), 
+              prompt: enhancedPrompt,
               assets: [], 
               format,
-              brand_id: activeBrandId,   // ✅ Ajouter brand_id pour attribution correcte
-              cost_woofs: finalCost       // ✅ Ajouter coût pour quotas cohérents
+              resolution: format,
+              brand_id: activeBrandId,
+              cost_woofs: finalCost,
+              // Params carrousel
+              backgroundOnly: false,
+              slideIndex: isCarousel ? i : undefined,
+              totalSlides: isCarousel ? quantity : undefined,
+              overlayText: overlayText || undefined,
+              negativePrompt: "logos de marques tierces, filigranes, artefacts, texte illisible, tuiles, grille, multi-cadres, collage, caricature, bande dessinée, emojis",
+              templateImageUrl: null
             } 
           });
           renderUrl = imgRes?.image_urls?.[0] || "";
