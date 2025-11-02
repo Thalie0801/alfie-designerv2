@@ -41,7 +41,7 @@ export function AlfieChat() {
   const [messages, setMessages] = useState<Message[]>([{
     id: 'welcome',
     role: 'assistant',
-    content: '👋 Salut ! Je suis Alfie, ton assistant créatif.\n\nJe peux générer :\n• **Images** (1 Woof)\n• **Vidéos** (1-3 Woofs)\n• **Carrousels** (1 Visuel/slide)\n\nQu\'est-ce qu\'on crée aujourd\'hui ?',
+    content: '👋 Hey ! Je suis Alfie, ton assistant créatif.\n\nJe peux créer pour toi :\n• Des **images** percutantes\n• Des **vidéos** engageantes\n• Des **carrousels** complets\n\nQu\'est-ce que tu veux créer aujourd\'hui ?',
     type: 'text',
     timestamp: new Date()
   }]);
@@ -176,6 +176,7 @@ export function AlfieChat() {
         return false;
       }
       
+      console.log(`[Quota] Consumed ${amount} ${type} for brand ${activeBrandId}`);
       return true;
     } catch (error: any) {
       console.error('[Quota] Error:', error);
@@ -276,9 +277,21 @@ export function AlfieChat() {
     } catch (error: any) {
       console.error('[Image] Error:', error);
       await refundWoofs(woofCost);
+      
+      const errorMsg = error.message?.toLowerCase() || '';
+      let friendlyError = '❌ Une erreur est survenue. Pas de panique, réessaye dans un instant !';
+      
+      if (errorMsg.includes('quota')) {
+        friendlyError = '😅 Oups, tu as atteint ta limite mensuelle ! Passe à un plan supérieur pour continuer.';
+      } else if (errorMsg.includes('network') || errorMsg.includes('fetch')) {
+        friendlyError = '🌐 Problème de connexion. Vérifie ta connexion internet et réessaye.';
+      } else if (errorMsg.includes('timeout')) {
+        friendlyError = '⏱️ La génération a pris trop de temps. Réessaye dans quelques instants.';
+      }
+      
       addMessage({
         role: 'assistant',
-        content: `❌ Erreur : ${error.message}`,
+        content: friendlyError,
         type: 'text'
       });
       toast.error('Échec de la génération d\'image');
@@ -344,9 +357,21 @@ export function AlfieChat() {
     } catch (error: any) {
       console.error('[Video] Error:', error);
       await refundWoofs(woofCost);
+      
+      const errorMsg = error.message?.toLowerCase() || '';
+      let friendlyError = '❌ Une erreur est survenue. Pas de panique, réessaye dans un instant !';
+      
+      if (errorMsg.includes('quota')) {
+        friendlyError = '😅 Oups, tu as atteint ta limite mensuelle ! Passe à un plan supérieur pour continuer.';
+      } else if (errorMsg.includes('network') || errorMsg.includes('fetch')) {
+        friendlyError = '🌐 Problème de connexion. Vérifie ta connexion internet et réessaye.';
+      } else if (errorMsg.includes('timeout')) {
+        friendlyError = '⏱️ La génération a pris trop de temps. Réessaye dans quelques instants.';
+      }
+      
       addMessage({
         role: 'assistant',
-        content: `❌ Erreur : ${error.message}`,
+        content: friendlyError,
         type: 'text'
       });
       toast.error('Échec de la génération de vidéo');
@@ -408,7 +433,7 @@ export function AlfieChat() {
     // 1. Appel à l'IA pour générer le plan textuel (APPEL SUPABASE)
     addMessage({
       role: 'assistant',
-      content: `🧠 Alfie est en train de générer le plan textuel de votre carrousel de ${count} slides...`,
+      content: `🎨 Je prépare ton carrousel de ${count} slides... Ça prend quelques instants !`,
       type: 'text'
     });
 
@@ -454,7 +479,7 @@ export function AlfieChat() {
     
     addMessage({
       role: 'assistant',
-      content: `Voici le plan proposé pour votre carrousel de ${count} slides :\n\n${planContent}\n\n**Validez-vous ce plan pour lancer la génération des images ?** (Répondez 'oui' ou 'non')`,
+      content: `Voici ce que je te propose pour ton carrousel :\n\n${planContent}\n\n✅ **Ça te va ?** Réponds **oui** pour lancer la génération, ou **non** pour recommencer.`,
       type: 'text',
       metadata: {
         awaitingValidation: true,
@@ -611,7 +636,7 @@ export function AlfieChat() {
           
           addMessage({
             role: 'assistant',
-            content: `✅ Plan validé ! Lancement de la génération des ${count} images...`,
+            content: `✅ C'est parti ! Je génère tes ${count} slides... Tu vas être bluffé ! 🎨`,
             type: 'text'
           });
           

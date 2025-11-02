@@ -20,6 +20,21 @@ function correctFrenchSpelling(text: string): string {
     'connection': 'connexion',
     'addresse': 'adresse',
     'language': 'langage',
+    'reponse': 'réponse',
+    'systeme': 'système',
+    'probleme': 'problème',
+    'integrer': 'intégrer',
+    'optimiser': 'optimiser',
+    'ameliorer': 'améliorer',
+    'efficacite': 'efficacité',
+    'qualite': 'qualité',
+    'strategie': 'stratégie',
+    'marque': 'marque',
+    'publier': 'publier',
+    'creer': 'créer',
+    'generer': 'générer',
+    'personnaliser': 'personnaliser',
+    'analyser': 'analyser',
   };
 
   let corrected = text;
