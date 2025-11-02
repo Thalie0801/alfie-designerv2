@@ -727,7 +727,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                   
                   const { data: imageData, error: imageError } = await supabase.functions.invoke('alfie-render-image', {
                     body: {
-                      provider: 'gemini-nano',
+                      provider: 'gemini_image',
                       prompt: slide.note || `Image pour ${slide.title}`,
                       format: '1024x1280',
                       brand_id: brandId,
@@ -964,7 +964,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
 
                 const { data: imageData } = await supabase.functions.invoke('alfie-render-image', {
                   body: {
-                    provider: 'gemini-nano',
+                    provider: 'gemini_image',
                     prompt: slide.imagePrompt ?? `Image pour: ${slide.title ?? 'Slide'}`,
                     format,
                     brand_id: brandId,
@@ -1028,7 +1028,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
 
               const { data: imageData, error: imageError } = await supabase.functions.invoke('alfie-render-image', {
                 body: {
-                  provider: 'gemini-nano',
+                  provider: 'gemini_image',
                   prompt: optimizedPrompt,
                   format,
                   brand_id: brandId,

@@ -184,7 +184,7 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
         }
 
         const aiPayload = {
-          model: 'google/gemini-2.5-flash-image-preview',
+          model: 'google/gemini-2.5-flash-image',
           messages,
           modalities: ['image', 'text'],
         };
@@ -222,7 +222,7 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
             brand_id: brand_id || null,
             type: 'image',
             modality: 'image',
-            provider_id: provider || 'gemini-nano',
+            provider_id: provider || 'gemini_image',
             prompt,
             output_url: imageUrl,
             render_url: imageUrl,
@@ -249,7 +249,7 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
         return {
           image_urls: [imageUrl],
           generation_id: generation?.id,
-          meta: { provider: provider || 'gemini-nano', format, cost: cost_woofs },
+          meta: { provider: provider || 'gemini_image', format, cost: cost_woofs },
         };
       } catch (genError: any) {
         // 5. REMBOURSEMENT en cas d'échec
