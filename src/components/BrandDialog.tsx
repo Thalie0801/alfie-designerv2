@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,7 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [quotaReached, setQuotaReached] = useState(false);
   const [formData, setFormData] = useState({
     name: brand?.name || '',
     logo_url: brand?.logo_url || '',
@@ -26,6 +27,39 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
     font_primary: brand?.fonts?.primary || '',
     font_secondary: brand?.fonts?.secondary || ''
   });
+
+  // ✅ Vérifier le quota au chargement
+  useEffect(() => {
+    const checkQuota = async () => {
+      if (!user || brand) return; // Skip si édition
+      
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('quota_brands')
+        .eq('id', user.id)
+        .single();
+
+      const { count: currentBrands } = await supabase
+        .from('brands')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      const maxAllowedBrands = profileData?.quota_brands || 1;
+      setQuotaReached((currentBrands || 0) >= maxAllowedBrands);
+    };
+    
+    checkQuota();
+  }, [user, brand, open]);
+
+  const handleOpen = () => {
+    if (quotaReached && !brand) {
+      toast.error('Limite de marques atteinte. Utilisez le bouton "Ajouter une marque + 39€"', {
+        duration: 5000
+      });
+      return;
+    }
+    setOpen(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,7 +144,7 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+      <DialogTrigger asChild onClick={handleOpen}>
         {children ? children : brand ? (
           <Button variant="outline" size="sm">
             Modifier
