@@ -46,13 +46,6 @@ export function CreateHeader({ onClearChat }: CreateHeaderProps) {
       })
     : '1 novembre';
 
-  const visualsRemaining = hasData
-    ? `${quotaStatus!.visuals.limit - quotaStatus!.visuals.used}/${quotaStatus!.visuals.limit}`
-    : '1000/1000';
-  const woofsRemaining = hasData
-    ? `${quotaStatus!.woofs.remaining}/${quotaStatus!.woofs.limit}`
-    : '100/100';
-
   return (
     <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur">
       <div className="max-w-[1200px] mx-auto px-4 py-4">
@@ -125,15 +118,6 @@ export function CreateHeader({ onClearChat }: CreateHeaderProps) {
                 )}
               </PopoverContent>
             </Popover>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700">
-              Visuels&nbsp;: {loading ? '…' : visualsRemaining}
-            </span>
-            <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700">
-              Woofs&nbsp;: {loading ? '…' : woofsRemaining}
-            </span>
           </div>
         </div>
       </div>
