@@ -1828,25 +1828,6 @@ export function AlfieChat() {
       }
     }
     
-    // Add user message (UI)
-    setMessages(prev => [...prev, { role: 'user', content: userMessage, imageUrl: imageUrl ?? undefined, created_at: new Date().toISOString() }]);
-
-    // Persister le message utilisateur
-    try {
-      if (convId) {
-        await supabase.from('alfie_messages').insert({
-          conversation_id: convId,
-          role: 'user',
-          content: userMessage,
-        });
-        await supabase
-          .from('alfie_conversations')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', convId);
-      }
-    } catch (e) {
-      console.error('Persist user message error:', e);
-    }
 
     // 1. Détection d'intent rapide (évite appel IA si possible)
     const intent = detectIntent(userMessage);
