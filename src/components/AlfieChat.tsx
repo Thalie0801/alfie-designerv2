@@ -721,8 +721,29 @@ export function AlfieChat() {
                 }));
               }
               
-              // Si tous terminés ou timeout
-              if (completed + failed >= count || pollAttempts >= maxPollAttempts) {
+              // Gérer le timeout
+              if (pollAttempts >= maxPollAttempts) {
+                clearInterval(carouselPollingRef.current!);
+                console.error('⏱️ Timeout: carousel generation exceeded 5 minutes');
+                
+                toast.error(`⏱️ Timeout : génération trop longue (${completed}/${count} terminées)`);
+                
+                setMessages(prev => {
+                  const filtered = prev.filter(m => m.metadata?.jobSetId !== jobSetId);
+                  return [...filtered, {
+                    id: `carousel-timeout-${Date.now()}`,
+                    role: 'assistant' as const,
+                    content: `⚠️ La génération a pris trop de temps. ${completed} slides terminées sur ${count}. Les autres jobs sont peut-être bloqués. Veuillez contacter le support si le problème persiste.`,
+                    type: 'text' as const,
+                    timestamp: new Date()
+                  }];
+                });
+                
+                return;
+              }
+              
+              // Si tous terminés
+              if (completed + failed >= count) {
                 clearInterval(carouselPollingRef.current!);
                 
                 // Récupérer les assets finaux
