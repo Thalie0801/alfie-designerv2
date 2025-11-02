@@ -91,12 +91,33 @@ export default function Creator() {
         });
         
         if (planError) throw planError;
-        carouselPlan = planRes;
-        toast.success("Plan du carrousel généré !");
+        
+        // ✅ Normaliser la structure de la réponse pour supporter plusieurs formats
+        const normalizedPlan = planRes?.plan ?? planRes;
+        
+        if (!normalizedPlan?.slides || !Array.isArray(normalizedPlan.slides) || normalizedPlan.slides.length === 0) {
+          throw new Error('Plan de carrousel vide ou invalide');
+        }
+        
+        carouselPlan = normalizedPlan;
+        toast.success(`Plan du carrousel généré (${carouselPlan.slides.length} slides) !`);
+        console.log('[Carousel Plan] Generated:', carouselPlan.slides.length, 'slides');
+        
       } catch (err: any) {
-        toast.error(`Erreur lors de la planification : ${err.message}`);
-        setIsGenerating(false);
-        return;
+        console.error('[Carousel Plan] Error:', err);
+        toast.message('Planification indisponible, utilisation d\'un plan de secours.');
+        
+        // ✅ Fallback local : créer un plan minimal pour continuer
+        const fallbackSlides = Array.from({ length: quantity }).map((_, i) => ({
+          type: i === 0 ? 'hero' : i === quantity - 1 ? 'cta' : 'solution',
+          title: `Slide ${i + 1}`,
+          subtitle: 'Contenu à affiner',
+          bullets: [],
+          note: `High quality background, brand colors ${brandKit?.palette?.slice(0, 2)?.join(', ') || 'default'}, no text`
+        }));
+        
+        carouselPlan = { slides: fallbackSlides };
+        console.log('[Carousel Plan] Using fallback plan');
       }
     }
 

@@ -544,6 +544,8 @@ export function AlfieChat() {
         throw new Error('Réponse invalide de alfie-plan-carousel');
       }
 
+      console.log('[Carousel Plan] slides:', data.plan.slides.length);
+
       // Mapper le format de retour vers CarouselSlide
       const slides: CarouselSlide[] = data.plan.slides.map((slide: any, index: number) => ({
         title: slide.title || `Slide ${index + 1}`,
