@@ -254,7 +254,11 @@ L'user peut checker ses quotas avec **get_quota**.
 
 Utilise **classify_intent** en premier pour bien comprendre ce que veut l'user !`;
 
-  const tools = [
+  console.log('[TRACE] Building tools array...');
+  
+  let tools: any[];
+  try {
+    tools = [
     {
       type: "function",
       function: {
@@ -277,27 +281,27 @@ Utilise **classify_intent** en premier pour bien comprendre ce que veut l'user !
       type: "function",
       function: {
         name: "browse_templates",
-          description: "Search for Canva templates based on criteria like category, keywords, or ratio",
-          parameters: {
-            type: "object",
-            properties: {
-              category: { type: "string", description: "Template category/niche (e.g., 'social_media', 'marketing')" },
-              keywords: { type: "string", description: "Keywords to search for in template titles/descriptions" },
-              ratio: { type: "string", description: "Aspect ratio (e.g., '1:1', '16:9', '9:16', '4:5')" },
-              limit: { type: "number", description: "Maximum number of results (default: 5)" }
-            }
+        description: "Search for Canva templates based on criteria like category, keywords, or ratio",
+        parameters: {
+          type: "object",
+          properties: {
+            category: { type: "string", description: "Template category/niche (e.g., 'social_media', 'marketing')" },
+            keywords: { type: "string", description: "Keywords to search for in template titles/descriptions" },
+            ratio: { type: "string", description: "Aspect ratio (e.g., '1:1', '16:9', '9:16', '4:5')" },
+            limit: { type: "number", description: "Maximum number of results (default: 5)" }
           }
         }
-      },
-      {
-        type: "function",
-        function: {
-          name: "show_brandkit",
-          description: "Show the user's current Brand Kit (colors, logo, fonts)",
-          parameters: { type: "object", properties: {} }
-        }
-      },
-      {
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "show_brandkit",
+        description: "Show the user's current Brand Kit (colors, logo, fonts)",
+        parameters: { type: "object", properties: {} }
+      }
+    },
+    {
         type: "function",
         function: {
           name: "open_canva",
@@ -493,6 +497,12 @@ Example: "Professional product photography, 45° angle, gradient background (${b
         }
       },
     ];
+    
+    console.log('[TRACE] ✅ Tools array built successfully:', tools.length, 'tools');
+  } catch (error) {
+    console.error('[TRACE] ❌ Error building tools array:', error);
+    throw error;
+  }
 
     // Construire le contexte pour l'orchestrateur
     const context: AgentContext = {
@@ -508,6 +518,12 @@ Example: "Professional product photography, 45° angle, gradient background (${b
       userMessage: transformedMessages[transformedMessages.length - 1]?.content || ''
     };
 
+    console.log('[TRACE] Context built:', {
+      hasBrandKit: !!context.brandKit,
+      brandName: context.brandKit?.name,
+      toolsCount: tools.length
+    });
+
     // ======
     // BOUCLE D'EXÉCUTION DE TOOLS (max 4 itérations)
     // ======
@@ -518,6 +534,13 @@ Example: "Professional product photography, 45° angle, gradient background (${b
     const maxIterations = 4;
     const collectedAssets: any[] = [];
     let finalJobSetId: string | undefined;
+
+    console.log('[TRACE] About to enter tool execution loop');
+    console.log('[TRACE] Initial conversation:', {
+      systemPromptLength: conversationMessages[0]?.content?.length,
+      userMessagesCount: conversationMessages.length - 1
+    });
+    console.log('[TRACE] Starting tool execution loop...');
 
     while (iterationCount < maxIterations) {
       iterationCount++;
@@ -805,9 +828,13 @@ Example: "Professional product photography, 45° angle, gradient background (${b
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Error in alfie-chat:", error);
+    console.error("[ERROR] alfie-chat crashed:", error);
+    console.error("[ERROR] Stack trace:", error instanceof Error ? error.stack : 'No stack');
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), 
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : "Unknown error",
+        details: error instanceof Error ? error.stack : undefined
+      }), 
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
