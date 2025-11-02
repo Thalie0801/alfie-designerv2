@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Info, ChevronDown } from 'lucide-react';
 import { useBrandKit } from '@/hooks/useBrandKit';
@@ -128,22 +127,6 @@ export function ChatHeader() {
               </div>
             </PopoverContent>
           </Popover>
-        </div>
-
-        {/* Chips quotas */}
-        <div className="flex items-center gap-2">
-          <Badge 
-            variant={quotaStatus.visuals.percentage >= 80 ? "destructive" : "secondary"}
-            className="text-xs"
-          >
-            Visuels: {quotaStatus.visuals.limit - quotaStatus.visuals.used}/{quotaStatus.visuals.limit}
-          </Badge>
-          <Badge 
-            variant={(quotaStatus.woofs.consumed / quotaStatus.woofs.limit) * 100 >= 80 ? "destructive" : "secondary"}
-            className="text-xs"
-          >
-            Woofs: {quotaStatus.woofs.remaining}/{quotaStatus.woofs.limit}
-          </Badge>
         </div>
       </div>
     </div>
