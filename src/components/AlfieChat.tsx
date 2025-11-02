@@ -1106,7 +1106,11 @@ export function AlfieChat() {
               }
             });
 
-            if (error || !data?.data?.id) {
+            // Flexible reading of job_set_id from response
+            const jobSetPayload = data;
+            const createdJobSetId = jobSetPayload?.data?.id ?? jobSetPayload?.id;
+
+            if (error || !createdJobSetId) {
               console.error('[Carousel] create-job-set failed:', error);
               toast.error('Impossible de créer le carrousel. Veuillez réessayer.');
               
@@ -1119,7 +1123,7 @@ export function AlfieChat() {
               return { error: 'Échec de création du carrousel' };
             }
 
-            jobSetId = data.data.id;
+            jobSetId = createdJobSetId;
             console.log('[Carousel] ✅ create-job-set succeeded, jobSetId:', jobSetId);
             
             if (!jobSetId) {
@@ -1345,7 +1349,11 @@ export function AlfieChat() {
               }
             });
             
-            if (jobSetError || !jobSetData?.data?.id) {
+            // Flexible reading of job_set_id from response
+            const jobSetPayload = jobSetData;
+            const createdJobSetId = jobSetPayload?.data?.id ?? jobSetPayload?.id;
+            
+            if (jobSetError || !createdJobSetId) {
               console.error('[Slide] create-job-set failed:', jobSetError);
               // Recréditer le quota en cas d'échec
               await supabase.functions.invoke('alfie-refund-woofs', {
@@ -1355,7 +1363,7 @@ export function AlfieChat() {
               return { error: 'Impossible de créer le carrousel' };
             }
             
-            jobSetId = jobSetData.data.id;
+            jobSetId = createdJobSetId;
             setActiveJobSetId(jobSetId);
             setCarouselTotal(carouselPlan.slides.length);
             localStorage.setItem('activeJobSetId', jobSetId);

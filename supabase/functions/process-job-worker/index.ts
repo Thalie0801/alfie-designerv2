@@ -188,7 +188,27 @@ serve(async (req) => {
     // 4. Construire overlayText à partir du slideContent structuré ou des métadonnées
     console.log('📝 [Worker] Step 1: Building overlayText from structured slideContent...');
     
-    const metaSlideContent = job.metadata?.slideContent;
+    // FALLBACK: Support legacy jobs without slideContent wrapper
+    const legacy = job.metadata || {};
+    const metaSlideContent =
+      job.metadata?.slideContent ??
+      (
+        legacy.title || legacy.subtitle || legacy.punchline || legacy.bullets || legacy.cta || legacy.kpis
+          ? {
+              type: legacy.slide_template || 'variant',
+              title: legacy.title,
+              subtitle: legacy.subtitle,
+              punchline: legacy.punchline,
+              bullets: legacy.bullets,
+              cta: legacy.cta,
+              cta_primary: legacy.cta_primary,
+              cta_secondary: legacy.cta_secondary,
+              note: legacy.note,
+              badge: legacy.badge,
+              kpis: legacy.kpis,
+            }
+          : null
+      );
     
     // GUARD: Fail job if slideContent is missing (plan not executed)
     if (!metaSlideContent) {
