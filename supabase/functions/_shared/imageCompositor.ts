@@ -179,26 +179,53 @@ export async function compositeSlide(
       throw new Error(`SVG upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
     
-    // 4. Generate composed image URL with overlay transformation + optional tint
-    console.log('🎭 Generating composed URL...');
-    
+    // 4. Generate composed image via explicit eager transformation (avoids strict-mode 400)
+    console.log('🎭 Generating composed image via explicit API...');
+
     // Build transformation pipeline with brand color tint if provided
     let transformations = '';
     if (options?.primaryColor && options?.secondaryColor) {
       const tintStrength = options.tintStrength || 60;
       const primary = options.primaryColor.replace('#', '');
       const secondary = options.secondaryColor.replace('#', '');
-      // Cloudinary: grayscale has no strength param; tint supports rgb:HEX colors
       transformations = `e_grayscale/e_tint:${tintStrength}:rgb:${primary}:rgb:${secondary}/`;
       console.log(`🎨 [imageCompositor] Applying brand tint: ${transformations}`);
     }
-    
-    const overlayId = encodeURIComponent(svgUploadedPublicId).replace(/%2F/g, ':');
-    const composedUrl = `https://res.cloudinary.com/${cloudName}/image/upload/` +
-      transformations +
-      `l_${overlayId},fl_layer_apply,g_center/` +
-      `${bgUploadedPublicId}.png`;
-    
+
+    // Prepare eager transformation for explicit API
+    const overlayIdForTransform = svgUploadedPublicId.replace(/\//g, ':');
+    const eagerTransform = `${transformations}l_${overlayIdForTransform},fl_layer_apply,g_center/f_png`;
+
+    const explicitEndpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/explicit`;
+    const explicitTs = Math.floor(Date.now() / 1000);
+    const explicitForm = new FormData();
+    explicitForm.append('public_id', bgUploadedPublicId);
+    explicitForm.append('type', 'upload');
+    explicitForm.append('eager', eagerTransform);
+    explicitForm.append('api_key', API_KEY!);
+    explicitForm.append('timestamp', explicitTs.toString());
+    const explicitSig = await generateCloudinarySignature({ public_id: bgUploadedPublicId, type: 'upload', eager: eagerTransform, timestamp: explicitTs.toString() }, API_SECRET!);
+    explicitForm.append('signature', explicitSig);
+
+    let composedUrl: string;
+    const explicitResp = await fetch(explicitEndpoint, { method: 'POST', body: explicitForm });
+    if (!explicitResp.ok) {
+      const errText = await explicitResp.text();
+      console.error('❌ Explicit transformation failed:', errText);
+      throw new Error(`Explicit transformation failed (${explicitResp.status}): ${errText}`);
+    }
+    const explicitData = await explicitResp.json();
+    composedUrl = explicitData?.eager?.[0]?.secure_url || explicitData?.eager?.[0]?.url;
+
+    if (!composedUrl) {
+      // Fallback to unsigned URL (may fail under strict mode but try)
+      const overlayId = encodeURIComponent(svgUploadedPublicId).replace(/%2F/g, ':');
+      composedUrl = `https://res.cloudinary.com/${cloudName}/image/upload/` +
+        transformations +
+        `l_${overlayId},fl_layer_apply,g_center/` +
+        `${bgUploadedPublicId}.png`;
+    }
+
     console.log('✅ Composition complete:', composedUrl);
     
     // 4.5 🔍 VERIFY: Wait for composed image to be available before cleanup
