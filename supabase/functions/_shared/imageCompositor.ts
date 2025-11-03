@@ -115,26 +115,22 @@ export async function compositeSlide(
     console.log('📝 SVG preview:', svgTextLayer.substring(0, 300).replace(/\n/g, ' '));
     console.log('📏 SVG size:', svgTextLayer.length, 'chars');
     
-    // 3. 🔧 SOLUTION 1: Encode SVG to base64 for proper accent handling
-    console.log('🔄 Encoding SVG to base64...');
+    // 3. ✅ FIX: Upload raw SVG with proper charset instead of base64
+    console.log('🔄 Preparing SVG for upload...');
     
-    // Convert SVG string to base64 data URI
-    // This ensures proper handling of French accents (é, è, à, etc.)
-    const encoder = new TextEncoder();
-    const svgBytes = encoder.encode(svgTextLayer);
-    const svgBase64 = btoa(String.fromCharCode(...svgBytes));
-    const svgDataUri = `data:image/svg+xml;base64,${svgBase64}`;
+    // Create a proper SVG blob with UTF-8 charset
+    const svgBlob = new Blob([svgTextLayer], { type: 'image/svg+xml;charset=utf-8' });
     
-    console.log('✅ SVG encoded to base64 (length:', svgBase64.length, ')');
+    console.log('✅ SVG blob created (size:', svgTextLayer.length, 'chars)');
     
     // 4. Upload SVG overlay to Cloudinary with signed authentication
-    console.log('⬆️ Uploading SVG overlay as base64 data URI...');
+    console.log('⬆️ Uploading SVG overlay as UTF-8 blob...');
     
     const svgPublicId = `alfie/${brandId || 'temp'}/${jobSetId || 'temp'}/overlay_${Date.now()}`;
     const svgTimestamp = Math.floor(Date.now() / 1000);
     
     const svgFormData = new FormData();
-    svgFormData.append('file', svgDataUri);
+    svgFormData.append('file', svgBlob, 'overlay.svg');
     svgFormData.append('public_id', svgPublicId);
     svgFormData.append('api_key', API_KEY);
     svgFormData.append('timestamp', svgTimestamp.toString());
