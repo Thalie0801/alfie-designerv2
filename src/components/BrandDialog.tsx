@@ -50,6 +50,14 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
   };
 
   const handleColorChange = (index: number, value: string) => {
+    // ✅ Validation du format hexadécimal uniquement si l'utilisateur tape manuellement
+    const hexRegex = /^#[0-9A-Fa-f]{6}$/;
+    
+    if (value && !hexRegex.test(value)) {
+      toast.error("Format invalide. Utilisez #RRGGBB (ex: #FF0000)");
+      return;
+    }
+    
     const newColors = [...formData.colors];
     newColors[index] = value;
     setFormData({ ...formData, colors: newColors });
@@ -99,6 +107,15 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
 
     if (!formData.name.trim()) {
       toast.error('Le nom de la marque est requis');
+      return;
+    }
+
+    // ✅ Validation des couleurs hexadécimales avant sauvegarde
+    const hexRegex = /^#[0-9A-Fa-f]{6}$/;
+    const invalidColors = formData.colors.filter(color => !hexRegex.test(color));
+    
+    if (invalidColors.length > 0) {
+      toast.error('Certaines couleurs sont invalides. Utilisez le format #RRGGBB');
       return;
     }
 
@@ -189,7 +206,7 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[85vh] sm:max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
             {brand ? 'Modifier la marque' : 'Nouvelle marque'}
@@ -200,7 +217,7 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
               : 'Créez une nouvelle marque pour vos visuels'}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 px-1">
           <div className="space-y-2">
             <Label htmlFor="name">Nom de la marque *</Label>
             <Input
