@@ -172,8 +172,8 @@ export async function compositeSlide(
 
     console.log('✅ SVG blob prepared (size:', svgBlob.size, 'bytes)');
     
-    // 4. Upload SVG overlay to Cloudinary with signed authentication
-    console.log('⬆️ Uploading SVG overlay as base64 data URI...');
+    //4. Upload SVG overlay to Cloudinary as image with fl_sanitize
+    console.log('⬆️ Uploading SVG overlay as image with sanitization...');
     
     const svgPublicId = `alfie/${brandId || 'temp'}/${jobSetId || 'temp'}/overlay_${Date.now()}`;
     const svgTimestamp = Math.floor(Date.now() / 1000);
@@ -181,16 +181,16 @@ export async function compositeSlide(
     const svgFormData = new FormData();
     svgFormData.append('file', svgBlob, 'overlay.svg');
     svgFormData.append('public_id', svgPublicId);
-    svgFormData.append('format', 'png');
+    svgFormData.append('transformation', 'fl_sanitize'); // ✅ Sanitize SVG on upload
     svgFormData.append('api_key', API_KEY);
     svgFormData.append('timestamp', svgTimestamp.toString());
     
     const svgSignature = await generateCloudinarySignature(
-      { public_id: svgPublicId, timestamp: svgTimestamp.toString(), format: 'png' },
+      { public_id: svgPublicId, timestamp: svgTimestamp.toString(), transformation: 'fl_sanitize' },
       API_SECRET
     );
     svgFormData.append('signature', svgSignature);
-    console.log('🛡️ Using signed SVG upload with public_id:', svgPublicId);
+    console.log('🛡️ Using signed SVG upload with fl_sanitize, public_id:', svgPublicId);
     
     const svgController = new AbortController();
     const svgTimeout = setTimeout(() => svgController.abort(), 60000);
@@ -199,7 +199,7 @@ export async function compositeSlide(
     let svgDeleteToken: string | undefined;
     try {
       const svgUploadResponse = await fetch(
-        uploadEndpoint,
+        uploadEndpoint,  // ✅ Use image upload endpoint
         {
           method: 'POST',
           body: svgFormData,

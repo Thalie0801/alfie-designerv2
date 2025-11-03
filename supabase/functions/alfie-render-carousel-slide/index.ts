@@ -139,7 +139,7 @@ serve(async (req) => {
     const svgOverlay = await renderSlideToSVG(slideContent, template, brandSnapshot);
     console.log('[Carousel Slide] ✅ SVG overlay generated:', svgOverlay.length, 'chars');
 
-    // 6. Composer l'image finale via Cloudinary avec base64 SVG encoding
+    // 6. Composer l'image finale via Cloudinary (SVG uploadé comme raw, puis transformé)
     console.log('[Carousel Slide] Composing final image with text overlay...');
     const { url: composedUrl, bgPublicId, svgPublicId } = await compositeSlide(
       backgroundUrl,
@@ -155,7 +155,7 @@ serve(async (req) => {
 
     console.log('[Carousel Slide] ✅ Final composition complete with text overlay');
 
-    // 7. ✅ NOUVEAU: Enregistrer l'image finale (avec overlay) dans media_generations
+    // 7. Enregistrer l'image finale (avec overlay) dans media_generations
     const { data: generation } = await supabaseAdmin
       .from('media_generations')
       .insert({
