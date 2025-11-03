@@ -31,17 +31,20 @@ export function useActivityStats(activeBrandId: string | null) {
     try {
       setLoading(true);
 
-      // Récupérer les stats de génération du mois en cours
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
+      // ✅ Calculer la période actuelle YYYYMM (ex: 202511 pour novembre 2025)
+      const now = new Date();
+      const periodYYYYMM = parseInt(
+        now.getFullYear().toString() + 
+        (now.getMonth() + 1).toString().padStart(2, '0')
+      );
 
-      const { data: generations } = await supabase
-        .from('media_generations')
-        .select('type, woofs')
-        .eq('user_id', user.id)
+      // ✅ Lire les compteurs mensuels depuis counters_monthly (source de vérité)
+      const { data: counter } = await supabase
+        .from('counters_monthly')
+        .select('images_used, reels_used, woofs_used')
         .eq('brand_id', activeBrandId)
-        .gte('created_at', startOfMonth.toISOString());
+        .eq('period_yyyymm', periodYYYYMM)
+        .maybeSingle();
 
       // Récupérer les quotas de la marque
       const { data: brand } = await supabase
@@ -50,14 +53,10 @@ export function useActivityStats(activeBrandId: string | null) {
         .eq('id', activeBrandId)
         .single();
 
-      const imagesCount = generations?.filter(g => g.type === 'image').length || 0;
-      const videosCount = generations?.filter(g => g.type === 'video').length || 0;
-      const totalWoofsUsed = generations?.reduce((sum, g) => sum + (g.woofs || 0), 0) || 0;
-
       setStats({
-        imagesCount,
-        videosCount,
-        totalWoofsUsed,
+        imagesCount: counter?.images_used || 0,
+        videosCount: counter?.reels_used || 0,
+        totalWoofsUsed: counter?.woofs_used || 0,
         imagesQuota: brand?.quota_images || 0,
         videosQuota: brand?.quota_videos || 0,
         woofsQuota: brand?.quota_woofs || 0,

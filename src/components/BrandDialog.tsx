@@ -29,6 +29,20 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
     colors: Array.isArray(brand?.palette) ? brand.palette : []
   });
 
+  // ✅ Recharger le formulaire quand le dialog s'ouvre avec une marque existante
+  useEffect(() => {
+    if (open && brand) {
+      setFormData({
+        name: brand.name || '',
+        logo_url: brand.logo_url || '',
+        voice: brand.voice || '',
+        font_primary: brand.fonts?.primary || '',
+        font_secondary: brand.fonts?.secondary || '',
+        colors: Array.isArray(brand.palette) ? brand.palette : []
+      });
+    }
+  }, [open, brand]);
+
   const handleAddColor = () => {
     if (formData.colors.length < 5) {
       setFormData({ ...formData, colors: [...formData.colors, '#000000'] });
