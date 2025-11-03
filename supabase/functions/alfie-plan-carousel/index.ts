@@ -147,9 +147,18 @@ Exemples :
     });
 
     if (!response.ok) {
+      const status = response.status;
       const errorText = await response.text();
-      console.error('[alfie-plan-carousel] AI Gateway error:', response.status, errorText);
-      throw new Error(`AI Gateway error: ${response.status}`);
+      console.error('[alfie-plan-carousel] AI Gateway error:', status, errorText);
+      const message = status === 429
+        ? 'Rate limits exceeded, please try again later.'
+        : status === 402
+        ? 'Payment required, please add funds to your Lovable AI workspace.'
+        : 'AI gateway error';
+      return new Response(JSON.stringify({ error: message }), {
+        status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     const data = await response.json();

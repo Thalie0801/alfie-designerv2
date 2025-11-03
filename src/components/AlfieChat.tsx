@@ -785,23 +785,28 @@ export function AlfieChat() {
     } catch (error: any) {
       console.error('[Orchestrator] Error:', error);
       
-      // Gérer les erreurs spécifiques
+      // Détecter le status HTTP de l'erreur
+      const status = error?.context?.response?.status || error?.status;
       const errorMsg = error.message?.toLowerCase() || '';
-      if (errorMsg.includes('429') || errorMsg.includes('rate')) {
-        toast.error('⏳ Trop de requêtes, patiente un instant !');
+      
+      if (status === 402 || errorMsg.includes('402') || errorMsg.includes('payment required') || errorMsg.includes('crédits insuffisants')) {
+        // Erreur 402 : Crédits insuffisants
+        toast.error('💳 Crédits insuffisants - Recharge maintenant');
         addMessage({
           role: 'assistant',
-          content: '⏳ Trop de requêtes en ce moment. Patiente quelques secondes et réessaye !',
+          content: '💳 **Crédits insuffisants**\n\nTu n\'as plus de crédits IA pour générer du contenu. Recharge tes crédits pour continuer à créer !\n\n👉 [Recharger mes crédits](/billing)',
           type: 'text'
         });
-      } else if (errorMsg.includes('402') || errorMsg.includes('credit')) {
-        toast.error('💳 Crédits insuffisants');
+      } else if (status === 429 || errorMsg.includes('429') || errorMsg.includes('rate limit') || errorMsg.includes('trop de requêtes')) {
+        // Erreur 429 : Rate limit
+        toast.error('⏳ Trop de requêtes - Patiente un instant');
         addMessage({
           role: 'assistant',
-          content: '💳 Crédit insuffisant. Recharge tes crédits pour continuer !',
+          content: '⏳ **Trop de requêtes**\n\nTu as fait trop de demandes en peu de temps. Patiente quelques secondes et réessaye !',
           type: 'text'
         });
       } else {
+        // Erreur générique
         toast.error('Échec de l\'orchestrateur');
       }
       

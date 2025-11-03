@@ -536,6 +536,49 @@ Example: "Professional product photography, 45° angle, gradient background (${b
     while (iterationCount < maxIterations) {
       iterationCount++;
       console.log(`[Tool Loop] Iteration ${iterationCount}/${maxIterations}`);
+      
+      // ✅ PRÉ-CHECK DE QUOTA (avant d'appeler l'IA) pour éviter 402
+      if (iterationCount === 1) {
+        const lastUserMessage = conversationMessages.filter(m => m.role === 'user').pop()?.content || '';
+        const detectedIntent = detectIntent(lastUserMessage);
+        
+        if ((detectedIntent === 'carousel' || detectedIntent === 'image' || detectedIntent === 'video') && brandId) {
+          console.log('[Pre-check] Detected generation intent:', detectedIntent, '- checking quotas');
+          
+          try {
+            const { data: quota, error: quotaError } = await supabase.functions.invoke('get-quota', {
+              body: { brand_id: brandId },
+              headers: functionHeaders
+            });
+            
+            if (quotaError || !quota?.ok) {
+              console.error('[Pre-check] Quota check failed:', quotaError, quota);
+            } else {
+              const woofsRemaining = quota.data?.woofs_remaining || 0;
+              
+              // Si pas de woofs (crédits IA), renvoyer 402 immédiatement
+              if (woofsRemaining === 0) {
+                console.warn('[Pre-check] ⚠️ No Woofs remaining, returning 402 immediately');
+                return new Response(
+                  JSON.stringify({ 
+                    error: 'Payment required, please add funds to your Lovable AI workspace.',
+                    code: 'PAYMENT_REQUIRED'
+                  }),
+                  {
+                    status: 402,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                  }
+                );
+              }
+              
+              console.log('[Pre-check] ✅ Quota OK:', woofsRemaining, 'Woofs remaining');
+            }
+          } catch (preCheckError: any) {
+            console.error('[Pre-check] Error:', preCheckError);
+            // Ne pas bloquer, continuer
+          }
+        }
+      }
 
       // DEBUG: Log des messages envoyés à l'IA
       console.log('[DEBUG] Messages sent to AI:', JSON.stringify(conversationMessages.map(m => ({
@@ -877,9 +920,35 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                 }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
               );
-            } catch (error) {
-              console.error('[FALLBACK] Error generating carousel:', error);
-              // Continuer avec le flux normal en cas d'erreur
+            } catch (fallbackError: any) {
+              console.error('[FALLBACK] Error generating carousel:', fallbackError);
+              
+              // Détecter si c'est un 402 (crédits insuffisants)
+              const errorStatus = fallbackError?.context?.response?.status || fallbackError?.status;
+              const errorMessage = fallbackError.message?.toLowerCase() || '';
+              
+              if (errorStatus === 402 || errorMessage.includes('402') || errorMessage.includes('payment required')) {
+                console.log('[FALLBACK] 402 detected - generating text-only carousel plan');
+                
+                // Générer un plan textuel simple sans appeler l'IA
+                const count = 5; // Valeur par défaut
+                const textPlan = {
+                  choices: [{
+                    message: {
+                      role: 'assistant',
+                      content: `📋 **Voici le plan de ton carrousel** (${count} slides)\n\n⚠️ **Crédits insuffisants** pour générer les images.\n\nRecharge tes crédits pour que je puisse créer les visuels ! 👇\n\n[Recharger mes crédits](/billing)`
+                    }
+                  }],
+                  noCredits: true
+                };
+                
+                return new Response(
+                  JSON.stringify(textPlan),
+                  { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                );
+              }
+              
+              // Continuer avec le flux normal pour autres erreurs
             }
           }
           
@@ -1294,6 +1363,37 @@ Example: "Professional product photography, 45° angle, gradient background (${b
   } catch (error) {
     console.error("[ERROR] alfie-chat crashed:", error);
     console.error("[ERROR] Stack trace:", error instanceof Error ? error.stack : 'No stack');
+    
+    // Détecter les erreurs 402/429 et propager le bon status
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStatus = (error as any)?.status;
+    
+    if (errorStatus === 402 || errorMessage.includes('402') || errorMessage.includes('Payment required')) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Payment required, please add funds to your Lovable AI workspace.',
+          code: 'PAYMENT_REQUIRED'
+        }), 
+        {
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+    
+    if (errorStatus === 429 || errorMessage.includes('429') || errorMessage.includes('Rate limit')) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Rate limits exceeded, please try again later.',
+          code: 'RATE_LIMIT'
+        }), 
+        {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+    
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : "Unknown error",

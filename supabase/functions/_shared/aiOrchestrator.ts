@@ -116,7 +116,14 @@ export async function callAIWithFallback(
       if (!response.ok) {
         const errorText = await response.text();
         console.warn(`[AI Orchestrator] ${provider} failed (${response.status}): ${errorText}`);
-        lastError = new Error(`${provider} failed: ${response.status}`);
+        const err: any = new Error(`${provider} failed: ${response.status}`);
+        err.status = response.status;
+        err.provider = provider;
+        // Pour 402 (crédits insuffisants), inutile d'essayer le provider suivant
+        if (response.status === 402) {
+          throw err;
+        }
+        lastError = err;
         continue;
       }
       
