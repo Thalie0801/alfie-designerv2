@@ -338,7 +338,9 @@ export function AlfieChat() {
     // 2. Message de génération
     addMessage({
       role: 'assistant',
-      content: `🎬 Génération vidéo lancée (${woofCost} Woofs)...`,
+      content: uploadedImage
+        ? `🎬 Génération vidéo lancée à partir de ton image (${woofCost} Woofs)...`
+        : `🎬 Génération vidéo lancée (${woofCost} Woofs)...`,
       type: 'text'
     });
     
@@ -351,7 +353,8 @@ export function AlfieChat() {
           prompt,
           aspectRatio,
           brandId: activeBrandId,
-          woofCost
+          woofCost,
+          ...(uploadedImage ? { imageUrl: uploadedImage } : {})
         },
         headers
       });
@@ -371,6 +374,11 @@ export function AlfieChat() {
       });
       
       pollVideoStatus(data.jobId, messageId, woofCost);
+      
+      // ✅ Clear uploaded image after starting video generation
+      if (uploadedImage) {
+        setUploadedImage(null);
+      }
       
     } catch (error: any) {
       console.error('[Video] Error:', error);
@@ -752,7 +760,8 @@ export function AlfieChat() {
       
       conversationHistory.push({
         role: 'user',
-        content: userMessage
+        content: userMessage,
+        ...(uploadedImage ? { imageUrl: uploadedImage } : {})
       });
       
       // Appeler l'orchestrateur backend
@@ -860,6 +869,11 @@ export function AlfieChat() {
         });
       }
       
+      // ✅ Clear uploaded image after successful orchestration
+      if (uploadedImage) {
+        setUploadedImage(null);
+      }
+      
       return true;
     } catch (error: any) {
       console.error('[Orchestrator] Error:', error);
@@ -898,7 +912,7 @@ export function AlfieChat() {
   // ======
   
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if (isLoading || (!input.trim() && !uploadedImage)) return;
     
     if (!activeBrandId) {
       toast.error('Sélectionne une marque d\'abord !');
@@ -912,7 +926,7 @@ export function AlfieChat() {
     // 1. Ajouter message utilisateur
     addMessage({
       role: 'user',
-      content: userMessage,
+      content: userMessage || '(Image jointe)',
       type: 'text'
     });
     
@@ -1230,7 +1244,7 @@ export function AlfieChat() {
           
           <Button
             onClick={handleSend}
-            disabled={!input.trim() || isLoading}
+            disabled={isLoading || (!input.trim() && !uploadedImage)}
             size="icon"
           >
             {isLoading ? (
