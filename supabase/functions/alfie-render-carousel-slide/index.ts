@@ -99,8 +99,7 @@ serve(async (req) => {
           format,
           backgroundOnly: true,
           globalStyle,
-          brandId,
-          brand_id: brandId,
+          brand_id: brandId, // ✅ CRITICAL FIX: Passer le brandId pour utiliser le bon brand
         }
       }
     );

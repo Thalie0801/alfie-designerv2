@@ -41,8 +41,19 @@ export async function renderSlideToSVG(
     const fontFamily = baseFontFamily;
     let textColor = layer.color;
     
-  // 1. Base SVG structure with viewBox for better compatibility
-  let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">`;
+    // ✅ CRITICAL FIX: Valider la couleur et utiliser les couleurs du brand
+    const hexRegex = /^#[0-9A-Fa-f]{6}$/;
+    if (!hexRegex.test(textColor)) {
+      console.warn(`[slideRenderer] Invalid color "${textColor}" for layer ${layer.id}, using brand color`);
+      textColor = brandSnapshot.primary_color || '#000000';
+    }
+    
+    // Priorité : utiliser les couleurs du brand pour les éléments principaux
+    if (layer.id === 'title' && brandSnapshot.primary_color) {
+      textColor = brandSnapshot.primary_color;
+    } else if (layer.id === 'subtitle' && brandSnapshot.secondary_color) {
+      textColor = brandSnapshot.secondary_color;
+    }
     
     // Vérifier contraste WCAG AA (4.5:1 minimum)
     const contrastRatio = calculateContrast(textColor, '#FFFFFF');
