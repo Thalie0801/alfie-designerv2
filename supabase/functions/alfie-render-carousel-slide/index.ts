@@ -73,13 +73,25 @@ serve(async (req) => {
 
     // 3. Générer le fond via alfie-render-image
     console.log('[Carousel Slide] Calling alfie-render-image...');
+
+    // Mapper l'aspect ratio vers un format attendu (fallback 1024x1280)
+    const format = aspectRatio === '1:1' ? '1024x1024'
+      : aspectRatio === '16:9' ? '1280x720'
+      : aspectRatio === '9:16' ? '720x1280'
+      : '1024x1280';
+
     const { data: bgData, error: bgError } = await supabaseAdmin.functions.invoke(
       'alfie-render-image',
       {
         body: {
+          // Compatibilité maximale avec la fonction existante
+          provider: 'gemini_image',
           prompt: enrichedPrompt,
           aspectRatio,
-          brandId
+          format,
+          backgroundOnly: true,
+          brandId,
+          brand_id: brandId,
         },
         headers: {
           authorization: authHeader
@@ -87,12 +99,15 @@ serve(async (req) => {
       }
     );
 
-    if (bgError || !bgData?.image_urls?.[0]) {
-      console.error('[Carousel Slide] Background generation failed:', bgError);
+    // Tolérance de format de réponse
+    const imageUrl = bgData?.data?.image_urls?.[0] || bgData?.image_urls?.[0] || bgData?.image_url;
+
+    if (bgError || !imageUrl) {
+      console.error('[Carousel Slide] Background generation failed:', bgError, bgData);
       throw new Error('Background generation failed: ' + (bgError?.message || 'No image URL'));
     }
 
-    const backgroundUrl = bgData.image_urls[0];
+    const backgroundUrl = imageUrl;
     console.log('[Carousel Slide] ✅ Background generated');
 
     // 4. Sélectionner le template approprié
