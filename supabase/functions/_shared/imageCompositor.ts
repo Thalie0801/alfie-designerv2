@@ -115,13 +115,21 @@ export async function compositeSlide(
     console.log('📝 SVG preview:', svgTextLayer.substring(0, 300).replace(/\n/g, ' '));
     console.log('📏 SVG size:', svgTextLayer.length, 'chars');
     
-    // 3. ✅ FIX: Upload raw SVG with proper charset instead of base64
-    console.log('🔄 Preparing SVG for upload...');
+    // 3. ✅ FIX: Sanitize SVG to fix quote issues in font-family attributes
+    console.log('🔄 Sanitizing SVG for Cloudinary...');
+    
+    // Replace problematic double quotes in font-family attributes with single quotes
+    const sanitizedSvg = svgTextLayer.replace(
+      /font-family="([^"]*)"/g,
+      (match, fontValue) => `font-family="${fontValue.replace(/"/g, "'")}"`
+    );
+    
+    console.log('✅ SVG sanitized (fixed font-family quotes)');
     
     // Create a proper SVG blob with UTF-8 charset
-    const svgBlob = new Blob([svgTextLayer], { type: 'image/svg+xml;charset=utf-8' });
+    const svgBlob = new Blob([sanitizedSvg], { type: 'image/svg+xml;charset=utf-8' });
     
-    console.log('✅ SVG blob created (size:', svgTextLayer.length, 'chars)');
+    console.log('✅ SVG blob created (size:', sanitizedSvg.length, 'chars)');
     
     // 4. Upload SVG overlay to Cloudinary with signed authentication
     console.log('⬆️ Uploading SVG overlay as UTF-8 blob...');
