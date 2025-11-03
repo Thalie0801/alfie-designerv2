@@ -139,8 +139,18 @@ export async function compositeSlide(
     console.log('✅ SVG sanitized (Cloudinary-safe)');
     console.log('🧪 Sanitized preview:', sanitizedSvg.substring(0, 250).replace(/\n/g, ' '));
 
-    // Create a URL-encoded data URI (more robust with Cloudinary)
-    const svgDataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sanitizedSvg)}`;
+    // Create a base64 data URI (Cloudinary expects base64 for data URIs)
+    const toBase64 = (input: string) => {
+      const bytes = new TextEncoder().encode(input);
+      let binary = '';
+      const chunkSize = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+      }
+      return btoa(binary);
+    };
+    const svgBase64 = toBase64(sanitizedSvg);
+    const svgDataUri = `data:image/svg+xml;base64,${svgBase64}`;
 
     console.log('✅ SVG data URI prepared (length:', svgDataUri.length, ')');
     
