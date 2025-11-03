@@ -233,31 +233,25 @@ export async function compositeSlide(
 
     console.log('✅ Composition complete:', composedUrl);
     
-    // 4.5 🔍 VERIFY: Wait for composed image to be available before cleanup
-    console.log('🔍 Verifying composed image availability...');
+    // 4.5 🔍 VERIFY (non-bloquant): essayer d'accéder à l'image sans échouer la requête
+    console.log('🔍 Verifying composed image availability (non-blocking)...');
     const verifyController = new AbortController();
-    const verifyTimeout = setTimeout(() => verifyController.abort(), 30000);
-    
+    const verifyTimeout = setTimeout(() => verifyController.abort(), 10000);
     try {
-      const verifyResponse = await fetch(composedUrl, { 
-        method: 'HEAD',
-        signal: verifyController.signal 
-      });
+      const head = await fetch(composedUrl, { method: 'HEAD', signal: verifyController.signal });
       clearTimeout(verifyTimeout);
-      
-      if (!verifyResponse.ok) {
-        console.warn(`⚠️ Composed image not yet available (${verifyResponse.status}), retrying with GET...`);
-        // Cloudinary may need a GET to generate the image on first request
-        const getResponse = await fetch(composedUrl);
-        if (!getResponse.ok) {
-          throw new Error(`Composed image not accessible: ${getResponse.status}`);
+      if (!head.ok) {
+        console.warn(`⚠️ HEAD returned ${head.status}, trying GET once...`);
+        const getOnce = await fetch(composedUrl);
+        if (!getOnce.ok) {
+          console.warn(`⚠️ GET also returned ${getOnce.status}. Proceeding anyway (Cloudinary may still be processing).`);
         }
+      } else {
+        console.log('✅ Composed image verified and accessible');
       }
-      console.log('✅ Composed image verified and accessible');
     } catch (err) {
       clearTimeout(verifyTimeout);
-      console.error('❌ Failed to verify composed image:', err);
-      throw new Error(`Composed image verification failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      console.warn('⚠️ Non-blocking verify failed, proceeding anyway:', err instanceof Error ? err.message : String(err));
     }
     
     // 5. Return composed info and let caller handle cleanup after upload
