@@ -31,12 +31,6 @@ interface Message {
 
 type IntentType = 'image' | 'video' | 'carousel' | 'unknown';
 
-interface CarouselSlide {
-  title: string;
-  text: string;
-  imagePrompt: string;
-}
-
 // ======
 // COMPOSANT PRINCIPAL
 // ======
@@ -323,75 +317,6 @@ export function AlfieChat() {
   };
   
   // ======
-  // GÉNÉRATION DE CARROUSEL SLIDE (avec texte overlay)
-  // ======
-  
-  const generateCarouselSlide = async (
-    slide: CarouselSlide, 
-    slideIndex: number, 
-    totalSlides: number, 
-    aspectRatio: string
-  ) => {
-    const woofCost = 1;
-    
-    // 1. Vérifier et consommer quota
-    const quotaOk = await checkAndConsumeQuota('woofs', woofCost);
-    if (!quotaOk) return;
-    
-    // 2. Construire le texte overlay à partir du slide validé
-    const overlayText = `${slide.title}\n${slide.text}`;
-    
-    try {
-      const headers = await getAuthHeader();
-      
-      // 3. Appeler alfie-render-image avec TOUS les paramètres carrousel
-      const { data, error } = await supabase.functions.invoke('alfie-render-image', {
-        body: {
-          provider: 'gemini-nano',
-          prompt: slide.imagePrompt, // ✅ Prompt visuel du plan
-          format: mapAspectRatio(aspectRatio),
-          brand_id: activeBrandId,
-          cost_woofs: woofCost,
-          // ✅ NOUVEAUX PARAMS CARROUSEL
-          backgroundOnly: false, // On veut le texte intégré
-          slideIndex: slideIndex,
-          totalSlides: totalSlides,
-          overlayText: overlayText, // ✅ Texte à intégrer
-          negativePrompt: "logos de marques tierces, filigranes, artefacts, texte illisible, tuiles, grille, multi-cadres, collage",
-          resolution: mapAspectRatio(aspectRatio)
-        },
-        headers
-      });
-      
-      if (error) throw error;
-      
-      if (!data?.ok || !data?.data?.image_urls?.[0]) {
-        throw new Error(data?.error || 'Aucune image générée');
-      }
-      
-      // 4. Afficher l'image
-      addMessage({
-        role: 'assistant',
-        content: `✅ Slide ${slideIndex + 1}/${totalSlides} générée !`,
-        type: 'image',
-        assetUrl: data.data.image_urls[0],
-        assetId: data.data.generation_id
-      });
-      
-    } catch (error: any) {
-      console.error(`[Carousel Slide ${slideIndex + 1}] Error:`, error);
-      await refundWoofs(woofCost);
-      
-      addMessage({
-        role: 'assistant',
-        content: `❌ Échec de la slide ${slideIndex + 1}/${totalSlides}`,
-        type: 'text'
-      });
-      toast.error(`Échec de la slide ${slideIndex + 1}`);
-    }
-  };
-  
-  // ======
   // GÉNÉRATION DE VIDÉOS
   // ======
   
@@ -529,11 +454,15 @@ export function AlfieChat() {
       
       const headers = await getAuthHeader();
       
+      // Extraire l'aspect ratio du prompt (défaut 4:5)
+      const aspectRatio = detectAspectRatio(prompt) || '4:5';
+      
       // 1. Générer le plan simplifié
       const { data: planData, error: planError } = await supabase.functions.invoke('alfie-plan-carousel', {
         body: { 
           prompt, 
           slideCount: count,
+          aspectRatio: aspectRatio,
           brandKit: {
             name: brandKit?.name,
             palette: brandKit?.palette,
@@ -919,58 +848,17 @@ export function AlfieChat() {
     });
     
     try {
-      // 2. Vérifier si on est en attente de validation de plan de carrousel
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage?.metadata?.awaitingValidation && lastMessage.metadata.action === 'carousel_plan_validation') {
-        if (userMessage.toLowerCase().includes('oui') || userMessage.toLowerCase().includes('ok')) {
-          
-          const { plan, aspectRatio } = lastMessage.metadata;
-          const count = plan.length;
-          
-          // 2.1. Vérifier et consommer quota (count visuels)
-          const quotaOk = await checkAndConsumeQuota('visuals', count);
-          if (!quotaOk) {
-            setIsLoading(false);
-            return;
-          }
-          
-          addMessage({
-            role: 'assistant',
-            content: `✅ C'est parti ! Je génère tes ${count} slides... Tu vas être bluffé ! 🎨`,
-            type: 'text'
-          });
-          
-          // 2.2. Lancer la boucle de génération d'images (le nouveau flux)
-          for (let i = 0; i < count; i++) {
-            const slide = plan[i];
-            addMessage({
-              role: 'assistant',
-              content: `🎨 Génération de la slide ${i + 1}/${count} : *${slide.title}*`,
-              type: 'text'
-            });
-            
-            // ✅ Appeler generateCarouselSlide avec toutes les données du slide
-            await generateCarouselSlide(slide, i, count, aspectRatio);
-          }
-          
-          addMessage({
-            role: 'assistant',
-            content: `🎉 Carrousel de ${count} slides terminé !`,
-            type: 'text'
-          });
-          
-          return;
-        } else if (userMessage.toLowerCase().includes('non')) {
-          addMessage({
-            role: 'assistant',
-            content: '❌ Plan annulé. Veuillez reformuler votre demande de carrousel.',
-            type: 'text'
-          });
-          return;
-        }
+      // 2. Détection d'intent côté frontend AVANT l'orchestrateur
+      const isCarouselRequest = userMessage.toLowerCase().match(/carrousel|carousel|slides/i);
+      
+      if (isCarouselRequest) {
+        console.log('[Chat] Carousel request detected, using progressive generation');
+        const count = extractCount(userMessage) || 5;
+        await generateCarouselProgressive(userMessage, count);
+        return;
       }
       
-      // 3. Essayer l'orchestrateur backend
+      // 3. Essayer l'orchestrateur backend pour les autres types (images, vidéos)
       console.log('[Chat] Trying orchestrator...');
       const orchestratorSuccess = await orchestratorSend(userMessage);
       
