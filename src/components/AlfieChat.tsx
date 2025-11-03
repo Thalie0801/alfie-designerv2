@@ -20,12 +20,24 @@ interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  type?: 'text' | 'image' | 'video' | 'carousel' | 'reasoning';
+  type?: 'text' | 'image' | 'video' | 'carousel' | 'reasoning' | 'bulk-carousel';
   assetUrl?: string;
   assetId?: string;
   metadata?: any;
-  reasoning?: string; // ✅ Nouveau : explications de l'agent
-  brandAlignment?: string; // ✅ Nouveau : comment ça respecte le Brand Kit
+  reasoning?: string;
+  brandAlignment?: string;
+  bulkCarouselData?: {
+    carousels: Array<{
+      carousel_index: number;
+      slides: Array<{
+        storage_url: string;
+        index: number;
+      }>;
+      zip_url?: string;
+    }>;
+    totalCarousels: number;
+    slidesPerCarousel: number;
+  };
   timestamp: Date;
 }
 
@@ -107,6 +119,22 @@ export function AlfieChat() {
     }
     
     return 'unknown';
+  };
+
+  const detectBulkCarousel = (text: string): { isBulk: boolean; numCarousels: number; numSlides: number } => {
+    const lower = text.toLowerCase();
+    
+    // Patterns: "5 carrousels de 10 slides", "générer 10 carrousels", etc.
+    const bulkPattern = /(\d+)\s*carrousels?\s*(?:de\s*(\d+)\s*slides?)?/i;
+    const match = lower.match(bulkPattern);
+    
+    if (match) {
+      const numCarousels = parseInt(match[1]) || 1;
+      const numSlides = parseInt(match[2]) || 5; // Default 5 slides per carousel
+      return { isBulk: numCarousels > 1, numCarousels, numSlides };
+    }
+    
+    return { isBulk: false, numCarousels: 1, numSlides: 5 };
   };
   
   const extractCount = (prompt: string): number => {
