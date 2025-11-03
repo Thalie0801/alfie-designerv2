@@ -139,20 +139,10 @@ export async function compositeSlide(
     console.log('✅ SVG sanitized (Cloudinary-safe)');
     console.log('🧪 Sanitized preview:', sanitizedSvg.substring(0, 250).replace(/\n/g, ' '));
 
-    // Create a base64 data URI (Cloudinary expects base64 for data URIs)
-    const toBase64 = (input: string) => {
-      const bytes = new TextEncoder().encode(input);
-      let binary = '';
-      const chunkSize = 0x8000;
-      for (let i = 0; i < bytes.length; i += chunkSize) {
-        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-      }
-      return btoa(binary);
-    };
-    const svgBase64 = toBase64(sanitizedSvg);
-    const svgDataUri = `data:image/svg+xml;base64,${svgBase64}`;
+    // Create a Blob from the SVG string (Cloudinary can handle this directly)
+    const svgBlob = new Blob([sanitizedSvg], { type: 'image/svg+xml' });
 
-    console.log('✅ SVG data URI prepared (length:', svgDataUri.length, ')');
+    console.log('✅ SVG blob prepared (size:', svgBlob.size, 'bytes)');
     
     // 4. Upload SVG overlay to Cloudinary with signed authentication
     console.log('⬆️ Uploading SVG overlay as base64 data URI...');
@@ -161,7 +151,7 @@ export async function compositeSlide(
     const svgTimestamp = Math.floor(Date.now() / 1000);
     
     const svgFormData = new FormData();
-    svgFormData.append('file', svgDataUri);
+    svgFormData.append('file', svgBlob);
     svgFormData.append('public_id', svgPublicId);
     svgFormData.append('api_key', API_KEY);
     svgFormData.append('timestamp', svgTimestamp.toString());
