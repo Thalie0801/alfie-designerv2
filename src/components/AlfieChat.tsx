@@ -737,6 +737,8 @@ export function AlfieChat() {
         hasAssets: !!data?.assets,
         assetsCount: data?.assets?.length || 0,
         hasJobSetId: !!data?.jobSetId,
+        noToolCalls: data?.noToolCalls,
+        noCredits: data?.noCredits,
         messageContent: data?.choices?.[0]?.message?.content?.substring(0, 200)
       });
       
@@ -748,6 +750,23 @@ export function AlfieChat() {
         throw new Error('No assistant message in response');
       }
       
+      // ✅ Gérer le flag noToolCalls
+      if (data.noToolCalls === true && (!data.assets || data.assets.length === 0)) {
+        console.warn('[Orchestrator] ⚠️ No tool calls from AI, triggering local fallback');
+        addMessage({
+          role: 'assistant',
+          content: '🤔 L\'IA n\'a pas exécuté les outils attendus. Je vais essayer de t\'aider autrement.\n\nPeux-tu reformuler ta demande de façon plus claire ? Par exemple:\n- "Crée-moi un carrousel 4:5 de 5 slides sur X"\n- "Génère une image 1:1 pour Y"\n- "Fais-moi une vidéo sur Z"',
+          type: 'text'
+        });
+        return false;
+      }
+      
+      // ✅ Gérer le flag noCredits (plan textuel sans images)
+      if (data.noCredits === true) {
+        console.log('[Orchestrator] No credits flag detected');
+        toast.error('💳 Crédits insuffisants - Plan généré sans images');
+      }
+      
       // Afficher le message de l'assistant
       addMessage({
         role: 'assistant',
@@ -757,6 +776,10 @@ export function AlfieChat() {
       
       // Traiter les assets s'il y en a
       if (data.assets && Array.isArray(data.assets)) {
+        if (data.assets.length > 0) {
+          toast.success(`✅ ${data.assets.length} asset${data.assets.length > 1 ? 's' : ''} généré${data.assets.length > 1 ? 's' : ''} !`);
+        }
+        
         for (const asset of data.assets) {
           if (asset.type === 'image') {
             addMessage({

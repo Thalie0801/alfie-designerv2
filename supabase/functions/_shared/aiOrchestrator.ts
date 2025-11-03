@@ -68,6 +68,10 @@ export async function callAIWithFallback(
     ? ['gemini' as AIProvider, 'openai' as AIProvider] 
     : ['openai' as AIProvider, 'gemini' as AIProvider];
   
+  console.log('[AI Orchestrator] preferredProvider:', preferredProvider);
+  console.log('[AI Orchestrator] providers order:', providers);
+  console.log('[AI Orchestrator] iterationCount:', iterationCount);
+  
   let lastError: Error | null = null;
   
   for (const provider of providers) {
@@ -79,17 +83,18 @@ export async function callAIWithFallback(
       
       console.log(`[AI] Sending ${tools?.length || 0} tools to ${provider}`);
       
-      // Pour OpenAI, forcer classify_intent en première itération
+      // Forcer classify_intent en première itération pour TOUS les providers
       let toolChoice: any = undefined;
       if (tools && tools.length > 0) {
-        if (provider === 'openai' && iterationCount === 0) {
-          // Forcer classify_intent en première itération pour OpenAI
+        if (iterationCount === 0) {
+          // Forcer classify_intent en première itération
           toolChoice = { type: "function", function: { name: "classify_intent" } };
-          console.log('[AI] Forcing tool_choice: classify_intent (first iteration)');
+          console.log('[AI Orchestrator] Forcing tool_choice: classify_intent (iteration 0)');
         } else {
           toolChoice = "auto";
         }
       }
+      console.log('[AI Orchestrator] tool_choice:', toolChoice);
       
       // ✅ Construire le body selon le provider (GPT-5 n'accepte pas temperature)
       const requestBody: any = {

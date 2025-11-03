@@ -521,10 +521,11 @@ Example: "Professional product photography, 45° angle, gradient background (${b
     let conversationMessages = [{ role: "system", content: systemPrompt }, ...transformedMessages];
     let aiResponse: AIResponse;
     let iterationCount = 0;
-    const maxIterations = 4;
+    const maxIterations = 5; // ✅ Augmenté à 5 pour permettre injections synthétiques
     const collectedAssets: any[] = [];
     let finalJobSetId: string | undefined;
     let fallbackAttempted = false; // ✅ Flag pour éviter double fallback client/backend
+    let syntheticInjectionDone = false; // ✅ Flag pour éviter double injection
 
     console.log('[TRACE] About to enter tool execution loop');
     console.log('[TRACE] Initial conversation:', {
@@ -535,12 +536,15 @@ Example: "Professional product photography, 45° angle, gradient background (${b
 
     while (iterationCount < maxIterations) {
       iterationCount++;
-      console.log(`[Tool Loop] Iteration ${iterationCount}/${maxIterations}`);
+      console.log(`[Tool Loop] === Iteration ${iterationCount}/${maxIterations} ===`);
+      console.log(`[Tool Loop] Conversation history: ${conversationMessages.length} messages`);
+      console.log(`[Tool Loop] syntheticInjectionDone: ${syntheticInjectionDone}`);
       
       // ✅ PRÉ-CHECK DE QUOTA (avant d'appeler l'IA) pour éviter 402
       if (iterationCount === 1) {
         const lastUserMessage = conversationMessages.filter(m => m.role === 'user').pop()?.content || '';
         const detectedIntent = detectIntent(lastUserMessage);
+        console.log(`[Pre-check] Detected intent: ${detectedIntent}`);
         
         if ((detectedIntent === 'carousel' || detectedIntent === 'image' || detectedIntent === 'video') && brandId) {
           console.log('[Pre-check] Detected generation intent:', detectedIntent, '- checking quotas');
@@ -613,6 +617,103 @@ Example: "Professional product photography, 45° angle, gradient background (${b
       const toolCalls = assistantMessage.tool_calls;
       
       if (!toolCalls || toolCalls.length === 0) {
+        console.warn('[Tool Loop] ⚠️ No tool calls from AI on iteration', iterationCount);
+        
+        // ✅ INJECTION SYNTHÉTIQUE ITÉRATION 2: Injecter classify_intent
+        if (iterationCount === 2 && !syntheticInjectionDone) {
+          console.log('[Synthetic Injection] Iteration 2: Injecting classify_intent...');
+          syntheticInjectionDone = true;
+          
+          const lastUserMsg = conversationMessages.filter(m => m.role === 'user').pop()?.content || '';
+          
+          // Appeler classify_intent
+          const { data: classifyData, error: classifyError } = await supabase.functions.invoke('alfie-classify-intent', {
+            body: { user_message: lastUserMsg },
+            headers: functionHeaders
+          });
+          
+          const intent = classifyData?.intent || detectIntent(lastUserMsg);
+          console.log('[Synthetic Injection] Intent detected:', intent);
+          
+          // Injecter assistant avec tool_call
+          conversationMessages.push({
+            role: 'assistant',
+            content: null,
+            tool_calls: [{
+              id: 'synthetic-classify',
+              type: 'function',
+              function: { name: 'classify_intent', arguments: JSON.stringify({ user_message: lastUserMsg }) }
+            }]
+          });
+          
+          // Injecter tool result
+          conversationMessages.push({
+            role: 'tool',
+            tool_call_id: 'synthetic-classify',
+            name: 'classify_intent',
+            content: JSON.stringify({ intent })
+          });
+          
+          continue; // Relancer avec ce nouvel historique
+        }
+        
+        // ✅ INJECTION SYNTHÉTIQUE ITÉRATION 3: Si intent = carousel, injecter plan_carousel
+        if (iterationCount === 3 && syntheticInjectionDone) {
+          const lastUserMsg = conversationMessages.filter(m => m.role === 'user').pop()?.content || '';
+          const intent = detectIntent(lastUserMsg);
+          
+          if (intent === 'carousel') {
+            console.log('[Synthetic Injection] Iteration 3: Injecting plan_carousel...');
+            
+            try {
+              // Appeler alfie-plan-carousel
+              const { data: planData, error: planError } = await supabase.functions.invoke('alfie-plan-carousel', {
+                body: {
+                  prompt: lastUserMsg,
+                  slideCount: 5,
+                  brandKit: brandKit
+                },
+                headers: functionHeaders
+              });
+              
+              if (planError) throw planError;
+              
+              console.log('[Synthetic Injection] Plan received:', planData?.plan?.slides?.length, 'slides');
+              
+              // Injecter assistant avec tool_call
+              conversationMessages.push({
+                role: 'assistant',
+                content: null,
+                tool_calls: [{
+                  id: 'synthetic-plan',
+                  type: 'function',
+                  function: { 
+                    name: 'plan_carousel', 
+                    arguments: JSON.stringify({ 
+                      prompt: lastUserMsg, 
+                      count: 5, 
+                      aspect_ratio: '4:5' 
+                    }) 
+                  }
+                }]
+              });
+              
+              // Injecter tool result
+              conversationMessages.push({
+                role: 'tool',
+                tool_call_id: 'synthetic-plan',
+                name: 'plan_carousel',
+                content: JSON.stringify(planData)
+              });
+              
+              continue; // Relancer pour que l'IA réponde avec le plan
+            } catch (planError: any) {
+              console.error('[Synthetic Injection] Plan carousel failed:', planError);
+              // Continuer avec le fallback manuel ci-dessous
+            }
+          }
+        }
+        
         // ✅ NE PAS activer fallback à la 1ère itération - forcer retry
         if (iterationCount === 1) {
           console.log('[Tool Loop] No tools called on iteration 1, AI will retry with explicit prompt');
@@ -626,8 +727,8 @@ Example: "Professional product photography, 45° angle, gradient background (${b
           continue; // Relancer iteration
         }
         
-        // ✅ FALLBACK DUR: Activer seulement à partir de l'itération 2+
-        if (iterationCount >= 2) {
+        // ✅ FALLBACK DUR: Activer seulement à partir de l'itération 4+
+        if (iterationCount >= 4) {
           console.warn('[FALLBACK] AI still did not call tools after retry, activating manual fallback');
           
           // Détecter l'intent manuellement
@@ -1342,9 +1443,9 @@ Example: "Professional product photography, 45° angle, gradient background (${b
     };
 
     // ✅ Surfacer si aucun tool n'a été appelé ET qu'aucun fallback n'a été tenté
-    if (collectedAssets.length === 0 && !finalJobSetId && !fallbackAttempted) {
+    if (collectedAssets.length === 0 && !finalJobSetId && !fallbackAttempted && !syntheticInjectionDone) {
       responsePayload.noToolCalls = true;
-      console.warn('[Response] Surfacing noToolCalls=true (no generation triggered)');
+      console.warn('[Response] Surfacing noToolCalls=true (no generation triggered, no synthetic injection)');
     }
 
     // Ajouter les assets collectés s'il y en a
