@@ -16,6 +16,7 @@ const supabaseAdmin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
+
 interface SlideContent {
   type: 'hero' | 'problem' | 'solution' | 'impact' | 'cta';
   title: string;
@@ -45,6 +46,13 @@ serve(async (req) => {
     }
 
     const { prompt, globalStyle, slideContent, brandId, aspectRatio } = await req.json();
+
+    // Client Supabase authentifié avec le JWT utilisateur
+    const supabaseAuth = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
 
     if (!prompt || !globalStyle || !slideContent || !brandId) {
       throw new Error('Missing required parameters');
@@ -80,7 +88,7 @@ serve(async (req) => {
       : aspectRatio === '9:16' ? '720x1280'
       : '1024x1280';
 
-    const { data: bgData, error: bgError } = await supabaseAdmin.functions.invoke(
+    const { data: bgData, error: bgError } = await supabaseAuth.functions.invoke(
       'alfie-render-image',
       {
         body: {
@@ -90,20 +98,24 @@ serve(async (req) => {
           aspectRatio,
           format,
           backgroundOnly: true,
+          globalStyle,
           brandId,
           brand_id: brandId,
-        },
-        headers: {
-          authorization: authHeader
         }
       }
     );
 
-    // Tolérance de format de réponse
-    const imageUrl = bgData?.data?.image_urls?.[0] || bgData?.image_urls?.[0] || bgData?.image_url;
+    // Tolérance de format de réponse + wrapper edgeHandler
+    const payload = (bgData && typeof bgData === 'object' && 'data' in bgData) ? (bgData as any).data : bgData;
+    if ((bgData as any)?.ok === false) {
+      console.error('[Carousel Slide] Background generation error payload:', JSON.stringify(bgData));
+      throw new Error((bgData as any)?.error || 'BACKGROUND_FUNCTION_ERROR');
+    }
+
+    const imageUrl = payload?.image_urls?.[0] || payload?.data?.image_urls?.[0] || payload?.image_url;
 
     if (bgError || !imageUrl) {
-      console.error('[Carousel Slide] Background generation failed:', bgError, bgData);
+      console.error('[Carousel Slide] Background generation failed:', bgError, JSON.stringify(bgData));
       throw new Error('Background generation failed: ' + (bgError?.message || 'No image URL'));
     }
 
@@ -138,7 +150,7 @@ serve(async (req) => {
     // 7. Retourner l'URL finale
     return new Response(JSON.stringify({ 
       image_url: composedUrl,
-      generation_id: bgData.generation_id || `carousel-${Date.now()}`,
+      generation_id: (payload as any)?.generation_id || `carousel-${Date.now()}`,
       debug: {
         bgPublicId,
         svgPublicId,
