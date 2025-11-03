@@ -69,9 +69,7 @@ export async function renderSlideToSVG(
       const textWidth = estimateTextWidth(text, layer.size);
       const rectWidth = Math.min(textWidth + padding * 2, layer.maxWidth);
       const rectHeight = layer.size + padding * 2;
-      const rectX = layer.align === 'center' 
-        ? layer.position.x - rectWidth / 2 
-        : layer.position.x;
+      const rectX = (width - rectWidth) / 2;
       const rectY = layer.position.y - layer.size;
       
       svg += `<rect x="${rectX}" y="${rectY}" width="${rectWidth}" height="${rectHeight}" 
@@ -82,28 +80,32 @@ export async function renderSlideToSVG(
     const lines = wrapText(text, layer.maxWidth, layer.size);
     lines.slice(0, layer.maxLines).forEach((line, i) => {
       const y = layer.position.y + i * (layer.size * 1.2);
-      const x = layer.align === 'center' ? layer.position.x : layer.position.x;
+      const x = width / 2;
+      
+      // Stroke pour lisibilité et text-anchor centré
+      const textLum = relativeLuminance(textColor);
+      const strokeColor = textLum > 0.5 ? '#000000' : '#FFFFFF';
       
       svg += `<text x="${x}" y="${y}"
         font-family="${fontFamily}" font-size="${layer.size}" font-weight="${layer.weight}"
-        fill="${textColor}" text-anchor="${layer.align === 'center' ? 'middle' : 'start'}">
+        fill="${textColor}" text-anchor="middle" stroke="${strokeColor}" stroke-opacity="0.35" stroke-width="3" style="paint-order: stroke fill">
         ${escapeXml(line)}
       </text>`;
     });
   }
   
-  // Bullets si présents
+  // Bullets si présents (centrés)
   if (slideContent.bullets && slideContent.bullets.length > 0) {
     const bulletColor = brandSnapshot.primary_color || '#000000';
     slideContent.bullets.forEach((bullet, i) => {
       const y = 450 + i * 120;
-      // Cercle bullet
-      svg += `<circle cx="80" cy="${y}" r="8" fill="${bulletColor}"/>`;
-      // Texte du bullet
-      const bulletLines = wrapText(bullet, 880, 28);
+      const bulletLines = wrapText(bullet, Math.floor(width * 0.8), 28);
       bulletLines.slice(0, 2).forEach((line, lineIndex) => {
-        svg += `<text x="110" y="${y + lineIndex * 36 + 8}" 
-          font-family="Inter" font-size="28" font-weight="400" fill="#333333">
+        const lineY = y + lineIndex * 36 + 8;
+        const strokeColor = '#000000';
+        svg += `<text x="${width / 2}" y="${lineY}" 
+          font-family="Inter" font-size="28" font-weight="400" fill="#333333" text-anchor="middle"
+          stroke="${strokeColor}" stroke-opacity="0.25" stroke-width="2" style="paint-order: stroke fill">
           ${escapeXml(line)}
         </text>`;
       });
