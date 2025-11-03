@@ -124,8 +124,8 @@ export async function compositeSlide(
       .replace(/"Segoe UI"/g, "'Segoe UI'")
       // Convert font-family attribute to single-quoted and normalize internal quotes
       .replace(/font-family=(["'])(.*?)\1/g, (_m, _q, val) => {
-        const safeVal = String(val).replace(/\"/g, "'").replace(/"/g, "'");
-        return `font-family='${safeVal}'`;
+        const safeVal = String(val).replace(/\"/g, '&quot;').replace(/"/g, '&quot;');
+        return `font-family="${safeVal}"`;
       })
       // Replace non-standard transparent color with none (Cloudinary strict parser)
       .replace(/fill="transparent"/g, 'fill="none"');
@@ -133,23 +133,25 @@ export async function compositeSlide(
     console.log('✅ SVG sanitized (fixed font-family quotes)');
     console.log('🧪 Sanitized preview:', sanitizedSvg.substring(0, 200).replace(/\n/g, ' '));
     
-    // Create a proper SVG blob with UTF-8 charset
-    const svgBlob = new Blob([sanitizedSvg], { type: 'image/svg+xml;charset=utf-8' });
+    // Create a base64 data URI (Cloudinary-friendly)
+    const encoder = new TextEncoder();
+    const svgBytes = encoder.encode(sanitizedSvg);
+    const svgBase64 = btoa(String.fromCharCode(...svgBytes));
+    const svgDataUri = `data:image/svg+xml;base64,${svgBase64}`;
     
-    console.log('✅ SVG blob created (size:', sanitizedSvg.length, 'chars)');
+    console.log('✅ SVG base64 prepared (length:', svgBase64.length, ')');
     
     // 4. Upload SVG overlay to Cloudinary with signed authentication
-    console.log('⬆️ Uploading SVG overlay as UTF-8 blob...');
+    console.log('⬆️ Uploading SVG overlay as base64 data URI...');
     
     const svgPublicId = `alfie/${brandId || 'temp'}/${jobSetId || 'temp'}/overlay_${Date.now()}`;
     const svgTimestamp = Math.floor(Date.now() / 1000);
     
     const svgFormData = new FormData();
-    svgFormData.append('file', svgBlob, 'overlay.svg');
+    svgFormData.append('file', svgDataUri);
     svgFormData.append('public_id', svgPublicId);
     svgFormData.append('api_key', API_KEY);
     svgFormData.append('timestamp', svgTimestamp.toString());
-    svgFormData.append('format', 'svg');
     
     const svgSignature = await generateCloudinarySignature(
       { public_id: svgPublicId, timestamp: svgTimestamp.toString() },

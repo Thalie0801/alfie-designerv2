@@ -23,13 +23,13 @@ export async function renderSlideToSVG(
 ): Promise<string> {
   const { width, height } = template.layout;
   
-  let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`;
+  let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">`;
   
   // Fond transparent (sera composité avec l'image IA)
   svg += `<rect width="${width}" height="${height}" fill="none"/>`;
   
   // Normalize font settings across all layers for consistency
-  const baseFontFamily = brandSnapshot.fonts?.default || "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  const rawFontFamily = brandSnapshot.fonts?.default || 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
   const textShadow = '0 2px 4px rgba(0,0,0,0.1)';
   
   // Couche de texte (typo contrôlée, pas d'IA)
@@ -37,8 +37,8 @@ export async function renderSlideToSVG(
     let text = getTextForLayer(layer, slideContent);
     if (!text) continue;
     
-    // Use consistent font from brand kit - normalize quotes for SVG safety
-    const fontFamily = (baseFontFamily || '').replace(/"/g, "'");
+    // Use consistent font from brand kit - escape inner quotes for XML attributes
+    const fontFamily = String(rawFontFamily).replace(/"/g, '&quot;');
     let textColor = layer.color;
     
     // ✅ CRITICAL FIX: Valider la couleur et utiliser les couleurs du brand
@@ -85,7 +85,7 @@ export async function renderSlideToSVG(
       const x = layer.align === 'center' ? layer.position.x : layer.position.x;
       
       svg += `<text x="${x}" y="${y}"
-        font-family='${fontFamily}' font-size="${layer.size}" font-weight="${layer.weight}"
+        font-family="${fontFamily}" font-size="${layer.size}" font-weight="${layer.weight}"
         fill="${textColor}" text-anchor="${layer.align === 'center' ? 'middle' : 'start'}">
         ${escapeXml(line)}
       </text>`;
