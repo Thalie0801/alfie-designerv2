@@ -85,7 +85,7 @@ export async function renderSlideToSVG(
       const x = layer.align === 'center' ? layer.position.x : layer.position.x;
       
       svg += `<text x="${x}" y="${y}"
-        font-family="${fontFamily}" font-size="${layer.size}" font-weight="${layer.weight}"
+        font-family='${fontFamily}' font-size="${layer.size}" font-weight="${layer.weight}"
         fill="${textColor}" text-anchor="${layer.align === 'center' ? 'middle' : 'start'}">
         ${escapeXml(line)}
       </text>`;

@@ -118,13 +118,18 @@ export async function compositeSlide(
     // 3. ✅ FIX: Sanitize SVG to fix quote issues in font-family attributes
     console.log('🔄 Sanitizing SVG for Cloudinary...');
     
-    // Replace problematic double quotes in font-family attributes with single quotes
-    const sanitizedSvg = svgTextLayer.replace(
-      /font-family="([^"]*)"/g,
-      (match, fontValue) => `font-family="${fontValue.replace(/"/g, "'")}"`
-    );
+    // Robust sanitation: handle inner quotes within font-family values
+    const sanitizedSvg = svgTextLayer
+      // Common problematic token in CSS font stacks
+      .replace(/"Segoe UI"/g, "'Segoe UI'")
+      // Convert font-family attribute to single-quoted and normalize internal quotes
+      .replace(/font-family=(["'])(.*?)\1/g, (_m, _q, val) => {
+        const safeVal = String(val).replace(/\"/g, "'").replace(/"/g, "'");
+        return `font-family='${safeVal}'`;
+      });
     
     console.log('✅ SVG sanitized (fixed font-family quotes)');
+    console.log('🧪 Sanitized preview:', sanitizedSvg.substring(0, 200).replace(/\n/g, ' '));
     
     // Create a proper SVG blob with UTF-8 charset
     const svgBlob = new Blob([sanitizedSvg], { type: 'image/svg+xml;charset=utf-8' });
