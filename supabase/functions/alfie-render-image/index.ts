@@ -95,7 +95,18 @@ export default {
 CRITICAL RULES:
 - Generate EXACTLY ONE single image (no grid, no collage, no multiple frames).
 - Use perfect French spelling with proper accents: é, è, ê, à, ç, ù.
-- Maintain high visual hierarchy and readability.`;
+- Maintain high visual hierarchy and readability.
+
+CRITICAL FRENCH TYPOGRAPHY RULES:
+- DO NOT include any visible text in the image unless explicitly requested
+- If text must appear, use ONLY correct French spelling:
+  • "Découvrez" (not Decouvrez, not Découvrez with wrong accent)
+  • "Créer" (not Creer)
+  • "Télécharger" (not Telecharger)
+  • "Qualité" (not Qualite)
+  • "Élégant" (not Elegant)
+- NEVER render styling metadata as visible text (no hex codes, no font names, no color codes)
+- Better: Generate pure backgrounds with NO TEXT AT ALL when backgroundOnly is true`;
 
         // Enrichissement si carrousel
         if (typeof slideIndex === 'number' && totalSlides) {
@@ -115,7 +126,15 @@ CRITICAL RULES:
 - NO decorative elements in center 60% of composition
 - Use brand colors: ${brandColors[0] || 'vibrant'}, ${brandColors[1] || 'accent'}
 - Style: ${backgroundStyle}
+
+ABSOLUTE CRITICAL: NO TEXT AT ALL
 - NO TEXT, NO TYPOGRAPHY, NO LETTERS anywhere in the image
+- NO VISIBLE WORDS of any kind
+- NO HEX COLOR CODES (like #90E3C2, #B58EE5)
+- NO FONT NAMES (like Arial, Helvetica)
+- NO STYLING METADATA visible in the image
+- Generate a PURE BACKGROUND with NO TEXT ELEMENTS
+- Text will be added separately by Cloudinary overlay system
 
 CONTRAST REQUIREMENTS:
 - Background contrast mode: ${textContrast} text (generate ${textContrast === 'light' ? 'dark' : 'light'} background)
@@ -171,7 +190,7 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
         if (backgroundOnly) {
           finalPrompt += `\n\nBackground style: ${backgroundStyle}`;
           finalPrompt += `\n\nText contrast mode: ${textContrast}`;
-          finalPrompt += `\n\nCRITICAL: Generate a background composition with NO TEXT, NO TYPOGRAPHY, NO LETTERS.`;
+          finalPrompt += `\n\nABSOLUTE CRITICAL: Generate a PURE BACKGROUND with NO TEXT, NO TYPOGRAPHY, NO LETTERS, NO VISIBLE WORDS, NO HEX CODES, NO FONT NAMES. Text will be added separately by overlay system.`;
         }
 
         console.log('[Render] Generating image with carousel context:', {

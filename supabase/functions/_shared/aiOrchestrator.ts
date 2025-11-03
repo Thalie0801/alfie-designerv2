@@ -326,6 +326,13 @@ export function enrichPromptWithBrandKit(
   
   return `${basePrompt}
 
-VISUAL DIRECTION (do not render as text): 
-Apply ${styleInstruction} visual style${nicheContext}. ${colorInstruction} Use high-quality professional composition with strong visual hierarchy and readability. Typography should feel ${fontsText || 'clean and modern'}. Create cohesive brand-aligned imagery.`;
+VISUAL DIRECTION (CRITICAL: This is styling metadata, NOT content to display):
+Apply ${styleInstruction} visual style${nicheContext}. ${colorInstruction} Use high-quality professional composition with strong visual hierarchy and readability. Typography should feel ${fontsText || 'clean and modern'}. Create cohesive brand-aligned imagery.
+
+ABSOLUTE CRITICAL: DO NOT RENDER THE FOLLOWING AS VISIBLE TEXT IN THE IMAGE:
+- Color codes (hex values like #90E3C2, #B58EE5, #F9C851)
+- Font names (Arial, Helvetica, etc.)
+- Style keywords (modern, professional, etc.)
+- Any metadata from this VISUAL DIRECTION section
+These are instructions for artistic direction ONLY, not content to be displayed.`;
 }

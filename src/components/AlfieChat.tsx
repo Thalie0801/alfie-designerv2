@@ -1363,11 +1363,24 @@ export function AlfieChat() {
                           </Button>
                         )}
                       </div>
+                      
+                      {/* Afficher l'URL Cloudinary du fond comme aperçu principal (synchronisé avec la bibliothèque) */}
+                      {carousel.cloudinary_background_url && (
+                        <div className="mb-3 rounded-lg overflow-hidden border border-border">
+                          <img 
+                            src={carousel.cloudinary_background_url} 
+                            alt={`Aperçu carrousel ${carousel.carousel_index}`}
+                            className="w-full object-cover"
+                          />
+                        </div>
+                      )}
+                      
+                      {/* Grille des slides individuelles */}
                       <div className="grid grid-cols-5 gap-2">
                         {carousel.slides?.slice(0, 5).map((slide: any, slideIdx: number) => (
                           <div key={slideIdx} className="aspect-square rounded overflow-hidden border border-border">
                             <img 
-                              src={slide.storage_url} 
+                              src={slide.cloudinary_url || slide.storage_url} 
                               alt={`Slide ${slideIdx + 1}`}
                               className="w-full h-full object-cover"
                             />

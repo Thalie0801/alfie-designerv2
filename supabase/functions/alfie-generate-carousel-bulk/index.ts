@@ -211,18 +211,20 @@ async function generateCarousel(params: any) {
     throw new Error(`Carousel ${carouselIndex + 1}: Background generation failed - no URL`);
   }
 
-  console.log(`[Carousel ${carouselIndex + 1}] ✅ Background generated:`, backgroundUrl.substring(0, 80));
+  console.log(`[Carousel ${carouselIndex + 1}] ✅ Background generated (base64 length: ${backgroundUrl.length})`);
 
-  // 2. Upload background to Cloudinary
+  // 2. Upload background to Cloudinary IMMÉDIATEMENT
   console.log(`[Carousel ${carouselIndex + 1}] Step 2/4: Uploading to Cloudinary...`);
   
-  const { publicId: bgPublicId } = await uploadBackgroundToCloudinary(
+  const { publicId: bgPublicId, cloudinaryUrl: cloudinaryBackgroundUrl } = await uploadBackgroundToCloudinary(
     backgroundUrl,
     brand_id,
     `carousel_${String(carouselIndex + 1).padStart(2, '0')}`
   );
 
-  console.log(`[Carousel ${carouselIndex + 1}] ✅ Uploaded to Cloudinary:`, bgPublicId);
+  console.log(`[Carousel ${carouselIndex + 1}] ✅ Uploaded to Cloudinary successfully`);
+  console.log(`[Carousel ${carouselIndex + 1}] Cloudinary URL:`, cloudinaryBackgroundUrl);
+  console.log(`[Carousel ${carouselIndex + 1}] Cloudinary Public ID:`, bgPublicId);
 
   // 3. Store background in Supabase storage
   console.log(`[Carousel ${carouselIndex + 1}] Step 3/4: Storing in Supabase...`);
@@ -253,7 +255,8 @@ async function generateCarousel(params: any) {
   for (let s = 0; s < num_slides_per_carousel; s++) {
     const slideText = slideTexts[s];
     
-    console.log(`[Carousel ${carouselIndex + 1}] Rendering slide ${s + 1}/${num_slides_per_carousel}...`);
+    console.log(`[Carousel ${carouselIndex + 1}] 📝 Rendering slide ${s + 1}/${num_slides_per_carousel}...`);
+    console.log(`[Carousel ${carouselIndex + 1}] Slide ${s + 1} Text:`, { title: slideText.title, subtitle: slideText.subtitle });
     
     // Build Cloudinary URL with text overlays
     const timestamp = Date.now() + s;
@@ -269,6 +272,8 @@ async function generateCarousel(params: any) {
       titleWeight: 'bold',
       subtitleWeight: 'normal'
     });
+    
+    console.log(`[Carousel ${carouselIndex + 1}] ✅ Slide ${s + 1}: Cloudinary URL generated:`, slideUrl.substring(0, 100));
 
     // Add version parameter to avoid cache
     const slideUrlWithVersion = slideUrl.replace(`/${bgPublicId}.png`, `/v${timestamp}/${bgPublicId}.png`);
@@ -308,6 +313,7 @@ async function generateCarousel(params: any) {
     carousel_index: carouselIndex + 1,
     theme,
     background_url: bgStorageUrl,
+    cloudinary_background_url: cloudinaryBackgroundUrl, // URL Cloudinary finale pour le chat
     cloudinary_public_id: bgPublicId,
     slides,
     created_at: new Date().toISOString()
@@ -334,6 +340,7 @@ async function generateCarousel(params: any) {
   }
 
   console.log(`[Carousel ${carouselIndex + 1}] 🎉 Complete!`);
+  console.log(`[Carousel ${carouselIndex + 1}] Thumbnail URL for chat:`, cloudinaryBackgroundUrl);
 
   return carouselMetadata;
 }
