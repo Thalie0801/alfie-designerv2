@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,17 @@ interface BrandDialogProps {
   children?: React.ReactNode;
 }
 
+// Normalise la palette en tableau de chaînes hex
+const mapPaletteToHexStrings = (palette: any): string[] => {
+  if (!Array.isArray(palette)) return [];
+  
+  return palette.map((item) => {
+    if (typeof item === 'string') return item;
+    if (typeof item === 'object' && item?.color) return item.color;
+    return '#000000';
+  });
+};
+
 export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
@@ -26,7 +37,7 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
     voice: brand?.voice || '',
     font_primary: brand?.fonts?.primary || '',
     font_secondary: brand?.fonts?.secondary || '',
-    colors: Array.isArray(brand?.palette) ? brand.palette : []
+    colors: mapPaletteToHexStrings(brand?.palette)
   });
 
   // ✅ Recharger le formulaire quand le dialog s'ouvre avec une marque existante
@@ -38,10 +49,18 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
         voice: brand.voice || '',
         font_primary: brand.fonts?.primary || '',
         font_secondary: brand.fonts?.secondary || '',
-        colors: Array.isArray(brand.palette) ? brand.palette : []
+        colors: mapPaletteToHexStrings(brand.palette)
       });
     }
   }, [open, brand]);
+
+  // Validation des couleurs (format hex correct)
+  const invalidColors = useMemo(() => {
+    const hexRegex = /^#[0-9A-Fa-f]{6}$/;
+    return formData.colors
+      .map((color, index) => ({ color, index }))
+      .filter(({ color }) => color && !hexRegex.test(color));
+  }, [formData.colors]);
 
   const handleAddColor = () => {
     if (formData.colors.length < 5) {
@@ -50,14 +69,7 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
   };
 
   const handleColorChange = (index: number, value: string) => {
-    // ✅ Validation du format hexadécimal uniquement si l'utilisateur tape manuellement
-    const hexRegex = /^#[0-9A-Fa-f]{6}$/;
-    
-    if (value && !hexRegex.test(value)) {
-      toast.error("Format invalide. Utilisez #RRGGBB (ex: #FF0000)");
-      return;
-    }
-    
+    // Pas de blocage pendant la saisie - validation uniquement en onBlur et submit
     const newColors = [...formData.colors];
     newColors[index] = value;
     setFormData({ ...formData, colors: newColors });
@@ -256,30 +268,40 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
               <p className="text-xs text-muted-foreground">Aucune couleur définie</p>
             ) : (
               <div className="space-y-2">
-                {formData.colors.map((color: string, index: number) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={color}
-                      onChange={(e) => handleColorChange(index, e.target.value)}
-                      className="h-10 w-16 rounded border cursor-pointer"
-                    />
-                    <Input
-                      value={color}
-                      onChange={(e) => handleColorChange(index, e.target.value)}
-                      placeholder="#000000"
-                      className="flex-1"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleRemoveColor(index)}
-                    >
-                      ×
-                    </Button>
-                  </div>
-                ))}
+                {formData.colors.map((color: string, index: number) => {
+                  const isInvalid = invalidColors.some(ic => ic.index === index);
+                  return (
+                    <div key={index} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={color.match(/^#[0-9A-Fa-f]{6}$/) ? color : '#000000'}
+                          onChange={(e) => handleColorChange(index, e.target.value)}
+                          className="h-10 w-16 rounded border cursor-pointer"
+                        />
+                        <Input
+                          value={color}
+                          onChange={(e) => handleColorChange(index, e.target.value)}
+                          placeholder="#000000"
+                          className={`flex-1 ${isInvalid ? 'border-destructive' : ''}`}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleRemoveColor(index)}
+                        >
+                          ×
+                        </Button>
+                      </div>
+                      {isInvalid && (
+                        <p className="text-xs text-destructive pl-[72px]">
+                          Format attendu: #RRGGBB (ex: #FF0000)
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
             <p className="text-xs text-muted-foreground">
@@ -333,7 +355,11 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
             >
               Annuler
             </Button>
-            <Button type="submit" disabled={loading} className="gap-2">
+            <Button 
+              type="submit" 
+              disabled={loading || invalidColors.length > 0} 
+              className="gap-2"
+            >
               <Save className="h-4 w-4" />
               {loading ? 'Enregistrement...' : 'Enregistrer'}
             </Button>
