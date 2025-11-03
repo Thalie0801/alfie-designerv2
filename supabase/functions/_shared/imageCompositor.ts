@@ -186,18 +186,17 @@ export async function compositeSlide(
     let transformations = '';
     if (options?.primaryColor && options?.secondaryColor) {
       const tintStrength = options.tintStrength || 60;
-      // Convert hex colors to RGB for Cloudinary
       const primary = options.primaryColor.replace('#', '');
       const secondary = options.secondaryColor.replace('#', '');
-      
-      // Apply subtle tint to ensure color consistency across slides
-      transformations = `e_grayscale:40/e_tint:${tintStrength}:co_rgb:${primary}:co_rgb:${secondary}/`;
+      // Cloudinary: grayscale has no strength param; tint supports rgb:HEX colors
+      transformations = `e_grayscale/e_tint:${tintStrength}:rgb:${primary}:rgb:${secondary}/`;
       console.log(`🎨 [imageCompositor] Applying brand tint: ${transformations}`);
     }
     
+    const overlayId = encodeURIComponent(svgUploadedPublicId).replace(/%2F/g, ':');
     const composedUrl = `https://res.cloudinary.com/${cloudName}/image/upload/` +
       transformations +
-      `l_${svgUploadedPublicId.replace(/\//g, ':')},fl_layer_apply,g_center/` +
+      `l_${overlayId},fl_layer_apply,g_center/` +
       `${bgUploadedPublicId}.png`;
     
     console.log('✅ Composition complete:', composedUrl);
