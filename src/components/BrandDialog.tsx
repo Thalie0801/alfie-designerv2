@@ -25,8 +25,26 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
     logo_url: brand?.logo_url || '',
     voice: brand?.voice || '',
     font_primary: brand?.fonts?.primary || '',
-    font_secondary: brand?.fonts?.secondary || ''
+    font_secondary: brand?.fonts?.secondary || '',
+    colors: Array.isArray(brand?.palette) ? brand.palette : []
   });
+
+  const handleAddColor = () => {
+    if (formData.colors.length < 5) {
+      setFormData({ ...formData, colors: [...formData.colors, '#000000'] });
+    }
+  };
+
+  const handleColorChange = (index: number, value: string) => {
+    const newColors = [...formData.colors];
+    newColors[index] = value;
+    setFormData({ ...formData, colors: newColors });
+  };
+
+  const handleRemoveColor = (index: number) => {
+    const newColors = formData.colors.filter((_: string, i: number) => i !== index);
+    setFormData({ ...formData, colors: newColors });
+  };
 
   // ✅ Vérifier le quota au chargement
   useEffect(() => {
@@ -80,6 +98,7 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
             name: formData.name,
             logo_url: formData.logo_url || null,
             voice: formData.voice || null,
+            palette: formData.colors,
             fonts: {
               primary: formData.font_primary || null,
               secondary: formData.font_secondary || null
@@ -120,11 +139,11 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
             name: formData.name,
             logo_url: formData.logo_url || null,
             voice: formData.voice || null,
+            palette: formData.colors,
             fonts: {
               primary: formData.font_primary || null,
               secondary: formData.font_secondary || null
-            },
-            palette: []
+            }
           });
 
         if (error) throw error;
@@ -132,7 +151,7 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
       }
 
       setOpen(false);
-      setFormData({ name: '', logo_url: '', voice: '', font_primary: '', font_secondary: '' });
+      setFormData({ name: '', logo_url: '', voice: '', font_primary: '', font_secondary: '', colors: [] });
       onSuccess();
     } catch (error: any) {
       console.error('Error saving brand:', error);
@@ -190,6 +209,50 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
             />
             <p className="text-xs text-muted-foreground">
               Lien vers votre logo (optionnel)
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Palette de couleurs</Label>
+              {formData.colors.length < 5 && (
+                <Button type="button" size="sm" variant="outline" onClick={handleAddColor}>
+                  + Ajouter
+                </Button>
+              )}
+            </div>
+            {formData.colors.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Aucune couleur définie</p>
+            ) : (
+              <div className="space-y-2">
+                {formData.colors.map((color: string, index: number) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={color}
+                      onChange={(e) => handleColorChange(index, e.target.value)}
+                      className="h-10 w-16 rounded border cursor-pointer"
+                    />
+                    <Input
+                      value={color}
+                      onChange={(e) => handleColorChange(index, e.target.value)}
+                      placeholder="#000000"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleRemoveColor(index)}
+                    >
+                      ×
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Définissez jusqu'à 5 couleurs principales de votre marque
             </p>
           </div>
 

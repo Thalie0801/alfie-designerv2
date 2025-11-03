@@ -3,8 +3,6 @@ import { Badge } from './ui/badge';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { BrandSelector } from './BrandSelector';
 import { BrandDialog } from './BrandDialog';
-import { AddBrandDialog } from './AddBrandDialog';
-import { AddPaidBrandDialog } from './AddPaidBrandDialog';
 import { Palette, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 
@@ -119,24 +117,18 @@ export function BrandManager() {
           </Alert>
         )}
 
-        {/* Add Brand Section */}
-        <div className="space-y-4 pt-4 border-t">
-          <div className="space-y-2">
-            <label className="text-sm font-semibold">Marque gratuite</label>
-            <p className="text-xs text-muted-foreground">
-              Vous avez droit à 1 marque gratuite incluse dans votre compte
-            </p>
-            <AddBrandDialog onSuccess={loadBrands} />
+        {/* Add Brand Section - Hidden since only 1 brand allowed */}
+        {totalBrands === 0 && (
+          <div className="space-y-4 pt-4 border-t">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">Créer votre marque</label>
+              <p className="text-xs text-muted-foreground">
+                Vous avez droit à 1 marque incluse dans votre compte
+              </p>
+              <BrandDialog onSuccess={loadBrands} />
+            </div>
           </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-semibold">Marques supplémentaires</label>
-            <p className="text-xs text-muted-foreground">
-              Ajoutez des marques supplémentaires pour 39€/mois par marque
-            </p>
-            <AddPaidBrandDialog />
-          </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

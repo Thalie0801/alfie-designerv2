@@ -28,7 +28,7 @@ interface Brand {
 }
 
 export function useBrandKit() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [activeBrandId, setActiveBrandId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -117,13 +117,13 @@ export function useBrandKit() {
   } : null;
 
   const canAddBrand = () => {
-    const quotaBrands = profile?.quota_brands || 0;
-    return brands.length < quotaBrands;
+    // Limiter à 1 seule marque
+    return brands.length < 1;
   };
 
   const remainingBrands = () => {
-    const quotaBrands = profile?.quota_brands || 0;
-    return Math.max(0, quotaBrands - brands.length);
+    // Toujours 1 marque maximum
+    return Math.max(0, 1 - brands.length);
   };
 
   return {
@@ -138,11 +138,11 @@ export function useBrandKit() {
     setActiveBrand,
     loadBrands,
     
-    // Quota management
+    // Quota management (limité à 1 marque)
     canAddBrand: canAddBrand(),
     remainingBrands: remainingBrands(),
     totalBrands: brands.length,
-    quotaBrands: profile?.quota_brands || 0,
+    quotaBrands: 1, // Limité à 1 marque
     
     loading,
     

@@ -121,8 +121,17 @@ export function AssetCard({
                 <img 
                   src={asset.output_url} 
                   alt="Generated content" 
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
                   onError={() => setImageError(true)}
+                  loading="lazy"
+                />
+              ) : asset.thumbnail_url && !imageError ? (
+                <img 
+                  src={asset.thumbnail_url} 
+                  alt="Thumbnail" 
+                  className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                  onError={() => setImageError(true)}
+                  loading="lazy"
                 />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 to-secondary/10">
@@ -132,7 +141,10 @@ export function AssetCard({
                       <p className="text-xs text-muted-foreground">Erreur de chargement</p>
                     </>
                   ) : (
-                    <Image className="h-16 w-16 text-muted-foreground" />
+                    <>
+                      <Image className="h-16 w-16 text-muted-foreground mb-2" />
+                      <p className="text-xs text-muted-foreground">Génération...</p>
+                    </>
                   )}
                 </div>
               )}
