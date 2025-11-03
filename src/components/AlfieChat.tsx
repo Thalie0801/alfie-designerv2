@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Send, ImagePlus, Loader2 } from 'lucide-react';
+import { Send, ImagePlus, Loader2, Download } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { supabase } from '@/integrations/supabase/client';
@@ -541,6 +541,17 @@ export function AlfieChat() {
     
     try {
       setIsLoading(true);
+      
+      // Détecter si c'est une demande bulk
+      const bulkInfo = detectBulkCarousel(prompt);
+      const aspectRatio = detectAspectRatio(prompt) || '4:5';
+      
+      // Si bulk détecté, utiliser la nouvelle edge function
+      if (bulkInfo.isBulk) {
+        return await generateBulkCarousels(prompt, bulkInfo, aspectRatio);
+      }
+      
+      // Sinon, génération standard (1 carrousel)
       setCarouselProgress({ current: 0, total: count });
       
       addMessage({
@@ -548,9 +559,6 @@ export function AlfieChat() {
         content: `🎨 Génération d'un carrousel de ${count} slides...`,
         type: 'text'
       });
-      
-      // Extraire l'aspect ratio du prompt (défaut 4:5)
-      const aspectRatio = detectAspectRatio(prompt) || '4:5';
       
       // 1. Générer le plan simplifié
       const { data: planData, error: planError } = await supabase.functions.invoke('alfie-plan-carousel', {
@@ -662,6 +670,85 @@ export function AlfieChat() {
         type: 'text'
       });
       toast.error('Échec de la génération du carrousel');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const generateBulkCarousels = async (
+    userPrompt: string, 
+    bulkInfo: { numCarousels: number; numSlides: number },
+    aspectRatio: string
+  ) => {
+    try {
+      const totalWoofs = bulkInfo.numCarousels * bulkInfo.numSlides;
+      
+      // Vérifier les quotas
+      const canProceed = await checkAndConsumeQuota('woofs', totalWoofs);
+      if (!canProceed) {
+        addMessage({
+          role: 'assistant',
+          content: `❌ Quota insuffisant. Vous avez besoin de ${totalWoofs} woofs pour générer ${bulkInfo.numCarousels} carrousels de ${bulkInfo.numSlides} slides.`,
+          type: 'text'
+        });
+        return;
+      }
+
+      addMessage({
+        role: 'assistant',
+        content: `🚀 Génération de ${bulkInfo.numCarousels} carrousels de ${bulkInfo.numSlides} slides chacun...`,
+        type: 'text'
+      });
+
+      const headers = await getAuthHeader();
+
+      // Appel à l'edge function bulk
+      const { data, error } = await supabase.functions.invoke('alfie-generate-carousel-bulk', {
+        body: {
+          num_carousels: bulkInfo.numCarousels,
+          num_slides_per_carousel: bulkInfo.numSlides,
+          theme: userPrompt,
+          brand_id: activeBrandId,
+          campaign_name: `bulk_${Date.now()}`,
+          text_option: 'alfie',
+          global_style: brandKit?.voice || 'Professional, clean',
+          aspect_ratio: aspectRatio
+        },
+        headers
+      });
+
+      if (error) throw error;
+
+      const { carousels, successful } = data;
+
+      // Affichage des résultats
+      const resultsContent = `🎉 Génération terminée !\n\n${successful} carrousels créés sur ${bulkInfo.numCarousels} demandés (${bulkInfo.numSlides} slides chacun)`;
+      
+      addMessage({
+        role: 'assistant',
+        content: resultsContent,
+        type: 'bulk-carousel',
+        bulkCarouselData: {
+          carousels: carousels.filter((c: any) => c.status === 'fulfilled').map((c: any) => c.data),
+          totalCarousels: bulkInfo.numCarousels,
+          slidesPerCarousel: bulkInfo.numSlides
+        }
+      });
+
+      toast.success(`${successful} carrousels générés !`);
+
+    } catch (error: any) {
+      console.error('Erreur génération bulk:', error);
+      addMessage({
+        role: 'assistant',
+        content: `❌ Erreur lors de la génération bulk: ${error.message}`,
+        type: 'text'
+      });
+      
+      // Refund woofs si échec
+      const totalWoofs = bulkInfo.numCarousels * bulkInfo.numSlides;
+      await refundWoofs(totalWoofs);
+      toast.error('Échec de la génération bulk');
     } finally {
       setIsLoading(false);
     }
@@ -1200,6 +1287,42 @@ export function AlfieChat() {
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Message bulk carrousel */}
+              {message.type === 'bulk-carousel' && message.bulkCarouselData && (
+                <div className="space-y-4 mt-4">
+                  {message.bulkCarouselData.carousels.map((carousel: any, idx: number) => (
+                    <div key={idx} className="border border-border rounded-lg p-4 bg-card">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-semibold text-lg">
+                          Carrousel {carousel.carousel_index}/{message.bulkCarouselData!.totalCarousels}
+                        </h3>
+                        {carousel.zip_url && (
+                          <Button
+                            size="sm"
+                            onClick={() => window.open(carousel.zip_url, '_blank')}
+                            className="gap-2"
+                          >
+                            <Download className="w-4 h-4" />
+                            Télécharger ZIP
+                          </Button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-5 gap-2">
+                        {carousel.slides?.slice(0, 5).map((slide: any, slideIdx: number) => (
+                          <div key={slideIdx} className="aspect-square rounded overflow-hidden border border-border">
+                            <img 
+                              src={slide.storage_url} 
+                              alt={`Slide ${slideIdx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
