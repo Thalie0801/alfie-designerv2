@@ -282,7 +282,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     roles,
     profile,
     subscription,
-    killSwitchDisabled,
   });
 
   // 3. Log complet avec toutes les infos
