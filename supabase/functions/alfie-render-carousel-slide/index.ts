@@ -38,6 +38,12 @@ serve(async (req) => {
   }
 
   try {
+    // Extraire le token d'authentification
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
+    }
+
     const { prompt, globalStyle, slideContent, brandId, aspectRatio } = await req.json();
 
     if (!prompt || !globalStyle || !slideContent || !brandId) {
@@ -74,6 +80,9 @@ serve(async (req) => {
           prompt: enrichedPrompt,
           aspectRatio,
           brandId
+        },
+        headers: {
+          authorization: authHeader
         }
       }
     );
