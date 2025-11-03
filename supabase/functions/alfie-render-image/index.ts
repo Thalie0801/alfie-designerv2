@@ -203,7 +203,7 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
         }
 
         const aiPayload = {
-          model: 'google/gemini-2.5-flash-image',
+          model: 'google/gemini-2.5-flash-image-preview',
           messages,
           modalities: ['image', 'text'],
         };

@@ -736,6 +736,7 @@ export function AlfieChat() {
         error: error,
         hasAssets: !!data?.assets,
         assetsCount: data?.assets?.length || 0,
+        imageUrlsCount: data?.data?.image_urls?.length || 0,
         hasJobSetId: !!data?.jobSetId,
         noToolCalls: data?.noToolCalls,
         noCredits: data?.noCredits,
@@ -775,10 +776,8 @@ export function AlfieChat() {
       });
       
       // Traiter les assets s'il y en a
-      if (data.assets && Array.isArray(data.assets)) {
-        if (data.assets.length > 0) {
-          toast.success(`✅ ${data.assets.length} asset${data.assets.length > 1 ? 's' : ''} généré${data.assets.length > 1 ? 's' : ''} !`);
-        }
+      if (data.assets && Array.isArray(data.assets) && data.assets.length > 0) {
+        toast.success(`✅ ${data.assets.length} asset${data.assets.length > 1 ? 's' : ''} généré${data.assets.length > 1 ? 's' : ''} !`);
         
         for (const asset of data.assets) {
           if (asset.type === 'image') {
@@ -791,6 +790,22 @@ export function AlfieChat() {
               brandAlignment: asset.brandAlignment
             });
           }
+        }
+      } else if (!data.assets || data.assets.length === 0) {
+        // ✅ Fallback: vérifier si l'image est dans data.imageUrl ou data.data.image_urls
+        const imageUrl = data.imageUrl || data.data?.image_urls?.[0];
+        if (imageUrl) {
+          console.log('[Orchestrator] Found image in alternate format:', imageUrl.substring(0, 80));
+          addMessage({
+            role: 'assistant',
+            content: '✅ Image générée !',
+            type: 'image',
+            assetUrl: imageUrl
+          });
+          toast.success('✅ Image générée !');
+        } else {
+          console.warn('[Orchestrator] ⚠️ Response without assets or imageUrl');
+          toast.warning('Réponse sans assets visuels');
         }
       }
       

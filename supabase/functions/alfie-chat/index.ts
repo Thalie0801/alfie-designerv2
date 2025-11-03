@@ -1008,6 +1008,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
               }
               
               // Retourner la réponse avec tous les assets
+              console.log('[Response] Returning carousel assets count:', collectedAssets.length);
               return new Response(
                 JSON.stringify({
                   choices: [{
