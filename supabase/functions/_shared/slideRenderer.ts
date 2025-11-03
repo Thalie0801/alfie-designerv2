@@ -29,7 +29,8 @@ export async function renderSlideToSVG(
   svg += `<rect width="${width}" height="${height}" fill="none"/>`;
   
   // Normalize font settings across all layers for consistency
-  const rawFontFamily = brandSnapshot.fonts?.default || 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  // ✅ CRITICAL: Remove inner quotes from Segoe UI to avoid XML nesting issues
+  const rawFontFamily = brandSnapshot.fonts?.default || 'Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
   const textShadow = '0 2px 4px rgba(0,0,0,0.1)';
   
   // Couche de texte (typo contrôlée, pas d'IA)
@@ -37,8 +38,8 @@ export async function renderSlideToSVG(
     let text = getTextForLayer(layer, slideContent);
     if (!text) continue;
     
-    // Use consistent font from brand kit - escape inner quotes for XML attributes
-    const fontFamily = String(rawFontFamily).replace(/"/g, '&quot;');
+    // Use consistent font from brand kit - no quotes around Segoe UI
+    const fontFamily = String(rawFontFamily);
     let textColor = layer.color;
     
     // ✅ CRITICAL FIX: Valider la couleur et utiliser les couleurs du brand

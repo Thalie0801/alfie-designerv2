@@ -115,25 +115,24 @@ export async function compositeSlide(
     console.log('📝 SVG preview:', svgTextLayer.substring(0, 300).replace(/\n/g, ' '));
     console.log('📏 SVG size:', svgTextLayer.length, 'chars');
     
-    // 3. ✅ FIX: Sanitize SVG to fix quote issues in font-family attributes
+    // 3. ✅ FIX: Sanitize SVG to make it Cloudinary-compatible
     console.log('🔄 Sanitizing SVG for Cloudinary...');
     
-    // Robust sanitation: handle inner quotes within font-family values and invalid colors
+    // Remove ALL quotes from font-family values and fix invalid attributes
     const sanitizedSvg = svgTextLayer
-      // Common problematic token in CSS font stacks
-      .replace(/"Segoe UI"/g, "'Segoe UI'")
-      // Convert font-family attribute to double-quoted and escape internals
-      .replace(/font-family=(["'])(.*?)\1/g, (_m, _q, val) => {
-        const safeVal = String(val).replace(/\"/g, '&quot;').replace(/"/g, '&quot;');
-        return `font-family="${safeVal}"`;
+      // Strip all quotes from font names (Segoe UI doesn't need quotes in SVG)
+      .replace(/font-family="([^"]*)"/g, (_match, fonts) => {
+        const cleanFonts = fonts.replace(/["']/g, '');
+        return `font-family="${cleanFonts}"`;
       })
-      // Replace non-standard transparent color with none (Cloudinary strict parser)
+      // Replace transparent with none (Cloudinary doesn't support transparent)
       .replace(/fill="transparent"/g, 'fill="none"')
-      // Remove any external <image .../> elements to avoid remote href in SVG uploads
-      .replace(/<image[^>]*\/>/g, '');
+      // Remove external <image/> elements (Cloudinary rejects remote href)
+      .replace(/<image[^>]*\/>/g, '')
+      .replace(/<image[^>]*>.*?<\/image>/g, '');
     
-    console.log('✅ SVG sanitized (fixed font-family quotes)');
-    console.log('🧪 Sanitized preview:', sanitizedSvg.substring(0, 200).replace(/\n/g, ' '));
+    console.log('✅ SVG sanitized (stripped quotes from font names, fixed fill)');
+    console.log('🧪 Sanitized preview:', sanitizedSvg.substring(0, 250).replace(/\n/g, ' '));
     
     // Create a base64 data URI (Cloudinary-friendly)
     const encoder = new TextEncoder();
