@@ -119,7 +119,7 @@ export async function compositeSlide(
     console.log('🔄 Sanitizing SVG for Cloudinary...');
     
     // Remove ALL quotes from font-family values and fix invalid attributes
-    const sanitizedSvg = svgTextLayer
+    let sanitizedSvg = svgTextLayer
       // Strip all quotes from font names (Segoe UI doesn't need quotes in SVG)
       .replace(/font-family="([^"]*)"/g, (_match, fonts) => {
         const cleanFonts = fonts.replace(/["']/g, '');
@@ -130,17 +130,19 @@ export async function compositeSlide(
       // Remove external <image/> elements (Cloudinary rejects remote href)
       .replace(/<image[^>]*\/>/g, '')
       .replace(/<image[^>]*>.*?<\/image>/g, '');
-    
-    console.log('✅ SVG sanitized (stripped quotes from font names, fixed fill)');
+
+    // If xlink namespace is unused, drop it to avoid strict parser issues
+    if (!sanitizedSvg.includes('xlink:')) {
+      sanitizedSvg = sanitizedSvg.replace(/\s+xmlns:xlink="[^"]*"/, '');
+    }
+
+    console.log('✅ SVG sanitized (Cloudinary-safe)');
     console.log('🧪 Sanitized preview:', sanitizedSvg.substring(0, 250).replace(/\n/g, ' '));
-    
-    // Create a base64 data URI (Cloudinary-friendly)
-    const encoder = new TextEncoder();
-    const svgBytes = encoder.encode(sanitizedSvg);
-    const svgBase64 = btoa(String.fromCharCode(...svgBytes));
-    const svgDataUri = `data:image/svg+xml;base64,${svgBase64}`;
-    
-    console.log('✅ SVG base64 prepared (length:', svgBase64.length, ')');
+
+    // Create a URL-encoded data URI (more robust with Cloudinary)
+    const svgDataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sanitizedSvg)}`;
+
+    console.log('✅ SVG data URI prepared (length:', svgDataUri.length, ')');
     
     // 4. Upload SVG overlay to Cloudinary with signed authentication
     console.log('⬆️ Uploading SVG overlay as base64 data URI...');
