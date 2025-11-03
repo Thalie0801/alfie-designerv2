@@ -38,6 +38,7 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [quotaReached, setQuotaReached] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'pending' | 'saving' | 'saved'>('idle');
   const [formData, setFormData] = useState({
     name: brand?.name || '',
     logo_url: brand?.logo_url || '',
@@ -88,6 +89,58 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
     const newColors = formData.colors.filter((_: string, i: number) => i !== index);
     setFormData({ ...formData, colors: newColors });
   };
+
+  // Auto-save function
+  const autoSave = async () => {
+    if (!brand?.id || !user) return;
+    
+    // Validation before save
+    if (!formData.name.trim()) return;
+    const hexRegex = /^#[0-9A-Fa-f]{6}$/;
+    if (formData.colors.some(c => !hexRegex.test(c))) return;
+    
+    setSaveStatus('saving');
+    
+    try {
+      const { error } = await supabase
+        .from('brands')
+        .update({
+          name: formData.name,
+          logo_url: formData.logo_url || null,
+          voice: formData.voice || null,
+          palette: formData.colors,
+          fonts: {
+            primary: formData.font_primary || null,
+            secondary: formData.font_secondary || null
+          },
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', brand.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      setSaveStatus('saved');
+      onSuccess();
+      
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch (error) {
+      console.error('Auto-save error:', error);
+      setSaveStatus('idle');
+    }
+  };
+
+  // Debounced auto-save effect
+  useEffect(() => {
+    if (!brand?.id) return;
+    
+    setSaveStatus('pending');
+    
+    const timer = setTimeout(() => {
+      autoSave();
+    }, 2000);
+    
+    return () => clearTimeout(timer);
+  }, [formData, brand?.id]);
 
   // ✅ Vérifier le quota au chargement
   useEffect(() => {
@@ -229,12 +282,21 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px] max-h-[85vh] sm:max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>
-            {brand ? 'Modifier la marque' : 'Nouvelle marque'}
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>
+              {brand ? 'Modifier la marque' : 'Nouvelle marque'}
+            </DialogTitle>
+            {brand && (
+              <div className="text-xs text-muted-foreground">
+                {saveStatus === 'pending' && '● Non sauvegardé'}
+                {saveStatus === 'saving' && '⏳ Sauvegarde...'}
+                {saveStatus === 'saved' && '✓ Sauvegardé'}
+              </div>
+            )}
+          </div>
           <DialogDescription>
             {brand
-              ? 'Modifiez les informations de votre marque'
+              ? 'Vos modifications sont sauvegardées automatiquement'
               : 'Créez une nouvelle marque pour vos visuels'}
           </DialogDescription>
         </DialogHeader>
@@ -356,22 +418,34 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
           </div>
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={loading}
-            >
-              Annuler
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={loading || invalidColors.length > 0} 
-              className="gap-2"
-            >
-              <Save className="h-4 w-4" />
-              {loading ? 'Enregistrement...' : 'Enregistrer'}
-            </Button>
+            {!brand ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setOpen(false)}
+                  disabled={loading}
+                >
+                  Annuler
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={loading || invalidColors.length > 0} 
+                  className="gap-2"
+                >
+                  <Save className="h-4 w-4" />
+                  {loading ? 'Création...' : 'Créer'}
+                </Button>
+              </>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+              >
+                Fermer
+              </Button>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>
