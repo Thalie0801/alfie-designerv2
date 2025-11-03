@@ -914,7 +914,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
             fallbackAttempted = true; // ✅ Marquer qu'on a tenté le fallback
             
             try {
-              // 1. Générer le plan
+              // 1. Générer le plan simplifié
               const { data: planData, error: planError } = await supabase.functions.invoke('alfie-plan-carousel', {
                 body: {
                   prompt: lastUserMessage,
@@ -924,87 +924,54 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                 headers: functionHeaders
               });
               
-              if (planError || !planData?.plan?.slides) {
+              if (planError || !planData?.style || !planData?.prompts) {
                 throw new Error(planError?.message || 'Plan generation failed');
               }
               
-              console.log('[FALLBACK] Plan fetched:', planData.plan.slides.length, 'slides');
+              const { style: globalStyle, prompts } = planData;
+              console.log('[FALLBACK] Plan fetched:', {
+                promptsCount: prompts.length,
+                style: globalStyle.substring(0, 100) + '...'
+              });
               
-              // 2. Générer les images pour chaque slide avec NOUVELLE APPROCHE 2 ÉTAPES
-              const slides = planData.plan.slides;
-              
-              for (let i = 0; i < slides.length; i++) {
-                const slide = slides[i];
+              // 2. Générer les images progressivement avec globalStyle
+              for (let i = 0; i < prompts.length; i++) {
+                const prompt = prompts[i];
                 
-                console.log(`[FALLBACK] Generating slide ${i + 1}/${slides.length}...`);
+                console.log(`[FALLBACK] Generating slide ${i + 1}/${prompts.length}...`);
                 
-                // ÉTAPE 1: Générer le fond sans texte
-                const { data: bgData, error: bgError } = await supabase.functions.invoke('alfie-render-image', {
+                // Générer l'image avec globalStyle
+                const { data: imgData, error: imgError } = await supabase.functions.invoke('alfie-render-image', {
                   body: {
                     provider: 'gemini_image',
-                    prompt: slide.note || `Image pour ${slide.title}`,
+                    prompt: prompt,
                     format: '1024x1280',
                     brand_id: brandId,
                     cost_woofs: 1,
-                    backgroundOnly: true, // ← PAS DE TEXTE
+                    globalStyle: globalStyle, // ✅ Style cohérent
+                    backgroundOnly: false,
                     slideIndex: i,
-                    totalSlides: slides.length,
-                    backgroundStyle: slide.backgroundStyle || 'gradient',
-                    textContrast: slide.textContrast || 'dark',
-                    negativePrompt: 'logos de marques tierces, filigranes, artefacts, texte, typography, letters'
+                    totalSlides: prompts.length,
+                    negativePrompt: 'logos de marques tierces, filigranes, artefacts'
                   },
                   headers: functionHeaders
                 });
                 
-                const bgUrl = bgData?.data?.image_urls?.[0];
-                if (bgError || !bgUrl) {
-                  console.error(`[FALLBACK] Background failed for slide ${i + 1}:`, bgError);
+                const imageUrl = imgData?.data?.image_urls?.[0];
+                if (imgError || !imageUrl) {
+                  console.error(`[FALLBACK] Image generation failed for slide ${i + 1}:`, imgError);
                   continue;
                 }
-                console.log(`[FALLBACK] Background for slide ${i + 1}:`, bgUrl.substring(0, 80) + '...');
                 
-                // ✅ NOUVEAU : Construire overlayText depuis le slide AVANT l'appel à alfie-add-text-overlay
-                const overlayText = [
-                  slide.title || '',
-                  slide.subtitle || slide.punchline || ''
-                ].filter(Boolean).join('\n');
+                console.log(`[FALLBACK] Slide ${i + 1}/${prompts.length} generated:`, imageUrl.substring(0, 80) + '...');
                 
-                // ÉTAPE 2: Ajouter le texte en overlay
-                const { data: textData, error: textError } = await supabase.functions.invoke('alfie-add-text-overlay', {
-                  body: {
-                    imageUrl: bgUrl,
-                    overlayText: overlayText,
-                    brand_id: brandId,
-                    slideIndex: i,
-                    totalSlides: slides.length,
-                    textPosition: 'center',
-                    fontSize: 48
-                  },
-                  headers: functionHeaders
+                collectedAssets.push({
+                  type: 'image',
+                  url: imageUrl,
+                  title: `Slide ${i + 1}/${prompts.length}`,
+                  reasoning: prompt,
+                  brandAlignment: brandKit ? 'Aligned with brand style' : ''
                 });
-                
-                const finalUrl = textData?.data?.image_url;
-                if (textError || !finalUrl) {
-                  console.error(`[FALLBACK] Text overlay failed for slide ${i + 1}:`, textError);
-                  // Si le texte échoue, utiliser quand même le fond
-                  collectedAssets.push({
-                    type: 'image',
-                    url: bgUrl,
-                    title: `Slide ${i + 1}/${slides.length} (background only)`,
-                    reasoning: slide.note || '',
-                    brandAlignment: brandKit ? 'Aligned with brand colors and voice' : ''
-                  });
-                  console.log(`[FALLBACK] Using background only for slide ${i + 1}`);
-                } else {
-                  collectedAssets.push({
-                    type: 'image',
-                    url: finalUrl,
-                    title: `Slide ${i + 1}/${slides.length}`,
-                    reasoning: slide.note || '',
-                    brandAlignment: brandKit ? 'Aligned with brand colors and voice' : ''
-                  });
-                  console.log(`[FALLBACK] Slide ${i + 1}/${slides.length} completed with text:`, finalUrl.substring(0, 80) + '...');
-                }
               }
               
               // Retourner la réponse avec tous les assets
@@ -1014,7 +981,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                   choices: [{
                     message: {
                       role: 'assistant',
-                      content: `✅ Carrousel généré ! Voici tes ${slides.length} slides.`
+                      content: `✅ Carrousel généré ! Voici tes ${prompts.length} slides avec un style cohérent.`
                     }
                   }],
                   assets: collectedAssets,

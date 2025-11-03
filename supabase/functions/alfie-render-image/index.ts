@@ -22,7 +22,8 @@ export default {
         templateImageUrl,
         resolution,
         backgroundStyle = 'gradient',
-        textContrast = 'dark'
+        textContrast = 'dark',
+        globalStyle // ✅ NOUVEAU: style global pour cohérence
       } = input;
 
       const supabaseAdmin = createClient(
@@ -150,8 +151,10 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
             });
         }
 
-        // Construire le prompt utilisateur final
-        let finalPrompt = enrichedPrompt;
+        // ✅ NOUVEAU: Préfixer avec le style global si fourni
+        let finalPrompt = globalStyle 
+          ? `Style: ${globalStyle}\n\nScene: ${enrichedPrompt}`
+          : enrichedPrompt;
 
         // Ajouter le format si résolution fournie
         const targetFormat = resolution || format;

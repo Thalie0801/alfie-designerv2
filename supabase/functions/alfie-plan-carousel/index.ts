@@ -12,21 +12,9 @@ interface BrandKit {
   niche?: string;
 }
 
-interface CarouselSlide {
-  type: 'hero' | 'problem' | 'solution' | 'impact' | 'cta';
-  title: string;
-  subtitle?: string;
-  punchline?: string;
-  bullets?: string[];
-  kpis?: { label: string; delta: string }[];
-  note: string; // Prompt image en anglais
-  slideNumber: string; // "1/7", "2/7", etc.
-  backgroundStyle: 'solid' | 'gradient' | 'illustration' | 'photo';
-  textContrast: 'light' | 'dark';
-}
-
-interface CarouselPlan {
-  slides: CarouselSlide[];
+interface SimplifiedCarouselPlan {
+  style: string;
+  prompts: string[];
 }
 
 serve(async (req) => {
@@ -46,90 +34,71 @@ serve(async (req) => {
     const brandInfo = brandKit as BrandKit;
     
     // Extraire les couleurs de la palette
-    const primary_color = brandInfo?.palette?.[0] || 'Non spécifié';
-    const secondary_color = brandInfo?.palette?.[1] || 'Non spécifié';
+    const primary_color = brandInfo?.palette?.[0] || 'vibrant blue';
+    const secondary_color = brandInfo?.palette?.[1] || 'warm orange';
     
-    // Construire le prompt système
-    const systemPrompt = `
-Tu es Alfie, un expert en stratégie de contenu pour réseaux sociaux.
+    // Construire le prompt système SIMPLIFIÉ
+    const systemPrompt = `You are Alfie, a social media carousel expert.
 
-**STRUCTURE OBLIGATOIRE DU CARROUSEL :**
+Your task: Generate a cohesive visual plan for ${slideCount} carousel slides.
 
-Slide 1 (COVER) - Type 'hero' :
-- Titre accrocheur et court (20-40 caractères)
-- Indication du nombre de slides : "1/${slideCount}"
-- Badge ou punchline qui promet la valeur
-- Design qui attire l'œil immédiatement
+OUTPUT FORMAT:
+- "style": A single, detailed visual style description that applies to ALL slides
+- "prompts": An array of ${slideCount} scene descriptions (one per slide)
 
-Slides 2 à ${slideCount - 1} (CONTENU) - Types 'problem', 'solution', 'impact' :
-- UN SEUL point/conseil/info par slide
-- Titre clair (15-40 caractères)
-- Maximum 3 bullets courts (15-44 caractères chacun)
-- Cohérence visuelle entre toutes les slides
+STYLE REQUIREMENTS:
+- Must be cohesive across all ${slideCount} slides
+- Use brand colors: ${primary_color}, ${secondary_color}
+- Specify: color palette, mood, composition rhythm, spacing
+- Example: "Modern gradient backgrounds using ${primary_color} to ${secondary_color}. Clean minimalist composition with 80px margins. High contrast center areas for text. Consistent geometric patterns."
 
-Slide ${slideCount} (CONCLUSION) - Type 'cta' :
-- Titre récapitulatif ou conclusion
-- Call-to-action clair (ex: "Sauvegarde ce post", "Partage à ton réseau")
-- Note/résumé final (optionnel)
+PROMPT REQUIREMENTS:
+Each prompt describes the VISUAL SCENE for that slide:
+- Slide 1 (hero): Eye-catching opening scene
+- Slides 2-${slideCount-1}: Content scenes (one concept per slide)
+- Slide ${slideCount}: Strong closing/CTA scene
+- Keep prompts visual and descriptive (not text-heavy)
+- NO TEXT, NO TYPOGRAPHY in the prompts (backgrounds only)
 
-**RÈGLES VISUELLES CRITIQUES :**
-- Chaque slide doit avoir un numéro visible : "1/${slideCount}", "2/${slideCount}", etc.
-- Arrière-plans recommandés (par ordre de préférence) :
-  1. Couleurs unies avec dégradé subtil (meilleur contraste) → backgroundStyle: 'solid'
-  2. Dégradés doux (moderne et élégant) → backgroundStyle: 'gradient'
-  3. Illustrations légères (ne pas écraser le texte) → backgroundStyle: 'illustration'
-  4. Photos avec overlay sombre (garantir contraste) → backgroundStyle: 'photo'
-- Palette cohérente : 2-3 couleurs max de ${primary_color} et ${secondary_color}
-- Éviter absolument : arrière-plans trop chargés, photos sans overlay
+BRAND CONTEXT:
+- Name: ${brandInfo?.name || 'Not specified'}
+- Niche: ${brandInfo?.niche || 'General'}
+- Voice: ${brandInfo?.voice || 'Professional and engaging'}
 
-**PROMPT IMAGE (note) - INSTRUCTIONS STRICTES :**
-Le champ \`note\` doit être un prompt en anglais pour générer le FOND UNIQUEMENT (sans texte).
-Format : "Clean [type] background with [style]. Use [colors] palette. High contrast area in center for text overlay. No text, no typography."
-
-Exemples :
-- Slide 1 (hero) : "Clean gradient background with vibrant ${primary_color} to ${secondary_color}. Modern abstract shapes. High contrast center area. No text."
-- Slide 2-N (contenu) : "Minimalist solid color background ${primary_color}. Subtle geometric patterns. Clean and professional. No text."
-- Slide ${slideCount} (cta) : "Energetic gradient background with ${primary_color}. Call-to-action mood. High contrast. No text."
-
-**BRAND KIT :**
-- Nom: ${brandInfo?.name || 'Non spécifié'}
-- Niche: ${brandInfo?.niche || 'Non spécifié'}
-- Tonalité: ${brandInfo?.voice || 'Professionnelle et engageante'}
-- Couleurs: ${primary_color} et ${secondary_color}
-
-**Limites de Caractères (STRICT) :**
-- **Title** : 15-60 caractères
-- **Subtitle** : 25-100 caractères
-- **Punchline** : 25-80 caractères
-- **Bullet** : 15-60 caractères
-- **Note** : 80-180 caractères
-
-**Format de Réponse (JSON Schema) :**
+Example output:
 {
-  "plan": {
-    "slides": [
-      {
-        "type": "hero",
-        "title": "Titre accrocheur",
-        "subtitle": "Sous-titre",
-        "punchline": "Phrase clé (optionnel)",
-        "bullets": ["Point 1", "Point 2"],
-        "note": "Clean gradient background...",
-        "slideNumber": "1/${slideCount}",
-        "backgroundStyle": "gradient",
-        "textContrast": "dark"
-      }
-    ]
-  }
-}
-`;
+  "style": "Vibrant gradient backgrounds blending ${primary_color} to ${secondary_color}. Modern, minimalist composition with high contrast center areas. Geometric shapes as accents. Professional and energetic mood.",
+  "prompts": [
+    "Dynamic gradient opening scene with abstract shapes, high energy",
+    "Clean solid background with subtle geometric pattern",
+    "Minimalist gradient with focus on center area",
+    "Bold energetic scene for call-to-action mood"
+  ]
+}`;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY not configured");
     }
 
-    // Appeler l'IA via Lovable AI Gateway
+    // Schema de réponse structurée
+    const responseSchema = {
+      type: "object",
+      properties: {
+        style: {
+          type: "string",
+          description: "Global visual style for all slides"
+        },
+        prompts: {
+          type: "array",
+          items: { type: "string" },
+          description: `Array of ${slideCount} visual scene descriptions`
+        }
+      },
+      required: ["style", "prompts"]
+    };
+
+    // Appeler l'IA via Lovable AI Gateway avec structured output
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -142,7 +111,13 @@ Exemples :
           { role: "system", content: systemPrompt },
           { role: "user", content: prompt },
         ],
-        response_format: { type: "json_object" },
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "carousel_plan",
+            schema: responseSchema
+          }
+        }
       }),
     });
 
@@ -168,105 +143,32 @@ Exemples :
       throw new Error('AI returned an empty response');
     }
 
-    const parsed = JSON.parse(jsonResponse);
+    const parsed: SimplifiedCarouselPlan = JSON.parse(jsonResponse);
     
-    // Accepter deux formats : { plan: { slides: [...] } } OU directement un tableau de slides
-    let slides: CarouselSlide[];
-    
-    if (parsed.plan?.slides) {
-      // Format attendu : { plan: { slides: [...] } }
-      slides = parsed.plan.slides;
-    } else if (Array.isArray(parsed.slides)) {
-      // Format alternatif : { slides: [...] }
-      slides = parsed.slides;
-    } else if (Array.isArray(parsed)) {
-      // Format direct : [{slide1}, {slide2}, ...]
-      slides = parsed;
-    } else {
-      console.error('[alfie-plan-carousel] Invalid plan structure:', parsed);
-      throw new Error('AI returned an invalid plan structure');
+    // Validation
+    if (!parsed.style || !Array.isArray(parsed.prompts)) {
+      console.error('[alfie-plan-carousel] Invalid structure:', parsed);
+      throw new Error('Invalid plan structure: missing style or prompts');
     }
 
-    // Validation du nombre de slides (warning seulement, on ajustera après)
-    if (!Array.isArray(slides) || slides.length !== slideCount) {
-      console.warn(`[alfie-plan-carousel] Expected ${slideCount} slides, got ${slides?.length || 0} - will adjust with pad/truncate`);
-    }
-    
-    // Ajuster le nombre de slides (pad/truncate)
-    if (slides.length > slideCount) {
-      slides.length = slideCount;
-      console.warn(`[Plan Carousel] Truncated to ${slideCount} slides`);
-    } else if (slides.length < slideCount) {
-      while (slides.length < slideCount) {
-        const missingIndex = slides.length + 1;
-        slides.push({
-          type: 'impact',
-          title: `Point ${missingIndex}`,
-          subtitle: '',
-          bullets: [],
-          note: 'Minimalist solid background, high-contrast, NO TEXT',
-          slideNumber: `${missingIndex}/${slideCount}`,
-          backgroundStyle: 'solid',
-          textContrast: 'dark'
-        });
+    // Ajuster le nombre de prompts
+    if (parsed.prompts.length > slideCount) {
+      parsed.prompts = parsed.prompts.slice(0, slideCount);
+      console.warn(`[Plan Carousel] Truncated to ${slideCount} prompts`);
+    } else if (parsed.prompts.length < slideCount) {
+      while (parsed.prompts.length < slideCount) {
+        parsed.prompts.push('Minimalist background, high contrast, clean composition');
       }
-      console.warn(`[Plan Carousel] Padded to ${slideCount} slides`);
+      console.warn(`[Plan Carousel] Padded to ${slideCount} prompts`);
     }
 
-    // Auto-fill metadata manquantes
-    for (let i = 0; i < slides.length; i++) {
-      if (!slides[i].slideNumber) {
-        slides[i].slideNumber = `${i + 1}/${slideCount}`;
-      }
-      if (!slides[i].backgroundStyle) {
-        slides[i].backgroundStyle = i === 0 ? 'gradient' : 'solid';
-      }
-      if (!slides[i].textContrast) {
-        slides[i].textContrast = 'dark';
-      }
-      if (i === 0) slides[i].type = 'hero';
-      if (i === slides.length - 1) slides[i].type = 'cta';
-    }
-    
-    const plan = { plan: { slides } };
+    console.log('[alfie-plan-carousel] ✅ Plan generated:', {
+      slideCount: parsed.prompts.length,
+      styleLength: parsed.style.length,
+      style: parsed.style.substring(0, 100) + '...'
+    });
 
-    // Validation des limites de caractères
-    const LIMITS = {
-      title: { min: 15, max: 60 },
-      subtitle: { min: 25, max: 100 },
-      punchline: { min: 25, max: 80 },
-      bullet: { min: 15, max: 60 },
-    };
-
-    for (const slide of plan.plan.slides) {
-      // Valider title
-      if (slide.title.length < LIMITS.title.min || slide.title.length > LIMITS.title.max) {
-        console.warn(`[alfie-plan-carousel] ⚠️ Title length violation: ${slide.title.length} chars - "${slide.title}"`);
-      }
-      
-      // Valider subtitle
-      if (slide.subtitle && (slide.subtitle.length < LIMITS.subtitle.min || slide.subtitle.length > LIMITS.subtitle.max)) {
-        console.warn(`[alfie-plan-carousel] ⚠️ Subtitle length violation: ${slide.subtitle.length} chars - "${slide.subtitle}"`);
-      }
-      
-      // Valider punchline
-      if (slide.punchline && (slide.punchline.length < LIMITS.punchline.min || slide.punchline.length > LIMITS.punchline.max)) {
-        console.warn(`[alfie-plan-carousel] ⚠️ Punchline length violation: ${slide.punchline.length} chars - "${slide.punchline}"`);
-      }
-      
-      // Valider bullets
-      if (slide.bullets) {
-        for (const bullet of slide.bullets) {
-          if (bullet.length < LIMITS.bullet.min || bullet.length > LIMITS.bullet.max) {
-            console.warn(`[alfie-plan-carousel] ⚠️ Bullet length violation: ${bullet.length} chars - "${bullet}"`);
-          }
-        }
-      }
-    }
-
-    console.log('[alfie-plan-carousel] Plan generated successfully with', plan.plan.slides.length, 'slides');
-
-    return new Response(JSON.stringify(plan), {
+    return new Response(JSON.stringify({ style: parsed.style, prompts: parsed.prompts }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 

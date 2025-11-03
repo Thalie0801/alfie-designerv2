@@ -31,6 +31,12 @@ interface Message {
 
 type IntentType = 'image' | 'video' | 'carousel' | 'unknown';
 
+interface CarouselSlide {
+  title: string;
+  text: string;
+  imagePrompt: string;
+}
+
 // ======
 // COMPOSANT PRINCIPAL
 // ======
@@ -39,7 +45,7 @@ export function AlfieChat() {
   const { user } = useAuth();
   const { activeBrandId, brandKit } = useBrandKit();
   
-  // États minimaux (6 au lieu de 15+)
+  // États minimaux
   const [messages, setMessages] = useState<Message[]>([{
     id: 'welcome',
     role: 'assistant',
@@ -50,9 +56,7 @@ export function AlfieChat() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  
-  // Tracking carrousel (commenté pour l'instant)
-  // const [carouselProgress, setCarouselProgress] = useState({ done: 0, total: 0 });
+  const [carouselProgress, setCarouselProgress] = useState<{ current: number; total: number } | null>(null);
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -509,26 +513,24 @@ export function AlfieChat() {
   };
   
   // ======
-  // GÉNÉRATION DE CARROUSELS (NOUVEAU FLUX : PLAN TEXTUEL + BOUCLE IMAGE)
+  // GÉNÉRATION DE CARROUSELS PROGRESSIVE (NOUVEAU)
   // ======
   
-  interface CarouselSlide {
-    title: string;
-    text: string;
-    imagePrompt: string;
-  }
-  
-  const generateCarouselPlan = async (prompt: string, count: number): Promise<CarouselSlide[] | null> => {
-    // 1. Appel à l'IA pour générer le plan textuel (APPEL SUPABASE)
-    addMessage({
-      role: 'assistant',
-      content: `🎨 Je prépare ton carrousel de ${count} slides... Ça prend quelques instants !`,
-      type: 'text'
-    });
-
+  const generateCarouselProgressive = async (prompt: string, count: number = 5) => {
     try {
+      setIsLoading(true);
+      setCarouselProgress({ current: 0, total: count });
+      
+      addMessage({
+        role: 'assistant',
+        content: `🎨 Génération d'un carrousel de ${count} slides...`,
+        type: 'text'
+      });
+      
       const headers = await getAuthHeader();
-      const { data, error } = await supabase.functions.invoke('alfie-plan-carousel', {
+      
+      // 1. Générer le plan simplifié
+      const { data: planData, error: planError } = await supabase.functions.invoke('alfie-plan-carousel', {
         body: { 
           prompt, 
           slideCount: count,
@@ -541,56 +543,97 @@ export function AlfieChat() {
         },
         headers
       });
-
-      if (error) throw error;
-
-      // Extraire le plan depuis data.plan.slides
-      if (!data?.plan?.slides || !Array.isArray(data.plan.slides)) {
-        throw new Error('Réponse invalide de alfie-plan-carousel');
+      
+      if (planError || !planData?.style || !planData?.prompts) {
+        throw new Error(planError?.message || 'Échec de la génération du plan');
       }
-
-      console.log('[Carousel Plan] slides:', data.plan.slides.length);
-
-      // Mapper le format de retour vers CarouselSlide
-      const slides: CarouselSlide[] = data.plan.slides.map((slide: any, index: number) => ({
-        title: slide.title || `Slide ${index + 1}`,
-        text: slide.subtitle || slide.punchline || '',
-        imagePrompt: slide.note || `Image pour ${slide.title}`
-      }));
-
-      return slides;
-
+      
+      const { style: globalStyle, prompts } = planData;
+      console.log('[Carousel] Plan received:', { 
+        promptsCount: prompts.length, 
+        style: globalStyle.substring(0, 100) 
+      });
+      
+      addMessage({
+        role: 'assistant',
+        content: `✅ Plan créé ! Style: ${globalStyle.substring(0, 100)}...\n\nGénération des ${prompts.length} slides en cours...`,
+        type: 'text'
+      });
+      
+      // 2. Générer chaque slide progressivement
+      for (let i = 0; i < prompts.length; i++) {
+        const slidePrompt = prompts[i];
+        setCarouselProgress({ current: i + 1, total: prompts.length });
+        
+        console.log(`[Carousel] Generating slide ${i + 1}/${prompts.length}...`);
+        
+        try {
+          const { data: imgData, error: imgError } = await supabase.functions.invoke('alfie-render-image', {
+            body: {
+              provider: 'gemini_image',
+              prompt: slidePrompt,
+              format: '1024x1280',
+              brand_id: activeBrandId,
+              cost_woofs: 1,
+              globalStyle: globalStyle,
+              backgroundOnly: false,
+              slideIndex: i,
+              totalSlides: prompts.length
+            },
+            headers
+          });
+          
+          if (imgError || !imgData?.data?.image_urls?.[0]) {
+            console.error(`[Carousel] Slide ${i + 1} generation failed:`, imgError);
+            toast.error(`Slide ${i + 1} a échoué`);
+            continue;
+          }
+          
+          const imageUrl = imgData.data.image_urls[0];
+          console.log(`[Carousel] ✅ Slide ${i + 1} generated`);
+          
+          // Afficher immédiatement la slide générée
+          addMessage({
+            role: 'assistant',
+            content: `✅ Slide ${i + 1}/${prompts.length}`,
+            type: 'image',
+            assetUrl: imageUrl,
+            reasoning: slidePrompt
+          });
+          
+          toast.success(`Slide ${i + 1}/${prompts.length} générée !`);
+          
+        } catch (slideError) {
+          console.error(`[Carousel] Error generating slide ${i + 1}:`, slideError);
+          toast.error(`Erreur sur la slide ${i + 1}`);
+        }
+      }
+      
+      // 3. Finalisation
+      setCarouselProgress(null);
+      addMessage({
+        role: 'assistant',
+        content: `🎉 Carrousel terminé ! Tes ${prompts.length} slides sont prêtes avec un style cohérent.`,
+        type: 'text'
+      });
+      toast.success(`✅ Carrousel de ${prompts.length} slides terminé !`);
+      
     } catch (error: any) {
-      console.error('[Carousel Plan] Error:', error);
-      toast.error(`Échec de la planification : ${error.message}`);
-      return null;
+      console.error('[Carousel] Error:', error);
+      setCarouselProgress(null);
+      
+      addMessage({
+        role: 'assistant',
+        content: `❌ Échec de la génération du carrousel.\n\n${error.message || 'Erreur inconnue'}`,
+        type: 'text'
+      });
+      toast.error('Échec de la génération du carrousel');
+    } finally {
+      setIsLoading(false);
     }
   };
-
-  const generateCarousel = async (prompt: string, count: number, aspectRatio: string) => {
-    // 1. Générer le plan textuel
-    const plan = await generateCarouselPlan(prompt, count);
-    if (!plan) return;
-    
-    // 2. Afficher le plan et demander validation
-    const planContent = plan.map((slide, index) => 
-      `**Slide ${index + 1}**\n- Titre: ${slide.title}\n- Texte: ${slide.text}\n- Prompt Image: *${slide.imagePrompt}*`
-    ).join('\n\n');
-    
-    addMessage({
-      role: 'assistant',
-      content: `Voici ce que je te propose pour ton carrousel :\n\n${planContent}\n\n✅ **Ça te va ?** Réponds **oui** pour lancer la génération, ou **non** pour recommencer.`,
-      type: 'text',
-      metadata: {
-        awaitingValidation: true,
-        action: 'carousel_plan_validation',
-        plan,
-        aspectRatio
-      }
-    });
-  };
   
-  // L'ancienne fonction generateCarousel est supprimée et remplacée par la logique de validation dans handleSend
+  // L'ancienne fonction generateCarousel est supprimée et remplacée par generateCarouselProgressive
   
   // const _subscribeToCarousel = (jobSetId: string, total: number) => {
   //   // Nettoyer l'ancien canal si présent
@@ -956,8 +999,7 @@ export function AlfieChat() {
         
         case 'carousel': {
           const count = extractCount(userMessage);
-          const aspectRatio = detectAspectRatio(userMessage);
-          await generateCarousel(userMessage, count, aspectRatio);
+          await generateCarouselProgressive(userMessage, count);
           break;
         }
         
@@ -1012,6 +1054,21 @@ export function AlfieChat() {
       
       {/* Quota Bar */}
       {activeBrandId && <QuotaBar activeBrandId={activeBrandId} />}
+      
+      {/* Carousel Progress Bar */}
+      {carouselProgress && (
+        <div className="px-4 py-3 bg-primary/10 border-b">
+          <div className="max-w-3xl mx-auto">
+            <p className="text-sm mb-2">
+              Génération : {carouselProgress.current}/{carouselProgress.total} slides
+            </p>
+            <Progress 
+              value={(carouselProgress.current / carouselProgress.total) * 100}
+              className="h-2"
+            />
+          </div>
+        </div>
+      )}
       
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
