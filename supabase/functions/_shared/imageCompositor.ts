@@ -118,7 +118,7 @@ export async function compositeSlide(
     // 3. ✅ FIX: Sanitize SVG to fix quote issues in font-family attributes
     console.log('🔄 Sanitizing SVG for Cloudinary...');
     
-    // Robust sanitation: handle inner quotes within font-family values
+    // Robust sanitation: handle inner quotes within font-family values and invalid colors
     const sanitizedSvg = svgTextLayer
       // Common problematic token in CSS font stacks
       .replace(/"Segoe UI"/g, "'Segoe UI'")
@@ -126,7 +126,9 @@ export async function compositeSlide(
       .replace(/font-family=(["'])(.*?)\1/g, (_m, _q, val) => {
         const safeVal = String(val).replace(/\"/g, "'").replace(/"/g, "'");
         return `font-family='${safeVal}'`;
-      });
+      })
+      // Replace non-standard transparent color with none (Cloudinary strict parser)
+      .replace(/fill="transparent"/g, 'fill="none"');
     
     console.log('✅ SVG sanitized (fixed font-family quotes)');
     console.log('🧪 Sanitized preview:', sanitizedSvg.substring(0, 200).replace(/\n/g, ' '));
@@ -147,6 +149,7 @@ export async function compositeSlide(
     svgFormData.append('public_id', svgPublicId);
     svgFormData.append('api_key', API_KEY);
     svgFormData.append('timestamp', svgTimestamp.toString());
+    svgFormData.append('format', 'svg');
     
     const svgSignature = await generateCloudinarySignature(
       { public_id: svgPublicId, timestamp: svgTimestamp.toString() },

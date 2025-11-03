@@ -26,7 +26,7 @@ export async function renderSlideToSVG(
   let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`;
   
   // Fond transparent (sera composité avec l'image IA)
-  svg += `<rect width="${width}" height="${height}" fill="transparent"/>`;
+  svg += `<rect width="${width}" height="${height}" fill="none"/>`;
   
   // Normalize font settings across all layers for consistency
   const baseFontFamily = brandSnapshot.fonts?.default || "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
