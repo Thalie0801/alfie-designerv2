@@ -183,13 +183,18 @@ export async function compositeSlide(
     console.log('🎭 Generating composed image via explicit API...');
 
     // Build transformation pipeline with brand color tint if provided
-    let transformations = '';
-    if (options?.primaryColor && options?.secondaryColor) {
-      const tintStrength = options.tintStrength || 60;
-      const primary = options.primaryColor.replace('#', '');
-      const secondary = options.secondaryColor.replace('#', '');
-      transformations = `e_grayscale/e_tint:${tintStrength}:rgb:${primary}:rgb:${secondary}/`;
+    let transformations = 'e_grayscale/';
+    const isHex = (c: string) => /^#?[0-9a-fA-F]{6}$/.test((c || '').trim());
+    const p = (options?.primaryColor || '').trim();
+    const s = (options?.secondaryColor || '').trim();
+    if (isHex(p) && isHex(s)) {
+      const tintStrength = options?.tintStrength || 60;
+      const primary = p.replace('#', '');
+      const secondary = s.replace('#', '');
+      transformations += `e_tint:${tintStrength}:rgb:${primary}:rgb:${secondary}/`;
       console.log(`🎨 [imageCompositor] Applying brand tint: ${transformations}`);
+    } else {
+      console.log('🎨 [imageCompositor] Skipping tint: non-hex brand colors provided', { primary: p, secondary: s });
     }
 
     // Prepare eager transformation for explicit API
