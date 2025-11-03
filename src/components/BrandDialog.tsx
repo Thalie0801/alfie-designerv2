@@ -15,13 +15,20 @@ interface BrandDialogProps {
   children?: React.ReactNode;
 }
 
-// Normalise la palette en tableau de chaînes hex
+// Normalise la palette en tableau de chaînes hex, nettoie les guillemets/backslashes
 const mapPaletteToHexStrings = (palette: any): string[] => {
   if (!Array.isArray(palette)) return [];
   
+  const toHex = (s: string) => {
+    const cleaned = s.trim().replace(/["'\\]/g, "");
+    const hex = cleaned.startsWith("#") ? cleaned.slice(1) : cleaned;
+    if (/^[0-9A-Fa-f]{6}$/.test(hex)) return ("#" + hex).toUpperCase();
+    return "#000000";
+  };
+  
   return palette.map((item) => {
-    if (typeof item === 'string') return item;
-    if (typeof item === 'object' && item?.color) return item.color;
+    if (typeof item === 'string') return toHex(item);
+    if (typeof item === 'object' && item?.color) return toHex(item.color);
     return '#000000';
   });
 };
@@ -69,9 +76,11 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
   };
 
   const handleColorChange = (index: number, value: string) => {
-    // Pas de blocage pendant la saisie - validation uniquement en onBlur et submit
+    // Nettoyer guillemets/backslashes et ajouter # automatiquement si 6 hex
+    const cleaned = value.trim().replace(/["'\\]/g, "");
+    const withHash = /^[0-9A-Fa-f]{6}$/.test(cleaned) ? "#" + cleaned : cleaned;
     const newColors = [...formData.colors];
-    newColors[index] = value;
+    newColors[index] = withHash.toUpperCase();
     setFormData({ ...formData, colors: newColors });
   };
 

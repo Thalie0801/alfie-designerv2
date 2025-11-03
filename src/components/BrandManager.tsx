@@ -87,7 +87,8 @@ export function BrandManager() {
                 <label className="text-sm font-medium">Palette de couleurs</label>
                 <div className="flex gap-2 flex-wrap">
                   {activeBrand.palette.map((color: any, index: number) => {
-                    const hexColor = typeof color === 'string' ? color : (color?.color || '#000000');
+                    const rawColor = typeof color === 'string' ? color : (color?.color || '#000000');
+                    const hexColor = rawColor.replace(/["'\\]/g, "");
                     return (
                       <div
                         key={index}
