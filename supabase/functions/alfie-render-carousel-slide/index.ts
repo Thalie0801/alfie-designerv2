@@ -1,8 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { resolveBrandKit, enrichPromptWithBrand } from "../_shared/brandResolver.ts";
-import { renderSlideToSVG } from "../_shared/slideRenderer.ts";
-import { compositeSlide } from "../_shared/imageCompositor.ts";
+import { uploadBackgroundToCloudinary, buildCloudinaryTextOverlayUrl } from "../_shared/imageCompositor.ts";
 import { SLIDE_TEMPLATES } from "../_shared/slideTemplates.ts";
 
 const corsHeaders = {
@@ -82,7 +81,6 @@ serve(async (req) => {
     // 3. Générer le fond via alfie-render-image
     console.log('[Carousel Slide] Calling alfie-render-image...');
 
-    // Mapper l'aspect ratio vers un format attendu (fallback 1024x1280)
     const format = aspectRatio === '1:1' ? '1024x1024'
       : aspectRatio === '16:9' ? '1280x720'
       : aspectRatio === '9:16' ? '720x1280'
@@ -92,24 +90,21 @@ serve(async (req) => {
       'alfie-render-image',
       {
         body: {
-          // Compatibilité maximale avec la fonction existante
           provider: 'gemini_image',
           prompt: enrichedPrompt,
           aspectRatio,
           format,
           backgroundOnly: true,
           globalStyle,
-          brand_id: brandId, // ✅ CRITICAL FIX: Passer le brandId pour utiliser le bon brand
+          brand_id: brandId,
         }
       }
     );
 
-    // Tolérance de format de réponse + wrapper edgeHandler
     const payload = (bgData && typeof bgData === 'object' && 'data' in bgData) ? (bgData as any).data : bgData;
-    console.log('[Carousel Slide] bgData keys:', bgData ? Object.keys(bgData as any) : 'null');
-    console.log('[Carousel Slide] payload keys:', payload ? Object.keys(payload as any) : 'null');
+    
     if ((bgData as any)?.ok === false) {
-      console.error('[Carousel Slide] Background generation error payload:', JSON.stringify(bgData));
+      console.error('[Carousel Slide] Background generation error:', JSON.stringify(bgData));
       throw new Error((bgData as any)?.error || 'BACKGROUND_FUNCTION_ERROR');
     }
 
@@ -123,39 +118,46 @@ serve(async (req) => {
     const imageUrl = imageUrlCandidates[0];
 
     if (bgError || !imageUrl) {
-      console.error('[Carousel Slide] Background generation failed:', bgError, JSON.stringify(bgData));
+      console.error('[Carousel Slide] Background generation failed:', bgError);
       throw new Error('Background generation failed: ' + (bgError?.message || 'No image URL'));
     }
 
     const backgroundUrl = imageUrl as string;
     console.log('[Carousel Slide] ✅ Background generated:', backgroundUrl.substring(0, 80));
 
-    // 4. Sélectionner le template approprié
-    const template = SLIDE_TEMPLATES[slideContent.type] || SLIDE_TEMPLATES.hero;
-    console.log('[Carousel Slide] Using template:', template.type);
-
-    // 5. Générer l'overlay SVG
-    console.log('[Carousel Slide] Generating SVG overlay...');
-    const svgOverlay = await renderSlideToSVG(slideContent, template, brandSnapshot);
-    console.log('[Carousel Slide] ✅ SVG overlay generated:', svgOverlay.length, 'chars');
-
-    // 6. Composer l'image finale via Cloudinary (SVG uploadé comme raw, puis transformé)
-    console.log('[Carousel Slide] Composing final image with text overlay...');
-    const { url: composedUrl, bgPublicId, svgPublicId } = await compositeSlide(
+    // 4. Upload background to Cloudinary
+    console.log('[Carousel Slide] Uploading background to Cloudinary...');
+    const { publicId } = await uploadBackgroundToCloudinary(
       backgroundUrl,
-      svgOverlay,
-      undefined, // jobSetId - not needed here
       brandId,
-      {
-        primaryColor: brandSnapshot.primary_color,
-        secondaryColor: brandSnapshot.secondary_color,
-        tintStrength: 40 // Subtle tint pour cohérence
-      }
+      undefined // jobSetId
     );
+    console.log('[Carousel Slide] ✅ Background uploaded to Cloudinary:', publicId);
 
-    console.log('[Carousel Slide] ✅ Final composition complete with text overlay');
+    // 5. Extraire les couleurs et polices du brand kit
+    const titleColor = brandSnapshot.primary_color?.replace('#', '') || '1E1E1E';
+    const subtitleColor = brandSnapshot.secondary_color?.replace('#', '') || '5A5A5A';
+    const titleFont = brandSnapshot.fonts?.primary || 'Arial';
+    const subtitleFont = brandSnapshot.fonts?.secondary || 'Arial';
 
-    // 7. Enregistrer l'image finale (avec overlay) dans media_generations
+    // 6. Construire l'URL Cloudinary avec text overlays natifs
+    console.log('[Carousel Slide] Building Cloudinary text overlay URL...');
+    const composedUrl = buildCloudinaryTextOverlayUrl(publicId, {
+      title: slideContent.title,
+      subtitle: slideContent.subtitle,
+      titleColor,
+      subtitleColor,
+      titleSize: 64,
+      subtitleSize: 28,
+      titleFont,
+      subtitleFont,
+      titleWeight: 'bold',
+      subtitleWeight: 'normal'
+    });
+
+    console.log('[Carousel Slide] ✅ Final URL with text overlay:', composedUrl.substring(0, 100));
+
+    // 7. Enregistrer dans media_generations
     const { data: generation } = await supabaseAdmin
       .from('media_generations')
       .insert({
@@ -163,28 +165,24 @@ serve(async (req) => {
         brand_id: brandId,
         type: 'image',
         modality: 'carousel_slide',
-        provider_id: 'gemini_image',
+        provider_id: 'cloudinary_text_overlay',
         prompt: `${prompt} - Slide ${slideContent.type}`,
         output_url: composedUrl,
         render_url: composedUrl,
         status: 'completed',
         cost_woofs: 1,
-        params_json: { slideType: slideContent.type, aspectRatio }
+        params_json: { slideType: slideContent.type, aspectRatio, cloudinaryPublicId: publicId }
       })
       .select()
       .single();
 
-    console.log('[Carousel Slide] ✅ Final image saved to media_generations:', generation?.id);
+    console.log('[Carousel Slide] ✅ Saved to media_generations:', generation?.id);
 
-    // 8. Retourner l'URL finale avec texte
+    // 8. Retourner l'URL finale
     return new Response(JSON.stringify({ 
       image_url: composedUrl,
       generation_id: generation?.id || `carousel-${Date.now()}`,
-      debug: {
-        bgPublicId,
-        svgPublicId,
-        slideType: slideContent.type
-      }
+      cloudinary_public_id: publicId
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

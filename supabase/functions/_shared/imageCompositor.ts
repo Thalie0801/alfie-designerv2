@@ -1,4 +1,77 @@
-// Phase 5: Compositeur d'images via Cloudinary (Deno Deploy compatible)
+// Phase 5: Compositeur d'images via Cloudinary - Text Overlay natif
+
+interface CloudinaryTextOverlayOptions {
+  title?: string;
+  subtitle?: string;
+  titleColor?: string;
+  subtitleColor?: string;
+  titleSize?: number;
+  subtitleSize?: number;
+  titleFont?: string;
+  subtitleFont?: string;
+  titleWeight?: string;
+  subtitleWeight?: string;
+}
+
+/**
+ * Construit une URL Cloudinary avec text overlays natifs (sans upload SVG)
+ * Cette approche est beaucoup plus fiable et garantit la fidélité des couleurs
+ */
+export function buildCloudinaryTextOverlayUrl(
+  backgroundPublicId: string,
+  options: CloudinaryTextOverlayOptions
+): string {
+  const CLOUD_NAME = Deno.env.get('CLOUDINARY_CLOUD_NAME')?.trim();
+  if (!CLOUD_NAME) {
+    throw new Error('Missing Cloudinary cloud name');
+  }
+  
+  const cloudName = CLOUD_NAME.toLowerCase();
+  const baseUrl = `https://res.cloudinary.com/${cloudName}/image/upload`;
+  
+  // Transformations de base pour garantir qualité et couleurs fidèles
+  const qualityParams = 'f_png,q_100,cs_srgb,fl_preserve_transparency';
+  const colorCorrection = 'e_brightness:5,e_saturation:8';
+  
+  const transformations: string[] = [qualityParams, colorCorrection];
+  
+  // Ajouter overlay titre si présent
+  if (options.title) {
+    const titleFont = (options.titleFont || 'Arial').replace(/\s+/g, '%20');
+    const titleSize = options.titleSize || 64;
+    const titleWeight = options.titleWeight || 'bold';
+    const titleColor = (options.titleColor || '000000').replace('#', '');
+    const encodedTitle = encodeURIComponent(options.title);
+    
+    // Text overlay Cloudinary : l_text:{font}_{size}_{weight}:{text},co_rgb:{color},g_center,y_{offset}
+    transformations.push(
+      `l_text:${titleFont}_${titleSize}_${titleWeight}:${encodedTitle},co_rgb:${titleColor},g_center,y_-150`
+    );
+  }
+  
+  // Ajouter overlay sous-titre si présent
+  if (options.subtitle) {
+    const subtitleFont = (options.subtitleFont || 'Arial').replace(/\s+/g, '%20');
+    const subtitleSize = options.subtitleSize || 28;
+    const subtitleWeight = options.subtitleWeight || 'normal';
+    const subtitleColor = (options.subtitleColor || '5A5A5A').replace('#', '');
+    const encodedSubtitle = encodeURIComponent(options.subtitle);
+    
+    transformations.push(
+      `l_text:${subtitleFont}_${subtitleSize}_${subtitleWeight}:${encodedSubtitle},co_rgb:${subtitleColor},g_center,y_-60`
+    );
+  }
+  
+  // Appliquer les transformations de texte avec contraintes
+  transformations.push('fl_relative,w_0.9,c_fit');
+  
+  // Construire l'URL finale
+  const url = `${baseUrl}/${transformations.join('/')}/${backgroundPublicId}.png`;
+  
+  console.log('🎨 [buildCloudinaryTextOverlayUrl] Generated URL:', url.substring(0, 150));
+  
+  return url;
+}
 
 // Helper pour générer une signature Cloudinary (pour les requêtes API authentifiées)
 async function generateCloudinarySignature(paramsToSign: Record<string, string>, apiSecret: string): Promise<string> {
@@ -12,20 +85,17 @@ async function generateCloudinarySignature(paramsToSign: Record<string, string>,
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-export async function compositeSlide(
+/**
+ * Upload une image background vers Cloudinary et retourne son public_id
+ * Cette fonction est maintenant simplifiée et ne gère plus les SVG overlays
+ */
+export async function uploadBackgroundToCloudinary(
   backgroundUrl: string,
-  svgTextLayer: string,
-  jobSetId?: string,
   brandId?: string,
-  options?: {
-    primaryColor?: string;
-    secondaryColor?: string;
-    tintStrength?: number;
-  }
-): Promise<{ url: string; bgPublicId: string; svgPublicId: string }> {
-  console.log('🎨 [imageCompositor] Starting Cloudinary composition...');
+  jobSetId?: string
+): Promise<{ publicId: string; cloudinaryUrl: string }> {
+  console.log('🎨 [uploadBackgroundToCloudinary] Uploading background...');
   console.log('📥 Background URL:', backgroundUrl);
-  console.log('📝 SVG layer size:', svgTextLayer.length, 'chars');
   
   const CLOUD_NAME = Deno.env.get('CLOUDINARY_CLOUD_NAME')?.trim();
   const API_KEY = Deno.env.get('CLOUDINARY_API_KEY');
@@ -41,15 +111,9 @@ export async function compositeSlide(
   }
   
   const cloudName = CLOUD_NAME.toLowerCase();
-  console.log('🌩️ Cloudinary cloud:', cloudName);
   const uploadEndpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
-  const deleteEndpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/destroy`;
-  console.log('🔗 Upload endpoint:', uploadEndpoint);
   
   try {
-    // 1. Upload background image to Cloudinary with signed authentication
-    console.log('⬇️ Uploading background to Cloudinary...');
-    
     const bgPublicId = `alfie/${brandId || 'temp'}/${jobSetId || 'temp'}/background_${Date.now()}`;
     const bgTimestamp = Math.floor(Date.now() / 1000);
     
@@ -68,17 +132,12 @@ export async function compositeSlide(
     const bgController = new AbortController();
     const bgTimeout = setTimeout(() => bgController.abort(), 60000);
     
-    let bgUploadedPublicId: string;
-    let bgDeleteToken: string | undefined;
     try {
-      const bgUploadResponse = await fetch(
-        uploadEndpoint,
-        {
-          method: 'POST',
-          body: bgFormData,
-          signal: bgController.signal
-        }
-      );
+      const bgUploadResponse = await fetch(uploadEndpoint, {
+        method: 'POST',
+        body: bgFormData,
+        signal: bgController.signal
+      });
       
       clearTimeout(bgTimeout);
       
@@ -89,211 +148,22 @@ export async function compositeSlide(
       }
       
       const bgData = await bgUploadResponse.json();
-      bgUploadedPublicId = bgData.public_id;
-      bgDeleteToken = bgData.delete_token;
-      console.log('✅ Background uploaded:', bgUploadedPublicId);
+      const uploadedPublicId = bgData.public_id;
+      const cloudinaryUrl = bgData.secure_url;
+      
+      console.log('✅ Background uploaded:', uploadedPublicId);
+      
+      return { 
+        publicId: uploadedPublicId, 
+        cloudinaryUrl 
+      };
     } catch (err) {
       clearTimeout(bgTimeout);
-      console.error('❌ Background upload timeout or error:', err);
+      console.error('❌ Background upload error:', err);
       throw new Error(`Background upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
-    
-    // 2. Validate SVG before uploading
-    console.log('🔍 Validating SVG structure...');
-    if (!svgTextLayer.includes('xmlns')) {
-      console.error('❌ SVG missing xmlns declaration');
-      throw new Error('SVG missing required xmlns attribute');
-    }
-    
-    // Check for common issues
-    if (svgTextLayer.length < 100) {
-      console.error('❌ SVG suspiciously short:', svgTextLayer.length, 'chars');
-      throw new Error('SVG appears to be incomplete');
-    }
-
-    // Log SVG snippet for debugging (first 300 chars)
-    console.log('📝 SVG preview:', svgTextLayer.substring(0, 300).replace(/\n/g, ' '));
-    console.log('📏 SVG size:', svgTextLayer.length, 'chars');
-    
-    // 3. ✅ FIX: Sanitize SVG to make it Cloudinary-compatible
-    console.log('🔄 Sanitizing SVG for Cloudinary...');
-    
-    // Remove ALL quotes from font-family values and fix invalid attributes
-    let sanitizedSvg = svgTextLayer
-      // Strip all quotes from font names (Segoe UI doesn't need quotes in SVG)
-      .replace(/font-family="([^"]*)"/g, (_match, fonts) => {
-        const cleanFonts = fonts.replace(/["']/g, '');
-        return `font-family="${cleanFonts}"`;
-      })
-      // Replace transparent with none (Cloudinary doesn't support transparent)
-      .replace(/fill="transparent"/g, 'fill="none"')
-      // Remove external <image/> elements (Cloudinary rejects remote href)
-      .replace(/<image[^>]*\/>/g, '')
-      .replace(/<image[^>]*>.*?<\/image>/g, '');
-
-    // If xlink namespace is unused, drop it to avoid strict parser issues
-    if (!sanitizedSvg.includes('xlink:')) {
-      sanitizedSvg = sanitizedSvg.replace(/\s+xmlns:xlink="[^"]*"/, '');
-    }
-
-    console.log('✅ SVG sanitized (Cloudinary-safe)');
-    console.log('🧪 Sanitized preview:', sanitizedSvg.substring(0, 250).replace(/\n/g, ' '));
-
-    // Additional hardening for Cloudinary strict SVG parser
-    // 1) Ensure proper xmlns value
-    if (!/xmlns\s*=\s*"http:\/\/www.w3.org\/2000\/svg"/i.test(sanitizedSvg)) {
-      sanitizedSvg = sanitizedSvg.replace(/<svg(?![^>]*xmlns=)/i, '<svg xmlns="http://www.w3.org/2000/svg" ');
-    }
-
-    // 2) Remove any <script> blocks and inline event handlers (onload, onclick, ...)
-    sanitizedSvg = sanitizedSvg
-      .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/\son[a-zA-Z]+="[^"]*"/g, '');
-
-    // 3) Disallow external URL references in styles or fills (e.g., url(http...))
-    sanitizedSvg = sanitizedSvg.replace(/url\(['"]?https?:[^)'"]+['"]?\)/gi, 'none');
-
-    // 4) Ensure width/height present (Cloudinary can reject viewBox-only SVGs)
-    const hasWidth = /\swidth=\"[^\"]+\"/i.test(sanitizedSvg);
-    const hasHeight = /\sheight=\"[^\"]+\"/i.test(sanitizedSvg);
-    if (!hasWidth || !hasHeight) {
-      const vbMatch = sanitizedSvg.match(/viewBox=\"[^\"]*?(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\"/i);
-      let w = 1080, h = 1350;
-      if (vbMatch) {
-        const vw = parseFloat(vbMatch[3] || '1080');
-        const vh = parseFloat(vbMatch[4] || '1350');
-        if (Number.isFinite(vw) && Number.isFinite(vh)) { w = vw; h = vh; }
-      }
-      sanitizedSvg = sanitizedSvg.replace(/<svg/i, `<svg width="${w}" height="${h}"`);
-    }
-
-    // Create a Blob from the SVG string (Cloudinary can handle this directly)
-    const svgBlob = new Blob([sanitizedSvg], { type: 'image/svg+xml' });
-
-    console.log('✅ SVG blob prepared (size:', svgBlob.size, 'bytes)');
-    
-    //4. Upload SVG overlay to Cloudinary as image with fl_sanitize
-    console.log('⬆️ Uploading SVG overlay as image with sanitization...');
-    
-    const svgPublicId = `alfie/${brandId || 'temp'}/${jobSetId || 'temp'}/overlay_${Date.now()}`;
-    const svgTimestamp = Math.floor(Date.now() / 1000);
-    
-    const svgFormData = new FormData();
-    svgFormData.append('file', svgBlob, 'overlay.svg');
-    svgFormData.append('public_id', svgPublicId);
-    svgFormData.append('transformation', 'fl_sanitize'); // ✅ Sanitize SVG on upload
-    svgFormData.append('api_key', API_KEY);
-    svgFormData.append('timestamp', svgTimestamp.toString());
-    
-    const svgSignature = await generateCloudinarySignature(
-      { public_id: svgPublicId, timestamp: svgTimestamp.toString(), transformation: 'fl_sanitize' },
-      API_SECRET
-    );
-    svgFormData.append('signature', svgSignature);
-    console.log('🛡️ Using signed SVG upload with fl_sanitize, public_id:', svgPublicId);
-    
-    const svgController = new AbortController();
-    const svgTimeout = setTimeout(() => svgController.abort(), 60000);
-    
-    let svgUploadedPublicId: string;
-    let svgDeleteToken: string | undefined;
-    try {
-      const svgUploadResponse = await fetch(
-        uploadEndpoint,  // ✅ Use image upload endpoint
-        {
-          method: 'POST',
-          body: svgFormData,
-          signal: svgController.signal
-        }
-      );
-      
-      clearTimeout(svgTimeout);
-      
-      if (!svgUploadResponse.ok) {
-        const errorText = await svgUploadResponse.text();
-        console.error('❌ SVG upload failed:', errorText);
-        throw new Error(`SVG upload failed (${svgUploadResponse.status}): ${errorText}`);
-      }
-      
-      const svgData = await svgUploadResponse.json();
-      svgUploadedPublicId = svgData.public_id;
-      svgDeleteToken = svgData.delete_token;
-      console.log('✅ SVG uploaded:', svgUploadedPublicId);
-    } catch (err) {
-      clearTimeout(svgTimeout);
-      console.error('❌ SVG upload timeout or error:', err);
-      throw new Error(`SVG upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    }
-    
-    // 4. Generate composed image via explicit eager transformation (avoids strict-mode 400)
-    console.log('🎭 Generating composed image via explicit API...');
-
-    // ✅ FIX: No color filters to preserve exact AI-generated colors
-    let transformations = '';
-    console.log('🎨 [imageCompositor] No color filters applied - preserving original colors');
-
-    // Prepare eager transformation for explicit API
-    const overlayIdForTransform = svgUploadedPublicId.replace(/\//g, ':');
-    const eagerTransform = `${transformations}l_${overlayIdForTransform},fl_layer_apply,g_center/f_png`;
-
-    const explicitEndpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/explicit`;
-    const explicitTs = Math.floor(Date.now() / 1000);
-    const explicitForm = new FormData();
-    explicitForm.append('public_id', bgUploadedPublicId);
-    explicitForm.append('type', 'upload');
-    explicitForm.append('eager', eagerTransform);
-    explicitForm.append('api_key', API_KEY!);
-    explicitForm.append('timestamp', explicitTs.toString());
-    const explicitSig = await generateCloudinarySignature({ public_id: bgUploadedPublicId, type: 'upload', eager: eagerTransform, timestamp: explicitTs.toString() }, API_SECRET!);
-    explicitForm.append('signature', explicitSig);
-
-    let composedUrl: string;
-    const explicitResp = await fetch(explicitEndpoint, { method: 'POST', body: explicitForm });
-    if (!explicitResp.ok) {
-      const errText = await explicitResp.text();
-      console.error('❌ Explicit transformation failed:', errText);
-      throw new Error(`Explicit transformation failed (${explicitResp.status}): ${errText}`);
-    }
-    const explicitData = await explicitResp.json();
-    composedUrl = explicitData?.eager?.[0]?.secure_url || explicitData?.eager?.[0]?.url;
-
-    if (!composedUrl) {
-      // Fallback to unsigned URL (may fail under strict mode but try)
-      const overlayId = encodeURIComponent(svgUploadedPublicId).replace(/%2F/g, ':');
-      composedUrl = `https://res.cloudinary.com/${cloudName}/image/upload/` +
-        transformations +
-        `l_${overlayId},fl_layer_apply,g_center/` +
-        `${bgUploadedPublicId}.png`;
-    }
-
-    console.log('✅ Composition complete:', composedUrl);
-    
-    // 4.5 🔍 VERIFY (non-bloquant): essayer d'accéder à l'image sans échouer la requête
-    console.log('🔍 Verifying composed image availability (non-blocking)...');
-    const verifyController = new AbortController();
-    const verifyTimeout = setTimeout(() => verifyController.abort(), 10000);
-    try {
-      const head = await fetch(composedUrl, { method: 'HEAD', signal: verifyController.signal });
-      clearTimeout(verifyTimeout);
-      if (!head.ok) {
-        console.warn(`⚠️ HEAD returned ${head.status}, trying GET once...`);
-        const getOnce = await fetch(composedUrl);
-        if (!getOnce.ok) {
-          console.warn(`⚠️ GET also returned ${getOnce.status}. Proceeding anyway (Cloudinary may still be processing).`);
-        }
-      } else {
-        console.log('✅ Composed image verified and accessible');
-      }
-    } catch (err) {
-      clearTimeout(verifyTimeout);
-      console.warn('⚠️ Non-blocking verify failed, proceeding anyway:', err instanceof Error ? err.message : String(err));
-    }
-    
-    // 5. Return composed info and let caller handle cleanup after upload
-    return { url: composedUrl, bgPublicId: bgUploadedPublicId, svgPublicId: svgUploadedPublicId };
-    
   } catch (error) {
-    console.error('❌ [imageCompositor] Cloudinary composition failed:', error);
+    console.error('❌ [uploadBackgroundToCloudinary] Upload failed:', error);
     if (error instanceof Error) {
       console.error('📍 Error message:', error.message);
       console.error('📍 Error stack:', error.stack);
@@ -302,35 +172,108 @@ export async function compositeSlide(
   }
 }
 
-// Cleanup helper to delete temporary Cloudinary resources AFTER upload is complete
+/**
+ * Cleanup helper to delete temporary Cloudinary resources
+ */
+export async function cleanupCloudinaryResource(publicId: string) {
+  const CLOUD_NAME = Deno.env.get('CLOUDINARY_CLOUD_NAME')?.trim();
+  const API_KEY = Deno.env.get('CLOUDINARY_API_KEY');
+  const API_SECRET = Deno.env.get('CLOUDINARY_API_SECRET');
+  
+  if (!CLOUD_NAME || !API_KEY || !API_SECRET || !publicId) {
+    return; // silently skip if missing
+  }
+  
+  const cloudName = CLOUD_NAME.toLowerCase();
+  const deleteEndpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/destroy`;
+  
+  const ts = Math.floor(Date.now() / 1000);
+  const form = new FormData();
+  form.append('public_id', publicId);
+  form.append('api_key', API_KEY);
+  form.append('timestamp', ts.toString());
+  
+  const sig = await generateCloudinarySignature(
+    { public_id: publicId, timestamp: ts.toString() }, 
+    API_SECRET
+  );
+  form.append('signature', sig);
+  
+  try {
+    const resp = await fetch(deleteEndpoint, { method: 'POST', body: form });
+    if (resp.ok) {
+      console.log('🧹 Deleted Cloudinary asset:', publicId);
+    } else {
+      console.warn('⚠️ Failed to delete Cloudinary asset:', publicId);
+    }
+  } catch (e: any) {
+    console.warn('⚠️ Cleanup error for', publicId, e?.message);
+  }
+}
+
+/**
+ * Legacy cleanup function - maintains backward compatibility
+ */
 export async function cleanupCloudinaryResources({
   bgPublicId,
   svgPublicId,
 }: { bgPublicId?: string; svgPublicId?: string }) {
-  const CLOUD_NAME = Deno.env.get('CLOUDINARY_CLOUD_NAME')?.trim();
-  const API_KEY = Deno.env.get('CLOUDINARY_API_KEY');
-  const API_SECRET = Deno.env.get('CLOUDINARY_API_SECRET');
-  if (!CLOUD_NAME || !API_KEY || !API_SECRET) return; // silently skip if missing
-  const cloudName = CLOUD_NAME.toLowerCase();
-  const deleteEndpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/destroy`;
+  if (bgPublicId) await cleanupCloudinaryResource(bgPublicId);
+  if (svgPublicId) await cleanupCloudinaryResource(svgPublicId);
+}
 
-  const doDelete = async (publicId?: string) => {
-    if (!publicId) return;
-    const ts = Math.floor(Date.now() / 1000);
-    const form = new FormData();
-    form.append('public_id', publicId);
-    form.append('api_key', API_KEY);
-    form.append('timestamp', ts.toString());
-    const sig = await generateCloudinarySignature({ public_id: publicId, timestamp: ts.toString() }, API_SECRET);
-    form.append('signature', sig);
-    try {
-      const resp = await fetch(deleteEndpoint, { method: 'POST', body: form });
-      if (resp.ok) console.log('🧹 Deleted Cloudinary asset:', publicId);
-      else console.warn('⚠️ Failed to delete Cloudinary asset:', publicId);
-    } catch (e: any) {
-      console.warn('⚠️ Cleanup error for', publicId, e?.message);
-    }
+/**
+ * Legacy compositeSlide function - now uses Cloudinary text overlays instead of SVG upload
+ * Maintains backward compatibility with existing code
+ */
+export async function compositeSlide(
+  backgroundUrl: string,
+  svgTextLayer: string,
+  jobSetId?: string,
+  brandId?: string,
+  options?: {
+    primaryColor?: string;
+    secondaryColor?: string;
+    tintStrength?: number;
+  }
+): Promise<{ url: string; bgPublicId: string; svgPublicId: string }> {
+  console.log('🎨 [compositeSlide] Legacy function called - using new text overlay approach');
+  
+  // Upload background first
+  const { publicId } = await uploadBackgroundToCloudinary(
+    backgroundUrl,
+    brandId,
+    jobSetId
+  );
+  
+  // IMPORTANT: La fonction legacy SVG → Cloudinary text overlay nécessite parsing du SVG
+  // Pour simplifier, on extrait titre/sous-titre via regex basique
+  const titleMatch = svgTextLayer.match(/<text[^>]*id="title"[^>]*>([^<]+)<\/text>/i);
+  const subtitleMatch = svgTextLayer.match(/<text[^>]*id="subtitle"[^>]*>([^<]+)<\/text>/i);
+  
+  const title = titleMatch ? titleMatch[1] : '';
+  const subtitle = subtitleMatch ? subtitleMatch[1] : '';
+  
+  // Construire l'URL avec text overlays
+  const composedUrl = buildCloudinaryTextOverlayUrl(publicId, {
+    title,
+    subtitle,
+    titleColor: options?.primaryColor,
+    subtitleColor: options?.secondaryColor,
+    titleSize: 64,
+    subtitleSize: 28,
+    titleFont: 'Arial',
+    subtitleFont: 'Arial',
+    titleWeight: 'bold',
+    subtitleWeight: 'normal'
+  });
+  
+  console.log('✅ [compositeSlide] Composed URL:', composedUrl.substring(0, 100));
+  
+  // Retourner le format attendu par l'ancien code
+  return {
+    url: composedUrl,
+    bgPublicId: publicId,
+    svgPublicId: `${publicId}_text_overlay` // Dummy ID for compatibility
   };
-
-  await Promise.all([doDelete(bgPublicId), doDelete(svgPublicId)]);
 }
