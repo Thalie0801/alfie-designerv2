@@ -139,6 +139,34 @@ export async function compositeSlide(
     console.log('✅ SVG sanitized (Cloudinary-safe)');
     console.log('🧪 Sanitized preview:', sanitizedSvg.substring(0, 250).replace(/\n/g, ' '));
 
+    // Additional hardening for Cloudinary strict SVG parser
+    // 1) Ensure proper xmlns value
+    if (!/xmlns\s*=\s*"http:\/\/www.w3.org\/2000\/svg"/i.test(sanitizedSvg)) {
+      sanitizedSvg = sanitizedSvg.replace(/<svg(?![^>]*xmlns=)/i, '<svg xmlns="http://www.w3.org/2000/svg" ');
+    }
+
+    // 2) Remove any <script> blocks and inline event handlers (onload, onclick, ...)
+    sanitizedSvg = sanitizedSvg
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/\son[a-zA-Z]+="[^"]*"/g, '');
+
+    // 3) Disallow external URL references in styles or fills (e.g., url(http...))
+    sanitizedSvg = sanitizedSvg.replace(/url\(['"]?https?:[^)'"]+['"]?\)/gi, 'none');
+
+    // 4) Ensure width/height present (Cloudinary can reject viewBox-only SVGs)
+    const hasWidth = /\swidth=\"[^\"]+\"/i.test(sanitizedSvg);
+    const hasHeight = /\sheight=\"[^\"]+\"/i.test(sanitizedSvg);
+    if (!hasWidth || !hasHeight) {
+      const vbMatch = sanitizedSvg.match(/viewBox=\"[^\"]*?(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\"/i);
+      let w = 1080, h = 1350;
+      if (vbMatch) {
+        const vw = parseFloat(vbMatch[3] || '1080');
+        const vh = parseFloat(vbMatch[4] || '1350');
+        if (Number.isFinite(vw) && Number.isFinite(vh)) { w = vw; h = vh; }
+      }
+      sanitizedSvg = sanitizedSvg.replace(/<svg/i, `<svg width="${w}" height="${h}"`);
+    }
+
     // Create a Blob from the SVG string (Cloudinary can handle this directly)
     const svgBlob = new Blob([sanitizedSvg], { type: 'image/svg+xml' });
 
@@ -151,13 +179,14 @@ export async function compositeSlide(
     const svgTimestamp = Math.floor(Date.now() / 1000);
     
     const svgFormData = new FormData();
-    svgFormData.append('file', svgBlob);
+    svgFormData.append('file', svgBlob, 'overlay.svg');
     svgFormData.append('public_id', svgPublicId);
+    svgFormData.append('format', 'png');
     svgFormData.append('api_key', API_KEY);
     svgFormData.append('timestamp', svgTimestamp.toString());
     
     const svgSignature = await generateCloudinarySignature(
-      { public_id: svgPublicId, timestamp: svgTimestamp.toString() },
+      { public_id: svgPublicId, timestamp: svgTimestamp.toString(), format: 'png' },
       API_SECRET
     );
     svgFormData.append('signature', svgSignature);
