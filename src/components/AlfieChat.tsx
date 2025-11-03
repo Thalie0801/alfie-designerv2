@@ -441,7 +441,46 @@ export function AlfieChat() {
   // GÉNÉRATION DE CARROUSELS PROGRESSIVE (NOUVEAU)
   // ======
   
+  // Utilitaire : construire un prompt depuis un slide (ancien format)
+  const buildPromptFromSlide = (slide: any, aspectRatio: string, brandKit?: any): string => {
+    const parts = [];
+    if (slide?.title) parts.push(`Illustration pour "${slide.title}"`);
+    if (slide?.subtitle) parts.push(`Contexte: ${slide.subtitle}`);
+    parts.push('Pas de texte dans l\'image, fond uniquement');
+    parts.push(`Ratio ${aspectRatio}`);
+    if (brandKit?.palette?.length) parts.push(`Couleurs: ${brandKit.palette.join(', ')}`);
+    return parts.join('. ') + '.';
+  };
+  
+  // Utilitaire : normaliser le plan (accepte nouveau et ancien format)
+  const normalizeCarouselPlan = (raw: any, count: number, aspectRatio: string, brandKit?: any) => {
+    let style = raw?.style;
+    let prompts: string[] | undefined = Array.isArray(raw?.prompts) ? raw.prompts : undefined;
+    
+    // Si format ancien : { plan: { slides: [...] } }
+    if ((!style || !prompts) && Array.isArray(raw?.plan?.slides)) {
+      const slides = raw.plan.slides.slice(0, count);
+      prompts = slides.map((s: any) => 
+        s?.note?.trim?.() || buildPromptFromSlide(s, aspectRatio, brandKit)
+      );
+      style = style || `Style cohérent, moderne et créatif, sans texte incrusté, ratio ${aspectRatio}${brandKit?.palette?.length ? `, palette ${brandKit.palette.join(', ')}` : ''}.`;
+    }
+    
+    // Garantir un array valide
+    if (!Array.isArray(prompts)) prompts = [];
+    
+    // Ajuster la longueur
+    if (prompts.length > count) prompts = prompts.slice(0, count);
+    while (prompts.length < count) {
+      prompts.push(prompts[prompts.length - 1] || `Fond abstrait, ratio ${aspectRatio}, sans texte`);
+    }
+    
+    return { style, prompts };
+  };
+  
   const generateCarouselProgressive = async (prompt: string, count: number = 5) => {
+    let successCount = 0;
+    
     try {
       setIsLoading(true);
       setCarouselProgress({ current: 0, total: count });
@@ -473,15 +512,24 @@ export function AlfieChat() {
         headers
       });
       
-      if (planError || !planData?.style || !planData?.prompts) {
-        throw new Error(planError?.message || 'Échec de la génération du plan');
+      // Log du plan brut pour diagnostic
+      console.log('[Carousel] Raw plan:', planData);
+      console.log('[Carousel] Raw plan keys:', Object.keys(planData || {}));
+      
+      // Normaliser le plan (supporte les deux formats)
+      const { style: globalStyle, prompts } = normalizeCarouselPlan(
+        planData, 
+        count, 
+        aspectRatio, 
+        brandKit
+      );
+      
+      if (planError || !globalStyle || !prompts?.length) {
+        throw new Error(planError?.message || 'Plan invalide (aucun prompt utilisable)');
       }
       
-      const { style: globalStyle, prompts } = planData;
-      console.log('[Carousel] Plan received:', { 
-        promptsCount: prompts.length, 
-        style: globalStyle.substring(0, 100) 
-      });
+      console.log('[Carousel] Using prompts count:', prompts.length);
+      console.log('[Carousel] Style:', globalStyle.substring(0, 100));
       
       addMessage({
         role: 'assistant',
@@ -512,13 +560,16 @@ export function AlfieChat() {
             headers
           });
           
-          if (imgError || !imgData?.data?.image_urls?.[0]) {
-            console.error(`[Carousel] Slide ${i + 1} generation failed:`, imgError);
+          // Récupération d'URL tolérante (supporte plusieurs formats)
+          const imageUrl = imgData?.data?.image_urls?.[0] || imgData?.image_urls?.[0] || imgData?.image_url;
+          
+          if (imgError || !imageUrl) {
+            console.error(`[Carousel] Slide ${i + 1} generation failed:`, imgError, imgData);
             toast.error(`Slide ${i + 1} a échoué`);
             continue;
           }
           
-          const imageUrl = imgData.data.image_urls[0];
+          successCount++;
           console.log(`[Carousel] ✅ Slide ${i + 1} generated`);
           
           // Afficher immédiatement la slide générée
@@ -542,10 +593,10 @@ export function AlfieChat() {
       setCarouselProgress(null);
       addMessage({
         role: 'assistant',
-        content: `🎉 Carrousel terminé ! Tes ${prompts.length} slides sont prêtes avec un style cohérent.`,
+        content: `🎉 Carrousel terminé ! ${successCount}/${prompts.length} slides générées avec succès.`,
         type: 'text'
       });
-      toast.success(`✅ Carrousel de ${prompts.length} slides terminé !`);
+      toast.success(`✅ Carrousel terminé : ${successCount}/${prompts.length} slides !`);
       
     } catch (error: any) {
       console.error('[Carousel] Error:', error);
