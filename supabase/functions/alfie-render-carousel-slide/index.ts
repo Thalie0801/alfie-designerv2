@@ -155,10 +155,31 @@ serve(async (req) => {
 
     console.log('[Carousel Slide] ✅ Final composition complete with text overlay');
 
-    // 7. Retourner l'URL finale avec texte
+    // 7. ✅ NOUVEAU: Enregistrer l'image finale (avec overlay) dans media_generations
+    const { data: generation } = await supabaseAdmin
+      .from('media_generations')
+      .insert({
+        user_id: (await supabaseAuth.auth.getUser()).data.user?.id,
+        brand_id: brandId,
+        type: 'image',
+        modality: 'carousel_slide',
+        provider_id: 'gemini_image',
+        prompt: `${prompt} - Slide ${slideContent.type}`,
+        output_url: composedUrl,
+        render_url: composedUrl,
+        status: 'completed',
+        cost_woofs: 1,
+        params_json: { slideType: slideContent.type, aspectRatio }
+      })
+      .select()
+      .single();
+
+    console.log('[Carousel Slide] ✅ Final image saved to media_generations:', generation?.id);
+
+    // 8. Retourner l'URL finale avec texte
     return new Response(JSON.stringify({ 
       image_url: composedUrl,
-      generation_id: (payload as any)?.generation_id || `carousel-${Date.now()}`,
+      generation_id: generation?.id || `carousel-${Date.now()}`,
       debug: {
         bgPublicId,
         svgPublicId,

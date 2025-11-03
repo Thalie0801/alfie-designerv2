@@ -14,6 +14,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isAuthorized: boolean;
   hasActivePlan: boolean;
+  subscriptionExpired: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
@@ -111,8 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase.functions.invoke('check-subscription');
       if (!error && data) {
+        const isExpired = data.current_period_end ? new Date(data.current_period_end) < new Date() : false;
         setSubscription({
-          status: data.subscribed ? 'active' : 'none',
+          status: isExpired ? 'expired' : (data.subscribed ? 'active' : 'none'),
           current_period_end: data.current_period_end ?? null,
         } as any);
       } else {
@@ -294,6 +296,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (subscription?.status ? ['active', 'trial', 'trialing'].includes(String(subscription.status).toLowerCase()) : false)
   );
 
+  const subscriptionExpired = subscription?.status === 'expired';
+
   const value = {
     user,
     session,
@@ -303,6 +307,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAdmin: computedAdmin,
     isAuthorized: computedIsAuthorized,
     hasActivePlan,
+    subscriptionExpired,
     loading,
     signIn,
     signUp,

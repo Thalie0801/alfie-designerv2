@@ -53,9 +53,17 @@ serve(async (req) => {
 
     const sub = subscriptions.data[0];
     const end = new Date(sub.current_period_end * 1000).toISOString();
+    const planName = sub.items.data[0]?.price?.product as string;
 
+    // ✅ Retourner aussi le plan pour UI
     return new Response(
-      JSON.stringify({ subscribed: true, status: 'active', current_period_end: end }),
+      JSON.stringify({ 
+        subscribed: true, 
+        status: 'active', 
+        current_period_end: end,
+        plan_id: planName,
+        subscription_id: sub.id
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (error) {

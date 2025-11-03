@@ -199,20 +199,9 @@ export async function compositeSlide(
     // 4. Generate composed image via explicit eager transformation (avoids strict-mode 400)
     console.log('🎭 Generating composed image via explicit API...');
 
-    // Build transformation pipeline with brand color tint if provided
-    let transformations = 'e_grayscale/';
-    const isHex = (c: string) => /^#?[0-9a-fA-F]{6}$/.test((c || '').trim());
-    const p = (options?.primaryColor || '').trim();
-    const s = (options?.secondaryColor || '').trim();
-    if (isHex(p) && isHex(s)) {
-      const tintStrength = options?.tintStrength || 60;
-      const primary = p.replace('#', '');
-      const secondary = s.replace('#', '');
-      transformations += `e_tint:${tintStrength}:rgb:${primary}:rgb:${secondary}/`;
-      console.log(`🎨 [imageCompositor] Applying brand tint: ${transformations}`);
-    } else {
-      console.log('🎨 [imageCompositor] Skipping tint: non-hex brand colors provided', { primary: p, secondary: s });
-    }
+    // ✅ FIX: No color filters to preserve exact AI-generated colors
+    let transformations = '';
+    console.log('🎨 [imageCompositor] No color filters applied - preserving original colors');
 
     // Prepare eager transformation for explicit API
     const overlayIdForTransform = svgUploadedPublicId.replace(/\//g, ':');

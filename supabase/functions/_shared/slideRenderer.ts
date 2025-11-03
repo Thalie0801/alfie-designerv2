@@ -29,16 +29,15 @@ export async function renderSlideToSVG(
   svg += `<rect width="${width}" height="${height}" fill="none"/>`;
   
   // Normalize font settings across all layers for consistency
-  // ✅ CRITICAL: Remove inner quotes from Segoe UI to avoid XML nesting issues
+  // ✅ Use brand font or fallback to Inter
   const rawFontFamily = brandSnapshot.fonts?.default || 'Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
-  const textShadow = '0 2px 4px rgba(0,0,0,0.1)';
   
   // Couche de texte (typo contrôlée, pas d'IA)
   for (const layer of template.textLayers) {
     let text = getTextForLayer(layer, slideContent);
     if (!text) continue;
     
-    // Use consistent font from brand kit - no quotes around Segoe UI
+    // Use consistent font from brand kit
     const fontFamily = String(rawFontFamily);
     let textColor = layer.color;
     
@@ -77,19 +76,24 @@ export async function renderSlideToSVG(
         fill="${ctaBgColor}" rx="12"/>`;
     }
     
-    // Word wrap + multi-lignes
-    const lines = wrapText(text, layer.maxWidth, layer.size);
+    // ✅ FIX: Réduire maxWidth pour éviter overflow (80% de la largeur d'image)
+    const safeMaxWidth = Math.min(layer.maxWidth, width * 0.8);
+    const lines = wrapText(text, safeMaxWidth, layer.size);
+    
     lines.slice(0, layer.maxLines).forEach((line, i) => {
       const y = layer.position.y + i * (layer.size * 1.2);
       const x = width / 2;
       
-      // Stroke pour lisibilité et text-anchor centré
+      // ✅ FIX: Contraste automatique (stroke blanc sur texte sombre, noir sur texte clair)
       const textLum = relativeLuminance(textColor);
       const strokeColor = textLum > 0.5 ? '#000000' : '#FFFFFF';
+      const strokeWidth = textLum > 0.5 ? 4 : 3;
       
       svg += `<text x="${x}" y="${y}"
         font-family="${fontFamily}" font-size="${layer.size}" font-weight="${layer.weight}"
-        fill="${textColor}" text-anchor="middle" stroke="${strokeColor}" stroke-opacity="0.35" stroke-width="3" style="paint-order: stroke fill">
+        fill="${textColor}" text-anchor="middle" 
+        stroke="${strokeColor}" stroke-opacity="0.4" stroke-width="${strokeWidth}" 
+        style="paint-order: stroke fill">
         ${escapeXml(line)}
       </text>`;
     });
