@@ -142,27 +142,18 @@ serve(async (req) => {
 
     // 6. Composer l'image finale via Cloudinary
     console.log('[Carousel Slide] Composing final image...');
-    const { url: composedUrl, bgPublicId, svgPublicId } = await compositeSlide(
-      backgroundUrl,
-      svgOverlay,
-      undefined, // jobSetId - not needed here
-      brandId,
-      {
-        primaryColor: brandSnapshot.primary_color,
-        secondaryColor: brandSnapshot.secondary_color,
-        tintStrength: 40 // Subtle tint pour cohérence
-      }
-    );
+    
+    // TEMPORARY: Skip Cloudinary composition, return background only
+    // TODO: Fix SVG encoding issues causing Cloudinary 400 errors
+    console.warn('[Carousel Slide] ⚠️ Skipping Cloudinary composition (SVG encoding issues)');
+    console.log('[Carousel Slide] ✅ Returning background URL directly');
 
-    console.log('[Carousel Slide] ✅ Final composition complete');
-
-    // 7. Retourner l'URL finale
+    // 7. Retourner l'URL du fond (temporaire)
     return new Response(JSON.stringify({ 
-      image_url: composedUrl,
+      image_url: backgroundUrl,
       generation_id: (payload as any)?.generation_id || `carousel-${Date.now()}`,
       debug: {
-        bgPublicId,
-        svgPublicId,
+        note: 'Using background only - SVG overlay disabled temporarily',
         slideType: slideContent.type
       }
     }), {
