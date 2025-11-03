@@ -283,6 +283,7 @@ ${fontsText ? fontsText.split(', ').map(line => `  • ${line}`).join('\n') : ' 
 
 /**
  * Enrichit un prompt avec le Brand Kit pour génération visuelle
+ * CRITIQUE: Les instructions sont formulées pour ne JAMAIS apparaître dans l'image générée
  */
 export function enrichPromptWithBrandKit(
   basePrompt: string,
@@ -296,18 +297,35 @@ export function enrichPromptWithBrandKit(
   const colorHex = colors.map((c: any) => typeof c === 'string' ? c : c.hex || c.value).filter(Boolean);
   const fontsText = normalizeFonts(brandKit.fonts);
   
+  // Convertir les codes hex en descriptions de couleurs naturelles
+  const colorDescriptions = colorHex.map((hex: string) => {
+    if (!hex) return '';
+    const h = hex.toLowerCase();
+    if (h.includes('90e3c2')) return 'soft mint green';
+    if (h.includes('b58ee5') || h.includes('b58ee3')) return 'lavender purple';
+    if (h.includes('f9c851')) return 'golden yellow';
+    if (h.includes('ffb89e')) return 'warm coral pink';
+    // Fallback générique selon la couleur dominante
+    if (h.match(/^#?[0-9a-f]{6}$/i)) {
+      const r = parseInt(h.slice(1, 3), 16);
+      const g = parseInt(h.slice(3, 5), 16);
+      const b = parseInt(h.slice(5, 7), 16);
+      if (r > g && r > b) return 'warm reddish tone';
+      if (g > r && g > b) return 'fresh green tone';
+      if (b > r && b > g) return 'cool blue tone';
+    }
+    return 'vibrant accent';
+  }).filter(Boolean);
+  
+  const colorInstruction = colorDescriptions.length > 0 
+    ? `Incorporate these colors naturally into the composition: ${colorDescriptions.join(', ')}.`
+    : 'Use professional neutral color palette.';
+  
+  const styleInstruction = brandKit.style || brandKit.voice || 'modern professional';
+  const nicheContext = brandKit.niche ? ` reflecting ${brandKit.niche} industry aesthetics` : '';
+  
   return `${basePrompt}
 
-**Style Guide Application:**
-- Primary color palette: ${colorHex.join(', ') || 'professional neutral tones'}
-- Visual aesthetic: ${brandKit.style || 'modern professional'}
-- Mood/Tone: ${brandKit.voice || 'professional engaging'}
-- Typography vibe: ${fontsText || 'clean sans-serif'}
-- Industry context: ${brandKit.niche || 'business'}
-
-**Quality requirements:**
-- High quality, professional grade
-- Cohesive color scheme matching brand palette
-- Consistent with brand visual identity
-- Strong visual hierarchy and readability`;
+VISUAL DIRECTION (do not render as text): 
+Apply ${styleInstruction} visual style${nicheContext}. ${colorInstruction} Use high-quality professional composition with strong visual hierarchy and readability. Typography should feel ${fontsText || 'clean and modern'}. Create cohesive brand-aligned imagery.`;
 }
