@@ -169,9 +169,15 @@ async function generateCarousel(params: any) {
     brandData
   } = params;
 
-  console.log(`[Carousel ${carouselIndex + 1}] Starting generation`);
+  console.log(`[Carousel ${carouselIndex + 1}] 🚀 Starting generation:`, {
+    slides: num_slides_per_carousel,
+    theme: theme.substring(0, 100),
+    aspect_ratio
+  });
 
   // 1. Generate background via Nano Banana
+  console.log(`[Carousel ${carouselIndex + 1}] Step 1/4: Generating background...`);
+  
   const bgPrompt = `${global_style}. ${theme}. Background only, no text, clean and professional.`;
   
   const format = aspect_ratio === '1:1' ? '1024x1024'
@@ -179,7 +185,10 @@ async function generateCarousel(params: any) {
     : aspect_ratio === '9:16' ? '720x1280'
     : '1024x1024';
 
-  const { data: bgData } = await supabaseAuth.functions.invoke('alfie-render-image', {
+  console.log(`[Carousel ${carouselIndex + 1}] Background prompt:`, bgPrompt.substring(0, 100));
+  console.log(`[Carousel ${carouselIndex + 1}] Format:`, format);
+
+  const { data: bgData, error: bgError } = await supabaseAuth.functions.invoke('alfie-render-image', {
     body: {
       provider: 'gemini_image',
       prompt: bgPrompt,
@@ -189,23 +198,35 @@ async function generateCarousel(params: any) {
     }
   });
 
+  if (bgError) {
+    console.error(`[Carousel ${carouselIndex + 1}] Background generation error:`, bgError);
+    throw new Error(`Carousel ${carouselIndex + 1}: Background generation failed - ${bgError.message}`);
+  }
+
   const payload = (bgData && typeof bgData === 'object' && 'data' in bgData) ? (bgData as any).data : bgData;
   const backgroundUrl = payload?.image_urls?.[0] || payload?.image_url || payload?.render_url;
 
   if (!backgroundUrl) {
-    throw new Error(`Carousel ${carouselIndex + 1}: Background generation failed`);
+    console.error(`[Carousel ${carouselIndex + 1}] No background URL in response:`, payload);
+    throw new Error(`Carousel ${carouselIndex + 1}: Background generation failed - no URL`);
   }
 
-  console.log(`[Carousel ${carouselIndex + 1}] Background generated`);
+  console.log(`[Carousel ${carouselIndex + 1}] ✅ Background generated:`, backgroundUrl.substring(0, 80));
 
   // 2. Upload background to Cloudinary
+  console.log(`[Carousel ${carouselIndex + 1}] Step 2/4: Uploading to Cloudinary...`);
+  
   const { publicId: bgPublicId } = await uploadBackgroundToCloudinary(
     backgroundUrl,
     brand_id,
     `carousel_${String(carouselIndex + 1).padStart(2, '0')}`
   );
 
+  console.log(`[Carousel ${carouselIndex + 1}] ✅ Uploaded to Cloudinary:`, bgPublicId);
+
   // 3. Store background in Supabase storage
+  console.log(`[Carousel ${carouselIndex + 1}] Step 3/4: Storing in Supabase...`);
+  
   const bgPath = `clients/${user_id}/${campaign_name}/carousel_${String(carouselIndex + 1).padStart(2, '0')}/backgrounds/bg_001.png`;
   const bgBlob = await fetch(backgroundUrl).then(r => r.blob());
   
@@ -217,14 +238,22 @@ async function generateCarousel(params: any) {
     .from('media-generations')
     .getPublicUrl(bgPath);
 
+  console.log(`[Carousel ${carouselIndex + 1}] ✅ Stored in Supabase:`, bgPath);
+
   // 4. Generate slides
+  console.log(`[Carousel ${carouselIndex + 1}] Step 4/4: Generating ${num_slides_per_carousel} slides...`);
+  
   const slides = [];
   const slideTexts = text_option === 'excel' && excel_data
     ? excel_data
     : await generateTextsWithAlfie(num_slides_per_carousel, theme, supabaseAuth);
 
+  console.log(`[Carousel ${carouselIndex + 1}] Slide texts generated:`, slideTexts.length);
+
   for (let s = 0; s < num_slides_per_carousel; s++) {
     const slideText = slideTexts[s];
+    
+    console.log(`[Carousel ${carouselIndex + 1}] Rendering slide ${s + 1}/${num_slides_per_carousel}...`);
     
     // Build Cloudinary URL with text overlays
     const timestamp = Date.now() + s;
@@ -267,10 +296,14 @@ async function generateCarousel(params: any) {
       cloudinary_url: slideUrlWithVersion
     });
 
-    console.log(`[Carousel ${carouselIndex + 1}] Slide ${s + 1}/${num_slides_per_carousel} completed`);
+    console.log(`[Carousel ${carouselIndex + 1}] ✅ Slide ${s + 1}/${num_slides_per_carousel} completed`);
   }
 
-  // 5. Create ZIP (simplified - store metadata for now, actual ZIP can be done on-demand)
+  console.log(`[Carousel ${carouselIndex + 1}] All ${num_slides_per_carousel} slides rendered successfully`);
+
+  // 5. Create metadata and store in database
+  console.log(`[Carousel ${carouselIndex + 1}] Storing metadata in database...`);
+  
   const carouselMetadata = {
     carousel_index: carouselIndex + 1,
     theme,
@@ -281,7 +314,7 @@ async function generateCarousel(params: any) {
   };
 
   // Store metadata in database
-  await supabaseAdmin
+  const { error: insertError } = await supabaseAdmin
     .from('media_generations')
     .insert({
       user_id,
@@ -296,7 +329,11 @@ async function generateCarousel(params: any) {
       params_json: carouselMetadata
     });
 
-  console.log(`[Carousel ${carouselIndex + 1}] ✅ Complete`);
+  if (insertError) {
+    console.error(`[Carousel ${carouselIndex + 1}] Database insert error:`, insertError);
+  }
+
+  console.log(`[Carousel ${carouselIndex + 1}] 🎉 Complete!`);
 
   return carouselMetadata;
 }

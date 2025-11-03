@@ -124,14 +124,26 @@ export function AlfieChat() {
   const detectBulkCarousel = (text: string): { isBulk: boolean; numCarousels: number; numSlides: number } => {
     const lower = text.toLowerCase();
     
-    // Patterns: "5 carrousels de 10 slides", "générer 10 carrousels", etc.
-    const bulkPattern = /(\d+)\s*carrousels?\s*(?:de\s*(\d+)\s*slides?)?/i;
-    const match = lower.match(bulkPattern);
+    // Patterns améliorés pour détecter les demandes bulk
+    const patterns = [
+      /(\d+)\s*carrousels?\s*(?:de\s*(\d+)\s*slides?)?/i,  // "5 carrousels de 10 slides"
+      /générer?\s*(\d+)\s*carrousels?/i,                    // "générer 10 carrousels"
+      /créer?\s*(\d+)\s*carrousels?/i,                      // "créer 10 carrousels"
+      /(\d+)\s*séries?\s*de\s*(\d+)\s*(?:images?|slides?)/i, // "10 séries de 5 images"
+      /production\s*massive.*?(\d+)\s*carrousels?/i,        // "production massive de X carrousels"
+      /bulk.*?(\d+)\s*carrousels?/i                         // "bulk carousel 10"
+    ];
     
-    if (match) {
-      const numCarousels = parseInt(match[1]) || 1;
-      const numSlides = parseInt(match[2]) || 5; // Default 5 slides per carousel
-      return { isBulk: numCarousels > 1, numCarousels, numSlides };
+    for (const pattern of patterns) {
+      const match = lower.match(pattern);
+      if (match) {
+        const numCarousels = parseInt(match[1]) || 1;
+        const numSlides = parseInt(match[2]) || 5; // Default 5 slides per carousel
+        
+        console.log('[Bulk Detection] Match found:', { pattern: pattern.source, numCarousels, numSlides });
+        
+        return { isBulk: numCarousels > 1, numCarousels, numSlides };
+      }
     }
     
     return { isBulk: false, numCarousels: 1, numSlides: 5 };
@@ -541,17 +553,9 @@ export function AlfieChat() {
     
     try {
       setIsLoading(true);
-      
-      // Détecter si c'est une demande bulk
-      const bulkInfo = detectBulkCarousel(prompt);
       const aspectRatio = detectAspectRatio(prompt) || '4:5';
       
-      // Si bulk détecté, utiliser la nouvelle edge function
-      if (bulkInfo.isBulk) {
-        return await generateBulkCarousels(prompt, bulkInfo, aspectRatio);
-      }
-      
-      // Sinon, génération standard (1 carrousel)
+      // Message de génération standard (NON bulk)
       setCarouselProgress({ current: 0, total: count });
       
       addMessage({
@@ -680,27 +684,55 @@ export function AlfieChat() {
     bulkInfo: { numCarousels: number; numSlides: number },
     aspectRatio: string
   ) => {
+    console.log('[Bulk Generation] Starting:', {
+      numCarousels: bulkInfo.numCarousels,
+      numSlides: bulkInfo.numSlides,
+      aspectRatio,
+      brandId: activeBrandId
+    });
+    
     try {
       const totalWoofs = bulkInfo.numCarousels * bulkInfo.numSlides;
+      const totalSlides = bulkInfo.numCarousels * bulkInfo.numSlides;
+      
+      console.log('[Bulk Generation] Quota check:', { totalWoofs, totalSlides });
+      
+      // Message de confirmation AVANT vérification quota
+      addMessage({
+        role: 'assistant',
+        content: `🔍 Détection : ${bulkInfo.numCarousels} carrousels × ${bulkInfo.numSlides} slides = ${totalSlides} images\n\nCoût total : ${totalWoofs} Woofs\n\nVérification des quotas...`,
+        type: 'text'
+      });
       
       // Vérifier les quotas
       const canProceed = await checkAndConsumeQuota('woofs', totalWoofs);
       if (!canProceed) {
+        console.log('[Bulk Generation] ❌ Quota insufficient');
         addMessage({
           role: 'assistant',
-          content: `❌ Quota insuffisant. Vous avez besoin de ${totalWoofs} woofs pour générer ${bulkInfo.numCarousels} carrousels de ${bulkInfo.numSlides} slides.`,
+          content: `❌ Quota insuffisant. Tu as besoin de ${totalWoofs} Woofs pour générer ${bulkInfo.numCarousels} carrousels de ${bulkInfo.numSlides} slides.`,
           type: 'text'
         });
         return;
       }
 
+      console.log('[Bulk Generation] ✅ Quota OK, starting generation');
+      
       addMessage({
         role: 'assistant',
-        content: `🚀 Génération de ${bulkInfo.numCarousels} carrousels de ${bulkInfo.numSlides} slides chacun...`,
+        content: `🚀 Génération lancée : ${bulkInfo.numCarousels} carrousels de ${bulkInfo.numSlides} slides chacun...`,
         type: 'text'
       });
 
       const headers = await getAuthHeader();
+
+      console.log('[Bulk Generation] Calling edge function with params:', {
+        num_carousels: bulkInfo.numCarousels,
+        num_slides_per_carousel: bulkInfo.numSlides,
+        theme: userPrompt.substring(0, 100),
+        brand_id: activeBrandId,
+        aspect_ratio: aspectRatio
+      });
 
       // Appel à l'edge function bulk
       const { data, error } = await supabase.functions.invoke('alfie-generate-carousel-bulk', {
@@ -715,6 +747,13 @@ export function AlfieChat() {
           aspect_ratio: aspectRatio
         },
         headers
+      });
+
+      console.log('[Bulk Generation] Edge function response:', {
+        hasData: !!data,
+        hasError: !!error,
+        successful: data?.successful,
+        total: data?.total
       });
 
       if (error) throw error;
@@ -738,15 +777,16 @@ export function AlfieChat() {
       toast.success(`${successful} carrousels générés !`);
 
     } catch (error: any) {
-      console.error('Erreur génération bulk:', error);
+      console.error('[Bulk Generation] ❌ Error:', error);
       addMessage({
         role: 'assistant',
         content: `❌ Erreur lors de la génération bulk: ${error.message}`,
         type: 'text'
       });
       
-      // Refund woofs si échec
+      // Refund woofs si échec complet
       const totalWoofs = bulkInfo.numCarousels * bulkInfo.numSlides;
+      console.log('[Bulk Generation] Refunding', totalWoofs, 'woofs');
       await refundWoofs(totalWoofs);
       toast.error('Échec de la génération bulk');
     } finally {
@@ -1050,9 +1090,22 @@ export function AlfieChat() {
       const isCarouselRequest = userMessage.toLowerCase().match(/carrousel|carousel|slides/i);
       
       if (isCarouselRequest) {
-        console.log('[Chat] Carousel request detected, using progressive generation');
-        const count = extractCount(userMessage) || 5;
-        await generateCarouselProgressive(userMessage, count);
+        console.log('[Chat] Carousel request detected');
+        
+        // Détecter si c'est une demande bulk
+        const bulkInfo = detectBulkCarousel(userMessage);
+        const aspectRatio = detectAspectRatio(userMessage) || '4:5';
+        
+        console.log('[Chat] Bulk detection result:', bulkInfo);
+        
+        if (bulkInfo.isBulk) {
+          console.log('[Chat] ✅ Bulk carousel detected, routing to generateBulkCarousels');
+          await generateBulkCarousels(userMessage, bulkInfo, aspectRatio);
+        } else {
+          console.log('[Chat] Single carousel detected, using progressive generation');
+          const count = extractCount(userMessage) || 5;
+          await generateCarouselProgressive(userMessage, count);
+        }
         return;
       }
       
