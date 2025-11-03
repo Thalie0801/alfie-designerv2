@@ -24,13 +24,9 @@ serve(async (req) => {
       }
     );
 
-    const testAccounts = [
-      {
-        email: "b2494709@gmail.com",
-        password: "JeanDavid08.",
-        full_name: "Jean David",
-      },
-    ];
+    // ⚠️ SECURITY: Credentials must be passed in request body, never hardcoded
+    const body = await req.json();
+    const testAccounts = body.accounts || [];
 
     const results = [];
 

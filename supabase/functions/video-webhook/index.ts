@@ -49,12 +49,34 @@ const isLikelyJson = (value: string) => {
   return (trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"));
 };
 
+// ✅ SECURITY: Whitelist allowed domains to prevent malicious URL injection
+const ALLOWED_DOMAINS = [
+  'replicate.delivery',
+  'pbxt.replicate.delivery',
+  'kie-api-cdn.com',
+  'cdn.kie.ai'
+];
+
+const isValidUrl = (url: string): boolean => {
+  try {
+    const parsed = new URL(url);
+    return ALLOWED_DOMAINS.some(domain => parsed.hostname.endsWith(domain));
+  } catch {
+    return false;
+  }
+};
+
 const extractUrlFromValue = (value: JsonValue): string | null => {
   if (!value) return null;
 
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (trimmed.startsWith("http")) {
+      // ✅ Validate URL against whitelist
+      if (!isValidUrl(trimmed)) {
+        console.warn(`⚠️ Rejected non-whitelisted URL: ${trimmed}`);
+        return null;
+      }
       return trimmed;
     }
     if (isLikelyJson(trimmed)) {

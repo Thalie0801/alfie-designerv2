@@ -17,30 +17,27 @@ type ProfileLike = {
  * 
  * HIÉRARCHIE D'AUTORISATION (ordre de priorité) :
  * 
- * 1. Kill switch désactivé (ENV: VITE_AUTH_ENFORCEMENT=off)
- *    → ✅ Accès total (dev mode uniquement)
- * 
- * 2. Admin (rôle 'admin' dans user_roles)
+ * 1. Admin (rôle 'admin' dans user_roles)
  *    → ✅ Accès total, toutes fonctionnalités
  * 
- * 3. Accès manuel (profile.granted_by_admin = true)
+ * 2. Accès manuel (profile.granted_by_admin = true)
  *    → ✅ Accès selon le plan assigné
  *    → Utilisé pour : ambassadeurs avec accès spécial, testeurs, partenaires
  *    → Quotas définis manuellement dans le profil
  * 
- * 4. Plan payé actif (profile.plan + profile.stripe_subscription_id)
+ * 3. Plan payé actif (profile.plan + profile.stripe_subscription_id)
  *    → ✅ Accès selon le plan payé
  *    → Client classique OU ambassadeur payant
  *    → Quotas définis par le plan
  * 
- * 5. Statut "active" sans plan
+ * 4. Statut "active" sans plan
  *    → ✅ Accès basique (fallback)
  * 
- * 6. Abonnement Stripe actif
+ * 5. Abonnement Stripe actif
  *    → ✅ Accès si subscription.status = 'active'|'trial'|'trialing'
  *    → ET current_period_end > now()
  * 
- * 7. Sinon → ❌ Redirection vers /onboarding/activate
+ * 6. Sinon → ❌ Redirection vers /onboarding/activate
  * 
  * SÉCURITÉ CRITIQUE :
  * - Les champs sensibles (plan, granted_by_admin, quotas) ne peuvent être modifiés que par :
@@ -60,7 +57,6 @@ type ProfileLike = {
  * @param options.roles - Rôles de l'utilisateur chargés depuis user_roles
  * @param options.profile - Profil utilisateur (profiles table)
  * @param options.subscription - Abonnement Stripe éventuel
- * @param options.killSwitchDisabled - True si AUTH_ENFORCEMENT=off (dev only)
  * @returns boolean - True si l'utilisateur peut accéder à la plateforme
  */
 export function isAuthorized(user: User | null, options?: {
@@ -68,12 +64,10 @@ export function isAuthorized(user: User | null, options?: {
   roles?: string[];
   profile?: ProfileLike;
   subscription?: SubscriptionLike;
-  killSwitchDisabled?: boolean;
 }): boolean {
-  const { isAdmin = false, roles = [], profile, subscription, killSwitchDisabled = false } = options ?? {};
+  const { isAdmin = false, roles = [], profile, subscription } = options ?? {};
 
   if (!user) return false;
-  if (killSwitchDisabled) return true;
   
   // ⭐ VIP/Admin bypass - vérification par rôle DB
   const isVipOrAdmin = hasRole(roles, 'vip') || hasRole(roles, 'admin');

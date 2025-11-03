@@ -110,7 +110,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.create-studio-accounts]
-verify_jwt = false
+verify_jwt = true  # ✅ SECURITY FIX: Require authentication
 
 [functions.create-missing-studio-accounts]
 verify_jwt = false
