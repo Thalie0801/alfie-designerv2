@@ -107,20 +107,29 @@ serve(async (req) => {
 
     // Tolérance de format de réponse + wrapper edgeHandler
     const payload = (bgData && typeof bgData === 'object' && 'data' in bgData) ? (bgData as any).data : bgData;
+    console.log('[Carousel Slide] bgData keys:', bgData ? Object.keys(bgData as any) : 'null');
+    console.log('[Carousel Slide] payload keys:', payload ? Object.keys(payload as any) : 'null');
     if ((bgData as any)?.ok === false) {
       console.error('[Carousel Slide] Background generation error payload:', JSON.stringify(bgData));
       throw new Error((bgData as any)?.error || 'BACKGROUND_FUNCTION_ERROR');
     }
 
-    const imageUrl = payload?.image_urls?.[0] || payload?.data?.image_urls?.[0] || payload?.image_url;
+    const imageUrlCandidates = [
+      (payload as any)?.image_urls?.[0],
+      (payload as any)?.data?.image_urls?.[0],
+      (payload as any)?.image_url,
+      (payload as any)?.render_url,
+      (payload as any)?.output_url,
+    ].filter(Boolean);
+    const imageUrl = imageUrlCandidates[0];
 
     if (bgError || !imageUrl) {
       console.error('[Carousel Slide] Background generation failed:', bgError, JSON.stringify(bgData));
       throw new Error('Background generation failed: ' + (bgError?.message || 'No image URL'));
     }
 
-    const backgroundUrl = imageUrl;
-    console.log('[Carousel Slide] ✅ Background generated');
+    const backgroundUrl = imageUrl as string;
+    console.log('[Carousel Slide] ✅ Background generated:', backgroundUrl.substring(0, 80));
 
     // 4. Sélectionner le template approprié
     const template = SLIDE_TEMPLATES[slideContent.type] || SLIDE_TEMPLATES.hero;
