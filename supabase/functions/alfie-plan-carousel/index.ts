@@ -12,9 +12,24 @@ interface BrandKit {
   niche?: string;
 }
 
+interface SlideContent {
+  type: 'hero' | 'problem' | 'solution' | 'impact' | 'cta';
+  title: string;
+  subtitle?: string;
+  punchline?: string;
+  bullets?: string[];
+  cta?: string;
+  cta_primary?: string;
+  cta_secondary?: string;
+  note?: string;
+  badge?: string;
+  kpis?: Array<{ label: string; delta: string }>;
+}
+
 interface SimplifiedCarouselPlan {
   style: string;
   prompts: string[];
+  slides: SlideContent[];
 }
 
 serve(async (req) => {
@@ -45,6 +60,7 @@ Your task: Generate a cohesive visual plan for ${slideCount} carousel slides.
 OUTPUT FORMAT:
 - "style": A single, detailed visual style description that applies to ALL slides
 - "prompts": An array of ${slideCount} scene descriptions (one per slide)
+- "slides": An array of ${slideCount} structured slide content objects with text content
 
 STYLE REQUIREMENTS:
 - Must be cohesive across all ${slideCount} slides
@@ -65,6 +81,14 @@ BRAND CONTEXT:
 - Niche: ${brandInfo?.niche || 'General'}
 - Voice: ${brandInfo?.voice || 'Professional and engaging'}
 
+SLIDES STRUCTURE:
+Each slide object must include:
+- type: One of 'hero', 'problem', 'solution', 'impact', 'cta'
+- title: Main title (10-40 chars)
+- Slide 1 should be type 'hero' with title, cta_primary, optional punchline/badge
+- Slides 2-${slideCount-1} should be 'problem' or 'solution' with title and bullets (3-4 bullets of 10-44 chars each)
+- Last slide should be 'cta' with title, cta_primary, optional subtitle/note
+
 Example output:
 {
   "style": "Vibrant gradient backgrounds blending ${primary_color} to ${secondary_color}. Modern, minimalist composition with high contrast center areas. Geometric shapes as accents. Professional and energetic mood.",
@@ -73,6 +97,32 @@ Example output:
     "Clean solid background with subtle geometric pattern",
     "Minimalist gradient with focus on center area",
     "Bold energetic scene for call-to-action mood"
+  ],
+  "slides": [
+    {
+      "type": "hero",
+      "title": "Titre accrocheur",
+      "punchline": "Sous-titre engageant qui donne envie",
+      "cta_primary": "Commencer",
+      "badge": "Nouveau"
+    },
+    {
+      "type": "problem",
+      "title": "Le problème que tu résous",
+      "bullets": ["Point clé 1", "Point clé 2", "Point clé 3"]
+    },
+    {
+      "type": "solution",
+      "title": "Ta solution innovante",
+      "bullets": ["Avantage 1", "Avantage 2", "Avantage 3"]
+    },
+    {
+      "type": "cta",
+      "title": "Passe à l'action maintenant",
+      "subtitle": "Rejoins des milliers d'utilisateurs satisfaits",
+      "cta_primary": "Essayer gratuitement",
+      "note": "Aucune carte bancaire requise. Installation en 2 minutes."
+    }
   ]
 }`;
 
@@ -93,9 +143,39 @@ Example output:
           type: "array",
           items: { type: "string" },
           description: `Array of ${slideCount} visual scene descriptions`
+        },
+        slides: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              type: { type: "string", enum: ["hero", "problem", "solution", "impact", "cta"] },
+              title: { type: "string" },
+              subtitle: { type: "string" },
+              punchline: { type: "string" },
+              bullets: { type: "array", items: { type: "string" } },
+              cta: { type: "string" },
+              cta_primary: { type: "string" },
+              cta_secondary: { type: "string" },
+              note: { type: "string" },
+              badge: { type: "string" },
+              kpis: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    label: { type: "string" },
+                    delta: { type: "string" }
+                  }
+                }
+              }
+            },
+            required: ["type", "title"]
+          },
+          description: `Array of ${slideCount} structured slide content objects`
         }
       },
-      required: ["style", "prompts"]
+      required: ["style", "prompts", "slides"]
     };
 
     // Appeler l'IA via Lovable AI Gateway avec structured output
@@ -146,9 +226,9 @@ Example output:
     const parsed: SimplifiedCarouselPlan = JSON.parse(jsonResponse);
     
     // Validation
-    if (!parsed.style || !Array.isArray(parsed.prompts)) {
+    if (!parsed.style || !Array.isArray(parsed.prompts) || !Array.isArray(parsed.slides)) {
       console.error('[alfie-plan-carousel] Invalid structure:', parsed);
-      throw new Error('Invalid plan structure: missing style or prompts');
+      throw new Error('Invalid plan structure: missing style, prompts, or slides');
     }
 
     // Ajuster le nombre de prompts
@@ -162,13 +242,31 @@ Example output:
       console.warn(`[Plan Carousel] Padded to ${slideCount} prompts`);
     }
 
+    // Ajuster le nombre de slides
+    if (parsed.slides.length > slideCount) {
+      parsed.slides = parsed.slides.slice(0, slideCount);
+    } else if (parsed.slides.length < slideCount) {
+      while (parsed.slides.length < slideCount) {
+        parsed.slides.push({
+          type: 'cta',
+          title: 'En savoir plus',
+          cta_primary: 'Découvrir'
+        });
+      }
+    }
+
     console.log('[alfie-plan-carousel] ✅ Plan generated:', {
       slideCount: parsed.prompts.length,
+      slidesCount: parsed.slides.length,
       styleLength: parsed.style.length,
       style: parsed.style.substring(0, 100) + '...'
     });
 
-    return new Response(JSON.stringify({ style: parsed.style, prompts: parsed.prompts }), {
+    return new Response(JSON.stringify({ 
+      style: parsed.style, 
+      prompts: parsed.prompts,
+      slides: parsed.slides 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 

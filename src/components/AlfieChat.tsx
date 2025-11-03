@@ -456,26 +456,48 @@ export function AlfieChat() {
   const normalizeCarouselPlan = (raw: any, count: number, aspectRatio: string, brandKit?: any) => {
     let style = raw?.style;
     let prompts: string[] | undefined = Array.isArray(raw?.prompts) ? raw.prompts : undefined;
+    let slides: any[] | undefined = Array.isArray(raw?.slides) ? raw.slides : undefined;
     
     // Si format ancien : { plan: { slides: [...] } }
-    if ((!style || !prompts) && Array.isArray(raw?.plan?.slides)) {
-      const slides = raw.plan.slides.slice(0, count);
-      prompts = slides.map((s: any) => 
+    if ((!style || !prompts || !slides) && Array.isArray(raw?.plan?.slides)) {
+      const oldSlides = raw.plan.slides.slice(0, count);
+      prompts = oldSlides.map((s: any) => 
         s?.note?.trim?.() || buildPromptFromSlide(s, aspectRatio, brandKit)
       );
       style = style || `Style cohérent, moderne et créatif, sans texte incrusté, ratio ${aspectRatio}${brandKit?.palette?.length ? `, palette ${brandKit.palette.join(', ')}` : ''}.`;
+      
+      // Convertir l'ancien format vers le nouveau
+      slides = oldSlides.map((s: any, i: number) => ({
+        type: i === 0 ? 'hero' : i === count - 1 ? 'cta' : 'problem',
+        title: s?.title || `Slide ${i + 1}`,
+        subtitle: s?.subtitle,
+        bullets: s?.bullets,
+        cta_primary: s?.cta || 'En savoir plus',
+        note: s?.note
+      }));
     }
     
-    // Garantir un array valide
+    // Garantir des arrays valides
     if (!Array.isArray(prompts)) prompts = [];
+    if (!Array.isArray(slides)) slides = [];
     
-    // Ajuster la longueur
+    // Ajuster la longueur des prompts
     if (prompts.length > count) prompts = prompts.slice(0, count);
     while (prompts.length < count) {
       prompts.push(prompts[prompts.length - 1] || `Fond abstrait, ratio ${aspectRatio}, sans texte`);
     }
     
-    return { style, prompts };
+    // Ajuster la longueur des slides
+    if (slides.length > count) slides = slides.slice(0, count);
+    while (slides.length < count) {
+      slides.push({
+        type: 'cta',
+        title: 'En savoir plus',
+        cta_primary: 'Découvrir'
+      });
+    }
+    
+    return { style, prompts, slides };
   };
   
   const generateCarouselProgressive = async (prompt: string, count: number = 5) => {
@@ -490,8 +512,6 @@ export function AlfieChat() {
         content: `🎨 Génération d'un carrousel de ${count} slides...`,
         type: 'text'
       });
-      
-      const headers = await getAuthHeader();
       
       // Extraire l'aspect ratio du prompt (défaut 4:5)
       const aspectRatio = detectAspectRatio(prompt) || '4:5';
@@ -508,8 +528,7 @@ export function AlfieChat() {
             voice: brandKit?.voice,
             niche: brandKit?.niche
           }
-        },
-        headers
+        }
       });
       
       // Log du plan brut pour diagnostic
@@ -517,18 +536,19 @@ export function AlfieChat() {
       console.log('[Carousel] Raw plan keys:', Object.keys(planData || {}));
       
       // Normaliser le plan (supporte les deux formats)
-      const { style: globalStyle, prompts } = normalizeCarouselPlan(
+      const { style: globalStyle, prompts, slides } = normalizeCarouselPlan(
         planData, 
         count, 
         aspectRatio, 
         brandKit
       );
       
-      if (planError || !globalStyle || !prompts?.length) {
+      if (planError || !globalStyle || !prompts?.length || !slides?.length) {
         throw new Error(planError?.message || 'Plan invalide (aucun prompt utilisable)');
       }
       
       console.log('[Carousel] Using prompts count:', prompts.length);
+      console.log('[Carousel] Using slides count:', slides.length);
       console.log('[Carousel] Style:', globalStyle.substring(0, 100));
       
       addMessage({
@@ -545,20 +565,18 @@ export function AlfieChat() {
         console.log(`[Carousel] Generating slide ${i + 1}/${prompts.length}...`);
         
         try {
-          const { data: imgData, error: imgError } = await supabase.functions.invoke('alfie-render-image', {
-            body: {
-              provider: 'gemini_image',
-              prompt: slidePrompt,
-              format: '1024x1280',
-              brand_id: activeBrandId,
-              cost_woofs: 1,
-              globalStyle: globalStyle,
-              backgroundOnly: false,
-              slideIndex: i,
-              totalSlides: prompts.length
-            },
-            headers
-          });
+          const { data: imgData, error: imgError } = await supabase.functions.invoke(
+            'alfie-render-carousel-slide',
+            {
+              body: {
+                prompt: prompts[i],
+                globalStyle,
+                slideContent: slides[i],
+                brandId: activeBrandId,
+                aspectRatio
+              }
+            }
+          );
           
           // Récupération d'URL tolérante (supporte plusieurs formats)
           const imageUrl = imgData?.data?.image_urls?.[0] || imgData?.image_urls?.[0] || imgData?.image_url;
