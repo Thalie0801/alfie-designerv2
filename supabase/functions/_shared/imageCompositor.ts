@@ -122,13 +122,15 @@ export async function compositeSlide(
     const sanitizedSvg = svgTextLayer
       // Common problematic token in CSS font stacks
       .replace(/"Segoe UI"/g, "'Segoe UI'")
-      // Convert font-family attribute to single-quoted and normalize internal quotes
+      // Convert font-family attribute to double-quoted and escape internals
       .replace(/font-family=(["'])(.*?)\1/g, (_m, _q, val) => {
         const safeVal = String(val).replace(/\"/g, '&quot;').replace(/"/g, '&quot;');
         return `font-family="${safeVal}"`;
       })
       // Replace non-standard transparent color with none (Cloudinary strict parser)
-      .replace(/fill="transparent"/g, 'fill="none"');
+      .replace(/fill="transparent"/g, 'fill="none"')
+      // Remove any external <image .../> elements to avoid remote href in SVG uploads
+      .replace(/<image[^>]*\/>/g, '');
     
     console.log('✅ SVG sanitized (fixed font-family quotes)');
     console.log('🧪 Sanitized preview:', sanitizedSvg.substring(0, 200).replace(/\n/g, ' '));
