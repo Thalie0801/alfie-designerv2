@@ -29,13 +29,25 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm   # 👈 ICI (remplace ton "ca")
+          cache: npm
+
+      - name: Show env
+        run: |
+          node -v && npm -v
+          ls -la
+          test -f package-lock.json && echo "package-lock.json present" || echo "NO package-lock.json"
 
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
 
-      - name: Install dependencies
-        run: npm ci --prefer-offline
+      # (si deps privées, décommente et ajoute le secret)
+      # - name: Configure npm auth (optional)
+      #   if: ${{ secrets.NPM_TOKEN != '' }}
+      #   run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc
+
+      - name: Install dependencies (ci -> fallback install)
+        run: |
+          npm ci --prefer-offline --no-audit --no-fund || npm install --prefer-online --no-audit --no-fund
 
       - name: Type check (capture report)
         id: tsc
@@ -68,8 +80,9 @@ jobs:
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
 
-      - name: Install dependencies
-        run: npm ci --prefer-offline
+      - name: Install dependencies (ci -> fallback install)
+        run: |
+          npm ci --prefer-offline --no-audit --no-fund || npm install --prefer-online --no-audit --no-fund
 
       - name: Lint (non-blocking)
         id: lint
@@ -93,8 +106,9 @@ jobs:
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
 
-      - name: Install dependencies
-        run: npm ci --prefer-offline
+      - name: Install dependencies (ci -> fallback install)
+        run: |
+          npm ci --prefer-offline --no-audit --no-fund || npm install --prefer-online --no-audit --no-fund
 
       - name: Build
         run: npm run build
