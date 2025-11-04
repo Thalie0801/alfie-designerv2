@@ -374,18 +374,21 @@ serve(async (req) => {
         });
       }
       
-      // ✅ Insert order_items with service role (idempotent)
+      // ✅ Insert order_items with service role (idempotent - check by type)
       if (items.length) {
-        // Check if items already exist
+        // Check which item types already exist
         const { data: existing } = await sb
           .from("order_items")
-          .select('id')
+          .select('id, type')
           .eq('order_id', order.id);
         
-        if (!existing || existing.length === 0) {
+        const existingTypes = new Set(existing?.map((item: any) => item.type) || []);
+        const newItems = items.filter((item: any) => !existingTypes.has(item.type));
+        
+        if (newItems.length > 0) {
           const { data: insertedItems, error: itemsError } = await sb
             .from("order_items")
-            .insert(items)
+            .insert(newItems)
             .select('id');
           
           if (itemsError) {
@@ -394,7 +397,7 @@ serve(async (req) => {
             console.log('[ORCH] ✅ Items inserted:', insertedItems?.length || 0);
           }
         } else {
-          console.log('[ORCH] ℹ️ Items already exist:', existing.length);
+          console.log('[ORCH] ℹ️ All item types already exist');
         }
       }
       

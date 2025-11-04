@@ -411,15 +411,20 @@ async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Pro
     });
     
   if (cascadeJobs.length > 0) {
-    // Check for existing jobs to avoid duplicates
+    // Check for existing jobs with same type AND status to avoid duplicates
     const { data: existingJobs } = await supabaseAdmin
       .from('job_queue')
-      .select('id, type')
+      .select('id, type, status')
       .eq('order_id', job.order_id)
-      .in('type', cascadeJobs.map(j => j.type));
+      .in('status', ['queued', 'running']); // Only check non-terminal states
     
-    const existingTypes = new Set(existingJobs?.map((j: any) => j.type) || []);
-    const newJobs = cascadeJobs.filter((j: any) => !existingTypes.has(j.type));
+    const existingKeys = new Set(
+      existingJobs?.map((j: any) => `${j.type}_${j.status}`) || []
+    );
+    
+    const newJobs = cascadeJobs.filter((j: any) => 
+      !existingKeys.has(`${j.type}_${j.status}`)
+    );
     
     if (newJobs.length > 0) {
       const { error: cascadeError } = await supabaseAdmin

@@ -92,6 +92,27 @@ export function AlfieChat() {
   }, [messages]);
   
   // ======
+  // SYSTEM MESSAGE WHEN GENERATING
+  // ======
+  
+  useEffect(() => {
+    if (conversationState === 'generating' && orderId) {
+      // Add system message to chat thread
+      const hasGeneratingMessage = messages.some(
+        m => m.role === 'assistant' && m.content.includes('🚀 Génération en cours')
+      );
+      
+      if (!hasGeneratingMessage) {
+        addMessage({
+          role: 'assistant',
+          content: '🚀 Génération en cours... Je te tiens au courant dès que c\'est prêt !',
+          type: 'text'
+        });
+      }
+    }
+  }, [conversationState, orderId, messages]);
+  
+  // ======
   // REALTIME JOB MONITORING
   // ======
   
@@ -323,25 +344,6 @@ export function AlfieChat() {
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
       <CreateHeader />
-      
-      {/* Conversation State Badge */}
-      {conversationState !== 'initial' && conversationState !== 'completed' && (
-        <div className="px-4 py-2 bg-muted/50 border-b border-border">
-          <div className="flex items-center gap-2 text-sm">
-            <div className={`w-2 h-2 rounded-full ${
-              conversationState === 'generating' ? 'bg-green-500 animate-pulse' :
-              conversationState === 'confirming' ? 'bg-yellow-500' :
-              'bg-blue-500'
-            }`} />
-            <span className="text-muted-foreground">
-              {conversationState === 'collecting_image_brief' && '📸 Collecte des briefs images...'}
-              {conversationState === 'collecting_carousel_brief' && '🎠 Collecte des briefs carrousels...'}
-              {conversationState === 'confirming' && '✅ Confirmation...'}
-              {conversationState === 'generating' && '🚀 Génération en cours...'}
-            </span>
-          </div>
-        </div>
-      )}
       
       {/* Quota Bar */}
       {activeBrandId && <QuotaBar activeBrandId={activeBrandId} />}
