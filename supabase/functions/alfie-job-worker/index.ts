@@ -336,6 +336,7 @@ Requirements: clean composition, no text, high contrast, ${aspectRatio} aspect r
           prompt: img.prompt,
           metadata: {
             orderId: payload.orderId,
+            orderItemId: payload.orderItemId,
             aspectRatio: img.aspectRatio,
             resolution: img.resolution,
             source: 'worker-cascade'
@@ -346,6 +347,32 @@ Requirements: clean composition, no text, high contrast, ${aspectRatio} aspect r
         console.warn('⚠️ Failed to save to media_generations:', saveError);
       } else {
         console.log('💾 [processRenderImages] Saved to media_generations');
+      }
+      
+      // ✅ Également sauvegarder dans library_assets pour visibilité immédiate
+      const { error: libError } = await supabaseAdmin
+        .from('library_assets')
+        .insert({
+          user_id: payload.userId,
+          brand_id: img.brandId,
+          order_id: payload.orderId,
+          order_item_id: payload.orderItemId,
+          type: 'image',
+          cloudinary_url: imageUrl,
+          format: img.aspectRatio,
+          metadata: {
+            orderId: payload.orderId,
+            orderItemId: payload.orderItemId,
+            aspectRatio: img.aspectRatio,
+            resolution: img.resolution,
+            source: 'worker-cascade'
+          }
+        });
+      
+      if (libError) {
+        console.warn('⚠️ Failed to save to library_assets:', libError);
+      } else {
+        console.log('💾 [processRenderImages] Saved to library_assets');
       }
       
       results.push({
@@ -477,6 +504,8 @@ async function processRenderCarousels(payload: any): Promise<any> {
           .insert({
             user_id: payload.userId,
             brand_id: carousel.brandId,
+            order_id: payload.orderId,
+            order_item_id: payload.orderItemId,
             carousel_id: carousel.id,
             slide_index: i,
             type: 'carousel_slide',
@@ -485,6 +514,7 @@ async function processRenderCarousels(payload: any): Promise<any> {
             format: '4:5',
             metadata: {
               orderId: payload.orderId,
+              orderItemId: payload.orderItemId,
               style: carousel.style,
               source: 'worker-cascade'
             }
