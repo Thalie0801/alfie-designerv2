@@ -85,6 +85,11 @@ serve(async (req) => {
 
       console.log(`✅ [Worker] Job ${job.id} completed successfully`);
 
+      // Create cascade jobs if needed
+      if (job.type === 'generate_texts') {
+        await createCascadeJobs(job, result, supabaseAdmin);
+      }
+
       return new Response(
         JSON.stringify({ success: true, job_id: job.id, result }),
         {
@@ -318,4 +323,58 @@ async function processGenerateVideo(payload: any): Promise<any> {
     audioGenerated: true,
     message: 'Video slideshow feature requires external video assembly service',
   };
+}
+
+// ========== CASCADE JOB CREATION ==========
+
+async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Promise<void> {
+  console.log('📋 [Cascade] Creating follow-up jobs for order:', job.order_id);
+  
+  const cascadeJobs = [];
+  
+  // Create render_images jobs
+  if (job.payload.numImages > 0 && result.texts) {
+    for (let i = 0; i < job.payload.numImages; i++) {
+      cascadeJobs.push({
+        user_id: job.user_id,
+        order_id: job.order_id,
+        type: 'render_images',
+        status: 'queued',
+        payload: {
+          textData: result.texts[i] || {},
+          brandId: job.payload.brandId,
+          imageIndex: i
+        }
+      });
+    }
+  }
+  
+  // Create render_carousels jobs
+  if (job.payload.numCarousels > 0 && result.texts) {
+    for (let i = 0; i < job.payload.numCarousels; i++) {
+      cascadeJobs.push({
+        user_id: job.user_id,
+        order_id: job.order_id,
+        type: 'render_carousels',
+        status: 'queued',
+        payload: {
+          carouselData: result.texts[job.payload.numImages + i] || {},
+          brandId: job.payload.brandId,
+          carouselIndex: i
+        }
+      });
+    }
+  }
+  
+  if (cascadeJobs.length > 0) {
+    const { error: cascadeError } = await supabaseAdmin
+      .from('job_queue')
+      .insert(cascadeJobs);
+    
+    if (cascadeError) {
+      console.error('❌ [Cascade] Failed to create jobs:', cascadeError);
+    } else {
+      console.log(`✅ [Cascade] Created ${cascadeJobs.length} follow-up jobs`);
+    }
+  }
 }

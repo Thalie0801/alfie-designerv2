@@ -212,7 +212,9 @@ serve(async (req) => {
       console.error('[Orchestrator] Session update error:', updateError);
     }
 
-    // If we should generate, create the order
+    // If we should generate, create the order and jobs
+    let createdOrderId = null;
+    
     if (shouldGenerate) {
       try {
         // Create order
@@ -233,6 +235,7 @@ serve(async (req) => {
         if (orderError) throw orderError;
 
         console.log('[Orchestrator] Order created:', order.id);
+        createdOrderId = order.id;
 
         // Link session to order
         await supabaseClient
@@ -273,6 +276,32 @@ serve(async (req) => {
 
         console.log('[Orchestrator] Order items created:', items.length);
 
+        // Create job for text generation
+        const { data: textJob, error: jobError } = await supabaseClient
+          .from('job_queue')
+          .insert({
+            user_id: user.id,
+            order_id: order.id,
+            type: 'generate_texts',
+            status: 'queued',
+            payload: {
+              imageBriefs: context.imageBriefs || [],
+              carouselBriefs: context.carouselBriefs || [],
+              brandId,
+              numImages: context.numImages || 0,
+              numCarousels: context.numCarousels || 0
+            }
+          })
+          .select()
+          .single();
+
+        if (jobError) {
+          console.error('[Orchestrator] Job creation error:', jobError);
+          throw jobError;
+        }
+
+        console.log('[Orchestrator] Text generation job created:', textJob.id);
+
       } catch (genError) {
         console.error('[Orchestrator] Generation setup error:', genError);
         responseText += '\n\n⚠️ Erreur lors de la préparation de la génération. Veuillez réessayer.';
@@ -283,6 +312,7 @@ serve(async (req) => {
       response: responseText,
       quickReplies,
       conversationId: session.id,
+      orderId: createdOrderId,
       state,
       context
     }), {

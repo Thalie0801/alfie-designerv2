@@ -41,8 +41,6 @@ interface Message {
   timestamp: Date;
 }
 
-type IntentType = 'image' | 'video' | 'carousel' | 'unknown';
-
 // ======
 // COMPOSANT PRINCIPAL
 // ======
@@ -97,30 +95,23 @@ export function AlfieChat() {
   }, [messages]);
   
   // ======
-  // DÉTECTION D'INTENTION LOCALE
+  // ORCHESTRATOR CONVERSATION STATE
   // ======
   
-  const detectIntent = (prompt: string): IntentType => {
+  // TODO: Integrate with orchestrator fully
+  // const [conversationId, setConversationId] = useState<string | null>(null);
+  // const [orderId, setOrderId] = useState<string | null>(null);
+  const orderId = null; // Temporary: will be populated by orchestrator integration
+  
+  // Simple local intent detection for fallback
+  const detectIntent = (prompt: string): 'image' | 'video' | 'carousel' | 'unknown' => {
     const lower = prompt.toLowerCase();
-    
-    // Priorité 1 : Carrousel
-    if (/(carrousel|carousel|slides|série)/i.test(lower)) {
-      return 'carousel';
-    }
-    
-    // Priorité 2 : Vidéo
-    if (/(vidéo|video|reel|short|story)/i.test(lower)) {
-      return 'video';
-    }
-    
-    // Priorité 3 : Image
-    if (/(image|visuel|photo|illustration|cover)/i.test(lower)) {
-      return 'image';
-    }
-    
+    if (/(carrousel|carousel|slides|série)/i.test(lower)) return 'carousel';
+    if (/(vidéo|video|reel|short|story)/i.test(lower)) return 'video';
+    if (/(image|visuel|photo|illustration|cover)/i.test(lower)) return 'image';
     return 'unknown';
   };
-
+  
   const detectBulkCarousel = (text: string): { isBulk: boolean; numCarousels: number; numSlides: number } => {
     const lower = text.toLowerCase();
     
@@ -258,7 +249,69 @@ export function AlfieChat() {
   // };
   
   // ======
-  // GÉNÉRATION D'IMAGES
+  // REALTIME JOB MONITORING
+  // ======
+  
+  useEffect(() => {
+    if (!orderId) return;
+    
+    console.log('[Realtime] Starting job monitoring for order:', orderId);
+    
+    const channel = supabase
+      .channel('job_queue_changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'job_queue',
+        filter: `order_id=eq.${orderId}`
+      }, (payload) => {
+        const job = payload.new as any;
+        console.log('[Realtime] Job update:', job);
+        
+        if (job.status === 'completed') {
+          const assetUrl = job.result?.assetUrl || job.result?.images?.[0] || job.result?.carousels?.[0]?.slides?.[0]?.url;
+          
+          if (assetUrl) {
+            let type: 'image' | 'carousel' | 'video' = 'image';
+            let content = '✅ Génération terminée !';
+            
+            if (job.type === 'render_images') {
+              type = 'image';
+              content = '✅ Image générée !';
+            } else if (job.type === 'render_carousels') {
+              type = 'carousel';
+              content = '✅ Slide de carrousel générée !';
+            } else if (job.type === 'generate_video') {
+              type = 'video';
+              content = '✅ Vidéo générée !';
+            }
+            
+            addMessage({
+              role: 'assistant',
+              content,
+              type,
+              assetUrl,
+              assetId: job.id
+            });
+          }
+        } else if (job.status === 'failed') {
+          addMessage({
+            role: 'assistant',
+            content: `❌ Erreur : ${job.error || 'Génération échouée'}`,
+            type: 'text'
+          });
+        }
+      })
+      .subscribe();
+    
+    return () => {
+      console.log('[Realtime] Cleaning up job monitoring');
+      supabase.removeChannel(channel);
+    };
+  }, [orderId, addMessage]);
+  
+  // ======
+  // LEGACY GENERATION FUNCTIONS (FALLBACK)
   // ======
   
   const mapAspectRatio = (ratio: string): string => {
