@@ -23,4 +23,21 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
+  {
+    files: ["supabase/functions/**/*.ts"],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: {
+        Deno: "readonly",
+        fetch: "readonly",
+        Request: "readonly",
+        Response: "readonly",
+        Headers: "readonly",
+        console: "readonly",
+      },
+    },
+    rules: {
+      "no-undef": "off",
+    },
+  },
 );
