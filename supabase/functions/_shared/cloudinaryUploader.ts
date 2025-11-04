@@ -10,7 +10,7 @@ export interface CloudinaryUploadResult {
 }
 
 export async function uploadToCloudinary(
-  imageData: string, // base64 or URL
+  dataUrlBase64: string,
   options: {
     folder?: string;
     publicId?: string;
@@ -26,45 +26,51 @@ export async function uploadToCloudinary(
     throw new Error('Cloudinary credentials not configured');
   }
 
-  const timestamp = Math.round(Date.now() / 1000);
-  
-  // Build signature
-  const paramsToSign: Record<string, any> = {
-    timestamp,
-    ...(options.folder && { folder: options.folder }),
-    ...(options.publicId && { public_id: options.publicId }),
-    ...(options.tags && { tags: options.tags.join(',') })
-  };
+  // 1) Convertir data URL → Blob
+  const m = dataUrlBase64.match(/^data:(.+?);base64,(.*)$/);
+  if (!m) throw new Error('Invalid data URL');
+  const mime = m[1];
+  const bin = atob(m[2]);
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  const file = new Blob([u8], { type: mime });
 
+  // 2) Build signature params
+  const timestamp = Math.round(Date.now() / 1000);
+  const paramsToSign: Record<string, string> = { timestamp: String(timestamp) };
+  if (options.folder) paramsToSign.folder = options.folder;
+  if (options.publicId) paramsToSign.public_id = options.publicId;
+  if (options.tags) paramsToSign.tags = options.tags.join(',');
+  if (options.context) {
+    paramsToSign.context = Object.entries(options.context)
+      .map(([k, v]) => `${k}=${String(v)}`)
+      .join('|');
+  }
+
+  // 3) Sign with SHA-1 (required by Cloudinary)
   const signatureString = Object.keys(paramsToSign)
     .sort()
     .map(key => `${key}=${paramsToSign[key]}`)
     .join('&') + apiSecret;
 
   const encoder = new TextEncoder();
-  const data = encoder.encode(signatureString);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const signatureData = encoder.encode(signatureString);
+  const hashBuffer = await crypto.subtle.digest('SHA-1', signatureData);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-  // Upload
+  // 4) Upload via FormData
   const formData = new FormData();
-  formData.append('file', imageData);
+  formData.append('file', file, options.publicId ? `${options.publicId}.png` : 'upload.png');
   formData.append('api_key', apiKey);
   formData.append('timestamp', timestamp.toString());
   formData.append('signature', signature);
-  
   if (options.folder) formData.append('folder', options.folder);
   if (options.publicId) formData.append('public_id', options.publicId);
   if (options.tags) formData.append('tags', options.tags.join(','));
-  if (options.context) {
-    const contextStr = Object.entries(options.context)
-      .map(([k, v]) => `${k}=${v}`)
-      .join('|');
-    formData.append('context', contextStr);
-  }
+  if (paramsToSign.context) formData.append('context', paramsToSign.context);
 
-  const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+  const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`;
   
   const response = await fetch(uploadUrl, {
     method: 'POST',

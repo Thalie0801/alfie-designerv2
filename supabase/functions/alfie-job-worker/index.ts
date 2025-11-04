@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { uploadToCloudinary } from '../_shared/cloudinaryUploader.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -316,70 +317,94 @@ Requirements: clean composition, no text, high contrast, ${aspectRatio} aspect r
         throw new Error(data?.error || error?.message || 'Image generation failed');
       }
       
-      const imageUrl = data?.imageUrl || data?.data?.imageUrl;
-      if (!imageUrl) {
+      const imageBase64 = data?.imageUrl || data?.data?.imageUrl;
+      if (!imageBase64) {
         throw new Error('No image URL returned');
       }
-      
-      console.log(`✅ [processRenderImages] Image generated: ${imageUrl}`);
-      
-      // ✅ Sauvegarder dans media_generations
-      const { error: saveError } = await supabaseAdmin
-        .from('media_generations')
-        .insert({
-          user_id: payload.userId,
-          brand_id: img.brandId,
-          type: 'image',
-          status: 'completed',
-          output_url: imageUrl,
-          thumbnail_url: imageUrl,
-          prompt: img.prompt,
-          metadata: {
-            orderId: payload.orderId,
-            orderItemId: payload.orderItemId,
-            aspectRatio: img.aspectRatio,
-            resolution: img.resolution,
-            source: 'worker-cascade'
+
+      // 🆕 UPLOADER VERS CLOUDINARY
+      console.log(`📤 [processRenderImages] Uploading image ${results.length + 1} to Cloudinary...`);
+
+      try {
+        const cloudinaryResult = await uploadToCloudinary(imageBase64, {
+          folder: `brands/${img.brandId}/images`,
+          publicId: `order_${payload.orderId}_img_${results.length + 1}`,
+          tags: ['ai-generated', 'worker', `order-${payload.orderId}`],
+          context: {
+            order_id: String(payload.orderId),
+            order_item_id: String(payload.orderItemId),
+            brand_id: String(img.brandId),
+            aspect_ratio: img.aspectRatio || '9:16'
           }
         });
-      
-      if (saveError) {
-        console.warn('⚠️ Failed to save to media_generations:', saveError);
-      } else {
-        console.log('💾 [processRenderImages] Saved to media_generations');
-      }
-      
-      // ✅ Également sauvegarder dans library_assets pour visibilité immédiate
-      const { error: libError } = await supabaseAdmin
-        .from('library_assets')
-        .insert({
-          user_id: payload.userId,
-          brand_id: img.brandId,
-          order_id: payload.orderId,
-          order_item_id: payload.orderItemId,
-          type: 'image',
-          cloudinary_url: imageUrl,
-          format: img.aspectRatio,
-          metadata: {
-            orderId: payload.orderId,
-            orderItemId: payload.orderItemId,
-            aspectRatio: img.aspectRatio,
-            resolution: img.resolution,
-            source: 'worker-cascade'
-          }
+
+        console.log(`✅ [processRenderImages] Uploaded: ${cloudinaryResult.secureUrl}`);
+        console.log(`📊 Size reduction: ${(imageBase64.length / 1024).toFixed(0)}KB base64 → ${cloudinaryResult.secureUrl.length}B URL`);
+
+        // ✅ Sauvegarder dans media_generations avec URL Cloudinary
+        const { error: saveError } = await supabaseAdmin
+          .from('media_generations')
+          .insert({
+            user_id: payload.userId,
+            brand_id: img.brandId,
+            type: 'image',
+            status: 'completed',
+            output_url: cloudinaryResult.secureUrl,
+            thumbnail_url: cloudinaryResult.secureUrl,
+            prompt: img.prompt,
+            metadata: {
+              orderId: payload.orderId,
+              orderItemId: payload.orderItemId,
+              aspectRatio: img.aspectRatio,
+              resolution: img.resolution,
+              source: 'worker-cascade',
+              cloudinary_public_id: cloudinaryResult.publicId
+            }
+          });
+
+        if (saveError) {
+          console.warn('⚠️ Failed to save to media_generations:', saveError);
+        } else {
+          console.log('💾 [processRenderImages] Saved to media_generations');
+        }
+
+        // ✅ Sauvegarder dans library_assets avec URL Cloudinary
+        const { error: libError } = await supabaseAdmin
+          .from('library_assets')
+          .insert({
+            user_id: payload.userId,
+            brand_id: img.brandId,
+            order_id: payload.orderId,
+            order_item_id: payload.orderItemId,
+            type: 'image',
+            cloudinary_url: cloudinaryResult.secureUrl,
+            format: img.aspectRatio,
+            metadata: {
+              orderId: payload.orderId,
+              orderItemId: payload.orderItemId,
+              aspectRatio: img.aspectRatio,
+              resolution: img.resolution,
+              source: 'worker-cascade',
+              cloudinary_public_id: cloudinaryResult.publicId
+            }
+          });
+
+        if (libError) {
+          console.warn('⚠️ Failed to save to library_assets:', libError);
+        } else {
+          console.log('💾 [processRenderImages] Saved to library_assets');
+        }
+
+        results.push({
+          url: cloudinaryResult.secureUrl,
+          aspectRatio: img.aspectRatio,
+          resolution: img.resolution
         });
-      
-      if (libError) {
-        console.warn('⚠️ Failed to save to library_assets:', libError);
-      } else {
-        console.log('💾 [processRenderImages] Saved to library_assets');
+
+      } catch (uploadError) {
+        console.error(`❌ Cloudinary upload failed for image ${results.length + 1}:`, uploadError);
+        throw uploadError;
       }
-      
-      results.push({
-        url: imageUrl,
-        aspectRatio: img.aspectRatio,
-        resolution: img.resolution
-      });
       
     } catch (imgError) {
       console.error(`❌ Failed to generate image:`, imgError);
@@ -491,46 +516,69 @@ async function processRenderCarousels(payload: any): Promise<any> {
           throw new Error(`Slide ${i + 1} generation failed: ${imgData?.error || imgError?.message}`);
         }
         
-        const bgUrl = imgData?.imageUrl || imgData?.data?.imageUrl;
-        if (!bgUrl) {
+        const bgBase64 = imgData?.imageUrl || imgData?.data?.imageUrl;
+        if (!bgBase64) {
           throw new Error(`Slide ${i + 1}: No image URL returned`);
         }
-        
-        console.log(`✅ [processRenderCarousels] Slide ${i + 1} generated: ${bgUrl}`);
-        
-        // ✅ Sauvegarder dans library_assets (carousel slides)
-        const { error: saveError } = await supabaseAdmin
-          .from('library_assets')
-          .insert({
-            user_id: payload.userId,
-            brand_id: carousel.brandId,
-            order_id: payload.orderId,
-            order_item_id: payload.orderItemId,
-            carousel_id: carousel.id,
-            slide_index: i,
-            type: 'carousel_slide',
-            cloudinary_url: bgUrl,
-            text_json: slide,
-            format: '4:5',
-            metadata: {
-              orderId: payload.orderId,
-              orderItemId: payload.orderItemId,
-              style: carousel.style,
-              source: 'worker-cascade'
+
+        // 🆕 UPLOADER VERS CLOUDINARY
+        console.log(`📤 [processRenderCarousels] Uploading slide ${i + 1}/${carousel.slides.length} to Cloudinary...`);
+
+        try {
+          const cloudinaryResult = await uploadToCloudinary(bgBase64, {
+            folder: `brands/${carousel.brandId}/carousels/${carousel.id}`,
+            publicId: `slide_${String(i + 1).padStart(2, '0')}`,
+            tags: ['carousel', 'worker', `order-${payload.orderId}`],
+            context: {
+              order_id: String(payload.orderId),
+              carousel_id: String(carousel.id),
+              slide_index: String(i),
+              brand_id: String(carousel.brandId)
             }
           });
-        
-        if (saveError) {
-          console.warn(`⚠️ Failed to save slide ${i + 1}:`, saveError);
-        } else {
-          console.log(`💾 [processRenderCarousels] Slide ${i + 1} saved to library_assets`);
+
+          console.log(`✅ [processRenderCarousels] Slide ${i + 1} uploaded: ${cloudinaryResult.secureUrl}`);
+          console.log(`📊 Size reduction: ${(bgBase64.length / 1024).toFixed(0)}KB base64 → ${cloudinaryResult.secureUrl.length}B URL`);
+
+          // ✅ Sauvegarder dans library_assets avec URL Cloudinary
+          const { error: saveError } = await supabaseAdmin
+            .from('library_assets')
+            .insert({
+              user_id: payload.userId,
+              brand_id: carousel.brandId,
+              order_id: payload.orderId,
+              order_item_id: payload.orderItemId,
+              carousel_id: carousel.id,
+              slide_index: i,
+              type: 'carousel_slide',
+              cloudinary_url: cloudinaryResult.secureUrl,
+              text_json: slide,
+              format: '4:5',
+              metadata: {
+                orderId: payload.orderId,
+                orderItemId: payload.orderItemId,
+                style: carousel.style,
+                source: 'worker-cascade',
+                cloudinary_public_id: cloudinaryResult.publicId
+              }
+            });
+
+          if (saveError) {
+            console.warn(`⚠️ Failed to save slide ${i + 1}:`, saveError);
+          } else {
+            console.log(`💾 [processRenderCarousels] Slide ${i + 1} saved to library_assets`);
+          }
+
+          slides.push({
+            index: i,
+            url: cloudinaryResult.secureUrl,
+            text: slide
+          });
+
+        } catch (uploadError) {
+          console.error(`❌ Cloudinary upload failed for slide ${i + 1}:`, uploadError);
+          throw uploadError;
         }
-        
-        slides.push({
-          index: i,
-          url: bgUrl,
-          text: slide
-        });
         
       } catch (slideError) {
         console.error(`❌ Failed to generate slide ${i + 1}:`, slideError);

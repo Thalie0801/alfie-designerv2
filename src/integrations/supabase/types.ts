@@ -2153,6 +2153,19 @@ export type Database = {
       }
     }
     Views: {
+      library_assets_view: {
+        Row: {
+          brand_id: string | null
+          created_at: string | null
+          id: string | null
+          metadata: Json | null
+          thumb_url: string | null
+          type: string | null
+          url: string | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
       v_brand_quota_current: {
         Row: {
           brand_id: string | null
