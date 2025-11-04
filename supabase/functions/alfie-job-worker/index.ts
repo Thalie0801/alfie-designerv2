@@ -514,8 +514,18 @@ async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Pro
         console.error('❌ [Cascade] Failed to create jobs:', cascadeError);
       } else {
         console.log(`✅ [Cascade] Created ${newJobs.length} jobs from order_items`);
+        // Trigger worker again to process newly queued jobs
+        try {
+          await supabaseAdmin.functions.invoke('alfie-job-worker', {
+            body: { trigger: 'cascade' }
+          });
+          console.log('▶️ [Cascade] Worker reinvoked for order_items jobs');
+        } catch (e) {
+          console.warn('[Cascade] Worker reinvoke error:', e);
+        }
       }
     } else {
       console.log('ℹ️ [Cascade] All cascade jobs already exist');
     }
   }
+}
