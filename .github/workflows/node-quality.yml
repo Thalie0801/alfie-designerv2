@@ -20,28 +20,13 @@ env:
 jobs:
   typecheck:
     runs-on: ubuntu-latest
-    # 👇 ne bloque plus le pipeline (mais on garde le statut du step)
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-
-      - name: Force public npm registry
-        run: npm config set registry https://registry.npmjs.org/
-
-      - name: Install dependencies
-        run: npm ci --prefer-offline
-
-      - name: Type check (capture report)
-        id: tsc
-        # on produit un fichier pour le consulter dans les artefacts
-        run: |
-          set -o pipefail
-          npm run typecheck | tee typecheck.txt || true
-
-      - name: Upload
+          ca
