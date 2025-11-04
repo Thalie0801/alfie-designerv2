@@ -202,28 +202,138 @@ async function processGenerateTexts(payload: any): Promise<any> {
 }
 
 async function processRenderImages(payload: any): Promise<any> {
-  console.log('🖼️ [processRenderImages] Starting...');
+  console.log('🖼️ [processRenderImages] Starting...', { payload });
   
-  const { images, brandId, orderId } = payload;
+  // ✅ Adapter au nouveau format de payload
+  let imagesToRender = [];
+  
+  if (payload.images) {
+    // Format ancien (compatibilité)
+    imagesToRender = payload.images;
+  } else if (payload.brief) {
+    // ✅ NOUVEAU FORMAT (depuis order_items)
+    const { count, briefs } = payload.brief;
+    const brandId = payload.brandId;
+    
+    // Charger le brand kit une fois
+    const { data: brand } = await supabaseAdmin
+      .from('brands')
+      .select('name, palette, voice, niche')
+      .eq('id', brandId)
+      .single();
+    
+    console.log('📦 [processRenderImages] Brand loaded:', brand?.name);
+    
+    // Convertir chaque brief en objet image avec prompt construit
+    imagesToRender = (briefs || [payload.brief]).map((brief: any, i: number) => {
+      const { objective, format, style } = brief;
+      
+      // Mapper format vers résolution
+      const AR_MAP: Record<string, { w: number; h: number }> = {
+        '1:1': { w: 1024, h: 1024 },
+        '4:5': { w: 1080, h: 1350 },
+        '9:16': { w: 1080, h: 1920 },
+        '16:9': { w: 1920, h: 1080 },
+      };
+      
+      const aspectRatio = format?.split(' ')[0] || '1:1';
+      const { w, h } = AR_MAP[aspectRatio] || AR_MAP['1:1'];
+      
+      // Construire prompt enrichi
+      const prompt = `Professional ${style || 'minimalist'} background for social media.
+Context: ${objective || 'generic post'}
+Brand: ${brand?.niche || ''}, tone: ${brand?.voice || 'professional'}
+Colors: ${brand?.palette?.slice(0, 3).join(', ') || 'modern palette'}
+Requirements: clean composition, no text, high contrast, ${aspectRatio} aspect ratio optimized.`;
+      
+      console.log(`🖼️ [processRenderImages] Image ${i + 1}: ${aspectRatio} (${w}x${h})`);
+      
+      return {
+        prompt,
+        resolution: `${w}x${h}`,
+        aspectRatio,
+        brandId,
+        briefIndex: i
+      };
+    });
+  } else {
+    throw new Error('Invalid payload: missing images or brief');
+  }
+  
+  console.log(`🖼️ [processRenderImages] Processing ${imagesToRender.length} images`);
+  
   const results = [];
   
-  for (const img of images) {
-    // Call alfie-render-image
-    const response = await supabaseAdmin.functions.invoke('alfie-render-image', {
-      body: {
-        prompt: img.prompt,
-        brandId,
-        orderId,
-        format: img.format || '1080x1080',
-        useNanoBanana: true,
-      },
-    });
-    
-    if (response.error) {
-      throw new Error(`Image render failed: ${response.error.message}`);
+  for (const img of imagesToRender) {
+    try {
+      // ✅ Appeler alfie-generate-ai-image (public, pas besoin JWT)
+      console.log(`🎨 [processRenderImages] Generating image ${results.length + 1}/${imagesToRender.length}`);
+      
+      const { data: brand } = await supabaseAdmin
+        .from('brands')
+        .select('name, palette, voice')
+        .eq('id', img.brandId)
+        .single();
+      
+      const { data, error } = await supabaseAdmin.functions.invoke('alfie-generate-ai-image', {
+        body: {
+          prompt: img.prompt,
+          resolution: img.resolution,
+          backgroundOnly: true,
+          brandKit: brand ? {
+            name: brand.name,
+            palette: brand.palette,
+            voice: brand.voice
+          } : undefined
+        }
+      });
+      
+      if (error || data?.error) {
+        throw new Error(data?.error || error?.message || 'Image generation failed');
+      }
+      
+      const imageUrl = data?.imageUrl || data?.data?.imageUrl;
+      if (!imageUrl) {
+        throw new Error('No image URL returned');
+      }
+      
+      console.log(`✅ [processRenderImages] Image generated: ${imageUrl}`);
+      
+      // ✅ Sauvegarder dans media_generations
+      const { error: saveError } = await supabaseAdmin
+        .from('media_generations')
+        .insert({
+          user_id: payload.userId,
+          brand_id: img.brandId,
+          type: 'image',
+          status: 'completed',
+          output_url: imageUrl,
+          thumbnail_url: imageUrl,
+          prompt: img.prompt,
+          metadata: {
+            orderId: payload.orderId,
+            aspectRatio: img.aspectRatio,
+            resolution: img.resolution,
+            source: 'worker-cascade'
+          }
+        });
+      
+      if (saveError) {
+        console.warn('⚠️ Failed to save to media_generations:', saveError);
+      } else {
+        console.log('💾 [processRenderImages] Saved to media_generations');
+      }
+      
+      results.push({
+        url: imageUrl,
+        aspectRatio: img.aspectRatio,
+        resolution: img.resolution
+      });
+      
+    } catch (imgError) {
+      console.error(`❌ Failed to generate image:`, imgError);
+      throw imgError; // Propagate pour le retry du job
     }
-    
-    results.push(response.data);
   }
   
   console.log(`✅ [processRenderImages] Rendered ${results.length} images`);
@@ -231,41 +341,152 @@ async function processRenderImages(payload: any): Promise<any> {
 }
 
 async function processRenderCarousels(payload: any): Promise<any> {
-  console.log('📚 [processRenderCarousels] Starting...');
+  console.log('📚 [processRenderCarousels] Starting...', { payload });
   
-  const { carousels, brandId, orderId, globalStyle } = payload;
+  // ✅ Adapter au nouveau format de payload
+  let carouselsToRender = [];
+  
+  if (payload.carousels) {
+    // Format ancien (compatibilité)
+    carouselsToRender = payload.carousels;
+  } else if (payload.brief) {
+    // ✅ NOUVEAU FORMAT (depuis order_items)
+    const { count, briefs } = payload.brief;
+    const brandId = payload.brandId;
+    
+    const { data: brand } = await supabaseAdmin
+      .from('brands')
+      .select('name, palette, voice, niche')
+      .eq('id', brandId)
+      .single();
+    
+    console.log('📦 [processRenderCarousels] Brand loaded:', brand?.name);
+    
+    // Pour chaque brief de carousel, générer un plan
+    const planPromises = (briefs || [payload.brief]).map(async (brief: any, idx: number) => {
+      const { topic, numSlides, angle } = brief;
+      
+      console.log(`📋 [processRenderCarousels] Planning carousel ${idx + 1}: "${topic}"`);
+      
+      // ✅ Appeler alfie-plan-carousel (public)
+      const { data, error } = await supabaseAdmin.functions.invoke('alfie-plan-carousel', {
+        body: {
+          topic,
+          numSlides: numSlides || 5,
+          angle: angle || '',
+          brandVoice: brand?.voice || 'professional'
+        }
+      });
+      
+      if (error || data?.error) {
+        throw new Error(`Carousel planning failed: ${data?.error || error?.message}`);
+      }
+      
+      console.log(`✅ [processRenderCarousels] Carousel ${idx + 1} planned: ${data.slides?.length || 0} slides`);
+      
+      return {
+        id: crypto.randomUUID(),
+        aspectRatio: '4:5', // Défaut Instagram
+        textVersion: 1,
+        slides: data.slides || [],
+        prompts: data.prompts || [],
+        style: data.style || 'minimalist',
+        brandId
+      };
+    });
+    
+    carouselsToRender = await Promise.all(planPromises);
+  } else {
+    throw new Error('Invalid payload: missing carousels or brief');
+  }
+  
+  console.log(`📚 [processRenderCarousels] Processing ${carouselsToRender.length} carousels`);
+  
   const results = [];
   
-  for (const carousel of carousels) {
+  for (const carousel of carouselsToRender) {
     const slides = [];
+    
+    console.log(`🎠 [processRenderCarousels] Rendering carousel ${results.length + 1}/${carouselsToRender.length} (${carousel.slides.length} slides)`);
+    
+    const { data: brand } = await supabaseAdmin
+      .from('brands')
+      .select('name, palette, voice, niche')
+      .eq('id', carousel.brandId)
+      .single();
     
     for (let i = 0; i < carousel.slides.length; i++) {
       const slide = carousel.slides[i];
+      const slidePrompt = carousel.prompts[i] || `Slide ${i + 1}`;
       
-      // Call alfie-render-carousel-slide
-      const response = await supabaseAdmin.functions.invoke('alfie-render-carousel-slide', {
-        body: {
-          slideContent: slide,
-          globalStyle,
-          brandId,
-          orderId,
-          carouselId: carousel.id,
-          slideIndex: i,
-          totalSlides: carousel.slides.length,
-          aspectRatio: carousel.aspectRatio || '1080x1350',
-          textVersion: carousel.textVersion || 'v1',
-          renderVersion: 'v1',
-        },
-      });
-      
-      if (response.error) {
-        throw new Error(`Carousel slide ${i} render failed: ${response.error.message}`);
+      try {
+        console.log(`🎨 [processRenderCarousels] Generating slide ${i + 1}/${carousel.slides.length}`);
+        
+        // Générer le background via alfie-generate-ai-image
+        const { data: imgData, error: imgError } = await supabaseAdmin.functions.invoke('alfie-generate-ai-image', {
+          body: {
+            prompt: `${slidePrompt}. Style: ${carousel.style}. Brand: ${brand?.niche}. Colors: ${brand?.palette?.slice(0,3).join(', ')}`,
+            resolution: '1080x1350',
+            backgroundOnly: true,
+            brandKit: brand ? { name: brand.name, palette: brand.palette, voice: brand.voice } : undefined
+          }
+        });
+        
+        if (imgError || imgData?.error) {
+          throw new Error(`Slide ${i + 1} generation failed: ${imgData?.error || imgError?.message}`);
+        }
+        
+        const bgUrl = imgData?.imageUrl || imgData?.data?.imageUrl;
+        if (!bgUrl) {
+          throw new Error(`Slide ${i + 1}: No image URL returned`);
+        }
+        
+        console.log(`✅ [processRenderCarousels] Slide ${i + 1} generated: ${bgUrl}`);
+        
+        // ✅ Sauvegarder dans library_assets (carousel slides)
+        const { error: saveError } = await supabaseAdmin
+          .from('library_assets')
+          .insert({
+            user_id: payload.userId,
+            brand_id: carousel.brandId,
+            carousel_id: carousel.id,
+            slide_index: i,
+            type: 'carousel_slide',
+            cloudinary_url: bgUrl,
+            text_json: slide,
+            format: '4:5',
+            metadata: {
+              orderId: payload.orderId,
+              style: carousel.style,
+              source: 'worker-cascade'
+            }
+          });
+        
+        if (saveError) {
+          console.warn(`⚠️ Failed to save slide ${i + 1}:`, saveError);
+        } else {
+          console.log(`💾 [processRenderCarousels] Slide ${i + 1} saved to library_assets`);
+        }
+        
+        slides.push({
+          index: i,
+          url: bgUrl,
+          text: slide
+        });
+        
+      } catch (slideError) {
+        console.error(`❌ Failed to generate slide ${i + 1}:`, slideError);
+        throw slideError;
       }
-      
-      slides.push(response.data);
     }
     
-    results.push({ carouselId: carousel.id, slides });
+    results.push({
+      carouselId: carousel.id,
+      slides,
+      totalSlides: slides.length
+    });
+    
+    console.log(`✅ [processRenderCarousels] Carousel ${results.length}/${carouselsToRender.length} completed`);
   }
   
   console.log(`✅ [processRenderCarousels] Rendered ${results.length} carousels`);
@@ -470,6 +691,8 @@ async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Pro
         type: 'render_carousels',
         status: 'queued',
         payload: {
+          userId: job.user_id, // ✅ Ajouté pour sauvegardes DB
+          orderId: job.order_id, // ✅ Ajouté pour traçabilité
           orderItemId: item.id,
           brief: item.brief_json,
           textData: result.texts,
@@ -484,6 +707,8 @@ async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Pro
         type: 'render_images',
         status: 'queued',
         payload: {
+          userId: job.user_id, // ✅ Ajouté pour sauvegardes DB
+          orderId: job.order_id, // ✅ Ajouté pour traçabilité
           orderItemId: item.id,
           brief: item.brief_json,
           textData: result.texts,
