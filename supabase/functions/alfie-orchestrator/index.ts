@@ -349,27 +349,27 @@ serve(async (req) => {
         })
         .eq("id", session.id);
       
-      // Create order items
+      // Build aggregated order_items (max 1 per type)
       const items: any[] = [];
       const nI = context.numImages || 0;
       const nC = context.numCarousels || 0;
       
-      for (let i = 0; i < nI; i++) {
+      if (nI > 0) {
         items.push({
           order_id: order.id,
           type: "image",
-          sequence_number: i,
-          brief_json: context.imageBriefs?.[i] || {},
+          sequence_number: 0,
+          brief_json: { count: nI, briefs: context.imageBriefs || [] },
           status: "pending"
         });
       }
       
-      for (let i = 0; i < nC; i++) {
+      if (nC > 0) {
         items.push({
           order_id: order.id,
           type: "carousel",
-          sequence_number: i,
-          brief_json: context.carouselBriefs?.[i] || {},
+          sequence_number: 0,
+          brief_json: { count: nC, briefs: context.carouselBriefs || [] },
           status: "pending"
         });
       }

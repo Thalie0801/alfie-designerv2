@@ -435,6 +435,15 @@ async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Pro
         console.error('❌ [Cascade] Failed to create fallback jobs:', cascadeError);
       } else {
         console.log(`✅ [Cascade] Created ${newJobs.length} jobs via FALLBACK`);
+        // Trigger worker again to process newly queued jobs
+        try {
+          await supabaseAdmin.functions.invoke('alfie-job-worker', {
+            body: { trigger: 'cascade' }
+          });
+          console.log('▶️ [Cascade] Worker reinvoked for FALLBACK jobs');
+        } catch (e) {
+          console.warn('[Cascade] Worker reinvoke error (fallback):', e);
+        }
       }
     } else {
       console.log('ℹ️ [Cascade] All fallback jobs already exist');
@@ -486,15 +495,15 @@ async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Pro
   }
   
   if (cascadeJobs.length > 0) {
-    // Check for existing jobs to avoid duplicates
+    // Check for existing jobs to avoid duplicates (type + non-terminal status)
     const { data: existingJobs } = await supabaseAdmin
       .from('job_queue')
-      .select('id, type')
+      .select('id, type, status')
       .eq('order_id', job.order_id)
-      .in('type', cascadeJobs.map(j => j.type));
+      .in('status', ['queued','running']);
     
-    const existingTypes = new Set(existingJobs?.map((j: any) => j.type) || []);
-    const newJobs = cascadeJobs.filter((j: any) => !existingTypes.has(j.type));
+    const existingKeys = new Set(existingJobs?.map((j: any) => `${j.type}_${j.status}`) || []);
+    const newJobs = cascadeJobs.filter((j: any) => !existingKeys.has(`${j.type}_${j.status}`));
     
     if (newJobs.length > 0) {
       const { error: cascadeError } = await supabaseAdmin
@@ -507,7 +516,6 @@ async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Pro
         console.log(`✅ [Cascade] Created ${newJobs.length} jobs from order_items`);
       }
     } else {
-      console.log('ℹ️ [Cascade] All jobs already exist');
+      console.log('ℹ️ [Cascade] All cascade jobs already exist');
     }
   }
-}
