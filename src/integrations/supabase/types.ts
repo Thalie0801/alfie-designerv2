@@ -1003,6 +1003,59 @@ export type Database = {
         }
         Relationships: []
       }
+      job_queue: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          max_retries: number
+          order_id: string | null
+          payload: Json
+          result: Json | null
+          retry_count: number
+          status: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          max_retries?: number
+          order_id?: string | null
+          payload: Json
+          result?: Json | null
+          retry_count?: number
+          status?: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          max_retries?: number
+          order_id?: string | null
+          payload?: Json
+          result?: Json | null
+          retry_count?: number
+          status?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_queue_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_sets: {
         Row: {
           brand_id: string

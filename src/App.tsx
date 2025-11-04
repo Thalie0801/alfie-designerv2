@@ -27,6 +27,7 @@ import NotFound from "./pages/NotFound";
 import Templates from "./pages/Templates";
 import Library from "./pages/Library";
 import Videos from "./pages/Videos";
+import AssetsLibrary from "./pages/AssetsLibrary";
 import ActivateAccess from "./pages/onboarding/Activate";
 import { AlfieChat } from "./components/AlfieChat";
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
@@ -93,6 +94,16 @@ const AppRoutes = () => {
               <ProtectedRoute>
                 <AppLayoutWithSidebar>
                   <Videos />
+                </AppLayoutWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/assets"
+            element={
+              <ProtectedRoute>
+                <AppLayoutWithSidebar>
+                  <AssetsLibrary />
                 </AppLayoutWithSidebar>
               </ProtectedRoute>
             }
