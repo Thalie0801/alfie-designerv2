@@ -441,11 +441,18 @@ serve(async (req) => {
         }
       }
       
+      // ✅ Récupérer les order_items créés avec leurs IDs
+      const { data: allOrderItems } = await sb
+        .from("order_items")
+        .select('id, type')
+        .eq('order_id', order.id);
+      
       // ✅ NEW: Create render jobs directly (skip generate_texts intermediate step)
       const renderJobs: any[] = [];
       
       // Create render_images jobs for each image
       if (nI > 0 && context.imageBriefs) {
+        const imageItem = allOrderItems?.find((it: any) => it.type === 'image');
         for (let i = 0; i < nI; i++) {
           const brief = context.imageBriefs[i] || {};
           renderJobs.push({
@@ -454,10 +461,10 @@ serve(async (req) => {
             type: "render_images",
             status: "queued",
             payload: {
-              userId: user.id, // ✅ Add userId for worker
+              userId: user.id,
               brandId: brand_id,
               orderId: order.id,
-              orderItemId: items.find((it: any) => it.type === 'image')?.order_id,
+              orderItemId: imageItem?.id, // ✅ Correct: use id, not order_id
               brief,
               imageIndex: i
             }
@@ -467,6 +474,7 @@ serve(async (req) => {
       
       // Create render_carousels jobs for each carousel
       if (nC > 0 && context.carouselBriefs) {
+        const carouselItem = allOrderItems?.find((it: any) => it.type === 'carousel');
         for (let i = 0; i < nC; i++) {
           const brief = context.carouselBriefs[i] || {};
           renderJobs.push({
@@ -475,10 +483,10 @@ serve(async (req) => {
             type: "render_carousels",
             status: "queued",
             payload: {
-              userId: user.id, // ✅ Add userId for worker
+              userId: user.id,
               brandId: brand_id,
               orderId: order.id,
-              orderItemId: items.find((it: any) => it.type === 'carousel')?.order_id,
+              orderItemId: carouselItem?.id, // ✅ Correct: use id, not order_id
               brief,
               carouselIndex: i
             }
