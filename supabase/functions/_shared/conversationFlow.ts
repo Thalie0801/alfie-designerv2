@@ -105,42 +105,128 @@ export function detectOrderIntent(message: string): { numImages: number; numCaro
   return null;
 }
 
+export function validateResponse(question: BriefQuestion, response: string): { valid: boolean; error?: string } {
+  if (question.required && !response.trim()) {
+    return { valid: false, error: 'Cette réponse est obligatoire' };
+  }
+  
+  if (question.type === 'select' && question.options) {
+    const normalized = response.toLowerCase();
+    const match = question.options.some(opt => normalized.includes(opt.toLowerCase()));
+    if (!match) {
+      return { valid: false, error: `Choisis parmi: ${question.options.join(', ')}` };
+    }
+  }
+  
+  return { valid: true };
+}
+
+export function extractResponseValue(question: BriefQuestion, response: string): any {
+  const normalized = response.toLowerCase().trim();
+  
+  if (question.type === 'select' && question.options) {
+    // Trouver l'option qui correspond
+    const match = question.options.find(opt => normalized.includes(opt.toLowerCase()));
+    return match || normalized;
+  }
+  
+  // Pour numSlides, extraire le nombre
+  if (question.key === 'numSlides') {
+    const match = response.match(/(\d+)/);
+    return match ? parseInt(match[1]) : 5;
+  }
+  
+  return response.trim();
+}
+
+export function isSkipResponse(response: string): boolean {
+  const normalized = response.toLowerCase();
+  return ['skip', 'passe', 'suivant', 'next', 'non', 'rien'].some(word => normalized === word);
+}
+
 export function getNextQuestion(
   state: ConversationState,
   context: ConversationContext
-): { question: string; quickReplies?: string[] } | null {
+): { question: string; quickReplies?: string[]; questionKey?: string } | null {
   
   if (state === 'initial') {
     return {
       question: "👋 Bonjour ! Je suis Alfie, votre assistant créatif. Combien d'images et de carrousels souhaitez-vous créer aujourd'hui ?",
-      quickReplies: ['3 images', '2 carrousels de 5 slides', '3 images + 2 carrousels']
+      quickReplies: ['3 images', '2 carrousels', '1 image + 1 carrousel']
     };
   }
   
   if (state === 'collecting_image_brief' && context.numImages) {
     const currentIndex = context.currentImageIndex || 0;
     if (currentIndex < context.numImages) {
-      return {
-        question: `📸 Image ${currentIndex + 1}/${context.numImages}: ${IMAGE_BRIEF_QUESTIONS[0].question}`,
-        quickReplies: ['Acquisition', 'Conversion', 'Awareness']
-      };
+      const briefs = context.imageBriefs || [];
+      const currentBrief = briefs[currentIndex] || {};
+      
+      // Progression dans les questions
+      if (!currentBrief.objective) {
+        return {
+          question: `📸 Image ${currentIndex + 1}/${context.numImages}: Quel est l'objectif ? (acquisition, conversion, awareness)`,
+          quickReplies: ['Acquisition', 'Conversion', 'Awareness'],
+          questionKey: 'objective'
+        };
+      }
+      if (!currentBrief.format) {
+        return {
+          question: `Image ${currentIndex + 1}: Quel format ?`,
+          quickReplies: ['1:1 (Instagram post)', '4:5 (Instagram feed)', '9:16 (Stories)'],
+          questionKey: 'format'
+        };
+      }
+      if (!currentBrief.style) {
+        return {
+          question: `Image ${currentIndex + 1}: Quel style visuel ? (ou tape "skip" pour utiliser le style de ta marque)`,
+          quickReplies: ['Minimaliste', 'Vibrant', 'Professionnel', 'Skip'],
+          questionKey: 'style'
+        };
+      }
+      // Brief complet pour cette image, passer à la suivante
+      context.currentImageIndex = currentIndex + 1;
+      return getNextQuestion(state, context);
     }
   }
   
   if (state === 'collecting_carousel_brief' && context.numCarousels) {
     const currentIndex = context.currentCarouselIndex || 0;
     if (currentIndex < context.numCarousels) {
-      return {
-        question: `🎠 Carrousel ${currentIndex + 1}/${context.numCarousels}: ${CAROUSEL_BRIEF_QUESTIONS[0].question}`,
-        quickReplies: ['Bénéfices produit', 'Témoignages clients', 'Tutoriel']
-      };
+      const briefs = context.carouselBriefs || [];
+      const currentBrief = briefs[currentIndex] || {};
+      
+      if (!currentBrief.topic) {
+        return {
+          question: `🎠 Carrousel ${currentIndex + 1}/${context.numCarousels}: Quel est le sujet ?`,
+          quickReplies: ['Bénéfices produit', 'Tutoriel', 'Témoignages'],
+          questionKey: 'topic'
+        };
+      }
+      if (!currentBrief.angle) {
+        return {
+          question: `Carrousel ${currentIndex + 1}: Quel angle ?`,
+          quickReplies: ['Éducatif', 'Promo', 'Storytelling'],
+          questionKey: 'angle'
+        };
+      }
+      if (!currentBrief.numSlides) {
+        return {
+          question: `Carrousel ${currentIndex + 1}: Combien de slides ? (recommandé: 5-8)`,
+          quickReplies: ['5 slides', '7 slides', '8 slides'],
+          questionKey: 'numSlides'
+        };
+      }
+      // Brief complet pour ce carrousel
+      context.currentCarouselIndex = currentIndex + 1;
+      return getNextQuestion(state, context);
     }
   }
   
   if (state === 'confirming') {
     return {
-      question: '✅ Parfait ! Je récapitule votre commande. Confirmez-vous ?',
-      quickReplies: ['Oui, générer !', 'Modifier']
+      question: buildSummary(context) + '\n\n✅ Tout est bon ? Je lance la génération ?',
+      quickReplies: ['Oui, lance !', 'Modifier']
     };
   }
   

@@ -63,6 +63,7 @@ export function AlfieChat() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [quickReplies, setQuickReplies] = useState<string[]>([]);
+  const [conversationState, setConversationState] = useState<string>('initial');
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -216,6 +217,10 @@ export function AlfieChat() {
           setOrderId(data.orderId);
         }
         
+        if (data.state) {
+          setConversationState(data.state);
+        }
+        
         // 4. Afficher la réponse de l'assistant
         if (data.response) {
           addMessage({
@@ -318,6 +323,25 @@ export function AlfieChat() {
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
       <CreateHeader />
+      
+      {/* Conversation State Badge */}
+      {conversationState !== 'initial' && conversationState !== 'completed' && (
+        <div className="px-4 py-2 bg-muted/50 border-b border-border">
+          <div className="flex items-center gap-2 text-sm">
+            <div className={`w-2 h-2 rounded-full ${
+              conversationState === 'generating' ? 'bg-green-500 animate-pulse' :
+              conversationState === 'confirming' ? 'bg-yellow-500' :
+              'bg-blue-500'
+            }`} />
+            <span className="text-muted-foreground">
+              {conversationState === 'collecting_image_brief' && '📸 Collecte des briefs images...'}
+              {conversationState === 'collecting_carousel_brief' && '🎠 Collecte des briefs carrousels...'}
+              {conversationState === 'confirming' && '✅ Confirmation...'}
+              {conversationState === 'generating' && '🚀 Génération en cours...'}
+            </span>
+          </div>
+        </div>
+      )}
       
       {/* Quota Bar */}
       {activeBrandId && <QuotaBar activeBrandId={activeBrandId} />}
