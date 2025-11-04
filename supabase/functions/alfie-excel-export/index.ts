@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { utils, write } from "https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs";
+import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -72,7 +72,7 @@ serve(async (req) => {
     // For now, use DB data only
 
     // Create Excel workbook with 3 sheets
-    const workbook = utils.book_new();
+    const workbook = XLSX.utils.book_new();
 
     // Sheet 1: Assets
     const assetsSheet = assets?.map((asset) => ({
@@ -87,8 +87,8 @@ serve(async (req) => {
       'Slide Index': asset.slide_index !== null ? asset.slide_index : 'N/A',
     })) || [];
 
-    const ws1 = utils.json_to_sheet(assetsSheet);
-    utils.book_append_sheet(workbook, ws1, 'Assets');
+    const ws1 = XLSX.utils.json_to_sheet(assetsSheet);
+    XLSX.utils.book_append_sheet(workbook, ws1, 'Assets');
 
     // Sheet 2: Carousels (group by carousel_id)
     const carousels = assets?.filter((a) => a.carousel_id) || [];
@@ -112,8 +112,8 @@ serve(async (req) => {
       }));
     });
 
-    const ws2 = utils.json_to_sheet(carouselsSheet);
-    utils.book_append_sheet(workbook, ws2, 'Carousels');
+    const ws2 = XLSX.utils.json_to_sheet(carouselsSheet);
+    XLSX.utils.book_append_sheet(workbook, ws2, 'Carousels');
 
     // Sheet 3: Logs
     const logsSheet = logs?.map((log) => ({
@@ -127,11 +127,11 @@ serve(async (req) => {
       'Created At': log.created_at,
     })) || [];
 
-    const ws3 = utils.json_to_sheet(logsSheet);
-    utils.book_append_sheet(workbook, ws3, 'Logs');
+    const ws3 = XLSX.utils.json_to_sheet(logsSheet);
+    XLSX.utils.book_append_sheet(workbook, ws3, 'Logs');
 
     // Write workbook to buffer
-    const excelBuffer = write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
     console.log(`✅ [Excel Export] Generated Excel with ${assets?.length || 0} assets, ${carouselsSheet.length} carousel slides, ${logs?.length || 0} logs`);
 

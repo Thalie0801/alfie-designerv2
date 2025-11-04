@@ -279,7 +279,7 @@ export default function AssetsLibrary() {
                             </div>
                             <div>
                               <strong>Créé le:</strong>{' '}
-                              {new Date(asset.created_at).toLocaleDateString('fr-FR')}
+                              {asset.created_at ? new Date(asset.created_at).toLocaleDateString('fr-FR') : 'N/A'}
                             </div>
                             {asset.tags && asset.tags.length > 0 && (
                               <div className="col-span-2">

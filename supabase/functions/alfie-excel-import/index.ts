@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { read, utils } from "https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs";
+import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -43,12 +43,12 @@ serve(async (req) => {
 
     // Read file as ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
-    const workbook = read(arrayBuffer);
+    const workbook = XLSX.read(arrayBuffer);
     
     // Parse first sheet
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
-    const jsonData = utils.sheet_to_json(worksheet);
+    const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
     console.log(`📥 [Excel Import] Parsing ${jsonData.length} rows`);
 
