@@ -11,8 +11,6 @@ import { CreateHeader } from '@/components/create/CreateHeader';
 import { QuotaBar } from '@/components/create/QuotaBar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
-import { useQueueMonitor } from '@/hooks/useQueueMonitor';
-import { QueueStatus } from '@/components/chat/QueueStatus';
 
 // ======
 // TYPES
@@ -66,9 +64,6 @@ export function AlfieChat() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [quickReplies, setQuickReplies] = useState<string[]>([]);
   const [conversationState, setConversationState] = useState<string>('initial');
-  
-  // Monitoring temps réel (affiché pendant la génération)
-  const { data: queueData } = useQueueMonitor(conversationState === 'generating');
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -300,6 +295,29 @@ export function AlfieChat() {
           setQuickReplies([]);
         }
         
+        // 6. Déclencher immédiatement le worker si des jobs ont été enfilés
+        if (data.orderId) {
+          console.log('[Chat] Triggering worker immediately after enqueue');
+          supabase.functions.invoke('alfie-job-worker', { headers })
+            .then(({ data: workerData, error: workerError }) => {
+              if (workerError) {
+                console.warn('[Chat] Worker trigger error:', workerError);
+                return;
+              }
+              console.log('[Chat] Worker response:', workerData);
+              
+              // Si aucun job n'a été traité, retry après 5s
+              if (workerData?.processed === 0) {
+                console.log('[Chat] No jobs processed, scheduling retry in 5s');
+                setTimeout(() => {
+                  supabase.functions.invoke('alfie-job-worker', { headers })
+                    .catch(e => console.warn('[Chat] Worker retry error:', e));
+                }, 5000);
+              }
+            })
+            .catch(e => console.warn('[Chat] Worker trigger failed:', e));
+        }
+        
         // Success - exit retry loop
         setIsLoading(false);
         return;
@@ -389,11 +407,6 @@ export function AlfieChat() {
       
       {/* Quota Bar */}
       {activeBrandId && <QuotaBar activeBrandId={activeBrandId} />}
-
-      {/* Queue Monitor (affiché pendant la génération) */}
-      {conversationState === 'generating' && queueData ? (
-        <QueueStatus data={queueData} />
-      ) : null}
       
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
