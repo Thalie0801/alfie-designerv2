@@ -93,7 +93,7 @@ const plans = [
 ];
 
 export default function Billing() {
-  const { profile, user, refreshProfile, isAdmin } = useAuth();
+  const { profile, user, refreshProfile, isAdmin, loading: authLoading } = useAuth();
   const { createCheckout, loading } = useStripeCheckout();
   const { openCustomerPortal, loading: portalLoading } = useCustomerPortal();
   const currentPlan = profile?.plan || null;
@@ -145,7 +145,7 @@ export default function Billing() {
         )}
       </div>
 
-      {isAdmin && (
+      {!authLoading && isAdmin && (
         <Alert className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
           <Sparkles className="h-4 w-4 text-green-600" />
           <AlertTitle className="text-green-800">Accès Administrateur</AlertTitle>
@@ -155,7 +155,7 @@ export default function Billing() {
         </Alert>
       )}
 
-      {!isAdmin && isAmbassador && (
+      {!authLoading && !isAdmin && isAmbassador && (
         <Alert className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
           <Award className="h-4 w-4 text-purple-600" />
           <AlertTitle className="text-purple-800">🎖️ Accès Ambassadeur</AlertTitle>
