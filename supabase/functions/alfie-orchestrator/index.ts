@@ -7,7 +7,8 @@ import {
   getNextQuestion,
   shouldTransitionState,
   extractResponseValue,
-  isSkipResponse
+  isSkipResponse,
+  detectTopicIntent
 } from "../_shared/conversationFlow.ts";
 
 const sb = createClient(
@@ -199,6 +200,44 @@ serve(async (req) => {
       const nextQ = getNextQuestion(state, context);
       
       if (nextQ?.questionKey) {
+        // ✅ NEW: AI-powered topic detection for free text input
+        if (nextQ.questionKey === 'topic' && !isSkipResponse(user_message || '')) {
+          const detection = await detectTopicIntent(user_message || '');
+          
+          if (detection.confidence > 0.7) {
+            // High confidence - accept the detected topic
+            currentBrief.topic = detection.topic;
+            if (detection.angle) {
+              currentBrief.angle = detection.angle;
+            }
+            context.carouselBriefs![currentIdx] = currentBrief;
+            
+            await sb
+              .from("alfie_conversation_sessions")
+              .update({ context_json: context })
+              .eq("id", session.id);
+            
+            const next = getNextQuestion(state, context);
+            return json({
+              response: `✅ Sujet détecté : "${detection.topic}"${detection.angle ? ` (angle: ${detection.angle})` : ''}\n\n${next?.question || ''}`,
+              quickReplies: next?.quickReplies || [],
+              conversationId: session.id,
+              state,
+              context
+            });
+          } else {
+            // Low confidence - ask user to clarify
+            return json({
+              response: `Je n'ai pas bien compris le sujet exact. Peux-tu être plus précis ?\n\nExemples :\n- "lancement de notre nouveau produit X"\n- "formation sur les réseaux sociaux"\n- "témoignages clients"`,
+              quickReplies: [],
+              conversationId: session.id,
+              state,
+              context
+            });
+          }
+        }
+        
+        // Standard extraction for other fields
         const value = extractResponseValue({ key: nextQ.questionKey } as any, user_message || '');
         if (!isSkipResponse(user_message || '')) {
           currentBrief[nextQ.questionKey] = value;

@@ -337,37 +337,51 @@ async function processGenerateVideo(payload: any): Promise<any> {
 async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Promise<void> {
   console.log('📋 [Cascade] Creating follow-up jobs for order:', job.order_id);
   
-  const cascadeJobs = [];
+  // ✅ NEW APPROACH: Create 1 job per order_item instead of grouped jobs
   
-  // Create render_images jobs
-  if (job.payload.numImages > 0 && result.texts) {
-    for (let i = 0; i < job.payload.numImages; i++) {
-      cascadeJobs.push({
-        user_id: job.user_id,
-        order_id: job.order_id,
-        type: 'render_images',
-        status: 'queued',
-        payload: {
-          textData: result.texts[i] || {},
-          brandId: job.payload.brandId,
-          imageIndex: i
-        }
-      });
-    }
+  // Fetch all order_items for this order
+  const { data: orderItems, error: itemsError } = await supabaseAdmin
+    .from('order_items')
+    .select('*')
+    .eq('order_id', job.order_id)
+    .order('sequence_number');
+  
+  if (itemsError || !orderItems || orderItems.length === 0) {
+    console.error('❌ [Cascade] No order_items found for order:', job.order_id);
+    return;
   }
   
-  // Create render_carousels jobs
-  if (job.payload.numCarousels > 0 && result.texts) {
-    for (let i = 0; i < job.payload.numCarousels; i++) {
+  const cascadeJobs = [];
+  
+  for (const item of orderItems) {
+    if (item.type === 'carousel') {
+      // Create 1 render_carousels job per carousel item
       cascadeJobs.push({
         user_id: job.user_id,
         order_id: job.order_id,
         type: 'render_carousels',
         status: 'queued',
         payload: {
-          carouselData: result.texts[job.payload.numImages + i] || {},
+          orderItemId: item.id,
+          brief: item.brief_json,
+          textData: result.texts, // Generated texts from AI
           brandId: job.payload.brandId,
-          carouselIndex: i
+          carouselIndex: item.sequence_number - 1
+        }
+      });
+    } else if (item.type === 'image') {
+      // Create 1 render_images job per image item
+      cascadeJobs.push({
+        user_id: job.user_id,
+        order_id: job.order_id,
+        type: 'render_images',
+        status: 'queued',
+        payload: {
+          orderItemId: item.id,
+          brief: item.brief_json,
+          textData: result.texts,
+          brandId: job.payload.brandId,
+          imageIndex: item.sequence_number - 1
         }
       });
     }
@@ -381,7 +395,7 @@ async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Pro
     if (cascadeError) {
       console.error('❌ [Cascade] Failed to create jobs:', cascadeError);
     } else {
-      console.log(`✅ [Cascade] Created ${cascadeJobs.length} follow-up jobs`);
+      console.log(`✅ [Cascade] Created ${cascadeJobs.length} follow-up jobs (1 per order_item)`);
     }
   }
 }
