@@ -17,7 +17,7 @@ export function useLibraryAssetsSubscription(orderId: string | null) {
   const [assets, setAssets] = useState<LibraryAsset[]>([]);
   const [total, setTotal] = useState(0);
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Réinitialiser quand orderId change
   useEffect(() => {
