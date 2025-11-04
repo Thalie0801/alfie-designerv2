@@ -70,8 +70,31 @@ serve(async (req) => {
     }
 
     const state = session.conversation_state;
-    const context = session.context_json || {};
+    let context = session.context_json || {};
     const hasOrder = !!session.order_id;
+
+    // Parse quick intents like "3 images" / "1 carrousel"
+    const normalized = (user_message || "").toLowerCase();
+    let contextUpdated = false;
+    const qtyMatch = normalized.match(/(\d+)\s*(images?|image|carrousels?|carrousels?|carrousel|carousel|slides?)/i);
+    if (qtyMatch) {
+      const qty = Math.max(1, parseInt(qtyMatch[1], 10));
+      if (/image|images/.test(qtyMatch[2])) {
+        context = { ...context, numImages: qty, shouldGenerate: true };
+        contextUpdated = true;
+      } else if (/carrousel|carousel|slides?/.test(qtyMatch[2])) {
+        context = { ...context, numCarousels: qty, shouldGenerate: true };
+        contextUpdated = true;
+      }
+    }
+
+    if (contextUpdated) {
+      await sb
+        .from("alfie_conversation_sessions")
+        .update({ context_json: context })
+        .eq("id", session.id);
+    }
+
     const nI = Number(context.numImages || 0);
     const nC = Number(context.numCarousels || 0);
     const countsSum = nI + nC;
@@ -79,7 +102,6 @@ serve(async (req) => {
     console.log('[ORCH] pre', { state, hasOrder, nI, nC, countsSum });
 
     // 2. Détection confirmation (AVANT toute mise à jour)
-    const normalized = (user_message || "").toLowerCase();
     const msgOk = ["oui","ok","go","vas y","lance","genere","cest parti","on y va","valide","✅","👍"]
       .some(t => normalized.includes(t) || user_message?.trim() === t);
     let shouldGenerate = Boolean(context.shouldGenerate) || msgOk;

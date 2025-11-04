@@ -17,6 +17,8 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,10 +30,10 @@ jobs:
           cache: 'npm'
 
       - name: Configure npm auth (optional)
-        if: ${{ secrets.NPM_TOKEN != '' }}
+        if: ${{ env.NPM_TOKEN != '' }}
         run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ env.NPM_TOKEN }}
 
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
