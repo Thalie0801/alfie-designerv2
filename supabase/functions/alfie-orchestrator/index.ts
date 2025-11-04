@@ -18,7 +18,16 @@ const json = (data: any, status = 200) =>
   });
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return json({}, 204);
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "access-control-allow-origin": "*",
+        "access-control-allow-headers": "content-type,authorization",
+        "access-control-allow-methods": "POST,OPTIONS"
+      }
+    });
+  }
   try {
     const body = await req.json();
     const { message: user_message, conversationId: session_id, brandId: brand_id } = body;
