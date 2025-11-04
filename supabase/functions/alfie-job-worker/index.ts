@@ -21,13 +21,33 @@ serve(async (req) => {
   try {
     console.log('🚀 [Worker] Starting job processing...');
 
-    // Boot diagnostics: check pending jobs count
-    const { count } = await supabaseAdmin
+    // 🧪 Environment check
+    console.log('🧪 env.check', {
+      hasUrl: !!Deno.env.get('SUPABASE_URL'),
+      hasAnon: !!Deno.env.get('SUPABASE_ANON_KEY'),
+      hasService: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+    });
+
+    // 🧪 Queue visibility probes
+    const { count: queued } = await supabaseAdmin
       .from('job_queue')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'queued');
     
-    console.log(`[WORKER] Boot: ${count ?? 0} jobs queued in job_queue`);
+    console.log('🧪 probe.queue_count', { queued: queued ?? 0 });
+
+    // 🧪 Check for legacy 'jobs' table
+    try {
+      const { data: dbgJobs, error: dbgErr } = await supabaseAdmin
+        .from('jobs')
+        .select('id')
+        .limit(1);
+      console.log('🧪 probe.jobs_table', { exists: !dbgErr, sample: dbgJobs?.length ?? 0 });
+    } catch {
+      console.log('🧪 probe.jobs_table', { exists: false });
+    }
+    
+    console.log(`[WORKER] Boot: ${queued ?? 0} jobs queued in job_queue`);
 
     // Process batch of jobs (3-5 max to avoid HTTP timeout)
     let processedCount = 0;
@@ -45,6 +65,10 @@ serve(async (req) => {
       }
 
       if (!claimedJobs || claimedJobs.length === 0) {
+        // 🧪 Warn if claim returns empty but we saw queued jobs
+        if ((queued ?? 0) > 0) {
+          console.warn('🧪 claim_empty_but_queued_gt0');
+        }
         console.log(`ℹ️ [Worker] No more jobs to process (processed ${processedCount})`);
         break;
       }
@@ -590,6 +614,8 @@ async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Pro
   
   // ✅ STEP 2: Fallback to payload if still no items found
   if (orderItems.length === 0) {
+    // 🧪 Explicit log when no items found after retries
+    console.warn('🧪 no_items_after_texts', { orderId: job.order_id });
     console.warn('⚠️ [Cascade] No order_items found after retries. Using payload fallback.');
     
     const { imageBriefs = [], carouselBriefs = [], brandId } = job.payload;
