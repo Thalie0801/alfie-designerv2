@@ -193,13 +193,50 @@ export function AlfieChat() {
     const userMessage = input.trim();
     setInput('');
     setIsLoading(true);
-    
+
     // 1. Ajouter message utilisateur
     addMessage({
       role: 'user',
       content: userMessage,
       type: 'text'
     });
+
+    // 1bis. Commande de monitoring simple: /queue
+    if (userMessage.startsWith('/queue')) {
+      try {
+        const headers = await getAuthHeader();
+        const { data, error } = await supabase.functions.invoke('queue-monitor', { headers });
+        if (error) throw error;
+        const c = (data as any)?.counts || {};
+        const oldest = (data as any)?.backlogSeconds ?? null;
+        const stuck = (data as any)?.stuck?.runningStuckCount ?? 0;
+        const completed24h = c.completed_24h ?? 0;
+        const minutes = oldest ? Math.max(0, Math.round((oldest as number) / 60)) : null;
+
+        addMessage({
+          role: 'assistant',
+          content: [
+            '📊 État de la file de jobs:',
+            `• queued: ${c.queued ?? 0}`,
+            `• running: ${c.running ?? 0}`,
+            `• failed: ${c.failed ?? 0}`,
+            `• completed (24h): ${completed24h}`,
+            `• plus ancien en attente: ${minutes !== null ? minutes + ' min' : 'n/a'}`,
+            `• jobs bloqués (>5min): ${stuck}`
+          ].join('\n'),
+          type: 'text'
+        });
+      } catch (e: any) {
+        addMessage({
+          role: 'assistant',
+          content: `❌ Monitoring indisponible: ${e?.message || e}`,
+          type: 'text'
+        });
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
     
     // 2. Appeler l'orchestrator avec retry (3 tentatives)
     let lastError: any = null;
