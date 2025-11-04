@@ -39,7 +39,7 @@ jobs:
         run: npm config set registry https://registry.npmjs.org/
 
       - name: Install dependencies
-        run: npm ci --prefer-online
+        run: npm install --prefer-online
 
       - name: Type check
         run: npm run typecheck
