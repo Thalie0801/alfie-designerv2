@@ -262,5 +262,5 @@ function escapeXml(text: string): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;')
     // Échapper tous les caractères non-ASCII pour Cloudinary
-    .replace(/[^\x00-\x7F]/g, (char) => `&#${char.charCodeAt(0)};`);
+    .replace(/[^\u0000-\u007F]/g, (char) => `&#${char.charCodeAt(0)};`);
 }
