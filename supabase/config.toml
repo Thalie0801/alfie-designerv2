@@ -1,9 +1,5 @@
 project_id = "itsjonazifiiikozengd"
 
-[functions.alfie-job-worker]
-verify_jwt = false
-schedule = "*/30 * * * * *"
-
 [functions.process-job-worker]
 verify_jwt = false
 schedule = "* * * * *"
@@ -177,7 +173,4 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.cancel-job-set]
-verify_jwt = true
-
-[functions.queue-monitor]
 verify_jwt = true

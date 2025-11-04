@@ -1,7 +1,6 @@
 import { edgeHandler } from '../_shared/edgeHandler.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { enrichPromptWithBrandKit } from '../_shared/aiOrchestrator.ts';
-import { uploadWithRichMetadata, type RichMetadata } from '../_shared/cloudinaryUploader.ts';
 
 export default {
   async fetch(req: Request) {
@@ -96,18 +95,7 @@ export default {
 CRITICAL RULES:
 - Generate EXACTLY ONE single image (no grid, no collage, no multiple frames).
 - Use perfect French spelling with proper accents: é, è, ê, à, ç, ù.
-- Maintain high visual hierarchy and readability.
-
-CRITICAL FRENCH TYPOGRAPHY RULES:
-- DO NOT include any visible text in the image unless explicitly requested
-- If text must appear, use ONLY correct French spelling:
-  • "Découvrez" (not Decouvrez, not Découvrez with wrong accent)
-  • "Créer" (not Creer)
-  • "Télécharger" (not Telecharger)
-  • "Qualité" (not Qualite)
-  • "Élégant" (not Elegant)
-- NEVER render styling metadata as visible text (no hex codes, no font names, no color codes)
-- Better: Generate pure backgrounds with NO TEXT AT ALL when backgroundOnly is true`;
+- Maintain high visual hierarchy and readability.`;
 
         // Enrichissement si carrousel
         if (typeof slideIndex === 'number' && totalSlides) {
@@ -127,15 +115,7 @@ CRITICAL FRENCH TYPOGRAPHY RULES:
 - NO decorative elements in center 60% of composition
 - Use brand colors: ${brandColors[0] || 'vibrant'}, ${brandColors[1] || 'accent'}
 - Style: ${backgroundStyle}
-
-ABSOLUTE CRITICAL: NO TEXT AT ALL
 - NO TEXT, NO TYPOGRAPHY, NO LETTERS anywhere in the image
-- NO VISIBLE WORDS of any kind
-- NO HEX COLOR CODES (like #90E3C2, #B58EE5)
-- NO FONT NAMES (like Arial, Helvetica)
-- NO STYLING METADATA visible in the image
-- Generate a PURE BACKGROUND with NO TEXT ELEMENTS
-- Text will be added separately by Cloudinary overlay system
 
 CONTRAST REQUIREMENTS:
 - Background contrast mode: ${textContrast} text (generate ${textContrast === 'light' ? 'dark' : 'light'} background)
@@ -191,7 +171,7 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
         if (backgroundOnly) {
           finalPrompt += `\n\nBackground style: ${backgroundStyle}`;
           finalPrompt += `\n\nText contrast mode: ${textContrast}`;
-          finalPrompt += `\n\nABSOLUTE CRITICAL: Generate a PURE BACKGROUND with NO TEXT, NO TYPOGRAPHY, NO LETTERS, NO VISIBLE WORDS, NO HEX CODES, NO FONT NAMES. Text will be added separately by overlay system.`;
+          finalPrompt += `\n\nCRITICAL: Generate a background composition with NO TEXT, NO TYPOGRAPHY, NO LETTERS.`;
         }
 
         console.log('[Render] Generating image with carousel context:', {
@@ -256,36 +236,7 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
           throw new Error('NO_IMAGE_GENERATED');
         }
 
-        // 4. Upload with rich metadata to Cloudinary (if brand_id present)
-        let finalImageUrl = imageUrl;
-        
-        if (brand_id && typeof slideIndex === 'number') {
-          try {
-            const metadata: RichMetadata = {
-              brandId: brand_id,
-              campaign: `order_${Date.now()}`,
-              orderId: brand_id,
-              assetId: crypto.randomUUID(),
-              type: 'carousel_slide',
-              format: format || '1024x1024',
-              language: 'fr',
-              alt: prompt.substring(0, 100),
-              slideIndex,
-              renderVersion: 1,
-              textVersion: 1,
-              textPublicId: overlayText ? `text_${slideIndex}` : undefined
-            };
-            
-            const uploadResult = await uploadWithRichMetadata(imageUrl, metadata);
-            finalImageUrl = uploadResult.secureUrl;
-            
-            console.log('[Render] Uploaded to Cloudinary with metadata:', uploadResult.publicId);
-          } catch (uploadError) {
-            console.error('[Render] Cloudinary upload failed, using original URL:', uploadError);
-          }
-        }
-        
-        // 5. Stocker la génération
+        // 4. Stocker la génération
         const { data: generation, error: insertError } = await supabaseAdmin
           .from('media_generations')
           .insert({
@@ -295,8 +246,8 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
             modality: 'image',
             provider_id: provider || 'gemini_image',
             prompt,
-            output_url: finalImageUrl,
-            render_url: finalImageUrl,
+            output_url: imageUrl,
+            render_url: imageUrl,
             status: 'completed',
             cost_woofs,
             params_json: { format },
@@ -342,7 +293,7 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
         }
 
         return {
-          image_urls: [finalImageUrl],
+          image_urls: [imageUrl],
           generation_id: generation?.id,
           meta: { provider: provider || 'gemini_image', format, cost: cost_woofs },
         };

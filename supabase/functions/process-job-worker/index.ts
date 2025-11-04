@@ -61,14 +61,6 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // SANITY CHECK: Compter les jobs en attente
-    const { count: queuedCount } = await supabase
-      .from('job_queue')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'queued');
-    
-    console.log(`[WORKER] Boot: ${queuedCount ?? 0} jobs queued in job_queue`);
-
     // 1. Récupérer 1 job en attente (FIFO) et le verrouiller atomiquement
     const { data: job, error: jobErr } = await supabase
       .from('jobs')

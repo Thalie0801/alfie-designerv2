@@ -61,8 +61,7 @@ export function GeneratorCard({
   onForceVideo,
   inputRef,
 }: GeneratorCardProps) {
-  const internalRef = useRef<HTMLTextAreaElement>(null);
-  const textareaRef = inputRef || internalRef;
+  const textareaRef = inputRef || useRef<HTMLTextAreaElement>(null);
 
   const handleMagicFocus = () => {
     textareaRef.current?.focus();
