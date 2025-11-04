@@ -155,9 +155,28 @@ serve(async (req) => {
           .update({ context_json: context })
           .eq("id", session.id);
         
+        console.log(`[ORCH] 📊 Image brief #${currentIdx + 1}:`, JSON.stringify(currentBrief, null, 2));
+        
         // Prochaine question
         const next = getNextQuestion(state, context);
         if (next) {
+          // ✅ CRITICAL FIX: Detect if image brief just became complete
+          const briefIsComplete = 
+            currentBrief.objective && 
+            currentBrief.format;
+          
+          if (briefIsComplete && next.questionKey === 'objective') {
+            // Image brief completed → next question is for NEXT image
+            context.currentImageIndex = currentIdx + 1;
+            
+            await sb
+              .from("alfie_conversation_sessions")
+              .update({ context_json: context })
+              .eq("id", session.id);
+            
+            console.log(`[ORCH] ✅ Image ${currentIdx + 1} completed. Moving to image ${currentIdx + 2}`);
+          }
+          
           return json({
             response: next.question,
             quickReplies: next.quickReplies || [],
@@ -249,8 +268,29 @@ serve(async (req) => {
           .update({ context_json: context })
           .eq("id", session.id);
         
+        console.log(`[ORCH] 📊 Carousel brief #${currentIdx + 1}:`, JSON.stringify(currentBrief, null, 2));
+        
         const next = getNextQuestion(state, context);
         if (next) {
+          // ✅ CRITICAL FIX: Detect if carousel brief just became complete
+          const briefIsComplete = 
+            currentBrief.topic && 
+            currentBrief.angle && 
+            currentBrief.numSlides;
+          
+          if (briefIsComplete && next.questionKey === 'topic') {
+            // Brief was just completed → next question is for NEXT carousel
+            // Increment and persist the index NOW
+            context.currentCarouselIndex = currentIdx + 1;
+            
+            await sb
+              .from("alfie_conversation_sessions")
+              .update({ context_json: context })
+              .eq("id", session.id);
+            
+            console.log(`[ORCH] ✅ Carrousel ${currentIdx + 1} completed. Moving to carousel ${currentIdx + 2}`);
+          }
+          
           return json({
             response: next.question,
             quickReplies: next.quickReplies || [],
