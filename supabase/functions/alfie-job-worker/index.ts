@@ -368,7 +368,13 @@ async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Pro
     console.warn('⚠️ [Cascade] No order_items found after retries. Using payload fallback.');
     
     const { imageBriefs = [], carouselBriefs = [], brandId } = job.payload;
-    const cascadeJobs = [];
+    const cascadeJobs: Array<{
+      user_id: string;
+      order_id: string;
+      type: string;
+      status: string;
+      payload: any;
+    }> = [];
     
     // Create jobs from imageBriefs
     imageBriefs.forEach((brief: any, index: number) => {
@@ -382,7 +388,7 @@ async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Pro
           textData: result.texts,
           brandId,
           imageIndex: index,
-          fallbackMode: true // debug marker
+          fallbackMode: true
         }
       });
     });
@@ -404,23 +410,43 @@ async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Pro
       });
     });
     
-    if (cascadeJobs.length > 0) {
+  if (cascadeJobs.length > 0) {
+    // Check for existing jobs to avoid duplicates
+    const { data: existingJobs } = await supabaseAdmin
+      .from('job_queue')
+      .select('id, type')
+      .eq('order_id', job.order_id)
+      .in('type', cascadeJobs.map(j => j.type));
+    
+    const existingTypes = new Set(existingJobs?.map((j: any) => j.type) || []);
+    const newJobs = cascadeJobs.filter((j: any) => !existingTypes.has(j.type));
+    
+    if (newJobs.length > 0) {
       const { error: cascadeError } = await supabaseAdmin
         .from('job_queue')
-        .insert(cascadeJobs);
+        .insert(newJobs);
       
       if (cascadeError) {
         console.error('❌ [Cascade] Failed to create fallback jobs:', cascadeError);
       } else {
-        console.log(`✅ [Cascade] Created ${cascadeJobs.length} jobs via FALLBACK`);
+        console.log(`✅ [Cascade] Created ${newJobs.length} jobs via FALLBACK`);
       }
+    } else {
+      console.log('ℹ️ [Cascade] All fallback jobs already exist');
     }
+  }
     
     return; // Exit after fallback
   }
   
   // ✅ STEP 3: Normal cascade from order_items
-  const cascadeJobs = [];
+  const cascadeJobs: Array<{
+    user_id: string;
+    order_id: string;
+    type: string;
+    status: string;
+    payload: any;
+  }> = [];
   
   for (const item of orderItems) {
     if (item.type === 'carousel') {
@@ -455,14 +481,28 @@ async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Pro
   }
   
   if (cascadeJobs.length > 0) {
-    const { error: cascadeError } = await supabaseAdmin
+    // Check for existing jobs to avoid duplicates
+    const { data: existingJobs } = await supabaseAdmin
       .from('job_queue')
-      .insert(cascadeJobs);
+      .select('id, type')
+      .eq('order_id', job.order_id)
+      .in('type', cascadeJobs.map(j => j.type));
     
-    if (cascadeError) {
-      console.error('❌ [Cascade] Failed to create jobs:', cascadeError);
+    const existingTypes = new Set(existingJobs?.map((j: any) => j.type) || []);
+    const newJobs = cascadeJobs.filter((j: any) => !existingTypes.has(j.type));
+    
+    if (newJobs.length > 0) {
+      const { error: cascadeError } = await supabaseAdmin
+        .from('job_queue')
+        .insert(newJobs);
+      
+      if (cascadeError) {
+        console.error('❌ [Cascade] Failed to create jobs:', cascadeError);
+      } else {
+        console.log(`✅ [Cascade] Created ${newJobs.length} jobs from order_items`);
+      }
     } else {
-      console.log(`✅ [Cascade] Created ${cascadeJobs.length} jobs from order_items`);
+      console.log('ℹ️ [Cascade] All jobs already exist');
     }
   }
 }

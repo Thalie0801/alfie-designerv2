@@ -374,37 +374,62 @@ serve(async (req) => {
         });
       }
       
-      // ✅ FIX: Use service role client to bypass RLS
+      // ✅ Insert order_items with service role (idempotent)
       if (items.length) {
-        const { data: insertedItems, error: itemsError } = await sb
+        // Check if items already exist
+        const { data: existing } = await sb
           .from("order_items")
-          .insert(items)
-          .select('id');
+          .select('id')
+          .eq('order_id', order.id);
         
-        if (itemsError) {
-          console.error('[ORCH] ❌ Failed to insert items:', itemsError);
-          // Continue anyway - worker will use fallback from payload
+        if (!existing || existing.length === 0) {
+          const { data: insertedItems, error: itemsError } = await sb
+            .from("order_items")
+            .insert(items)
+            .select('id');
+          
+          if (itemsError) {
+            console.error('[ORCH] ❌ Failed to insert items:', itemsError);
+          } else {
+            console.log('[ORCH] ✅ Items inserted:', insertedItems?.length || 0);
+          }
         } else {
-          console.log('[ORCH] ✅ Items inserted:', insertedItems?.length || 0, 'ids:', insertedItems?.map(i => i.id).join(', '));
+          console.log('[ORCH] ℹ️ Items already exist:', existing.length);
         }
       }
       
-      // Enqueue job
-      await sb.from("job_queue").insert({
-        user_id: user.id,
-        order_id: order.id,
-        type: "generate_texts",
-        status: "queued",
-        payload: {
-          imageBriefs: context.imageBriefs || [],
-          carouselBriefs: context.carouselBriefs || [],
-          brandId: brand_id,
-          numImages: nI,
-          numCarousels: nC
+      // ✅ Queue the initial job (idempotent)
+      const { data: existingJob } = await sb
+        .from("job_queue")
+        .select('id')
+        .eq('order_id', order.id)
+        .eq('type', 'generate_texts')
+        .maybeSingle();
+
+      if (!existingJob) {
+        const { error: jobError } = await sb.from("job_queue").insert({
+          user_id: user.id,
+          order_id: order.id,
+          type: "generate_texts",
+          status: "queued",
+          payload: {
+            brandId: brand_id,
+            imageBriefs: context.imageBriefs || [],
+            carouselBriefs: context.carouselBriefs || [],
+            numImages: nI,
+            numCarousels: nC
+          },
+        });
+
+        if (jobError) {
+          console.error('[ORCH] ❌ Failed to queue job:', jobError);
+          return json({ error: "failed_to_queue_job" }, 500);
         }
-      });
-      
-      console.log('[ORCH] ✅ Job queued for order:', order.id);
+        
+        console.log('[ORCH] ✅ Job queued for order:', order.id);
+      } else {
+        console.log('[ORCH] ℹ️ Job already exists for order:', order.id);
+      }
       
       // Invoke worker
       try {
