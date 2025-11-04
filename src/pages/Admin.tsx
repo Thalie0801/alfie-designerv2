@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Activity, ArrowLeft, Sparkles, Plus, ExternalLink, Trash2, Edit2, Search, RefreshCw, TrendingUp, UserCheck, UserX, Award } from 'lucide-react';
+import { Users, Activity, ArrowLeft, Sparkles, Plus, ExternalLink, Trash2, Edit2, Search, RefreshCw, TrendingUp, UserCheck, UserX, Award, Unlock } from 'lucide-react';
 import { toast } from 'sonner';
 import { NewsManager } from '@/components/NewsManager';
 import { VideoDiagnostic } from '@/components/VideoDiagnostic';
@@ -28,6 +28,7 @@ export default function Admin() {
   const [editingDesign, setEditingDesign] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [designDialogOpen, setDesignDialogOpen] = useState(false);
+  const [resettingJobs, setResettingJobs] = useState(false);
 
   useEffect(() => {
     loadAdminData();
@@ -219,6 +220,27 @@ export default function Admin() {
     }
   };
 
+  const handleResetStuckJobs = async () => {
+    if (!confirm('Débloquer tous les jobs bloqués depuis plus de 5 minutes ?')) return;
+    
+    setResettingJobs(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-reset-stuck-jobs', {
+        body: {}
+      });
+
+      if (error) throw error;
+
+      toast.success(data.message || 'Jobs débloqués avec succès');
+      console.log('[ADMIN] Reset result:', data);
+    } catch (error: any) {
+      console.error('Reset stuck jobs error:', error);
+      toast.error(error.message || 'Erreur lors du déblocage des jobs');
+    } finally {
+      setResettingJobs(false);
+    }
+  };
+
   const filteredUsers = users.filter(user => 
     user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -259,6 +281,15 @@ export default function Admin() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button 
+            onClick={handleResetStuckJobs} 
+            variant="outline" 
+            className="gap-2 border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950"
+            disabled={resettingJobs}
+          >
+            <Unlock className="h-4 w-4" />
+            {resettingJobs ? 'Déblocage...' : 'Débloquer jobs'}
+          </Button>
           <Button onClick={() => navigate('/admin/reset-password')} variant="outline" className="gap-2">
             <UserCheck className="h-4 w-4" />
             Reset mot de passe

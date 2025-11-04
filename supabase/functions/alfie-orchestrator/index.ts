@@ -527,10 +527,14 @@ serve(async (req) => {
         
         if (!workerRes.ok) {
           const errorText = await workerRes.text().catch(() => 'Unknown error');
-          console.warn('[ORCH] ⚠️ Worker returned error:', workerRes.status, errorText);
+          console.error('[ORCH] ❌ Worker failed:', workerRes.status, errorText);
         } else {
-          const workerData = await workerRes.json().catch(() => null);
-          console.log('[ORCH] ▶️ Worker invoked successfully:', workerData);
+          const workerData = await workerRes.json().catch(() => ({}));
+          console.log('[ORCH] ✅ Worker completed:', {
+            status: workerRes.status,
+            processed: workerData.processed || 0,
+            failed: workerData.failed || 0
+          });
         }
       } catch (e) {
         console.error('[ORCH] ❌ Worker invoke failed:', e);
