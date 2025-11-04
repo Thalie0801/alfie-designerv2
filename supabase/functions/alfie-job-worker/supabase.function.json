@@ -1,0 +1,4 @@
+{
+  "schedule": "*/30 * * * * *",
+  "verify_jwt": false
+}

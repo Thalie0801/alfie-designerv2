@@ -27,6 +27,7 @@ import NotFound from "./pages/NotFound";
 import Templates from "./pages/Templates";
 import Library from "./pages/Library";
 import Videos from "./pages/Videos";
+
 import ActivateAccess from "./pages/onboarding/Activate";
 import { AlfieChat } from "./components/AlfieChat";
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
