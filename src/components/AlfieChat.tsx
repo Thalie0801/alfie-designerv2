@@ -13,6 +13,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { useQueueMonitor } from '@/hooks/useQueueMonitor';
 import { QueueStatus } from '@/components/chat/QueueStatus';
+import { useLibraryAssetsSubscription } from '@/hooks/useLibraryAssetsSubscription';
+import { OrderResults } from '@/components/chat/OrderResults';
 
 // ======
 // TYPES
@@ -69,6 +71,9 @@ export function AlfieChat() {
   
   // Monitoring temps réel (affiché pendant la génération)
   const { data: queueData } = useQueueMonitor(conversationState === 'generating');
+  
+  // Subscription aux assets de l'order
+  const { assets: orderAssets, total: orderTotal } = useLibraryAssetsSubscription(orderId);
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -394,6 +399,17 @@ export function AlfieChat() {
       {conversationState === 'generating' && queueData ? (
         <QueueStatus data={queueData} />
       ) : null}
+      
+      {/* Order Results */}
+      {orderId && orderAssets.length > 0 && (
+        <div className="px-4 pb-2">
+          <OrderResults 
+            assets={orderAssets} 
+            total={orderTotal} 
+            orderId={orderId}
+          />
+        </div>
+      )}
       
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">

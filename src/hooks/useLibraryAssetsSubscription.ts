@@ -49,10 +49,17 @@ export function useLibraryAssetsSubscription(orderId: string | null) {
     for (const item of data) {
       if (item.type === 'carousel') {
         const brief = item.brief_json as any;
-        const slideCount = brief?.slideCount || brief?.slides?.length || 5;
+        // Check multiple possible locations for slide count
+        const slideCount = 
+          brief?.slideCount || 
+          brief?.slides?.length || 
+          brief?.briefs?.[0]?.numSlides ||
+          brief?.count ||
+          5;
         expectedTotal += slideCount;
       } else if (item.type === 'image') {
-        expectedTotal += 1;
+        const brief = item.brief_json as any;
+        expectedTotal += brief?.count || 1;
       }
     }
 
