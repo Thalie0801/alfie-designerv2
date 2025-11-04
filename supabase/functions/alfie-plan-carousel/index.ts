@@ -40,10 +40,26 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, slideCount, brandKit } = await req.json();
+    const body = await req.json();
+    
+    // ✅ COMPATIBILITÉ RÉTROACTIVE : accepter les deux formats
+    // Format ancien (de alfie-job-worker non redéployé): topic, numSlides, brandVoice
+    // Format nouveau (de alfie-job-worker redéployé): prompt, slideCount, brandKit
+    const prompt = body.prompt || body.topic;
+    const slideCount = body.slideCount || body.numSlides;
+    const brandKit = body.brandKit || (body.brandVoice ? { voice: body.brandVoice } : undefined);
+    
+    console.log('[alfie-plan-carousel] Received format:', {
+      hasPrompt: !!body.prompt,
+      hasTopic: !!body.topic,
+      hasSlideCount: !!body.slideCount,
+      hasNumSlides: !!body.numSlides,
+      hasBrandKit: !!body.brandKit,
+      hasBrandVoice: !!body.brandVoice
+    });
 
     if (!prompt || !slideCount) {
-      throw new Error('Missing prompt or slideCount');
+      throw new Error('Missing prompt/topic or slideCount/numSlides');
     }
 
     const brandInfo = brandKit as BrandKit;

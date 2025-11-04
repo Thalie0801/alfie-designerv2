@@ -11,6 +11,8 @@ import { CreateHeader } from '@/components/create/CreateHeader';
 import { QuotaBar } from '@/components/create/QuotaBar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
+import { useQueueMonitor } from '@/hooks/useQueueMonitor';
+import { QueueStatus } from '@/components/chat/QueueStatus';
 
 // ======
 // TYPES
@@ -63,6 +65,10 @@ export function AlfieChat() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [quickReplies, setQuickReplies] = useState<string[]>([]);
+  const [conversationState, setConversationState] = useState<string>('initial');
+  
+  // Monitoring temps réel (affiché pendant la génération)
+  const { data: queueData } = useQueueMonitor(conversationState === 'generating');
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -89,6 +95,27 @@ export function AlfieChat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+  
+  // ======
+  // SYSTEM MESSAGE WHEN GENERATING
+  // ======
+  
+  useEffect(() => {
+    if (conversationState === 'generating' && orderId) {
+      // Add system message to chat thread
+      const hasGeneratingMessage = messages.some(
+        m => m.role === 'assistant' && m.content.includes('🚀 Génération en cours')
+      );
+      
+      if (!hasGeneratingMessage) {
+        addMessage({
+          role: 'assistant',
+          content: '🚀 Génération en cours... Je te tiens au courant dès que c\'est prêt !',
+          type: 'text'
+        });
+      }
+    }
+  }, [conversationState, orderId, messages]);
   
   // ======
   // REALTIME JOB MONITORING
@@ -171,13 +198,50 @@ export function AlfieChat() {
     const userMessage = input.trim();
     setInput('');
     setIsLoading(true);
-    
+
     // 1. Ajouter message utilisateur
     addMessage({
       role: 'user',
       content: userMessage,
       type: 'text'
     });
+
+    // 1bis. Commande de monitoring simple: /queue
+    if (userMessage.startsWith('/queue')) {
+      try {
+        const headers = await getAuthHeader();
+        const { data, error } = await supabase.functions.invoke('queue-monitor', { headers });
+        if (error) throw error;
+        const c = (data as any)?.counts || {};
+        const oldest = (data as any)?.backlogSeconds ?? null;
+        const stuck = (data as any)?.stuck?.runningStuckCount ?? 0;
+        const completed24h = c.completed_24h ?? 0;
+        const minutes = oldest ? Math.max(0, Math.round((oldest as number) / 60)) : null;
+
+        addMessage({
+          role: 'assistant',
+          content: [
+            '📊 État de la file de jobs:',
+            `• queued: ${c.queued ?? 0}`,
+            `• running: ${c.running ?? 0}`,
+            `• failed: ${c.failed ?? 0}`,
+            `• completed (24h): ${completed24h}`,
+            `• plus ancien en attente: ${minutes !== null ? minutes + ' min' : 'n/a'}`,
+            `• jobs bloqués (>5min): ${stuck}`
+          ].join('\n'),
+          type: 'text'
+        });
+      } catch (e: any) {
+        addMessage({
+          role: 'assistant',
+          content: `❌ Monitoring indisponible: ${e?.message || e}`,
+          type: 'text'
+        });
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
     
     // 2. Appeler l'orchestrator avec retry (3 tentatives)
     let lastError: any = null;
@@ -214,6 +278,10 @@ export function AlfieChat() {
         if (data.orderId) {
           console.log('[Chat] Order created:', data.orderId);
           setOrderId(data.orderId);
+        }
+        
+        if (data.state) {
+          setConversationState(data.state);
         }
         
         // 4. Afficher la réponse de l'assistant
@@ -321,6 +389,11 @@ export function AlfieChat() {
       
       {/* Quota Bar */}
       {activeBrandId && <QuotaBar activeBrandId={activeBrandId} />}
+
+      {/* Queue Monitor (affiché pendant la génération) */}
+      {conversationState === 'generating' && queueData ? (
+        <QueueStatus data={queueData} />
+      ) : null}
       
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">

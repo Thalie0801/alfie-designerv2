@@ -2247,6 +2247,16 @@ export type Database = {
           woofs_needed: number
         }[]
       }
+      claim_next_job: {
+        Args: never
+        Returns: {
+          id: string
+          order_id: string
+          payload: Json
+          type: string
+          user_id: string
+        }[]
+      }
       consume_visuals: {
         Args: {
           brand_id_param: string
