@@ -115,11 +115,27 @@ serve(async (req) => {
       }
     }
 
-    // Check for state transition
-    const newState = shouldTransitionState(state, context, message);
-    if (newState) {
-      state = newState;
-      console.log('[Orchestrator] State transition to:', state);
+    // Handle confirming state BEFORE transition (to set shouldGenerate)
+    if (state === 'confirming') {
+      const normalized = message.toLowerCase();
+      if (normalized.includes('oui') || normalized.includes('générer') || normalized.includes('confirmer')) {
+        shouldGenerate = true;
+        responseText = '🚀 Génération en cours... Je commence par créer les textes optimisés pour chaque élément.';
+        state = 'generating';
+      } else {
+        responseText = buildSummary(context) + '\n\nQue souhaitez-vous modifier ?';
+      }
+    }
+
+    // Check for state transition (but skip if already handled above)
+    if (state !== 'generating') {
+      const newState = shouldTransitionState(state, context, message);
+      if (newState) {
+        state = newState;
+        console.log('[Orchestrator] State transition to:', state);
+      }
+    } else {
+      console.log('[Orchestrator] State transition to: generating');
     }
 
     // Handle state-specific logic
@@ -180,16 +196,6 @@ serve(async (req) => {
       }
     }
 
-    if (state === 'confirming') {
-      const normalized = message.toLowerCase();
-      if (normalized.includes('oui') || normalized.includes('générer') || normalized.includes('confirmer')) {
-        state = 'generating';
-        shouldGenerate = true;
-        responseText = '🚀 Génération en cours... Je commence par créer les textes optimisés pour chaque élément.';
-      } else {
-        responseText = buildSummary(context) + '\n\nQue souhaitez-vous modifier ?';
-      }
-    }
 
     // Update session
     messages.push({
