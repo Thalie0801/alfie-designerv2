@@ -86,7 +86,8 @@ serve(async (req) => {
     });
 
     console.log('[Orchestrator] Current state:', state);
-    console.log('[Orchestrator] Current context:', context);
+    console.log('[Orchestrator] Current context:', JSON.stringify(context));
+    console.log('[Orchestrator] Session order_id:', session.order_id);
 
     // Process message based on state
     let responseText = '';
@@ -117,13 +118,27 @@ serve(async (req) => {
 
     // Handle confirming state BEFORE transition (to set shouldGenerate)
     if (state === 'confirming') {
-      const normalized = message.toLowerCase();
-      if (normalized.includes('oui') || normalized.includes('générer') || normalized.includes('confirmer')) {
+      // Normalize message for robust confirmation detection
+      const normalized = message
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, ""); // Remove accents
+      
+      const confirmKeywords = ['oui', 'ok', 'go', 'cest parti', 'vas y', 'lance', 'genere', 'confirme', 'partons', 'on y va'];
+      const isConfirmation = confirmKeywords.some(kw => normalized.includes(kw)) || 
+                            message.trim() === '✅' || 
+                            message.trim() === '👍';
+      
+      console.log('[Orchestrator] Confirmation check:', { normalized, isConfirmation });
+      
+      if (isConfirmation) {
         shouldGenerate = true;
         responseText = '🚀 Génération en cours... Je commence par créer les textes optimisés pour chaque élément.';
         state = 'generating';
+        console.log('[Orchestrator] Confirmation detected -> shouldGenerate=true, state=generating');
       } else {
         responseText = buildSummary(context) + '\n\nQue souhaitez-vous modifier ?';
+        console.log('[Orchestrator] No confirmation detected, asking for modification');
       }
     }
 
@@ -135,7 +150,19 @@ serve(async (req) => {
         console.log('[Orchestrator] State transition to:', state);
       }
     } else {
-      console.log('[Orchestrator] State transition to: generating');
+      console.log('[Orchestrator] Already in generating state');
+    }
+
+    // Fallback: Force generation if in generating state without order but with valid briefs
+    if (state === 'generating' && !session.order_id && !shouldGenerate) {
+      const hasImages = (context.numImages || 0) > 0;
+      const hasCarousels = (context.numCarousels || 0) > 0;
+      
+      if (hasImages || hasCarousels) {
+        console.log('[Orchestrator] Fallback: forcing shouldGenerate=true in generating state without order_id');
+        shouldGenerate = true;
+        responseText = '🚀 Génération en cours... Je commence par créer les textes optimisés pour chaque élément.';
+      }
     }
 
     // Handle state-specific logic
@@ -219,109 +246,170 @@ serve(async (req) => {
     }
 
     // If we should generate, create the order and jobs
-    let createdOrderId = null;
+    let createdOrderId = session.order_id; // Start with existing order_id if any
+    
+    console.log('[Orchestrator] Generation decision:', {
+      shouldGenerate,
+      hasOrderId: !!session.order_id,
+      numImages: context.numImages || 0,
+      numCarousels: context.numCarousels || 0
+    });
     
     if (shouldGenerate) {
-      try {
-        // Create order
-        const campaignName = `Campaign_${Date.now()}`;
+      // Idempotence check: if session already has an order_id, don't recreate
+      if (session.order_id) {
+        console.log('[Orchestrator] Order already exists for session:', session.order_id);
+        createdOrderId = session.order_id;
         
-        const { data: order, error: orderError } = await supabaseClient
-          .from('orders')
-          .insert({
+        // Check if job already exists
+        const { data: existingJob } = await supabaseClient
+          .from('job_queue')
+          .select('id')
+          .eq('order_id', session.order_id)
+          .eq('type', 'generate_texts')
+          .in('status', ['queued', 'processing'])
+          .single();
+        
+        if (existingJob) {
+          console.log('[Orchestrator] Job already queued/processing for order:', existingJob.id);
+          // Don't recreate, just return
+          responseText = '🚀 Génération en cours... Je commence par créer les textes optimisés pour chaque élément.';
+        }
+      } else {
+        // Create new order
+        try {
+          const campaignName = `Campaign_${Date.now()}`;
+          
+          console.log('[Orchestrator] Creating order with:', {
             user_id: user.id,
             brand_id: brandId,
             campaign_name: campaignName,
-            status: 'text_generation',
             brief_json: context
-          })
-          .select()
-          .single();
-
-        if (orderError) throw orderError;
-
-        console.log('[Orchestrator] Order created:', order.id);
-        createdOrderId = order.id;
-
-        // Link session to order
-        await supabaseClient
-          .from('alfie_conversation_sessions')
-          .update({ order_id: order.id })
-          .eq('id', session.id);
-
-        // Create order items
-        const items = [];
-        
-        for (let i = 0; i < (context.numImages || 0); i++) {
-          items.push({
-            order_id: order.id,
-            type: 'image',
-            sequence_number: i,
-            brief_json: context.imageBriefs?.[i] || {},
-            status: 'pending'
           });
-        }
+          
+          const { data: order, error: orderError } = await supabaseClient
+            .from('orders')
+            .insert({
+              user_id: user.id,
+              brand_id: brandId,
+              campaign_name: campaignName,
+              status: 'text_generation',
+              brief_json: context
+            })
+            .select()
+            .single();
 
-        for (let i = 0; i < (context.numCarousels || 0); i++) {
-          items.push({
-            order_id: order.id,
-            type: 'carousel',
-            sequence_number: i,
-            brief_json: context.carouselBriefs?.[i] || {},
-            status: 'pending'
-          });
-        }
+          if (orderError) {
+            console.error('[Orchestrator] Order creation error:', orderError);
+            throw orderError;
+          }
 
-        if (items.length > 0) {
-          const { error: itemsError } = await supabaseClient
-            .from('order_items')
-            .insert(items);
+          console.log('[Orchestrator] ✅ Order created successfully:', order.id);
+          createdOrderId = order.id;
 
-          if (itemsError) throw itemsError;
-        }
+          // Link session to order
+          await supabaseClient
+            .from('alfie_conversation_sessions')
+            .update({ order_id: order.id })
+            .eq('id', session.id);
 
-        console.log('[Orchestrator] Order items created:', items.length);
+          // Create order items
+          const items = [];
+          
+          for (let i = 0; i < (context.numImages || 0); i++) {
+            items.push({
+              order_id: order.id,
+              type: 'image',
+              sequence_number: i,
+              brief_json: context.imageBriefs?.[i] || {},
+              status: 'pending'
+            });
+          }
 
-        // Create job for text generation
-        const { data: textJob, error: jobError } = await supabaseClient
-          .from('job_queue')
-          .insert({
-            user_id: user.id,
-            order_id: order.id,
-            type: 'generate_texts',
-            status: 'queued',
-            payload: {
-              imageBriefs: context.imageBriefs || [],
-              carouselBriefs: context.carouselBriefs || [],
-              brandId,
-              numImages: context.numImages || 0,
-              numCarousels: context.numCarousels || 0
+          for (let i = 0; i < (context.numCarousels || 0); i++) {
+            items.push({
+              order_id: order.id,
+              type: 'carousel',
+              sequence_number: i,
+              brief_json: context.carouselBriefs?.[i] || {},
+              status: 'pending'
+            });
+          }
+
+          console.log('[Orchestrator] Inserting order items:', items.length);
+
+          if (items.length > 0) {
+            const { error: itemsError } = await supabaseClient
+              .from('order_items')
+              .insert(items);
+
+            if (itemsError) {
+              console.error('[Orchestrator] Order items creation error:', itemsError);
+              throw itemsError;
             }
-          })
-          .select()
-          .single();
+          }
 
-        if (jobError) {
-          console.error('[Orchestrator] Job creation error:', jobError);
-          throw jobError;
+          console.log('[Orchestrator] ✅ Order items created successfully:', items.length);
+
+          // Create job for text generation
+          const jobPayload = {
+            imageBriefs: context.imageBriefs || [],
+            carouselBriefs: context.carouselBriefs || [],
+            brandId,
+            numImages: context.numImages || 0,
+            numCarousels: context.numCarousels || 0
+          };
+
+          console.log('[Orchestrator] Creating job with payload:', jobPayload);
+
+          const { data: textJob, error: jobError } = await supabaseClient
+            .from('job_queue')
+            .insert({
+              user_id: user.id,
+              order_id: order.id,
+              type: 'generate_texts',
+              status: 'queued',
+              payload: jobPayload
+            })
+            .select()
+            .single();
+
+          if (jobError) {
+            console.error('[Orchestrator] Job creation error:', jobError);
+            throw jobError;
+          }
+
+          console.log('[Orchestrator] ✅ Text generation job created successfully:', textJob.id);
+
+        } catch (genError) {
+          console.error('[Orchestrator] Generation setup error:', genError);
+          console.error('[Orchestrator] Error details:', genError);
+          responseText = '⚠️ Erreur lors de la préparation de la génération. Veuillez réessayer.';
         }
-
-        console.log('[Orchestrator] Text generation job created:', textJob.id);
-
-      } catch (genError) {
-        console.error('[Orchestrator] Generation setup error:', genError);
-        responseText += '\n\n⚠️ Erreur lors de la préparation de la génération. Veuillez réessayer.';
       }
     }
 
-    return new Response(JSON.stringify({
+    // Clear quickReplies if generating
+    if (state === 'generating') {
+      quickReplies = [];
+    }
+
+    const responsePayload = {
       response: responseText,
       quickReplies,
       conversationId: session.id,
       orderId: createdOrderId,
       state,
       context
-    }), {
+    };
+
+    console.log('[Orchestrator] Final response:', {
+      state,
+      orderId: createdOrderId,
+      hasQuickReplies: quickReplies.length > 0
+    });
+
+    return new Response(JSON.stringify(responsePayload), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
