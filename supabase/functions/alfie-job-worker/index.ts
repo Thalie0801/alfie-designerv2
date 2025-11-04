@@ -21,124 +21,131 @@ serve(async (req) => {
   try {
     console.log('🚀 [Worker] Starting job processing...');
 
-    // Fetch ONE queued job (FIFO)
-    const { data: jobs, error: fetchError } = await supabaseAdmin
+    // Boot diagnostics: check pending jobs count
+    const { count } = await supabaseAdmin
       .from('job_queue')
-      .select('*')
-      .eq('status', 'queued')
-      .order('created_at', { ascending: true })
-      .limit(1);
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'queued');
+    
+    console.log(`[WORKER] Boot: ${count ?? 0} jobs queued in job_queue`);
 
-    if (fetchError) {
-      console.error('❌ [Worker] Error fetching jobs:', fetchError);
-      throw fetchError;
+    // Process batch of jobs (3-5 max to avoid HTTP timeout)
+    let processedCount = 0;
+    const maxJobs = 5;
+    const results: any[] = [];
+
+    for (let i = 0; i < maxJobs; i++) {
+      // Atomically claim next job using RPC function
+      const { data: claimedJobs, error: claimError } = await supabaseAdmin
+        .rpc('claim_next_job');
+
+      if (claimError) {
+        console.error('❌ [Worker] Error claiming job:', claimError);
+        break;
+      }
+
+      if (!claimedJobs || claimedJobs.length === 0) {
+        console.log(`ℹ️ [Worker] No more jobs to process (processed ${processedCount})`);
+        break;
+      }
+
+      const job = claimedJobs[0];
+      console.log(`🟢 [Worker] start_job`, { jobId: job.id, order_id: job.order_id, type: job.type });
+
+      let result: any = null;
+      let error: string | null = null;
+
+      try {
+        // Execute job based on type
+        switch (job.type) {
+          case 'generate_texts':
+            result = await processGenerateTexts(job.payload);
+            break;
+          case 'render_images':
+            result = await processRenderImages(job.payload);
+            break;
+          case 'render_carousels':
+            result = await processRenderCarousels(job.payload);
+            break;
+          case 'generate_video':
+            result = await processGenerateVideo(job.payload);
+            break;
+          default:
+            throw new Error(`Unknown job type: ${job.type}`);
+        }
+
+        // Mark job as completed
+        await supabaseAdmin
+          .from('job_queue')
+          .update({
+            status: 'completed',
+            result,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', job.id);
+
+        console.log(`✅ [Worker] job_done`, { jobId: job.id, order_id: job.order_id });
+
+        // Create cascade jobs if needed
+        if (job.type === 'generate_texts') {
+          await createCascadeJobs(job, result, supabaseAdmin);
+        }
+
+        processedCount++;
+        results.push({ job_id: job.id, success: true });
+
+      } catch (processingError) {
+        console.error(`🔴 [Worker] job_failed`, { jobId: job.id, error: processingError instanceof Error ? processingError.message : 'Unknown error' });
+        error = processingError instanceof Error ? processingError.message : 'Unknown error';
+
+        // Check retry logic
+        const retryCount = job.retry_count || 0;
+        const maxRetries = job.max_retries || 3;
+        const shouldRetry = retryCount < maxRetries;
+        
+        if (shouldRetry) {
+          // Increment retry count and requeue
+          await supabaseAdmin
+            .from('job_queue')
+            .update({
+              status: 'queued',
+              retry_count: retryCount + 1,
+              error,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', job.id);
+          
+          console.log(`🔄 [Worker] Job ${job.id} requeued (retry ${retryCount + 1}/${maxRetries})`);
+        } else {
+          // Mark as failed permanently
+          await supabaseAdmin
+            .from('job_queue')
+            .update({
+              status: 'failed',
+              error,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', job.id);
+          
+          console.log(`❌ [Worker] Job ${job.id} failed permanently after ${retryCount} retries`);
+        }
+
+        results.push({ job_id: job.id, success: false, error, retried: shouldRetry });
+      }
     }
 
-    if (!jobs || jobs.length === 0) {
-      console.log('ℹ️ [Worker] No jobs to process');
-      return new Response(JSON.stringify({ message: 'No jobs to process' }), {
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        processed: processedCount,
+        results 
+      }),
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
-      });
-    }
-
-    const job = jobs[0];
-    console.log(`📋 [Worker] Processing job ${job.id} (type: ${job.type})`);
-
-    // Mark job as running
-    await supabaseAdmin
-      .from('job_queue')
-      .update({ status: 'running', updated_at: new Date().toISOString() })
-      .eq('id', job.id);
-
-    let result: any = null;
-    let error: string | null = null;
-
-    try {
-      // Execute job based on type
-      switch (job.type) {
-        case 'generate_texts':
-          result = await processGenerateTexts(job.payload);
-          break;
-        case 'render_images':
-          result = await processRenderImages(job.payload);
-          break;
-        case 'render_carousels':
-          result = await processRenderCarousels(job.payload);
-          break;
-        case 'generate_video':
-          result = await processGenerateVideo(job.payload);
-          break;
-        default:
-          throw new Error(`Unknown job type: ${job.type}`);
       }
+    );
 
-      // Mark job as completed
-      await supabaseAdmin
-        .from('job_queue')
-        .update({
-          status: 'completed',
-          result,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', job.id);
-
-      console.log(`✅ [Worker] Job ${job.id} completed successfully`);
-
-      // Create cascade jobs if needed
-      if (job.type === 'generate_texts') {
-        await createCascadeJobs(job, result, supabaseAdmin);
-      }
-
-      return new Response(
-        JSON.stringify({ success: true, job_id: job.id, result }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
-    } catch (processingError) {
-      console.error(`❌ [Worker] Job ${job.id} failed:`, processingError);
-      error = processingError instanceof Error ? processingError.message : 'Unknown error';
-
-      // Check retry logic
-      const shouldRetry = job.retry_count < job.max_retries;
-      
-      if (shouldRetry) {
-        // Increment retry count and requeue
-        await supabaseAdmin
-          .from('job_queue')
-          .update({
-            status: 'queued',
-            retry_count: job.retry_count + 1,
-            error,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', job.id);
-        
-        console.log(`🔄 [Worker] Job ${job.id} requeued (retry ${job.retry_count + 1}/${job.max_retries})`);
-      } else {
-        // Mark as failed permanently
-        await supabaseAdmin
-          .from('job_queue')
-          .update({
-            status: 'failed',
-            error,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', job.id);
-        
-        console.log(`❌ [Worker] Job ${job.id} failed permanently after ${job.retry_count} retries`);
-      }
-
-      return new Response(
-        JSON.stringify({ success: false, job_id: job.id, error, retried: shouldRetry }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
-    }
   } catch (error) {
     console.error('❌ [Worker] Fatal error:', error);
     return new Response(

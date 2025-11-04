@@ -208,6 +208,23 @@ serve(async (req) => {
     if (jErr) console.error('[ORCH] job_enqueue_error', jErr);
     else console.info('[ORCH] ✅ job_queued', { order_id: order.id });
 
+    // Invoke worker immediately to process the job
+    try {
+      const workerUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/alfie-job-worker`;
+      const workerRes = await fetch(workerUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ trigger: 'orchestrator' }),
+      });
+      console.log('[ORCH] ▶️ worker invoked', { ok: workerRes.ok, status: workerRes.status });
+    } catch (workerErr) {
+      console.error('[ORCH] worker_invoke_error', workerErr);
+      // Don't block if worker fails to respond
+    }
+
     return json({ 
       response: "🚀 Génération en cours…", 
       orderId: order.id, 
