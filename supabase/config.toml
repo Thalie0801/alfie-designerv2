@@ -180,5 +180,9 @@ verify_jwt = true
 [functions.admin-reset-stuck-jobs]
 verify_jwt = true
 
+[functions.alfie-job-worker]
+verify_jwt = false
+schedule = "*/30 * * * * *"
+
 [functions.queue-monitor]
 verify_jwt = true
