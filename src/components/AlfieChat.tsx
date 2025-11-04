@@ -47,7 +47,7 @@ interface Message {
 
 export function AlfieChat() {
   const { user } = useAuth();
-  const { activeBrandId, brandKit } = useBrandKit();
+  const { activeBrandId } = useBrandKit();
   
   // États minimaux
   const [messages, setMessages] = useState<Message[]>([{
@@ -60,13 +60,10 @@ export function AlfieChat() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [carouselProgress, setCarouselProgress] = useState<{ current: number; total: number } | null>(null);
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoPollingRef = useRef<Record<string, NodeJS.Timeout>>({});
-  const carouselChannelRef = useRef<any>(null);
   
   // ======
   // UTILITAIRES
@@ -82,10 +79,6 @@ export function AlfieChat() {
     return id;
   };
   
-  const updateMessage = (id: string, updates: Partial<Message>) => {
-    setMessages(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
-  };
-  
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -98,53 +91,60 @@ export function AlfieChat() {
   // ORCHESTRATOR CONVERSATION STATE
   // ======
   
-  // TODO: Integrate with orchestrator fully
-  // const [conversationId, setConversationId] = useState<string | null>(null);
-  // const [orderId, setOrderId] = useState<string | null>(null);
-  const orderId = null; // Temporary: will be populated by orchestrator integration
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [quickReplies, setQuickReplies] = useState<string[]>([]);
   
-  // Simple local intent detection for fallback
-  const detectIntent = (prompt: string): 'image' | 'video' | 'carousel' | 'unknown' => {
-    const lower = prompt.toLowerCase();
-    if (/(carrousel|carousel|slides|série)/i.test(lower)) return 'carousel';
-    if (/(vidéo|video|reel|short|story)/i.test(lower)) return 'video';
-    if (/(image|visuel|photo|illustration|cover)/i.test(lower)) return 'image';
-    return 'unknown';
-  };
+  // Simple local intent detection for fallback (kept for reference)
+  // const detectIntent = (prompt: string): 'image' | 'video' | 'carousel' | 'unknown' => {
+  //   const lower = prompt.toLowerCase();
+  //   if (/(carrousel|carousel|slides|série)/i.test(lower)) return 'carousel';
+  //   if (/(vidéo|video|reel|short|story)/i.test(lower)) return 'video';
+  //   if (/(image|visuel|photo|illustration|cover)/i.test(lower)) return 'image';
+  //   return 'unknown';
+  // };
   
-  const detectBulkCarousel = (text: string): { isBulk: boolean; numCarousels: number; numSlides: number } => {
-    const lower = text.toLowerCase();
-    
-    // Patterns améliorés pour détecter les demandes bulk
-    const patterns = [
-      /(\d+)\s*carrousels?\s*(?:de\s*(\d+)\s*slides?)?/i,  // "5 carrousels de 10 slides"
-      /générer?\s*(\d+)\s*carrousels?/i,                    // "générer 10 carrousels"
-      /créer?\s*(\d+)\s*carrousels?/i,                      // "créer 10 carrousels"
-      /(\d+)\s*séries?\s*de\s*(\d+)\s*(?:images?|slides?)/i, // "10 séries de 5 images"
-      /production\s*massive.*?(\d+)\s*carrousels?/i,        // "production massive de X carrousels"
-      /bulk.*?(\d+)\s*carrousels?/i                         // "bulk carousel 10"
-    ];
-    
-    for (const pattern of patterns) {
-      const match = lower.match(pattern);
-      if (match) {
-        const numCarousels = parseInt(match[1]) || 1;
-        const numSlides = parseInt(match[2]) || 5; // Default 5 slides per carousel
-        
-        console.log('[Bulk Detection] Match found:', { pattern: pattern.source, numCarousels, numSlides });
-        
-        return { isBulk: numCarousels > 1, numCarousels, numSlides };
-      }
-    }
-    
-    return { isBulk: false, numCarousels: 1, numSlides: 5 };
-  };
+  // Kept for potential future use
+  // const detectBulkCarousel = (text: string): { isBulk: boolean; numCarousels: number; numSlides: number } => {
+  //   const lower = text.toLowerCase();
+  //   
+  //   // Patterns améliorés pour détecter les demandes bulk
+  //   const patterns = [
+  //     /(\d+)\s*carrousels?\s*(?:de\s*(\d+)\s*slides?)?/i,  // "5 carrousels de 10 slides"
+  //     /générer?\s*(\d+)\s*carrousels?/i,                    // "générer 10 carrousels"
+  //     /créer?\s*(\d+)\s*carrousels?/i,                      // "créer 10 carrousels"
+  //     /(\d+)\s*séries?\s*de\s*(\d+)\s*(?:images?|slides?)/i, // "10 séries de 5 images"
+  //     /production\s*massive.*?(\d+)\s*carrousels?/i,        // "production massive de X carrousels"
+  //     /bulk.*?(\d+)\s*carrousels?/i                         // "bulk carousel 10"
+  //   ];
+  //   
+  //   for (const pattern of patterns) {
+  //     const match = lower.match(pattern);
+  //     if (match) {
+  //       const numCarousels = parseInt(match[1]) || 1;
+  //       const numSlides = parseInt(match[2]) || 5; // Default 5 slides per carousel
+  //       
+  //       console.log('[Bulk Detection] Match found:', { pattern: pattern.source, numCarousels, numSlides });
+  //       
+  //       return { isBulk: numCarousels > 1, numCarousels, numSlides };
+  //     }
+  //   }
+  //   
+  //   return { isBulk: false, numCarousels: 1, numSlides: 5 };
+  // };
   
-  const extractCount = (prompt: string): number => {
-    const match = prompt.match(/(\d+)\s*(slides?|visuels?|images?)/i);
-    return match ? parseInt(match[1]) : 5;
-  };
+  // const extractCount = (prompt: string): number => {
+  //   const match = prompt.match(/(\d+)\s*(slides?|visuels?|images?)/i);
+  //   return match ? parseInt(match[1]) : 5;
+  // };
   
+  // ======
+  // GESTION DES QUOTAS (LEGACY - Kept for potential future use)
+  // ======
+  
+  // Commented out for now as orchestrator handles quota management
+  
+  /*
   const detectAspectRatio = (prompt: string): string => {
     if (/9:16|story|vertical|tiktok|reels/i.test(prompt)) return '9:16';
     if (/16:9|youtube|horizontal|paysage/i.test(prompt)) return '16:9';
@@ -152,10 +152,6 @@ export function AlfieChat() {
     if (/1:1|carré|square/i.test(prompt)) return '1:1';
     return '1:1';
   };
-  
-  // ======
-  // GESTION DES QUOTAS
-  // ======
   
   const checkAndConsumeQuota = async (
     type: 'woofs' | 'visuals',
@@ -247,6 +243,7 @@ export function AlfieChat() {
   //     console.error('[Refund] Error:', error);
   //   }
   // };
+  */
   
   // ======
   // REALTIME JOB MONITORING
@@ -311,9 +308,13 @@ export function AlfieChat() {
   }, [orderId, addMessage]);
   
   // ======
-  // LEGACY GENERATION FUNCTIONS (FALLBACK)
+  // LEGACY GENERATION FUNCTIONS (KEPT FOR POTENTIAL FUTURE USE)
   // ======
   
+  // These functions are commented out but kept for reference
+  // as they might be useful for fallback or debugging purposes
+  
+  /*
   const mapAspectRatio = (ratio: string): string => {
     const mapping: Record<string, string> = {
       '1:1': '1024x1024',
@@ -943,11 +944,11 @@ export function AlfieChat() {
   useEffect(() => {
     return () => {
       // Nettoyer le polling des vidéos
-      Object.values(videoPollingRef.current).forEach(clearInterval);
+      Object.values(_videoPollingRef.current).forEach(clearInterval);
       
       // Nettoyer le canal carrousel
-      if (carouselChannelRef.current) {
-        supabase.removeChannel(carouselChannelRef.current);
+      if (_carouselChannelRef.current) {
+        supabase.removeChannel(_carouselChannelRef.current);
       }
     };
   }, []);
@@ -1114,13 +1115,14 @@ export function AlfieChat() {
       return false;
     }
   };
+  */
   
   // ======
-  // HANDLER PRINCIPAL
+  // HANDLER PRINCIPAL (ORCHESTRATOR-BASED)
   // ======
   
   const handleSend = async () => {
-    if (isLoading || (!input.trim() && !uploadedImage)) return;
+    if (isLoading || !input.trim()) return;
     
     if (!activeBrandId) {
       toast.error('Sélectionne une marque d\'abord !');
@@ -1134,81 +1136,68 @@ export function AlfieChat() {
     // 1. Ajouter message utilisateur
     addMessage({
       role: 'user',
-      content: userMessage || '(Image jointe)',
+      content: userMessage,
       type: 'text'
     });
     
     try {
-      // 2. Détection d'intent côté frontend AVANT l'orchestrateur
-      const isCarouselRequest = userMessage.toLowerCase().match(/carrousel|carousel|slides/i);
+      const headers = await getAuthHeader();
       
-      if (isCarouselRequest) {
-        console.log('[Chat] Carousel request detected');
-        
-        // Détecter si c'est une demande bulk
-        const bulkInfo = detectBulkCarousel(userMessage);
-        const aspectRatio = detectAspectRatio(userMessage) || '4:5';
-        
-        console.log('[Chat] Bulk detection result:', bulkInfo);
-        
-        if (bulkInfo.isBulk) {
-          console.log('[Chat] ✅ Bulk carousel detected, routing to generateBulkCarousels');
-          await generateBulkCarousels(userMessage, bulkInfo, aspectRatio);
-        } else {
-          console.log('[Chat] Single carousel detected, using progressive generation');
-          const count = extractCount(userMessage) || 5;
-          await generateCarouselProgressive(userMessage, count);
-        }
-        return;
+      // 2. Appeler l'orchestrator
+      console.log('[Chat] Calling orchestrator with:', { 
+        message: userMessage, 
+        conversationId, 
+        brandId: activeBrandId 
+      });
+      
+      const { data, error } = await supabase.functions.invoke('alfie-orchestrator', {
+        body: {
+          message: userMessage,
+          conversationId,
+          brandId: activeBrandId
+        },
+        headers
+      });
+      
+      if (error) throw error;
+      
+      console.log('[Chat] Orchestrator response:', data);
+      
+      // 3. Mettre à jour l'état conversationnel
+      if (data.conversationId) {
+        setConversationId(data.conversationId);
       }
       
-      // 3. Essayer l'orchestrateur backend pour les autres types (images, vidéos)
-      console.log('[Chat] Trying orchestrator...');
-      const orchestratorSuccess = await orchestratorSend(userMessage);
-      
-      // Si l'orchestrateur a fonctionné, on s'arrête ici
-      if (orchestratorSuccess) {
-        console.log('[Chat] ✅ Orchestrator success');
-        return;
+      if (data.orderId) {
+        console.log('[Chat] Order created:', data.orderId);
+        setOrderId(data.orderId);
       }
       
-      // 4. FALLBACK LOCAL si l'orchestrateur échoue
-      console.log('[Chat] Orchestrator failed, using local fallback');
-      const intent = detectIntent(userMessage);
-      
-      switch (intent) {
-        case 'image': {
-          const aspectRatio = detectAspectRatio(userMessage);
-          await generateImage(userMessage, aspectRatio);
-          break;
-        }
-        
-        case 'video': {
-          const aspectRatio = detectAspectRatio(userMessage);
-          await generateVideo(userMessage, aspectRatio);
-          break;
-        }
-        
-        case 'carousel': {
-          const count = extractCount(userMessage);
-          await generateCarouselProgressive(userMessage, count);
-          break;
-        }
-        
-        default:
-          addMessage({
-            role: 'assistant',
-            content: "Je ne suis pas sûr de comprendre. Tu veux créer une **image**, une **vidéo** ou un **carrousel** ? 🤔",
-            type: 'text'
-          });
+      // 4. Afficher la réponse de l'assistant
+      if (data.response) {
+        addMessage({
+          role: 'assistant',
+          content: data.response,
+          type: 'text'
+        });
       }
-    } catch (error) {
-      console.error('Error in handleSend:', error);
+      
+      // 5. Mettre à jour les quick replies
+      if (data.quickReplies && Array.isArray(data.quickReplies)) {
+        setQuickReplies(data.quickReplies);
+      } else {
+        setQuickReplies([]);
+      }
+      
+    } catch (error: any) {
+      console.error('[Chat] Error:', error);
+      
       addMessage({
         role: 'assistant',
-        content: '❌ Une erreur inattendue est survenue. Veuillez réessayer.',
+        content: '❌ Une erreur est survenue. Réessaye dans un instant.',
         type: 'text'
       });
+      toast.error('Erreur de communication');
     } finally {
       setIsLoading(false);
     }
@@ -1236,6 +1225,33 @@ export function AlfieChat() {
   };
   
   // ======
+  // QUICK REPLIES COMPONENT
+  // ======
+  
+  const QuickRepliesButtons = ({ replies, onSelect }: { replies: string[]; onSelect: (reply: string) => void }) => {
+    if (replies.length === 0) return null;
+    
+    return (
+      <div className="flex flex-wrap gap-2 px-4 pb-2">
+        {replies.map((reply, idx) => (
+          <Button
+            key={idx}
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setInput(reply);
+              onSelect(reply);
+            }}
+            className="text-xs"
+          >
+            {reply}
+          </Button>
+        ))}
+      </div>
+    );
+  };
+  
+  // ======
   // RENDU
   // ======
   
@@ -1246,21 +1262,6 @@ export function AlfieChat() {
       
       {/* Quota Bar */}
       {activeBrandId && <QuotaBar activeBrandId={activeBrandId} />}
-      
-      {/* Carousel Progress Bar */}
-      {carouselProgress && (
-        <div className="px-4 py-3 bg-primary/10 border-b">
-          <div className="max-w-3xl mx-auto">
-            <p className="text-sm mb-2">
-              Génération : {carouselProgress.current}/{carouselProgress.total} slides
-            </p>
-            <Progress 
-              value={(carouselProgress.current / carouselProgress.total) * 100}
-              className="h-2"
-            />
-          </div>
-        </div>
-      )}
       
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -1457,6 +1458,16 @@ export function AlfieChat() {
         ))}
         <div ref={messagesEndRef} />
       </div>
+      
+      {/* Quick Replies */}
+      <QuickRepliesButtons 
+        replies={quickReplies} 
+        onSelect={async (reply) => {
+          setInput(reply);
+          // Auto-send when clicking quick reply
+          await handleSend();
+        }} 
+      />
       
       {/* Composer */}
       <div className="border-t bg-background p-4">
