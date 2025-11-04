@@ -179,67 +179,87 @@ export function AlfieChat() {
       type: 'text'
     });
     
-    try {
-      const headers = await getAuthHeader();
-      
-      // 2. Appeler l'orchestrator
-      console.log('[Chat] Calling orchestrator with:', { 
-        message: userMessage, 
-        conversationId, 
-        brandId: activeBrandId 
-      });
-      
-      const { data, error } = await supabase.functions.invoke('alfie-orchestrator', {
-        body: {
-          message: userMessage,
-          conversationId,
-          brandId: activeBrandId
-        },
-        headers
-      });
-      
-      if (error) throw error;
-      
-      console.log('[Chat] Orchestrator response:', data);
-      
-      // 3. Mettre à jour l'état conversationnel
-      if (data.conversationId) {
-        setConversationId(data.conversationId);
-      }
-      
-      if (data.orderId) {
-        console.log('[Chat] Order created:', data.orderId);
-        setOrderId(data.orderId);
-      }
-      
-      // 4. Afficher la réponse de l'assistant
-      if (data.response) {
-        addMessage({
-          role: 'assistant',
-          content: data.response,
-          type: 'text'
+    // 2. Appeler l'orchestrator avec retry (3 tentatives)
+    let lastError: any = null;
+    const maxRetries = 3;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const headers = await getAuthHeader();
+        
+        console.log(`[Chat] Calling orchestrator (attempt ${attempt}/${maxRetries}):`, { 
+          message: userMessage.substring(0, 50), 
+          conversationId, 
+          brandId: activeBrandId 
         });
+        
+        const { data, error } = await supabase.functions.invoke('alfie-orchestrator', {
+          body: {
+            message: userMessage,
+            conversationId,
+            brandId: activeBrandId
+          },
+          headers
+        });
+        
+        if (error) throw error;
+        
+        console.log('[Chat] Orchestrator response:', data);
+        
+        // 3. Mettre à jour l'état conversationnel
+        if (data.conversationId) {
+          setConversationId(data.conversationId);
+        }
+        
+        if (data.orderId) {
+          console.log('[Chat] Order created:', data.orderId);
+          setOrderId(data.orderId);
+        }
+        
+        // 4. Afficher la réponse de l'assistant
+        if (data.response) {
+          addMessage({
+            role: 'assistant',
+            content: data.response,
+            type: 'text'
+          });
+        }
+        
+        // 5. Mettre à jour les quick replies
+        if (data.quickReplies && Array.isArray(data.quickReplies)) {
+          setQuickReplies(data.quickReplies);
+        } else {
+          setQuickReplies([]);
+        }
+        
+        // Success - exit retry loop
+        setIsLoading(false);
+        return;
+        
+      } catch (error: any) {
+        lastError = error;
+        console.error(`[Chat] Error (attempt ${attempt}/${maxRetries}):`, error);
+        
+        // Si c'est la dernière tentative, on arrête
+        if (attempt === maxRetries) break;
+        
+        // Sinon, on attend avant de retry (backoff exponentiel)
+        const delay = 600 * attempt; // 600ms, 1200ms, 1800ms
+        console.log(`[Chat] Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
-      
-      // 5. Mettre à jour les quick replies
-      if (data.quickReplies && Array.isArray(data.quickReplies)) {
-        setQuickReplies(data.quickReplies);
-      } else {
-        setQuickReplies([]);
-      }
-      
-    } catch (error: any) {
-      console.error('[Chat] Error:', error);
-      
-      addMessage({
-        role: 'assistant',
-        content: '❌ Une erreur est survenue. Réessaye dans un instant.',
-        type: 'text'
-      });
-      toast.error('Erreur de communication');
-    } finally {
-      setIsLoading(false);
     }
+    
+    // Si on arrive ici, toutes les tentatives ont échoué
+    console.error('[Chat] All retry attempts failed:', lastError);
+    
+    addMessage({
+      role: 'assistant',
+      content: '❌ Impossible de lancer la génération après plusieurs tentatives. Réessaye dans quelques instants.',
+      type: 'text'
+    });
+    toast.error('Échec après 3 tentatives');
+    setIsLoading(false);
   };
   
   // ======
