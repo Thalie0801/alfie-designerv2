@@ -291,6 +291,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     )
   });
   const hasActivePlan = Boolean(
+    vipBypass ||
     computedAdmin ||
     profile?.granted_by_admin ||
     (subscription?.status ? ['active', 'trial', 'trialing'].includes(String(subscription.status).toLowerCase()) : false)
