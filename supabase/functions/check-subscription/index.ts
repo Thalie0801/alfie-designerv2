@@ -19,24 +19,21 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('No authorization header provided');
 
-    // ✅ Utiliser ANON_KEY avec le Authorization header pour valider le JWT
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: { headers: { Authorization: authHeader } },
-        auth: { persistSession: false }
-      }
-    );
+    // ✅ Décoder le JWT (la fonction est déjà protégée par verify_jwt)
+    const token = authHeader.replace('Bearer ', '');
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
+    const payload = JSON.parse(atob(padded));
 
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser();
-    if (userError) throw new Error(`Authentication error: ${userError.message}`);
-    const user = userData.user;
-    if (!user?.email) throw new Error('User not authenticated or email not available');
+    const userEmail: string | undefined = payload.email || payload.user_metadata?.email;
+    const userId: string | undefined = payload.sub;
+
+    if (!userEmail) throw new Error('User not authenticated or email not available');
 
     const stripe = new Stripe(stripeKey, { apiVersion: '2025-08-27.basil' });
 
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    const customers = await stripe.customers.list({ email: userEmail, limit: 1 });
     if (customers.data.length === 0) {
       return new Response(
         JSON.stringify({ subscribed: false, status: 'none', current_period_end: null }),
