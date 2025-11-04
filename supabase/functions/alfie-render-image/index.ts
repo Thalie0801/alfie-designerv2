@@ -1,7 +1,6 @@
 import { edgeHandler } from '../_shared/edgeHandler.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { enrichPromptWithBrandKit } from '../_shared/aiOrchestrator.ts';
-import { uploadWithRichMetadata, type RichMetadata } from '../_shared/cloudinaryUploader.ts';
 
 export default {
   async fetch(req: Request) {
@@ -256,36 +255,7 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
           throw new Error('NO_IMAGE_GENERATED');
         }
 
-        // 4. Upload with rich metadata to Cloudinary (if brand_id present)
-        let finalImageUrl = imageUrl;
-        
-        if (brand_id && typeof slideIndex === 'number') {
-          try {
-            const metadata: RichMetadata = {
-              brandId: brand_id,
-              campaign: `order_${Date.now()}`,
-              orderId: brand_id,
-              assetId: crypto.randomUUID(),
-              type: 'carousel_slide',
-              format: format || '1024x1024',
-              language: 'fr',
-              alt: prompt.substring(0, 100),
-              slideIndex,
-              renderVersion: 1,
-              textVersion: 1,
-              textPublicId: overlayText ? `text_${slideIndex}` : undefined
-            };
-            
-            const uploadResult = await uploadWithRichMetadata(imageUrl, metadata);
-            finalImageUrl = uploadResult.secureUrl;
-            
-            console.log('[Render] Uploaded to Cloudinary with metadata:', uploadResult.publicId);
-          } catch (uploadError) {
-            console.error('[Render] Cloudinary upload failed, using original URL:', uploadError);
-          }
-        }
-        
-        // 5. Stocker la génération
+        // 4. Stocker la génération
         const { data: generation, error: insertError } = await supabaseAdmin
           .from('media_generations')
           .insert({
@@ -295,8 +265,8 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
             modality: 'image',
             provider_id: provider || 'gemini_image',
             prompt,
-            output_url: finalImageUrl,
-            render_url: finalImageUrl,
+            output_url: imageUrl,
+            render_url: imageUrl,
             status: 'completed',
             cost_woofs,
             params_json: { format },
@@ -342,7 +312,7 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
         }
 
         return {
-          image_urls: [finalImageUrl],
+          image_urls: [imageUrl],
           generation_id: generation?.id,
           meta: { provider: provider || 'gemini_image', format, cost: cost_woofs },
         };

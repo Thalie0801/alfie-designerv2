@@ -41,13 +41,15 @@ interface Message {
   timestamp: Date;
 }
 
+type IntentType = 'image' | 'video' | 'carousel' | 'unknown';
+
 // ======
 // COMPOSANT PRINCIPAL
 // ======
 
 export function AlfieChat() {
   const { user } = useAuth();
-  const { activeBrandId } = useBrandKit();
+  const { activeBrandId, brandKit } = useBrandKit();
   
   // États minimaux
   const [messages, setMessages] = useState<Message[]>([{
@@ -60,14 +62,13 @@ export function AlfieChat() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [orderId, setOrderId] = useState<string | null>(null);
-  const [quickReplies, setQuickReplies] = useState<string[]>([]);
-  const [conversationState, setConversationState] = useState<string>('initial');
+  const [carouselProgress, setCarouselProgress] = useState<{ current: number; total: number } | null>(null);
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoPollingRef = useRef<Record<string, NodeJS.Timeout>>({});
+  const carouselChannelRef = useRef<any>(null);
   
   // ======
   // UTILITAIRES
@@ -83,6 +84,10 @@ export function AlfieChat() {
     return id;
   };
   
+  const updateMessage = (id: string, updates: Partial<Message>) => {
+    setMessages(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+  };
+  
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -92,98 +97,977 @@ export function AlfieChat() {
   }, [messages]);
   
   // ======
-  // SYSTEM MESSAGE WHEN GENERATING
+  // DÉTECTION D'INTENTION LOCALE
   // ======
   
-  useEffect(() => {
-    if (conversationState === 'generating' && orderId) {
-      // Add system message to chat thread
-      const hasGeneratingMessage = messages.some(
-        m => m.role === 'assistant' && m.content.includes('🚀 Génération en cours')
-      );
-      
-      if (!hasGeneratingMessage) {
-        addMessage({
-          role: 'assistant',
-          content: '🚀 Génération en cours... Je te tiens au courant dès que c\'est prêt !',
-          type: 'text'
-        });
+  const detectIntent = (prompt: string): IntentType => {
+    const lower = prompt.toLowerCase();
+    
+    // Priorité 1 : Carrousel
+    if (/(carrousel|carousel|slides|série)/i.test(lower)) {
+      return 'carousel';
+    }
+    
+    // Priorité 2 : Vidéo
+    if (/(vidéo|video|reel|short|story)/i.test(lower)) {
+      return 'video';
+    }
+    
+    // Priorité 3 : Image
+    if (/(image|visuel|photo|illustration|cover)/i.test(lower)) {
+      return 'image';
+    }
+    
+    return 'unknown';
+  };
+
+  const detectBulkCarousel = (text: string): { isBulk: boolean; numCarousels: number; numSlides: number } => {
+    const lower = text.toLowerCase();
+    
+    // Patterns améliorés pour détecter les demandes bulk
+    const patterns = [
+      /(\d+)\s*carrousels?\s*(?:de\s*(\d+)\s*slides?)?/i,  // "5 carrousels de 10 slides"
+      /générer?\s*(\d+)\s*carrousels?/i,                    // "générer 10 carrousels"
+      /créer?\s*(\d+)\s*carrousels?/i,                      // "créer 10 carrousels"
+      /(\d+)\s*séries?\s*de\s*(\d+)\s*(?:images?|slides?)/i, // "10 séries de 5 images"
+      /production\s*massive.*?(\d+)\s*carrousels?/i,        // "production massive de X carrousels"
+      /bulk.*?(\d+)\s*carrousels?/i                         // "bulk carousel 10"
+    ];
+    
+    for (const pattern of patterns) {
+      const match = lower.match(pattern);
+      if (match) {
+        const numCarousels = parseInt(match[1]) || 1;
+        const numSlides = parseInt(match[2]) || 5; // Default 5 slides per carousel
+        
+        console.log('[Bulk Detection] Match found:', { pattern: pattern.source, numCarousels, numSlides });
+        
+        return { isBulk: numCarousels > 1, numCarousels, numSlides };
       }
     }
-  }, [conversationState, orderId, messages]);
+    
+    return { isBulk: false, numCarousels: 1, numSlides: 5 };
+  };
+  
+  const extractCount = (prompt: string): number => {
+    const match = prompt.match(/(\d+)\s*(slides?|visuels?|images?)/i);
+    return match ? parseInt(match[1]) : 5;
+  };
+  
+  const detectAspectRatio = (prompt: string): string => {
+    if (/9:16|story|vertical|tiktok|reels/i.test(prompt)) return '9:16';
+    if (/16:9|youtube|horizontal|paysage/i.test(prompt)) return '16:9';
+    if (/4:5|instagram|carrousel/i.test(prompt)) return '4:5';
+    if (/1:1|carré|square/i.test(prompt)) return '1:1';
+    return '1:1';
+  };
   
   // ======
-  // REALTIME JOB MONITORING
+  // GESTION DES QUOTAS
   // ======
   
-  useEffect(() => {
-    if (!orderId) return;
+  const checkAndConsumeQuota = async (
+    type: 'woofs' | 'visuals',
+    amount: number
+  ): Promise<boolean> => {
+    if (!activeBrandId) {
+      toast.error('Aucune marque active. Sélectionne une marque d\'abord !');
+      return false;
+    }
     
-    console.log('[Realtime] Starting job monitoring for order:', orderId);
-    
-    const channel = supabase
-      .channel('job_queue_changes')
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'job_queue',
-        filter: `order_id=eq.${orderId}`
-      }, (payload) => {
-        const job = payload.new as any;
-        console.log('[Realtime] Job update:', job);
+    try {
+      const headers = await getAuthHeader();
+      
+      // 1. Vérifier le quota
+      const { data: quota, error: quotaError } = await supabase.functions.invoke('get-quota', {
+        body: { brand_id: activeBrandId },
+        headers
+      });
+      
+      if (quotaError || !quota) {
+        toast.error('Impossible de vérifier les quotas');
+        return false;
+      }
+      
+      const remaining = type === 'woofs' ? quota.woofs_remaining : quota.visuals_remaining;
+      
+      if (remaining < amount) {
+        toast.error(`Quota insuffisant. Il te reste ${remaining} ${type}.`);
+        addMessage({
+          role: 'assistant',
+          content: `❌ Quota insuffisant.\n\nIl te reste **${remaining} ${type}** mais tu en demandes **${amount}**.\n\nConsulte ton quota dans ton profil ou upgrade ton plan.`,
+          type: 'text'
+        });
+        return false;
+      }
+      
+      // 2. Consommer le quota (seulement pour visuals, pas pour woofs)
+      if (type === 'visuals') {
+        const { error: consumeError } = await supabase.functions.invoke('alfie-consume-visuals', {
+          body: { 
+            cost_visuals: amount,
+            brand_id: activeBrandId 
+          },
+          headers
+        });
         
-        if (job.status === 'completed') {
-          const assetUrl = job.result?.assetUrl || job.result?.images?.[0] || job.result?.carousels?.[0]?.slides?.[0]?.url;
+        if (consumeError) {
+          toast.error('Impossible de consommer le quota');
+          return false;
+        }
+        
+        console.log(`[Quota] Consumed ${amount} visuals for brand ${activeBrandId}`);
+      } else {
+        // Pour woofs : vérification seulement, le backend consommera
+        console.log(`[Quota] Woofs verified (${amount} available), backend will consume`);
+      }
+      
+      return true;
+    } catch (error: any) {
+      console.error('[Quota] Error:', error);
+      toast.error('Erreur lors de la vérification des quotas');
+      return false;
+    }
+  };
+  
+  const refundWoofs = async (amount: number) => {
+    if (!activeBrandId) return;
+    try {
+      const headers = await getAuthHeader();
+      await supabase.functions.invoke('alfie-refund-woofs', {
+        body: { amount, brand_id: activeBrandId },
+        headers
+      });
+      console.log(`[Refund] ${amount} Woofs remboursés`);
+    } catch (error) {
+      console.error('[Refund] Error:', error);
+    }
+  };
+  
+  // const _refundVisuals = async (amount: number) => {
+  //   if (!activeBrandId) return;
+  //   try {
+  //     await supabase.rpc('refund_brand_quotas', {
+  //       p_brand_id: activeBrandId,
+  //       p_visuals_count: amount
+  //     });
+  //     console.log(`[Refund] ${amount} Visuels remboursés`);
+  //   } catch (error) {
+  //     console.error('[Refund] Error:', error);
+  //   }
+  // };
+  
+  // ======
+  // GÉNÉRATION D'IMAGES
+  // ======
+  
+  const mapAspectRatio = (ratio: string): string => {
+    const mapping: Record<string, string> = {
+      '1:1': '1024x1024',
+      '4:5': '1024x1280',
+      '9:16': '1024x1820',
+      '16:9': '1820x1024',
+      '3:4': '1024x1365',
+      '4:3': '1365x1024'
+    };
+    return mapping[ratio] || '1024x1024';
+  };
+  
+  const generateImage = async (prompt: string, aspectRatio: string) => {
+    const woofCost = 1;
+    
+    // 1. Vérifier et consommer quota
+    const quotaOk = await checkAndConsumeQuota('woofs', woofCost);
+    if (!quotaOk) return;
+    
+    // 2. Message de génération
+    addMessage({
+      role: 'assistant',
+      content: uploadedImage 
+        ? '🎨 Génération basée sur ton image...' 
+        : '🎨 Génération de ton image en cours...',
+      type: 'text'
+    });
+    
+    try {
+      const headers = await getAuthHeader();
+      
+      // 3. Préparer le body avec l'image uploadée si présente
+      const body: any = {
+        provider: 'gemini-nano',
+        prompt,
+        format: mapAspectRatio(aspectRatio),
+        brand_id: activeBrandId,
+        cost_woofs: woofCost
+      };
+      
+      // ✅ Ajouter l'image de référence si uploadée
+      if (uploadedImage) {
+        body.templateImageUrl = uploadedImage;
+      }
+      
+      // 3. Appeler alfie-render-image
+      const { data, error } = await supabase.functions.invoke('alfie-render-image', {
+        body,
+        headers
+      });
+      
+      if (error) throw error;
+      
+      if (!data?.ok || !data?.data?.image_urls?.[0]) {
+        throw new Error(data?.error || 'Aucune image générée');
+      }
+      
+      // 4. Afficher l'image
+      addMessage({
+        role: 'assistant',
+        content: '✅ Image générée avec succès !',
+        type: 'image',
+        assetUrl: data.data.image_urls[0],
+        assetId: data.data.generation_id
+      });
+      
+      toast.success('Image générée !');
+      
+      // ✅ Réinitialiser uploadedImage après génération
+      setUploadedImage(null);
+      
+    } catch (error: any) {
+      console.error('[Image] Error:', error);
+      await refundWoofs(woofCost);
+      
+      const errorMsg = error.message?.toLowerCase() || '';
+      let friendlyError = '❌ Une erreur est survenue. Pas de panique, réessaye dans un instant !';
+      
+      if (errorMsg.includes('quota')) {
+        friendlyError = '😅 Oups, tu as atteint ta limite mensuelle ! Passe à un plan supérieur pour continuer.';
+      } else if (errorMsg.includes('network') || errorMsg.includes('fetch')) {
+        friendlyError = '🌐 Problème de connexion. Vérifie ta connexion internet et réessaye.';
+      } else if (errorMsg.includes('timeout')) {
+        friendlyError = '⏱️ La génération a pris trop de temps. Réessaye dans quelques instants.';
+      }
+      
+      addMessage({
+        role: 'assistant',
+        content: friendlyError,
+        type: 'text'
+      });
+      toast.error('Échec de la génération d\'image');
+    }
+  };
+  
+  // ======
+  // GÉNÉRATION DE VIDÉOS
+  // ======
+  
+  const generateVideo = async (prompt: string, aspectRatio: string) => {
+    // Déterminer le coût en Woofs (1-3 selon durée détectée)
+    const duration = prompt.match(/(\d+)\s*s/)?.[1];
+    let woofCost = 1;
+    if (duration) {
+      const seconds = parseInt(duration);
+      if (seconds <= 8) woofCost = 1;
+      else if (seconds <= 15) woofCost = 2;
+      else woofCost = 3;
+    }
+    
+    // 1. Vérifier et consommer quota
+    const quotaOk = await checkAndConsumeQuota('woofs', woofCost);
+    if (!quotaOk) return;
+    
+    // 2. Message de génération
+    addMessage({
+      role: 'assistant',
+      content: uploadedImage
+        ? `🎬 Génération vidéo lancée à partir de ton image (${woofCost} Woofs)...`
+        : `🎬 Génération vidéo lancée (${woofCost} Woofs)...`,
+      type: 'text'
+    });
+    
+    try {
+      const headers = await getAuthHeader();
+      
+      // 3. Appeler generate-video
+      const { data, error } = await supabase.functions.invoke('generate-video', {
+        body: {
+          prompt,
+          aspectRatio,
+          brandId: activeBrandId,
+          woofCost,
+          ...(uploadedImage ? { imageUrl: uploadedImage } : {})
+        },
+        headers
+      });
+      
+      if (error) throw error;
+      
+      if (!data?.jobId) {
+        throw new Error('Aucun jobId reçu');
+      }
+      
+      // 4. Afficher placeholder et démarrer le polling
+      const messageId = addMessage({
+        role: 'assistant',
+        content: '⏳ Vidéo en cours de génération...',
+        type: 'video',
+        metadata: { jobId: data.jobId, status: 'processing' }
+      });
+      
+      pollVideoStatus(data.jobId, messageId, woofCost);
+      
+      // ✅ Clear uploaded image after starting video generation
+      if (uploadedImage) {
+        setUploadedImage(null);
+      }
+      
+    } catch (error: any) {
+      console.error('[Video] Error:', error);
+      await refundWoofs(woofCost);
+      
+      const errorMsg = error.message?.toLowerCase() || '';
+      let friendlyError = '❌ Une erreur est survenue. Pas de panique, réessaye dans un instant !';
+      
+      if (errorMsg.includes('quota')) {
+        friendlyError = '😅 Oups, tu as atteint ta limite mensuelle ! Passe à un plan supérieur pour continuer.';
+      } else if (errorMsg.includes('network') || errorMsg.includes('fetch')) {
+        friendlyError = '🌐 Problème de connexion. Vérifie ta connexion internet et réessaye.';
+      } else if (errorMsg.includes('timeout')) {
+        friendlyError = '⏱️ La génération a pris trop de temps. Réessaye dans quelques instants.';
+      }
+      
+      addMessage({
+        role: 'assistant',
+        content: friendlyError,
+        type: 'text'
+      });
+      toast.error('Échec de la génération de vidéo');
+    }
+  };
+  
+  const pollVideoStatus = (jobId: string, messageId: string, woofCost: number) => {
+    const interval = setInterval(async () => {
+      try {
+        const { data } = await supabase
+          .from('media_generations')
+          .select('status, output_url')
+          .eq('id', jobId)
+          .single();
+        
+        if (data?.status === 'completed') {
+          clearInterval(interval);
+          delete videoPollingRef.current[jobId];
           
-          if (assetUrl) {
-            let type: 'image' | 'carousel' | 'video' = 'image';
-            let content = '✅ Génération terminée !';
-            
-            if (job.type === 'render_images') {
-              type = 'image';
-              content = '✅ Image générée !';
-            } else if (job.type === 'render_carousels') {
-              type = 'carousel';
-              content = '✅ Slide de carrousel générée !';
-            } else if (job.type === 'generate_video') {
-              type = 'video';
-              content = '✅ Vidéo générée !';
-            }
-            
-            addMessage({
-              role: 'assistant',
-              content,
-              type,
-              assetUrl,
-              assetId: job.id
-            });
-            
-            toast.success(content);
+          updateMessage(messageId, {
+            content: '✅ Vidéo générée !',
+            assetUrl: data.output_url,
+            metadata: { jobId, status: 'completed' }
+          });
+          
+          toast.success('Vidéo générée avec succès !');
+        } else if (data?.status === 'failed') {
+          clearInterval(interval);
+          delete videoPollingRef.current[jobId];
+          
+          updateMessage(messageId, {
+            content: '❌ Échec de la génération',
+            metadata: { jobId, status: 'failed' }
+          });
+          
+          // Rembourser les Woofs
+          await refundWoofs(woofCost);
+          toast.error('Échec de la génération de vidéo');
+        }
+      } catch (error) {
+        console.error('[Poll] Error:', error);
+      }
+    }, 5000);
+    
+    videoPollingRef.current[jobId] = interval;
+  };
+  
+  // ======
+  // GÉNÉRATION DE CARROUSELS PROGRESSIVE (NOUVEAU)
+  // ======
+  
+  // Utilitaire : construire un prompt depuis un slide (ancien format)
+  const buildPromptFromSlide = (slide: any, aspectRatio: string, brandKit?: any): string => {
+    const parts = [];
+    if (slide?.title) parts.push(`Illustration pour "${slide.title}"`);
+    if (slide?.subtitle) parts.push(`Contexte: ${slide.subtitle}`);
+    parts.push('Pas de texte dans l\'image, fond uniquement');
+    parts.push(`Ratio ${aspectRatio}`);
+    if (brandKit?.palette?.length) parts.push(`Couleurs: ${brandKit.palette.join(', ')}`);
+    return parts.join('. ') + '.';
+  };
+  
+  // Utilitaire : normaliser le plan (accepte nouveau et ancien format)
+  const normalizeCarouselPlan = (raw: any, count: number, aspectRatio: string, brandKit?: any) => {
+    let style = raw?.style;
+    let prompts: string[] | undefined = Array.isArray(raw?.prompts) ? raw.prompts : undefined;
+    let slides: any[] | undefined = Array.isArray(raw?.slides) ? raw.slides : undefined;
+    
+    // Si format ancien : { plan: { slides: [...] } }
+    if ((!style || !prompts || !slides) && Array.isArray(raw?.plan?.slides)) {
+      const oldSlides = raw.plan.slides.slice(0, count);
+      prompts = oldSlides.map((s: any) => 
+        s?.note?.trim?.() || buildPromptFromSlide(s, aspectRatio, brandKit)
+      );
+      style = style || `Style cohérent, moderne et créatif, sans texte incrusté, ratio ${aspectRatio}${brandKit?.palette?.length ? `, palette ${brandKit.palette.join(', ')}` : ''}.`;
+      
+      // Convertir l'ancien format vers le nouveau
+      slides = oldSlides.map((s: any, i: number) => ({
+        type: i === 0 ? 'hero' : i === count - 1 ? 'cta' : 'problem',
+        title: s?.title || `Slide ${i + 1}`,
+        subtitle: s?.subtitle,
+        bullets: s?.bullets,
+        cta_primary: s?.cta || 'En savoir plus',
+        note: s?.note
+      }));
+    }
+    
+    // Garantir des arrays valides
+    if (!Array.isArray(prompts)) prompts = [];
+    if (!Array.isArray(slides)) slides = [];
+    
+    // Ajuster la longueur des prompts
+    if (prompts.length > count) prompts = prompts.slice(0, count);
+    while (prompts.length < count) {
+      prompts.push(prompts[prompts.length - 1] || `Fond abstrait, ratio ${aspectRatio}, sans texte`);
+    }
+    
+    // Ajuster la longueur des slides
+    if (slides.length > count) slides = slides.slice(0, count);
+    while (slides.length < count) {
+      slides.push({
+        type: 'cta',
+        title: 'En savoir plus',
+        cta_primary: 'Découvrir'
+      });
+    }
+    
+    return { style, prompts, slides };
+  };
+  
+  const generateCarouselProgressive = async (prompt: string, count: number = 5) => {
+    let successCount = 0;
+    
+    try {
+      setIsLoading(true);
+      const aspectRatio = detectAspectRatio(prompt) || '4:5';
+      
+      // Message de génération standard (NON bulk)
+      setCarouselProgress({ current: 0, total: count });
+      
+      addMessage({
+        role: 'assistant',
+        content: `🎨 Génération d'un carrousel de ${count} slides...`,
+        type: 'text'
+      });
+      
+      // 1. Générer le plan simplifié
+      const { data: planData, error: planError } = await supabase.functions.invoke('alfie-plan-carousel', {
+        body: { 
+          prompt, 
+          slideCount: count,
+          aspectRatio: aspectRatio,
+          brandKit: {
+            name: brandKit?.name,
+            palette: brandKit?.palette,
+            voice: brandKit?.voice,
+            niche: brandKit?.niche
           }
-        } else if (job.status === 'failed') {
-          const errorContent = `❌ Erreur : ${job.error || 'Génération échouée'}`;
+        }
+      });
+      
+      // Log du plan brut pour diagnostic
+      console.log('[Carousel] Raw plan:', planData);
+      console.log('[Carousel] Raw plan keys:', Object.keys(planData || {}));
+      
+      // Normaliser le plan (supporte les deux formats)
+      const { style: globalStyle, prompts, slides } = normalizeCarouselPlan(
+        planData, 
+        count, 
+        aspectRatio, 
+        brandKit
+      );
+      
+      if (planError || !globalStyle || !prompts?.length || !slides?.length) {
+        throw new Error(planError?.message || 'Plan invalide (aucun prompt utilisable)');
+      }
+      
+      console.log('[Carousel] Using prompts count:', prompts.length);
+      console.log('[Carousel] Using slides count:', slides.length);
+      console.log('[Carousel] Style:', globalStyle.substring(0, 100));
+      
+      addMessage({
+        role: 'assistant',
+        content: `✅ Plan créé ! Style: ${globalStyle.substring(0, 100)}...\n\nGénération des ${prompts.length} slides en cours...`,
+        type: 'text'
+      });
+      
+      // 2. Générer chaque slide progressivement
+      for (let i = 0; i < prompts.length; i++) {
+        const slidePrompt = prompts[i];
+        setCarouselProgress({ current: i + 1, total: prompts.length });
+        
+        console.log(`[Carousel] Generating slide ${i + 1}/${prompts.length}...`);
+        
+        try {
+          const { data: imgData, error: imgError } = await supabase.functions.invoke(
+            'alfie-render-carousel-slide',
+            {
+              body: {
+                prompt: prompts[i],
+                globalStyle,
+                slideContent: slides[i],
+                brandId: activeBrandId,
+                aspectRatio
+              }
+            }
+          );
+          
+          // Récupération d'URL tolérante (supporte plusieurs formats)
+          const imageUrl = imgData?.data?.image_urls?.[0] || imgData?.image_urls?.[0] || imgData?.image_url;
+          
+          if (imgError || !imageUrl) {
+            console.error(`[Carousel] Slide ${i + 1} generation failed:`, imgError, imgData);
+            toast.error(`Slide ${i + 1} a échoué`);
+            continue;
+          }
+          
+          successCount++;
+          console.log(`[Carousel] ✅ Slide ${i + 1} generated`);
+          
+          // Afficher immédiatement la slide générée
           addMessage({
             role: 'assistant',
-            content: errorContent,
-            type: 'text'
+            content: `✅ Slide ${i + 1}/${prompts.length}`,
+            type: 'image',
+            assetUrl: imageUrl,
+            reasoning: slidePrompt
           });
-          toast.error('Échec de la génération');
+          
+          toast.success(`Slide ${i + 1}/${prompts.length} générée !`);
+          
+        } catch (slideError) {
+          console.error(`[Carousel] Error generating slide ${i + 1}:`, slideError);
+          toast.error(`Erreur sur la slide ${i + 1}`);
         }
-      })
-      .subscribe();
+      }
+      
+      // 3. Finalisation
+      setCarouselProgress(null);
+      addMessage({
+        role: 'assistant',
+        content: `🎉 Carrousel terminé ! ${successCount}/${prompts.length} slides générées avec succès.`,
+        type: 'text'
+      });
+      toast.success(`✅ Carrousel terminé : ${successCount}/${prompts.length} slides !`);
+      
+    } catch (error: any) {
+      console.error('[Carousel] Error:', error);
+      setCarouselProgress(null);
+      
+      addMessage({
+        role: 'assistant',
+        content: `❌ Échec de la génération du carrousel.\n\n${error.message || 'Erreur inconnue'}`,
+        type: 'text'
+      });
+      toast.error('Échec de la génération du carrousel');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const generateBulkCarousels = async (
+    userPrompt: string, 
+    bulkInfo: { numCarousels: number; numSlides: number },
+    aspectRatio: string
+  ) => {
+    console.log('[Bulk Generation] Starting:', {
+      numCarousels: bulkInfo.numCarousels,
+      numSlides: bulkInfo.numSlides,
+      aspectRatio,
+      brandId: activeBrandId
+    });
     
+    try {
+      const totalWoofs = bulkInfo.numCarousels * bulkInfo.numSlides;
+      const totalSlides = bulkInfo.numCarousels * bulkInfo.numSlides;
+      
+      console.log('[Bulk Generation] Quota check:', { totalWoofs, totalSlides });
+      
+      // Message de confirmation AVANT vérification quota
+      addMessage({
+        role: 'assistant',
+        content: `🔍 Détection : ${bulkInfo.numCarousels} carrousels × ${bulkInfo.numSlides} slides = ${totalSlides} images\n\nCoût total : ${totalWoofs} Woofs\n\nVérification des quotas...`,
+        type: 'text'
+      });
+      
+      // Vérifier les quotas
+      const canProceed = await checkAndConsumeQuota('woofs', totalWoofs);
+      if (!canProceed) {
+        console.log('[Bulk Generation] ❌ Quota insufficient');
+        addMessage({
+          role: 'assistant',
+          content: `❌ Quota insuffisant. Tu as besoin de ${totalWoofs} Woofs pour générer ${bulkInfo.numCarousels} carrousels de ${bulkInfo.numSlides} slides.`,
+          type: 'text'
+        });
+        return;
+      }
+
+      console.log('[Bulk Generation] ✅ Quota OK, starting generation');
+      
+      addMessage({
+        role: 'assistant',
+        content: `🚀 Génération lancée : ${bulkInfo.numCarousels} carrousels de ${bulkInfo.numSlides} slides chacun...`,
+        type: 'text'
+      });
+
+      const headers = await getAuthHeader();
+
+      console.log('[Bulk Generation] Calling edge function with params:', {
+        num_carousels: bulkInfo.numCarousels,
+        num_slides_per_carousel: bulkInfo.numSlides,
+        theme: userPrompt.substring(0, 100),
+        brand_id: activeBrandId,
+        aspect_ratio: aspectRatio
+      });
+
+      // Appel à l'edge function bulk
+      const { data, error } = await supabase.functions.invoke('alfie-generate-carousel-bulk', {
+        body: {
+          num_carousels: bulkInfo.numCarousels,
+          num_slides_per_carousel: bulkInfo.numSlides,
+          theme: userPrompt,
+          brand_id: activeBrandId,
+          campaign_name: `bulk_${Date.now()}`,
+          text_option: 'alfie',
+          global_style: brandKit?.voice || 'Professional, clean',
+          aspect_ratio: aspectRatio
+        },
+        headers
+      });
+
+      console.log('[Bulk Generation] Edge function response:', {
+        hasData: !!data,
+        hasError: !!error,
+        successful: data?.successful,
+        total: data?.total
+      });
+
+      if (error) throw error;
+
+      const { carousels, successful } = data;
+
+      // Affichage des résultats
+      const resultsContent = `🎉 Génération terminée !\n\n${successful} carrousels créés sur ${bulkInfo.numCarousels} demandés (${bulkInfo.numSlides} slides chacun)`;
+      
+      addMessage({
+        role: 'assistant',
+        content: resultsContent,
+        type: 'bulk-carousel',
+        bulkCarouselData: {
+          carousels: carousels.filter((c: any) => c.status === 'fulfilled').map((c: any) => c.data),
+          totalCarousels: bulkInfo.numCarousels,
+          slidesPerCarousel: bulkInfo.numSlides
+        }
+      });
+
+      toast.success(`${successful} carrousels générés !`);
+
+    } catch (error: any) {
+      console.error('[Bulk Generation] ❌ Error:', error);
+      addMessage({
+        role: 'assistant',
+        content: `❌ Erreur lors de la génération bulk: ${error.message}`,
+        type: 'text'
+      });
+      
+      // Refund woofs si échec complet
+      const totalWoofs = bulkInfo.numCarousels * bulkInfo.numSlides;
+      console.log('[Bulk Generation] Refunding', totalWoofs, 'woofs');
+      await refundWoofs(totalWoofs);
+      toast.error('Échec de la génération bulk');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // L'ancienne fonction generateCarousel est supprimée et remplacée par generateCarouselProgressive
+  
+  // const _subscribeToCarousel = (jobSetId: string, total: number) => {
+  //   // Nettoyer l'ancien canal si présent
+  //   if (carouselChannelRef.current) {
+  //     supabase.removeChannel(carouselChannelRef.current);
+  //   }
+  //   
+  //   const channel = supabase
+  //     .channel(`carousel-${jobSetId}`)
+  //     .on('postgres_changes', {
+  //       event: 'UPDATE',
+  //       schema: 'public',
+  //       table: 'jobs',
+  //       filter: `job_set_id=eq.${jobSetId}`
+  //     }, () => {
+  //       // Recompter les jobs terminés
+  //       updateCarouselProgress(jobSetId, total);
+  //     })
+  //     .subscribe();
+  //   
+  //   carouselChannelRef.current = channel;
+  //   
+  //   // Polling de secours toutes les 10s
+  //   const pollInterval = setInterval(async () => {
+  //     await updateCarouselProgress(jobSetId, total);
+  //     
+  //     // Arrêter le polling si terminé
+  //     if (carouselProgress.done >= total) {
+  //       clearInterval(pollInterval);
+  //     }
+  //   }, 10000);
+  // };
+  
+  // const updateCarouselProgress = async (jobSetId: string, total: number) => {
+  //   try {
+  //     const { data: jobs } = await supabase
+  //       .from('jobs')
+  //       .select('status')
+  //       .eq('job_set_id', jobSetId);
+  //     
+  //     if (!jobs) return;
+  //     
+  //     const done = jobs.filter(j => j.status === 'succeeded' || j.status === 'completed').length;
+  //     setCarouselProgress({ done, total });
+  //     
+  //     // Mettre à jour le message de progression
+  //     setMessages(prev => prev.map(m => {
+  //       if (m.type === 'carousel' && m.metadata?.jobSetId === jobSetId) {
+  //         return {
+  //           ...m,
+  //           content: done >= total 
+  //             ? `✅ Carrousel terminé (${done}/${total}) !`
+  //             : `⏳ Génération en cours (${done}/${total})...`,
+  //           metadata: { ...m.metadata, done }
+  //         };
+  //       }
+  //       return m;
+  //     }));
+  //     
+  //     // Si terminé, charger les assets
+  //     if (done >= total) {
+  //       const { data: assets } = await supabase
+  //         .from('assets')
+  //         .select('id, storage_key')
+  //         .eq('job_set_id', jobSetId)
+  //         .order('index_in_set', { ascending: true });
+  //       
+  //       if (assets && assets.length > 0) {
+  //         // Afficher les slides générées
+  //         addMessage({
+  //           role: 'assistant',
+  //           content: `✅ ${assets.length} slides générées avec succès !`,
+  //           type: 'text',
+  //           metadata: { 
+  //             jobSetId, 
+  //             assetIds: assets.map(a => a.id),
+  //             assetUrls: assets.map(a => {
+  //               const { data } = supabase.storage.from('media-generations').getPublicUrl(a.storage_key);
+  //               return data.publicUrl;
+  //             })
+  //           }
+  //         });
+  //         
+  //         toast.success(`Carrousel terminé ! ${assets.length} slides générées.`);
+  //       }
+  //     }
+  //   } catch (error) {
+  //     console.error('[Carousel] Progress update error:', error);
+  //   }
+  // };
+  
+  // Cleanup des subscriptions et polling
+  useEffect(() => {
     return () => {
-      console.log('[Realtime] Cleaning up job monitoring');
-      supabase.removeChannel(channel);
+      // Nettoyer le polling des vidéos
+      Object.values(videoPollingRef.current).forEach(clearInterval);
+      
+      // Nettoyer le canal carrousel
+      if (carouselChannelRef.current) {
+        supabase.removeChannel(carouselChannelRef.current);
+      }
     };
-  }, [orderId]);
+  }, []);
   
   // ======
-  // HANDLER PRINCIPAL (ORCHESTRATOR-BASED)
+  // ORCHESTRATOR BACKEND
+  // ======
+  
+  const orchestratorSend = async (userMessage: string): Promise<boolean> => {
+    try {
+      const headers = await getAuthHeader();
+      
+      // Construire l'historique complet
+      const conversationHistory = messages.map(m => ({
+        role: m.role,
+        content: m.content
+      }));
+      
+      conversationHistory.push({
+        role: 'user',
+        content: userMessage,
+        ...(uploadedImage ? { imageUrl: uploadedImage } : {})
+      });
+      
+      // Appeler l'orchestrateur backend
+      console.log('[Orchestrator] Sending to backend:', {
+        messageCount: conversationHistory.length,
+        lastMessage: conversationHistory[conversationHistory.length - 1],
+        brandId: activeBrandId
+      });
+
+      const { data, error } = await supabase.functions.invoke('alfie-chat', {
+        body: {
+          messages: conversationHistory,
+          brandId: activeBrandId,
+          expertMode: true,
+          stream: false
+        },
+        headers
+      });
+      
+      console.log('[Orchestrator] Backend response:', {
+        hasData: !!data,
+        error: error,
+        hasAssets: !!data?.assets,
+        assetsCount: data?.assets?.length || 0,
+        imageUrlsCount: data?.data?.image_urls?.length || 0,
+        hasJobSetId: !!data?.jobSetId,
+        noToolCalls: data?.noToolCalls,
+        noCredits: data?.noCredits,
+        messageContent: data?.choices?.[0]?.message?.content?.substring(0, 200)
+      });
+      
+      if (error) throw error;
+      
+      // Parser la réponse
+      const assistantMessage = data?.choices?.[0]?.message;
+      if (!assistantMessage) {
+        throw new Error('No assistant message in response');
+      }
+      
+      // ✅ Gérer le flag noToolCalls
+      if (data.noToolCalls === true && (!data.assets || data.assets.length === 0)) {
+        console.warn('[Orchestrator] ⚠️ No tool calls from AI, triggering local fallback');
+        addMessage({
+          role: 'assistant',
+          content: '🤔 L\'IA n\'a pas exécuté les outils attendus. Je vais essayer de t\'aider autrement.\n\nPeux-tu reformuler ta demande de façon plus claire ? Par exemple:\n- "Crée-moi un carrousel 4:5 de 5 slides sur X"\n- "Génère une image 1:1 pour Y"\n- "Fais-moi une vidéo sur Z"',
+          type: 'text'
+        });
+        return false;
+      }
+      
+      // ✅ Gérer le flag noCredits (plan textuel sans images)
+      if (data.noCredits === true) {
+        console.log('[Orchestrator] No credits flag detected');
+        toast.error('💳 Crédits insuffisants - Plan généré sans images');
+      }
+      
+      // Afficher le message de l'assistant
+      addMessage({
+        role: 'assistant',
+        content: assistantMessage.content || '',
+        type: 'text'
+      });
+      
+      // Traiter les assets s'il y en a
+      if (data.assets && Array.isArray(data.assets) && data.assets.length > 0) {
+        toast.success(`✅ ${data.assets.length} asset${data.assets.length > 1 ? 's' : ''} généré${data.assets.length > 1 ? 's' : ''} !`);
+        
+        for (const asset of data.assets) {
+          if (asset.type === 'image') {
+            addMessage({
+              role: 'assistant',
+              content: asset.title ? `✅ ${asset.title}` : '✅ Image générée !',
+              type: 'image',
+              assetUrl: asset.url,
+              reasoning: asset.reasoning,
+              brandAlignment: asset.brandAlignment
+            });
+          }
+        }
+      } else if (!data.assets || data.assets.length === 0) {
+        // ✅ Fallback: vérifier si l'image est dans data.imageUrl ou data.data.image_urls
+        const imageUrl = data.imageUrl || data.data?.image_urls?.[0];
+        if (imageUrl) {
+          console.log('[Orchestrator] Found image in alternate format:', imageUrl.substring(0, 80));
+          addMessage({
+            role: 'assistant',
+            content: '✅ Image générée !',
+            type: 'image',
+            assetUrl: imageUrl
+          });
+          toast.success('✅ Image générée !');
+        } else {
+          console.warn('[Orchestrator] ⚠️ Response without assets or imageUrl');
+          toast.warning('Réponse sans assets visuels');
+        }
+      }
+      
+      // Traiter le jobSetId si présent (pour les carrousels via job system)
+      if (data.jobSetId) {
+        addMessage({
+          role: 'assistant',
+          content: '⏳ Génération en cours...',
+          type: 'carousel',
+          metadata: { jobSetId: data.jobSetId, status: 'processing' }
+        });
+      }
+      
+      // ✅ Clear uploaded image after successful orchestration
+      if (uploadedImage) {
+        setUploadedImage(null);
+      }
+      
+      return true;
+    } catch (error: any) {
+      console.error('[Orchestrator] Error:', error);
+      
+      // Détecter le status HTTP de l'erreur
+      const status = error?.context?.response?.status || error?.status;
+      const errorMsg = error.message?.toLowerCase() || '';
+      
+      if (status === 402 || errorMsg.includes('402') || errorMsg.includes('payment required') || errorMsg.includes('crédits insuffisants')) {
+        // Erreur 402 : Crédits insuffisants
+        toast.error('💳 Crédits insuffisants - Recharge maintenant');
+        addMessage({
+          role: 'assistant',
+          content: '💳 **Crédits insuffisants**\n\nTu n\'as plus de crédits IA pour générer du contenu. Recharge tes crédits pour continuer à créer !\n\n👉 [Recharger mes crédits](/billing)',
+          type: 'text'
+        });
+      } else if (status === 429 || errorMsg.includes('429') || errorMsg.includes('rate limit') || errorMsg.includes('trop de requêtes')) {
+        // Erreur 429 : Rate limit
+        toast.error('⏳ Trop de requêtes - Patiente un instant');
+        addMessage({
+          role: 'assistant',
+          content: '⏳ **Trop de requêtes**\n\nTu as fait trop de demandes en peu de temps. Patiente quelques secondes et réessaye !',
+          type: 'text'
+        });
+      } else {
+        // Erreur générique
+        toast.error('Échec de l\'orchestrateur');
+      }
+      
+      return false;
+    }
+  };
+  
+  // ======
+  // HANDLER PRINCIPAL
   // ======
   
   const handleSend = async () => {
-    if (isLoading || !input.trim()) return;
+    if (isLoading || (!input.trim() && !uploadedImage)) return;
     
     if (!activeBrandId) {
       toast.error('Sélectionne une marque d\'abord !');
@@ -193,159 +1077,88 @@ export function AlfieChat() {
     const userMessage = input.trim();
     setInput('');
     setIsLoading(true);
-
+    
     // 1. Ajouter message utilisateur
     addMessage({
       role: 'user',
-      content: userMessage,
+      content: userMessage || '(Image jointe)',
       type: 'text'
     });
-
-    // 1bis. Commande de monitoring simple: /queue
-    if (userMessage.startsWith('/queue')) {
-      try {
-        const headers = await getAuthHeader();
-        const { data, error } = await supabase.functions.invoke('queue-monitor', { headers });
-        if (error) throw error;
-        const c = (data as any)?.counts || {};
-        const oldest = (data as any)?.backlogSeconds ?? null;
-        const stuck = (data as any)?.stuck?.runningStuckCount ?? 0;
-        const completed24h = c.completed_24h ?? 0;
-        const minutes = oldest ? Math.max(0, Math.round((oldest as number) / 60)) : null;
-
-        addMessage({
-          role: 'assistant',
-          content: [
-            '📊 État de la file de jobs:',
-            `• queued: ${c.queued ?? 0}`,
-            `• running: ${c.running ?? 0}`,
-            `• failed: ${c.failed ?? 0}`,
-            `• completed (24h): ${completed24h}`,
-            `• plus ancien en attente: ${minutes !== null ? minutes + ' min' : 'n/a'}`,
-            `• jobs bloqués (>5min): ${stuck}`
-          ].join('\n'),
-          type: 'text'
-        });
-      } catch (e: any) {
-        addMessage({
-          role: 'assistant',
-          content: `❌ Monitoring indisponible: ${e?.message || e}`,
-          type: 'text'
-        });
-      } finally {
-        setIsLoading(false);
+    
+    try {
+      // 2. Détection d'intent côté frontend AVANT l'orchestrateur
+      const isCarouselRequest = userMessage.toLowerCase().match(/carrousel|carousel|slides/i);
+      
+      if (isCarouselRequest) {
+        console.log('[Chat] Carousel request detected');
+        
+        // Détecter si c'est une demande bulk
+        const bulkInfo = detectBulkCarousel(userMessage);
+        const aspectRatio = detectAspectRatio(userMessage) || '4:5';
+        
+        console.log('[Chat] Bulk detection result:', bulkInfo);
+        
+        if (bulkInfo.isBulk) {
+          console.log('[Chat] ✅ Bulk carousel detected, routing to generateBulkCarousels');
+          await generateBulkCarousels(userMessage, bulkInfo, aspectRatio);
+        } else {
+          console.log('[Chat] Single carousel detected, using progressive generation');
+          const count = extractCount(userMessage) || 5;
+          await generateCarouselProgressive(userMessage, count);
+        }
+        return;
       }
-      return;
-    }
-    
-    // 2. Appeler l'orchestrator avec retry (3 tentatives)
-    let lastError: any = null;
-    const maxRetries = 3;
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        const headers = await getAuthHeader();
-        
-        console.log(`[Chat] Calling orchestrator (attempt ${attempt}/${maxRetries}):`, { 
-          message: userMessage.substring(0, 50), 
-          conversationId, 
-          brandId: activeBrandId 
-        });
-        
-        const { data, error } = await supabase.functions.invoke('alfie-orchestrator', {
-          body: {
-            message: userMessage,
-            conversationId,
-            brandId: activeBrandId
-          },
-          headers
-        });
-        
-        if (error) throw error;
-        
-        console.log('[Chat] Orchestrator response:', data);
-        
-        // 3. Mettre à jour l'état conversationnel
-        if (data.conversationId) {
-          setConversationId(data.conversationId);
+      
+      // 3. Essayer l'orchestrateur backend pour les autres types (images, vidéos)
+      console.log('[Chat] Trying orchestrator...');
+      const orchestratorSuccess = await orchestratorSend(userMessage);
+      
+      // Si l'orchestrateur a fonctionné, on s'arrête ici
+      if (orchestratorSuccess) {
+        console.log('[Chat] ✅ Orchestrator success');
+        return;
+      }
+      
+      // 4. FALLBACK LOCAL si l'orchestrateur échoue
+      console.log('[Chat] Orchestrator failed, using local fallback');
+      const intent = detectIntent(userMessage);
+      
+      switch (intent) {
+        case 'image': {
+          const aspectRatio = detectAspectRatio(userMessage);
+          await generateImage(userMessage, aspectRatio);
+          break;
         }
         
-        if (data.orderId) {
-          console.log('[Chat] Order created:', data.orderId);
-          setOrderId(data.orderId);
+        case 'video': {
+          const aspectRatio = detectAspectRatio(userMessage);
+          await generateVideo(userMessage, aspectRatio);
+          break;
         }
         
-        if (data.state) {
-          setConversationState(data.state);
+        case 'carousel': {
+          const count = extractCount(userMessage);
+          await generateCarouselProgressive(userMessage, count);
+          break;
         }
         
-        // 4. Afficher la réponse de l'assistant
-        if (data.response) {
+        default:
           addMessage({
             role: 'assistant',
-            content: data.response,
+            content: "Je ne suis pas sûr de comprendre. Tu veux créer une **image**, une **vidéo** ou un **carrousel** ? 🤔",
             type: 'text'
           });
-        }
-        
-        // 5. Mettre à jour les quick replies
-        if (data.quickReplies && Array.isArray(data.quickReplies)) {
-          setQuickReplies(data.quickReplies);
-        } else {
-          setQuickReplies([]);
-        }
-        
-        // 6. Déclencher immédiatement le worker si des jobs ont été enfilés
-        if (data.orderId) {
-          console.log('[Chat] Triggering worker immediately after enqueue');
-          supabase.functions.invoke('alfie-job-worker', { headers })
-            .then(({ data: workerData, error: workerError }) => {
-              if (workerError) {
-                console.warn('[Chat] Worker trigger error:', workerError);
-                return;
-              }
-              console.log('[Chat] Worker response:', workerData);
-              
-              // Si aucun job n'a été traité, retry après 5s
-              if (workerData?.processed === 0) {
-                console.log('[Chat] No jobs processed, scheduling retry in 5s');
-                setTimeout(() => {
-                  supabase.functions.invoke('alfie-job-worker', { headers })
-                    .catch(e => console.warn('[Chat] Worker retry error:', e));
-                }, 5000);
-              }
-            })
-            .catch(e => console.warn('[Chat] Worker trigger failed:', e));
-        }
-        
-        // Success - exit retry loop
-        setIsLoading(false);
-        return;
-        
-      } catch (error: any) {
-        lastError = error;
-        console.error(`[Chat] Error (attempt ${attempt}/${maxRetries}):`, error);
-        
-        // Si c'est la dernière tentative, on arrête
-        if (attempt === maxRetries) break;
-        
-        // Sinon, on attend avant de retry (backoff exponentiel)
-        const delay = 600 * attempt; // 600ms, 1200ms, 1800ms
-        console.log(`[Chat] Retrying in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
       }
+    } catch (error) {
+      console.error('Error in handleSend:', error);
+      addMessage({
+        role: 'assistant',
+        content: '❌ Une erreur inattendue est survenue. Veuillez réessayer.',
+        type: 'text'
+      });
+    } finally {
+      setIsLoading(false);
     }
-    
-    // Si on arrive ici, toutes les tentatives ont échoué
-    console.error('[Chat] All retry attempts failed:', lastError);
-    
-    addMessage({
-      role: 'assistant',
-      content: '❌ Impossible de lancer la génération après plusieurs tentatives. Réessaye dans quelques instants.',
-      type: 'text'
-    });
-    toast.error('Échec après 3 tentatives');
-    setIsLoading(false);
   };
   
   // ======
@@ -370,33 +1183,6 @@ export function AlfieChat() {
   };
   
   // ======
-  // QUICK REPLIES COMPONENT
-  // ======
-  
-  const QuickRepliesButtons = ({ replies, onSelect }: { replies: string[]; onSelect: (reply: string) => void }) => {
-    if (replies.length === 0) return null;
-    
-    return (
-      <div className="flex flex-wrap gap-2 px-4 pb-2">
-        {replies.map((reply, idx) => (
-          <Button
-            key={idx}
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setInput(reply);
-              onSelect(reply);
-            }}
-            className="text-xs"
-          >
-            {reply}
-          </Button>
-        ))}
-      </div>
-    );
-  };
-  
-  // ======
   // RENDU
   // ======
   
@@ -407,6 +1193,21 @@ export function AlfieChat() {
       
       {/* Quota Bar */}
       {activeBrandId && <QuotaBar activeBrandId={activeBrandId} />}
+      
+      {/* Carousel Progress Bar */}
+      {carouselProgress && (
+        <div className="px-4 py-3 bg-primary/10 border-b">
+          <div className="max-w-3xl mx-auto">
+            <p className="text-sm mb-2">
+              Génération : {carouselProgress.current}/{carouselProgress.total} slides
+            </p>
+            <Progress 
+              value={(carouselProgress.current / carouselProgress.total) * 100}
+              className="h-2"
+            />
+          </div>
+        </div>
+      )}
       
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -603,16 +1404,6 @@ export function AlfieChat() {
         ))}
         <div ref={messagesEndRef} />
       </div>
-      
-      {/* Quick Replies */}
-      <QuickRepliesButtons 
-        replies={quickReplies} 
-        onSelect={async (reply) => {
-          setInput(reply);
-          // Auto-send when clicking quick reply
-          await handleSend();
-        }} 
-      />
       
       {/* Composer */}
       <div className="border-t bg-background p-4">
