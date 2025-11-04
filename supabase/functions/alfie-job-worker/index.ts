@@ -371,10 +371,14 @@ async function processRenderCarousels(payload: any): Promise<any> {
       // ✅ Appeler alfie-plan-carousel (public)
       const { data, error } = await supabaseAdmin.functions.invoke('alfie-plan-carousel', {
         body: {
-          topic,
-          numSlides: numSlides || 5,
-          angle: angle || '',
-          brandVoice: brand?.voice || 'professional'
+          prompt: topic,
+          slideCount: numSlides || 5,
+          brandKit: brand ? {
+            name: brand.name,
+            palette: brand.palette,
+            voice: brand.voice,
+            niche: brand.niche
+          } : undefined
         }
       });
       
@@ -605,6 +609,8 @@ async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Pro
         type: 'render_images',
         status: 'queued',
         payload: {
+          userId: job.user_id,
+          orderId: job.order_id,
           brief,
           textData: result.texts,
           brandId,
@@ -622,6 +628,8 @@ async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Pro
         type: 'render_carousels',
         status: 'queued',
         payload: {
+          userId: job.user_id,
+          orderId: job.order_id,
           brief,
           textData: result.texts,
           brandId,
