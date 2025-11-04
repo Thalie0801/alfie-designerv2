@@ -441,53 +441,100 @@ serve(async (req) => {
         }
       }
       
-      // ✅ Queue the initial job (idempotent)
-      const { data: existingJob } = await sb
-        .from("job_queue")
-        .select('id')
-        .eq('order_id', order.id)
-        .eq('type', 'generate_texts')
-        .maybeSingle();
-
-      if (!existingJob) {
-        const { error: jobError } = await sb.from("job_queue").insert({
-          user_id: user.id,
-          order_id: order.id,
-          type: "generate_texts",
-          status: "queued",
-          payload: {
-            brandId: brand_id,
-            imageBriefs: context.imageBriefs || [],
-            carouselBriefs: context.carouselBriefs || [],
-            numImages: nI,
-            numCarousels: nC
-          },
-        });
-
-        if (jobError) {
-          console.error('[ORCH] ❌ Failed to queue job:', jobError);
-          return json({ error: "failed_to_queue_job" }, 500);
+      // ✅ NEW: Create render jobs directly (skip generate_texts intermediate step)
+      const renderJobs: any[] = [];
+      
+      // Create render_images jobs for each image
+      if (nI > 0 && context.imageBriefs) {
+        for (let i = 0; i < nI; i++) {
+          const brief = context.imageBriefs[i] || {};
+          renderJobs.push({
+            user_id: user.id,
+            order_id: order.id,
+            type: "render_images",
+            status: "queued",
+            payload: {
+              userId: user.id, // ✅ Add userId for worker
+              brandId: brand_id,
+              orderId: order.id,
+              orderItemId: items.find((it: any) => it.type === 'image')?.order_id,
+              brief,
+              imageIndex: i
+            }
+          });
         }
-        
-        console.log('[ORCH] ✅ Job queued for order:', order.id);
-      } else {
-        console.log('[ORCH] ℹ️ Job already exists for order:', order.id);
       }
       
-      // Invoke worker
+      // Create render_carousels jobs for each carousel
+      if (nC > 0 && context.carouselBriefs) {
+        for (let i = 0; i < nC; i++) {
+          const brief = context.carouselBriefs[i] || {};
+          renderJobs.push({
+            user_id: user.id,
+            order_id: order.id,
+            type: "render_carousels",
+            status: "queued",
+            payload: {
+              userId: user.id, // ✅ Add userId for worker
+              brandId: brand_id,
+              orderId: order.id,
+              orderItemId: items.find((it: any) => it.type === 'carousel')?.order_id,
+              brief,
+              carouselIndex: i
+            }
+          });
+        }
+      }
+      
+      // Insert render jobs (idempotent check)
+      if (renderJobs.length > 0) {
+        const { data: existingJobs } = await sb
+          .from("job_queue")
+          .select('id, type, payload')
+          .eq('order_id', order.id)
+          .in('type', ['render_images', 'render_carousels']);
+        
+        const existingCount = existingJobs?.length || 0;
+        const newJobs = renderJobs.slice(existingCount); // Only insert missing jobs
+        
+        if (newJobs.length > 0) {
+          const { error: jobError } = await sb.from("job_queue").insert(newJobs);
+          
+          if (jobError) {
+            console.error('[ORCH] ❌ Failed to queue render jobs:', jobError);
+            return json({ error: "failed_to_queue_jobs" }, 500);
+          }
+          
+          console.log(`[ORCH] ✅ ${newJobs.length} render jobs queued for order:`, order.id);
+        } else {
+          console.log('[ORCH] ℹ️ All render jobs already exist for order:', order.id);
+        }
+      }
+      
+      // Invoke worker and wait for response
       try {
         const workerUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/alfie-job-worker`;
-        await fetch(workerUrl, {
+        console.log('[ORCH] 🔄 Invoking worker at:', workerUrl);
+        
+        const workerRes = await fetch(workerUrl, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ trigger: 'orchestrator' }),
+          body: JSON.stringify({ trigger: 'orchestrator', orderId: order.id }),
         });
-        console.log('[ORCH] ▶️ Worker invoked');
+        
+        if (!workerRes.ok) {
+          const errorText = await workerRes.text().catch(() => 'Unknown error');
+          console.warn('[ORCH] ⚠️ Worker returned error:', workerRes.status, errorText);
+        } else {
+          const workerData = await workerRes.json().catch(() => null);
+          console.log('[ORCH] ▶️ Worker invoked successfully:', workerData);
+        }
       } catch (e) {
-        console.warn('[ORCH] Worker invoke error:', e);
+        console.error('[ORCH] ❌ Worker invoke failed:', e);
+        // Don't fail the entire request - worker will process via cron
       }
       
       return json({

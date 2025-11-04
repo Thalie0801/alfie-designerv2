@@ -164,7 +164,12 @@ Réponds UNIQUEMENT en JSON valide avec cette structure exacte :
     });
 
     if (!response.ok) {
-      console.error('[detectTopicIntent] AI error:', response.status);
+      const errorText = await response.text().catch(() => 'Unknown error');
+      if (response.status === 402) {
+        console.warn('[detectTopicIntent] 402 Payment Required - Using fallback (raw text)');
+      } else {
+        console.error('[detectTopicIntent] AI error:', response.status, errorText);
+      }
       return { topic: userMessage, confidence: 0.5 };
     }
 
