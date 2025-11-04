@@ -22,6 +22,16 @@ export async function callEdge<T = any>(
   const silent = options?.silent ?? false;
   let lastError: string = '';
 
+  // ✅ Vérifier qu'on a une session valide AVANT d'appeler l'edge function
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    const errorMsg = 'Session expirée. Veuillez vous reconnecter.';
+    if (!silent) {
+      toast.error(errorMsg);
+    }
+    return { ok: false, error: 'AUTH_REQUIRED' };
+  }
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const { data, error } = await supabase.functions.invoke(functionName, { body });
