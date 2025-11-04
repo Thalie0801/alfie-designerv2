@@ -48,7 +48,6 @@ export function AppSidebar() {
     { path: '/chat', label: 'Chat Alfie', icon: MessageCircle, tourId: 'chat' },
     { path: '/templates', label: 'Catalogue', icon: Layers, badge: 'Bientôt' },
     { path: '/library', label: 'Bibliothèque', icon: FolderOpen, tourId: 'library' },
-    { path: '/assets', label: 'Assets', icon: FolderOpen },
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/profile', label: 'Profil', icon: UserCircle },
     { path: '/billing', label: 'Abonnement', icon: CreditCard },
