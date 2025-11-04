@@ -450,51 +450,43 @@ serve(async (req) => {
       // ✅ NEW: Create render jobs directly (skip generate_texts intermediate step)
       const renderJobs: any[] = [];
       
-      // Create render_images jobs for each image
+      // Create a single render_images job aggregating all image briefs
       if (nI > 0 && context.imageBriefs) {
         const imageItem = allOrderItems?.find((it: any) => it.type === 'image');
-        for (let i = 0; i < nI; i++) {
-          const brief = context.imageBriefs[i] || {};
-          renderJobs.push({
-            user_id: user.id,
-            order_id: order.id,
-            type: "render_images",
-            status: "queued",
-            payload: {
-              userId: user.id,
-              brandId: brand_id,
-              orderId: order.id,
-              orderItemId: imageItem?.id, // ✅ Correct: use id, not order_id
-              brief,
-              imageIndex: i
-            }
-          });
-        }
+        renderJobs.push({
+          user_id: user.id,
+          order_id: order.id,
+          type: "render_images",
+          status: "queued",
+          payload: {
+            userId: user.id,
+            brandId: brand_id,
+            orderId: order.id,
+            orderItemId: imageItem?.id,
+            brief: { count: nI, briefs: context.imageBriefs }
+          }
+        });
       }
       
-      // Create render_carousels jobs for each carousel
+      // Create a single render_carousels job aggregating all carousel briefs
       if (nC > 0 && context.carouselBriefs) {
         const carouselItem = allOrderItems?.find((it: any) => it.type === 'carousel');
-        for (let i = 0; i < nC; i++) {
-          const brief = context.carouselBriefs[i] || {};
-          renderJobs.push({
-            user_id: user.id,
-            order_id: order.id,
-            type: "render_carousels",
-            status: "queued",
-            payload: {
-              userId: user.id,
-              brandId: brand_id,
-              orderId: order.id,
-              orderItemId: carouselItem?.id, // ✅ Correct: use id, not order_id
-              brief,
-              carouselIndex: i
-            }
-          });
-        }
+        renderJobs.push({
+          user_id: user.id,
+          order_id: order.id,
+          type: "render_carousels",
+          status: "queued",
+          payload: {
+            userId: user.id,
+            brandId: brand_id,
+            orderId: order.id,
+            orderItemId: carouselItem?.id,
+            brief: { count: nC, briefs: context.carouselBriefs }
+          }
+        });
       }
       
-      // Insert render jobs (idempotent check)
+      // Insert render jobs with robust idempotency by type + index key
       if (renderJobs.length > 0) {
         const { data: existingJobs } = await sb
           .from("job_queue")
@@ -502,8 +494,11 @@ serve(async (req) => {
           .eq('order_id', order.id)
           .in('type', ['render_images', 'render_carousels']);
         
-        const existingCount = existingJobs?.length || 0;
-        const newJobs = renderJobs.slice(existingCount); // Only insert missing jobs
+        const existingKeys = new Set(
+          (existingJobs || []).map((j: any) => j.type)
+        );
+        
+        const newJobs = renderJobs.filter(j => !existingKeys.has(j.type));
         
         if (newJobs.length > 0) {
           const { error: jobError } = await sb.from("job_queue").insert(newJobs);
@@ -513,7 +508,7 @@ serve(async (req) => {
             return json({ error: "failed_to_queue_jobs" }, 500);
           }
           
-          console.log(`[ORCH] ✅ ${newJobs.length} render jobs queued for order:`, order.id);
+          console.log(`[ORCH] ✅ ${newJobs.length} render job(s) queued for order:`, order.id);
         } else {
           console.log('[ORCH] ℹ️ All render jobs already exist for order:', order.id);
         }
