@@ -177,5 +177,8 @@ schedule = "*/5 * * * *"
 [functions.cancel-job-set]
 verify_jwt = true
 
+[functions.admin-reset-stuck-jobs]
+verify_jwt = true
+
 [functions.queue-monitor]
 verify_jwt = true
