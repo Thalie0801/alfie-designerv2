@@ -353,6 +353,7 @@ export default function Admin() {
           </TabsTrigger>
           <TabsTrigger value="news">Actualités</TabsTrigger>
           <TabsTrigger value="diagnostic">Diagnostic</TabsTrigger>
+          <TabsTrigger value="tools">Outils</TabsTrigger>
         </TabsList>
 
         {/* Users Tab */}
@@ -785,6 +786,100 @@ export default function Admin() {
         {/* Diagnostic Tab */}
         <TabsContent value="diagnostic" className="space-y-4">
           <VideoDiagnostic />
+        </TabsContent>
+
+        {/* Tools Tab */}
+        <TabsContent value="tools" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Outils de maintenance</CardTitle>
+              <CardDescription>Outils pour corriger et diagnostiquer les problèmes système</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="border rounded-lg p-4 space-y-3">
+                <h3 className="font-semibold">🔧 Synchronisation VIP/Admin</h3>
+                <p className="text-sm text-muted-foreground">
+                  Corrige les rôles VIP/Admin et met à jour les plans Enterprise pour les utilisateurs autorisés.
+                  Utile si un utilisateur VIP n'a plus le bon plan affiché.
+                </p>
+                <Button 
+                  onClick={async () => {
+                    try {
+                      toast.loading('Synchronisation en cours...');
+                      const { data, error } = await supabase.functions.invoke('fix-vip-roles');
+                      
+                      if (error) throw error;
+                      
+                      toast.dismiss();
+                      if (data?.ok) {
+                        toast.success(`✅ ${data.fixed} compte(s) corrigé(s)`, {
+                          description: data.results.map((r: any) => 
+                            `${r.email}: ${r.status}`
+                          ).join('\n')
+                        });
+                        loadAdminData();
+                      } else {
+                        toast.error('Erreur lors de la synchronisation');
+                      }
+                    } catch (error: any) {
+                      toast.dismiss();
+                      toast.error('Échec de la synchronisation', {
+                        description: error.message
+                      });
+                    }
+                  }}
+                  className="gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Synchroniser les VIP/Admin
+                </Button>
+              </div>
+
+              <div className="border rounded-lg p-4 space-y-3">
+                <h3 className="font-semibold">🔍 Diagnostic utilisateur</h3>
+                <p className="text-sm text-muted-foreground">
+                  Affiche les informations détaillées sur votre compte (rôles, plan, variables d'environnement).
+                </p>
+                <Button 
+                  onClick={async () => {
+                    try {
+                      const { data: { session } } = await supabase.auth.getSession();
+                      if (!session) {
+                        toast.error('Non connecté');
+                        return;
+                      }
+
+                      toast.loading('Récupération des informations...');
+                      const { data, error } = await supabase.functions.invoke('debug-user-access', {
+                        headers: {
+                          Authorization: `Bearer ${session.access_token}`
+                        }
+                      });
+                      
+                      toast.dismiss();
+                      
+                      if (error) throw error;
+                      
+                      console.log('[Debug User Access]', data);
+                      toast.success('Informations récupérées (voir console)', {
+                        description: `Email: ${data.user.email}\nRôles: ${data.roles.map((r: any) => r.role).join(', ') || 'Aucun'}\nPlan: ${data.profile?.plan || 'Aucun'}`
+                      });
+                    } catch (error: any) {
+                      toast.dismiss();
+                      toast.error('Échec du diagnostic', {
+                        description: error.message
+                      });
+                    }
+                  }}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <Search className="h-4 w-4" />
+                  Diagnostic mon compte
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

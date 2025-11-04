@@ -181,3 +181,9 @@ verify_jwt = true
 
 [functions.queue-monitor]
 verify_jwt = true
+
+[functions.debug-user-access]
+verify_jwt = true
+
+[functions.fix-vip-roles]
+verify_jwt = false
