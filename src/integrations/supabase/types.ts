@@ -2331,6 +2331,12 @@ export type Database = {
           success: boolean
         }[]
       }
+      reset_stuck_jobs: {
+        Args: { age_minutes?: number }
+        Returns: {
+          reset_count: number
+        }[]
+      }
       update_affiliate_status: {
         Args: { affiliate_id_param: string }
         Returns: undefined
