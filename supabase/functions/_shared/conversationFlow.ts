@@ -328,8 +328,28 @@ export function buildSummary(context: ConversationContext): string {
   
   if (context.numCarousels && context.numCarousels > 0) {
     summary += `\n📑 **${context.numCarousels} carrousel(s)**\n`;
+    
+    // ✅ Group carousels by (topic + angle + numSlides) to avoid duplicate display
+    const grouped = new Map<string, { brief: any; indices: number[] }>();
+    
     context.carouselBriefs?.forEach((brief, idx) => {
-      summary += `  ${idx + 1}. ${brief.topic || 'Non spécifié'} - ${brief.numSlides || 5} slides - Angle: ${brief.angle || 'éducatif'}\n`;
+      const key = `${(brief.topic || 'n/a').toLowerCase()}|${(brief.angle || 'n/a').toLowerCase()}|${brief.numSlides || 5}`;
+      
+      if (grouped.has(key)) {
+        grouped.get(key)!.indices.push(idx + 1);
+      } else {
+        grouped.set(key, { brief, indices: [idx + 1] });
+      }
+    });
+    
+    // Display with variant labels
+    Array.from(grouped.values()).forEach(({ brief, indices }) => {
+      const variantLabel = indices.length > 1 
+        ? ` (${indices.length} variantes: #${indices.join(', #')})`
+        : ` (#${indices[0]})`;
+      
+      summary += `  • ${brief.topic || 'Sujet libre'}${variantLabel}\n`;
+      summary += `    Angle: ${brief.angle || 'N/A'} • ${brief.numSlides || 5} slides\n`;
     });
   }
   

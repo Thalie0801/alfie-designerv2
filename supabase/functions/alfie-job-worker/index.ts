@@ -337,25 +337,93 @@ async function processGenerateVideo(payload: any): Promise<any> {
 async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Promise<void> {
   console.log('📋 [Cascade] Creating follow-up jobs for order:', job.order_id);
   
-  // ✅ NEW APPROACH: Create 1 job per order_item instead of grouped jobs
+  // ✅ STEP 1: Retry to fetch order_items (max 10 attempts over 1 second)
+  let orderItems: any[] = [];
+  const maxRetries = 10;
+  const retryDelay = 100; // ms
   
-  // Fetch all order_items for this order
-  const { data: orderItems, error: itemsError } = await supabaseAdmin
-    .from('order_items')
-    .select('*')
-    .eq('order_id', job.order_id)
-    .order('sequence_number');
-  
-  if (itemsError || !orderItems || orderItems.length === 0) {
-    console.error('❌ [Cascade] No order_items found for order:', job.order_id);
-    return;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const { data, error } = await supabaseAdmin
+      .from('order_items')
+      .select('*')
+      .eq('order_id', job.order_id)
+      .order('sequence_number');
+    
+    if (error) {
+      console.error(`❌ [Cascade] Error fetching items (attempt ${attempt + 1}):`, error);
+    } else if (data && data.length > 0) {
+      orderItems = data;
+      console.log(`✅ [Cascade] Found ${orderItems.length} order_items (attempt ${attempt + 1})`);
+      break;
+    }
+    
+    // Wait before retry
+    if (attempt < maxRetries - 1) {
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+    }
   }
   
+  // ✅ STEP 2: Fallback to payload if still no items found
+  if (orderItems.length === 0) {
+    console.warn('⚠️ [Cascade] No order_items found after retries. Using payload fallback.');
+    
+    const { imageBriefs = [], carouselBriefs = [], brandId } = job.payload;
+    const cascadeJobs = [];
+    
+    // Create jobs from imageBriefs
+    imageBriefs.forEach((brief: any, index: number) => {
+      cascadeJobs.push({
+        user_id: job.user_id,
+        order_id: job.order_id,
+        type: 'render_images',
+        status: 'queued',
+        payload: {
+          brief,
+          textData: result.texts,
+          brandId,
+          imageIndex: index,
+          fallbackMode: true // debug marker
+        }
+      });
+    });
+    
+    // Create jobs from carouselBriefs
+    carouselBriefs.forEach((brief: any, index: number) => {
+      cascadeJobs.push({
+        user_id: job.user_id,
+        order_id: job.order_id,
+        type: 'render_carousels',
+        status: 'queued',
+        payload: {
+          brief,
+          textData: result.texts,
+          brandId,
+          carouselIndex: index,
+          fallbackMode: true
+        }
+      });
+    });
+    
+    if (cascadeJobs.length > 0) {
+      const { error: cascadeError } = await supabaseAdmin
+        .from('job_queue')
+        .insert(cascadeJobs);
+      
+      if (cascadeError) {
+        console.error('❌ [Cascade] Failed to create fallback jobs:', cascadeError);
+      } else {
+        console.log(`✅ [Cascade] Created ${cascadeJobs.length} jobs via FALLBACK`);
+      }
+    }
+    
+    return; // Exit after fallback
+  }
+  
+  // ✅ STEP 3: Normal cascade from order_items
   const cascadeJobs = [];
   
   for (const item of orderItems) {
     if (item.type === 'carousel') {
-      // Create 1 render_carousels job per carousel item
       cascadeJobs.push({
         user_id: job.user_id,
         order_id: job.order_id,
@@ -364,13 +432,12 @@ async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Pro
         payload: {
           orderItemId: item.id,
           brief: item.brief_json,
-          textData: result.texts, // Generated texts from AI
+          textData: result.texts,
           brandId: job.payload.brandId,
-          carouselIndex: item.sequence_number - 1
+          carouselIndex: item.sequence_number
         }
       });
     } else if (item.type === 'image') {
-      // Create 1 render_images job per image item
       cascadeJobs.push({
         user_id: job.user_id,
         order_id: job.order_id,
@@ -381,7 +448,7 @@ async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Pro
           brief: item.brief_json,
           textData: result.texts,
           brandId: job.payload.brandId,
-          imageIndex: item.sequence_number - 1
+          imageIndex: item.sequence_number
         }
       });
     }
@@ -395,7 +462,7 @@ async function createCascadeJobs(job: any, result: any, supabaseAdmin: any): Pro
     if (cascadeError) {
       console.error('❌ [Cascade] Failed to create jobs:', cascadeError);
     } else {
-      console.log(`✅ [Cascade] Created ${cascadeJobs.length} follow-up jobs (1 per order_item)`);
+      console.log(`✅ [Cascade] Created ${cascadeJobs.length} jobs from order_items`);
     }
   }
 }

@@ -374,9 +374,19 @@ serve(async (req) => {
         });
       }
       
+      // ✅ FIX: Use service role client to bypass RLS
       if (items.length) {
-        await sb.from("order_items").insert(items);
-        console.log('[ORCH] ✅ Items created:', items.length);
+        const { data: insertedItems, error: itemsError } = await sb
+          .from("order_items")
+          .insert(items)
+          .select('id');
+        
+        if (itemsError) {
+          console.error('[ORCH] ❌ Failed to insert items:', itemsError);
+          // Continue anyway - worker will use fallback from payload
+        } else {
+          console.log('[ORCH] ✅ Items inserted:', insertedItems?.length || 0, 'ids:', insertedItems?.map(i => i.id).join(', '));
+        }
       }
       
       // Enqueue job
