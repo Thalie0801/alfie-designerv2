@@ -11,17 +11,17 @@ on:
       - '**/*.jsx'
       - '**/*.json'
       - '**/*.css'
-      - package.json
-      - package-lock.json
-      - pnpm-lock.yaml
-      - bun.lockb
-      - tsconfig*.json
-      - next.config.*
-      - vite.config.*
-      - tailwind.config.*
-      - postcss.config.*
-      - eslint.config.*
-      - .github/workflows/node-quality.yml
+      - 'package.json'
+      - 'package-lock.json'
+      - 'pnpm-lock.yaml'
+      - 'bun.lockb'
+      - 'tsconfig*.json'
+      - 'next.config.*'
+      - 'vite.config.*'
+      - 'tailwind.config.*'
+      - 'postcss.config.*'
+      - 'eslint.config.*'
+      - '.github/workflows/node-quality.yml'
   pull_request:
     branches: [main, refonte-alfie-2025]
     paths:
@@ -31,33 +31,16 @@ on:
       - '**/*.jsx'
       - '**/*.json'
       - '**/*.css'
-      - package.json
-      - package-lock.json
-      - pnpm-lock.yaml
-      - bun.lockb
-      - tsconfig*.json
-      - next.config.*
-      - vite.config.*
-      - tailwind.config.*
-      - postcss.config.*
-      - eslint.config.*
-      - .github/workflows/node-quality.yml
-      - '**.ts'
-      - '**.tsx'
-      - '**.js'
-      - '**.jsx'
-      - 'package*.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'pnpm-lock.yaml'
+      - 'bun.lockb'
       - 'tsconfig*.json'
-      - '.github/workflows/node-quality.yml'
-  pull_request:
-    branches: [main, refonte-alfie-2025]
-    paths:
-      - '**.ts'
-      - '**.tsx'
-      - '**.js'
-      - '**.jsx'
-      - 'package*.json'
-      - 'tsconfig*.json'
+      - 'next.config.*'
+      - 'vite.config.*'
+      - 'tailwind.config.*'
+      - 'postcss.config.*'
+      - 'eslint.config.*'
       - '.github/workflows/node-quality.yml'
 
 permissions:
@@ -74,56 +57,41 @@ env:
   NEXT_TELEMETRY_DISABLED: 1
 
 jobs:
-  typecheck:
-    name: TypeScript
-    runs-on: ubuntu-latest
-    outputs:
-      exit_code: ${{ steps.tsc.outputs.exit_code }}
   install:
+    name: Install deps (with cache)
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - name: Restore npm cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            npm-${{ runner.os }}-
-
-      - name: Restore node_modules
-        id: node-modules-cache
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
+
       - name: Cache node_modules
         id: cache-node-modules
         uses: actions/cache@v4
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Install dependencies
-        if: steps.node-modules-cache.outputs.cache-hit != 'true'
           restore-keys: |
             node-modules-${{ runner.os }}-
-      - name: Install dependencies
+
+      - name: Install dependencies (robust)
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: |
+          set -euxo pipefail
           if [ -f package-lock.json ]; then
-            npm ci --prefer-offline --no-audit --no-fund
+            npm ci --prefer-offline --no-audit --no-fund \
+            || npm ci --prefer-offline --no-audit --no-fund --legacy-peer-deps \
+            || npm install --prefer-online --no-audit --no-fund --legacy-peer-deps
           else
-            npm install --prefer-online --no-audit --no-fund
+            npm install --prefer-online --no-audit --no-fund --legacy-peer-deps
           fi
 
       - name: Cache Next.js build
@@ -135,8 +103,11 @@ jobs:
             nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
 
   typecheck:
+    name: TypeScript
     runs-on: ubuntu-latest
     needs: install
+    outputs:
+      exit_code: ${{ steps.tsc.outputs.exit_code }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -145,22 +116,21 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+
       - name: Restore node_modules cache
         uses: actions/cache@v4
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
       - name: Type check
         id: tsc
-        continue-on-error: true
         run: |
           set -o pipefail
           npm run typecheck 2>&1 | tee typecheck.txt
-          exit_code=${PIPESTATUS[0]}
-          echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
-
-          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
           exit ${PIPESTATUS[0]}
+
       - name: Parse typecheck results
         if: always()
         id: parse-results
@@ -170,22 +140,18 @@ jobs:
             echo "warnings=$(grep -c 'warning TS' typecheck.txt || echo 0)" >> $GITHUB_OUTPUT
             head -n 20 typecheck.txt > typecheck-summary.txt || true
           fi
+
       - name: Upload typecheck report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: typecheck-report
-          path: typecheck.txt
-          if-no-files-found: warn
-
-      - name: Fail if typecheck failed
-        if: steps.tsc.outputs.exit_code != '0'
-        run: exit 1
           path: |
             typecheck.txt
             typecheck-summary.txt
           retention-days: 7
           if-no-files-found: ignore
+
       - name: Comment PR with typecheck results
         if: github.event_name == 'pull_request' && always()
         uses: actions/github-script@v7
@@ -206,11 +172,8 @@ jobs:
               }
               body += '📥 Full logs in the Actions run.\n';
             }
-            github.rest.issues.createComment({
-              ...context.repo,
-              issue_number: context.issue.number,
-              body
-            });
+            github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+
       - name: Fail if typecheck failed
         if: steps.tsc.outputs.exit_code != '0'
         run: |
@@ -220,48 +183,23 @@ jobs:
   lint:
     name: ESLint
     runs-on: ubuntu-latest
-    needs: typecheck
-    if: always()
+    needs: install
     outputs:
       exit_code: ${{ steps.lint.outputs.exit_code }}
-    needs: install
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - name: Restore npm cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            npm-${{ runner.os }}-
-
-      - name: Restore node_modules
-        id: node-modules-cache
       - name: Restore node_modules cache
         uses: actions/cache@v4
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Install dependencies
-        if: steps.node-modules-cache.outputs.cache-hit != 'true'
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci --prefer-offline --no-audit --no-fund
-          else
-            npm install --prefer-online --no-audit --no-fund
-          fi
 
       - name: Lint
         id: lint
@@ -269,12 +207,9 @@ jobs:
         run: |
           set -o pipefail
           npm run lint 2>&1 | tee lint.txt
-          exit_code=${PIPESTATUS[0]}
-          echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
-
-          npm run lint 2>&1 | tee lint.txt
-          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
           exit ${PIPESTATUS[0]}
+
       - name: Parse lint results
         if: always()
         id: parse-lint
@@ -283,15 +218,16 @@ jobs:
             echo "errors=$(grep -c 'error' lint.txt || echo 0)" >> $GITHUB_OUTPUT
             echo "warnings=$(grep -c 'warning' lint.txt || echo 0)" >> $GITHUB_OUTPUT
           fi
+
       - name: Upload lint report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lint-report
           path: lint.txt
-          if-no-files-found: warn
           retention-days: 7
           if-no-files-found: ignore
+
       - name: Comment PR with lint results
         if: github.event_name == 'pull_request' && always()
         uses: actions/github-script@v7
@@ -307,11 +243,8 @@ jobs:
               body += `⚠️ **Found ${errors} error(s) and ${warnings} warning(s)**\n\n`;
               body += '📥 Full logs in the Actions run.\n';
             }
-            github.rest.issues.createComment({
-              ...context.repo,
-              issue_number: context.issue.number,
-              body
-            });
+            github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+
       - name: Warn if lint failed
         if: steps.lint.outputs.exit_code != '0'
         run: echo "::warning::ESLint found issues but continuing build"
@@ -320,36 +253,33 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     needs: [typecheck, lint]
-    if: always()
-    outputs:
-      result: ${{ job.status }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+
       - name: Restore node_modules cache
         uses: actions/cache@v4
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
       - name: Restore Next.js cache
         uses: actions/cache@v4
         with:
           path: .next/cache
           key: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
+
       - name: Build
         id: build
         run: |
           npm run build
           echo "Build completed successfully"
+
       - name: Check build output
         run: |
           if [ -d ".next" ]; then
@@ -359,6 +289,7 @@ jobs:
             echo "❌ .next directory not found"
             exit 1
           fi
+
       - name: Comment PR with build results
         if: github.event_name == 'pull_request' && always()
         uses: actions/github-script@v7
@@ -368,116 +299,15 @@ jobs:
             const body = ok
               ? '## 🏗️ Build Results\n\n✅ **Build completed successfully!**\n\n🚀 Ready to deploy'
               : '## 🏗️ Build Results\n\n❌ **Build failed**\n\nPlease check the logs for details.';
-            github.rest.issues.createComment({
-              ...context.repo,
-              issue_number: context.issue.number,
-              body
-            });
+            github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
 
-      - name: Restore npm cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            npm-${{ runner.os }}-
-
-      - name: Restore node_modules
-        id: node-modules-cache
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Install dependencies
-        if: steps.node-modules-cache.outputs.cache-hit != 'true'
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci --prefer-offline --no-audit --no-fund
-          else
-            npm install --prefer-online --no-audit --no-fund
-          fi
-
-      - name: Restore Next.js cache
-        uses: actions/cache@v4
-        with:
-          path: .next/cache
-          key: next-cache-${{ runner.os }}-${{ hashFiles('package-lock.json', 'tsconfig*.json') }}
-          restore-keys: |
-            next-cache-${{ runner.os }}-
-
-      - name: Build application
-        run: npm run build
-
-  summary:
+  quality-check-summary:
     name: Quality summary
     runs-on: ubuntu-latest
     needs: [typecheck, lint, build]
     if: always()
     steps:
       - name: Summarize results
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const core = require('@actions/core');
-            const checks = [
-              {
-                label: 'Type check',
-                result: '${{ needs.typecheck.result }}',
-                exitCode: '${{ needs.typecheck.outputs.exit_code }}'
-              },
-              {
-                label: 'ESLint',
-                result: '${{ needs.lint.result }}',
-                exitCode: '${{ needs.lint.outputs.exit_code }}'
-              },
-              {
-                label: 'Build',
-                result: '${{ needs.build.result }}',
-                exitCode: ''
-              }
-            ];
-
-            const statusEmoji = (result) => {
-              switch (result) {
-                case 'success':
-                  return '✅';
-                case 'skipped':
-                  return '⏭️';
-                case 'cancelled':
-                  return '⚠️';
-                default:
-                  return '❌';
-              }
-            };
-
-            let table = '| Check | Status | Details |\n| --- | --- | --- |\n';
-            for (const check of checks) {
-              const exitCode = check.exitCode && check.exitCode.length > 0 ? check.exitCode : '0';
-              const detail = check.exitCode !== '' ? `exit code ${exitCode}` : '—';
-              table += `| ${check.label} | ${statusEmoji(check.result)} ${check.result} | ${detail} |\n`;
-            }
-
-            core.summary
-              .addHeading('Node quality checks')
-              .addRaw(table)
-              .write();
-
-            if (context.eventName === 'pull_request') {
-              const body = `## Node quality checks\n\n${table}\n\n- 📄 TypeScript log: [artifact](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n- 📄 ESLint log: [artifact](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`;
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.pull_request.number,
-                body
-              });
-            }
-  quality-check-summary:
-    runs-on: ubuntu-latest
-    needs: [typecheck, lint, build]
-    if: always()
-    steps:
-      - name: Check all jobs status
         run: |
           echo "Typecheck: ${{ needs.typecheck.result }}"
           echo "Lint: ${{ needs.lint.result }}"
@@ -489,20 +319,5 @@ jobs:
           if [ "${{ needs.lint.result }}" != "success" ]; then
             echo "::warning::Lint had issues but not blocking"; fi
           echo "✅ Quality checks completed"
-      - name: Final PR comment
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const t='${{ needs.typecheck.result }}', l='${{ needs.lint.result }}', b='${{ needs.build.result }}';
-            const emoji = s => s==='success'?'✅':(s==='failure'?'❌':'⚠️');
-            let body = '## 📊 Quality Check Summary\n\n';
-            body += `${emoji(t)} **TypeScript**: ${t}\n`;
-            body += `${emoji(l)} **Lint**: ${l}\n`;
-            body += `${emoji(b)} **Build**: ${b}\n\n`;
-            if (t==='success' && b==='success') body += '🎉 **All checks passed! Ready to merge.**\n';
-            else body += '⚠️ **Some checks failed. Please review.**\n';
-            body += `\n---\n*Run: [#${{ github.run_number }}](../actions/runs/${{ github.run_id }})*`;
-            github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
 
    
