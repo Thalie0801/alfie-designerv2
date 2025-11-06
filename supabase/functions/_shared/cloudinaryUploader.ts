@@ -144,7 +144,9 @@ export function buildTextOverlayTransform(options: {
   // Title layer
   if (title) {
     const encodedTitle = encodeCloudinaryText(title);
-    const fontStyle = titleWeight === 'bold' ? `${titleFont}_Bold_${titleSize}` : `${titleFont}_${titleSize}`;
+    // ✅ FIX: Encode font names with spaces (e.g., "Nunito Sans" -> "Nunito%20Sans")
+    const safeTitleFont = (titleFont || 'Arial').replace(/\s+/g, '%20');
+    const fontStyle = titleWeight === 'bold' ? `${safeTitleFont}_Bold_${titleSize}` : `${safeTitleFont}_${titleSize}`;
     transformations.push(
       `l_text:${fontStyle}:${encodedTitle},co_rgb:${titleColor},w_${width},c_fit/fl_layer_apply,g_north,y_200`
     );
@@ -153,7 +155,9 @@ export function buildTextOverlayTransform(options: {
   // Subtitle layer
   if (subtitle) {
     const encodedSubtitle = encodeCloudinaryText(subtitle);
-    const fontStyle = subtitleWeight === 'bold' ? `${subtitleFont}_Bold_${subtitleSize}` : `${subtitleFont}_${subtitleSize}`;
+    // ✅ FIX: Encode font names with spaces
+    const safeSubtitleFont = (subtitleFont || 'Arial').replace(/\s+/g, '%20');
+    const fontStyle = subtitleWeight === 'bold' ? `${safeSubtitleFont}_Bold_${subtitleSize}` : `${safeSubtitleFont}_${subtitleSize}`;
     transformations.push(
       `l_text:${fontStyle}:${encodedSubtitle},co_rgb:${subtitleColor},w_${width},c_fit/fl_layer_apply,g_north,y_${280 + lineSpacing}`
     );

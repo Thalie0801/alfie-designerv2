@@ -47,7 +47,8 @@ function encodeCloudinaryText(text: string): string {
  * Build a single text layer transformation for Cloudinary
  */
 function buildTextLayer(layer: TextLayer): string {
-  const fontFamily = layer.font || 'Inter';
+  // ✅ FIX: Encode font names with spaces (e.g., "Nunito Sans" -> "Nunito%20Sans")
+  const fontFamily = (layer.font || 'Inter').replace(/\s+/g, '%20');
   const fontWeight = layer.weight || 'Bold';
   const fontSize = layer.size || 64;
   const font = `${fontFamily}_${fontWeight}_${fontSize}`;
@@ -345,6 +346,7 @@ export function buildCloudinaryTextOverlayUrl(
   
   // Add title overlay
   if (options.title) {
+    // ✅ FIX: Font already encoded above, keep it
     const titleFont = (options.titleFont || 'Inter').replace(/\s+/g, '%20');
     const titleSize = options.titleSize || 64;
     const titleWeight = options.titleWeight || 'Bold';
@@ -358,6 +360,7 @@ export function buildCloudinaryTextOverlayUrl(
   
   // Add subtitle overlay
   if (options.subtitle) {
+    // ✅ FIX: Font already encoded above, keep it
     const subtitleFont = (options.subtitleFont || 'Inter').replace(/\s+/g, '%20');
     const subtitleSize = options.subtitleSize || 36;
     const subtitleWeight = options.subtitleWeight || 'Regular';
