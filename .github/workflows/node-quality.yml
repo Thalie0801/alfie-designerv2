@@ -94,13 +94,15 @@ jobs:
             npm install --prefer-online --no-audit --no-fund --legacy-peer-deps
           fi
 
-      - name: Cache Next.js build
+      - name: Cache Vite build
         uses: actions/cache@v4
         with:
-          path: .next/cache
-          key: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
+          path: |
+            dist
+            node_modules/.vite
+          key: vite-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
           restore-keys: |
-            nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+            vite-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
 
   typecheck:
     name: TypeScript
@@ -272,11 +274,13 @@ jobs:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      - name: Restore Next.js cache
+      - name: Restore Vite cache
         uses: actions/cache@v4
         with:
-          path: .next/cache
-          key: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
+          path: |
+            dist
+            node_modules/.vite
+          key: vite-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
 
       - name: Build
         id: build
@@ -286,11 +290,11 @@ jobs:
 
       - name: Check build output
         run: |
-          if [ -d ".next" ]; then
-            echo "✅ .next directory created"
-            du -sh .next || true
+          if [ -d "dist" ]; then
+            echo "✅ dist directory created"
+            du -sh dist || true
           else
-            echo "❌ .next directory not found"
+            echo "❌ dist directory not found"
             exit 1
           fi
 
