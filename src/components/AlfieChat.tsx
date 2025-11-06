@@ -216,6 +216,8 @@ export function AlfieChat() {
       finishAnnouncedRef.current = orderId;
       setConversationState('completed');
       finishAnnouncedRef.current = orderId;
+      setConversationState('completed');
+      finishAnnouncedRef.current = orderId;
     const canAnnounce =
       conversationState === 'generating' &&
       (orderTotal ?? 0) > 0 &&
@@ -252,6 +254,8 @@ export function AlfieChat() {
         quickReplies: ['Voir la bibliothèque', 'Créer un nouveau carrousel'],
         type: 'text'
       });
+    }
+  }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
     }
   }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
     }
