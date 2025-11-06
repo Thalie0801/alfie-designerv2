@@ -22,10 +22,8 @@ export async function getAuthHeader() {
     }
 
     const headers: Record<string, string> = {
-      Authorization: `Bearer ${anonToken}`
+      Authorization: `Bearer ${userToken}`
     };
-
-    headers['X-Supabase-Auth'] = `Bearer ${userToken}`;
 
     return headers;
   } catch (error) {
