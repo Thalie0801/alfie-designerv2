@@ -95,6 +95,117 @@ export async function uploadToCloudinary(
   };
 }
 
+// Encode texte pour URL Cloudinary (robuste, identique à imageCompositor)
+export function encodeCloudinaryText(text: string): string {
+  let encoded = encodeURIComponent(text);
+  // Protéger les caractères sensibles Cloudinary
+  encoded = encoded.replace(/%2C/g, '%252C'); // virgule
+  encoded = encoded.replace(/%2F/g, '%252F'); // slash
+  encoded = encoded.replace(/%3A/g, '%253A'); // deux-points
+  encoded = encoded.replace(/%23/g, '%2523'); // hash
+  encoded = encoded.replace(/\(/g, '%28');
+  encoded = encoded.replace(/\)/g, '%29');
+  encoded = encoded.replace(/\n/g, '%0A'); // newline
+  return encoded;
+}
+
+// Construire la chaîne de transformation pour text overlay (réutilisable pour eager)
+export function buildTextOverlayTransform(options: {
+  title?: string;
+  subtitle?: string;
+  titleColor?: string;
+  subtitleColor?: string;
+  titleSize?: number;
+  subtitleSize?: number;
+  titleFont?: string;
+  subtitleFont?: string;
+  titleWeight?: string;
+  subtitleWeight?: string;
+  width?: number;
+  lineSpacing?: number;
+}): string {
+  const {
+    title,
+    subtitle = '',
+    titleColor = '1E1E1E',
+    subtitleColor = '5A5A5A',
+    titleSize = 64,
+    subtitleSize = 32,
+    titleFont = 'Arial',
+    subtitleFont = 'Arial',
+    titleWeight = 'bold',
+    subtitleWeight = 'normal',
+    width = 960,
+    lineSpacing = 10
+  } = options;
+
+  const transformations: string[] = [];
+
+  // Title layer
+  if (title) {
+    const encodedTitle = encodeCloudinaryText(title);
+    const fontStyle = titleWeight === 'bold' ? `${titleFont}_Bold_${titleSize}` : `${titleFont}_${titleSize}`;
+    transformations.push(
+      `l_text:${fontStyle}:${encodedTitle},co_rgb:${titleColor},w_${width},c_fit/fl_layer_apply,g_north,y_200`
+    );
+  }
+
+  // Subtitle layer
+  if (subtitle) {
+    const encodedSubtitle = encodeCloudinaryText(subtitle);
+    const fontStyle = subtitleWeight === 'bold' ? `${subtitleFont}_Bold_${subtitleSize}` : `${subtitleFont}_${subtitleSize}`;
+    transformations.push(
+      `l_text:${fontStyle}:${encodedSubtitle},co_rgb:${subtitleColor},w_${width},c_fit/fl_layer_apply,g_north,y_${280 + lineSpacing}`
+    );
+  }
+
+  // Final format
+  transformations.push('f_png,q_auto,cs_srgb');
+
+  return transformations.join('/');
+}
+
+// Garantir qu'une dérivée Cloudinary existe (Strict Transformations)
+export async function ensureDerived(
+  cloudName: string,
+  apiKey: string,
+  apiSecret: string,
+  publicId: string,
+  eagerTransform: string
+): Promise<any> {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const params = new URLSearchParams({
+    public_id: publicId,
+    type: 'upload',
+    eager: eagerTransform,
+    timestamp: String(timestamp),
+    api_key: apiKey,
+  });
+
+  // Signature SHA-1 (ordre alphabétique des paramètres)
+  const toSign = ['eager', 'public_id', 'timestamp', 'type']
+    .map(k => `${k}=${params.get(k)!}`)
+    .join('&');
+  const sigBuf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(toSign + apiSecret));
+  const signature = Array.from(new Uint8Array(sigBuf))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  
+  params.append('signature', signature);
+
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/explicit`, {
+    method: 'POST',
+    body: params,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Cloudinary explicit failed ${response.status}: ${errorText}`);
+  }
+
+  return response.json();
+}
+
 export function buildCloudinaryTextOverlayUrl(
   publicId: string,
   options: {
@@ -113,56 +224,11 @@ export function buildCloudinaryTextOverlayUrl(
   }
 ): string {
   const cloudName = Deno.env.get('CLOUDINARY_CLOUD_NAME');
-  if (!cloudName) throw new Error('CLOUDINARY_CLOUD_NAME not set');
+  if (!cloudName) throw new Error('CLOUDINARY_CLOUD_NAME not configured');
 
-  let transformations = [];
-
-  // Title overlay (robuste avec wrapping)
-  if (options.title) {
-    const titleFont = `${options.titleFont || 'Arial'}_${options.titleSize || 64}_${options.titleWeight || 'bold'}`;
-    const titleColor = (options.titleColor || '000000').replace('#', '');
-    // URL-encode et gérer accents FR
-    const titleText = encodeURIComponent(options.title);
-    const width = options.width || 960;
-    const lineSpacing = options.lineSpacing || 10;
-    
-    transformations.push(
-      `w_${width}`,
-      'c_fit',
-      `co_rgb:${titleColor}`,
-      `l_text:${titleFont}:${titleText}`,
-      'fl_text_no_trim',
-      `line_spacing_${lineSpacing}`,
-      'fl_layer_apply',
-      'g_north',
-      'y_100'
-    );
-  }
-
-  // Subtitle overlay (robuste avec wrapping)
-  if (options.subtitle) {
-    const subtitleFont = `${options.subtitleFont || 'Arial'}_${options.subtitleSize || 32}_${options.subtitleWeight || 'normal'}`;
-    const subtitleColor = (options.subtitleColor || '333333').replace('#', '');
-    const subtitleText = encodeURIComponent(options.subtitle);
-    const width = options.width || 960;
-    const lineSpacing = options.lineSpacing || 10;
-    
-    transformations.push(
-      `w_${width}`,
-      'c_fit',
-      `co_rgb:${subtitleColor}`,
-      `l_text:${subtitleFont}:${subtitleText}`,
-      'fl_text_no_trim',
-      `line_spacing_${lineSpacing}`,
-      'fl_layer_apply',
-      'g_north',
-      'y_180'
-    );
-  }
-
-  const transformString = transformations.join(',');
-  
-  return `https://res.cloudinary.com/${cloudName}/image/upload/${transformString}/${publicId}.png`;
+  const transformString = buildTextOverlayTransform(options);
+  const cloudinaryUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${transformString}/${publicId}`;
+  return cloudinaryUrl;
 }
 
 export async function createCloudinaryFolder(

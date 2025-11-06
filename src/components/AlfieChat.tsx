@@ -628,28 +628,38 @@ export function AlfieChat() {
                         )}
                       </div>
                       
-                      {/* Afficher l'URL Cloudinary du fond comme aperçu principal (synchronisé avec la bibliothèque) */}
-                      {carousel.cloudinary_background_url && (
+                      {/* Aperçu principal: afficher la première slide avec text overlays */}
+                      {carousel.slides?.[0]?.cloudinary_url && (
                         <div className="mb-3 rounded-lg overflow-hidden border border-border">
                           <img 
-                            src={carousel.cloudinary_background_url} 
+                            src={carousel.slides[0].cloudinary_url} 
                             alt={`Aperçu carrousel ${carousel.carousel_index}`}
                             className="w-full object-cover"
                           />
                         </div>
                       )}
                       
-                      {/* Grille des slides individuelles */}
+                      {/* Grille des slides individuelles avec aspect ratio dynamique */}
                       <div className="grid grid-cols-5 gap-2">
-                        {carousel.slides?.slice(0, 5).map((slide: any, slideIdx: number) => (
-                          <div key={slideIdx} className="aspect-square rounded overflow-hidden border border-border">
-                            <img 
-                              src={slide.cloudinary_url || slide.storage_url} 
-                              alt={`Slide ${slideIdx + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        ))}
+                        {carousel.slides?.slice(0, 5).map((slide: any, slideIdx: number) => {
+                          // Mapper l'aspect ratio selon le format
+                          const aspectClass = 
+                            slide.format === '9:16' ? 'aspect-[9/16]' :
+                            slide.format === '16:9' ? 'aspect-video' :
+                            slide.format === '1:1' ? 'aspect-square' :
+                            slide.format === '4:5' ? 'aspect-[4/5]' :
+                            'aspect-[9/16]'; // Défaut portrait
+                          
+                          return (
+                            <div key={slideIdx} className={`${aspectClass} rounded overflow-hidden border border-border`}>
+                              <img 
+                                src={slide.cloudinary_url || slide.storage_url} 
+                                alt={`Slide ${slideIdx + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}

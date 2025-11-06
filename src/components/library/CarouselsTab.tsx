@@ -14,6 +14,7 @@ interface CarouselSlide {
   carousel_id: string | null;
   order_id: string | null;
   created_at: string | null;
+  format: string | null;
 }
 
 interface CarouselsTabProps {
@@ -40,7 +41,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
 
     let query = supabase
       .from('library_assets')
-      .select('id, cloudinary_url, slide_index, carousel_id, order_id, created_at')
+      .select('id, cloudinary_url, slide_index, carousel_id, order_id, created_at, format')
       .eq('user_id', user.id)
       .eq('type', 'carousel_slide')
       .order('created_at', { ascending: false })
@@ -126,13 +127,22 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {carouselSlides
               .sort((a, b) => (a.slide_index ?? 0) - (b.slide_index ?? 0))
-              .map((slide) => (
-                <div key={slide.id} className="relative group">
-                  <img
-                    src={slide.cloudinary_url}
-                    alt={`Slide ${(slide.slide_index ?? 0) + 1}`}
-                    className="w-full rounded-lg aspect-[4/5] object-cover border"
-                  />
+              .map((slide) => {
+                // Mapper l'aspect ratio dynamiquement selon le format
+                const aspectClass = 
+                  slide.format === '9:16' ? 'aspect-[9/16]' :
+                  slide.format === '16:9' ? 'aspect-video' :
+                  slide.format === '1:1' ? 'aspect-square' :
+                  slide.format === '4:5' ? 'aspect-[4/5]' :
+                  'aspect-[9/16]'; // Défaut portrait
+                
+                return (
+                  <div key={slide.id} className="relative group">
+                    <img
+                      src={slide.cloudinary_url}
+                      alt={`Slide ${(slide.slide_index ?? 0) + 1}`}
+                      className={`w-full rounded-lg ${aspectClass} object-cover border`}
+                    />
                   <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
                     {(slide.slide_index ?? 0) + 1}
                   </div>
@@ -143,9 +153,10 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                     >
                       <Download className="h-4 w-4" />
                     </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
           </div>
         </div>
       ))}
