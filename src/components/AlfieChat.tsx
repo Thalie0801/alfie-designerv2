@@ -11,8 +11,6 @@ import { CreateHeader } from '@/components/create/CreateHeader';
 import { QuotaBar } from '@/components/create/QuotaBar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
-import { useQueueMonitor } from '@/hooks/useQueueMonitor';
-import { QueueStatus } from '@/components/chat/QueueStatus';
 import { useLibraryAssetsSubscription } from '@/hooks/useLibraryAssetsSubscription';
 import { OrderResults } from '@/components/chat/OrderResults';
 
@@ -68,9 +66,6 @@ export function AlfieChat() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [quickReplies, setQuickReplies] = useState<string[]>([]);
   const [conversationState, setConversationState] = useState<string>('initial');
-  
-  // Monitoring temps réel (affiché pendant la génération)
-  const { data: queueData } = useQueueMonitor(conversationState === 'generating');
   
   // Subscription aux assets de l'order
   const { assets: orderAssets, total: orderTotal } = useLibraryAssetsSubscription(orderId);
@@ -446,11 +441,6 @@ export function AlfieChat() {
       
       {/* Quota Bar */}
       {activeBrandId && <QuotaBar activeBrandId={activeBrandId} />}
-
-      {/* Queue Monitor (affiché pendant la génération) */}
-      {conversationState === 'generating' && queueData ? (
-        <QueueStatus data={queueData} />
-      ) : null}
       
       {/* Order Results - compact et collapsible */}
       {orderId && (
