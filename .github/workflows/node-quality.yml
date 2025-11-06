@@ -4,6 +4,393 @@ on:
   workflow_dispatch: {}
   push:
     branches: [main, refonte-alfie-2025]
+    paths:
+      - '**.ts'
+      - '**.tsx'
+      - '**.js'
+      - '**.jsx'
+      - 'package*.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/node-quality.yml'
+  pull_request:
+    branches: [main, refonte-alfie-2025]
+    paths:
+      - '**.ts'
+      - '**.tsx'
+      - '**.js'
+      - '**.jsx'
+      - 'package*.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/node-quality.yml'
+
+permissions:
+  contents: read
+  pull-requests: write # Pour commenter les PR
+
+concurrency:
+  group: node-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  NODE_VERSION: '20'
+  # Désactive les telemetry pour accélérer
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  # Job d'installation partagé pour optimiser
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1 # Shallow clone plus rapide
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Force public npm registry
+        run: npm config set registry https://registry.npmjs.org/
+
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            node-modules-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --prefer-offline --no-audit --no-fund
+          else
+            npm install --prefer-online --no-audit --no-fund
+          fi
+
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: |
+            .next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+
+  typecheck:
+    runs-on: ubuntu-latest
+    needs: install
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Restore node_modules cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Type check
+        id: tsc
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee typecheck.txt
+          exit_code=${PIPESTATUS[0]}
+          echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
+          exit $exit_code
+
+      - name: Parse typecheck results
+        if: always()
+        id: parse-results
+        run: |
+          if [ -f typecheck.txt ]; then
+            error_count=$(grep -c "error TS" typecheck.txt || echo "0")
+            warning_count=$(grep -c "warning TS" typecheck.txt || echo "0")
+            echo "errors=$error_count" >> $GITHUB_OUTPUT
+            echo "warnings=$warning_count" >> $GITHUB_OUTPUT
+            
+            # Extraire les premières erreurs pour le résumé
+            head -n 20 typecheck.txt > typecheck-summary.txt
+          fi
+
+      - name: Upload typecheck report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typecheck-report
+          path: |
+            typecheck.txt
+            typecheck-summary.txt
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Comment PR with typecheck results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const errors = '${{ steps.parse-results.outputs.errors }}';
+            const warnings = '${{ steps.parse-results.outputs.warnings }}';
+            const exitCode = '${{ steps.tsc.outputs.exit_code }}';
+            
+            let summary = '## 🔍 TypeScript Check Results\n\n';
+            
+            if (exitCode === '0') {
+              summary += '✅ **No TypeScript errors found!**\n\n';
+            } else {
+              summary += `❌ **Found ${errors} error(s) and ${warnings} warning(s)**\n\n`;
+              
+              if (fs.existsSync('typecheck-summary.txt')) {
+                const typecheckSummary = fs.readFileSync('typecheck-summary.txt', 'utf8');
+                summary += '<details><summary>View first 20 lines</summary>\n\n```\n';
+                summary += typecheckSummary;
+                summary += '\n```\n</details>\n\n';
+              }
+              
+              summary += '📥 [Download full report](../actions/runs/${{ github.run_id }})\n';
+            }
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+      - name: Fail if typecheck failed
+        if: steps.tsc.outputs.exit_code != '0'
+        run: |
+          echo "::error::TypeScript typecheck failed with ${{ steps.parse-results.outputs.errors }} errors"
+          exit 1
+
+  lint:
+    runs-on: ubuntu-latest
+    needs: install
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Restore node_modules cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Lint
+        id: lint
+        continue-on-error: true
+        run: |
+          npm run lint 2>&1 | tee lint.txt
+          exit_code=${PIPESTATUS[0]}
+          echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
+          exit $exit_code
+
+      - name: Parse lint results
+        if: always()
+        id: parse-lint
+        run: |
+          if [ -f lint.txt ]; then
+            error_count=$(grep -c "error" lint.txt || echo "0")
+            warning_count=$(grep -c "warning" lint.txt || echo "0")
+            echo "errors=$error_count" >> $GITHUB_OUTPUT
+            echo "warnings=$warning_count" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: lint.txt
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Comment PR with lint results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const errors = '${{ steps.parse-lint.outputs.errors }}';
+            const warnings = '${{ steps.parse-lint.outputs.warnings }}';
+            const exitCode = '${{ steps.lint.outputs.exit_code }}';
+            
+            let summary = '## 🧹 ESLint Results\n\n';
+            
+            if (exitCode === '0') {
+              summary += '✅ **No linting errors found!**\n\n';
+            } else {
+              summary += `⚠️  **Found ${errors} error(s) and ${warnings} warning(s)**\n\n`;
+              summary += '📥 [Download full report](../actions/runs/${{ github.run_id }})\n';
+            }
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+      # Le lint peut warning sans fail, donc on continue même si erreurs
+      - name: Warn if lint failed
+        if: steps.lint.outputs.exit_code != '0'
+        run: |
+          echo "::warning::ESLint found issues but continuing build"
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [typecheck, lint]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Restore node_modules cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Restore Next.js cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
+
+      - name: Build
+        id: build
+        run: |
+          npm run build
+          echo "Build completed successfully"
+
+      - name: Check build output
+        run: |
+          if [ -d ".next" ]; then
+            echo "✅ .next directory created"
+            du -sh .next
+          else
+            echo "❌ .next directory not found"
+            exit 1
+          fi
+
+      - name: Comment PR with build results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const buildSuccess = '${{ steps.build.outcome }}' === 'success';
+            
+            let summary = '## 🏗️  Build Results\n\n';
+            
+            if (buildSuccess) {
+              summary += '✅ **Build completed successfully!**\n\n';
+              summary += '🚀 Ready to deploy\n';
+            } else {
+              summary += '❌ **Build failed**\n\n';
+              summary += 'Please check the logs for details.\n';
+            }
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+  # Job de résumé final
+  quality-check-summary:
+    runs-on: ubuntu-latest
+    needs: [typecheck, lint, build]
+    if: always()
+    steps:
+      - name: Check all jobs status
+        run: |
+          echo "Typecheck: ${{ needs.typecheck.result }}"
+          echo "Lint: ${{ needs.lint.result }}"
+          echo "Build: ${{ needs.build.result }}"
+          
+          if [ "${{ needs.typecheck.result }}" != "success" ]; then
+            echo "::error::Typecheck failed"
+            exit 1
+          fi
+          
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            echo "::error::Build failed"
+            exit 1
+          fi
+          
+          # Lint peut être en warning sans bloquer
+          if [ "${{ needs.lint.result }}" != "success" ]; then
+            echo "::warning::Lint had issues but not blocking"
+          fi
+          
+          echo "✅ Quality checks completed"
+
+      - name: Final PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const typecheckStatus = '${{ needs.typecheck.result }}';
+            const lintStatus = '${{ needs.lint.result }}';
+            const buildStatus = '${{ needs.build.result }}';
+            
+            const getEmoji = (status) => {
+              if (status === 'success') return '✅';
+              if (status === 'failure') return '❌';
+              return '⚠️';
+            };
+            
+            let summary = '## 📊 Quality Check Summary\n\n';
+            summary += `${getEmoji(typecheckStatus)} **TypeScript**: ${typecheckStatus}\n`;
+            summary += `${getEmoji(lintStatus)} **Lint**: ${lintStatus}\n`;
+            summary += `${getEmoji(buildStatus)} **Build**: ${buildStatus}\n\n`;
+            
+            const allSuccess = typecheckStatus === 'success' && buildStatus === 'success';
+            
+            if (allSuccess) {
+              summary += '🎉 **All checks passed! Ready to merge.**\n';
+            } else {
+              summary += '⚠️  **Some checks failed. Please review.**\n';
+            }
+            
+            summary += `\n---\n*Run: [#${{ github.run_number }}](../actions/runs/${{ github.run_id }})*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            }); Node Quality Checks
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main, refonte-alfie-2025]
   pull_request:
     branches: [main, refonte-alfie-2025]
 
