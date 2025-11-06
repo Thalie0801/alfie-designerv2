@@ -305,13 +305,19 @@ export async function uploadWithRichMetadata(
 
   const timestamp = Math.round(Date.now() / 1000);
   
+  // IMPORTANT: Calculer contextStr AVANT signature pour l'inclure dans paramsToSign
+  const contextStr = Object.keys(context).length > 0
+    ? Object.entries(context).map(([k, v]) => `${k}=${v}`).join('|')
+    : '';
+  
   const paramsToSign: Record<string, any> = {
     timestamp,
     folder,
     public_id: publicId,
     tags: tags.join(','),
     overwrite: false,
-    unique_filename: false
+    unique_filename: false,
+    ...(contextStr && { context: contextStr })
   };
 
   const signatureString = Object.keys(paramsToSign)
@@ -336,10 +342,7 @@ export async function uploadWithRichMetadata(
   formData.append('overwrite', 'false');
   formData.append('unique_filename', 'false');
   
-  if (Object.keys(context).length > 0) {
-    const contextStr = Object.entries(context)
-      .map(([k, v]) => `${k}=${v}`)
-      .join('|');
+  if (contextStr) {
     formData.append('context', contextStr);
   }
 
@@ -351,9 +354,21 @@ export async function uploadWithRichMetadata(
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    console.error('[Cloudinary] Upload error:', error);
-    throw new Error(`Cloudinary upload failed: ${response.status}`);
+    const errorText = await response.text();
+    let errorDetail;
+    try {
+      errorDetail = JSON.parse(errorText);
+    } catch {
+      errorDetail = errorText;
+    }
+    console.error('[Cloudinary] Upload failed:', {
+      status: response.status,
+      error: errorDetail,
+      publicId,
+      folder,
+      timestamp
+    });
+    throw new Error(`Cloudinary upload failed: ${response.status} - ${JSON.stringify(errorDetail)}`);
   }
 
   const result = await response.json();
@@ -391,7 +406,11 @@ export async function uploadTextAsRaw(
   
   const timestamp = Math.round(Date.now() / 1000);
   
+  // IMPORTANT: Calculer context AVANT signature pour l'inclure dans paramsToSign
+  const contextStr = `type=carousel_copy|language=${metadata.language}|text_version=${metadata.textVersion}`;
+  
   const paramsToSign: Record<string, any> = {
+    context: contextStr,
     timestamp,
     public_id: publicId,
     tags: tags.join(','),
@@ -420,8 +439,6 @@ export async function uploadTextAsRaw(
   formData.append('tags', tags.join(','));
   formData.append('resource_type', 'raw');
   formData.append('overwrite', 'false');
-  
-  const contextStr = `type=carousel_copy|language=${metadata.language}|text_version=${metadata.textVersion}`;
   formData.append('context', contextStr);
 
   const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/raw/upload`;
@@ -432,9 +449,20 @@ export async function uploadTextAsRaw(
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    console.error('[Cloudinary] Raw text upload error:', error);
-    throw new Error(`Cloudinary raw upload failed: ${response.status}`);
+    const errorText = await response.text();
+    let errorDetail;
+    try {
+      errorDetail = JSON.parse(errorText);
+    } catch {
+      errorDetail = errorText;
+    }
+    console.error('[Cloudinary] Raw text upload failed:', {
+      status: response.status,
+      error: errorDetail,
+      publicId,
+      timestamp
+    });
+    throw new Error(`Cloudinary raw upload failed: ${response.status} - ${JSON.stringify(errorDetail)}`);
   }
 
   const result = await response.json();
