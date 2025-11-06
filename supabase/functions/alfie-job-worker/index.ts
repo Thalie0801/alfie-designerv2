@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { uploadToCloudinary } from '../_shared/cloudinaryUploader.ts';
-import { buildCloudinaryTextOverlayUrl } from '../_shared/imageCompositor.ts';
+import { buildCarouselSlideUrl, type Slide } from '../_shared/imageCompositor.ts';
+import { consumeBrandQuotas } from '../_shared/quota.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -416,6 +417,17 @@ Format: ${aspectRatio} aspect ratio optimized.`;
   }
   
   console.log(`✅ [processRenderImages] Rendered ${results.length} images`);
+  
+  // 📊 Consommer le quota pour toutes les images
+  console.log(`📊 [processRenderImages] Consuming quota: ${results.length} images`);
+  try {
+    await consumeBrandQuotas(payload.brandId, results.length);
+    console.log(`✅ [processRenderImages] Quota consumed: ${results.length} images`);
+  } catch (quotaError) {
+    console.error('❌ Failed to consume quota:', quotaError);
+    // Non-bloquant : on continue même si le quota échoue
+  }
+  
   return { images: results };
 }
 
@@ -586,34 +598,25 @@ async function processRenderCarousels(payload: any): Promise<any> {
           console.log(`✅ [processRenderCarousels] Slide ${i + 1} uploaded: ${cloudinaryResult.secureUrl}`);
           console.log(`📊 Size reduction: ${(bgBase64.length / 1024).toFixed(0)}KB base64 → ${cloudinaryResult.secureUrl.length}B URL`);
 
-          // 🆕 CRÉER L'IMAGE COMPOSÉE (background + texte overlay)
+          // 🆕 CRÉER L'IMAGE COMPOSÉE (background + texte overlay complet)
           let finalUrl = cloudinaryResult.secureUrl;
 
-          if (slide.title || slide.subtitle) {
-            try {
-              const primaryColor = brand?.palette?.[0]?.replace('#', '') || '000000';
-              const secondaryColor = brand?.palette?.[1]?.replace('#', '') || '5A5A5A';
-              
-              const titleText = slide.title || slide.heading || slide.headline || slide.h1 || slide.main || (slide.text?.title) || (slide.texts?.title) || slidePrompt;
-              const subtitleText = slide.subtitle || slide.body || slide.text || slide.h2 || slide.description || (slide.text?.subtitle) || (slide.texts?.subtitle) || '';
-              
-              finalUrl = buildCloudinaryTextOverlayUrl(cloudinaryResult.publicId, {
-                title: String(titleText || ''),
-                subtitle: String(subtitleText || ''),
-                titleColor: primaryColor,
-                subtitleColor: secondaryColor,
-                titleSize: 72,
-                subtitleSize: 32,
-                titleFont: 'Arial',
-                subtitleFont: 'Arial',
-                titleWeight: 'bold',
-                subtitleWeight: 'normal'
-              });
-              
-              console.log(`✅ [processRenderCarousels] Slide ${i + 1} composed with text overlay`);
-            } catch (compositeError) {
-              console.warn(`⚠️ Text overlay failed for slide ${i + 1}, using background only:`, compositeError);
-            }
+          try {
+            const primaryColor = (brand?.palette?.[0] || '#000000').replace('#', '');
+            const secondaryColor = (brand?.palette?.[1] || '#5A5A5A').replace('#', '');
+            
+            // ✅ Utiliser la nouvelle fonction avec le slide complet
+            finalUrl = buildCarouselSlideUrl(
+              cloudinaryResult.publicId,
+              slide as Slide,  // Cast pour le type
+              primaryColor,
+              secondaryColor
+            );
+            
+            console.log(`✅ [processRenderCarousels] Slide ${i + 1}/${carousel.slides.length} composed with full text overlay (${slide.type || 'unknown'})`);
+          } catch (compositeError) {
+            console.error(`❌ Text overlay failed for slide ${i + 1}:`, compositeError);
+            console.warn(`⚠️ Using background only for slide ${i + 1}`);
           }
 
           // ✅ Sauvegarder dans library_assets avec URL composée
@@ -660,6 +663,16 @@ async function processRenderCarousels(payload: any): Promise<any> {
         console.error(`❌ Failed to generate slide ${i + 1}:`, slideError);
         throw slideError;
       }
+    }
+    
+    // 📊 Consommer le quota pour toutes les slides du carrousel
+    console.log(`📊 [processRenderCarousels] Consuming quota: ${slides.length} images for carousel ${carousel.id}`);
+    try {
+      await consumeBrandQuotas(carousel.brandId, slides.length);
+      console.log(`✅ [processRenderCarousels] Quota consumed: ${slides.length} images`);
+    } catch (quotaError) {
+      console.error('❌ Failed to consume quota:', quotaError);
+      // Non-bloquant : on continue même si le quota échoue
     }
     
     results.push({
