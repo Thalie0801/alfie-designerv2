@@ -3,28 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useState } from 'react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-
-interface Asset {
-  id: string;
-  url: string;
-  slideIndex: number;
-  type: string;
-  format?: string;
-}
-
-// Helper pour déterminer la classe d'aspect ratio
-const getAspectClass = (format?: string): string => {
-  switch (format) {
-    case '9:16': return 'aspect-[9/16]';
-    case '16:9': return 'aspect-video';
-    case '1:1':  return 'aspect-square';
-    case '5:4':  return 'aspect-[5/4]';
-    default:     return 'aspect-[4/5]';
-  }
-};
+import type { LibraryAsset } from '@/types/chat';
+import { getAspectClass } from '@/types/chat';
 
 interface OrderResultsProps {
-  assets: Asset[];
+  assets: LibraryAsset[];
   total: number;
   orderId: string;
 }
