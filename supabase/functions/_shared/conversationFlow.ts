@@ -94,17 +94,50 @@ export const CAROUSEL_BRIEF_QUESTIONS: BriefQuestion[] = [
 export function detectOrderIntent(message: string): { numImages: number; numCarousels: number } | null {
   const normalized = message.toLowerCase();
   
-  // Patterns pour détecter les quantités
-  const imagePattern = /(\d+)\s*(image|visuel|photo)/i;
-  const carouselPattern = /(\d+)\s*(carrousel|carousel)/i;
+  // Mapping des nombres en lettres français
+  const numberWords: Record<string, number> = {
+    'un': 1, 'une': 1,
+    'deux': 2,
+    'trois': 3,
+    'quatre': 4,
+    'cinq': 5,
+    'six': 6,
+    'sept': 7,
+    'huit': 8,
+    'neuf': 9,
+    'dix': 10
+  };
   
-  const imageMatch = normalized.match(imagePattern);
-  const carouselMatch = normalized.match(carouselPattern);
+  // Helper pour extraire nombre (chiffre ou mot)
+  const extractNumber = (pattern: RegExp): number | null => {
+    const match = normalized.match(pattern);
+    if (!match) return null;
+    
+    const numStr = match[1].trim();
+    // Tenter chiffre d'abord
+    if (/^\d+$/.test(numStr)) {
+      return parseInt(numStr);
+    }
+    // Sinon chercher dans le mapping
+    return numberWords[numStr] || null;
+  };
   
-  if (imageMatch || carouselMatch) {
+  // Patterns pour détecter quantités (chiffres ou mots)
+  const imagePattern = /(\d+|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix)\s*(image|visuel|photo)/i;
+  const carouselPattern = /(\d+|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix)\s*(carrousel|carousel|diaporama|slides)/i;
+  
+  const numImages = extractNumber(imagePattern);
+  const numCarousels = extractNumber(carouselPattern);
+  
+  // Détection sans nombre explicite (par défaut 1)
+  const hasImageKeyword = /\b(image|visuel|photo)\b/i.test(normalized);
+  const hasCarouselKeyword = /\b(carrousel|carousel|diaporama|slides)\b/i.test(normalized);
+  
+  // Si au moins un élément détecté
+  if (numImages !== null || numCarousels !== null || hasImageKeyword || hasCarouselKeyword) {
     return {
-      numImages: imageMatch ? parseInt(imageMatch[1]) : 0,
-      numCarousels: carouselMatch ? parseInt(carouselMatch[1]) : 0
+      numImages: numImages !== null ? numImages : (hasImageKeyword ? 1 : 0),
+      numCarousels: numCarousels !== null ? numCarousels : (hasCarouselKeyword ? 1 : 0)
     };
   }
   

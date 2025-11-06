@@ -325,9 +325,11 @@ export async function uploadWithRichMetadata(
     .map(key => `${key}=${paramsToSign[key]}`)
     .join('&') + apiSecret;
 
+  console.log('[Cloudinary] Signing keys:', Object.keys(paramsToSign).sort());
+
   const encoder = new TextEncoder();
   const data = encoder.encode(signatureString);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashBuffer = await crypto.subtle.digest('SHA-1', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
@@ -409,13 +411,13 @@ export async function uploadTextAsRaw(
   // IMPORTANT: Calculer context AVANT signature pour l'inclure dans paramsToSign
   const contextStr = `type=carousel_copy|language=${metadata.language}|text_version=${metadata.textVersion}`;
   
+  // CRITICAL: Ne PAS inclure resource_type dans la signature pour raw uploads
   const paramsToSign: Record<string, any> = {
     context: contextStr,
-    timestamp,
+    overwrite: false,
     public_id: publicId,
     tags: tags.join(','),
-    resource_type: 'raw',
-    overwrite: false
+    timestamp
   };
 
   const signatureString = Object.keys(paramsToSign)
@@ -423,9 +425,11 @@ export async function uploadTextAsRaw(
     .map(key => `${key}=${paramsToSign[key]}`)
     .join('&') + apiSecret;
 
+  console.log('[Cloudinary] Raw upload signing keys:', Object.keys(paramsToSign).sort());
+
   const encoder = new TextEncoder();
   const data = encoder.encode(signatureString);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashBuffer = await crypto.subtle.digest('SHA-1', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
