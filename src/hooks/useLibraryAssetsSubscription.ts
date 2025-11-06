@@ -7,6 +7,7 @@ export interface LibraryAsset {
   url: string;
   slideIndex: number;
   type: string;
+  format?: string;
 }
 
 /**
