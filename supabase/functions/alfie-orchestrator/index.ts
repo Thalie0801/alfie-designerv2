@@ -162,7 +162,8 @@ serve(async (req) => {
         if (next) {
           // ✅ CRITICAL FIX: Detect if image brief just became complete
           const briefIsComplete = 
-            currentBrief.objective && 
+            currentBrief.objective &&
+            currentBrief.content &&
             currentBrief.format;
           
           if (briefIsComplete && next.questionKey === 'objective') {

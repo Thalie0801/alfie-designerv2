@@ -266,11 +266,12 @@ async function processRenderImages(payload: any): Promise<any> {
       const { w, h } = AR_MAP[aspectRatio] || AR_MAP['1:1'];
       
       // Construire prompt enrichi avec le contenu visuel demandé
-      const prompt = `${content || 'Abstract background'}.
-Style: ${style || 'minimalist'}.
+      const prompt = `${content || 'A detailed subject scene'}.
+Style: ${style || 'realistic photo or clean illustration'}.
 Context: ${objective || 'social media post'}.
 Brand: ${brand?.niche || ''}, tone: ${brand?.voice || 'professional'}.
 Colors: ${brand?.palette?.slice(0, 3).join(', ') || 'modern palette'}.
+Composition: clear main subject (no empty background), depth, lighting, natural shadows. No text overlays.
 Format: ${aspectRatio} aspect ratio optimized.`;
       
       console.log(`🖼️ [processRenderImages] Image ${i + 1}: ${aspectRatio} (${w}x${h})`);
@@ -302,18 +303,18 @@ Format: ${aspectRatio} aspect ratio optimized.`;
         .eq('id', img.brandId)
         .single();
       
-      const { data, error } = await supabaseAdmin.functions.invoke('alfie-generate-ai-image', {
-        body: {
-          prompt: img.prompt,
-          resolution: img.resolution,
-          backgroundOnly: true,
-          brandKit: brand ? {
-            name: brand.name,
-            palette: brand.palette,
-            voice: brand.voice
-          } : undefined
-        }
-      });
+        const { data, error } = await supabaseAdmin.functions.invoke('alfie-generate-ai-image', {
+          body: {
+            prompt: img.prompt,
+            resolution: img.resolution,
+            backgroundOnly: false,
+            brandKit: brand ? {
+              name: brand.name,
+              palette: brand.palette,
+              voice: brand.voice
+            } : undefined
+          }
+        });
       
       if (error || data?.error) {
         throw new Error(data?.error || error?.message || 'Image generation failed');
@@ -550,9 +551,12 @@ async function processRenderCarousels(payload: any): Promise<any> {
               const primaryColor = brand?.palette?.[0]?.replace('#', '') || '000000';
               const secondaryColor = brand?.palette?.[1]?.replace('#', '') || '5A5A5A';
               
+              const titleText = slide.title || slide.heading || slide.headline || slide.h1 || slide.main || (slide.text?.title) || (slide.texts?.title) || slidePrompt;
+              const subtitleText = slide.subtitle || slide.body || slide.text || slide.h2 || slide.description || (slide.text?.subtitle) || (slide.texts?.subtitle) || '';
+              
               finalUrl = buildCloudinaryTextOverlayUrl(cloudinaryResult.publicId, {
-                title: slide.title,
-                subtitle: slide.subtitle,
+                title: String(titleText || ''),
+                subtitle: String(subtitleText || ''),
                 titleColor: primaryColor,
                 subtitleColor: secondaryColor,
                 titleSize: 72,
