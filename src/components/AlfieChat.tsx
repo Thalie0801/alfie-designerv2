@@ -12,7 +12,7 @@ import { QuotaBar } from '@/components/create/QuotaBar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { useLibraryAssetsSubscription } from '@/hooks/useLibraryAssetsSubscription';
-import type { ConversationState, OrchestratorResponse } from '@/types/chat';
+import { getAspectClass, type ConversationState, type OrchestratorResponse } from '@/types/chat';
 
 const normalizeConversationState = (state?: string | null): ConversationState => {
   switch (state) {
@@ -194,7 +194,7 @@ export function AlfieChat() {
         type: isCarouselSlide ? 'carousel' : 'image',
         assetUrl: asset.url,
         metadata: isCarouselSlide
-          ? { assetUrls: [{ url: asset.url, format: asset.format }] }
+          ? { assetUrls: [{ url: asset.url, format: asset.format || '4:5' }] }
           : undefined
       });
     }
@@ -646,12 +646,7 @@ export function AlfieChat() {
                         const item = typeof entry === 'string' ? { url: entry } : entry;
                         if (!item?.url) return null;
 
-                        const aspectClass =
-                          item.format === '9:16' ? 'aspect-[9/16]' :
-                          item.format === '16:9' ? 'aspect-video' :
-                          item.format === '1:1'  ? 'aspect-square' :
-                          item.format === '5:4'  ? 'aspect-[5/4]' :
-                                                  'aspect-[4/5]';
+                        const aspectClass = getAspectClass(item.format || '4:5');
 
                         return (
                           <div key={i} className={`relative ${aspectClass} rounded-lg overflow-hidden`}>
@@ -704,12 +699,7 @@ export function AlfieChat() {
                       {/* Grille des slides individuelles avec aspect ratio dynamique */}
                       <div className="grid grid-cols-5 gap-2">
                         {carousel.slides?.slice(0, 5).map((slide: any, slideIdx: number) => {
-                          const aspectClass =
-                            slide.format === '9:16' ? 'aspect-[9/16]' :
-                            slide.format === '16:9' ? 'aspect-video' :
-                            slide.format === '1:1'  ? 'aspect-square' :
-                            slide.format === '5:4'  ? 'aspect-[5/4]' :
-                                                      'aspect-[4/5]';
+                          const aspectClass = getAspectClass(slide.format || '4:5');
 
                           return (
                             <div key={slideIdx} className={`relative ${aspectClass} rounded overflow-hidden border border-border`}>
