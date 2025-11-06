@@ -539,11 +539,12 @@ export function ChatGenerator() {
             <div className="relative rounded-2xl overflow-hidden bg-card border border-border backdrop-blur-sm animate-fade-in">
               <div className={cn(
                 "relative",
-                generatedAsset.format === '1:1' && "aspect-square",
-                generatedAsset.format === '16:9' && "aspect-video",
-                generatedAsset.format === '9:16' && "aspect-[9/16]",
-                generatedAsset.format === '4:3' && "aspect-[4/3]",
-                generatedAsset.format === '3:4' && "aspect-[3/4]"
+                (generatedAsset.format || '4:5') === '1:1' && "aspect-square",
+                (generatedAsset.format || '4:5') === '16:9' && "aspect-video",
+                (generatedAsset.format || '4:5') === '9:16' && "aspect-[9/16]",
+                (generatedAsset.format || '4:5') === '4:3' && "aspect-[4/3]",
+                (generatedAsset.format || '4:5') === '3:4' && "aspect-[3/4]",
+                (generatedAsset.format || '4:5') === '4:5' && "aspect-[4/5]"
               )}>
                 {generatedAsset.type === 'image' ? (
                   <img
@@ -561,7 +562,7 @@ export function ChatGenerator() {
                 <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent"></div>
                 <div className="absolute bottom-0 left-0 right-0 p-6 space-y-3">
                   <p className="text-xs text-muted-foreground">
-                    Type : {generatedAsset.type === 'video' ? 'Vidéo' : 'Image'} • Format : {generatedAsset.format}
+                    Type : {generatedAsset.type === 'video' ? 'Vidéo' : 'Image'} • Format : {generatedAsset.format || '4:5'}
                   </p>
                   <Button
                     onClick={handleDownload}

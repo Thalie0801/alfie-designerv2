@@ -97,7 +97,7 @@ export function OrderResults({ assets, total, orderId }: OrderResultsProps) {
                     {carouselSlides.map(slide => (
                       <div key={slide.id} className="relative group">
                         {/* Wrapper avec aspect ratio */}
-                        <div className={`relative w-full ${getAspectClass(slide.format)} rounded-lg overflow-hidden`}>
+                        <div className={`relative w-full ${getAspectClass(slide.format || '4:5')} rounded-lg overflow-hidden`}>
                           {/* Image en absolute pour remplir le wrapper */}
                           <img
                             src={slide.url}

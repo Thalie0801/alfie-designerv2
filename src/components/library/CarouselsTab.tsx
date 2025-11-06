@@ -129,11 +129,12 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
               .sort((a, b) => (a.slide_index ?? 0) - (b.slide_index ?? 0))
               .map((slide) => {
                 // Mapper l'aspect ratio dynamiquement selon le format
+                const format = slide.format || '4:5';
                 const aspectClass = 
-                  slide.format === '9:16' ? 'aspect-[9/16]' :
-                  slide.format === '16:9' ? 'aspect-video' :
-                  slide.format === '1:1' ? 'aspect-square' :
-                  slide.format === '4:5' ? 'aspect-[4/5]' :
+                  format === '9:16' ? 'aspect-[9/16]' :
+                  format === '16:9' ? 'aspect-video' :
+                  format === '1:1' ? 'aspect-square' :
+                  format === '4:5' ? 'aspect-[4/5]' :
                   'aspect-[9/16]'; // Défaut portrait
                 
                 return (
