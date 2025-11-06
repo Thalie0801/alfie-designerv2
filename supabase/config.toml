@@ -21,7 +21,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.alfie-render-carousel-slide]
-verify_jwt = true
+verify_jwt = false
 
 [functions.alfie-proofread-fr]
 verify_jwt = true

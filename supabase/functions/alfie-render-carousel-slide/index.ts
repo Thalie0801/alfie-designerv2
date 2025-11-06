@@ -12,6 +12,7 @@ const corsHeaders = {
 };
 
 interface SlideRequest {
+  userId: string; // ✅ Required from worker
   prompt: string;
   globalStyle: string;
   slideContent: {
@@ -40,22 +41,9 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      throw new Error('Missing authorization header');
-    }
-
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    if (!user) throw new Error('Unauthorized');
-
     const params: SlideRequest = await req.json();
     const {
+      userId,
       prompt,
       globalStyle,
       slideContent,
@@ -70,6 +58,21 @@ serve(async (req) => {
       campaign,
       language = 'FR'
     } = params;
+
+    // ✅ Validation: userId requis
+    if (!userId) {
+      console.error('[alfie-render-carousel-slide] Missing userId in request');
+      return new Response(JSON.stringify({ error: 'userId is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // ✅ Use service role client pour toutes les opérations
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
     console.log('[Render Slide] Starting generation:', {
       slideIndex: slideIndex + 1,
@@ -98,57 +101,60 @@ serve(async (req) => {
 
     console.log('[Render Slide] Text uploaded to Cloudinary:', textPublicId);
 
-    // 2. Générer background via Nano Banana avec negative prompt anti-collage
-    console.log('[Render Slide] Step 2/4: Generating background...');
+    // 2. ✅ Générer background directement via Lovable AI (pas de JWT requis)
+    console.log('[Render Slide] Step 2/4: Generating background with Lovable AI...');
     
-    const enrichedPrompt = `${globalStyle}. ${prompt}. Background only, no text, clean and professional.`;
-    const negativePrompt = 'collage, grid, panels, multiple images, split screen, text, typography, letters';
+    const enrichedPrompt = `${globalStyle}. ${prompt}. Background only, no text, clean and professional. High quality, detailed, vibrant colors.`;
     
-    const format = aspectRatio === '1:1' ? '1024x1024'
-      : aspectRatio === '16:9' ? '1280x720'
-      : aspectRatio === '9:16' ? '720x1280'
-      : aspectRatio === '4:5' ? '1024x1280'
-      : '1024x1024';
+    const [width, height] = aspectRatio === '1:1' ? [1024, 1024]
+      : aspectRatio === '16:9' ? [1280, 720]
+      : aspectRatio === '9:16' ? [720, 1280]
+      : aspectRatio === '4:5' ? [1024, 1280]
+      : [1024, 1024];
 
-    const { data: bgData, error: bgError } = await supabaseClient.functions.invoke('alfie-render-image', {
-      body: {
-        provider: 'gemini_image',
-        prompt: enrichedPrompt,
-        negativePrompt,
-        format,
-        backgroundOnly: true,
-        brand_id: brandId,
-        cost_woofs: 0, // Pas de coût pour background intermédiaire
-        globalStyle,
-        slideIndex,
-        totalSlides
-      }
-    });
-
-    if (bgError) {
-      console.error('[Render Slide] Background generation error:', bgError);
-      throw new Error(`Background generation failed: ${bgError.message}`);
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    const payload = (bgData && typeof bgData === 'object' && 'data' in bgData) ? (bgData as any).data : bgData;
-    const backgroundUrl = payload?.image_urls?.[0];
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash-image-preview',
+        messages: [
+          {
+            role: 'user',
+            content: enrichedPrompt
+          }
+        ],
+        modalities: ['image', 'text']
+      })
+    });
+
+    if (!aiResponse.ok) {
+      const errorText = await aiResponse.text();
+      console.error('[Render Slide] AI error:', aiResponse.status, errorText);
+      throw new Error(`Background generation failed: ${aiResponse.status}`);
+    }
+
+    const aiData = await aiResponse.json();
+    const backgroundUrl = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
     if (!backgroundUrl) {
-      console.error('[Render Slide] No background URL in response:', payload);
+      console.error('[Render Slide] No background URL in AI response:', aiData);
       throw new Error('Background generation failed - no URL');
     }
 
-    console.log('[Render Slide] Background generated (base64 length:', backgroundUrl.substring(0, 100), ')');
+    console.log('[Render Slide] Background generated:', backgroundUrl.substring(0, 100));
 
     // 3. Upload slide avec métadonnées enrichies
     console.log('[Render Slide] Step 3/4: Uploading slide to Cloudinary...');
     
     // Récupérer brand kit pour les couleurs
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     const { data: brandData } = await supabaseAdmin
       .from('brands')
       .select('palette, fonts')
@@ -252,11 +258,13 @@ serve(async (req) => {
       }
     }
 
-    // 6. Stocker dans library_assets
+    // 6. ✅ Stocker dans library_assets avec userId du body
+    console.log('[Render Slide] Step 6/6: Saving to library_assets...');
+    
     const { error: insertError } = await supabaseAdmin
       .from('library_assets')
       .insert({
-        user_id: user.id,
+        user_id: userId, // ✅ Utiliser userId du body
         brand_id: brandId,
         order_id: orderId,
         carousel_id: carouselId,
@@ -284,7 +292,10 @@ serve(async (req) => {
 
     if (insertError) {
       console.error('[Render Slide] Database insert error:', insertError);
+      throw new Error(`Failed to save slide: ${insertError.message}`);
     }
+    
+    console.log('[Render Slide] ✅ Saved to library_assets:', { orderId, slideIndex, userId });
 
     return new Response(JSON.stringify({
       success: true,

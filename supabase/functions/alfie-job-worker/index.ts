@@ -559,11 +559,12 @@ async function processRenderCarousels(payload: any): Promise<any> {
       try {
         console.log(`🎨 [processRenderCarousels] Rendering slide ${i + 1}/${carousel.slides.length}`);
         
-        // ✅ Utiliser alfie-render-carousel-slide avec toutes les corrections (encoding, eager, aspect ratio)
+        // ✅ Utiliser alfie-render-carousel-slide avec userId dans le body
         const { data: slideData, error: slideError } = await supabaseAdmin.functions.invoke(
           'alfie-render-carousel-slide',
           {
             body: {
+              userId: payload.userId, // ✅ CRITIQUE: passer userId
               prompt: slidePrompt,
               globalStyle: carousel.style || 'minimalist',
               slideContent: slide,
