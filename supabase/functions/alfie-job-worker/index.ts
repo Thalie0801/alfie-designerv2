@@ -559,31 +559,61 @@ async function processRenderCarousels(payload: any): Promise<any> {
       try {
         console.log(`🎨 [processRenderCarousels] Rendering slide ${i + 1}/${carousel.slides.length}`);
         
-        // ✅ Utiliser alfie-render-carousel-slide avec userId dans le body
-        const { data: slideData, error: slideError } = await supabaseAdmin.functions.invoke(
-          'alfie-render-carousel-slide',
-          {
-            body: {
-              userId: payload.userId, // ✅ CRITIQUE: passer userId
-              prompt: slidePrompt,
-              globalStyle: carousel.style || 'minimalist',
-              slideContent: slide,
-              brandId: carousel.brandId,
-              orderId: payload.orderId,
-              carouselId: carousel.id,
-              slideIndex: i,
-              totalSlides: carousel.slides.length,
-              aspectRatio: carousel.aspectRatio || '9:16',
-              textVersion: carousel.textVersion || 1,
-              renderVersion: 1,
-              campaign: 'carousel_generation',
-              language: 'FR'
+        let slideData;
+        let slideError;
+        let retries = 0;
+        const maxRetries = 2;
+
+        // ✅ Retry logic for rate limits
+        while (retries <= maxRetries) {
+          const response = await supabaseAdmin.functions.invoke(
+            'alfie-render-carousel-slide',
+            {
+              body: {
+                userId: payload.userId, // ✅ CRITIQUE: passer userId
+                prompt: slidePrompt,
+                globalStyle: carousel.style || 'minimalist',
+                slideContent: slide,
+                brandId: carousel.brandId,
+                orderId: payload.orderId,
+                carouselId: carousel.id,
+                slideIndex: i,
+                totalSlides: carousel.slides.length,
+                aspectRatio: carousel.aspectRatio || '9:16',
+                textVersion: carousel.textVersion || 1,
+                renderVersion: 1,
+                campaign: 'carousel_generation',
+                language: 'FR'
+              }
             }
+          );
+
+          slideData = response.data;
+          slideError = response.error;
+
+          // If 429 (rate limit), retry with exponential backoff
+          if (slideError?.message?.includes('429') || slideError?.message?.includes('Rate limit') || slideData?.error?.includes('Rate limit')) {
+            if (retries < maxRetries) {
+              const waitTime = Math.pow(1.5, retries + 1) * 1000; // 1.5s, 2.25s
+              console.log(`⏳ [processRenderCarousels] Rate limited, waiting ${waitTime}ms before retry ${retries + 1}/${maxRetries}`);
+              await new Promise(resolve => setTimeout(resolve, waitTime));
+              retries++;
+              continue;
+            }
+            throw new Error(`Slide ${i + 1} render failed after ${maxRetries} retries: Rate limit exceeded`);
           }
-        );
-        
-        if (slideError || slideData?.error) {
-          throw new Error(`Slide ${i + 1} render failed: ${slideData?.error || slideError?.message}`);
+
+          // If 402 (insufficient credits), fail immediately
+          if (slideError?.message?.includes('402') || slideError?.message?.includes('Insufficient credits') || slideData?.error?.includes('Insufficient credits')) {
+            throw new Error(`Slide ${i + 1} render failed: Insufficient credits`);
+          }
+
+          // Other errors or success
+          if (slideError || slideData?.error) {
+            throw new Error(`Slide ${i + 1} render failed: ${slideData?.error || slideError?.message}`);
+          }
+
+          break; // Success
         }
         
         console.log(`✅ [processRenderCarousels] Slide ${i + 1} rendered successfully: ${slideData.cloudinary_url}`);

@@ -26,7 +26,7 @@ interface SlideRequest {
   carouselId: string;
   slideIndex: number;
   totalSlides: number;
-  aspectRatio: '1:1' | '4:5' | '9:16' | '16:9';
+  aspectRatio: string; // Allow any string, we'll normalize it
   textVersion: number;
   renderVersion: number;
   campaign: string;
@@ -42,7 +42,7 @@ serve(async (req) => {
 
   try {
     const params: SlideRequest = await req.json();
-    const {
+    let {
       userId,
       prompt,
       globalStyle,
@@ -59,20 +59,55 @@ serve(async (req) => {
       language = 'FR'
     } = params;
 
-    // ✅ Validation: userId requis
+    // ✅ Use service role client pour toutes les opérations
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // ✅ Fallback: si userId manquant, tenter de le déduire depuis orderId
+    if (!userId && orderId) {
+      console.log(`[alfie-render-carousel-slide] ⚠️ userId missing, attempting to deduce from orderId: ${orderId}`);
+      
+      const { data: order, error: orderError } = await supabaseAdmin
+        .from('orders')
+        .select('user_id')
+        .eq('id', orderId)
+        .single();
+
+      if (orderError || !order) {
+        console.error('[alfie-render-carousel-slide] ❌ Cannot deduce userId from orderId:', orderError);
+        return new Response(
+          JSON.stringify({ error: 'userId is required and could not be deduced from orderId' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      userId = order.user_id;
+      console.log(`[alfie-render-carousel-slide] ✅ Deduced userId: ${userId}`);
+    }
+
+    // ✅ Validation finale: userId requis
     if (!userId) {
-      console.error('[alfie-render-carousel-slide] Missing userId in request');
+      console.error('[alfie-render-carousel-slide] ❌ Missing userId in request and no orderId to deduce from');
       return new Response(JSON.stringify({ error: 'userId is required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // ✅ Use service role client pour toutes les opérations
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    // Normalize aspectRatio (handle pixel formats like "1080x1350")
+    let normalizedAspectRatio = aspectRatio;
+    if (aspectRatio && aspectRatio.includes('x')) {
+      // Convert pixel format to ratio
+      normalizedAspectRatio = aspectRatio === '1080x1350' ? '4:5' :
+                               aspectRatio === '1080x1920' ? '9:16' :
+                               aspectRatio === '1920x1080' ? '16:9' :
+                               aspectRatio === '1080x1080' ? '1:1' : '4:5';
+      console.log(`[alfie-render-carousel-slide] Normalized aspectRatio from ${aspectRatio} to ${normalizedAspectRatio}`);
+    }
+
+    console.log(`[alfie-render-carousel-slide] Processing slide ${slideIndex + 1}/${totalSlides} for user: ${userId}, carousel: ${carouselId}`);
 
     console.log('[Render Slide] Starting generation:', {
       slideIndex: slideIndex + 1,
@@ -106,10 +141,10 @@ serve(async (req) => {
     
     const enrichedPrompt = `${globalStyle}. ${prompt}. Background only, no text, clean and professional. High quality, detailed, vibrant colors.`;
     
-    const [width, height] = aspectRatio === '1:1' ? [1024, 1024]
-      : aspectRatio === '16:9' ? [1280, 720]
-      : aspectRatio === '9:16' ? [720, 1280]
-      : aspectRatio === '4:5' ? [1024, 1280]
+    const [width, height] = normalizedAspectRatio === '1:1' ? [1024, 1024]
+      : normalizedAspectRatio === '16:9' ? [1280, 720]
+      : normalizedAspectRatio === '9:16' ? [720, 1280]
+      : normalizedAspectRatio === '4:5' ? [1024, 1280]
       : [1024, 1024];
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -135,9 +170,27 @@ serve(async (req) => {
       })
     });
 
+    // ✅ Handle rate limit (429)
+    if (aiResponse.status === 429) {
+      console.error('[Render Slide] ⏱️ Rate limit exceeded');
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded, please try again in a moment' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ✅ Handle insufficient credits (402)
+    if (aiResponse.status === 402) {
+      console.error('[Render Slide] 💳 Insufficient credits');
+      return new Response(
+        JSON.stringify({ error: 'Insufficient credits for AI generation' }),
+        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('[Render Slide] AI error:', aiResponse.status, errorText);
+      console.error('[Render Slide] ❌ AI error:', aiResponse.status, errorText);
       throw new Error(`Background generation failed: ${aiResponse.status}`);
     }
 
@@ -145,8 +198,11 @@ serve(async (req) => {
     const backgroundUrl = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
     if (!backgroundUrl) {
-      console.error('[Render Slide] No background URL in AI response:', aiData);
-      throw new Error('Background generation failed - no URL');
+      console.error('[Render Slide] ❌ No background URL in AI response. Full response:', JSON.stringify(aiData));
+      return new Response(
+        JSON.stringify({ error: 'No image generated by AI API', details: aiData }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     console.log('[Render Slide] Background generated:', backgroundUrl.substring(0, 100));
@@ -174,7 +230,7 @@ serve(async (req) => {
         orderId,
         assetId: carouselId,
         type: 'carousel_slide',
-        format: aspectRatio,
+        format: normalizedAspectRatio,
         language,
         slideIndex,
         textPublicId,
@@ -183,6 +239,11 @@ serve(async (req) => {
         alt: slideContent.alt
       }
     );
+
+    console.log('[Render Slide] 📦 Uploaded to Cloudinary:', {
+      publicId: uploadResult.publicId,
+      url: uploadResult.secureUrl?.substring(0, 100)
+    });
 
     console.log('[Render Slide] Uploaded to Cloudinary:', {
       publicId: uploadResult.publicId,
@@ -258,8 +319,38 @@ serve(async (req) => {
       }
     }
 
-    // 6. ✅ Stocker dans library_assets avec userId du body
-    console.log('[Render Slide] Step 6/6: Saving to library_assets...');
+    // 6. ✅ Stocker dans library_assets avec idempotence check
+    console.log('[Render Slide] Step 6/6: Checking for existing asset and saving to library_assets...');
+    
+    // Check if asset already exists (idempotence)
+    const { data: existingAsset } = await supabaseAdmin
+      .from('library_assets')
+      .select('id, cloudinary_url, cloudinary_public_id')
+      .eq('order_id', orderId)
+      .eq('carousel_id', carouselId)
+      .eq('slide_index', slideIndex)
+      .maybeSingle();
+
+    if (existingAsset) {
+      console.log(`[Render Slide] ♻️ Asset already exists (idempotent): ${existingAsset.id}`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          idempotent: true,
+          cloudinary_url: existingAsset.cloudinary_url,
+          cloudinary_public_id: existingAsset.cloudinary_public_id,
+          text_public_id: textPublicId,
+          slide_metadata: {
+            title: slideContent.title,
+            subtitle: slideContent.subtitle,
+            slideIndex,
+            renderVersion,
+            textVersion
+          }
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     const { error: insertError } = await supabaseAdmin
       .from('library_assets')
@@ -270,7 +361,7 @@ serve(async (req) => {
         carousel_id: carouselId,
         type: 'carousel_slide',
         slide_index: slideIndex,
-        format: aspectRatio,
+        format: normalizedAspectRatio,
         campaign,
         cloudinary_url: cloudinaryUrl,
         cloudinary_public_id: uploadResult.publicId,
@@ -291,11 +382,11 @@ serve(async (req) => {
       });
 
     if (insertError) {
-      console.error('[Render Slide] Database insert error:', insertError);
+      console.error('[Render Slide] ❌ Database insert error:', insertError);
       throw new Error(`Failed to save slide: ${insertError.message}`);
     }
     
-    console.log('[Render Slide] ✅ Saved to library_assets:', { orderId, slideIndex, userId });
+    console.log('[Render Slide] ✅ Saved to library_assets:', { orderId, slideIndex, userId, publicId: uploadResult.publicId });
 
     return new Response(JSON.stringify({
       success: true,

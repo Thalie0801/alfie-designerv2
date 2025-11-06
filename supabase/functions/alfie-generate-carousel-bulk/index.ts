@@ -26,6 +26,9 @@ serve(async (req) => {
     
     if (userError || !user) throw new Error('Unauthorized');
 
+    const userId = user.id;
+    console.log(`🎨 [Carousel Bulk] Authenticated user: ${userId}`);
+
     const { carousels, brandId, orderId, globalStyle, textVersion = 'v1' } = await req.json();
 
     if (!carousels || !Array.isArray(carousels)) {
@@ -54,6 +57,7 @@ serve(async (req) => {
           'alfie-render-carousel-slide',
           {
             body: {
+              userId,
               slideContent: slide,
               globalStyle: globalStyle || carousel.globalStyle || {},
               brandId,
@@ -61,9 +65,10 @@ serve(async (req) => {
               carouselId,
               slideIndex,
               totalSlides: carousel.slides.length,
-              aspectRatio: carousel.aspectRatio || '1080x1350',
+              aspectRatio: carousel.aspectRatio || '4:5',
               textVersion,
               renderVersion: 'v1',
+              context: 'bulk',
             },
           }
         );
