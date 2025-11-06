@@ -15,6 +15,11 @@ interface CarouselSlide {
   order_id: string | null;
   created_at: string | null;
   format: string | null;
+  cloudinary_public_id?: string | null;
+  metadata?: {
+    cloudinary_base_url?: string;
+    [k: string]: any;
+  } | null;
 }
 
 interface CarouselsTabProps {
@@ -41,7 +46,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
 
     let query = supabase
       .from('library_assets')
-      .select('id, cloudinary_url, slide_index, carousel_id, order_id, created_at, format')
+      .select('id, cloudinary_url, cloudinary_public_id, metadata, slide_index, carousel_id, order_id, created_at, format')
       .eq('user_id', user.id)
       .eq('type', 'carousel_slide')
       .order('created_at', { ascending: false })
@@ -62,10 +67,40 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     if (error) {
       console.error('[CarouselsTab] Error loading slides:', error);
     } else {
-      setSlides(data || []);
+      setSlides((data || []) as CarouselSlide[]);
     }
 
     setLoading(false);
+  };
+
+  // Utility functions for robust fallback
+  const buildBaseUrlFromOriginal = (originalUrl: string): string | null => {
+    try {
+      const url = new URL(originalUrl);
+      // Remove all transformations after /image/upload/ and keep version path
+      const match = url.pathname.match(/^(\/[^/]+)\/image\/upload(?:\/[^/]+)?(\/v\d+\/.+)$/);
+      if (match) {
+        return `${url.origin}${match[1]}/image/upload${match[2]}`;
+      }
+      // If no version, try without transform part
+      const noTransform = url.pathname.replace(/(\/image\/upload)\/[^/]+(\/.+)/, '$1$2');
+      return `${url.origin}${noTransform}`;
+    } catch {
+      return null;
+    }
+  };
+
+  const buildBaseUrlFromPublicId = (originalUrl: string, publicId?: string | null): string | null => {
+    if (!publicId) return null;
+    try {
+      const url = new URL(originalUrl);
+      const segments = url.pathname.split('/');
+      const cloudName = segments[1];
+      if (!cloudName) return null;
+      return `${url.origin}/${cloudName}/image/upload/${publicId}.png`;
+    } catch {
+      return null;
+    }
   };
 
   // Grouper les slides par carousel_id ou order_id
@@ -144,21 +179,27 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                       alt={`Slide ${(slide.slide_index ?? 0) + 1}`}
                       className={`w-full rounded-lg ${aspectClass} object-cover border`}
                       onError={(e) => {
-                        // ✅ Fallback to base URL without text overlay if it fails
                         const img = e.currentTarget;
-                        const originalUrl = slide.cloudinary_url;
+                        const alreadyTried = img.dataset.fallbackTried === 'true';
+                        if (alreadyTried) return; // Prevent infinite loop
+
+                        const original = slide.cloudinary_url;
+                        const metaBase = slide.metadata?.cloudinary_base_url || null;
+                        const baseFromOriginal = buildBaseUrlFromOriginal(original);
+                        const baseFromPublicId = buildBaseUrlFromPublicId(original, slide.cloudinary_public_id);
+
+                        // Priority order for fallback
+                        const fallback = metaBase || baseFromOriginal || baseFromPublicId;
                         
-                        // Try to extract base URL from Cloudinary URL
-                        // Format: https://res.cloudinary.com/{cloud}/image/upload/{transforms}/{publicId}
-                        const fallbackUrl = originalUrl.replace(/\/l_text:[^/]+/g, '');
-                        
-                        console.warn('[CarouselsTab] Image load failed, trying fallback:', {
-                          original: originalUrl.substring(0, 100),
-                          fallback: fallbackUrl.substring(0, 100)
+                        console.warn('[CarouselsTab] Overlay failed. Fallbacking to:', {
+                          metaBase: metaBase?.substring(0, 120),
+                          baseFromOriginal: baseFromOriginal?.substring(0, 120),
+                          baseFromPublicId: baseFromPublicId?.substring(0, 120)
                         });
-                        
-                        if (img.src !== fallbackUrl) {
-                          img.src = fallbackUrl;
+
+                        if (fallback && img.src !== fallback) {
+                          img.dataset.fallbackTried = 'true';
+                          img.src = fallback;
                         }
                       }}
                     />
