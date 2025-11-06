@@ -181,12 +181,6 @@ export function AlfieChat() {
       });
       
       setQuickReplies(['3 images', '2 carrousels', '1 image + 1 carrousel', 'Voir la bibliothèque']);
-      
-      // Reset pour permettre une nouvelle génération
-      setTimeout(() => {
-        setOrderId(null);
-        setConversationId(null);
-      }, 1000);
     }
   }, [orderAssets, orderTotal, conversationState]);
   
@@ -439,8 +433,13 @@ export function AlfieChat() {
             variant="outline"
             size="sm"
             onClick={() => {
-              setInput(reply);
-              onSelect(reply);
+              // Si "Voir la bibliothèque" ET qu'on a un orderId, ouvrir la page library
+              if (reply === 'Voir la bibliothèque' && orderId) {
+                window.open(`/library?order=${orderId}`, '_blank');
+              } else {
+                setInput(reply);
+                onSelect(reply);
+              }
             }}
             className="text-xs"
           >

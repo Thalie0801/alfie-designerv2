@@ -17,12 +17,16 @@ import { CarouselsTab } from '@/components/library/CarouselsTab';
 export default function Library() {
   const { user } = useAuth();
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<'images' | 'videos' | 'carousels'>('images');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   
   // Lire le paramètre ?order= pour filtrer par commande
   const orderIdFromQuery = new URLSearchParams(location.search).get('order');
+  
+  // Si ?order= est présent, afficher l'onglet carrousels par défaut
+  const [activeTab, setActiveTab] = useState<'images' | 'videos' | 'carousels'>(
+    orderIdFromQuery ? 'carousels' : 'images'
+  );
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
 
   const { 
     assets, 

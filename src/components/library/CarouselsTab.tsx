@@ -42,10 +42,14 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
       .from('library_assets')
       .select('id, cloudinary_url, slide_index, carousel_id, order_id, created_at')
       .eq('user_id', user.id)
-      .eq('brand_id', activeBrandId)
       .eq('type', 'carousel_slide')
       .order('created_at', { ascending: false })
       .order('slide_index', { ascending: true });
+    
+    // Filtre par brand_id seulement si aucun orderId spécifique n'est demandé
+    if (!orderId && activeBrandId) {
+      query = query.eq('brand_id', activeBrandId);
+    }
 
     // Filtre par order_id si fourni
     if (orderId) {
