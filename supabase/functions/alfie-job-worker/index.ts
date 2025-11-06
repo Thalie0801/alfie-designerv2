@@ -605,6 +605,20 @@ async function processRenderCarousels(payload: any): Promise<any> {
             const primaryColor = (brand?.palette?.[0] || '#000000').replace('#', '');
             const secondaryColor = (brand?.palette?.[1] || '#5A5A5A').replace('#', '');
             
+            // 🔍 LOGGER LA STRUCTURE DU SLIDE AVANT COMPOSITION
+            console.log(`📋 [processRenderCarousels] Slide ${i + 1}/${carousel.slides.length} structure:`, {
+              type: slide.type,
+              title: slide.title?.substring(0, 30) || 'none',
+              hasSubtitle: !!slide.subtitle,
+              hasPunchline: !!slide.punchline,
+              hasBullets: !!slide.bullets,
+              bulletsCount: slide.bullets?.length || 0,
+              hasCTA: !!slide.cta_primary,
+              hasNote: !!slide.note,
+              hasBadge: !!slide.badge,
+              allKeys: Object.keys(slide)
+            });
+            
             // ✅ Utiliser la nouvelle fonction avec le slide complet
             finalUrl = buildCarouselSlideUrl(
               cloudinaryResult.publicId,
@@ -613,7 +627,20 @@ async function processRenderCarousels(payload: any): Promise<any> {
               secondaryColor
             );
             
-            console.log(`✅ [processRenderCarousels] Slide ${i + 1}/${carousel.slides.length} composed with full text overlay (${slide.type || 'unknown'})`);
+            // 🔍 COMPTER LES LAYERS DANS L'URL CLOUDINARY
+            const layerMatches = finalUrl.match(/l_text:/g);
+            const layerCount = layerMatches ? layerMatches.length : 0;
+            
+            console.log(`✅ [processRenderCarousels] Slide ${i + 1}/${carousel.slides.length} composed:`, {
+              type: slide.type,
+              layersGenerated: layerCount,
+              urlLength: finalUrl.length,
+              expectedLayers: slide.type === 'hero' ? '3-4' : slide.type === 'cta' ? '3-4' : slide.bullets?.length ? `2+${slide.bullets.length}` : '2-3'
+            });
+            
+            if (layerCount < 2) {
+              console.warn(`⚠️ [processRenderCarousels] Slide ${i + 1} has only ${layerCount} layers, expected 3+!`);
+            }
           } catch (compositeError) {
             console.error(`❌ Text overlay failed for slide ${i + 1}:`, compositeError);
             console.warn(`⚠️ Using background only for slide ${i + 1}`);
