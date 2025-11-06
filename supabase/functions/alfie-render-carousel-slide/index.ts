@@ -270,6 +270,10 @@ serve(async (req) => {
 
     console.log('[Render Slide] Final URL generated:', cloudinaryUrl.substring(0, 150));
 
+    // ✅ Store base URL without overlay as fallback
+    const cloudinaryBaseUrl = uploadResult.secureUrl;
+    console.log('[Render Slide] Base URL (fallback):', cloudinaryBaseUrl.substring(0, 100));
+
     // 5. Garantir que la dérivée existe sur Cloudinary (Strict Transformations)
     console.log('[Render Slide] Step 5/6: Ensuring derivative exists on Cloudinary...');
     
@@ -282,6 +286,7 @@ serve(async (req) => {
     const apiKey = Deno.env.get('CLOUDINARY_API_KEY');
     const apiSecret = Deno.env.get('CLOUDINARY_API_SECRET');
     
+    let derivedSuccess = false;
     if (!cloudName || !apiKey || !apiSecret) {
       console.warn('[Render Slide] Cloudinary credentials missing, skipping eager generation');
     } else {
@@ -313,9 +318,10 @@ serve(async (req) => {
           publicId: explicitResult.public_id,
           eager: explicitResult.eager?.length || 0
         });
+        derivedSuccess = true;
       } catch (eagerError: any) {
-        console.error('[Render Slide] Eager generation failed:', eagerError.message);
-        // Continue anyway - l'URL on-the-fly pourrait fonctionner
+        console.error('[Render Slide] ⚠️ Eager generation failed, fallback to base URL:', eagerError.message);
+        // Continue - we'll use base URL as fallback
       }
     }
 
@@ -352,10 +358,11 @@ serve(async (req) => {
       );
     }
     
+    // ✅ Insert with both overlay URL and base URL fallback
     const { error: insertError } = await supabaseAdmin
       .from('library_assets')
       .insert({
-        user_id: userId, // ✅ Utiliser userId du body
+        user_id: userId,
         brand_id: brandId,
         order_id: orderId,
         carousel_id: carouselId,
@@ -363,7 +370,7 @@ serve(async (req) => {
         slide_index: slideIndex,
         format: normalizedAspectRatio,
         campaign,
-        cloudinary_url: cloudinaryUrl,
+        cloudinary_url: cloudinaryUrl, // ✅ Overlay URL (preferred)
         cloudinary_public_id: uploadResult.publicId,
         text_json: {
           title: slideContent.title,
@@ -377,7 +384,9 @@ serve(async (req) => {
         metadata: {
           width: uploadResult.width,
           height: uploadResult.height,
-          format: uploadResult.format
+          format: uploadResult.format,
+          cloudinary_base_url: cloudinaryBaseUrl, // ✅ Base URL as fallback
+          overlay_generated: derivedSuccess
         }
       });
 

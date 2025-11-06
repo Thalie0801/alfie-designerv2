@@ -516,8 +516,9 @@ serve(async (req) => {
       }
       
       // Invoke worker and wait for response
+      const workerUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/alfie-job-worker`;
+      
       try {
-        const workerUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/alfie-job-worker`;
         console.log('[ORCH] 🔄 Invoking worker at:', workerUrl);
         
         const workerRes = await fetch(workerUrl, {
@@ -544,6 +545,52 @@ serve(async (req) => {
         console.error('[ORCH] ❌ Worker invoke failed:', e);
         // Don't fail the entire request - worker will process via cron
       }
+      
+      // ✅ NEW: Drain loop to ensure jobs for this order complete
+      // Run in background (non-blocking)
+      const drainLoop = async () => {
+        const maxIterations = 10;
+        const delayMs = 3000; // 3 seconds between checks
+        
+        for (let i = 0; i < maxIterations; i++) {
+          // Check if all jobs for this order are completed
+          const { data: jobs } = await sb
+            .from('job_queue')
+            .select('id, type, status')
+            .eq('order_id', order.id)
+            .in('type', ['render_images', 'render_carousels']);
+          
+          const allCompleted = jobs?.every(j => j.status === 'completed' || j.status === 'failed') ?? false;
+          
+          if (allCompleted) {
+            console.log(`[ORCH] ✅ All jobs completed for order ${order.id} after ${i + 1} iterations`);
+            break;
+          }
+          
+          // Jobs still pending - invoke worker again
+          console.log(`[ORCH] 🔄 Drain iteration ${i + 1}: calling worker for order ${order.id}`);
+          
+          try {
+            await fetch(workerUrl, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ trigger: 'drain', orderId: order.id }),
+            });
+          } catch (drainError) {
+            console.error(`[ORCH] ⚠️ Drain worker call failed:`, drainError);
+          }
+          
+          // Wait before next check
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      };
+      
+      // Start drain loop in background (don't block response)
+      drainLoop().catch(e => console.error('[ORCH] ⚠️ Drain loop error:', e));
+      console.log('[ORCH] 🔄 Background drain loop started for order:', order.id);
       
       return json({
         response: "🚀 Génération lancée ! Je te tiens au courant.",

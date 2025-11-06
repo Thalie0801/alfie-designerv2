@@ -143,6 +143,24 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                       src={slide.cloudinary_url}
                       alt={`Slide ${(slide.slide_index ?? 0) + 1}`}
                       className={`w-full rounded-lg ${aspectClass} object-cover border`}
+                      onError={(e) => {
+                        // ✅ Fallback to base URL without text overlay if it fails
+                        const img = e.currentTarget;
+                        const originalUrl = slide.cloudinary_url;
+                        
+                        // Try to extract base URL from Cloudinary URL
+                        // Format: https://res.cloudinary.com/{cloud}/image/upload/{transforms}/{publicId}
+                        const fallbackUrl = originalUrl.replace(/\/l_text:[^/]+/g, '');
+                        
+                        console.warn('[CarouselsTab] Image load failed, trying fallback:', {
+                          original: originalUrl.substring(0, 100),
+                          fallback: fallbackUrl.substring(0, 100)
+                        });
+                        
+                        if (img.src !== fallbackUrl) {
+                          img.src = fallbackUrl;
+                        }
+                      }}
                     />
                   <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
                     {(slide.slide_index ?? 0) + 1}
