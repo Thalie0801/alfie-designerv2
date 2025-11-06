@@ -150,9 +150,9 @@ export function useLibraryAssetsSubscription(orderId: string | null) {
 
     channelRef.current = channel;
 
-    // 4. Polling fallback (every 3s, max 40 times = 2 minutes)
+    // 4. Polling fallback (every 3s, max 100 times = 5 minutes)
     let pollCount = 0;
-    const maxPolls = 40;
+    const maxPolls = 100;
 
     pollingIntervalRef.current = setInterval(async () => {
       pollCount++;

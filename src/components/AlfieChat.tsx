@@ -78,6 +78,36 @@ export function AlfieChat() {
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const seenAssetsRef = useRef(new Set<string>());
+  
+  // ======
+  // RESTAURATION D'ÉTAT APRÈS REFRESH
+  // ======
+  
+  useEffect(() => {
+    const restoreSessionState = async () => {
+      if (orderId || !user?.id) return;
+      
+      console.log('[Chat] Restoring session state for user:', user.id);
+      
+      const { data, error } = await supabase
+        .from('alfie_conversation_sessions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (!error && data?.order_id) {
+        console.log('[Chat] Restored session:', data.order_id);
+        setOrderId(data.order_id);
+        setConversationId(data.id);
+        setConversationState(data.conversation_state || 'initial');
+      }
+    };
+    
+    restoreSessionState();
+  }, [user?.id]);
   
   // ======
   // UTILITAIRES
@@ -121,6 +151,28 @@ export function AlfieChat() {
       }
     }
   }, [conversationState, orderId, messages]);
+  
+  // ======
+  // AFFICHAGE TEMPS RÉEL DES NOUVEAUX ASSETS
+  // ======
+  
+  useEffect(() => {
+    for (const asset of orderAssets) {
+      if (!seenAssetsRef.current.has(asset.id)) {
+        seenAssetsRef.current.add(asset.id);
+        
+        const isCarouselSlide = asset.type === 'carousel_slide';
+        addMessage({
+          role: 'assistant',
+          content: isCarouselSlide 
+            ? `✅ Slide ${asset.slideIndex + 1} générée !` 
+            : '✅ Image générée !',
+          type: 'image',
+          assetUrl: asset.url
+        });
+      }
+    }
+  }, [orderAssets]);
   
   // ======
   // REALTIME JOB MONITORING
@@ -401,7 +453,7 @@ export function AlfieChat() {
       ) : null}
       
       {/* Order Results */}
-      {orderId && orderAssets.length > 0 && (
+      {orderId && (
         <div className="px-4 pb-2">
           <OrderResults 
             assets={orderAssets} 

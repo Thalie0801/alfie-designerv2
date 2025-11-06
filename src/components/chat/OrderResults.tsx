@@ -16,9 +16,8 @@ interface OrderResultsProps {
 }
 
 export function OrderResults({ assets, total, orderId }: OrderResultsProps) {
-  if (assets.length === 0) return null;
-
   const isComplete = assets.length === total && total > 0;
+  const isLoading = total > 0 && assets.length < total;
 
   // Grouper par type
   const images = assets.filter(a => a.type === 'image');
@@ -30,8 +29,9 @@ export function OrderResults({ assets, total, orderId }: OrderResultsProps) {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold">
+            <h3 className="font-semibold flex items-center gap-2">
               {isComplete ? '✅ Génération terminée !' : '⏳ Génération en cours...'}
+              {isLoading && <span className="text-xs text-muted-foreground animate-pulse">(chargement...)</span>}
             </h3>
             <p className="text-sm text-muted-foreground">
               {assets.length} / {total} assets

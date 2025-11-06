@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,12 +12,17 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AccessGuard } from '@/components/AccessGuard';
+import { CarouselsTab } from '@/components/library/CarouselsTab';
 
 export default function Library() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'images' | 'videos'>('images');
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState<'images' | 'videos' | 'carousels'>('images');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
+  
+  // Lire le paramètre ?order= pour filtrer par commande
+  const orderIdFromQuery = new URLSearchParams(location.search).get('order');
 
   const { 
     assets, 
@@ -26,7 +32,7 @@ export default function Library() {
     downloadMultiple,
     cleanupProcessingVideos,
     refetch
-  } = useLibraryAssets(user?.id, activeTab);
+  } = useLibraryAssets(user?.id, activeTab === 'carousels' ? 'images' : activeTab);
 
   // Auto cleanup when switching to videos tab
   useEffect(() => {
@@ -35,10 +41,19 @@ export default function Library() {
     }
   }, [activeTab]);
 
-  const filteredAssets = assets.filter(asset =>
-    !searchQuery || 
-    asset.engine?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredAssets = assets
+    .filter(asset => {
+      // Filtre par order_id si présent dans l'URL
+      if (orderIdFromQuery && activeTab !== 'carousels') {
+        const assetOrderId = asset.metadata?.orderId;
+        if (assetOrderId !== orderIdFromQuery) return false;
+      }
+      // Filtre par recherche
+      if (searchQuery && !asset.engine?.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      return true;
+    });
 
   const handleSelectAsset = (assetId: string) => {
     setSelectedAssets(prev => 
@@ -147,10 +162,11 @@ export default function Library() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'images' | 'videos')}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'images' | 'videos' | 'carousels')}>
         <TabsList>
           <TabsTrigger value="images">🖼️ Images</TabsTrigger>
           <TabsTrigger value="videos">🎬 Vidéos</TabsTrigger>
+          <TabsTrigger value="carousels">📱 Carrousels</TabsTrigger>
         </TabsList>
 
         {/* Toolbar */}
@@ -292,6 +308,11 @@ export default function Library() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* Carousels Tab */}
+        <TabsContent value="carousels" className="mt-6">
+          <CarouselsTab orderId={orderIdFromQuery} />
         </TabsContent>
       </Tabs>
     </div>
