@@ -12,9 +12,7 @@ import { QuotaBar } from '@/components/create/QuotaBar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { useLibraryAssetsSubscription } from '@/hooks/useLibraryAssetsSubscription';
-import { OrderResults } from '@/components/chat/OrderResults';
-import type { ConversationState, Message, OrchestratorResponse, QuickRepliesProps } from '@/types/chat';
-import { getAspectClass } from '@/types/chat';
+import type { ConversationState, OrchestratorResponse } from '@/types/chat';
 
 const normalizeConversationState = (state?: string | null): ConversationState => {
   switch (state) {
@@ -79,8 +77,6 @@ export function AlfieChat() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [conversationState, setConversationState] = useState<ConversationState>('idle');
   const [expectedTotal, setExpectedTotal] = useState<number | null>(null);
-  const [quickReplies, setQuickReplies] = useState<string[]>([]);
-  const [conversationState, setConversationState] = useState<string>('initial');
 
   // Subscription aux assets de l'order
   const { assets: orderAssets, total: orderTotal } = useLibraryAssetsSubscription(orderId);
@@ -102,8 +98,6 @@ export function AlfieChat() {
       setExpectedTotal(orderTotal);
     }
   }, [orderTotal]);
-    setQuickReplies([]);
-  }, [orderId]);
   
   // ======
   // RESTAURATION D'ÉTAT APRÈS REFRESH
@@ -184,8 +178,8 @@ export function AlfieChat() {
   useEffect(() => {
     if (!orderId || !orderAssets.length) return;
 
+    // Afficher chaque nouveau asset dans le chat
     for (const asset of orderAssets) {
-      const key = asset.url;
       const key = asset.url || asset.id;
       if (!key || seenAssetsRef.current.has(key)) continue;
 
@@ -198,10 +192,14 @@ export function AlfieChat() {
           ? `✅ Slide ${asset.slideIndex + 1} générée !`
           : '✅ Image générée !',
         type: isCarouselSlide ? 'carousel' : 'image',
-        assetUrl: asset.url
+        assetUrl: asset.url,
+        metadata: isCarouselSlide
+          ? { assetUrls: [{ url: asset.url, format: asset.format }] }
+          : undefined
       });
     }
 
+    // Annoncer la fin de génération une seule fois
     const targetTotal = expectedTotal ?? orderTotal ?? 0;
     const canAnnounce =
       conversationState === 'generating' &&
@@ -210,43 +208,13 @@ export function AlfieChat() {
       finishAnnouncedRef.current !== orderId;
 
     if (canAnnounce) {
-      setConversationState('completed');
-      finishAnnouncedRef.current = orderId;
-      setConversationState('completed');
-      finishAnnouncedRef.current = orderId;
-      setConversationState('completed');
-      finishAnnouncedRef.current = orderId;
-      setConversationState('completed');
-      finishAnnouncedRef.current = orderId;
-    const canAnnounce =
-      conversationState === 'generating' &&
-      (orderTotal ?? 0) > 0 &&
-      orderAssets.length >= (orderTotal ?? 0) &&
-      finishAnnouncedRef.current !== orderId;
-
-    if (canAnnounce) {
-      setConversationState('completed');
-      finishAnnouncedRef.current = orderId!;
-        assetUrl: asset.url,
-        metadata: isCarouselSlide
-          ? { assetUrls: [{ url: asset.url, format: asset.format }] }
-          : undefined
+      console.log('[Chat] 🎉 Génération terminée !', { 
+        assets: orderAssets.length, 
+        total: targetTotal 
       });
-    }
-
-    const alreadyAnnounced = messages.some(
-      (m) => m.role === 'assistant' && m.content.includes('🎉 Génération terminée')
-    );
-
-    if (
-      !alreadyAnnounced &&
-      conversationState === 'generating' &&
-      orderTotal > 0 &&
-      orderAssets.length >= orderTotal
-    ) {
-      console.log('[Chat] 🎉 Génération terminée !', { assets: orderAssets.length, total: orderTotal });
 
       setConversationState('completed');
+      finishAnnouncedRef.current = orderId;
 
       addMessage({
         role: 'assistant',
@@ -256,19 +224,6 @@ export function AlfieChat() {
       });
     }
   }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
-    }
-  }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
-    }
-  }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
-    }
-  }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
-      setQuickReplies(['Voir la bibliothèque', 'Créer un nouveau carrousel']);
-    }
-  }, [orderAssets, orderId, conversationState, orderTotal]);
-
-      setQuickReplies(['3 images', '2 carrousels', '1 image + 1 carrousel', 'Voir la bibliothèque']);
-    }
-  }, [orderAssets, orderTotal, conversationState, messages]);
   
   // ======
   // REALTIME JOB MONITORING
@@ -518,8 +473,6 @@ export function AlfieChat() {
   // QUICK REPLIES COMPONENT
   // ======
   
-  const QuickRepliesButtons = ({ replies, onSelect }: QuickRepliesProps) => {
-  const QuickRepliesButtons = ({ replies, onSelect }: { replies: string[]; onSelect: (reply: string) => Promise<void> }) => {
   const QuickRepliesButtons = ({ replies, onSelect }: { replies: string[]; onSelect: (reply: string) => Promise<void> | void }) => {
     if (replies.length === 0) return null;
 
@@ -539,7 +492,6 @@ export function AlfieChat() {
               }
               setInput(reply);
               await onSelect(reply);
-              await Promise.resolve(onSelect(reply));
             }}
             className="text-xs"
           >
@@ -561,17 +513,6 @@ export function AlfieChat() {
       
       {/* Quota Bar */}
       {activeBrandId && <QuotaBar activeBrandId={activeBrandId} />}
-      
-      {/* Order Results - compact et collapsible */}
-      {orderId && (
-        <div className="px-4">
-          <OrderResults
-            assets={orderAssets}
-            total={(expectedTotal ?? orderTotal) ?? 0}
-            orderId={orderId}
-          />
-        </div>
-      )}
       
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -705,7 +646,6 @@ export function AlfieChat() {
                         const item = typeof entry === 'string' ? { url: entry } : entry;
                         if (!item?.url) return null;
 
-                        const aspectClass = getAspectClass(item.format);
                         const aspectClass =
                           item.format === '9:16' ? 'aspect-[9/16]' :
                           item.format === '16:9' ? 'aspect-video' :
@@ -764,7 +704,6 @@ export function AlfieChat() {
                       {/* Grille des slides individuelles avec aspect ratio dynamique */}
                       <div className="grid grid-cols-5 gap-2">
                         {carousel.slides?.slice(0, 5).map((slide: any, slideIdx: number) => {
-                          const aspectClass = getAspectClass(slide.format);
                           const aspectClass =
                             slide.format === '9:16' ? 'aspect-[9/16]' :
                             slide.format === '16:9' ? 'aspect-video' :
@@ -802,13 +741,6 @@ export function AlfieChat() {
         <div ref={messagesEndRef} />
       </div>
       
-      {/* Quick Replies */}
-      <QuickRepliesButtons
-        replies={quickReplies}
-        onSelect={async (reply) => {
-          await handleSend(reply);
-        }}
-      />
       
       {/* Composer */}
       <div className="border-t bg-background p-4">
