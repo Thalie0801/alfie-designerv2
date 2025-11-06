@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { uploadToCloudinary } from '../_shared/cloudinaryUploader.ts';
+import { buildCloudinaryTextOverlayUrl } from '../_shared/imageCompositor.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -251,7 +252,7 @@ async function processRenderImages(payload: any): Promise<any> {
     
     // Convertir chaque brief en objet image avec prompt construit
     imagesToRender = (briefs || [payload.brief]).map((brief: any, i: number) => {
-      const { objective, format, style } = brief;
+      const { objective, format, style, content } = brief;
       
       // Mapper format vers résolution
       const AR_MAP: Record<string, { w: number; h: number }> = {
@@ -264,12 +265,13 @@ async function processRenderImages(payload: any): Promise<any> {
       const aspectRatio = format?.split(' ')[0] || '1:1';
       const { w, h } = AR_MAP[aspectRatio] || AR_MAP['1:1'];
       
-      // Construire prompt enrichi
-      const prompt = `Professional ${style || 'minimalist'} background for social media.
-Context: ${objective || 'generic post'}
-Brand: ${brand?.niche || ''}, tone: ${brand?.voice || 'professional'}
-Colors: ${brand?.palette?.slice(0, 3).join(', ') || 'modern palette'}
-Requirements: clean composition, no text, high contrast, ${aspectRatio} aspect ratio optimized.`;
+      // Construire prompt enrichi avec le contenu visuel demandé
+      const prompt = `${content || 'Abstract background'}.
+Style: ${style || 'minimalist'}.
+Context: ${objective || 'social media post'}.
+Brand: ${brand?.niche || ''}, tone: ${brand?.voice || 'professional'}.
+Colors: ${brand?.palette?.slice(0, 3).join(', ') || 'modern palette'}.
+Format: ${aspectRatio} aspect ratio optimized.`;
       
       console.log(`🖼️ [processRenderImages] Image ${i + 1}: ${aspectRatio} (${w}x${h})`);
       
@@ -540,7 +542,34 @@ async function processRenderCarousels(payload: any): Promise<any> {
           console.log(`✅ [processRenderCarousels] Slide ${i + 1} uploaded: ${cloudinaryResult.secureUrl}`);
           console.log(`📊 Size reduction: ${(bgBase64.length / 1024).toFixed(0)}KB base64 → ${cloudinaryResult.secureUrl.length}B URL`);
 
-          // ✅ Sauvegarder dans library_assets avec URL Cloudinary
+          // 🆕 CRÉER L'IMAGE COMPOSÉE (background + texte overlay)
+          let finalUrl = cloudinaryResult.secureUrl;
+
+          if (slide.title || slide.subtitle) {
+            try {
+              const primaryColor = brand?.palette?.[0]?.replace('#', '') || '000000';
+              const secondaryColor = brand?.palette?.[1]?.replace('#', '') || '5A5A5A';
+              
+              finalUrl = buildCloudinaryTextOverlayUrl(cloudinaryResult.publicId, {
+                title: slide.title,
+                subtitle: slide.subtitle,
+                titleColor: primaryColor,
+                subtitleColor: secondaryColor,
+                titleSize: 72,
+                subtitleSize: 32,
+                titleFont: 'Arial',
+                subtitleFont: 'Arial',
+                titleWeight: 'bold',
+                subtitleWeight: 'normal'
+              });
+              
+              console.log(`✅ [processRenderCarousels] Slide ${i + 1} composed with text overlay`);
+            } catch (compositeError) {
+              console.warn(`⚠️ Text overlay failed for slide ${i + 1}, using background only:`, compositeError);
+            }
+          }
+
+          // ✅ Sauvegarder dans library_assets avec URL composée
           const { error: saveError } = await supabaseAdmin
             .from('library_assets')
             .insert({
@@ -551,7 +580,7 @@ async function processRenderCarousels(payload: any): Promise<any> {
               carousel_id: carousel.id,
               slide_index: i,
               type: 'carousel_slide',
-              cloudinary_url: cloudinaryResult.secureUrl,
+              cloudinary_url: finalUrl,
               text_json: slide,
               format: '4:5',
               metadata: {
@@ -571,7 +600,7 @@ async function processRenderCarousels(payload: any): Promise<any> {
 
           slides.push({
             index: i,
-            url: cloudinaryResult.secureUrl,
+            url: finalUrl,
             text: slide
           });
 

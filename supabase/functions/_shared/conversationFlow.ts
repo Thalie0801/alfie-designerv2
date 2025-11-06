@@ -36,6 +36,12 @@ export const IMAGE_BRIEF_QUESTIONS: BriefQuestion[] = [
     required: true
   },
   {
+    key: 'content',
+    question: 'Que veux-tu voir sur cette image ? Décris le contenu visuel (ex: produit, paysage, personne, objet, etc.)',
+    type: 'text',
+    required: true
+  },
+  {
     key: 'format',
     question: 'Quel format souhaitez-vous ? (1:1, 4:5, 9:16)',
     type: 'select',
@@ -256,6 +262,13 @@ export function getNextQuestion(
           question: `📸 Image ${currentIndex + 1}/${context.numImages}: Quel est l'objectif ? (acquisition, conversion, awareness)`,
           quickReplies: ['Acquisition', 'Conversion', 'Awareness'],
           questionKey: 'objective'
+        };
+      }
+      if (!currentBrief.content) {
+        return {
+          question: `Image ${currentIndex + 1}: Que veux-tu voir sur cette image ? Décris le contenu visuel (ex: produit, paysage, personne, objet, etc.)`,
+          quickReplies: [],
+          questionKey: 'content'
         };
       }
       if (!currentBrief.format) {
