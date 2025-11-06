@@ -218,8 +218,25 @@ export function AlfieChat() {
 
       addMessage({
         role: 'assistant',
-        content: '🎉 Génération terminée ! Toutes tes slides sont prêtes.',
-        quickReplies: ['Voir la bibliothèque', 'Créer un nouveau carrousel'],
+        content: '🎉 Génération terminée ! Tes visuels sont prêts dans la Bibliothèque.',
+        quickReplies: ['Voir la bibliothèque', 'Créer un nouveau visuel'],
+        type: 'text'
+      });
+    }
+    
+    // Fallback: si des assets arrivent mais qu'on n'a pas de total précis
+    if (conversationState === 'generating' && 
+        orderAssets.length > 0 && 
+        !targetTotal &&
+        finishAnnouncedRef.current !== orderId) {
+      
+      console.log('[Chat] 📦 Assets détectés sans total connu');
+      finishAnnouncedRef.current = orderId;
+      
+      addMessage({
+        role: 'assistant',
+        content: '📦 Des visuels ont été générés ! Retrouve-les dans la Bibliothèque.',
+        quickReplies: ['Voir la bibliothèque'],
         type: 'text'
       });
     }
@@ -385,6 +402,14 @@ export function AlfieChat() {
           console.log('[Chat] Order created:', payload.orderId);
           setOrderId(payload.orderId);
           setConversationState('generating');
+          
+          // Ajouter immédiatement un message pour rediriger vers la bibliothèque
+          addMessage({
+            role: 'assistant',
+            content: '🚀 Génération lancée ! Tu peux suivre l\'avancement et télécharger tes visuels directement dans la Bibliothèque.',
+            type: 'text',
+            quickReplies: ['Voir la bibliothèque']
+          });
         }
 
         if (typeof payload?.totalSlides === 'number') {

@@ -327,6 +327,9 @@ Format: ${aspectRatio} aspect ratio optimized.`;
 
       // 🆕 UPLOADER VERS CLOUDINARY
       console.log(`📤 [processRenderImages] Uploading image ${results.length + 1} to Cloudinary...`);
+      
+      // Normaliser l'aspect ratio
+      const normalizedAspectRatio = img.aspectRatio || '4:5';
 
       try {
         const cloudinaryResult = await uploadToCloudinary(imageBase64, {
@@ -337,12 +340,15 @@ Format: ${aspectRatio} aspect ratio optimized.`;
             order_id: String(payload.orderId),
             order_item_id: String(payload.orderItemId),
             brand_id: String(img.brandId),
-            aspect_ratio: img.aspectRatio || '9:16'
+            aspect_ratio: normalizedAspectRatio
           }
         });
 
-        console.log(`✅ [processRenderImages] Uploaded: ${cloudinaryResult.secureUrl}`);
-        console.log(`📊 Size reduction: ${(imageBase64.length / 1024).toFixed(0)}KB base64 → ${cloudinaryResult.secureUrl.length}B URL`);
+        console.log(`✅ [processRenderImages] Cloudinary upload successful:`, {
+          secureUrl: cloudinaryResult.secureUrl,
+          publicId: cloudinaryResult.publicId,
+          sizeReduction: `${(imageBase64.length / 1024).toFixed(0)}KB base64 → ${cloudinaryResult.secureUrl.length}B URL`
+        });
 
         // ✅ Sauvegarder dans media_generations avec URL Cloudinary
         const { error: saveError } = await supabaseAdmin
@@ -371,41 +377,59 @@ Format: ${aspectRatio} aspect ratio optimized.`;
           console.log('💾 [processRenderImages] Saved to media_generations');
         }
 
-        // ✅ Sauvegarder dans library_assets avec URL Cloudinary
-        const { error: libError } = await supabaseAdmin
+        // ✅ Sauvegarder dans library_assets avec URL Cloudinary + idempotence
+        // Vérifier si l'asset existe déjà (idempotence pour retry)
+        const { data: existingAsset } = await supabaseAdmin
           .from('library_assets')
-          .insert({
-            user_id: payload.userId,
-            brand_id: img.brandId,
-            order_id: payload.orderId,
-            order_item_id: payload.orderItemId,
-            type: 'image',
-            cloudinary_url: cloudinaryResult.secureUrl,
-            format: img.aspectRatio,
-            metadata: {
-              orderId: payload.orderId,
-              orderItemId: payload.orderItemId,
-              aspectRatio: img.aspectRatio,
-              resolution: img.resolution,
-              source: 'worker-cascade',
-              cloudinary_public_id: cloudinaryResult.publicId
-            }
-          });
-
-        if (libError) {
-          console.warn('⚠️ Failed to save to library_assets:', libError);
+          .select('id, cloudinary_url')
+          .eq('order_id', payload.orderId)
+          .eq('order_item_id', payload.orderItemId)
+          .eq('cloudinary_url', cloudinaryResult.secureUrl)
+          .maybeSingle();
+        
+        if (existingAsset) {
+          console.log('💾 [processRenderImages] Asset already exists (idempotent):', existingAsset.id);
         } else {
-          console.log('💾 [processRenderImages] Saved to library_assets');
+          const { error: libError } = await supabaseAdmin
+            .from('library_assets')
+            .insert({
+              user_id: payload.userId,
+              brand_id: img.brandId,
+              order_id: payload.orderId,
+              order_item_id: payload.orderItemId,
+              type: 'image',
+              cloudinary_url: cloudinaryResult.secureUrl,
+              format: normalizedAspectRatio,
+              metadata: {
+                orderId: payload.orderId,
+                orderItemId: payload.orderItemId,
+                aspectRatio: normalizedAspectRatio,
+                resolution: img.resolution,
+                source: 'worker-cascade',
+                cloudinary_public_id: cloudinaryResult.publicId
+              }
+            });
+
+          if (libError) {
+            console.error('❌ [processRenderImages] Failed to save to library_assets:', libError);
+            // Ne pas throw ici, l'image est générée et uploadée
+          } else {
+            console.log('💾 [processRenderImages] Saved to library_assets');
+          }
         }
 
         results.push({
           url: cloudinaryResult.secureUrl,
-          aspectRatio: img.aspectRatio,
+          aspectRatio: normalizedAspectRatio,
           resolution: img.resolution
         });
 
       } catch (uploadError) {
-        console.error(`❌ Cloudinary upload failed for image ${results.length + 1}:`, uploadError);
+        console.error(`❌ [processRenderImages] Cloudinary upload failed:`, {
+          error: uploadError instanceof Error ? uploadError.message : String(uploadError),
+          imageIndex: results.length + 1,
+          aspectRatio: normalizedAspectRatio
+        });
         throw uploadError;
       }
       
