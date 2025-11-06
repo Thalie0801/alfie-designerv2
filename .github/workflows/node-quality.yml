@@ -136,8 +136,10 @@ jobs:
         id: parse-results
         run: |
           if [ -f typecheck.txt ]; then
-            echo "errors=$(grep -c 'error TS' typecheck.txt || echo 0)" >> $GITHUB_OUTPUT
-            echo "warnings=$(grep -c 'warning TS' typecheck.txt || echo 0)" >> $GITHUB_OUTPUT
+            count_errors=$(grep -c 'error TS' typecheck.txt || true)
+            count_warnings=$(grep -c 'warning TS' typecheck.txt || true)
+            echo "errors=${count_errors:-0}" >> "$GITHUB_OUTPUT"
+            echo "warnings=${count_warnings:-0}" >> "$GITHUB_OUTPUT"
             head -n 20 typecheck.txt > typecheck-summary.txt || true
           fi
 
@@ -215,8 +217,10 @@ jobs:
         id: parse-lint
         run: |
           if [ -f lint.txt ]; then
-            echo "errors=$(grep -c 'error' lint.txt || echo 0)" >> $GITHUB_OUTPUT
-            echo "warnings=$(grep -c 'warning' lint.txt || echo 0)" >> $GITHUB_OUTPUT
+            count_errors=$(grep -c 'error' lint.txt || true)
+            count_warnings=$(grep -c 'warning' lint.txt || true)
+            echo "errors=${count_errors:-0}" >> "$GITHUB_OUTPUT"
+            echo "warnings=${count_warnings:-0}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Upload lint report
