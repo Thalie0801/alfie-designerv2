@@ -146,9 +146,11 @@ export function buildTextOverlayTransform(options: {
     const encodedTitle = encodeCloudinaryText(title);
     // ✅ FIX: Encode font names with spaces (e.g., "Nunito Sans" -> "Nunito%20Sans")
     const safeTitleFont = (titleFont || 'Arial').replace(/\s+/g, '%20');
-    const fontStyle = titleWeight === 'bold' ? `${safeTitleFont}_Bold_${titleSize}` : `${safeTitleFont}_${titleSize}`;
+    // ✅ CRITICAL FIX: Font order must be font_family_size_style
+    const fontStyle = titleWeight === 'bold' ? `${safeTitleFont}_${titleSize}_Bold` : `${safeTitleFont}_${titleSize}`;
+    // ✅ CRITICAL FIX: All parameters BEFORE /fl_layer_apply
     transformations.push(
-      `l_text:${fontStyle}:${encodedTitle},co_rgb:${titleColor},w_${width},c_fit/fl_layer_apply,g_north,y_200`
+      `l_text:${fontStyle}:${encodedTitle},co_rgb:${titleColor},w_${width},c_fit,g_north,y_200/fl_layer_apply`
     );
   }
 
@@ -157,9 +159,11 @@ export function buildTextOverlayTransform(options: {
     const encodedSubtitle = encodeCloudinaryText(subtitle);
     // ✅ FIX: Encode font names with spaces
     const safeSubtitleFont = (subtitleFont || 'Arial').replace(/\s+/g, '%20');
-    const fontStyle = subtitleWeight === 'bold' ? `${safeSubtitleFont}_Bold_${subtitleSize}` : `${safeSubtitleFont}_${subtitleSize}`;
+    // ✅ CRITICAL FIX: Font order must be font_family_size_style
+    const fontStyle = subtitleWeight === 'bold' ? `${safeSubtitleFont}_${subtitleSize}_Bold` : `${safeSubtitleFont}_${subtitleSize}`;
+    // ✅ CRITICAL FIX: All parameters BEFORE /fl_layer_apply
     transformations.push(
-      `l_text:${fontStyle}:${encodedSubtitle},co_rgb:${subtitleColor},w_${width},c_fit/fl_layer_apply,g_north,y_${280 + lineSpacing}`
+      `l_text:${fontStyle}:${encodedSubtitle},co_rgb:${subtitleColor},w_${width},c_fit,g_north,y_${280 + lineSpacing}/fl_layer_apply`
     );
   }
 

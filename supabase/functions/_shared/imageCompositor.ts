@@ -49,9 +49,11 @@ function encodeCloudinaryText(text: string): string {
 function buildTextLayer(layer: TextLayer): string {
   // ✅ FIX: Encode font names with spaces (e.g., "Nunito Sans" -> "Nunito%20Sans")
   const fontFamily = (layer.font || 'Inter').replace(/\s+/g, '%20');
-  const fontWeight = layer.weight || 'Bold';
+  // ✅ CRITICAL FIX: Normalize ExtraBold to Bold (Cloudinary doesn't support ExtraBold)
+  const fontWeight = layer.weight === 'ExtraBold' ? 'Bold' : (layer.weight || 'Bold');
   const fontSize = layer.size || 64;
-  const font = `${fontFamily}_${fontWeight}_${fontSize}`;
+  // ✅ CRITICAL FIX: Font order must be font_family_size_style
+  const font = `${fontFamily}_${fontSize}_${fontWeight}`;
   
   const styleParams = [
     layer.color ? `co_rgb:${layer.color.replace('#', '')}` : '',
@@ -69,6 +71,7 @@ function buildTextLayer(layer: TextLayer): string {
   
   const positionParams = [gravity, position].filter(Boolean).join(',');
   
+  // ✅ CRITICAL FIX: All parameters BEFORE /fl_layer_apply
   return `${base}${styleParams ? ',' + styleParams : ''}${positionParams ? ',' + positionParams : ''}/fl_layer_apply`;
 }
 

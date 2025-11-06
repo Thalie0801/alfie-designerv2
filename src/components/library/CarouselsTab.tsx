@@ -178,12 +178,36 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                       src={slide.cloudinary_url}
                       alt={`Slide ${(slide.slide_index ?? 0) + 1}`}
                       className={`w-full rounded-lg ${aspectClass} object-cover border`}
-                      onError={(e) => {
+                      onError={async (e) => {
                         const img = e.currentTarget;
+                        const alreadyRepaired = img.dataset.repaired === 'true';
                         const alreadyTried = img.dataset.fallbackTried === 'true';
+                        
                         if (alreadyTried) return; // Prevent infinite loop
 
                         const original = slide.cloudinary_url;
+                        
+                        // Try to repair the overlay first (if not already repaired)
+                        if (!alreadyRepaired) {
+                          try {
+                            console.log('[CarouselsTab] Attempting to repair overlay for slide:', slide.id);
+                            img.dataset.repaired = 'true'; // Mark as repaired to prevent loops
+                            
+                            const { data, error } = await supabase.functions.invoke('repair-carousel-overlay', {
+                              body: { slideId: slide.id }
+                            });
+                            
+                            if (!error && data?.cloudinary_url) {
+                              console.log('[CarouselsTab] ✅ Overlay repaired, reloading image');
+                              img.src = data.cloudinary_url;
+                              return; // Success, no need for fallback
+                            }
+                          } catch (repairError) {
+                            console.warn('[CarouselsTab] Repair failed:', repairError);
+                          }
+                        }
+                        
+                        // If repair failed or was already tried, use fallback
                         const metaBase = slide.metadata?.cloudinary_base_url || null;
                         const baseFromOriginal = buildBaseUrlFromOriginal(original);
                         const baseFromPublicId = buildBaseUrlFromPublicId(original, slide.cloudinary_public_id);
@@ -191,7 +215,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                         // Priority order for fallback
                         const fallback = metaBase || baseFromOriginal || baseFromPublicId;
                         
-                        console.warn('[CarouselsTab] Overlay failed. Fallbacking to:', {
+                        console.warn('[CarouselsTab] Using fallback image:', {
                           metaBase: metaBase?.substring(0, 120),
                           baseFromOriginal: baseFromOriginal?.substring(0, 120),
                           baseFromPublicId: baseFromPublicId?.substring(0, 120)
