@@ -96,13 +96,14 @@ export function useLibraryAssetsSubscription(orderId: string | null) {
     }
 
     if (data && data.length > 0) {
-    const mapped: LibraryAsset[] = data.map(row => ({
-      id: row.id,
-      url: row.cloudinary_url,
-      slideIndex: row.slide_index ?? 0,
-      type: row.type,
-      format: normalizeFormat(row.format ?? undefined)
-    }));
+      const mapped: LibraryAsset[] = data.map(row => ({
+        id: row.id,
+        url: row.cloudinary_url,
+        slideIndex: row.slide_index ?? 0,
+        type: row.type,
+        format: normalizeFormat(row.format ?? undefined)
+      }));
+
       setAssets(mapped);
       console.log('[LibraryAssets] Loaded existing assets:', mapped.length);
     }
@@ -137,13 +138,13 @@ export function useLibraryAssetsSubscription(orderId: string | null) {
           console.log('[LibraryAssets] New asset received:', payload.new);
 
           const newAsset = payload.new;
-        const newItem: LibraryAsset = {
-          id: newAsset.id,
-          url: newAsset.cloudinary_url,
-          slideIndex: newAsset.slide_index ?? 0,
-          type: newAsset.type,
-          format: normalizeFormat(newAsset.format ?? undefined)
-        };
+          const newItem: LibraryAsset = {
+            id: newAsset.id,
+            url: newAsset.cloudinary_url,
+            slideIndex: newAsset.slide_index ?? 0,
+            type: newAsset.type,
+            format: normalizeFormat(newAsset.format ?? undefined)
+          };
 
           setAssets(prev => {
             // Déduplication
