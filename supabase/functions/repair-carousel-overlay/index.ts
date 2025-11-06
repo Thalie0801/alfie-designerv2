@@ -94,6 +94,8 @@ serve(async (req) => {
     const transformString = buildTextOverlayTransform({
       title: slide.text_json?.title || '',
       subtitle: slide.text_json?.subtitle || '',
+      bullets: slide.text_json?.bullets || [],
+      cta: slide.text_json?.cta || slide.text_json?.alt || '',
       titleColor: primaryColor,
       subtitleColor: secondaryColor,
       titleSize: 64,

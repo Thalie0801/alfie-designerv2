@@ -3,9 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Eye, Download } from 'lucide-react';
+import { Eye, Download, FileArchive, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 
 interface CarouselSlide {
   id: string;
@@ -31,6 +32,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
   const { activeBrandId } = useBrandKit();
   const [slides, setSlides] = useState<CarouselSlide[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingZip, setDownloadingZip] = useState<string | null>(null);
 
   useEffect(() => {
     loadSlides();
@@ -71,6 +73,42 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     }
 
     setLoading(false);
+  };
+
+  const handleDownloadZip = async (carouselKey: string, carouselSlides: CarouselSlide[]) => {
+    setDownloadingZip(carouselKey);
+    
+    try {
+      // Get job_set_id from first slide's metadata or use carousel_id
+      const jobSetId = carouselSlides[0]?.carousel_id || carouselKey;
+      
+      console.log('[CarouselsTab] Requesting ZIP download for:', jobSetId);
+      
+      const { data, error } = await supabase.functions.invoke('download-job-set-zip', {
+        body: { jobSetId }
+      });
+
+      if (error) {
+        console.error('[CarouselsTab] ZIP download error:', error);
+        throw error;
+      }
+
+      if (!data?.url) {
+        throw new Error('No ZIP URL returned');
+      }
+
+      // Open ZIP download in new tab
+      window.open(data.url, '_blank');
+      
+      const sizeInMB = (data.size / (1024 * 1024)).toFixed(2);
+      toast.success(`ZIP téléchargé : ${data.filename} (${sizeInMB} MB)`);
+      
+    } catch (err: any) {
+      console.error('[CarouselsTab] ZIP download failed:', err);
+      toast.error(`Échec du téléchargement ZIP : ${err.message || 'Erreur inconnue'}`);
+    } finally {
+      setDownloadingZip(null);
+    }
   };
 
   // Utility functions for robust fallback
@@ -142,21 +180,36 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
               <h3 className="font-semibold">Carrousel</h3>
               <Badge variant="secondary">{carouselSlides.length} slides</Badge>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                // Télécharger toutes les slides (ouvrir dans nouvel onglet)
-                carouselSlides.forEach((slide, index) => {
-                  setTimeout(() => {
-                    window.open(slide.cloudinary_url, '_blank');
-                  }, index * 200); // Stagger downloads
-                });
-              }}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Télécharger tout
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleDownloadZip(carouselKey, carouselSlides)}
+                disabled={downloadingZip === carouselKey}
+              >
+                {downloadingZip === carouselKey ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <FileArchive className="h-4 w-4 mr-2" />
+                )}
+                Télécharger en ZIP
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  // Télécharger toutes les slides individuellement (fallback)
+                  carouselSlides.forEach((slide, index) => {
+                    setTimeout(() => {
+                      window.open(slide.cloudinary_url, '_blank');
+                    }, index * 200);
+                  });
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Individual
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">

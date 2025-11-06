@@ -250,12 +250,14 @@ serve(async (req) => {
       url: uploadResult.secureUrl
     });
 
-    // 4. Construire URL finale avec text overlays robustes
+    // 4. Construire URL finale avec text overlays robustes (avec bullets et CTA)
     console.log('[Render Slide] Step 4/4: Building final URL with text overlays...');
     
     const cloudinaryUrl = buildCloudinaryTextOverlayUrl(uploadResult.publicId, {
       title: slideContent.title,
       subtitle: slideContent.subtitle || '',
+      bullets: slideContent.bullets || [],
+      cta: slideContent.alt, // Using alt as CTA fallback
       titleColor: primaryColor,
       subtitleColor: secondaryColor,
       titleSize: 64,
@@ -294,6 +296,8 @@ serve(async (req) => {
         const transformString = buildTextOverlayTransform({
           title: slideContent.title,
           subtitle: slideContent.subtitle || '',
+          bullets: slideContent.bullets || [],
+          cta: slideContent.alt,
           titleColor: primaryColor,
           subtitleColor: secondaryColor,
           titleSize: 64,

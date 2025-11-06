@@ -113,6 +113,10 @@ export function encodeCloudinaryText(text: string): string {
 export function buildTextOverlayTransform(options: {
   title?: string;
   subtitle?: string;
+  bullets?: string[];
+  cta?: string;
+  ctaPrimary?: string;
+  ctaSecondary?: string;
   titleColor?: string;
   subtitleColor?: string;
   titleSize?: number;
@@ -127,6 +131,10 @@ export function buildTextOverlayTransform(options: {
   const {
     title,
     subtitle = '',
+    bullets = [],
+    cta = '',
+    ctaPrimary = '',
+    ctaSecondary = '',
     titleColor = '1E1E1E',
     subtitleColor = '5A5A5A',
     titleSize = 64,
@@ -144,26 +152,42 @@ export function buildTextOverlayTransform(options: {
   // Title layer
   if (title) {
     const encodedTitle = encodeCloudinaryText(title);
-    // ✅ FIX: Encode font names with spaces (e.g., "Nunito Sans" -> "Nunito%20Sans")
     const safeTitleFont = (titleFont || 'Arial').replace(/\s+/g, '%20');
-    // ✅ CRITICAL FIX: Font order must be font_family_size_style
     const fontStyle = titleWeight === 'bold' ? `${safeTitleFont}_${titleSize}_Bold` : `${safeTitleFont}_${titleSize}`;
-    // ✅ CRITICAL FIX: All parameters BEFORE /fl_layer_apply
     transformations.push(
-      `l_text:${fontStyle}:${encodedTitle},co_rgb:${titleColor},w_${width},c_fit,g_north,y_200/fl_layer_apply`
+      `l_text:${fontStyle}:${encodedTitle},co_rgb:${titleColor},e_outline:12:color_black,w_${width},c_fit,g_north,y_200/fl_layer_apply`
     );
   }
 
   // Subtitle layer
   if (subtitle) {
     const encodedSubtitle = encodeCloudinaryText(subtitle);
-    // ✅ FIX: Encode font names with spaces
     const safeSubtitleFont = (subtitleFont || 'Arial').replace(/\s+/g, '%20');
-    // ✅ CRITICAL FIX: Font order must be font_family_size_style
     const fontStyle = subtitleWeight === 'bold' ? `${safeSubtitleFont}_${subtitleSize}_Bold` : `${safeSubtitleFont}_${subtitleSize}`;
-    // ✅ CRITICAL FIX: All parameters BEFORE /fl_layer_apply
     transformations.push(
-      `l_text:${fontStyle}:${encodedSubtitle},co_rgb:${subtitleColor},w_${width},c_fit,g_north,y_${280 + lineSpacing}/fl_layer_apply`
+      `l_text:${fontStyle}:${encodedSubtitle},co_rgb:${subtitleColor},e_outline:10:color_black,w_${width},c_fit,g_north,y_${280 + lineSpacing}/fl_layer_apply`
+    );
+  }
+
+  // Bullets layers (each bullet on its own line)
+  if (bullets && bullets.length > 0) {
+    const safeBulletFont = (subtitleFont || 'Arial').replace(/\s+/g, '%20');
+    bullets.forEach((bullet, index) => {
+      const encodedBullet = encodeCloudinaryText(`• ${bullet}`);
+      const yPos = 400 + (index * 60);
+      transformations.push(
+        `l_text:${safeBulletFont}_36:${encodedBullet},co_rgb:${subtitleColor},e_outline:10:color_black,w_${width - 120},c_fit,g_north_west,x_80,y_${yPos}/fl_layer_apply`
+      );
+    });
+  }
+
+  // CTA layer (bottom center)
+  const ctaText = ctaPrimary || cta;
+  if (ctaText) {
+    const encodedCta = encodeCloudinaryText(ctaText);
+    const safeCtaFont = (titleFont || 'Arial').replace(/\s+/g, '%20');
+    transformations.push(
+      `l_text:${safeCtaFont}_44_Bold:${encodedCta},co_rgb:${titleColor},e_outline:12:color_black,w_700,c_fit,g_south,y_80/fl_layer_apply`
     );
   }
 
@@ -219,6 +243,10 @@ export function buildCloudinaryTextOverlayUrl(
   options: {
     title?: string;
     subtitle?: string;
+    bullets?: string[];
+    cta?: string;
+    ctaPrimary?: string;
+    ctaSecondary?: string;
     titleColor?: string;
     subtitleColor?: string;
     titleSize?: number;
