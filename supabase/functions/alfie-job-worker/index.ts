@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { uploadToCloudinary } from '../_shared/cloudinaryUploader.ts';
-import { buildCarouselSlideUrl, type Slide } from '../_shared/imageCompositor.ts';
 import { consumeBrandQuotas } from '../_shared/quota.ts';
 
 const corsHeaders = {
@@ -558,144 +557,42 @@ async function processRenderCarousels(payload: any): Promise<any> {
       const slidePrompt = carousel.prompts[i] || `Slide ${i + 1}`;
       
       try {
-        console.log(`🎨 [processRenderCarousels] Generating slide ${i + 1}/${carousel.slides.length}`);
+        console.log(`🎨 [processRenderCarousels] Rendering slide ${i + 1}/${carousel.slides.length}`);
         
-        // ✅ Calculer la résolution selon l'aspect ratio
-        const aspectRatio = carousel.aspectRatio || '9:16';
-        const resolution = 
-          aspectRatio === '9:16' ? '1080x1920' :
-          aspectRatio === '16:9' ? '1920x1080' :
-          aspectRatio === '1:1' ? '1080x1080' :
-          aspectRatio === '4:5' ? '1080x1350' :
-          '1080x1920'; // Défaut portrait
-        
-        console.log(`🎨 [processRenderCarousels] Generating slide ${i + 1} with aspect ratio ${aspectRatio} (${resolution})`);
-        
-        // Générer le background via alfie-generate-ai-image
-        const { data: imgData, error: imgError } = await supabaseAdmin.functions.invoke('alfie-generate-ai-image', {
-          body: {
-            prompt: `${slidePrompt}. Style: ${carousel.style}. Brand: ${brand?.niche}. Colors: ${brand?.palette?.slice(0,3).join(', ')}`,
-            resolution,
-            backgroundOnly: true,
-            brandKit: brand ? { name: brand.name, palette: brand.palette, voice: brand.voice } : undefined
+        // ✅ Utiliser alfie-render-carousel-slide avec toutes les corrections (encoding, eager, aspect ratio)
+        const { data: slideData, error: slideError } = await supabaseAdmin.functions.invoke(
+          'alfie-render-carousel-slide',
+          {
+            body: {
+              prompt: slidePrompt,
+              globalStyle: carousel.style || 'minimalist',
+              slideContent: slide,
+              brandId: carousel.brandId,
+              orderId: payload.orderId,
+              carouselId: carousel.id,
+              slideIndex: i,
+              totalSlides: carousel.slides.length,
+              aspectRatio: carousel.aspectRatio || '9:16',
+              textVersion: carousel.textVersion || 1,
+              renderVersion: 1,
+              campaign: 'carousel_generation',
+              language: 'FR'
+            }
           }
+        );
+        
+        if (slideError || slideData?.error) {
+          throw new Error(`Slide ${i + 1} render failed: ${slideData?.error || slideError?.message}`);
+        }
+        
+        console.log(`✅ [processRenderCarousels] Slide ${i + 1} rendered successfully: ${slideData.cloudinary_url}`);
+        
+        slides.push({
+          index: i,
+          url: slideData.cloudinary_url,
+          publicId: slideData.cloudinary_public_id,
+          text: slide
         });
-        
-        if (imgError || imgData?.error) {
-          throw new Error(`Slide ${i + 1} generation failed: ${imgData?.error || imgError?.message}`);
-        }
-        
-        const bgBase64 = imgData?.imageUrl || imgData?.data?.imageUrl;
-        if (!bgBase64) {
-          throw new Error(`Slide ${i + 1}: No image URL returned`);
-        }
-
-        // 🆕 UPLOADER VERS CLOUDINARY
-        console.log(`📤 [processRenderCarousels] Uploading slide ${i + 1}/${carousel.slides.length} to Cloudinary...`);
-
-        try {
-          const cloudinaryResult = await uploadToCloudinary(bgBase64, {
-            folder: `brands/${carousel.brandId}/carousels/${carousel.id}`,
-            publicId: `slide_${String(i + 1).padStart(2, '0')}`,
-            tags: ['carousel', 'worker', `order-${payload.orderId}`],
-            context: {
-              order_id: String(payload.orderId),
-              carousel_id: String(carousel.id),
-              slide_index: String(i),
-              brand_id: String(carousel.brandId)
-            }
-          });
-
-          console.log(`✅ [processRenderCarousels] Slide ${i + 1} uploaded: ${cloudinaryResult.secureUrl}`);
-          console.log(`📊 Size reduction: ${(bgBase64.length / 1024).toFixed(0)}KB base64 → ${cloudinaryResult.secureUrl.length}B URL`);
-
-          // 🆕 CRÉER L'IMAGE COMPOSÉE (background + texte overlay complet)
-          let finalUrl = cloudinaryResult.secureUrl;
-
-          try {
-            const primaryColor = (brand?.palette?.[0] || '#000000').replace('#', '');
-            const secondaryColor = (brand?.palette?.[1] || '#5A5A5A').replace('#', '');
-            
-            // 🔍 LOGGER LA STRUCTURE DU SLIDE AVANT COMPOSITION
-            console.log(`📋 [processRenderCarousels] Slide ${i + 1}/${carousel.slides.length} structure:`, {
-              type: slide.type,
-              title: slide.title?.substring(0, 30) || 'none',
-              hasSubtitle: !!slide.subtitle,
-              hasPunchline: !!slide.punchline,
-              hasBullets: !!slide.bullets,
-              bulletsCount: slide.bullets?.length || 0,
-              hasCTA: !!slide.cta_primary,
-              hasNote: !!slide.note,
-              hasBadge: !!slide.badge,
-              allKeys: Object.keys(slide)
-            });
-            
-            // ✅ Utiliser la nouvelle fonction avec le slide complet
-            finalUrl = buildCarouselSlideUrl(
-              cloudinaryResult.publicId,
-              slide as Slide,  // Cast pour le type
-              primaryColor,
-              secondaryColor
-            );
-            
-            // 🔍 COMPTER LES LAYERS DANS L'URL CLOUDINARY
-            const layerMatches = finalUrl.match(/l_text:/g);
-            const layerCount = layerMatches ? layerMatches.length : 0;
-            
-            console.log(`✅ [processRenderCarousels] Slide ${i + 1}/${carousel.slides.length} composed:`, {
-              type: slide.type,
-              layersGenerated: layerCount,
-              urlLength: finalUrl.length,
-              expectedLayers: slide.type === 'hero' ? '3-4' : slide.type === 'cta' ? '3-4' : slide.bullets?.length ? `2+${slide.bullets.length}` : '2-3'
-            });
-            
-            if (layerCount < 2) {
-              console.warn(`⚠️ [processRenderCarousels] Slide ${i + 1} has only ${layerCount} layers, expected 3+!`);
-            }
-          } catch (compositeError) {
-            console.error(`❌ Text overlay failed for slide ${i + 1}:`, compositeError);
-            console.warn(`⚠️ Using background only for slide ${i + 1}`);
-          }
-
-          // ✅ Sauvegarder dans library_assets avec URL composée et format correct
-          const { error: saveError } = await supabaseAdmin
-            .from('library_assets')
-            .insert({
-              user_id: payload.userId,
-              brand_id: carousel.brandId,
-              order_id: payload.orderId,
-              order_item_id: payload.orderItemId,
-              carousel_id: carousel.id,
-              slide_index: i,
-              type: 'carousel_slide',
-              cloudinary_url: finalUrl,
-              text_json: slide,
-              format: aspectRatio, // ✅ Utiliser l'aspect ratio réel
-              metadata: {
-                orderId: payload.orderId,
-                orderItemId: payload.orderItemId,
-                style: carousel.style,
-                source: 'worker-cascade',
-                cloudinary_public_id: cloudinaryResult.publicId
-              }
-            });
-
-          if (saveError) {
-            console.warn(`⚠️ Failed to save slide ${i + 1}:`, saveError);
-          } else {
-            console.log(`💾 [processRenderCarousels] Slide ${i + 1} saved to library_assets`);
-          }
-
-          slides.push({
-            index: i,
-            url: finalUrl,
-            text: slide
-          });
-
-        } catch (uploadError) {
-          console.error(`❌ Cloudinary upload failed for slide ${i + 1}:`, uploadError);
-          throw uploadError;
-        }
         
       } catch (slideError) {
         console.error(`❌ Failed to generate slide ${i + 1}:`, slideError);
