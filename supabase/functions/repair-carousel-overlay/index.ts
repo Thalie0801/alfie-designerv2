@@ -47,6 +47,29 @@ serve(async (req) => {
       );
     }
 
+    // Validate required fields
+    if (!slide.cloudinary_public_id) {
+      console.error('[repair-carousel-overlay] Missing cloudinary_public_id for slide:', slideId);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Slide is missing cloudinary_public_id - cannot repair overlay',
+          slide_id: slideId 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!slide.text_json?.title && !slide.text_json?.subtitle) {
+      console.log('[repair-carousel-overlay] No text to overlay for slide:', slideId);
+      return new Response(
+        JSON.stringify({ 
+          error: 'No text content to overlay',
+          slide_id: slideId 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Fetch brand palette and fonts
     const { data: brandData } = await supabase
       .from('brands')
