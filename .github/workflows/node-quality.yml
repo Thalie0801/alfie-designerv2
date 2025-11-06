@@ -40,7 +40,6 @@ jobs:
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
 
-      # (si deps privées, décommente et ajoute le secret)
       # - name: Configure npm auth (optional)
       #   if: ${{ secrets.NPM_TOKEN != '' }}
       #   run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc
@@ -111,4 +110,6 @@ jobs:
           npm ci --prefer-offline --no-audit --no-fund || npm install --prefer-online --no-audit --no-fund
 
       - name: Build
+        run: npm run build
+
         run: npm run build

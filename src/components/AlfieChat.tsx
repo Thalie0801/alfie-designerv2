@@ -28,6 +28,7 @@ interface Message {
   metadata?: any;
   reasoning?: string;
   brandAlignment?: string;
+  quickReplies?: string[];
   bulkCarouselData?: {
     carousels: Array<{
       carousel_index: number;
@@ -66,14 +67,21 @@ export function AlfieChat() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [quickReplies, setQuickReplies] = useState<string[]>([]);
   const [conversationState, setConversationState] = useState<string>('initial');
-  
+
   // Subscription aux assets de l'order
   const { assets: orderAssets, total: orderTotal } = useLibraryAssetsSubscription(orderId);
-  
+
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const seenAssetsRef = useRef(new Set<string>()); // stocke les URLs déjà annoncées
+  const finishAnnouncedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    seenAssetsRef.current = new Set<string>();
+    finishAnnouncedRef.current = null;
+    setQuickReplies([]);
+  }, [orderId]);
   
   // ======
   // RESTAURATION D'ÉTAT APRÈS REFRESH
@@ -152,7 +160,10 @@ export function AlfieChat() {
   // ======
   
   useEffect(() => {
+    if (!orderId || !orderAssets.length) return;
+
     for (const asset of orderAssets) {
+      const key = asset.url;
       const key = asset.url || asset.id;
       if (!key || seenAssetsRef.current.has(key)) continue;
 
@@ -165,6 +176,19 @@ export function AlfieChat() {
           ? `✅ Slide ${asset.slideIndex + 1} générée !`
           : '✅ Image générée !',
         type: isCarouselSlide ? 'carousel' : 'image',
+        assetUrl: asset.url
+      });
+    }
+
+    const canAnnounce =
+      conversationState === 'generating' &&
+      (orderTotal ?? 0) > 0 &&
+      orderAssets.length >= (orderTotal ?? 0) &&
+      finishAnnouncedRef.current !== orderId;
+
+    if (canAnnounce) {
+      setConversationState('completed');
+      finishAnnouncedRef.current = orderId!;
         assetUrl: asset.url,
         metadata: isCarouselSlide
           ? { assetUrls: [{ url: asset.url, format: asset.format }] }
@@ -188,9 +212,13 @@ export function AlfieChat() {
 
       addMessage({
         role: 'assistant',
-        content: `🎉 Génération terminée ! ${orderTotal} asset${orderTotal > 1 ? 's' : ''} créé${orderTotal > 1 ? 's' : ''}.\n\nQue veux-tu créer maintenant ?`,
+        content: '🎉 Génération terminée ! Toutes tes slides sont prêtes.',
+        quickReplies: ['Voir la bibliothèque', 'Créer un nouveau carrousel'],
         type: 'text'
       });
+      setQuickReplies(['Voir la bibliothèque', 'Créer un nouveau carrousel']);
+    }
+  }, [orderAssets, orderId, conversationState, orderTotal]);
 
       setQuickReplies(['3 images', '2 carrousels', '1 image + 1 carrousel', 'Voir la bibliothèque']);
     }
@@ -431,6 +459,7 @@ export function AlfieChat() {
   // QUICK REPLIES COMPONENT
   // ======
   
+  const QuickRepliesButtons = ({ replies, onSelect }: { replies: string[]; onSelect: (reply: string) => Promise<void> }) => {
   const QuickRepliesButtons = ({ replies, onSelect }: { replies: string[]; onSelect: (reply: string) => Promise<void> | void }) => {
     if (replies.length === 0) return null;
 
@@ -441,6 +470,7 @@ export function AlfieChat() {
             key={idx}
             variant="outline"
             size="sm"
+            disabled={isLoading}
             onClick={async () => {
               // Si "Voir la bibliothèque" ET qu'on a un orderId, ouvrir la page library
               if (reply === 'Voir la bibliothèque' && orderId) {
@@ -448,6 +478,7 @@ export function AlfieChat() {
                 return;
               }
               setInput(reply);
+              await onSelect(reply);
               await Promise.resolve(onSelect(reply));
             }}
             className="text-xs"
