@@ -557,6 +557,56 @@ serve(async (req) => {
 
     // === 5. GENERATING (état terminal) ===
     if (state === 'generating') {
+      // ✅ Check if user wants to start a NEW generation
+      const newIntent = detectOrderIntent(user_message || '');
+      if (newIntent && (newIntent.numImages > 0 || newIntent.numCarousels > 0)) {
+        // Reset session and start fresh
+        console.log('[ORCH] 🔄 New intent detected while generating, resetting session');
+        
+        state = 'initial';
+        context = {};
+        await sb
+          .from("alfie_conversation_sessions")
+          .update({ 
+            conversation_state: 'initial',
+            context_json: {},
+            order_id: null
+          })
+          .eq("id", session.id);
+        
+        // Process the new intent
+        context.numImages = newIntent.numImages;
+        context.numCarousels = newIntent.numCarousels;
+        context.imageBriefs = Array(newIntent.numImages).fill(null).map(() => ({}));
+        context.carouselBriefs = Array(newIntent.numCarousels).fill(null).map(() => ({}));
+        context.currentImageIndex = 0;
+        context.currentCarouselIndex = 0;
+        
+        // Transition to collecting
+        if (newIntent.numImages > 0) {
+          state = 'collecting_image_brief';
+        } else if (newIntent.numCarousels > 0) {
+          state = 'collecting_carousel_brief';
+        }
+        
+        await sb
+          .from("alfie_conversation_sessions")
+          .update({ 
+            conversation_state: state,
+            context_json: context 
+          })
+          .eq("id", session.id);
+        
+        const nextQ = getNextQuestion(state, context);
+        return json({
+          response: nextQ?.question || "Super ! Dis-m'en plus.",
+          quickReplies: nextQ?.quickReplies || [],
+          conversationId: session.id,
+          state,
+          context
+        });
+      }
+      
       return json({
         response: "⏳ Génération en cours... Patience !",
         orderId: session.order_id,
