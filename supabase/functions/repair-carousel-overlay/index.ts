@@ -106,20 +106,76 @@ serve(async (req) => {
       lineSpacing: 10
     });
 
-    // Generate derived image
-    console.log('[repair-carousel-overlay] Generating derivative...');
-    const explicitResult = await ensureDerived(
-      cloudName,
-      apiKey,
-      apiSecret,
-      slide.cloudinary_public_id,
-      transformString
-    );
+    // Resolve/repair missing publicId from metadata base URL if needed
+    const extractPublicIdFromUrl = (url?: string | null) => {
+      if (!url) return null;
+      try {
+        const afterUpload = url.split('/upload/')[1];
+        if (!afterUpload) return null;
+        const noQuery = afterUpload.split('?')[0];
+        const noExt = noQuery.replace(/\.(png|jpg|jpeg|webp|gif)$/i, '');
+        return noExt;
+      } catch (_) {
+        return null;
+      }
+    };
+
+    let publicId: string | null = slide.cloudinary_public_id || null;
+    if (!publicId) {
+      const inferred = extractPublicIdFromUrl(
+        slide.metadata?.cloudinary_base_url ||
+        slide.metadata?.base_url ||
+        slide.metadata?.source_url ||
+        slide.metadata?.original_url
+      );
+      if (inferred) {
+        publicId = inferred;
+        await supabase
+          .from('library_assets')
+          .update({ cloudinary_public_id: publicId })
+          .eq('id', slideId);
+        console.log('[repair-carousel-overlay] Inferred publicId from metadata:', publicId);
+      } else {
+        return new Response(
+          JSON.stringify({
+            error: 'Missing Cloudinary public id and cannot infer from metadata',
+            slide_id: slideId
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Generate derived image (explicit) with robust error mapping
+    console.log('[repair-carousel-overlay] Generating derivative for', publicId);
+    try {
+      await ensureDerived(
+        cloudName!,
+        apiKey!,
+        apiSecret!,
+        publicId!,
+        transformString
+      );
+    } catch (e: any) {
+      const msg = String(e?.message || e);
+      console.error('[repair-carousel-overlay] ensureDerived failed:', msg);
+      if (msg.includes('Resource not found')) {
+        return new Response(
+          JSON.stringify({
+            error: 'Cloudinary source not found for this slide',
+            public_id: publicId,
+            slide_id: slideId
+          }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      throw e;
+    }
 
     console.log('[repair-carousel-overlay] Derivative generated');
 
-    // Build new URL
-    const newCloudinaryUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${transformString}/${slide.cloudinary_public_id}.png`;
+    // Build new URL using resolved publicId
+    const newCloudinaryUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${transformString}/${publicId}.png`;
 
     // Update database
     const { error: updateError } = await supabase
