@@ -606,6 +606,81 @@ serve(async (req) => {
           context
         });
       }
+
+      // 🆕 Convenience: allow "carrousel" / "image" without a number to start a new flow
+      const normalized = (user_message || '').toLowerCase();
+      if (/\b(carrousel|carousel)\b/.test(normalized) || /\bimage\b/.test(normalized)) {
+        const wantsCarousel = /\b(carrousel|carousel)\b/.test(normalized);
+        // Reset previous generation
+        await sb
+          .from('alfie_conversation_sessions')
+          .update({ conversation_state: 'initial', context_json: {}, order_id: null })
+          .eq('id', session.id);
+        
+        // Initialize minimal context
+        context = wantsCarousel
+          ? { numCarousels: 1, carouselBriefs: [{}], currentCarouselIndex: 0 }
+          : { numImages: 1, imageBriefs: [{}], currentImageIndex: 0 } as any;
+        const newState: ConversationState = wantsCarousel ? 'collecting_carousel_brief' : 'collecting_image_brief';
+        
+        await sb
+          .from('alfie_conversation_sessions')
+          .update({ conversation_state: newState, context_json: context })
+          .eq('id', session.id);
+        
+        const nextQ = getNextQuestion(newState, context);
+        return json({
+          response: nextQ?.question || "Super ! Dis-m'en plus.",
+          quickReplies: nextQ?.quickReplies || [],
+          conversationId: session.id,
+          state: newState,
+          context
+        });
+      }
+
+      // 🆕 Completion check: mark session as completed when all assets are produced
+      if (session.order_id) {
+        let expected = 0;
+        const { data: items } = await sb
+          .from('order_items')
+          .select('type, brief_json')
+          .eq('order_id', session.order_id);
+        
+        for (const it of items || []) {
+          const b: any = it.brief_json || {};
+          if (it.type === 'image') {
+            const c = typeof b.count === 'number' ? b.count : (Array.isArray(b.briefs) ? b.briefs.length : 0);
+            expected += c || 0;
+          }
+          if (it.type === 'carousel') {
+            const briefs = Array.isArray(b.briefs) ? b.briefs : [];
+            expected += briefs.reduce((sum: number, br: any) => {
+              const n = typeof br?.numSlides === 'number' ? br.numSlides : (parseInt(String(br?.numSlides || 0)) || 0);
+              return sum + n;
+            }, 0);
+          }
+        }
+        
+        const { count: done } = await sb
+          .from('library_assets')
+          .select('id', { count: 'exact', head: true })
+          .eq('order_id', session.order_id);
+        
+        if ((done ?? 0) >= expected && expected > 0) {
+          await sb
+            .from('alfie_conversation_sessions')
+            .update({ conversation_state: 'completed' })
+            .eq('id', session.id);
+          
+          return json({
+            response: '🎉 Génération terminée ! Toutes tes slides sont prêtes.',
+            orderId: session.order_id,
+            quickReplies: ['Voir la bibliothèque', 'Créer un nouveau carrousel'],
+            conversationId: session.id,
+            state: 'completed'
+          });
+        }
+      }
       
       return json({
         response: "⏳ Génération en cours... Patience !",
