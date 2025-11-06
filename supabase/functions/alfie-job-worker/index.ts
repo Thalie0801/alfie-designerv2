@@ -445,13 +445,21 @@ async function processRenderCarousels(payload: any): Promise<any> {
     const planPromises = (briefs || [payload.brief]).map(async (brief: any, idx: number) => {
       const { topic, numSlides, angle } = brief;
       
-      console.log(`📋 [processRenderCarousels] Planning carousel ${idx + 1}: "${topic}"`);
+      // ✅ FIX: S'assurer que numSlides est un nombre
+      const slideCount = typeof numSlides === 'number' ? numSlides : (parseInt(String(numSlides)) || 5);
+      
+      console.log(`📋 [processRenderCarousels] Planning carousel ${idx + 1}:`, {
+        topic,
+        numSlides: brief.numSlides,
+        slideCount,
+        angle
+      });
       
       // ✅ Appeler alfie-plan-carousel (public)
       const { data, error } = await supabaseAdmin.functions.invoke('alfie-plan-carousel', {
         body: {
           prompt: topic,
-          slideCount: numSlides || 5,
+          slideCount,
           brandKit: brand ? {
             name: brand.name,
             palette: brand.palette,
@@ -462,16 +470,38 @@ async function processRenderCarousels(payload: any): Promise<any> {
       });
       
       if (error || data?.error) {
+        console.error(`❌ [processRenderCarousels] Planning failed:`, {
+          error: error?.message,
+          dataError: data?.error,
+          topic,
+          slideCount
+        });
         throw new Error(`Carousel planning failed: ${data?.error || error?.message}`);
       }
       
-      console.log(`✅ [processRenderCarousels] Carousel ${idx + 1} planned: ${data.slides?.length || 0} slides`);
+      console.log(`✅ [processRenderCarousels] Carousel ${idx + 1} planned:`, {
+        requestedSlides: slideCount,
+        returnedSlides: data.slides?.length || 0,
+        returnedPrompts: data.prompts?.length || 0,
+        hasSlidesArray: Array.isArray(data.slides),
+        firstSlide: data.slides?.[0] ? JSON.stringify(data.slides[0]) : 'none'
+      });
+      
+      // ✅ CRITICAL: Valider que le plan contient le bon nombre de slides
+      if (!data.slides || !Array.isArray(data.slides) || data.slides.length === 0) {
+        console.error(`❌ [processRenderCarousels] Invalid plan structure:`, data);
+        throw new Error(`Plan returned no slides`);
+      }
+      
+      if (data.slides.length !== slideCount) {
+        console.warn(`⚠️ [processRenderCarousels] Slide count mismatch: requested ${slideCount}, got ${data.slides.length}`);
+      }
       
       return {
         id: crypto.randomUUID(),
         aspectRatio: '4:5', // Défaut Instagram
         textVersion: 1,
-        slides: data.slides || [],
+        slides: data.slides,
         prompts: data.prompts || [],
         style: data.style || 'minimalist',
         brandId
@@ -490,13 +520,26 @@ async function processRenderCarousels(payload: any): Promise<any> {
   for (const carousel of carouselsToRender) {
     const slides = [];
     
-    console.log(`🎠 [processRenderCarousels] Rendering carousel ${results.length + 1}/${carouselsToRender.length} (${carousel.slides.length} slides)`);
+    console.log(`🎠 [processRenderCarousels] Rendering carousel ${results.length + 1}/${carouselsToRender.length}:`, {
+      totalSlides: carousel.slides.length,
+      hasSlides: Array.isArray(carousel.slides),
+      slideTypes: carousel.slides.map((s: any) => s.type),
+      carouselId: carousel.id
+    });
+    
+    // ✅ VALIDATION: S'assurer qu'il y a des slides à traiter
+    if (!carousel.slides || carousel.slides.length === 0) {
+      console.error(`❌ [processRenderCarousels] Carousel has no slides to render!`, carousel);
+      throw new Error('Carousel has no slides');
+    }
     
     const { data: brand } = await supabaseAdmin
       .from('brands')
       .select('name, palette, voice, niche')
       .eq('id', carousel.brandId)
       .single();
+    
+    console.log(`🎨 [processRenderCarousels] Starting slide-by-slide generation...`);
     
     for (let i = 0; i < carousel.slides.length; i++) {
       const slide = carousel.slides[i];

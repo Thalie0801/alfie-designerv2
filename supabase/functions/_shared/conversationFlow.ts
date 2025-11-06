@@ -215,19 +215,25 @@ export function validateResponse(question: BriefQuestion, response: string): { v
   return { valid: true };
 }
 
-export function extractResponseValue(question: BriefQuestion, response: string): any {
+export function extractResponseValue(question: BriefQuestion | { key: string }, response: string): any {
   const normalized = response.toLowerCase().trim();
+  const key = 'key' in question ? question.key : '';
   
-  if (question.type === 'select' && question.options) {
+  // Cast pour accéder aux propriétés
+  const fullQuestion = question as BriefQuestion;
+  
+  if (fullQuestion.type === 'select' && fullQuestion.options) {
     // Trouver l'option qui correspond
-    const match = question.options.find(opt => normalized.includes(opt.toLowerCase()));
+    const match = fullQuestion.options.find(opt => normalized.includes(opt.toLowerCase()));
     return match || normalized;
   }
   
-  // Pour numSlides, extraire le nombre
-  if (question.key === 'numSlides') {
+  // ✅ FIX: Pour numSlides, extraire le nombre (support "5", "5 slides", "5-8", etc.)
+  if (key === 'numSlides') {
     const match = response.match(/(\d+)/);
-    return match ? parseInt(match[1]) : 5;
+    const value = match ? parseInt(match[1]) : 5;
+    console.log(`[extractResponseValue] numSlides: "${response}" → ${value}`);
+    return value;
   }
   
   return response.trim();
