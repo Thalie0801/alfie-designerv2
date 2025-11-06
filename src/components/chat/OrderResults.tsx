@@ -9,7 +9,19 @@ interface Asset {
   url: string;
   slideIndex: number;
   type: string;
+  format?: string;
 }
+
+// Helper pour déterminer la classe d'aspect ratio
+const getAspectClass = (format?: string): string => {
+  switch (format) {
+    case '9:16': return 'aspect-[9/16]';
+    case '16:9': return 'aspect-video';
+    case '1:1':  return 'aspect-square';
+    case '5:4':  return 'aspect-[5/4]';
+    default:     return 'aspect-[4/5]';
+  }
+};
 
 interface OrderResultsProps {
   assets: Asset[];
@@ -101,14 +113,22 @@ export function OrderResults({ assets, total, orderId }: OrderResultsProps) {
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {carouselSlides.map(slide => (
                       <div key={slide.id} className="relative group">
-                        <img
-                          src={slide.url}
-                          alt={`Slide ${slide.slideIndex + 1}`}
-                          className="w-full rounded-lg aspect-[4/5] object-cover"
-                        />
-                        <div className="absolute top-1 left-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-                          {slide.slideIndex + 1}
+                        {/* Wrapper avec aspect ratio */}
+                        <div className={`relative w-full ${getAspectClass(slide.format)} rounded-lg overflow-hidden`}>
+                          {/* Image en absolute pour remplir le wrapper */}
+                          <img
+                            src={slide.url}
+                            alt={`Slide ${slide.slideIndex + 1}`}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                          {/* Badge du numéro de slide */}
+                          <div className="absolute top-1 left-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded z-10">
+                            {slide.slideIndex + 1}
+                          </div>
                         </div>
+                        
+                        {/* Bouton de téléchargement au hover */}
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
                           <Button
                             size="sm"

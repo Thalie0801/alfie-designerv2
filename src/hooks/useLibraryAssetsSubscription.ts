@@ -10,6 +10,17 @@ export interface LibraryAsset {
   format?: string;
 }
 
+// Normaliser les formats pour éviter les surprises
+const normalizeFormat = (v?: string): '4:5' | '9:16' | '16:9' | '1:1' => {
+  if (!v) return '4:5';
+  const s = v.toLowerCase();
+  if (s.includes('1080x1350') || s.includes('4:5')) return '4:5';
+  if (s.includes('9:16') || s.includes('portrait')) return '9:16';
+  if (s.includes('16:9') || s.includes('landscape')) return '16:9';
+  if (s.includes('1:1') || s.includes('square')) return '1:1';
+  return '4:5';
+};
+
 /**
  * Hook pour s'abonner aux assets d'un order en temps réel
  * et gérer le fallback polling
@@ -75,7 +86,7 @@ export function useLibraryAssetsSubscription(orderId: string | null) {
 
     const { data, error } = await supabase
       .from('library_assets')
-      .select('id, cloudinary_url, slide_index, type')
+      .select('id, cloudinary_url, slide_index, type, format')
       .eq('order_id', orderId)
       .order('slide_index', { ascending: true });
 
@@ -85,12 +96,13 @@ export function useLibraryAssetsSubscription(orderId: string | null) {
     }
 
     if (data && data.length > 0) {
-      const mapped: LibraryAsset[] = data.map(row => ({
-        id: row.id,
-        url: row.cloudinary_url,
-        slideIndex: row.slide_index ?? 0,
-        type: row.type
-      }));
+    const mapped: LibraryAsset[] = data.map(row => ({
+      id: row.id,
+      url: row.cloudinary_url,
+      slideIndex: row.slide_index ?? 0,
+      type: row.type,
+      format: normalizeFormat(row.format ?? undefined)
+    }));
       setAssets(mapped);
       console.log('[LibraryAssets] Loaded existing assets:', mapped.length);
     }
@@ -125,12 +137,13 @@ export function useLibraryAssetsSubscription(orderId: string | null) {
           console.log('[LibraryAssets] New asset received:', payload.new);
 
           const newAsset = payload.new;
-          const newItem: LibraryAsset = {
-            id: newAsset.id,
-            url: newAsset.cloudinary_url,
-            slideIndex: newAsset.slide_index ?? 0,
-            type: newAsset.type
-          };
+        const newItem: LibraryAsset = {
+          id: newAsset.id,
+          url: newAsset.cloudinary_url,
+          slideIndex: newAsset.slide_index ?? 0,
+          type: newAsset.type,
+          format: normalizeFormat(newAsset.format ?? undefined)
+        };
 
           setAssets(prev => {
             // Déduplication
