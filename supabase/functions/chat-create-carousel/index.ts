@@ -147,7 +147,7 @@ serve(async (req) => {
       console.log('[CreateCarousel] Monthly counters incremented successfully');
     }
 
-    // 3) Créer le job_set
+    // 3) Créer le job_set avec l'aspectRatio
     const { data: set, error: setErr } = await adminClient
       .from("job_sets")
       .insert({
@@ -157,7 +157,9 @@ serve(async (req) => {
         total: count,
         status: "queued",
         master_seed: generateMasterSeed(),
-        constraints: {},
+        constraints: {
+          aspectRatio: aspectRatio || '9:16', // ✅ Stocker l'aspect ratio demandé
+        },
       })
       .select()
       .single();

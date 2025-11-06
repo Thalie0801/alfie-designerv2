@@ -511,7 +511,7 @@ async function processRenderCarousels(payload: any): Promise<any> {
       
       return {
         id: crypto.randomUUID(),
-        aspectRatio: '4:5', // Défaut Instagram
+        aspectRatio: payload.aspectRatio || '9:16', // ✅ Utiliser l'aspect ratio du payload
         textVersion: 1,
         slides: data.slides,
         prompts: data.prompts || [],
@@ -560,11 +560,22 @@ async function processRenderCarousels(payload: any): Promise<any> {
       try {
         console.log(`🎨 [processRenderCarousels] Generating slide ${i + 1}/${carousel.slides.length}`);
         
+        // ✅ Calculer la résolution selon l'aspect ratio
+        const aspectRatio = carousel.aspectRatio || '9:16';
+        const resolution = 
+          aspectRatio === '9:16' ? '1080x1920' :
+          aspectRatio === '16:9' ? '1920x1080' :
+          aspectRatio === '1:1' ? '1080x1080' :
+          aspectRatio === '4:5' ? '1080x1350' :
+          '1080x1920'; // Défaut portrait
+        
+        console.log(`🎨 [processRenderCarousels] Generating slide ${i + 1} with aspect ratio ${aspectRatio} (${resolution})`);
+        
         // Générer le background via alfie-generate-ai-image
         const { data: imgData, error: imgError } = await supabaseAdmin.functions.invoke('alfie-generate-ai-image', {
           body: {
             prompt: `${slidePrompt}. Style: ${carousel.style}. Brand: ${brand?.niche}. Colors: ${brand?.palette?.slice(0,3).join(', ')}`,
-            resolution: '1080x1350',
+            resolution,
             backgroundOnly: true,
             brandKit: brand ? { name: brand.name, palette: brand.palette, voice: brand.voice } : undefined
           }
@@ -646,7 +657,7 @@ async function processRenderCarousels(payload: any): Promise<any> {
             console.warn(`⚠️ Using background only for slide ${i + 1}`);
           }
 
-          // ✅ Sauvegarder dans library_assets avec URL composée
+          // ✅ Sauvegarder dans library_assets avec URL composée et format correct
           const { error: saveError } = await supabaseAdmin
             .from('library_assets')
             .insert({
@@ -659,7 +670,7 @@ async function processRenderCarousels(payload: any): Promise<any> {
               type: 'carousel_slide',
               cloudinary_url: finalUrl,
               text_json: slide,
-              format: '4:5',
+              format: aspectRatio, // ✅ Utiliser l'aspect ratio réel
               metadata: {
                 orderId: payload.orderId,
                 orderItemId: payload.orderItemId,
