@@ -452,9 +452,9 @@ export function AlfieChat() {
         <QueueStatus data={queueData} />
       ) : null}
       
-      {/* Order Results */}
+      {/* Order Results - compact et collapsible */}
       {orderId && (
-        <div className="px-4 pb-2">
+        <div className="px-4">
           <OrderResults 
             assets={orderAssets} 
             total={orderTotal} 
