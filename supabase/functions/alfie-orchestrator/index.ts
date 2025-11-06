@@ -565,6 +565,30 @@ serve(async (req) => {
       });
     }
 
+    // === 6. COMPLETED (permettre de recommencer) ===
+    if (state === 'completed') {
+      // Reset la session pour permettre une nouvelle génération
+      state = 'initial';
+      context = {};
+      
+      await sb
+        .from("alfie_conversation_sessions")
+        .update({ 
+          conversation_state: state,
+          context_json: context,
+          order_id: null
+        })
+        .eq("id", session.id);
+      
+      const welcomeQ = getNextQuestion('initial', context);
+      return json({
+        response: welcomeQ?.question || "Que veux-tu créer maintenant ?",
+        quickReplies: welcomeQ?.quickReplies || ['3 images', '2 carrousels', '1 image + 1 carrousel'],
+        conversationId: session.id,
+        state: 'initial'
+      });
+    }
+
     // Default fallback
     return json({
       response: "Je n'ai pas compris. Dis-moi ce que tu veux créer !",

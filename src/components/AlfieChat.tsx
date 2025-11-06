@@ -167,7 +167,28 @@ export function AlfieChat() {
         });
       }
     }
-  }, [orderAssets]);
+    
+    // ✅ DÉTECTION DE FIN DE GÉNÉRATION
+    if (conversationState === 'generating' && orderTotal > 0 && orderAssets.length >= orderTotal) {
+      console.log('[Chat] 🎉 Génération terminée !', { assets: orderAssets.length, total: orderTotal });
+      
+      setConversationState('completed');
+      
+      addMessage({
+        role: 'assistant',
+        content: `🎉 Génération terminée ! ${orderTotal} asset${orderTotal > 1 ? 's' : ''} créé${orderTotal > 1 ? 's' : ''}.\n\nQue veux-tu créer maintenant ?`,
+        type: 'text'
+      });
+      
+      setQuickReplies(['3 images', '2 carrousels', '1 image + 1 carrousel', 'Voir la bibliothèque']);
+      
+      // Reset pour permettre une nouvelle génération
+      setTimeout(() => {
+        setOrderId(null);
+        setConversationId(null);
+      }, 1000);
+    }
+  }, [orderAssets, orderTotal, conversationState]);
   
   // ======
   // REALTIME JOB MONITORING
