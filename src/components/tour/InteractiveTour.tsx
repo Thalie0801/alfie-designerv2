@@ -1,24 +1,24 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { X, ChevronLeft, ChevronRight, HelpCircle } from 'lucide-react';
-import { lsGet, lsSet, autoCompletedKey } from '@/utils/localStorage';
+import React, { createContext, useContext, useState, useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { X, ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
+import { lsGet, lsSet, autoCompletedKey } from "@/utils/localStorage";
 
-// ============= Types =============
-type Placement = 'top' | 'bottom' | 'left' | 'right' | 'center';
+/* ================= Types ================= */
+type Placement = "top" | "bottom" | "left" | "right" | "center";
 
 interface TourStep {
-  selector: string;
+  selector: string; // 'center' => bubble centrée
   title: string;
-  content: string;
+  content: string; // accepte du markdown simple **bold** + \n\n
   placement?: Placement;
 }
 
 interface TourOptions {
   userEmail?: string | null;
-  autoStart?: 'on-first-login' | 'always' | 'never';
+  autoStart?: "on-first-login" | "always" | "never";
   skipForAdmins?: boolean;
-  targets?: string[]; // selectors to wait for
+  targets?: string[]; // selectors à attendre si tu utilises un autostart externe
 }
 
 interface TourContextValue {
@@ -39,116 +39,141 @@ interface BubblePosition {
   placement: Placement;
 }
 
-// ============= Context =============
 const TourContext = createContext<TourContextValue | undefined>(undefined);
-
 export const useTour = () => {
   const ctx = useContext(TourContext);
-  if (!ctx) throw new Error('useTour must be used within TourProvider');
+  if (!ctx) throw new Error("useTour must be used within TourProvider");
   return ctx;
 };
 
-// ============= Platform Detection =============
-const isMobileDevice = (): boolean => {
-  if (typeof window === 'undefined') return false;
-  return window.matchMedia?.('(max-width: 767px)')?.matches ?? false;
-};
+/* ============== Utils ============== */
+const isMobileDevice = () =>
+  typeof window !== "undefined" && (window.matchMedia?.("(max-width: 767px)")?.matches ?? false);
 
-// ============= Tour Steps =============
+// markdown light : **bold** + \n\n => <br/><br/>
+function renderLiteMarkdown(md: string) {
+  const html = md.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\n{2,}/g, "<br/><br/>");
+  return { __html: html };
+}
+
+// Attente robuste de cibles (data-tour-id ET data-sidebar-id) + rAF polling
+const waitForTargets = (selectors: string[], maxWaitMs = 4000) =>
+  new Promise<boolean>((resolve) => {
+    const hasAll = () => selectors.every((sel) => sel === "center" || !!document.querySelector(sel));
+    if (hasAll()) return resolve(true);
+
+    let timeoutId: number | undefined;
+    let rafId: number | undefined;
+
+    const mo = new MutationObserver(() => {
+      if (hasAll()) done(true);
+    });
+
+    const done = (ok: boolean) => {
+      mo.disconnect();
+      if (timeoutId) clearTimeout(timeoutId);
+      if (rafId) cancelAnimationFrame(rafId);
+      resolve(ok);
+    };
+
+    // Observe largement (ajoute aussi data-sidebar-id)
+    mo.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-tour-id", "data-sidebar-id"],
+    });
+
+    const poll = () => {
+      if (hasAll()) return done(true);
+      rafId = requestAnimationFrame(poll);
+    };
+    rafId = requestAnimationFrame(poll);
+
+    timeoutId = window.setTimeout(() => done(false), maxWaitMs);
+  });
+
+/* ============== Steps par défaut (inchangés) ============== */
 const DEFAULT_STEPS: TourStep[] = [
   {
     selector: '[data-tour-id="nav-dashboard"]',
-    title: '🏠 Bienvenue sur votre Dashboard',
-    content: 'Voici votre espace central. Retrouvez ici toutes vos statistiques et actions rapides.',
-    placement: 'right',
+    title: "🏠 Bienvenue sur votre Dashboard",
+    content: "Voici votre espace central. Retrouvez ici toutes vos statistiques et actions rapides.",
+    placement: "right",
   },
   {
     selector: '[data-sidebar-id="chat"]',
-    title: '💬 Chat Alfie - Mode Exploration',
-    content: 'Discutez naturellement avec Alfie. Idéal pour explorer des idées, poser des questions et être guidé pas à pas. Uploadez des images pour créer des variations ou les transformer en vidéos.',
-    placement: 'right',
+    title: "💬 Chat Alfie - Mode Exploration",
+    content:
+      "Discutez naturellement avec Alfie. Idéal pour explorer des idées, poser des questions et être guidé pas à pas. Uploadez des images pour créer des variations ou les transformer en vidéos.",
+    placement: "right",
   },
   {
     selector: '[data-tour-id="btn-create"]',
-    title: '⚡ Créateur - Mode Expert',
-    content: 'Accès direct au générateur avec formulaire complet. Pour ceux qui savent exactement ce qu\'ils veulent créer et veulent contrôler tous les paramètres.',
-    placement: 'bottom',
+    title: "⚡ Créateur - Mode Expert",
+    content:
+      "Accès direct au générateur avec formulaire complet. Pour ceux qui savent exactement ce qu'ils veulent créer et veulent contrôler tous les paramètres.",
+    placement: "bottom",
   },
   {
-    selector: 'center',
-    title: '🎭 Deux modes pour deux usages',
-    content: '**Chat Alfie** : Pour explorer et être guidé avec une IA conversationnelle.\n\n**Créateur** : Pour produire rapidement avec contrôle total sur les paramètres.\n\nChoisissez selon votre besoin du moment !',
-    placement: 'center',
+    selector: "center",
+    title: "🎭 Deux modes pour deux usages",
+    content:
+      "**Chat Alfie** : Pour explorer et être guidé avec une IA conversationnelle.\n\n**Créateur** : Pour produire rapidement avec contrôle total sur les paramètres.\n\nChoisissez selon votre besoin du moment !",
+    placement: "center",
   },
   {
     selector: '[data-tour-id="quotas"]',
-    title: '📊 Vos quotas & Woofs',
-    content: 'Suivez vos images, vidéos et Woofs (crédits pour vidéos Premium Sora/Veo). Les compteurs se réinitialisent automatiquement le 1er de chaque mois. Les Woofs non utilisés ne sont pas reportés.',
-    placement: 'top',
+    title: "📊 Vos quotas & Woofs",
+    content:
+      "Suivez vos images, vidéos et Woofs (crédits pour vidéos Premium Sora/Veo). Les compteurs se réinitialisent automatiquement le 1er de chaque mois. Les Woofs non utilisés ne sont pas reportés.",
+    placement: "top",
   },
   {
     selector: '[data-tour-id="quick-actions"]',
-    title: '⚡ Actions rapides',
-    content: 'Accédez rapidement à vos actions les plus courantes.',
-    placement: 'top',
+    title: "⚡ Actions rapides",
+    content: "Accédez rapidement à vos actions les plus courantes.",
+    placement: "top",
   },
   {
     selector: '[data-tour-id="brand-kit"]',
-    title: '🎨 Brand Kit',
-    content: 'Gérez vos marques et personnalisez vos contenus avec votre identité visuelle.',
-    placement: 'bottom',
+    title: "🎨 Brand Kit",
+    content: "Gérez vos marques et personnalisez vos contenus avec votre identité visuelle.",
+    placement: "bottom",
   },
   {
     selector: '[data-tour-id="add-brand"]',
-    title: '➕ Ajouter une marque',
-    content: 'Créez une nouvelle marque pour organiser vos contenus.',
-    placement: 'left',
+    title: "➕ Ajouter une marque",
+    content: "Créez une nouvelle marque pour organiser vos contenus.",
+    placement: "left",
   },
   {
     selector: '[data-sidebar-id="library"]',
-    title: '📚 Bibliothèque',
-    content: 'Retrouvez tous vos contenus créés dans la bibliothèque.',
-    placement: 'right',
+    title: "📚 Bibliothèque",
+    content: "Retrouvez tous vos contenus créés dans la bibliothèque.",
+    placement: "right",
   },
   {
     selector: '[data-tour-id="news"]',
-    title: '📰 Actualités',
-    content: 'Restez informé des dernières nouveautés et mises à jour.',
-    placement: 'top',
+    title: "📰 Actualités",
+    content: "Restez informé des dernières nouveautés et mises à jour.",
+    placement: "top",
   },
   {
     selector: '[data-tour-id="suggest"]',
-    title: '💡 Suggestions',
-    content: 'Partagez vos idées pour améliorer la plateforme.',
-    placement: 'top',
+    title: "💡 Suggestions",
+    content: "Partagez vos idées pour améliorer la plateforme.",
+    placement: "top",
   },
   {
     selector: '[data-sidebar-id="affiliate"]',
-    title: '🤝 Programme d\'affiliation',
-    content: 'Parrainez vos amis et gagnez des récompenses.',
-    placement: 'right',
+    title: "🤝 Programme d'affiliation",
+    content: "Parrainez vos amis et gagnez des récompenses.",
+    placement: "right",
   },
 ];
 
-// Utility to wait for DOM targets to be ready
-const waitForTargets = (selectors: string[], maxWaitMs = 4000) => new Promise<boolean>((resolve) => {
-  const hasAll = () => selectors.every((sel) => !!document.querySelector(sel));
-  if (hasAll()) return resolve(true);
-  const mo = new MutationObserver(() => {
-    if (hasAll()) {
-      mo.disconnect();
-      if (timeoutId) clearTimeout(timeoutId);
-      resolve(true);
-    }
-  });
-  mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-tour-id'] });
-  const timeoutId = window.setTimeout(() => {
-    mo.disconnect();
-    resolve(false);
-  }, maxWaitMs);
-});
-
-// ============= Provider =============
+/* ============== Provider ============== */
 interface TourProviderProps {
   children: React.ReactNode;
   steps?: TourStep[];
@@ -162,60 +187,47 @@ export function TourProvider({ children, steps = DEFAULT_STEPS, options = {} }: 
   const wasActiveRef = useRef(false);
   const forceRef = useRef(false);
 
-  const { userEmail, autoStart = 'on-first-login' } = options;
+  const { userEmail, autoStart = "on-first-login" } = options;
 
-  // Mark tour as auto-completed when it becomes inactive after being active
+  // marque auto-complete quand on sort d'un état actif
   useEffect(() => {
     if (wasActiveRef.current && !isActive && userEmail) {
-      const key = autoCompletedKey(userEmail);
-      lsSet(key, '1');
-      console.debug('[Tour] Marked as auto-completed for', userEmail);
+      lsSet(autoCompletedKey(userEmail), "1");
+      console.debug("[Tour] Marked as auto-completed for", userEmail);
     }
     wasActiveRef.current = isActive;
   }, [isActive, userEmail]);
 
-  const start = useCallback((force: boolean = false) => {
-    forceRef.current = !!force;
-    
-    // Check if already auto-completed (unless force = true or autoStart = 'always')
-    if (!force && autoStart !== 'always' && userEmail) {
-      const key = autoCompletedKey(userEmail);
-      if (lsGet(key) === '1') {
-        console.debug('[Tour] Already auto-completed for', userEmail);
-        return;
+  const start = useCallback(
+    (force = false) => {
+      forceRef.current = !!force;
+      if (!force && autoStart !== "always" && userEmail) {
+        const done = lsGet(autoCompletedKey(userEmail)) === "1";
+        if (done) {
+          console.debug("[Tour] Already auto-completed for", userEmail);
+          return;
+        }
       }
-    }
-    setCurrentStep(0);
-    setIsActive(true);
-    console.debug('[Tour] Started', { force, userEmail });
-  }, [userEmail, autoStart]);
+      setCurrentStep(0);
+      setIsActive(true);
+      console.debug("[Tour] Started", { force, userEmail });
+    },
+    [userEmail, autoStart],
+  );
 
   const stop = useCallback(() => {
     setIsActive(false);
-    console.debug('[Tour] Stopped');
   }, []);
-
-  const next = useCallback(() => {
-    if (currentStep < steps.length - 1) {
-      setCurrentStep((prev) => prev + 1);
-    } else {
-      stop();
-    }
-  }, [currentStep, steps.length, stop]);
-
-  const prev = useCallback(() => {
-    if (currentStep > 0) {
-      setCurrentStep((prev) => prev - 1);
-    }
-  }, [currentStep]);
-
+  const next = useCallback(
+    () => setCurrentStep((s) => (s < steps.length - 1 ? s + 1 : (stop(), s))),
+    [steps.length, stop],
+  );
+  const prev = useCallback(() => setCurrentStep((s) => (s > 0 ? s - 1 : s)), []);
   const goTo = useCallback(
-    (step: number) => {
-      if (step >= 0 && step < steps.length) {
-        setCurrentStep(step);
-      }
+    (n: number) => {
+      if (n >= 0 && n < steps.length) setCurrentStep(n);
     },
-    [steps.length]
+    [steps.length],
   );
 
   const value: TourContextValue = {
@@ -234,9 +246,9 @@ export function TourProvider({ children, steps = DEFAULT_STEPS, options = {} }: 
     <TourContext.Provider value={value}>
       {children}
       {isActive && (
-        <TourBubble 
-          step={steps[currentStep]} 
-          currentStep={currentStep} 
+        <TourBubble
+          step={steps[currentStep]}
+          currentStep={currentStep}
           totalSteps={steps.length}
           onVisibilityChange={setBubbleVisible}
           forceCenter={forceRef.current}
@@ -246,20 +258,21 @@ export function TourProvider({ children, steps = DEFAULT_STEPS, options = {} }: 
   );
 }
 
-// ============= Arrow Component =============
+/* ============== Arrow ============== */
 const Arrow = ({ placement }: { placement: Placement }) => {
-  const arrowClasses = {
-    top: 'absolute left-1/2 -translate-x-1/2 -bottom-2 w-0 h-0 border-l-[12px] border-r-[12px] border-t-[12px] border-l-transparent border-r-transparent border-t-primary drop-shadow-lg',
-    bottom: 'absolute left-1/2 -translate-x-1/2 -top-2 w-0 h-0 border-l-[12px] border-r-[12px] border-b-[12px] border-l-transparent border-r-transparent border-b-primary drop-shadow-lg',
-    left: 'absolute top-1/2 -translate-y-1/2 -right-2 w-0 h-0 border-t-[12px] border-b-[12px] border-l-[12px] border-t-transparent border-b-transparent border-l-primary drop-shadow-lg',
-    right: 'absolute top-1/2 -translate-y-1/2 -left-2 w-0 h-0 border-t-[12px] border-b-[12px] border-r-[12px] border-t-transparent border-b-transparent border-r-primary drop-shadow-lg',
-    center: 'hidden',
+  const cls = {
+    top: "absolute left-1/2 -translate-x-1/2 -bottom-2 w-0 h-0 border-l-[12px] border-r-[12px] border-t-[12px] border-l-transparent border-r-transparent border-t-primary drop-shadow-lg",
+    bottom:
+      "absolute left-1/2 -translate-x-1/2 -top-2 w-0 h-0 border-l-[12px] border-r-[12px] border-b-[12px] border-l-transparent border-r-transparent border-b-primary drop-shadow-lg",
+    left: "absolute top-1/2 -translate-y-1/2 -right-2 w-0 h-0 border-t-[12px] border-b-[12px] border-l-[12px] border-t-transparent border-b-transparent border-l-primary drop-shadow-lg",
+    right:
+      "absolute top-1/2 -translate-y-1/2 -left-2 w-0 h-0 border-t-[12px] border-b-[12px] border-r-[12px] border-t-transparent border-b-transparent border-r-primary drop-shadow-lg",
+    center: "hidden",
   };
-
-  return <div className={arrowClasses[placement]} />;
+  return <div className={cls[placement]} />;
 };
 
-// ============= Tour Bubble Component =============
+/* ============== Bubble ============== */
 interface TourBubbleProps {
   step: TourStep;
   currentStep: number;
@@ -273,148 +286,143 @@ function TourBubble({ step, currentStep, totalSteps, onVisibilityChange, forceCe
   const [position, setPosition] = useState<BubblePosition | null>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>();
-
   const isMobile = isMobileDevice();
 
-  // Calculate bubble position
+  const getTarget = () => (step.selector === "center" ? null : document.querySelector(step.selector));
+
   const calculatePosition = useCallback(() => {
-    const target = document.querySelector(step.selector);
-    
-    // Always show bubble in center if target not found and forced restart
-    if (!target && forceCenter) {
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      
-      // Use fixed dimensions if bubbleRef not ready yet
-      const bubbleHeight = bubbleRef.current?.getBoundingClientRect().height || 300;
-      const bubbleWidth = bubbleRef.current?.getBoundingClientRect().width || (isMobile ? Math.min(320, viewportWidth * 0.9) : 380);
-      
-      setPosition({
-        top: (viewportHeight - bubbleHeight) / 2,
-        left: (viewportWidth - bubbleWidth) / 2,
-        placement: 'center' as const
-      });
+    const target = getTarget();
+
+    // center si force ou pas de cible
+    if (!target && (forceCenter || step.selector === "center")) {
+      const vw = window.innerWidth,
+        vh = window.innerHeight;
+      const br = bubbleRef.current?.getBoundingClientRect();
+      const bw = br?.width ?? (isMobile ? Math.min(320, vw * 0.9) : 380);
+      const bh = br?.height ?? 300;
+      setPosition({ top: (vh - bh) / 2, left: (vw - bw) / 2, placement: "center" });
       onVisibilityChange(true);
       return;
     }
-    
-    if (!target) {
-      setPosition(null);
-      onVisibilityChange(false);
-      return;
-    }
-    
-    if (!bubbleRef.current) {
+    if (!target || !bubbleRef.current) {
       setPosition(null);
       onVisibilityChange(false);
       return;
     }
 
-    const targetRect = target.getBoundingClientRect();
-    const bubbleRect = bubbleRef.current.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
+    const tr = (target as HTMLElement).getBoundingClientRect();
+    const br = bubbleRef.current.getBoundingClientRect();
+    const vw = window.innerWidth,
+      vh = window.innerHeight;
 
-    // Adaptive placement for mobile
-    let placement = step.placement || (isMobile ? 'bottom' : 'right');
-    const offset = isMobile ? 14 : 10;
-    const padding = 20;
-
-    let top = 0;
-    let left = 0;
+    let placement: Placement = step.placement || (isMobile ? "bottom" : "right");
+    const offset = isMobile ? 14 : 10,
+      pad = 20;
+    let top = 0,
+      left = 0;
 
     switch (placement) {
-      case 'top':
-        top = targetRect.top - bubbleRect.height - offset;
-        left = targetRect.left + targetRect.width / 2 - bubbleRect.width / 2;
+      case "top":
+        top = tr.top - br.height - offset;
+        left = tr.left + tr.width / 2 - br.width / 2;
         break;
-      case 'bottom':
-        top = targetRect.bottom + offset;
-        left = targetRect.left + targetRect.width / 2 - bubbleRect.width / 2;
+      case "bottom":
+        top = tr.bottom + offset;
+        left = tr.left + tr.width / 2 - br.width / 2;
         break;
-      case 'left':
-        top = targetRect.top + targetRect.height / 2 - bubbleRect.height / 2;
-        left = targetRect.left - bubbleRect.width - offset;
+      case "left":
+        top = tr.top + tr.height / 2 - br.height / 2;
+        left = tr.left - br.width - offset;
         break;
-      case 'right':
-        top = targetRect.top + targetRect.height / 2 - bubbleRect.height / 2;
-        left = targetRect.right + offset;
+      case "right":
+        top = tr.top + tr.height / 2 - br.height / 2;
+        left = tr.right + offset;
         break;
-      case 'center':
-        top = viewportHeight / 2 - bubbleRect.height / 2;
-        left = viewportWidth / 2 - bubbleRect.width / 2;
+      case "center":
+        top = vh / 2 - br.height / 2;
+        left = vw / 2 - br.width / 2;
         break;
     }
 
-    // Clamp to viewport with padding
-    top = Math.max(padding, Math.min(top, viewportHeight - bubbleRect.height - padding));
-    left = Math.max(padding, Math.min(left, viewportWidth - bubbleRect.width - padding));
+    // clamp viewport
+    top = Math.max(pad, Math.min(top, vh - br.height - pad));
+    left = Math.max(pad, Math.min(left, vw - br.width - pad));
 
     setPosition({ top, left, placement });
     onVisibilityChange(true);
   }, [step.selector, step.placement, isMobile, forceCenter, onVisibilityChange]);
 
-  // Update position on mount, scroll, resize using useLayoutEffect for immediate measurement
+  // focus, clavier, recalc
   useLayoutEffect(() => {
-    const updatePosition = () => {
+    const update = () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(calculatePosition);
     };
 
-    updatePosition();
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
 
-    window.addEventListener('scroll', updatePosition, { passive: true });
-    window.addEventListener('resize', updatePosition);
-
-    const target = document.querySelector(step.selector) as HTMLElement;
-    
-    // Add pulsing effect on target element
+    const target = getTarget() as HTMLElement | null;
     if (target) {
-      target.classList.add('tour-target-highlight');
-      target.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
+      target.classList.add("tour-target-highlight");
+      target.scrollIntoView({ behavior: "instant", block: "center", inline: "center" });
     }
 
-    const resizeObserver =
-      typeof ResizeObserver !== 'undefined'
-        ? new ResizeObserver(updatePosition)
-        : null;
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    if (target && ro) ro.observe(target);
 
-    if (target && resizeObserver) {
-      resizeObserver.observe(target);
-    }
+    // focus le dialog au mount
+    const to = setTimeout(() => bubbleRef.current?.focus(), 0);
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        stop();
+      } else if (e.key === "ArrowRight" || e.key === "Enter") {
+        e.preventDefault();
+        next();
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        prev();
+      }
+    };
+    window.addEventListener("keydown", onKey);
 
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      window.removeEventListener('scroll', updatePosition);
-      window.removeEventListener('resize', updatePosition);
-      resizeObserver?.disconnect();
-      // Remove pulsing effect from target element
-      target?.classList.remove('tour-target-highlight');
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+      window.removeEventListener("keydown", onKey);
+      ro?.disconnect();
+      clearTimeout(to);
+      target?.classList.remove("tour-target-highlight");
       onVisibilityChange(false);
     };
-  }, [step.selector, calculatePosition, onVisibilityChange]);
+  }, [calculatePosition, onVisibilityChange, next, prev, stop]);
 
   const maxWidth = isMobile ? Math.min(320, window.innerWidth * 0.9) : 380;
 
   return (
     <>
       {/* Overlay */}
-      <div 
-        className="fixed inset-0 bg-background/80 z-[9998]"
-        onClick={stop}
-      />
-      
-      {/* Bubble */}
+      <div className="fixed inset-0 bg-background/80 z-[9998]" onClick={stop} aria-hidden="true" />
+
+      {/* Dialog / Bubble */}
       <Card
         ref={bubbleRef}
-        className="fixed z-[9999] shadow-2xl border-2 border-primary/20 animate-in fade-in-0 zoom-in-95"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Aide interactive"
+        tabIndex={-1}
+        className="fixed z-[9999] shadow-2xl border-2 border-primary/20 animate-in fade-in-0 zoom-in-95 outline-none"
         style={{
-          top: `${position?.top ?? 0}px`,
-          left: `${position?.left ?? 0}px`,
+          top: `${position?.top ?? -9999}px`,
+          left: `${position?.left ?? -9999}px`,
           maxWidth: `${maxWidth}px`,
-          width: isMobile ? '90vw' : 'auto',
-          visibility: position ? 'visible' : 'hidden',
-          pointerEvents: position ? 'auto' : 'none',
+          width: isMobile ? "90vw" : "auto",
+          visibility: position ? "visible" : "hidden",
+          pointerEvents: position ? "auto" : "none",
         }}
       >
         {position && <Arrow placement={position.placement} />}
@@ -422,58 +430,47 @@ function TourBubble({ step, currentStep, totalSteps, onVisibilityChange, forceCe
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
             <h3 className="font-semibold text-lg leading-tight pr-2">{step.title}</h3>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={stop}
-              className="h-6 w-6 p-0 shrink-0"
-            >
+            <Button variant="ghost" size="sm" onClick={stop} className="h-6 w-6 p-0 shrink-0" aria-label="Fermer">
               <X className="h-4 w-4" />
             </Button>
           </div>
 
-          {/* Content */}
-          <p className="text-sm text-muted-foreground leading-relaxed">{step.content}</p>
+          {/* Content (markdown light) */}
+          <div
+            className="text-sm text-muted-foreground leading-relaxed"
+            dangerouslySetInnerHTML={renderLiteMarkdown(step.content)}
+          />
 
           {/* Footer */}
           <div className="flex items-center justify-between gap-3 pt-2">
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1" aria-label="Progression du tutoriel">
               {Array.from({ length: totalSteps }).map((_, idx) => (
                 <div
                   key={idx}
-                  className={`h-1.5 rounded-full transition-all ${
-                    idx === currentStep
-                      ? 'w-6 bg-primary'
-                      : 'w-1.5 bg-muted'
-                  }`}
+                  className={`h-1.5 rounded-full transition-all ${idx === currentStep ? "w-6 bg-primary" : "w-1.5 bg-muted"}`}
                 />
               ))}
             </div>
 
             <div className="flex items-center gap-2">
               {currentStep > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={prev}
-                  className="gap-1"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  {!isMobile && 'Précédent'}
+                <Button variant="ghost" size="sm" onClick={prev} className="gap-1" aria-label="Précédent">
+                  <ChevronLeft className="h-4 w-4" /> {!isMobile && "Précédent"}
                 </Button>
               )}
               <Button
                 size="sm"
                 onClick={next}
                 className="gap-1"
+                aria-label={currentStep < totalSteps - 1 ? "Suivant" : "Terminer"}
               >
                 {currentStep < totalSteps - 1 ? (
                   <>
-                    {!isMobile && 'Suivant'}
+                    <span className="hidden sm:inline">Suivant</span>
                     <ChevronRight className="h-4 w-4" />
                   </>
                 ) : (
-                  'Terminer'
+                  "Terminer"
                 )}
               </Button>
             </div>
@@ -484,34 +481,31 @@ function TourBubble({ step, currentStep, totalSteps, onVisibilityChange, forceCe
   );
 }
 
-// ============= Help Launcher =============
+/* ============== Help Launcher ============== */
 export function HelpLauncher() {
   const { start, isActive, bubbleVisible } = useTour();
 
-  const handleClick = async () => {
-    console.debug('[HelpLauncher] Clicked - waiting for tour targets');
-    
-    // Wait for all tour target elements to be ready
-    const selectors = DEFAULT_STEPS.map(s => s.selector);
+  const safeStart = useCallback(async () => {
+    const selectors = DEFAULT_STEPS.map((s) => s.selector);
+    const visible = document.visibilityState === "visible";
+    if (!visible) return;
+
     const ready = await waitForTargets(selectors, 2000);
-    
-    if (ready) {
-      console.debug('[HelpLauncher] All targets ready, starting tour');
-      start(true); // Force restart even if tour was previously completed
-    } else {
-      console.warn('[HelpLauncher] Some targets not found, starting anyway');
-      start(true);
-    }
-  };
+    if (!ready) console.warn("[HelpLauncher] Some targets missing, starting anyway");
+    start(true);
+  }, [start]);
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") safeStart();
+    };
+    return () => {
+      /* noop cleanup placeholder if you add listeners */
+    };
+  }, [safeStart]);
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={handleClick}
-      disabled={isActive && bubbleVisible}
-      className="gap-2"
-    >
+    <Button variant="outline" size="sm" onClick={safeStart} disabled={isActive && bubbleVisible} className="gap-2">
       <HelpCircle className="h-4 w-4" />
       <span className="hidden sm:inline">Aide</span>
     </Button>
