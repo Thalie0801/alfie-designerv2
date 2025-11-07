@@ -16,7 +16,7 @@ export interface SlideUrlOptions {
   width?: number;
   height?: number;
   aspectRatio?: string; // e.g., "9:16", "16:9", "1:1"
-  cloudName?: string; // Explicit cloudName override
+  cloudName: string; // REQUIRED - must be extracted by caller
   baseUrlForCloudGuess?: string; // URL to extract cloudName from if not provided
 }
 
@@ -24,7 +24,7 @@ export interface SlideUrlOptions {
  * Generate a Cloudinary URL for a carousel slide with text overlays
  * Uses @cloudinary/url-gen SDK for proper transformation handling
  */
-export function slideUrl(publicId: string, options: SlideUrlOptions = {}): string {
+export function slideUrl(publicId: string, options: SlideUrlOptions = { cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dkad5vdyo' }): string {
   // ✅ Validation : rejeter si c'est une URL complète
   if (publicId.startsWith('http://') || publicId.startsWith('https://')) {
     // Tenter d'extraire le publicId depuis l'URL

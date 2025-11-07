@@ -690,24 +690,28 @@ export function AlfieChat() {
                         const aspectClass = getAspectClass(item.format || '4:5');
                         
                         const imageUrl = (() => {
-                          // Regenerate with overlays if we have publicId + text
                           if (item.publicId && item.text) {
-                            const cloudName = extractCloudNameFromUrl(item.url);
-                            return slideUrl(item.publicId, {
-                              title: item.text.title,
-                              subtitle: item.text.subtitle,
-                              bulletPoints: item.text.bullets,
-                              aspectRatio: item.format || '4:5',
-                              cloudName,
-                              baseUrlForCloudGuess: item.url,
-                            });
+                            const cloudName = 
+                              extractCloudNameFromUrl(item.url) ||
+                              (import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined);
+                            
+                            if (!cloudName) return item.url ?? '/placeholder.svg';
+                            
+                            try {
+                              return slideUrl(item.publicId, {
+                                title: item.text.title,
+                                subtitle: item.text.subtitle,
+                                bulletPoints: item.text.bullets,
+                                aspectRatio: item.format || '4:5',
+                                cloudName,
+                                baseUrlForCloudGuess: item.url,
+                              });
+                            } catch {
+                              return item.url ?? '/placeholder.svg';
+                            }
                           }
                           
-                          // Use URL directly if it's complete
-                          if (item.url?.startsWith('https://')) {
-                            return item.url;
-                          }
-                          
+                          if (item.url?.startsWith('https://')) return item.url;
                           return '/placeholder.svg';
                         })();
 
@@ -760,15 +764,26 @@ export function AlfieChat() {
                             src={(() => {
                               const firstSlide = carousel.slides[0];
                               if (firstSlide.cloudinary_public_id && firstSlide.text_json) {
-                                const cloudName = extractCloudNameFromUrl(firstSlide.cloudinary_url);
-                                return slideUrl(firstSlide.cloudinary_public_id, {
-                                  title: firstSlide.text_json.title,
-                                  subtitle: firstSlide.text_json.subtitle,
-                                  bulletPoints: firstSlide.text_json.bullets,
-                                  aspectRatio: firstSlide.format || '4:5',
-                                  cloudName,
-                                  baseUrlForCloudGuess: firstSlide.cloudinary_url,
-                                });
+                                const cloudName = 
+                                  extractCloudNameFromUrl(firstSlide.cloudinary_url) ||
+                                  (import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined);
+                                
+                                if (!cloudName) {
+                                  return firstSlide.cloudinary_url || firstSlide.storage_url;
+                                }
+                                
+                                try {
+                                  return slideUrl(firstSlide.cloudinary_public_id, {
+                                    title: firstSlide.text_json.title,
+                                    subtitle: firstSlide.text_json.subtitle,
+                                    bulletPoints: firstSlide.text_json.bullets,
+                                    aspectRatio: firstSlide.format || '4:5',
+                                    cloudName,
+                                    baseUrlForCloudGuess: firstSlide.cloudinary_url,
+                                  });
+                                } catch {
+                                  return firstSlide.cloudinary_url || firstSlide.storage_url;
+                                }
                               }
                               return firstSlide.cloudinary_url || firstSlide.storage_url;
                             })()}
@@ -791,15 +806,26 @@ export function AlfieChat() {
                           
                           const thumbUrl = (() => {
                             if (slide.cloudinary_public_id && slide.text_json) {
-                              const cloudName = extractCloudNameFromUrl(slide.cloudinary_url);
-                              return slideUrl(slide.cloudinary_public_id, {
-                                title: slide.text_json.title,
-                                subtitle: slide.text_json.subtitle,
-                                bulletPoints: slide.text_json.bullets,
-                                aspectRatio: slide.format || '4:5',
-                                cloudName,
-                                baseUrlForCloudGuess: slide.cloudinary_url,
-                              });
+                              const cloudName = 
+                                extractCloudNameFromUrl(slide.cloudinary_url) ||
+                                (import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined);
+                              
+                              if (!cloudName) {
+                                return slide.cloudinary_url || slide.storage_url;
+                              }
+                              
+                              try {
+                                return slideUrl(slide.cloudinary_public_id, {
+                                  title: slide.text_json.title,
+                                  subtitle: slide.text_json.subtitle,
+                                  bulletPoints: slide.text_json.bullets,
+                                  aspectRatio: slide.format || '4:5',
+                                  cloudName,
+                                  baseUrlForCloudGuess: slide.cloudinary_url,
+                                });
+                              } catch {
+                                return slide.cloudinary_url || slide.storage_url;
+                              }
                             }
                             return slide.cloudinary_url || slide.storage_url;
                           })();

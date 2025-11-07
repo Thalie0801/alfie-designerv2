@@ -68,7 +68,13 @@ export function CarouselBuilder({ brandId, campaignId, onSlideCreated }: Carouse
       toast.success('Background uploaded successfully!');
       
       if (onSlideCreated) {
-        const url = slideUrl(result.public_id, { title, subtitle, bulletPoints: bullets.filter(b => b) });
+        const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string || 'dkad5vdyo';
+        const url = slideUrl(result.public_id, { 
+          title, 
+          subtitle, 
+          bulletPoints: bullets.filter(b => b),
+          cloudName
+        });
         onSlideCreated(result.public_id, url);
       }
     } catch (error: any) {
@@ -93,6 +99,7 @@ export function CarouselBuilder({ brandId, campaignId, onSlideCreated }: Carouse
         width: 1080,
         height: 1920,
         aspectRatio: '9:16',
+        cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string || 'dkad5vdyo',
       })
     : null;
 

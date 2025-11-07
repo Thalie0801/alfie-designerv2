@@ -10,6 +10,13 @@ import { toast } from 'sonner';
 import { slideUrl } from '@/lib/cloudinary/imageUrls';
 import { extractCloudNameFromUrl } from '@/lib/cloudinary/utils';
 
+function resolveCloudName(slide: CarouselSlide): string | undefined {
+  const fromUrl = extractCloudNameFromUrl(slide.cloudinary_url);
+  const fromMeta = extractCloudNameFromUrl(slide.metadata?.cloudinary_base_url);
+  const fromEnv = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined;
+  return fromUrl || fromMeta || fromEnv;
+}
+
 interface CarouselSlide {
   id: string;
   cloudinary_url: string;
@@ -214,25 +221,34 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                   <div key={slide.id} className="relative group">
                     <img
                       src={(() => {
-                        // Regenerate with overlays if we have publicId + text
-                        if (slide.cloudinary_public_id && slide.text_json) {
-                          const cloudName = extractCloudNameFromUrl(slide.cloudinary_url);
+                        const base = slide.cloudinary_url ?? '';
+                        
+                        // Need all 3 conditions
+                        if (!slide.cloudinary_public_id || !slide.text_json) return base;
+                        
+                        const cloudName = resolveCloudName(slide);
+                        if (!cloudName) {
+                          console.warn('[CarouselsTab] No cloudName found, fallback to base URL');
+                          return base;
+                        }
+                        
+                        try {
                           return slideUrl(slide.cloudinary_public_id, {
                             title: slide.text_json.title,
                             subtitle: slide.text_json.subtitle,
                             bulletPoints: slide.text_json.bullets || [],
                             aspectRatio: slide.format || '4:5',
                             cloudName,
-                            baseUrlForCloudGuess: slide.cloudinary_url,
+                            baseUrlForCloudGuess: base || slide.metadata?.cloudinary_base_url,
                           });
+                        } catch (e) {
+                          console.warn('[CarouselsTab] Overlay generation failed:', e);
+                          return base;
                         }
-                        // Otherwise use base URL
-                        return slide.cloudinary_url;
                       })()}
                       alt={`Slide ${(slide.slide_index ?? 0) + 1}`}
                       className={`w-full rounded-lg ${aspectClass} object-cover border`}
                       onError={(e) => {
-                        // Simple fallback: use base URL without overlays
                         if (slide.cloudinary_url?.startsWith('https://')) {
                           e.currentTarget.src = slide.cloudinary_url;
                         }

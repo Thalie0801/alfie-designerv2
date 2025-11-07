@@ -100,7 +100,8 @@ export function testImageUrlGeneration(): TestResult {
       bulletPoints: ['Point 1', 'Point 2'],
       width: 1080,
       height: 1920,
-      aspectRatio: '9:16'
+      aspectRatio: '9:16',
+      cloudName: 'dkad5vdyo'
     });
     const duration = Date.now() - start;
     
@@ -185,7 +186,8 @@ export function testNamingConvention(): TestResult {
     
     const url = slideUrl(fullPath, {
       title: 'Test',
-      aspectRatio: '9:16'
+      aspectRatio: '9:16',
+      cloudName: 'dkad5vdyo'
     });
     const duration = Date.now() - start;
     
