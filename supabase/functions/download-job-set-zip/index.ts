@@ -97,7 +97,7 @@ function buildOverlayUrl(slide: any): string | null {
     format === '1:1' ? { w: 1080, h: 1080 } :
     { w: 1080, h: 1350 }; // 4:5
   
-  const baseTransform = `w_${dims.w},h_${dims.h},c_fill,r_20,f_png`;
+  const baseTransform = `w_${dims.w},h_${dims.h},c_fill,f_png`;
   
   const overlays: string[] = [];
   
