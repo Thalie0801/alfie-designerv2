@@ -313,9 +313,15 @@ async function processRenderImage(payload: any) {
     throw new Error("Invalid render_image payload");
   }
 
-  const { data, error } = await supabaseAdmin.functions.invoke("alfie-render-image", {
-    body: { prompt, brand_id: brandId, sourceUrl },
+  const resp = await callFn<any>("alfie-render-image", {
+    prompt,
+    brand_id: brandId,
+    sourceUrl,
+    userId,
+    orderId,
   });
+  const data = resp as any;
+  const error = data && data.error ? { message: data.error } : null;
 
   if (error || (data as any)?.error) {
     const message = (data as any)?.error || error?.message || "render_image_failed";
@@ -555,9 +561,15 @@ async function processRenderCarousels(payload: any) {
       throw new Error("Invalid render_carousels payload");
     }
 
-    const { data, error } = await supabaseAdmin.functions.invoke("alfie-render-carousel", {
-      body: { brandId, orderId, slides: payload.slides, sourceUrl: payload?.sourceUrl ?? null },
+    const resp = await callFn<any>("alfie-render-carousel", {
+      brandId,
+      orderId,
+      slides: payload.slides,
+      sourceUrl: payload?.sourceUrl ?? null,
+      userId,
     });
+    const data = resp as any;
+    const error = data && data.error ? { message: data.error } : null;
     if (error || (data as any)?.error) {
       const message = (data as any)?.error || error?.message || "render_carousel_failed";
       throw new Error(message);
