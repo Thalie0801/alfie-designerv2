@@ -128,3 +128,14 @@ export function PlanGlobalsEditor({
               <SelectContent>
                 {LOCALES.map((locale) => (
                   <SelectItem key={locale.value} value={locale.value}>
+                    {locale.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
