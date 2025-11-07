@@ -15,6 +15,27 @@ function extractCloudName(url?: string): string | undefined {
   return match?.[1];
 }
 
+/**
+ * Dérive le public_id depuis une URL Cloudinary complète
+ * Exemple: https://res.cloudinary.com/dcuvvilto/image/upload/v1762505257/alfie/abc123.png
+ * → public_id = alfie/abc123
+ */
+function derivePublicIdFromUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  
+  // Pattern: /upload/[v1234567890/]path/to/file.ext
+  const match = url.match(/\/upload\/(?:v\d+\/)?(.*?)(?:\.\w+)?$/i);
+  if (!match) return undefined;
+  
+  let derivedId = match[1];
+  
+  // Enlever l'extension si présente
+  derivedId = derivedId.replace(/\.(png|jpg|jpeg|gif|webp)$/i, '');
+  
+  console.log(`[derivePublicId] Derived '${derivedId}' from URL: ${url.substring(0, 100)}...`);
+  return derivedId;
+}
+
 function cleanText(text: string, maxLen = 220): string {
   let cleaned = text.replace(/[\u0000-\u001F\u007F\u00A0\uFEFF]/g, '');
   // Remove emojis
@@ -32,7 +53,23 @@ function encodeCloudinaryText(text: string): string {
 
 function buildOverlayUrl(slide: any): string | null {
   const cloudName = extractCloudName(slide.cloudinary_url);
-  if (!cloudName || !slide.cloudinary_public_id || !slide.text_json) {
+  if (!cloudName) {
+    console.warn(`[buildOverlay] Missing cloudName for slide ${slide.id}`);
+    return null;
+  }
+  
+  // Tenter d'obtenir public_id depuis la colonne ou dériver depuis l'URL
+  let publicId = slide.cloudinary_public_id;
+  if (!publicId || publicId.trim() === '') {
+    publicId = derivePublicIdFromUrl(slide.cloudinary_url);
+    if (!publicId) {
+      console.warn(`[buildOverlay] Could not derive public_id from URL for slide ${slide.id}`);
+      return null;
+    }
+  }
+  
+  if (!slide.text_json) {
+    console.warn(`[buildOverlay] Missing text_json for slide ${slide.id}`);
     return null;
   }
 
@@ -40,7 +77,10 @@ function buildOverlayUrl(slide: any): string | null {
   const cleanTitle = cleanText(title || '', 120);
   const cleanSubtitle = cleanText(subtitle || '', 220);
   
-  if (!cleanTitle) return null;
+  if (!cleanTitle || cleanTitle.trim() === '') {
+    console.warn(`[buildOverlay] Empty title after cleaning for slide ${slide.id}`);
+    return null;
+  }
   
   const format = slide.format || '4:5';
   const dimensions = 
@@ -53,11 +93,13 @@ function buildOverlayUrl(slide: any): string | null {
   
   let overlays = `l_text:Arial_72_bold:${encodeCloudinaryText(cleanTitle)},co_rgb:FFFFFF,g_north,y_200`;
   
-  if (cleanSubtitle) {
+  if (cleanSubtitle && cleanSubtitle.trim() !== '') {
     overlays += `/l_text:Arial_48_normal:${encodeCloudinaryText(cleanSubtitle)},co_rgb:E5E7EB,g_center`;
   }
 
-  return `https://res.cloudinary.com/${cloudName}/image/upload/${baseTransform}/${overlays}/${slide.cloudinary_public_id}`;
+  const finalUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${baseTransform}/${overlays}/${publicId}`;
+  console.log(`[buildOverlay] ✅ Built overlay URL for slide ${slide.id} (${format})`);
+  return finalUrl;
 }
 
 serve(async (req) => {
