@@ -1,6 +1,12 @@
 import { edgeHandler } from "../_shared/edgeHandler.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
+/* ===============================
+   Types
+================================= */
+type Placement = "top" | "center" | "bottom";
+type ContrastMode = "light" | "dark" | "auto";
+
 interface TextOverlayInput {
   imageUrl: string; // URL distante ou dataURL base64
   overlayText: string; // lignes séparées par \n (1ère = titre, reste = sous-titre)
@@ -8,15 +14,22 @@ interface TextOverlayInput {
   slideIndex?: number;
   totalSlides?: number;
   slideNumber?: string; // ex: "1/5"
-  textContrast?: "light" | "dark"; // force clair/foncé
+  textContrast?: ContrastMode; // "light" | "dark" | "auto"
   isLastSlide?: boolean; // ajoute "Swipe →" en bas
-  textPosition?: "top" | "center" | "bottom";
+  textPosition?: Placement;
   fontSize?: number; // taille de base du titre (par défaut 56)
+  fontFamily?: string; // ex "Arial" (fallback si non fourni)
 }
 
-/** Build Cloudinary signature (`string_to_sign`) */
+/* ===============================
+   Helpers Cloudinary
+================================= */
+
+/** Build Cloudinary signature (`string_to_sign`)
+ * IMPORTANT: n'inclure que les paramètres Cloudinary supportés pour la signature,
+ * triés alphabétiquement, et surtout NE PAS inclure "file", "api_key", "signature".
+ */
 function buildCloudinarySignature(params: Record<string, string | number | undefined>, apiSecret: string) {
-  // Cloudinary: tri alphabétique, exclure undefined/empty, concat "key=value" via "&", puis SHA-1 + api_secret
   const filtered = Object.entries(params)
     .filter(([_, v]) => v !== undefined && v !== null && v !== "")
     .sort(([a], [b]) => a.localeCompare(b));
@@ -32,10 +45,79 @@ function hexFromBuffer(buf: ArrayBuffer) {
 
 /** Encode texte pour l’overlay Cloudinary */
 function encodeText(t: string) {
-  // Cloudinary attend un encodage URL strict (y compris espaces, ponctuation)
+  // Cloudinary attend un encodage URL strict (espaces inclus)
   return encodeURIComponent(t).replace(/%20/g, "%20");
 }
 
+/* ===============================
+   Helpers génériques
+================================= */
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function fetchWithRetry(url: string, init: RequestInit, retries = 2) {
+  let lastErr: any;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const res = await fetch(url, init);
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new Error(`HTTP ${res.status} ${body}`);
+      }
+      return res;
+    } catch (e) {
+      lastErr = e;
+      if (i < retries) await sleep(300 * (i + 1));
+    }
+  }
+  throw lastErr;
+}
+
+// moyenne approx à partir d'une couleur dominante [r,g,b]
+function luminance(rgb: [number, number, number]) {
+  const [r, g, b] = rgb.map((v) => {
+    const n = v / 255;
+    return n <= 0.03928 ? n / 12.92 : Math.pow((n + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b; // WCAG
+}
+
+function clampText(s: string, max = 400) {
+  const trimmed = s.trim().replace(/\s+/g, " ");
+  return trimmed.length > max ? trimmed.slice(0, max - 1) + "…" : trimmed;
+}
+
+/* ===============================
+   Cloudinary Admin: Auto-contrast
+================================= */
+async function resolveAutoContrast(
+  cloud: string,
+  apiKey: string,
+  apiSecret: string,
+  publicId: string,
+): Promise<"light" | "dark"> {
+  const endpoint = `https://api.cloudinary.com/v1_1/${cloud}/resources/image/upload?colors=true&public_ids[]=${encodeURIComponent(
+    publicId,
+  )}`;
+  const auth = "Basic " + btoa(`${apiKey}:${apiSecret}`);
+  const res = await fetchWithRetry(endpoint, { headers: { Authorization: auth } }, 1);
+  const json = await res.json();
+
+  const hex = json?.resources?.[0]?.colors?.[0]?.[0] as string | undefined;
+  if (!hex || !/^#?[0-9a-f]{6}$/i.test(hex)) return "dark";
+  const clean = hex.startsWith("#") ? hex.slice(1) : hex;
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  const L = luminance([r, g, b] as any);
+  // luminance élevée => fond clair => texte foncé
+  return L > 0.5 ? "dark" : "light";
+}
+
+/* ===============================
+   Handler principal
+================================= */
 export default {
   async fetch(req: Request) {
     return edgeHandler(req, async ({ jwt, input }) => {
@@ -52,6 +134,7 @@ export default {
         isLastSlide = false,
         textPosition = "center",
         fontSize = 56,
+        fontFamily,
       } = input as TextOverlayInput;
 
       if (!imageUrl || !overlayText) {
@@ -75,35 +158,6 @@ export default {
       if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
         throw new Error("CLOUDINARY_NOT_CONFIGURED");
       }
-
-      // Couleur texte selon contraste
-      const textColor = textContrast === "light" ? "FFFFFF" : "000000";
-      const strokeColor = textContrast === "light" ? "000000" : "FFFFFF";
-
-      // Parsing titre / sous-titre
-      const lines = overlayText
-        .split("\n")
-        .map((l) => l.trim())
-        .filter(Boolean);
-      const title = lines[0] || "";
-      const subtitle = lines.slice(1).join(" ") || "";
-
-      // Positionnement vertical: on y décale l’overlay "g_center" avec y négatif/positif
-      // (on reste simple et fiable sans dépendre de w/h au runtime)
-      const pos = (() => {
-        switch (textPosition) {
-          case "top":
-            return { titleY: -250, subtitleY: -120, swipeY: 140 };
-          case "bottom":
-            return { titleY: 0, subtitleY: 120, swipeY: 160 };
-          default:
-            return { titleY: -100, subtitleY: 50, swipeY: 140 };
-        }
-      })();
-
-      // Tailles cohérentes
-      const titleSize = Math.max(24, Math.min(120, Math.round(fontSize)));
-      const subtitleSize = Math.max(18, Math.min(90, Math.round(fontSize * 0.65)));
 
       // Dossier / public_id déterministes
       const folder = brand_id ? `alfie/${brand_id}/overlays` : `alfie/overlays`;
@@ -159,28 +213,74 @@ export default {
         if (context) uploadFormData.append("context", context);
         uploadFormData.append("signature", signatureHex);
 
-        const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
-          method: "POST",
-          body: uploadFormData,
-        });
+        const uploadRes = await fetchWithRetry(
+          `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+          { method: "POST", body: uploadFormData },
+          2,
+        );
 
-        if (!uploadRes.ok) {
-          const txt = await uploadRes.text().catch(() => "");
-          throw new Error(`Cloudinary upload failed: ${uploadRes.status} ${txt}`);
-        }
         const uploadJson = await uploadRes.json();
         const publicId: string = uploadJson.public_id;
-        // console.log('[Text Overlay] Uploaded:', publicId);
 
-        // 2) Construire les overlays textes
+        // 2) Déterminer contraste si "auto"
+        let finalContrast: "light" | "dark";
+        if (textContrast === "auto") {
+          try {
+            const auto = await resolveAutoContrast(
+              CLOUDINARY_CLOUD_NAME,
+              CLOUDINARY_API_KEY,
+              CLOUDINARY_API_SECRET,
+              publicId,
+            );
+            finalContrast = auto;
+          } catch {
+            finalContrast = "dark";
+          }
+        } else {
+          finalContrast = textContrast === "light" ? "light" : "dark";
+        }
+
+        // Couleurs
+        const textColor = finalContrast === "light" ? "FFFFFF" : "000000";
+        const strokeColor = finalContrast === "light" ? "000000" : "FFFFFF";
+
+        // Parsing + garde-fou longueur (évite URL trop longues)
+        const lines = overlayText
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(Boolean);
+
+        const rawTitle = lines[0] || "";
+        const rawSubtitle = lines.slice(1).join(" ") || "";
+
+        const title = clampText(rawTitle, 200);
+        const subtitle = clampText(rawSubtitle, 400);
+
+        // Positionnement
+        const pos = (() => {
+          switch (textPosition) {
+            case "top":
+              return { titleY: -250, subtitleY: -120, swipeY: 140 };
+            case "bottom":
+              return { titleY: 0, subtitleY: 120, swipeY: 160 };
+            default:
+              return { titleY: -100, subtitleY: 50, swipeY: 140 };
+          }
+        })();
+
+        // Tailles cohérentes
+        const titleSize = Math.max(24, Math.min(120, Math.round(fontSize)));
+        const subtitleSize = Math.max(18, Math.min(90, Math.round(fontSize * 0.65)));
+        const family = (fontFamily || "Arial").replace(/[^-a-zA-Z0-9_]/g, "");
+
+        // 3) Overlays
         const overlays: string[] = [];
 
-        // Slide number (coin sup droit)
         if (slideNumber) {
           const encodedNumber = encodeText(slideNumber);
           overlays.push(
             [
-              `l_text:Arial_40_bold:${encodedNumber}`,
+              `l_text:${family}_40_bold:${encodedNumber}`,
               `co_rgb:${textColor}`,
               `g_north_east`,
               `x_60`,
@@ -192,12 +292,11 @@ export default {
           );
         }
 
-        // Titre (centré, wrapping à w=900)
         if (title) {
           const encodedTitle = encodeText(title);
           overlays.push(
             [
-              `l_text:Arial_${titleSize}_bold:${encodedTitle}`,
+              `l_text:${family}_${titleSize}_bold:${encodedTitle}`,
               `co_rgb:${textColor}`,
               `g_center`,
               `y_${pos.titleY}`,
@@ -210,12 +309,11 @@ export default {
           );
         }
 
-        // Sous-titre (centré, sous le titre, w plus large)
         if (subtitle) {
           const encodedSubtitle = encodeText(subtitle);
           overlays.push(
             [
-              `l_text:Arial_${subtitleSize}:${encodedSubtitle}`,
+              `l_text:${family}_${subtitleSize}:${encodedSubtitle}`,
               `co_rgb:${textColor}`,
               `g_center`,
               `y_${pos.subtitleY}`,
@@ -228,12 +326,11 @@ export default {
           );
         }
 
-        // Dernière slide → "Swipe →" en bas
         if (isLastSlide) {
           const swipeText = encodeText("Swipe →");
           overlays.push(
             [
-              `l_text:Arial_48_bold:${swipeText}`,
+              `l_text:${family}_48_bold:${swipeText}`,
               `co_rgb:${textColor}`,
               `g_south`,
               `y_${pos.swipeY}`,
@@ -245,8 +342,12 @@ export default {
         }
 
         const textOverlays = overlays.join("/");
-        // Sortie en PNG + sRGB + qualité auto
-        const finalUrl = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/f_png,q_auto:good,cs_srgb/${textOverlays}/${publicId}.png`;
+
+        // + Améliorations d'affichage (strip metadata, sRGB, auto DPR)
+        const finalUrl =
+          `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/` +
+          `f_png,fl_force_strip,q_auto:good,cs_srgb,dpr_auto/` +
+          `${textOverlays}/${publicId}.png`;
 
         return {
           image_url: finalUrl,
@@ -261,6 +362,8 @@ export default {
             textColor: `#${textColor}`,
             strokeColor: `#${strokeColor}`,
             position: textPosition,
+            contrastMode: finalContrast,
+            fontFamily: family,
           },
         };
       } catch (error: any) {
