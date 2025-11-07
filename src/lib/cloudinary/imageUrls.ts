@@ -5,7 +5,7 @@ import { text } from '@cloudinary/url-gen/qualifiers/source';
 import { TextStyle } from '@cloudinary/url-gen/qualifiers/textStyle';
 import { Position } from '@cloudinary/url-gen/qualifiers/position';
 import { compass } from '@cloudinary/url-gen/qualifiers/gravity';
-import { max } from '@cloudinary/url-gen/actions/roundCorners';
+import { byRadius } from '@cloudinary/url-gen/actions/roundCorners';
 import { extractCloudNameFromUrl, cleanText } from './utils';
 
 export interface SlideUrlOptions {
@@ -18,6 +18,43 @@ export interface SlideUrlOptions {
   aspectRatio?: string; // e.g., "9:16", "16:9", "1:1"
   cloudName: string; // REQUIRED - must be extracted by caller
   baseUrlForCloudGuess?: string; // URL to extract cloudName from if not provided
+}
+
+/**
+ * Retourne les tailles et positions de texte adaptées au format
+ */
+function getTextSizes(aspectRatio: string) {
+  switch (aspectRatio) {
+    case '9:16': // Portrait Stories/Reels
+      return {
+        title: { size: 80, offsetY: 300 },
+        subtitle: { size: 52, offsetY: 50 },
+        bullet: { size: 44, offsetY: -350, spacing: 110 },
+        cta: { size: 60, offsetY: 250 }
+      };
+    case '16:9': // Paysage YouTube
+      return {
+        title: { size: 64, offsetY: 150 },
+        subtitle: { size: 42, offsetY: 0 },
+        bullet: { size: 36, offsetY: -250, spacing: 90 },
+        cta: { size: 50, offsetY: 180 }
+      };
+    case '1:1': // Carré Instagram
+      return {
+        title: { size: 70, offsetY: 180 },
+        subtitle: { size: 46, offsetY: 0 },
+        bullet: { size: 38, offsetY: -280, spacing: 95 },
+        cta: { size: 54, offsetY: 200 }
+      };
+    case '4:5': // Portrait classique
+    default:
+      return {
+        title: { size: 72, offsetY: 200 },
+        subtitle: { size: 48, offsetY: 0 },
+        bullet: { size: 40, offsetY: -300, spacing: 100 },
+        cta: { size: 56, offsetY: 200 }
+      };
+  }
 }
 
 /**
@@ -64,6 +101,9 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = { cloudNam
   const cleanBullets = bulletPoints.map(b => cleanText(b, 80)).slice(0, 6);
   const cleanCta = cleanText(cta, 60);
 
+  // Get text sizes adapted to format
+  const sizes = getTextSizes(aspectRatio);
+
   // Start with base image
   let img = cld.image(publicId);
 
@@ -82,12 +122,12 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = { cloudNam
     img = img.resize(fill().width(ratio.w).height(ratio.h));
   }
 
-  // Add rounded corners for modern look
-  img = img.roundCorners(max());
+  // Add subtle rounded corners for modern look (20px radius instead of max to avoid oval effect)
+  img = img.roundCorners(byRadius(20));
 
   // Add title overlay if provided
   if (cleanTitle) {
-    const titleStyle = new TextStyle('Arial', 72)
+    const titleStyle = new TextStyle('Arial', sizes.title.size)
       .fontWeight('bold')
       .textAlignment('center');
 
@@ -96,14 +136,14 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = { cloudNam
         text(cleanTitle, titleStyle)
           .textColor('#FFFFFF')
       ).position(
-        new Position().gravity(compass('north')).offsetY(200)
+        new Position().gravity(compass('north')).offsetY(sizes.title.offsetY)
       )
     );
   }
 
   // Add subtitle overlay if provided
   if (cleanSubtitle) {
-    const subtitleStyle = new TextStyle('Arial', 48)
+    const subtitleStyle = new TextStyle('Arial', sizes.subtitle.size)
       .fontWeight('normal')
       .textAlignment('center');
 
@@ -112,7 +152,7 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = { cloudNam
         text(cleanSubtitle, subtitleStyle)
           .textColor('#E5E7EB')
       ).position(
-        new Position().gravity(compass('center')).offsetY(0)
+        new Position().gravity(compass('center')).offsetY(sizes.subtitle.offsetY)
       )
     );
   }
@@ -121,11 +161,11 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = { cloudNam
   cleanBullets.forEach((bullet, index) => {
     if (!bullet) return;
     
-    const bulletStyle = new TextStyle('Arial', 40)
+    const bulletStyle = new TextStyle('Arial', sizes.bullet.size)
       .fontWeight('normal')
       .textAlignment('left');
 
-    const offsetY = -300 + (index * 100);
+    const offsetY = sizes.bullet.offsetY + (index * sizes.bullet.spacing);
 
     img = img.overlay(
       source(
@@ -139,7 +179,7 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = { cloudNam
 
   // Add CTA overlay if provided
   if (cleanCta) {
-    const ctaStyle = new TextStyle('Arial', 56)
+    const ctaStyle = new TextStyle('Arial', sizes.cta.size)
       .fontWeight('bold')
       .textAlignment('center');
 
@@ -148,7 +188,7 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = { cloudNam
         text(cleanCta, ctaStyle)
           .textColor('#FFFFFF')
       ).position(
-        new Position().gravity(compass('south')).offsetY(200)
+        new Position().gravity(compass('south')).offsetY(sizes.cta.offsetY)
       )
     );
   }
