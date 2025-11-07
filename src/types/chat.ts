@@ -9,6 +9,8 @@ export interface LibraryAsset {
   id: string;
   url: string;
   publicId?: string;
+  alt?: string;
+  thumbnailUrl?: string;
   text?: {
     title?: string;
     subtitle?: string;
