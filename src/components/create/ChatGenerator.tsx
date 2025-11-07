@@ -474,11 +474,6 @@ export function ChatGenerator() {
     })();
   };
 
-  const promptPlaceholder =
-    contentType === "video"
-      ? "Décrivez la scène vidéo que vous imaginez, ou ajoutez un média pour l'animer..."
-      : "Décrivez la scène que vous imaginez, ou uploadez une image pour la transformer...";
-
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-12">
