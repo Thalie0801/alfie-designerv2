@@ -81,6 +81,13 @@ type UploadedSource = {
 // =====================
 // TYPES
 // =====================
+type SendOptions = {
+  forceTool?: "generate_video" | "generate_image" | "render_carousel";
+  slides?: any[];
+  promptOverride?: string;
+  intentOverride?: "video" | "image" | "carousel";
+};
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -92,6 +99,7 @@ interface Message {
   reasoning?: string;
   brandAlignment?: string;
   quickReplies?: string[];
+  links?: Array<{ label: string; href: string }>;
   bulkCarouselData?: {
     carousels: Array<{
       carousel_index: number;
@@ -113,7 +121,7 @@ interface Message {
 // =====================
 export function AlfieChat() {
   const { user } = useAuth();
-  const { activeBrandId } = useBrandKit();
+  const { activeBrandId, brandKit } = useBrandKit();
 
   // États
   const [messages, setMessages] = useState<Message[]>([
@@ -134,6 +142,7 @@ export function AlfieChat() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [conversationState, setConversationState] = useState<ConversationState>("idle");
   const [expectedTotal, setExpectedTotal] = useState<number | null>(null);
+  const [lastContext, setLastContext] = useState<any | null>(null);
 
   // Subscription aux assets de l'order
   const { assets: orderAssets, total: orderTotal } = useLibraryAssetsSubscription(orderId);
@@ -440,11 +449,57 @@ export function AlfieChat() {
     }
   };
 
+  const planCarouselSlides = useCallback(
+    async (brief: any) => {
+      if (!brief) throw new Error("Brief carrousel manquant");
+
+      const slideCount = (() => {
+        const value =
+          typeof brief?.numSlides === "number" ? brief.numSlides : parseInt(String(brief?.numSlides ?? ""), 10);
+        return Number.isFinite(value) && value > 0 ? value : 5;
+      })();
+
+      const { data, error } = await supabase.functions.invoke("alfie-plan-carousel", {
+        body: {
+          prompt: brief?.topic || "Carousel",
+          slideCount,
+          brandKit: brandKit
+            ? {
+                name: brandKit.name,
+                palette: brandKit.palette,
+                voice: brandKit.voice,
+                niche: brandKit.niche,
+              }
+            : undefined,
+        },
+      });
+      if (error) throw error;
+
+      const payload = (data as any)?.data ?? data;
+      if (payload?.error) throw new Error(String(payload.error));
+
+      const prompts: string[] = Array.isArray(payload?.prompts) ? payload.prompts : [];
+      const slides: any[] = Array.isArray(payload?.slides) ? payload.slides : [];
+
+      return slides.map((slide, idx) => ({
+        title: slide?.title ?? `Slide ${idx + 1}`,
+        subtitle: slide?.subtitle ?? slide?.punchline ?? "",
+        bullets: Array.isArray(slide?.bullets) ? slide.bullets : [],
+        cta: slide?.cta ?? slide?.cta_primary ?? "",
+        prompt: prompts[idx] ?? prompts[0] ?? "",
+        type: slide?.type ?? null,
+        topic: brief?.topic ?? null,
+        angle: brief?.angle ?? null,
+        index: idx,
+      }));
+    },
+    [brandKit],
+  );
+
   // =====================
   // Handler principal (orchestrator + retry)
   // =====================
-  const handleSend = async (override?: string) => {
-    const messageToSend = (override ?? input).trim();
+  const handleSend = async (override?: string, options?: SendOptions) => {
     if (isLoading || inFlightRef.current) return;
 
     if (uploadingSource) {
@@ -452,14 +507,18 @@ export function AlfieChat() {
       return;
     }
 
-    if (!messageToSend && !uploadedSource) return;
+    const rawMessage = (override ?? input).trim();
+    const promptOverride = options?.promptOverride ? options.promptOverride.trim() : "";
+    const baseMessage = promptOverride.length > 0 ? promptOverride : rawMessage;
+    const trimmed = baseMessage.slice(0, MAX_INPUT_LEN);
+
+    if (!trimmed && !uploadedSource) return;
     if (!activeBrandId) {
       toast.error("Sélectionne une marque d'abord !");
       return;
     }
 
-    const trimmed = messageToSend.slice(0, MAX_INPUT_LEN);
-    const intent = detectIntent(trimmed);
+    const intent = options?.intentOverride ?? detectIntent(trimmed || rawMessage);
 
     // lock UI
     setIsLoading(true);
@@ -476,7 +535,7 @@ export function AlfieChat() {
     });
 
     // Commande /queue (monitoring)
-    if (trimmed.startsWith("/queue")) {
+    if (rawMessage.startsWith("/queue")) {
       try {
         const headers = await getAuthHeader();
         const { data, error } = await supabase.functions.invoke("queue-monitor", { headers });
@@ -535,13 +594,17 @@ export function AlfieChat() {
 
         const requestPayload: {
           message: string;
+          user_message?: string;
           conversationId?: string;
           brandId: string;
-          forceTool?: "generate_video";
+          forceTool?: "generate_video" | "generate_image" | "render_carousel";
           uploadedSourceUrl?: string;
           uploadedSourceType?: UploadedSource["type"];
+          prompt?: string;
+          slides?: any[];
         } = {
-          message: trimmed,
+          message: trimmed || rawMessage || "",
+          user_message: promptOverride.length > 0 ? promptOverride : trimmed || rawMessage || "",
           brandId: activeBrandId,
         };
 
@@ -550,7 +613,20 @@ export function AlfieChat() {
         }
 
         // intention vidéo
-        if (intent === "video") requestPayload.forceTool = "generate_video";
+        if (options?.forceTool) {
+          requestPayload.forceTool = options.forceTool;
+        } else if (intent === "video") {
+          requestPayload.forceTool = "generate_video";
+        }
+
+        if (promptOverride.length > 0) {
+          requestPayload.prompt = promptOverride;
+        }
+
+        if (options?.slides && options.slides.length > 0) {
+          requestPayload.slides = options.slides;
+        }
+
         if (uploadedSource) {
           requestPayload.uploadedSourceUrl = uploadedSource.url;
           requestPayload.uploadedSourceType = uploadedSource.type;
@@ -568,17 +644,20 @@ export function AlfieChat() {
 
         if (payload?.conversationId) setConversationId(payload.conversationId);
 
+        if (payload?.context) setLastContext(payload.context);
+
         if (payload?.orderId) {
           setOrderId(payload.orderId);
           setConversationState("generating");
 
-          // info utilisateur
           addMessage({
             role: "assistant",
-            content:
-              "🚀 Génération lancée ! Tu peux suivre l’avancement et télécharger tes visuels directement dans la Bibliothèque.",
+            content: "🚀 Génération lancée !",
             type: "text",
-            quickReplies: ["Voir la bibliothèque"],
+            links: [
+              { label: "Voir dans Studio", href: `/studio?order=${payload.orderId}` },
+              { label: "Voir la Bibliothèque", href: `/library?order=${payload.orderId}` },
+            ],
           });
         }
 
@@ -594,6 +673,13 @@ export function AlfieChat() {
           const quickReplies =
             Array.isArray(payload.quickReplies) && payload.quickReplies.length > 0 ? payload.quickReplies : undefined;
 
+          const links = payload?.orderId
+            ? [
+                { label: "Voir dans Studio", href: `/studio?order=${payload.orderId}` },
+                { label: "Voir la Bibliothèque", href: `/library?order=${payload.orderId}` },
+              ]
+            : undefined;
+
           addMessage({
             role: "assistant",
             content: payload.response,
@@ -602,6 +688,7 @@ export function AlfieChat() {
             reasoning: payload.reasoning,
             brandAlignment: payload.brandAlignment,
             orderId: payload.orderId ?? null,
+            links,
           });
         }
 
@@ -640,6 +727,49 @@ export function AlfieChat() {
       inFlightRef.current = false;
     }
   };
+
+  const handleQuickReplyClick = useCallback(
+    async (reply: string) => {
+      if (isLoading || inFlightRef.current) return;
+
+      if (reply === "Voir la bibliothèque" && orderId) {
+        window.open(`/library?order=${orderId}`, "_blank");
+        return;
+      }
+
+      if (reply === "Oui, lance !" && lastContext) {
+        try {
+          if (Array.isArray(lastContext.carouselBriefs) && lastContext.carouselBriefs.length > 0) {
+            const slides = await planCarouselSlides(lastContext.carouselBriefs[0]);
+            await handleSend(reply, { forceTool: "render_carousel", slides, intentOverride: "carousel" });
+            return;
+          }
+
+          if (Array.isArray(lastContext.imageBriefs) && lastContext.imageBriefs.length > 0) {
+            const brief = lastContext.imageBriefs[0] || {};
+            const parts = [brief.objective, brief.content, brief.style]
+              .map((part: unknown) => (typeof part === "string" ? part.trim() : ""))
+              .filter((part: string) => part.length > 0);
+            const prompt = parts.join(" • ");
+            await handleSend(prompt || reply, {
+              forceTool: "generate_image",
+              promptOverride: prompt || reply,
+              intentOverride: "image",
+            });
+            return;
+          }
+        } catch (err) {
+          console.error("[Chat] Quick reply launch error:", err);
+          toast.error(`Impossible de lancer : ${toErrorMessage(err)}`);
+          return;
+        }
+      }
+
+      setInput(reply);
+      await handleSend(reply);
+    },
+    [handleSend, isLoading, lastContext, orderId, planCarouselSlides],
+  );
 
   // =====================
   // Rendu
@@ -715,13 +845,8 @@ export function AlfieChat() {
                             variant="outline"
                             size="sm"
                             disabled={isLoading}
-                            onClick={async () => {
-                              if (reply === "Voir la bibliothèque" && orderId) {
-                                window.open(`/library?order=${orderId}`, "_blank");
-                                return;
-                              }
-                              setInput(reply);
-                              await handleSend(reply);
+                            onClick={() => {
+                              void handleQuickReplyClick(reply);
                             }}
                             className="text-xs"
                           >
@@ -732,11 +857,23 @@ export function AlfieChat() {
                     </div>
                   )}
 
-                  {message.orderId && (
+                  {message.orderId && (!message.links || message.links.length === 0) && (
                     <div className="mt-3">
                       <Button asChild variant="link" className="px-0">
                         <a href={`/studio?order=${message.orderId}`}>Voir dans Studio →</a>
                       </Button>
+                    </div>
+                  )}
+
+                  {message.links && message.links.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {message.links.map((link, linkIdx) => (
+                        <Button key={linkIdx} asChild variant="link" className="px-0 text-xs">
+                          <a href={link.href} target="_blank" rel="noreferrer">
+                            {link.label} →
+                          </a>
+                        </Button>
+                      ))}
                     </div>
                   )}
                 </div>

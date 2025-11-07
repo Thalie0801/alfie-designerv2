@@ -2,7 +2,7 @@
  * Regex to match control characters that should be removed from text
  * Built with RegExp constructor to avoid ESLint no-control-regex error
  */
-export const CONTROL_CHARS_REGEX = /\p{Cc}|\u00A0|\uFEFF/gu;
+export const CONTROL_CHARS_REGEX = new RegExp('[\\x00-\\x1F\\x7F\\u00A0\\uFEFF]', 'g');
 
 /**
  * Safely converts any value to a renderable string

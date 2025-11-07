@@ -150,7 +150,7 @@ serve(async (req) => {
       const sourceUrl = body?.uploadedSourceUrl || null;
       const sourceType = body?.uploadedSourceType || null;
 
-      let orderId = session.order_id;
+      let orderId: string | null = session.order_id;
       if (!orderId) {
         const { data: order, error: oErr } = await sb
           .from("orders")
@@ -205,6 +205,137 @@ serve(async (req) => {
         .eq("id", session.id);
 
       return json({ response: "OK", orderId, conversationId: session.id, state: "generating" });
+    }
+
+    if (forceTool === "generate_image") {
+      const promptText = (user_message || body?.prompt || "").trim();
+      if (!promptText) return json({ error: "missing_prompt" }, 400);
+
+      const sourceUrl = body?.uploadedSourceUrl || null;
+
+      let orderId = session.order_id;
+      if (!orderId) {
+        const { data: order, error: oErr } = await sb
+          .from("orders")
+          .insert({
+            user_id: user.id,
+            brand_id: brand_id,
+            campaign_name: `Image_${Date.now()}`,
+            brief_json: { image: { prompt: promptText, sourceUrl } },
+            status: "pending",
+          })
+          .select()
+          .single();
+        if (oErr) return json({ error: oErr.message }, 500);
+        orderId = order.id;
+        await sb.from("alfie_conversation_sessions").update({ order_id: orderId }).eq("id", session.id);
+      }
+
+      const finalOrderId = orderId as string;
+
+      await sb.from("job_queue").insert({
+        user_id: user.id,
+        order_id: finalOrderId,
+        type: "render_images",
+        status: "queued",
+        payload: {
+          userId: user.id,
+          brandId: brand_id,
+          orderId: finalOrderId,
+          prompt: promptText,
+          sourceUrl,
+        },
+      });
+
+      try {
+        await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/alfie-job-worker`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ trigger: "image" }),
+        });
+      } catch {}
+
+      const responseText = "🚀 Génération lancée !";
+      await appendMessage(session.id, "assistant", responseText);
+      await sb
+        .from("alfie_conversation_sessions")
+        .update({ conversation_state: "generating" })
+        .eq("id", session.id);
+
+      return json({
+        response: responseText,
+        orderId: finalOrderId,
+        conversationId: session.id,
+        state: "generating",
+      });
+    }
+
+    if (forceTool === "render_carousel") {
+      const slides = body?.slides;
+      if (!Array.isArray(slides) || slides.length === 0) {
+        return json({ error: "missing_slides" }, 400);
+      }
+
+      let orderId: string | null = session.order_id;
+      if (!orderId) {
+        const { data: order, error: oErr } = await sb
+          .from("orders")
+          .insert({
+            user_id: user.id,
+            brand_id: brand_id,
+            campaign_name: `Carousel_${Date.now()}`,
+            brief_json: { carousel: { slides } },
+            status: "pending",
+          })
+          .select()
+          .single();
+        if (oErr) return json({ error: oErr.message }, 500);
+        orderId = order.id;
+        await sb.from("alfie_conversation_sessions").update({ order_id: orderId }).eq("id", session.id);
+      }
+
+      const finalOrderId = orderId as string;
+
+      await sb.from("job_queue").insert({
+        user_id: user.id,
+        order_id: finalOrderId,
+        type: "render_carousels",
+        status: "queued",
+        payload: {
+          userId: user.id,
+          brandId: brand_id,
+          orderId: finalOrderId,
+          slides,
+        },
+      });
+
+      try {
+        await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/alfie-job-worker`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ trigger: "carousel" }),
+        });
+      } catch {}
+
+      const responseText = "🚀 Génération lancée !";
+      await appendMessage(session.id, "assistant", responseText);
+      await sb
+        .from("alfie_conversation_sessions")
+        .update({ conversation_state: "generating" })
+        .eq("id", session.id);
+
+      return json({
+        response: responseText,
+        orderId: finalOrderId,
+        conversationId: session.id,
+        state: "generating",
+      });
     }
 
     const VIDEO_RE = /\b(vid[ée]o|reel|r[ée]el|tiktok|shorts?|clip)\b/i;

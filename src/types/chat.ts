@@ -40,6 +40,7 @@ export interface Message {
   quickReplies?: string[];
   bulkCarouselData?: BulkCarouselData;
   orderId?: string | null;
+  links?: Array<{ label: string; href: string }>;
   timestamp: Date;
 }
 
@@ -74,6 +75,7 @@ export interface OrchestratorResponse {
   totalSlides?: number;
   bulkCarouselData?: BulkCarouselData;
   state?: ConversationState | string;
+  context?: Record<string, any>;
 }
 
 /**

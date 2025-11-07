@@ -40,6 +40,8 @@ const err = (message: string, status = 500) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+const THIRTY_DAYS_MS = 30 * 24 * 3600 * 1000;
+
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -285,8 +287,71 @@ async function processGenerateTexts(payload: any) {
   return { texts: content, count, type };
 }
 
+async function processRenderImage(payload: any) {
+  console.log("🖼️ [processRenderImage]", payload?.orderId);
+
+  const { userId, brandId, orderId, prompt, sourceUrl } = payload || {};
+  if (!userId || !brandId || !orderId || !prompt) {
+    throw new Error("Invalid render_image payload");
+  }
+
+  const { data, error } = await supabaseAdmin.functions.invoke("alfie-render-image", {
+    body: { prompt, brand_id: brandId, sourceUrl },
+  });
+
+  if (error || (data as any)?.error) {
+    const message = (data as any)?.error || error?.message || "render_image_failed";
+    throw new Error(message);
+  }
+
+  const imageUrl = (data as any)?.imageUrl || (data as any)?.data?.url || (data as any)?.url;
+  if (!imageUrl || typeof imageUrl !== "string") {
+    throw new Error("Missing imageUrl");
+  }
+
+  const expiresAt = new Date(Date.now() + THIRTY_DAYS_MS).toISOString();
+
+  const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
+    user_id: userId,
+    brand_id: brandId,
+    order_id: orderId,
+    type: "image",
+    status: "completed",
+    output_url: imageUrl,
+    metadata: { prompt, sourceUrl },
+    expires_at: expiresAt,
+  });
+  if (mediaErr) throw new Error(mediaErr.message);
+
+  const { error: libErr } = await supabaseAdmin.from("library_assets").insert({
+    user_id: userId,
+    brand_id: brandId,
+    order_id: orderId,
+    type: "image",
+    cloudinary_url: imageUrl,
+    src_url: imageUrl,
+    title: typeof prompt === "string" && prompt.trim() ? prompt.trim().slice(0, 80) : "Image",
+    tags: ["studio", "auto"],
+    expires_at: expiresAt,
+    metadata: { prompt, sourceUrl },
+  } as any);
+  if (libErr) throw new Error(libErr.message);
+
+  return { imageUrl };
+}
+
 async function processRenderImages(payload: any) {
   console.log("🖼️ [processRenderImages] payload.in", payload);
+
+  if (
+    payload &&
+    typeof payload.prompt === "string" &&
+    payload.prompt.trim().length > 0 &&
+    !payload.images &&
+    !payload.brief
+  ) {
+    return processRenderImage(payload);
+  }
 
   const results: Array<{ url: string; aspectRatio: string; resolution: string }> = [];
   let imagesToRender: Array<{
@@ -454,6 +519,66 @@ Format: ${aspectRatio} aspect ratio optimized.`;
 
 async function processRenderCarousels(payload: any) {
   console.log("📚 [processRenderCarousels]");
+
+  if (Array.isArray(payload?.slides) && payload.slides.length > 0) {
+    const { userId, brandId, orderId } = payload || {};
+    if (!userId || !brandId || !orderId) {
+      throw new Error("Invalid render_carousels payload");
+    }
+
+    const { data, error } = await supabaseAdmin.functions.invoke("alfie-render-carousel", {
+      body: { brandId, orderId, slides: payload.slides, sourceUrl: payload?.sourceUrl ?? null },
+    });
+    if (error || (data as any)?.error) {
+      const message = (data as any)?.error || error?.message || "render_carousel_failed";
+      throw new Error(message);
+    }
+
+    const slideUrls: string[] = Array.isArray((data as any)?.slide_urls)
+      ? ((data as any).slide_urls as string[])
+      : Array.isArray((data as any)?.slides)
+        ? (data as any).slides
+            .map((item: any) => (typeof item === "string" ? item : item?.url))
+            .filter((url: unknown): url is string => typeof url === "string" && url.startsWith("http"))
+        : [];
+
+    if (!slideUrls.length) {
+      throw new Error("No slides returned");
+    }
+
+    const expiresAt = new Date(Date.now() + THIRTY_DAYS_MS).toISOString();
+
+    const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
+      user_id: userId,
+      brand_id: brandId,
+      order_id: orderId,
+      type: "carousel",
+      status: "completed",
+      output_url: slideUrls[0],
+      metadata: { slides_count: slideUrls.length, slides: slideUrls },
+      expires_at: expiresAt,
+    });
+    if (mediaErr) throw new Error(mediaErr.message);
+
+    await Promise.all(
+      slideUrls.map((url, idx) =>
+        supabaseAdmin.from("library_assets").insert({
+          user_id: userId,
+          brand_id: brandId,
+          order_id: orderId,
+          type: "image",
+          cloudinary_url: url,
+          src_url: url,
+          title: `Slide ${idx + 1}`,
+          tags: ["carousel", `slide_${idx + 1}`],
+          expires_at: expiresAt,
+          metadata: { orderId, slideIndex: idx, total: slideUrls.length },
+        } as any),
+      ),
+    );
+
+    return { slide_urls: slideUrls };
+  }
 
   let carouselsToRender: any[] = [];
 
