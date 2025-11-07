@@ -512,10 +512,10 @@ export function AlfieChat() {
           ].join("\n"),
           type: "text",
         });
-      } catch (e: any) {
+      } catch (error: unknown) {
         addMessage({
           role: "assistant",
-          content: `❌ Monitoring indisponible: ${e?.message || e}`,
+          content: `❌ Monitoring indisponible: ${toErrorMessage(error)}`,
           type: "text",
         });
       } finally {
@@ -532,11 +532,21 @@ export function AlfieChat() {
       try {
         const headers = await getAuthHeader();
 
-        const requestPayload: any = {
+        const requestPayload: {
+          message: string;
+          conversationId?: string;
+          brandId: string;
+          forceTool?: "generate_video";
+          uploadedSourceUrl?: string;
+          uploadedSourceType?: UploadedSource["type"];
+        } = {
           message: trimmed,
-          conversationId,
           brandId: activeBrandId,
         };
+
+        if (conversationId) {
+          requestPayload.conversationId = conversationId;
+        }
 
         // intention vidéo
         if (intent === "video") requestPayload.forceTool = "generate_video";
@@ -978,7 +988,7 @@ export function AlfieChat() {
               aria-label="Retirer le média"
               title="Retirer le média"
             >
-              ×
+              <span aria-hidden>×</span>
             </Button>
           </div>
         )}
