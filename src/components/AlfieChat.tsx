@@ -778,7 +778,6 @@ export function AlfieChat() {
                                     bulletPoints: firstSlide.text_json.bullets,
                                     aspectRatio: firstSlide.format || '4:5',
                                     cloudName,
-                                    baseUrlForCloudGuess: firstSlide.cloudinary_url,
                                   });
                                 } catch {
                                   return firstSlide.cloudinary_url || firstSlide.storage_url;
@@ -820,7 +819,6 @@ export function AlfieChat() {
                                   bulletPoints: slide.text_json.bullets,
                                   aspectRatio: slide.format || '4:5',
                                   cloudName,
-                                  baseUrlForCloudGuess: slide.cloudinary_url,
                                 });
                               } catch {
                                 return slide.cloudinary_url || slide.storage_url;
