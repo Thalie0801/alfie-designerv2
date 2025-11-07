@@ -35,7 +35,7 @@ serve(async (req) => {
     // Fetch slide data
     const { data: slide, error: slideError } = await supabase
       .from('library_assets')
-      .select('cloudinary_public_id, text_json, metadata, brand_id, order_id, user_id')
+      .select('cloudinary_public_id, cloudinary_url, text_json, metadata, brand_id, order_id, user_id')
       .eq('id', slideId)
       .single();
 
@@ -47,16 +47,81 @@ serve(async (req) => {
       );
     }
 
-    // Validate required fields
-    if (!slide.cloudinary_public_id) {
-      console.error('[repair-carousel-overlay] Missing cloudinary_public_id for slide:', slideId);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Slide is missing cloudinary_public_id - cannot repair overlay',
-          slide_id: slideId 
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Helper to extract public_id from Cloudinary URL
+    const extractPublicIdFromUrl = (url?: string | null): string | null => {
+      if (!url) return null;
+      try {
+        // Extract part after /upload/
+        const afterUpload = url.split('/upload/')[1];
+        if (!afterUpload) return null;
+        
+        // Remove transformations (everything before the version or path)
+        const parts = afterUpload.split('/');
+        // Find where the actual path starts (after transformations)
+        let pathStart = 0;
+        for (let i = 0; i < parts.length; i++) {
+          if (parts[i].startsWith('v') && /^v\d+$/.test(parts[i])) {
+            pathStart = i;
+            break;
+          }
+        }
+        
+        // Join remaining parts and remove query string and extension
+        const pathParts = pathStart > 0 ? parts.slice(pathStart) : parts;
+        const fullPath = pathParts.join('/');
+        const noQuery = fullPath.split('?')[0];
+        const noExt = noQuery.replace(/\.(png|jpg|jpeg|webp|gif)$/i, '');
+        
+        return noExt || null;
+      } catch (err) {
+        console.warn('[repair-carousel-overlay] Failed to extract public_id:', err);
+        return null;
+      }
+    };
+
+    // Try to infer cloudinary_public_id if missing
+    let publicId = slide.cloudinary_public_id;
+    
+    if (!publicId) {
+      console.log('[repair-carousel-overlay] cloudinary_public_id missing, attempting to infer...');
+      
+      // Try multiple sources in priority order
+      const candidateUrls = [
+        slide.cloudinary_url,
+        slide.metadata?.cloudinary_base_url,
+        slide.metadata?.base_url,
+        slide.metadata?.source_url,
+        slide.metadata?.original_url
+      ];
+      
+      for (const url of candidateUrls) {
+        const inferred = extractPublicIdFromUrl(url);
+        if (inferred) {
+          publicId = inferred;
+          console.log(`[repair-carousel-overlay] ✅ Inferred public_id from URL: ${inferred}`);
+          
+          // Update database with inferred public_id
+          await supabase
+            .from('library_assets')
+            .update({ cloudinary_public_id: publicId })
+            .eq('id', slideId);
+          
+          break;
+        }
+      }
+      
+      // If still no public_id after inference, fail
+      if (!publicId) {
+        console.error('[repair-carousel-overlay] Cannot infer cloudinary_public_id from any URL');
+        return new Response(
+          JSON.stringify({ 
+            error: 'Cannot infer Cloudinary public_id from URLs - slide may need manual repair',
+            slide_id: slideId,
+            checked_urls: candidateUrls.filter(Boolean).length
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     if (!slide.text_json?.title && !slide.text_json?.subtitle) {
@@ -108,48 +173,8 @@ serve(async (req) => {
       lineSpacing: 10
     });
 
-    // Resolve/repair missing publicId from metadata base URL if needed
-    const extractPublicIdFromUrl = (url?: string | null) => {
-      if (!url) return null;
-      try {
-        const afterUpload = url.split('/upload/')[1];
-        if (!afterUpload) return null;
-        const noQuery = afterUpload.split('?')[0];
-        const noExt = noQuery.replace(/\.(png|jpg|jpeg|webp|gif)$/i, '');
-        return noExt;
-      } catch (_) {
-        return null;
-      }
-    };
-
-    let publicId: string | null = slide.cloudinary_public_id || null;
-    if (!publicId) {
-      const inferred = extractPublicIdFromUrl(
-        slide.metadata?.cloudinary_base_url ||
-        slide.metadata?.base_url ||
-        slide.metadata?.source_url ||
-        slide.metadata?.original_url
-      );
-      if (inferred) {
-        publicId = inferred;
-        await supabase
-          .from('library_assets')
-          .update({ cloudinary_public_id: publicId })
-          .eq('id', slideId);
-        console.log('[repair-carousel-overlay] Inferred publicId from metadata:', publicId);
-      } else {
-        return new Response(
-          JSON.stringify({
-            error: 'Missing Cloudinary public id and cannot infer from metadata',
-            slide_id: slideId
-          }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
     // Generate derived image (explicit) with robust error mapping
-    console.log('[repair-carousel-overlay] Generating derivative for', publicId);
+    console.log('[repair-carousel-overlay] Generating derivative for public_id:', publicId);
     try {
       await ensureDerived(
         cloudName!,
@@ -176,8 +201,9 @@ serve(async (req) => {
 
     console.log('[repair-carousel-overlay] Derivative generated');
 
-    // Build new URL using resolved publicId
+    // Build new URL using resolved public_id
     const newCloudinaryUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${transformString}/${publicId}.png`;
+    console.log('[repair-carousel-overlay] Generated new URL:', newCloudinaryUrl.substring(0, 150) + '...');
 
     // Update database
     const { error: updateError } = await supabase
