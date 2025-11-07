@@ -34,7 +34,6 @@ interface CarouselSlide {
   // champs possibles selon ta table
   user_id?: string;
   brand_id?: string;
-  status?: string | null;
 }
 
 function resolveCloudName(slide: CarouselSlide): string | undefined {
@@ -91,7 +90,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
       let query = supabase
         .from("library_assets")
         .select(
-          "id, cloudinary_url, cloudinary_public_id, metadata, text_json, slide_index, carousel_id, order_id, created_at, format, status, user_id, brand_id",
+          "id, cloudinary_url, cloudinary_public_id, metadata, text_json, slide_index, carousel_id, order_id, created_at, format, user_id, brand_id",
         )
         .eq("user_id", user.id)
         .eq("type", "carousel_slide")
