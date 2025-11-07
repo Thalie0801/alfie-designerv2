@@ -79,13 +79,20 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     setDownloadingZip(carouselKey);
     
     try {
-      // Get job_set_id from first slide's metadata or use carousel_id
-      const jobSetId = carouselSlides[0]?.carousel_id || carouselKey;
+      const carouselId = carouselSlides[0]?.carousel_id;
+      const orderId = carouselSlides[0]?.order_id;
       
-      console.log('[CarouselsTab] Requesting ZIP download for:', jobSetId);
-      
+      if (!carouselId && !orderId) {
+        throw new Error('No carousel or order ID found');
+      }
+
+      console.log('[CarouselsTab] Downloading ZIP for:', { carouselId, orderId });
+
       const { data, error } = await supabase.functions.invoke('download-job-set-zip', {
-        body: { jobSetId }
+        body: { 
+          carouselId: carouselId || undefined,
+          orderId: orderId || undefined
+        }
       });
 
       if (error) {
@@ -105,7 +112,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
       
     } catch (err: any) {
       console.error('[CarouselsTab] ZIP download failed:', err);
-      toast.error(`Échec du téléchargement ZIP : ${err.message || 'Erreur inconnue'}`);
+      toast.error(`Échec du téléchargement : ${err.message || 'Erreur inconnue'}`);
     } finally {
       setDownloadingZip(null);
     }

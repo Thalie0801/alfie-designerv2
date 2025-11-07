@@ -16,8 +16,8 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('Missing authorization');
 
-    const { jobSetId } = await req.json();
-    if (!jobSetId) throw new Error('Missing jobSetId');
+    const { carouselId, orderId } = await req.json();
+    if (!carouselId && !orderId) throw new Error('Missing carouselId or orderId');
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -29,93 +29,67 @@ serve(async (req) => {
     );
     if (userError || !user) throw new Error('Unauthorized');
 
-    // Vérifier que le job_set appartient à l'utilisateur
-    const { data: jobSet, error: jobSetErr } = await supabase
-      .from('job_sets')
-      .select('brand_id, user_id, total, status')
-      .eq('id', jobSetId)
-      .single();
+    console.log(`[download-zip] User ${user.id} requesting ZIP for carousel=${carouselId}, order=${orderId}`);
 
-    if (jobSetErr || !jobSet) {
-      console.error('[download-zip] Job set not found:', jobSetErr);
-      throw new Error('Job set not found');
+    // Récupérer toutes les slides du carrousel depuis library_assets
+    let query = supabase
+      .from('library_assets')
+      .select('id, slide_index, cloudinary_url, metadata, carousel_id, order_id')
+      .eq('type', 'carousel_slide')
+      .eq('user_id', user.id)
+      .order('slide_index');
+
+    if (carouselId) {
+      query = query.eq('carousel_id', carouselId);
+    } else {
+      query = query.eq('order_id', orderId);
     }
 
-    // 🔒 SÉCURITÉ: Vérifier que l'utilisateur possède le job_set OU la marque
-    if (jobSet.user_id !== user.id) {
-      const { data: brand } = await supabase
-        .from('brands')
-        .select('user_id')
-        .eq('id', jobSet.brand_id)
-        .single();
-      
-      if (!brand || brand.user_id !== user.id) {
-        console.error(`[download-zip] ⛔ User ${user.id} tried to download job_set ${jobSetId} from brand ${jobSet.brand_id}`);
-        throw new Error('Forbidden: you don\'t own this job set or brand');
-      }
+    const { data: slides, error: slidesErr } = await query;
+
+    if (slidesErr) throw slidesErr;
+    if (!slides || slides.length === 0) {
+      throw new Error('No slides found for this carousel');
     }
 
-    console.log(`[download-zip] ✅ Ownership verified for user ${user.id}`);
-
-    // Récupérer tous les jobs complétés
-    const { data: jobs, error: jobsErr } = await supabase
-      .from('jobs')
-      .select('id, index_in_set, asset_id')
-      .eq('job_set_id', jobSetId)
-      .eq('status', 'succeeded')
-      .order('index_in_set');
-
-    if (jobsErr) throw jobsErr;
-    if (!jobs || jobs.length === 0) {
-      throw new Error('No completed images found');
-    }
-
-    console.log(`[download-zip] Found ${jobs.length} completed jobs`);
+    console.log(`[download-zip] Found ${slides.length} slides`);
 
     // Créer le ZIP
     const zip = new JSZip();
 
-    for (const job of jobs) {
-      if (!job.asset_id) continue;
-
-      // Récupérer l'asset dans la table assets
-      const { data: assetRec, error: assetErr } = await supabase
-        .from('assets')
-        .select('storage_key, index_in_set, meta')
-        .eq('id', job.asset_id)
-        .single();
-
-      if (assetErr || !assetRec) {
-        console.warn(`[download-zip] Asset not found for job ${job.id}`);
-        continue;
-      }
-
-      const meta = (assetRec.meta as any) || {};
-      let imageUrl: string | undefined = meta.public_url;
-      if (!imageUrl) {
-        const { data: pub } = supabase.storage
-          .from('media-generations')
-          .getPublicUrl(assetRec.storage_key);
-        imageUrl = pub.publicUrl;
+    for (const slide of slides) {
+      // Priorité 1: cloudinary_url (avec overlay texte)
+      // Priorité 2: metadata.cloudinary_base_url (fallback sans texte)
+      const meta = (slide.metadata as any) || {};
+      let imageUrl = slide.cloudinary_url;
+      
+      if (!imageUrl && meta.cloudinary_base_url) {
+        imageUrl = meta.cloudinary_base_url;
+        console.log(`[download-zip] Using base URL for slide ${slide.id}`);
       }
 
       if (!imageUrl) {
-        console.warn(`[download-zip] No public URL for asset of job ${job.id}`);
+        console.warn(`[download-zip] No URL found for slide ${slide.id}`);
         continue;
       }
 
-      const response = await fetch(imageUrl);
-      if (!response.ok) {
-        console.warn(`[download-zip] Failed to fetch ${imageUrl} for job ${job.id}`);
-        continue;
+      try {
+        const response = await fetch(imageUrl);
+        if (!response.ok) {
+          console.warn(`[download-zip] Failed to fetch ${imageUrl}: ${response.status}`);
+          continue;
+        }
+
+        const blob = await response.blob();
+        const arrayBuffer = await blob.arrayBuffer();
+
+        const slideNum = (slide.slide_index ?? 0) + 1;
+        const filename = `slide-${slideNum.toString().padStart(2, '0')}.png`;
+        zip.file(filename, new Uint8Array(arrayBuffer));
+        console.log(`[download-zip] Added ${filename} to ZIP`);
+      } catch (err) {
+        console.error(`[download-zip] Error fetching slide ${slide.id}:`, err);
       }
-
-      const blob = await response.blob();
-      const arrayBuffer = await blob.arrayBuffer();
-
-      const filename = `slide-${(job.index_in_set ?? assetRec.index_in_set) + 1}.png`;
-      zip.file(filename, new Uint8Array(arrayBuffer));
-      console.log(`[download-zip] Added ${filename} to ZIP`);
     }
 
     // Générer le ZIP en blob
@@ -123,7 +97,8 @@ serve(async (req) => {
     const arrayBuffer = await zipBlob.arrayBuffer();
 
     // Uploader le ZIP dans le storage
-    const zipFileName = `zips/carousel-${jobSetId}-${Date.now()}.zip`;
+    const identifier = carouselId || orderId;
+    const zipFileName = `zips/carousel-${identifier}-${Date.now()}.zip`;
     console.log(`[download-zip] Uploading ZIP to storage: ${zipFileName}`);
     
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -149,7 +124,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ 
       url: zipUrl,
-      filename: `carousel-${jobSetId}.zip`,
+      filename: `carousel-${identifier}.zip`,
       size: arrayBuffer.byteLength
     }), {
       headers: {
