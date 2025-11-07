@@ -27,6 +27,7 @@ import NotFound from "./pages/NotFound";
 import Templates from "./pages/Templates";
 import Library from "./pages/Library";
 import Videos from "./pages/Videos";
+import CloudinaryTest from "./pages/CloudinaryTest";
 
 import ActivateAccess from "./pages/onboarding/Activate";
 import { AlfieChat } from "./components/AlfieChat";
@@ -95,6 +96,14 @@ const AppRoutes = () => {
                 <AppLayoutWithSidebar>
                   <Videos />
                 </AppLayoutWithSidebar>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cloudinary-test"
+            element={
+              <ProtectedRoute requireAdmin>
+                <CloudinaryTest />
               </ProtectedRoute>
             }
           />

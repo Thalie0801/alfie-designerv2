@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { uploadToCloudinary, buildCarouselSlideUrl } from "../_shared/cloudinary.ts";
+import { buildCarouselSlideUrl } from "../_shared/cloudinary.ts";
 import { uploadTextAsRaw } from "../_shared/cloudinaryUploader.ts";
 
 const corsHeaders = {
@@ -204,8 +204,8 @@ serve(async (req) => {
 
     console.log('[Render Slide] Background generated:', backgroundUrl.substring(0, 100));
 
-    // 3. Upload slide avec métadonnées enrichies
-    console.log('[Render Slide] Step 3/4: Uploading slide to Cloudinary...');
+    // 3. Upload slide avec métadonnées enrichies via centralized /cloudinary function
+    console.log('[Render Slide] Step 3/4: Uploading slide to Cloudinary via centralized function...');
     
     // Récupérer brand kit pour les couleurs
     const { data: brandData } = await supabaseAdmin
@@ -219,19 +219,44 @@ serve(async (req) => {
     const primaryColor = (palette[0]?.color || palette[0] || 'ffffff').replace('#', '');
     const secondaryColor = (palette[1]?.color || palette[1] || 'eeeeee').replace('#', '');
 
-    // 3. Upload to Cloudinary with SDK - stores base public_id correctly
-    const uploadResult = await uploadToCloudinary(backgroundUrl, {
-      folder: `brands/${brandId}/carousels/${carouselId}`,
-      publicId: `slide_${String(slideIndex + 1).padStart(2, '0')}`,
-      tags: [brandId, carouselId, 'carousel_slide', campaign],
-      context: {
-        brand: brandId,
-        carousel: carouselId,
-        slide_index: String(slideIndex),
-        render_version: String(renderVersion),
-        text_version: String(textVersion)
+    // ✅ Phase 4: New naming convention: alfie/{brandId}/{campaignId}/slides/slide_XX
+    const slidePublicId = `slide_${String(slideIndex + 1).padStart(2, '0')}`;
+    const slideFolder = `alfie/${brandId}/${carouselId}/slides`;
+
+    // ✅ Phase 3: Use centralized /cloudinary edge function for upload
+    const { data: uploadData, error: uploadError } = await supabaseAdmin.functions.invoke('cloudinary', {
+      body: {
+        action: 'upload',
+        params: {
+          file: backgroundUrl,
+          folder: slideFolder,
+          public_id: slidePublicId,
+          resource_type: 'image',
+          tags: [brandId, carouselId, 'carousel_slide', campaign, 'alfie'],
+          context: {
+            brand: brandId,
+            carousel: carouselId,
+            campaign: campaign,
+            slide_index: String(slideIndex),
+            render_version: String(renderVersion),
+            text_version: String(textVersion)
+          }
+        }
       }
     });
+
+    if (uploadError || !uploadData) {
+      console.error('[Render Slide] ❌ Cloudinary upload error:', uploadError);
+      throw new Error(`Failed to upload to Cloudinary: ${uploadError?.message || 'Unknown error'}`);
+    }
+
+    const uploadResult = {
+      publicId: uploadData.public_id,
+      secureUrl: uploadData.secure_url,
+      width: uploadData.width,
+      height: uploadData.height,
+      format: uploadData.format
+    };
 
     console.log('[Render Slide] ✅ Uploaded to Cloudinary:', {
       publicId: uploadResult.publicId,
