@@ -695,17 +695,23 @@ async function createCascadeJobs(job: JobRow, result: any, sb: SupabaseClient) {
 // ---------- helpers ----------
 async function loadBrandMini(brandId?: string, full = false) {
   if (!brandId) return undefined;
-  const { data: brand } = await supabaseAdmin
+  
+  type BrandMini = { name: string | null; palette: any; voice: any; niche?: any };
+  
+  const { data, error } = await supabaseAdmin
     .from("brands")
     .select(full ? "name, palette, voice, niche" : "name, palette, voice")
     .eq("id", brandId)
     .maybeSingle();
-  if (!brand) return undefined;
+    
+  if (error || !data) return undefined;
+  
+  const brand = data as unknown as BrandMini;
   return {
     name: brand.name,
     palette: brand.palette,
     voice: brand.voice,
-    niche: (brand as any).niche,
+    niche: full ? brand.niche : undefined,
   };
 }
 

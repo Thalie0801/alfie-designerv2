@@ -205,7 +205,7 @@ function ensureBrandInPrompt(optimized: string, brandKit?: AgentContext["brandKi
   if (!brandKit) return optimized;
 
   const hasColors = brandKit.colors && Array.isArray(brandKit.colors) && brandKit.colors.length > 0;
-  const colorsTxt = hasColors ? brandKit.colors.join(", ") : "";
+  const colorsTxt = hasColors ? (brandKit.colors?.join(", ") ?? "") : "";
   const voiceTxt = brandKit.voice || "professional";
 
   const needColors = hasColors && !new RegExp(colorsTxt.slice(0, 6), "i").test(optimized);
