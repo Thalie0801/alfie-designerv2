@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Download, ExternalLink, Copy, CheckCheck, RotateCcw, PlayCircle, Image as ImageIcon } from "lucide-react";
+import { Download, ExternalLink, Copy, CheckCheck, RotateCcw, PlayCircle, Image as ImageIcon, Film } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { generateCarouselVideoFromJobSet } from "@/lib/cloudinary/carouselToVideo";
 
 interface CarouselDeliveryProps {
   jobSetId: string;
@@ -75,6 +76,7 @@ export function CarouselDelivery({ jobSetId }: CarouselDeliveryProps) {
   const [copied, setCopied] = useState(false);
   const [imgErrorIds, setImgErrorIds] = useState<Record<string, boolean>>({});
   const [vidPosterErrorIds, setVidPosterErrorIds] = useState<Record<string, boolean>>({});
+  const [generatingVideo, setGeneratingVideo] = useState(false);
 
   const loadJobSet = useCallback(async () => {
     setLoading(true);
@@ -106,6 +108,30 @@ export function CarouselDelivery({ jobSetId }: CarouselDeliveryProps) {
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error("Erreur lors de la copie");
+    }
+  };
+
+  const handleExportToVideo = async () => {
+    if (!jobSetId) return;
+    
+    setGeneratingVideo(true);
+    try {
+      const aspect = (meta.aspect_ratio as string) || '4:5';
+      const videoUrl = await generateCarouselVideoFromJobSet({
+        jobSetId,
+        aspect: aspect as any,
+        title: 'Mon Carrousel',
+        durationPerSlide: 2,
+      });
+
+      // Ouvrir la vidéo dans un nouvel onglet
+      window.open(videoUrl, '_blank');
+      toast.success('Vidéo générée avec succès ! 🎬');
+    } catch (err: any) {
+      console.error('[CarouselDelivery] Video generation failed:', err);
+      toast.error(`Échec de la génération : ${err.message || 'Erreur inconnue'}`);
+    } finally {
+      setGeneratingVideo(false);
     }
   };
 
@@ -229,11 +255,20 @@ export function CarouselDelivery({ jobSetId }: CarouselDeliveryProps) {
 
         {/* Actions de téléchargement */}
         <div className="flex flex-wrap gap-2">
+          <Button 
+            onClick={handleExportToVideo} 
+            disabled={!jobSet || generatingVideo}
+            variant="default"
+          >
+            <Film className="h-4 w-4 mr-2" />
+            {generatingVideo ? 'Génération...' : 'Exporter en vidéo'}
+          </Button>
+
           {meta.zipUrl && (
-            <Button asChild variant="default">
+            <Button asChild variant="outline">
               <a href={meta.zipUrl as string} download>
                 <Download className="h-4 w-4 mr-2" />
-                Télécharger ZIP
+                ZIP
               </a>
             </Button>
           )}

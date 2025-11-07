@@ -3,12 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Eye, Download, FileArchive, Loader2 } from 'lucide-react';
+import { Eye, Download, FileArchive, Loader2, Film } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { slideUrl } from '@/lib/cloudinary/imageUrls';
 import { extractCloudNameFromUrl } from '@/lib/cloudinary/utils';
+import { generateCarouselVideoFromLibrary } from '@/lib/cloudinary/carouselToVideo';
 
 function resolveCloudName(slide: CarouselSlide): string | undefined {
   const fromUrl = extractCloudNameFromUrl(slide.cloudinary_url);
@@ -48,6 +49,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
   const [slides, setSlides] = useState<CarouselSlide[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingZip, setDownloadingZip] = useState<string | null>(null);
+  const [generatingVideo, setGeneratingVideo] = useState<string | null>(null);
 
   useEffect(() => {
     loadSlides();
@@ -133,6 +135,36 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     }
   };
 
+  const handleGenerateVideo = async (carouselKey: string, carouselSlides: CarouselSlide[]) => {
+    setGeneratingVideo(carouselKey);
+    
+    try {
+      const carouselId = carouselSlides[0]?.carousel_id;
+      const orderId = carouselSlides[0]?.order_id;
+      const format = carouselSlides[0]?.format || '4:5';
+      
+      console.log('[CarouselsTab] Generating video for:', { carouselId, orderId });
+
+      const videoUrl = await generateCarouselVideoFromLibrary({
+        carouselId: carouselId || undefined,
+        orderId: orderId || undefined,
+        aspect: format as any,
+        title: 'Mon Carrousel',
+        durationPerSlide: 2,
+      });
+
+      // Ouvrir la vidéo dans un nouvel onglet
+      window.open(videoUrl, '_blank');
+      toast.success('Vidéo générée avec succès ! 🎬');
+      
+    } catch (err: any) {
+      console.error('[CarouselsTab] Video generation failed:', err);
+      toast.error(`Échec de la génération : ${err.message || 'Erreur inconnue'}`);
+    } finally {
+      setGeneratingVideo(null);
+    }
+  };
+
   // Grouper les slides par carousel_id ou order_id
   const groupedCarousels = slides.reduce((acc, slide) => {
     const key = slide.carousel_id || slide.order_id || 'unknown';
@@ -175,6 +207,19 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
             <div className="flex gap-2">
               <Button
                 size="sm"
+                variant="default"
+                onClick={() => handleGenerateVideo(carouselKey, carouselSlides)}
+                disabled={generatingVideo === carouselKey}
+              >
+                {generatingVideo === carouselKey ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Film className="h-4 w-4 mr-2" />
+                )}
+                Créer une vidéo
+              </Button>
+              <Button
+                size="sm"
                 variant="outline"
                 onClick={() => handleDownloadZip(carouselKey, carouselSlides)}
                 disabled={downloadingZip === carouselKey}
@@ -184,7 +229,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                 ) : (
                   <FileArchive className="h-4 w-4 mr-2" />
                 )}
-                Télécharger en ZIP
+                ZIP
               </Button>
               <Button
                 size="sm"

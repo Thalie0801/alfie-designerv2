@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { VIDEO_ENGINE_CONFIG } from "@/config/videoEngine";
+import { imageToVideoUrl, spliceVideoUrl, extractCloudNameFromUrl } from '@/lib/cloudinary/videoSimple';
 
 type GeneratedAsset = {
   url: string;
@@ -324,6 +325,66 @@ export function ChatGenerator() {
         setGeneratedAsset({ url: imageUrl, type: "image" });
         toast({ title: "Image générée !", description: "Prête à télécharger" });
       } else {
+        const ffmpegBackend = VIDEO_ENGINE_CONFIG.FFMPEG_BACKEND_URL;
+        
+        // ✅ NOUVEAU : Si pas de backend FFmpeg → Cloudinary-only
+        if (!ffmpegBackend) {
+          // 1️⃣ Récupérer cloudName
+          const envCloud = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined;
+          const guessed = extractCloudNameFromUrl(uploadedSource?.url);
+          const cloudName = guessed || envCloud;
+          
+          if (!cloudName) {
+            throw new Error("Cloudinary cloudName manquant. Configurez VITE_CLOUDINARY_CLOUD_NAME dans .env.local");
+          }
+
+          let videoUrl: string;
+
+          // 2️⃣ Cas 1 : Utilisateur a uploadé une IMAGE
+          if (uploadedSource?.type === 'image') {
+            // Extraire publicId depuis l'URL Cloudinary
+            const publicId = uploadedSource.url.replace(
+              /^https?:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/[^/]*\//i, 
+              ''
+            ).replace(/\.[^.]+$/, '');
+
+            videoUrl = imageToVideoUrl({
+              cloudName,
+              imagePublicId: publicId,
+              aspect: aspectRatio as any,
+              durationSec: 3,
+              zoomPercent: 18,
+              pan: 'center',
+              title: prompt.slice(0, 80) || 'Alfie Studio',
+              subtitle: undefined,
+              cta: 'Découvrir',
+            });
+          }
+          // 3️⃣ Cas 2 : Utilisateur a uploadé une VIDÉO
+          else if (uploadedSource?.type === 'video') {
+            const publicId = uploadedSource.url.replace(
+              /^https?:\/\/res\.cloudinary\.com\/[^/]+\/video\/upload\/[^/]*\//i, 
+              ''
+            ).replace(/\.[^.]+$/, '');
+
+            videoUrl = spliceVideoUrl({
+              cloudName,
+              items: [{ type: 'video', publicId }],
+              aspect: aspectRatio as any,
+              title: prompt.slice(0, 80) || 'Alfie Studio',
+            });
+          }
+          // 4️⃣ Cas 3 : Pas de média uploadé → fallback
+          else {
+            throw new Error("Veuillez uploader une image ou vidéo pour générer une vidéo (Cloudinary-only)");
+          }
+
+          setGeneratedAsset({ url: videoUrl, type: "video" });
+          toast({ title: "Vidéo générée via Cloudinary ✨" });
+          return;
+        }
+
+        // ⏭️ Sinon : continuer avec generateVideoWithFfmpeg (backend FFmpeg)
         const abortController = new AbortController();
 
         const videoUrl = await generateVideoWithFfmpeg(
