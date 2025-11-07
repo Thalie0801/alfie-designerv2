@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { VIDEO_ENGINE_CONFIG } from "@/config/videoEngine";
 import { imageToVideoUrl, spliceVideoUrl, extractCloudNameFromUrl } from '@/lib/cloudinary/videoSimple';
@@ -34,6 +34,9 @@ type JobEntry = {
   created_at: string;
   updated_at: string;
   error?: string | null;
+  error_message?: string | null;
+  payload?: Record<string, any> | null;
+  user_id: string;
 };
 
 type MediaEntry = {
@@ -260,9 +263,9 @@ export function ChatGenerator() {
   );
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
   const [jobs, setJobs] = useState<JobEntry[]>([]);
-  const [jobsLoading, setJobsLoading] = useState(false);
-  const [media, setMedia] = useState<MediaEntry[]>([]);
-  const [mediaLoading, setMediaLoading] = useState(false);
+  const [assets, setAssets] = useState<MediaEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const { toast } = useToast();
 
@@ -300,87 +303,149 @@ export function ChatGenerator() {
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
   };
 
-  const refetchJobs = useCallback(async () => {
-    if (!user?.id) return;
-    setJobsLoading(true);
+  const refetchAll = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
     try {
-      let query = supabase
+      const {
+        data: { user: currentUser },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError) throw authError;
+      if (!currentUser) throw new Error("Non authentifié");
+
+      let jobsQuery = supabase
         .from("job_queue")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", currentUser.id)
         .order("created_at", { ascending: false })
         .limit(50);
 
-      if (orderId) {
-        query = query.eq("order_id", orderId);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      setJobs((data as JobEntry[]) ?? []);
-    } catch (error) {
-      console.error("[Studio] fetchJobs error:", error);
-    } finally {
-      setJobsLoading(false);
-    }
-  }, [user?.id, orderId]);
-
-  const refetchMedia = useCallback(async () => {
-    if (!user?.id) return;
-    setMediaLoading(true);
-    try {
-      let query = supabase
+      let assetsQuery = supabase
         .from("media_generations")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", currentUser.id)
         .order("created_at", { ascending: false })
         .limit(50);
 
       if (orderId) {
-        query = query.eq("order_id", orderId);
+        jobsQuery = jobsQuery.eq("order_id", orderId);
+        assetsQuery = assetsQuery.eq("order_id", orderId);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      setMedia((data as MediaEntry[]) ?? []);
-    } catch (error) {
-      console.error("[Studio] fetchMedia error:", error);
+      const [jobsResponse, assetsResponse] = await Promise.all([
+        jobsQuery,
+        assetsQuery,
+      ]);
+
+      if (jobsResponse.error) throw jobsResponse.error;
+      if (assetsResponse.error) throw assetsResponse.error;
+
+      setJobs((jobsResponse.data as JobEntry[]) ?? []);
+      setAssets((assetsResponse.data as MediaEntry[]) ?? []);
+    } catch (err) {
+      console.error("[Studio] refetchAll error:", err);
+      setJobs([]);
+      setAssets([]);
+      const message = err instanceof Error ? err.message : "Erreur inconnue pendant le rafraîchissement";
+      setError(message);
     } finally {
-      setMediaLoading(false);
+      setLoading(false);
     }
-  }, [user?.id, orderId]);
+  }, [orderId]);
 
   useEffect(() => {
-    if (!user?.id) return;
-    void refetchJobs();
-    void refetchMedia();
-  }, [user?.id, refetchJobs, refetchMedia]);
+    let mounted = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
-  useEffect(() => {
-    if (!user?.id) return;
+    (async () => {
+      await refetchAll();
 
-    const channel = supabase
-      .channel("studio-stream")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "job_queue", filter: `user_id=eq.${user.id}` },
-        () => {
-          void refetchJobs();
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "media_generations", filter: `user_id=eq.${user.id}` },
-        () => {
-          void refetchMedia();
-        },
-      )
-      .subscribe();
+      const {
+        data: { user: currentUser },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (!mounted) return;
+      if (authError) {
+        console.error("[Studio] auth error after refetch:", authError);
+        setError((prev) => prev ?? authError.message);
+        return;
+      }
+      if (!currentUser) return;
+
+      channel = supabase
+        .channel("studio-stream")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "job_queue", filter: `user_id=eq.${currentUser.id}` },
+          () => {
+            if (mounted) void refetchAll();
+          },
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "media_generations", filter: `user_id=eq.${currentUser.id}` },
+          () => {
+            if (mounted) void refetchAll();
+          },
+        )
+        .subscribe();
+    })();
 
     return () => {
-      supabase.removeChannel(channel);
+      mounted = false;
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
-  }, [user?.id, refetchJobs, refetchMedia]);
+  }, [refetchAll]);
+
+  const requeueJob = useCallback(
+    async (job: JobEntry) => {
+      try {
+        let payload: unknown = job.payload ?? null;
+        if (typeof payload === "string" && payload.trim()) {
+          try {
+            payload = JSON.parse(payload);
+          } catch (parseError) {
+            throw new Error("Impossible de relancer le job: payload invalide");
+          }
+        }
+
+        if (payload == null) {
+          throw new Error("Impossible de relancer ce job sans payload");
+        }
+
+        const { error: insertError } = await supabase.from("job_queue").insert({
+          user_id: job.user_id,
+          order_id: job.order_id,
+          type: job.type,
+          status: "queued",
+          payload,
+        });
+
+        if (insertError) throw insertError;
+
+        toast({
+          title: "Job relancé",
+          description: "Le job a été renvoyé en file d'attente",
+        });
+
+        await refetchAll();
+      } catch (err) {
+        console.error("[Studio] requeueJob error:", err);
+        toast({
+          title: "Échec du renvoi",
+          description: err instanceof Error ? err.message : "Erreur inconnue lors du renvoi du job",
+          variant: "destructive",
+        });
+      }
+    },
+    [refetchAll, toast],
+  );
 
   const handleSourceUpload = useCallback(
     async (file: File) => {
@@ -768,15 +833,23 @@ export function ChatGenerator() {
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  void refetchJobs();
+                  void refetchAll();
                 }}
-                disabled={jobsLoading || !user?.id}
+                disabled={loading}
               >
-                Rafraîchir
+                {loading ? (
+                  <span className="flex items-center gap-1 text-xs">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    …
+                  </span>
+                ) : (
+                  "Rafraîchir"
+                )}
               </Button>
             </div>
+            {error && <div className="text-xs text-red-600 mt-2">{error}</div>}
 
-            {jobsLoading ? (
+            {loading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Chargement des jobs…
@@ -787,29 +860,42 @@ export function ChatGenerator() {
               </p>
             ) : (
               <div className="space-y-3">
-                {jobs.map((job) => (
-                  <div key={job.id} className="rounded-lg border p-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium capitalize">
-                          {job.type.replace(/_/g, " ")}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{formatDate(job.created_at)}</p>
+                {jobs.map((job) => {
+                  const jobError = job.error_message || job.error;
+
+                  return (
+                    <div key={job.id} className="rounded-lg border p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium capitalize">
+                            {job.type.replace(/_/g, " ")}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{formatDate(job.created_at)}</p>
+                        </div>
+                        <Badge variant={jobBadgeVariant(job.status)} className="uppercase">
+                          {job.status}
+                        </Badge>
                       </div>
-                      <Badge variant={jobBadgeVariant(job.status)} className="uppercase">
-                        {job.status}
-                      </Badge>
+                      {job.order_id && (
+                        <p className="mt-1 text-xs text-muted-foreground">Order #{job.order_id}</p>
+                      )}
+                      {jobError && (
+                        <div className="mt-2 text-xs text-red-600 flex flex-wrap items-center gap-2">
+                          <span className="break-words flex-1">{jobError}</span>
+                          <button
+                            type="button"
+                            className="underline"
+                            onClick={() => {
+                              void requeueJob(job);
+                            }}
+                          >
+                            Retenter
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    {job.order_id && (
-                      <p className="mt-1 text-xs text-muted-foreground">Order #{job.order_id}</p>
-                    )}
-                    {job.error && (
-                      <p className="mt-2 text-xs text-destructive break-words">
-                        {job.error}
-                      </p>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </Card>
@@ -824,26 +910,33 @@ export function ChatGenerator() {
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  void refetchMedia();
+                  void refetchAll();
                 }}
-                disabled={mediaLoading || !user?.id}
+                disabled={loading}
               >
-                Rafraîchir
+                {loading ? (
+                  <span className="flex items-center gap-1 text-xs">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    …
+                  </span>
+                ) : (
+                  "Rafraîchir"
+                )}
               </Button>
             </div>
 
-            {mediaLoading ? (
+            {loading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Chargement des médias…
               </div>
-            ) : media.length === 0 ? (
+            ) : assets.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Aucun média {orderId ? "pour cette commande." : "enregistré pour le moment."}
               </p>
             ) : (
               <div className="space-y-4">
-                {media.map((item) => {
+                {assets.map((item) => {
                   const previewUrl = item.thumbnail_url || item.output_url || "";
                   const woofs =
                     typeof item.metadata === "object" && item.metadata && "woofs" in item.metadata
@@ -896,7 +989,6 @@ export function ChatGenerator() {
             )}
           </Card>
         </div>
-
         {/* Result preview */}
         {generatedAsset && (
           <Card className="p-6">

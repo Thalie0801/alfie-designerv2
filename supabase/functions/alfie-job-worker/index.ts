@@ -54,6 +54,77 @@ function isHttp402(e: unknown) {
   return /402|payment required|insufficient credits/i.test(msg);
 }
 
+async function callFn<T = unknown>(name: string, body: unknown): Promise<T> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+
+  if (!supabaseUrl || !anonKey) {
+    throw new Error(`Missing Supabase configuration for ${name}`);
+  }
+
+  const resp = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${anonKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body ?? {}),
+  });
+
+  const text = await resp.text().catch(() => "");
+  if (!resp.ok) {
+    throw new Error(`${name} failed: ${resp.status} ${resp.statusText} ${text}`);
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return text as unknown as T;
+  }
+}
+
+function unwrapResult<T = unknown>(input: any): T {
+  if (input && typeof input === "object" && "data" in input && (input as any).data != null) {
+    return unwrapResult<T>((input as any).data);
+  }
+  return input as T;
+}
+
+function extractError(input: any): string | null {
+  if (!input || typeof input !== "object") return null;
+  if ("error" in input) {
+    const value = (input as any).error;
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  if ("data" in input) {
+    return extractError((input as any).data);
+  }
+  return null;
+}
+
+function getResultValue<T = unknown>(input: any, keys: string[]): T | null {
+  for (const key of keys) {
+    const value = deepGet(input, key);
+    if (value !== undefined && value !== null) {
+      return value as T;
+    }
+  }
+  return null;
+}
+
+function deepGet(obj: any, key: string): any {
+  if (!obj || typeof obj !== "object") return null;
+  if (key in obj && (obj as any)[key] != null) {
+    return (obj as any)[key];
+  }
+  if ("data" in obj) {
+    return deepGet((obj as any).data, key);
+  }
+  return null;
+}
+
 // ---------- HTTP Entrypoint ----------
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -276,17 +347,22 @@ Format: ${aspectRatio} aspect ratio optimized.`;
     try {
       // 1) generate
       console.log("🎨 generate", { aspectRatio, resolution: img.resolution });
-      const { data, error } = await supabaseAdmin.functions.invoke("alfie-generate-ai-image", {
-        body: {
-          prompt: img.prompt,
-          resolution: img.resolution,
-          backgroundOnly: false,
-          brandKit: await loadBrandMini(img.brandId),
-        },
+      const imageResult = await callFn<any>("alfie-generate-ai-image", {
+        prompt: img.prompt,
+        resolution: img.resolution,
+        backgroundOnly: false,
+        brandKit: await loadBrandMini(img.brandId),
       });
-      if (error || data?.error) throw new Error(data?.error || error?.message || "Image generation failed");
 
-      const imageUrl = data?.imageUrl || data?.data?.imageUrl;
+      const imagePayload = unwrapResult<any>(imageResult);
+      const imageError = extractError(imageResult) ?? extractError(imagePayload);
+      if (imageError) throw new Error(imageError || "Image generation failed");
+
+      const imageUrl =
+        (typeof imagePayload === "string"
+          ? imagePayload
+          : getResultValue<string>(imagePayload, ["imageUrl", "url", "outputUrl", "output_url"])) ??
+        getResultValue<string>(imageResult, ["imageUrl", "url", "outputUrl", "output_url"]);
       if (!imageUrl) throw new Error("No image URL returned");
 
       // 2) upload cloudinary
@@ -392,21 +468,44 @@ async function processRenderCarousels(payload: any) {
       const slideCount =
         typeof brief?.numSlides === "number" ? brief.numSlides : parseInt(String(brief?.numSlides ?? "5")) || 5;
 
-      const { data, error } = await supabaseAdmin.functions.invoke("alfie-plan-carousel", {
-        body: { prompt: brief?.topic ?? "Carousel", slideCount, brandKit: brandMini },
+      const planResult = await callFn<any>("alfie-plan-carousel", {
+        prompt: brief?.topic ?? "Carousel",
+        slideCount,
+        brandKit: brandMini,
       });
-      if (error || data?.error) throw new Error(data?.error || error?.message);
 
-      const slides = data?.slides;
-      if (!Array.isArray(slides) || slides.length === 0) throw new Error("Plan returned no slides");
+      const planPayload = unwrapResult<any>(planResult);
+      const planError = extractError(planResult) ?? extractError(planPayload);
+      if (planError) throw new Error(planError);
+
+      const planObject =
+        (planPayload && typeof planPayload === "object"
+          ? (planPayload as Record<string, any>)
+          : null) ??
+        (typeof planResult === "object" && planResult !== null
+          ? (planResult as Record<string, any>)
+          : null);
+
+      if (!planObject) throw new Error("Plan returned invalid payload");
+
+      const slides = Array.isArray(planObject.slides) ? planObject.slides : [];
+      if (slides.length === 0) throw new Error("Plan returned no slides");
+
+      const prompts = Array.isArray(planObject.prompts) ? planObject.prompts : [];
+      const style =
+        typeof planObject.style === "string"
+          ? planObject.style
+          : typeof (planObject as any).meta?.style === "string"
+            ? (planObject as any).meta.style
+            : "minimalist";
 
       return {
         id: crypto.randomUUID(),
         aspectRatio: payload.aspectRatio || "9:16",
         textVersion: 1,
         slides,
-        prompts: data?.prompts || [],
-        style: data?.style || "minimalist",
+        prompts,
+        style,
         brandId,
       };
     });
@@ -436,31 +535,42 @@ async function processRenderCarousels(payload: any) {
 
       while (true) {
         try {
-          const { data, error } = await supabaseAdmin.functions.invoke("alfie-render-carousel-slide", {
-            body: {
-              userId: payload.userId,
-              prompt: slidePrompt,
-              globalStyle: carousel.style || "minimalist",
-              slideContent: slide,
-              brandId: carousel.brandId,
-              orderId: payload.orderId,
-              carouselId: carousel.id,
-              slideIndex: i,
-              totalSlides: carousel.slides.length,
-              aspectRatio: carousel.aspectRatio || "9:16",
-              textVersion: carousel.textVersion || 1,
-              renderVersion: 1,
-              campaign: "carousel_generation",
-              language: "FR",
-            },
+          const slideResult = await callFn<any>("alfie-render-carousel-slide", {
+            userId: payload.userId,
+            prompt: slidePrompt,
+            globalStyle: carousel.style || "minimalist",
+            slideContent: slide,
+            brandId: carousel.brandId,
+            orderId: payload.orderId,
+            carouselId: carousel.id,
+            slideIndex: i,
+            totalSlides: carousel.slides.length,
+            aspectRatio: carousel.aspectRatio || "9:16",
+            textVersion: carousel.textVersion || 1,
+            renderVersion: 1,
+            campaign: "carousel_generation",
+            language: "FR",
           });
 
-          if (error || data?.error) throw new Error(data?.error || error?.message);
+          const slidePayload = unwrapResult<any>(slideResult);
+          const slideError = extractError(slideResult) ?? extractError(slidePayload);
+          if (slideError) throw new Error(slideError);
+
+          const cloudinaryUrl =
+            (typeof slidePayload === "string"
+              ? slidePayload
+              : getResultValue<string>(slidePayload, ["cloudinary_url", "url"])) ??
+            getResultValue<string>(slideResult, ["cloudinary_url", "url"]);
+          const cloudinaryPublicId =
+            getResultValue<string>(slidePayload, ["cloudinary_public_id"]) ??
+            getResultValue<string>(slideResult, ["cloudinary_public_id"]);
+
+          if (!cloudinaryUrl) throw new Error("Slide renderer did not return cloudinary_url");
 
           slidesOut.push({
             index: i,
-            url: data.cloudinary_url,
-            publicId: data.cloudinary_public_id,
+            url: cloudinaryUrl,
+            publicId: cloudinaryPublicId ?? undefined,
             text: slide,
           });
           break;
@@ -491,22 +601,30 @@ async function processRenderCarousels(payload: any) {
   return { carousels: results };
 }
 
-type AssembleResp = { video_url?: string; error?: string };
-
 async function processGenerateVideo(payload: any) {
   console.log("🎥 [processGenerateVideo]", payload?.orderId);
 
   const { userId, brandId, orderId, aspectRatio, duration, prompt, sourceUrl } = payload;
 
-  const { data, error } = await supabaseAdmin.functions.invoke("alfie-assemble-video", {
-    body: { aspectRatio, duration, prompt, sourceUrl, brandId, orderId },
+  const assembleResult = await callFn<any>("alfie-assemble-video", {
+    aspectRatio,
+    duration,
+    prompt,
+    sourceUrl,
+    brandId,
+    orderId,
   });
-  const res = (data ?? {}) as AssembleResp;
-  if (error || res.error) {
-    throw new Error(res.error || error?.message || "Video assembly failed");
-  }
 
-  const videoUrl = res.video_url;
+  const assemblePayload = unwrapResult<any>(assembleResult);
+  const assembleError = extractError(assembleResult) ?? extractError(assemblePayload);
+  if (assembleError) throw new Error(assembleError || "Video assembly failed");
+
+  let videoUrl =
+    (typeof assemblePayload === "string"
+      ? assemblePayload
+      : getResultValue<string>(assemblePayload, ["video_url", "videoUrl", "output_url", "outputUrl"])) ??
+    getResultValue<string>(assembleResult, ["video_url", "videoUrl", "output_url", "outputUrl"]);
+
   if (!videoUrl) throw new Error("Missing video_url from assembler response");
 
   const seconds = Number(duration) || 12;
