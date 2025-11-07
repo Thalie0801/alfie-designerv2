@@ -398,7 +398,9 @@ export function buildSummary(context: ConversationContext): string {
     const grouped = new Map<string, { brief: any; indices: number[] }>();
     
     context.carouselBriefs?.forEach((brief, idx) => {
-      const key = `${(brief.topic || 'n/a').toLowerCase()}|${(brief.angle || 'n/a').toLowerCase()}|${brief.numSlides || 5}`;
+      const topic = typeof brief.topic === 'string' ? brief.topic : 'n/a';
+      const angle = typeof brief.angle === 'string' ? brief.angle : 'n/a';
+      const key = `${topic.toLowerCase()}|${angle.toLowerCase()}|${brief.numSlides || 5}`;
       
       if (grouped.has(key)) {
         grouped.get(key)!.indices.push(idx + 1);

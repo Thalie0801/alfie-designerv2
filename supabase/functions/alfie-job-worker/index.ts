@@ -393,6 +393,7 @@ async function processRenderImages(payload: any) {
     aspectRatio: "1:1" | "4:5" | "9:16" | "16:9";
     brandId?: string;
     briefIndex?: number;
+    templateImageUrl?: string;
   }> = [];
 
   if (payload.images) {

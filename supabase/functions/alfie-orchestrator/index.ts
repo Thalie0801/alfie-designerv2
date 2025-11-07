@@ -148,7 +148,6 @@ serve(async (req) => {
       const duration = Number(body?.durationSec) || 12;
       const promptText = (user_message || "").trim();
       const sourceUrl = body?.uploadedSourceUrl || null;
-      const sourceType = body?.uploadedSourceType || null;
 
       let orderId: string | null = session.order_id;
       if (!orderId) {
@@ -159,7 +158,7 @@ serve(async (req) => {
             brand_id: brand_id,
             campaign_name: `Video_${Date.now()}`,
             brief_json: {
-              video: { aspectRatio, durationSec: duration, prompt: promptText, sourceUrl, sourceType },
+              video: { aspectRatio, durationSec: duration, prompt: promptText, sourceUrl },
             },
             status: "pending",
           })
@@ -183,7 +182,6 @@ serve(async (req) => {
           duration,
           prompt: promptText,
           sourceUrl,
-          sourceType,
         },
       });
 
@@ -353,7 +351,6 @@ serve(async (req) => {
         durationSec: null,
         prompt: null,
         sourceUrl: body?.uploadedSourceUrl || null,
-        sourceType: body?.uploadedSourceType || null,
       };
       state = "awaiting_video_params";
       await sb
@@ -379,7 +376,6 @@ serve(async (req) => {
         durationSec: null,
         prompt: null,
         sourceUrl: body?.uploadedSourceUrl || null,
-        sourceType: body?.uploadedSourceType || null,
       };
 
       const { aspectRatio, durationSec } = parseFormatDuration(user_message || "");
@@ -387,9 +383,6 @@ serve(async (req) => {
       if (durationSec) context.video!.durationSec = durationSec;
       if (!context.video!.sourceUrl && body?.uploadedSourceUrl) {
         context.video!.sourceUrl = body.uploadedSourceUrl;
-      }
-      if (!context.video!.sourceType && body?.uploadedSourceType) {
-        context.video!.sourceType = body.uploadedSourceType;
       }
 
       await sb
@@ -433,7 +426,6 @@ serve(async (req) => {
         durationSec: null,
         prompt: null,
         sourceUrl: body?.uploadedSourceUrl || null,
-        sourceType: body?.uploadedSourceType || null,
       }) as any;
       const promptText = (user_message || "").trim();
       if (!promptText) {
@@ -483,7 +475,6 @@ serve(async (req) => {
           duration: v.durationSec,
           prompt: v.prompt,
           sourceUrl: v.sourceUrl || null,
-          sourceType: v.sourceType || null,
         },
       };
       await sb.from("job_queue").insert(job);

@@ -917,56 +917,13 @@ export function AlfieChat() {
               {message.type === "carousel" && (
                 <div className="space-y-2">
                   <p className="text-sm">{message.content}</p>
-                  {message.metadata?.total && (
-                    <Progress value={(message.metadata.done / message.metadata.total) * 100} className="w-full" />
+                  {message.metadata?.total && message.metadata?.done && (
+                    <Progress value={(Number(message.metadata.done) / Number(message.metadata.total)) * 100} className="w-full" />
                   )}
-                  {message.metadata?.assetUrls && (
+                  {message.metadata?.assetUrls && Array.isArray(message.metadata.assetUrls) && (
                     <div className="grid grid-cols-2 gap-2 mt-2">
                       {message.metadata.assetUrls.map((entry: any, i: number) => {
-                        const item = typeof entry === "string" ? { url: entry } : entry;
-                        if (!item?.url) return null;
-
-                        const aspectClass = getAspectClass(item.format || "4:5");
-
-                        const imageUrl = (() => {
-                          if (item.publicId && item.text) {
-                            const cloudName =
-                              extractCloudNameFromUrl(item.url) ||
-                              (import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined);
-
-                            if (!cloudName) return item.url ?? "/placeholder.svg";
-
-                            try {
-                              return slideUrl(item.publicId, {
-                                title: item.text.title,
-                                subtitle: item.text.subtitle,
-                                bulletPoints: item.text.bullets,
-                                aspectRatio: (item.format || "4:5") as "4:5" | "1:1" | "9:16" | "16:9",
-                                cloudName,
-                              });
-                            } catch {
-                              return item.url ?? "/placeholder.svg";
-                            }
-                          }
-
-                          if (item.url?.startsWith("https://")) return item.url;
-                          return "/placeholder.svg";
-                        })();
-
-                        return (
-                          <div key={i} className={`relative ${aspectClass} rounded-lg overflow-hidden`}>
-                            <img
-                              src={imageUrl}
-                              alt={`Slide ${i + 1}`}
-                              className="absolute inset-0 w-full h-full object-cover"
-                              loading="lazy"
-                              onError={(e) => {
-                                if (item.url?.startsWith("https://")) {
-                                  (e.currentTarget as HTMLImageElement).src = item.url;
-                                }
-                              }}
-                            />
-                          </div>
+...
                         );
                       })}
                     </div>

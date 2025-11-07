@@ -8,7 +8,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { uploadToChatBucket } from "@/lib/chatUploads";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { toast } from "sonner";
 
@@ -46,7 +45,7 @@ type MediaEntry = {
   id: string;
   type: string;
   status: string;
-  order_id: string | null;
+  order_id?: string | null;
   output_url: string | null;
   thumbnail_url?: string | null;
   metadata?: Record<string, any> | null;
@@ -114,7 +113,6 @@ function extractMediaUrl(payload: unknown): string | null {
 }
 
 export function ChatGenerator() {
-  const { user } = useAuth();
   const { activeBrandId } = useBrandKit();
   const location = useLocation();
   const navigate = useNavigate();
@@ -220,7 +218,7 @@ export function ChatGenerator() {
       if (assetsResponse.error) throw assetsResponse.error;
 
       setJobs((jobsResponse.data as JobEntry[]) ?? []);
-      setAssets((assetsResponse.data as MediaEntry[]) ?? []);
+      setAssets((assetsResponse.data || []) as MediaEntry[]);
     } catch (err) {
       console.error("[Studio] refetchAll error:", err);
       setJobs([]);
@@ -295,13 +293,12 @@ export function ChatGenerator() {
           throw new Error("Impossible de relancer ce job sans payload");
         }
 
-        const { error: insertError } = await supabase.from("job_queue").insert({
-          user_id: job.user_id,
+        const { error: insertError } = await supabase.from("job_queue").insert([{
           order_id: job.order_id,
           type: job.type,
-          status: "queued",
+          status: "queued" as const,
           payload,
-        });
+        }] as any);
 
         if (insertError) throw insertError;
 
@@ -824,7 +821,7 @@ export function ChatGenerator() {
                           <span className="break-words flex-1">{jobError}</span>
                           <Button
                             variant="ghost"
-                            size="xs"
+                            size="sm"
                             disabled={isLegacy}
                             title={
                               isLegacy

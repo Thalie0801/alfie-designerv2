@@ -230,7 +230,7 @@ serve(async (req) => {
         const label = `carousel=${carouselId} slide=${job.slideIndex + 1}/${totalSlides}`;
 
         const exec = async () => {
-          const headers = forwardAuth && authHeader
+          const headers: Record<string, string> = forwardAuth && authHeader
             ? { Authorization: authHeader, "X-Internal-Secret": INTERNAL_SECRET }
             : { "X-Internal-Secret": INTERNAL_SECRET };
 
