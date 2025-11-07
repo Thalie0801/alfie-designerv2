@@ -77,9 +77,16 @@ export function FileUploader({
   }, [acceptedTypes]);
 
   const uploadToSupabase = async (file: File): Promise<string> => {
-    const ext = (file.name.split(".").pop() || "").toLowerCase();
-    const name = (crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)) + (ext ? `.${ext}` : "");
-    const path = `uploads/${name}`;
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError) throw authError;
+    if (!user) throw new Error("Utilisateur non authentifié");
+
+    const safeName = file.name.replace(/\s+/g, "_");
+    const fileName = `${Date.now()}_${safeName}`;
+    const path = `${user.id}/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
       .from("chat-uploads")
@@ -87,10 +94,14 @@ export function FileUploader({
 
     if (uploadError) throw uploadError;
 
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from("chat-uploads").getPublicUrl(path);
-    return publicUrl;
+    const { data: signed, error: signedError } = await supabase.storage
+      .from("chat-uploads")
+      .createSignedUrl(path, 60 * 60);
+    if (signedError) throw signedError;
+
+    const signedUrl = signed?.signedUrl;
+    if (!signedUrl) throw new Error("Impossible de générer l’URL signée");
+    return signedUrl;
   };
 
   const onDrop = useCallback(

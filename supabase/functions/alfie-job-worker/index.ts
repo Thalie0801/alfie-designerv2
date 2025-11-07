@@ -492,57 +492,32 @@ async function processRenderCarousels(payload: any) {
 }
 
 async function processGenerateVideo(payload: any) {
-  console.log("🎥 [processGenerateVideo]");
+  console.log("🎥 [processGenerateVideo]", payload?.orderId);
 
-  const { slides, narration, brandId, orderId } = payload;
-  if (!Array.isArray(slides) || slides.length === 0) throw new Error("Slides required");
+  const { userId, brandId, orderId, aspectRatio, duration, prompt, sourceUrl } = payload;
 
-  // Generate images (16:9)
-  const imageResults = await Promise.all(
-    slides.map((s: any, idx: number) =>
-      supabaseAdmin.functions.invoke("alfie-render-image", {
-        body: {
-          provider: "gemini_image",
-          prompt: s?.prompt || s?.text || `Slide ${idx + 1}`,
-          brand_id: brandId,
-          order_id: orderId,
-          format: "1280x720",
-          backgroundOnly: false,
-          slideIndex: idx,
-          totalSlides: slides.length,
-        },
-      }),
-    ),
-  );
-  const imageUrls = imageResults
-    .map((r) => r.data?.data?.image_urls?.[0] || r.data?.imageUrl || r.data?.url)
-    .filter(Boolean);
-  if (imageUrls.length !== slides.length) throw new Error("Some images failed to generate");
-
-  // TTS best-effort (kept optional)
-  let audioGenerated = false;
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (LOVABLE_API_KEY && typeof narration === "string" && narration.trim()) {
-    try {
-      const tts = await fetch("https://ai.gateway.lovable.dev/v1/audio/speech", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "google/gemini-2.5-tts", input: narration, voice: "female_warm" }),
-      });
-      audioGenerated = tts.ok;
-    } catch {
-      audioGenerated = false;
-    }
+  const { data, error } = await supabaseAdmin.functions.invoke("alfie-assemble-video", {
+    body: { aspectRatio, duration, prompt, sourceUrl, brandId, orderId },
+  });
+  if (error || data?.error) {
+    throw new Error(data?.error || error?.message || "Video assembly failed");
   }
 
-  // Assembly is out-of-scope here (needs Cloudinary video pipeline or external compute)
-  console.log("⚠️ Video assembly not implemented in worker (use slideshow function or external pipeline)");
+  const videoUrl = data?.video_url;
+  if (!videoUrl) throw new Error("Missing video_url from assembler response");
 
-  return {
-    imageUrls,
-    audioGenerated,
-    message: "Images ready; assemble video via slideshow pipeline or external service.",
-  };
+  const { error: assetErr } = await supabaseAdmin.from("media_generations").insert({
+    user_id: userId,
+    brand_id: brandId,
+    order_id: orderId,
+    type: "video",
+    status: "completed",
+    output_url: videoUrl,
+    metadata: { aspectRatio, duration, prompt, sourceUrl, generator: "assemble-video" },
+  });
+  if (assetErr) throw new Error(assetErr.message);
+
+  return { videoUrl };
 }
 
 // ========== CASCADE JOB CREATION ==========

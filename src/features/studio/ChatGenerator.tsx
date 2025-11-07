@@ -239,11 +239,16 @@ export function ChatGenerator() {
       }
 
       try {
-        const ext = file.name.split(".").pop() || "bin";
-        const fileName = `${Date.now()}_${Math.random()
-          .toString(36)
-          .substr(2, 9)}.${ext}`;
-        const filePath = `chat-uploads/${fileName}`;
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+        if (authError) throw authError;
+        if (!user) throw new Error("Utilisateur non authentifié");
+
+        const safeName = file.name.replace(/\s+/g, "_");
+        const fileName = `${Date.now()}_${safeName}`;
+        const filePath = `${user.id}/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
           .from("chat-uploads")
@@ -254,13 +259,17 @@ export function ChatGenerator() {
 
         if (uploadError) throw uploadError;
 
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("chat-uploads").getPublicUrl(filePath);
+        const { data: signed, error: signedError } = await supabase.storage
+          .from("chat-uploads")
+          .createSignedUrl(filePath, 60 * 60);
+        if (signedError) throw signedError;
+
+        const uploadedSourceUrl = signed?.signedUrl;
+        if (!uploadedSourceUrl) throw new Error("Impossible de générer l’URL signée");
 
         setUploadedSource({
           type: isImage ? "image" : "video",
-          url: publicUrl,
+          url: uploadedSourceUrl,
           name: file.name,
         });
 

@@ -1,10 +1,12 @@
 // Gestion du workflow conversationnel Alfie
 
-export type ConversationState = 
+export type ConversationState =
   | 'initial'
   | 'collecting_order_size'
   | 'collecting_image_brief'
   | 'collecting_carousel_brief'
+  | 'awaiting_video_params'
+  | 'awaiting_video_prompt'
   | 'confirming'
   | 'generating'
   | 'completed';
@@ -18,6 +20,12 @@ export interface ConversationContext {
   carouselBriefs?: any[];
   globalStyle?: string;
   campaign?: string;
+  video?: {
+    aspectRatio: string | null;
+    durationSec: number | null;
+    prompt?: string | null;
+    sourceUrl?: string | null;
+  } | null;
 }
 
 export interface BriefQuestion {

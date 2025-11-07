@@ -285,27 +285,38 @@ export function ChatGenerator() {
     try {
       const {
         data: { user },
+        error: authError,
       } = await supabase.auth.getUser();
+      if (authError) throw authError;
       if (!user) {
         toast.error("Vous devez être connecté");
         return;
       }
-      const safeName = file.name.replace(/[^\w.\-]+/g, "_");
-      const fileName = `${user.id}/${Date.now()}-${safeName}`;
+
+      const safeName = file.name.replace(/\s+/g, "_");
+      const fileName = `${Date.now()}_${safeName}`;
+      const filePath = `${user.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from("chat-uploads")
-        .upload(fileName, file, { contentType: file.type, upsert: false });
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
 
       if (uploadError) throw uploadError;
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("chat-uploads").getPublicUrl(fileName);
+      const { data: signed, error: signedError } = await supabase.storage
+        .from("chat-uploads")
+        .createSignedUrl(filePath, 60 * 60);
+      if (signedError) throw signedError;
+
+      const uploadedSourceUrl = signed?.signedUrl;
+      if (!uploadedSourceUrl) throw new Error("Impossible de générer l’URL signée");
 
       const src: UploadedSource = {
         type: isVideo ? ("video" as const) : ("image" as const),
-        url: publicUrl,
+        url: uploadedSourceUrl,
         name: file.name,
       };
       setUploadedSource(src);

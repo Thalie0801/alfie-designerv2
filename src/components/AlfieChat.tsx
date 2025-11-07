@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { Send, ImagePlus, Loader2, Download } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -59,6 +59,14 @@ const backoffMs = (attempt: number) => {
 // Upload image: types + taille max (10 Mo)
 const ALLOWED_IMG = ["image/png", "image/jpeg", "image/webp"];
 const MAX_IMG_BYTES = 10 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
+
+type UploadedSource = {
+  url: string;
+  previewUrl: string;
+  type: "image" | "video";
+  name: string;
+};
 
 // =====================
 // TYPES
@@ -109,7 +117,8 @@ export function AlfieChat() {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedSource, setUploadedSource] = useState<UploadedSource | null>(null);
+  const [uploadingSource, setUploadingSource] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [conversationState, setConversationState] = useState<ConversationState>("idle");
@@ -126,12 +135,37 @@ export function AlfieChat() {
   const mountedRef = useRef(true);
   const inFlightRef = useRef(false);
 
+  const clearUploadedSource = useCallback(() => {
+    setUploadedSource((prev) => {
+      if (prev?.previewUrl?.startsWith("blob:")) {
+        try {
+          URL.revokeObjectURL(prev.previewUrl);
+        } catch (err) {
+          console.warn("[Chat] revoke preview failed", err);
+        }
+      }
+      return null;
+    });
+  }, []);
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (uploadedSource?.previewUrl?.startsWith("blob:")) {
+        try {
+          URL.revokeObjectURL(uploadedSource.previewUrl);
+        } catch (err) {
+          console.warn("[Chat] revoke preview cleanup failed", err);
+        }
+      }
+    };
+  }, [uploadedSource]);
 
   useEffect(() => {
     seenAssetsRef.current = new Set<string>();
@@ -337,30 +371,72 @@ export function AlfieChat() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!ALLOWED_IMG.includes(file.type)) {
-      toast.error("Format non supporté (PNG/JPEG/WebP uniquement).");
+    const isImage = file.type.startsWith("image/");
+    const isVideo = file.type.startsWith("video/");
+
+    if (isImage && !ALLOWED_IMG.includes(file.type)) {
+      toast.error("Format image non supporté (PNG/JPEG/WebP).");
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
-    if (file.size > MAX_IMG_BYTES) {
-      toast.error("Image trop lourde (max 10 Mo).");
+    if (!isImage && !isVideo) {
+      toast.error("Format non supporté. Choisis une image ou une vidéo.");
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
+    if (isImage && file.size > MAX_IMG_BYTES) {
+      toast.error("Image trop lourde (max 10 Mo).");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    if (isVideo && file.size > MAX_VIDEO_BYTES) {
+      toast.error("Vidéo trop volumineuse (max 200 Mo).");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setUploadingSource(true);
+
     try {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const dataUrl = event.target?.result as string;
-        setUploadedImage(dataUrl);
-        toast.success("Image importée ! Décris ce que tu veux en faire.");
-      };
-      reader.readAsDataURL(file);
-    } catch (error) {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      if (!user) throw new Error("Authentification requise");
+
+      const safeName = file.name.replace(/\s+/g, "_");
+      const filePath = `${user.id}/${Date.now()}_${safeName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("chat-uploads")
+        .upload(filePath, file, { cacheControl: "3600", upsert: false });
+      if (uploadError) throw uploadError;
+
+      const { data: signed, error: signedError } = await supabase.storage
+        .from("chat-uploads")
+        .createSignedUrl(filePath, 60 * 60);
+      if (signedError) throw signedError;
+
+      const signedUrl = signed?.signedUrl;
+      if (!signedUrl) throw new Error("Impossible de générer l’URL signée");
+
+      const previewUrl = URL.createObjectURL(file);
+      clearUploadedSource();
+      setUploadedSource({
+        url: signedUrl,
+        previewUrl,
+        type: isVideo ? "video" : "image",
+        name: file.name,
+      });
+
+      toast.success(isVideo ? "Vidéo importée ! Décris ce que tu veux en faire." : "Image importée ! Décris ce que tu veux en faire.");
+    } catch (error: any) {
       console.error("[Upload] Error:", error);
-      toast.error("Erreur lors de l’upload");
+      toast.error(`Erreur lors de l’upload${error?.message ? ` : ${error.message}` : ""}`);
     } finally {
-      // reset input pour pouvoir re-sélectionner la même image
+      setUploadingSource(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
@@ -372,7 +448,12 @@ export function AlfieChat() {
     const messageToSend = (override ?? input).trim();
     if (isLoading || inFlightRef.current) return;
 
-    if (!messageToSend && !uploadedImage) return;
+    if (uploadingSource) {
+      toast.error("Upload en cours. Patiente quelques secondes avant d’envoyer.");
+      return;
+    }
+
+    if (!messageToSend && !uploadedSource) return;
     if (!activeBrandId) {
       toast.error("Sélectionne une marque d'abord !");
       return;
@@ -387,7 +468,13 @@ export function AlfieChat() {
 
     // push message user
     setInput("");
-    addMessage({ role: "user", content: trimmed || "(image uniquement)", type: "text" });
+    addMessage({
+      role: "user",
+      content: trimmed || (uploadedSource ? "(média uniquement)" : "(message vide)"),
+      type: (uploadedSource?.type as Message["type"]) || "text",
+      assetUrl: uploadedSource ? uploadedSource.previewUrl || uploadedSource.url : undefined,
+      metadata: uploadedSource ? { name: uploadedSource.name, signedUrl: uploadedSource.url } : undefined,
+    });
 
     // Commande /queue (monitoring)
     if (trimmed.startsWith("/queue")) {
@@ -455,8 +542,10 @@ export function AlfieChat() {
 
         // intention vidéo
         if (intent === "video") requestPayload.forceTool = "generate_video";
-        // transmet l’image si présente (dataURL)
-        if (uploadedImage) requestPayload.imageDataUrl = uploadedImage;
+        if (uploadedSource) {
+          requestPayload.uploadedSourceUrl = uploadedSource.url;
+          requestPayload.uploadedSourceType = uploadedSource.type;
+        }
 
         const { data, error } = await supabase.functions.invoke("alfie-orchestrator", {
           body: requestPayload,
@@ -516,7 +605,7 @@ export function AlfieChat() {
         }
 
         // succès → reset image si envoyée
-        if (uploadedImage) setUploadedImage(null);
+        if (uploadedSource) clearUploadedSource();
 
         setIsLoading(false);
         inFlightRef.current = false;
@@ -866,16 +955,30 @@ export function AlfieChat() {
 
       {/* Composer */}
       <div className="border-t bg-background p-4">
-        {uploadedImage && (
+        {uploadedSource && (
           <div className="mb-2 relative inline-block">
-            <img src={uploadedImage} alt="Upload preview" className="h-20 rounded-lg border" />
+            {uploadedSource.type === "image" ? (
+              <img
+                src={uploadedSource.previewUrl || uploadedSource.url}
+                alt="Média uploadé"
+                className="h-20 rounded-lg border object-cover"
+              />
+            ) : (
+              <video
+                src={uploadedSource.previewUrl || uploadedSource.url}
+                className="h-20 rounded-lg border object-cover"
+                muted
+                loop
+                playsInline
+              />
+            )}
             <Button
               size="sm"
               variant="destructive"
               className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
-              onClick={() => setUploadedImage(null)}
-              aria-label="Retirer l’image"
-              title="Retirer l’image"
+              onClick={clearUploadedSource}
+              aria-label="Retirer le média"
+              title="Retirer le média"
             >
               ×
             </Button>
@@ -883,17 +986,17 @@ export function AlfieChat() {
         )}
 
         <div className="flex gap-2 items-end">
-          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
+          <input type="file" ref={fileInputRef} className="hidden" accept="image/*,video/*" onChange={handleFileUpload} />
 
           <Button
             variant="outline"
             size="icon"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isLoading}
-            aria-label="Importer une image"
-            title="Importer une image"
+            disabled={isLoading || uploadingSource}
+            aria-label="Importer un média"
+            title="Importer un média"
           >
-            <ImagePlus className="h-4 w-4" />
+            {uploadingSource ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
           </Button>
 
           <TextareaAutosize
@@ -915,7 +1018,7 @@ export function AlfieChat() {
 
           <Button
             onClick={() => void handleSend()}
-            disabled={isLoading || (!input.trim() && !uploadedImage)}
+            disabled={isLoading || uploadingSource || (!input.trim() && !uploadedSource)}
             size="icon"
             aria-label="Envoyer"
             title="Envoyer"

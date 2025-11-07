@@ -34,6 +34,16 @@ const toInt = (v: any, d = 0) => {
   return Number.isFinite(n) ? n : d;
 };
 
+// parse "9:16 • 12s" / "16:9 10s" / "9:16" / "12s"
+function parseFormatDuration(msg: string) {
+  const fmtMatch = msg.match(/\b(9:16|16:9)\b/i);
+  const durMatch = msg.match(/\b(\d{1,2})\s*s\b/i);
+  return {
+    aspectRatio: fmtMatch ? fmtMatch[1] : undefined,
+    durationSec: durMatch ? parseInt(durMatch[1], 10) : undefined,
+  };
+}
+
 async function appendMessage(sessionId: string, role: "user" | "assistant", content: string) {
   try {
     const { data: s } = await sb.from("alfie_conversation_sessions").select("messages").eq("id", sessionId).single();
@@ -73,19 +83,6 @@ serve(async (req) => {
       brand_id,
       msg: (user_message || "").substring(0, 80),
     });
-
-    // --- Détection vidéo en amont (format + durée)
-    const VIDEO_RE = /\b(vid[ée]o|reel|r[ée]el|tiktok|shorts?|clip)\b/i;
-    if (forceTool === "generate_video" || VIDEO_RE.test(user_message || "")) {
-      const resp = "🎬 Format vidéo ? 9:16 (vertical) ou 16:9 (paysage) — et durée ? (5–15 s recommandé)";
-      const quickReplies = ["9:16 • 7s", "9:16 • 12s", "16:9 • 10s", "16:9 • 15s"];
-      return json({
-        response: resp,
-        quickReplies,
-        conversationId: session_id || null,
-        state: "awaiting_format",
-      });
-    }
 
     // --- Auth côté user
     const authHeader = req.headers.get("authorization");
@@ -132,6 +129,176 @@ serve(async (req) => {
     }
 
     console.log("[ORCH] 📊 State:", state, "Context:", context);
+
+    const VIDEO_RE = /\b(vid[ée]o|reel|r[ée]el|tiktok|shorts?|clip)\b/i;
+    const isVideoFlowActive =
+      state === "awaiting_video_params" ||
+      state === "awaiting_video_prompt" ||
+      (state === "generating" && Boolean(context?.video));
+
+    if (
+      !isVideoFlowActive &&
+      (forceTool === "generate_video" || VIDEO_RE.test(user_message || ""))
+    ) {
+      context.video = {
+        aspectRatio: null,
+        durationSec: null,
+        prompt: null,
+        sourceUrl: body?.uploadedSourceUrl || null,
+      };
+      state = "awaiting_video_params";
+      await sb
+        .from("alfie_conversation_sessions")
+        .update({ conversation_state: state, context_json: context })
+        .eq("id", session.id);
+
+      const responseText =
+        "🎬 Format vidéo ? 9:16 (vertical) ou 16:9 (paysage) — et durée ? (5–15 s conseillé)";
+      const quickReplies = ["9:16 • 7s", "9:16 • 12s", "16:9 • 10s", "16:9 • 15s"];
+      await appendMessage(session.id, "assistant", responseText);
+      return json({
+        response: responseText,
+        quickReplies,
+        conversationId: session.id,
+        state,
+      });
+    }
+
+    if (state === "awaiting_video_params") {
+      context.video = context.video || {
+        aspectRatio: null,
+        durationSec: null,
+        prompt: null,
+        sourceUrl: body?.uploadedSourceUrl || null,
+      };
+
+      const { aspectRatio, durationSec } = parseFormatDuration(user_message || "");
+      if (aspectRatio) context.video!.aspectRatio = aspectRatio;
+      if (durationSec) context.video!.durationSec = durationSec;
+      if (!context.video!.sourceUrl && body?.uploadedSourceUrl) {
+        context.video!.sourceUrl = body.uploadedSourceUrl;
+      }
+
+      await sb
+        .from("alfie_conversation_sessions")
+        .update({ context_json: context })
+        .eq("id", session.id);
+
+      if (!context.video!.aspectRatio || !context.video!.durationSec) {
+        const responseText =
+          "Il me faut le **format** (9:16 / 16:9) et la **durée** (ex: 12s).";
+        const quickReplies = ["9:16 • 12s", "16:9 • 10s"];
+        await appendMessage(session.id, "assistant", responseText);
+        return json({
+          response: responseText,
+          quickReplies,
+          conversationId: session.id,
+          state,
+        });
+      }
+
+      state = "awaiting_video_prompt";
+      await sb
+        .from("alfie_conversation_sessions")
+        .update({ conversation_state: state })
+        .eq("id", session.id);
+
+      const responseText =
+        "Parfait. Décris la scène / message de ta vidéo (ou colle un prompt).";
+      await appendMessage(session.id, "assistant", responseText);
+      return json({
+        response: responseText,
+        quickReplies: [],
+        conversationId: session.id,
+        state,
+      });
+    }
+
+    if (state === "awaiting_video_prompt") {
+      const v = (context.video || {
+        aspectRatio: null,
+        durationSec: null,
+        prompt: null,
+        sourceUrl: body?.uploadedSourceUrl || null,
+      }) as any;
+      const promptText = (user_message || "").trim();
+      if (!promptText) {
+        const responseText =
+          "J’ai besoin d’un prompt pour la vidéo. Une ou deux phrases suffisent.";
+        await appendMessage(session.id, "assistant", responseText);
+        return json({
+          response: responseText,
+          conversationId: session.id,
+          state,
+        });
+      }
+      v.prompt = promptText;
+      context.video = v;
+
+      let orderId = session.order_id;
+      if (!orderId) {
+        const { data: order, error: oErr } = await sb
+          .from("orders")
+          .insert({
+            user_id: user.id,
+            brand_id: brand_id,
+            campaign_name: `Video_${Date.now()}`,
+            brief_json: { video: v },
+            status: "pending",
+          })
+          .select()
+          .single();
+        if (oErr) return json({ error: "order_creation_failed", details: oErr.message }, 500);
+        orderId = order.id;
+        await sb
+          .from("alfie_conversation_sessions")
+          .update({ order_id: orderId })
+          .eq("id", session.id);
+      }
+
+      const job = {
+        user_id: user.id,
+        order_id: orderId,
+        type: "generate_video",
+        status: "queued" as const,
+        payload: {
+          userId: user.id,
+          brandId: brand_id,
+          orderId,
+          aspectRatio: v.aspectRatio,
+          duration: v.durationSec,
+          prompt: v.prompt,
+          sourceUrl: v.sourceUrl || null,
+        },
+      };
+      await sb.from("job_queue").insert(job);
+
+      try {
+        await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/alfie-job-worker`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ trigger: "video" }),
+        });
+      } catch {}
+
+      state = "generating";
+      await sb
+        .from("alfie_conversation_sessions")
+        .update({ conversation_state: state, context_json: context })
+        .eq("id", session.id);
+
+      const responseText = "🚀 Vidéo lancée ! Je te préviens dès que c’est prêt.";
+      await appendMessage(session.id, "assistant", responseText);
+      return json({
+        response: responseText,
+        orderId,
+        conversationId: session.id,
+        state,
+      });
+    }
 
     // --- 2) INITIAL : détecter l'intent "commande"
     if (state === "initial") {
@@ -559,6 +726,18 @@ serve(async (req) => {
 
     // --- 5) GENERATING
     if (state === "generating") {
+      if (context?.video) {
+        const responseText =
+          "Ta vidéo est en cours de création. Je t’envoie le lien dès que c’est prêt !";
+        await appendMessage(session.id, "assistant", responseText);
+        return json({
+          response: responseText,
+          conversationId: session.id,
+          state,
+          context,
+        });
+      }
+
       // Nouveau brief pendant la génération → réinitialiser et relancer
       const newIntent = detectOrderIntent(user_message || "");
       if (newIntent && (newIntent.numImages > 0 || newIntent.numCarousels > 0)) {
