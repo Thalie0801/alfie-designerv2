@@ -55,24 +55,61 @@ serve(async (req) => {
         const afterUpload = url.split('/upload/')[1];
         if (!afterUpload) return null;
         
-        // Remove transformations (everything before the version or path)
+        // Split by slashes
         const parts = afterUpload.split('/');
-        // Find where the actual path starts (after transformations)
+        
+        // Strategy 1: Find version pattern (v followed by timestamp)
+        // e.g., v1762415878/brands/...
+        for (let i = 0; i < parts.length; i++) {
+          if (/^v\d{10,}$/.test(parts[i])) {
+            // Found version, everything after is the path
+            const pathParts = parts.slice(i);
+            const fullPath = pathParts.join('/');
+            const noQuery = fullPath.split('?')[0];
+            const noExt = noQuery.replace(/\.(png|jpg|jpeg|webp|gif)$/i, '');
+            console.log('[repair-carousel-overlay] Extracted via version pattern:', noExt);
+            return noExt;
+          }
+        }
+        
+        // Strategy 2: Find 'brands/' pattern (our folder structure)
+        // e.g., brands/xxx/carousels/yyy/slide_01
+        for (let i = 0; i < parts.length; i++) {
+          if (parts[i] === 'brands') {
+            const pathParts = parts.slice(i);
+            const fullPath = pathParts.join('/');
+            const noQuery = fullPath.split('?')[0];
+            const noExt = noQuery.replace(/\.(png|jpg|jpeg|webp|gif)$/i, '');
+            console.log('[repair-carousel-overlay] Extracted via brands pattern:', noExt);
+            return noExt;
+          }
+        }
+        
+        // Strategy 3: Skip transformation patterns
+        // Transformations typically start with a letter followed by underscore
+        // e.g., l_text, f_png, e_outline, etc.
         let pathStart = 0;
         for (let i = 0; i < parts.length; i++) {
-          if (parts[i].startsWith('v') && /^v\d+$/.test(parts[i])) {
+          const part = parts[i];
+          // Check if it looks like a transformation (starts with x_xxx pattern)
+          if (!/^[a-z]_/.test(part) && !part.includes(':') && !part.includes(',')) {
+            // This looks like a real path segment
             pathStart = i;
             break;
           }
         }
         
-        // Join remaining parts and remove query string and extension
-        const pathParts = pathStart > 0 ? parts.slice(pathStart) : parts;
-        const fullPath = pathParts.join('/');
-        const noQuery = fullPath.split('?')[0];
-        const noExt = noQuery.replace(/\.(png|jpg|jpeg|webp|gif)$/i, '');
+        if (pathStart > 0 && pathStart < parts.length) {
+          const pathParts = parts.slice(pathStart);
+          const fullPath = pathParts.join('/');
+          const noQuery = fullPath.split('?')[0];
+          const noExt = noQuery.replace(/\.(png|jpg|jpeg|webp|gif)$/i, '');
+          console.log('[repair-carousel-overlay] Extracted via transformation skip:', noExt);
+          return noExt;
+        }
         
-        return noExt || null;
+        console.warn('[repair-carousel-overlay] Could not extract public_id from:', url.substring(0, 200));
+        return null;
       } catch (err) {
         console.warn('[repair-carousel-overlay] Failed to extract public_id:', err);
         return null;
