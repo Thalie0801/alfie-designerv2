@@ -441,7 +441,6 @@ export function AlfieChat() {
     }
 
     // Retry orchestrator (3 tentatives)
-    let lastError: any = null;
     const maxRetries = 3;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -523,7 +522,6 @@ export function AlfieChat() {
         inFlightRef.current = false;
         return;
       } catch (error: any) {
-        lastError = error;
         console.error(`[Chat] Error (attempt ${attempt}/${maxRetries}):`, error);
         if (attempt < maxRetries) {
           await sleep(backoffMs(attempt));
