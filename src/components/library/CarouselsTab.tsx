@@ -1,22 +1,16 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { useBrandKit } from '@/hooks/useBrandKit';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Eye, Download, FileArchive, Loader2, Film } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
-import { slideUrl } from '@/lib/cloudinary/imageUrls';
-import { extractCloudNameFromUrl } from '@/lib/cloudinary/utils';
-import { generateCarouselVideoFromLibrary } from '@/lib/cloudinary/carouselToVideo';
-
-function resolveCloudName(slide: CarouselSlide): string | undefined {
-  const fromUrl = extractCloudNameFromUrl(slide.cloudinary_url);
-  const fromMeta = extractCloudNameFromUrl(slide.metadata?.cloudinary_base_url);
-  const fromEnv = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined;
-  return fromUrl || fromMeta || fromEnv;
-}
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useBrandKit } from "@/hooks/useBrandKit";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Eye, Download, FileArchive, Loader2, Film } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import { slideUrl } from "@/lib/cloudinary/imageUrls";
+import { extractCloudNameFromUrl } from "@/lib/cloudinary/utils";
+import { generateCarouselVideoFromLibrary } from "@/lib/cloudinary/carouselToVideo";
+import { cn } from "@/lib/utils";
 
 interface CarouselSlide {
   id: string;
@@ -37,6 +31,33 @@ interface CarouselSlide {
     cloudinary_base_url?: string;
     [k: string]: any;
   } | null;
+  // champs possibles selon ta table
+  user_id?: string;
+  brand_id?: string;
+  status?: string | null;
+}
+
+function resolveCloudName(slide: CarouselSlide): string | undefined {
+  const fromUrl = extractCloudNameFromUrl(slide.cloudinary_url);
+  const fromMeta = extractCloudNameFromUrl(slide.metadata?.cloudinary_base_url || "");
+  const fromEnv = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined;
+  return fromUrl || fromMeta || fromEnv;
+}
+
+type Aspect = "4:5" | "1:1" | "9:16" | "16:9";
+function aspectClassFor(format?: string | null) {
+  const f = (format || "4:5") as Aspect;
+  switch (f) {
+    case "9:16":
+      return "aspect-[9/16]";
+    case "16:9":
+      return "aspect-video";
+    case "1:1":
+      return "aspect-square";
+    case "4:5":
+    default:
+      return "aspect-[4/5]";
+  }
 }
 
 interface CarouselsTabProps {
@@ -50,135 +71,204 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
   const [loading, setLoading] = useState(true);
   const [downloadingZip, setDownloadingZip] = useState<string | null>(null);
   const [generatingVideo, setGeneratingVideo] = useState<string | null>(null);
+  const mounted = useRef(true);
 
   useEffect(() => {
-    loadSlides();
-  }, [activeBrandId, orderId]);
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
-  const loadSlides = async () => {
+  const loadSlides = useCallback(async () => {
     if (!user?.id || !activeBrandId) {
+      setSlides([]);
       setLoading(false);
       return;
     }
-
     setLoading(true);
-
-    let query = supabase
-      .from('library_assets')
-      .select('id, cloudinary_url, cloudinary_public_id, metadata, text_json, slide_index, carousel_id, order_id, created_at, format')
-      .eq('user_id', user.id)
-      .eq('type', 'carousel_slide')
-      .order('created_at', { ascending: false })
-      .order('slide_index', { ascending: true });
-    
-    // Filtre par brand_id seulement si aucun orderId spécifique n'est demandé
-    if (!orderId && activeBrandId) {
-      query = query.eq('brand_id', activeBrandId);
-    }
-
-    // Filtre par order_id si fourni
-    if (orderId) {
-      query = query.eq('order_id', orderId);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('[CarouselsTab] Error loading slides:', error);
-    } else {
-      setSlides((data || []) as CarouselSlide[]);
-    }
-
-    setLoading(false);
-  };
-
-  const handleDownloadZip = async (carouselKey: string, carouselSlides: CarouselSlide[]) => {
-    setDownloadingZip(carouselKey);
-    
     try {
-      const carouselId = carouselSlides[0]?.carousel_id;
-      const orderId = carouselSlides[0]?.order_id;
-      
-      if (!carouselId && !orderId) {
-        throw new Error('No carousel or order ID found');
-      }
+      let query = supabase
+        .from("library_assets")
+        .select(
+          "id, cloudinary_url, cloudinary_public_id, metadata, text_json, slide_index, carousel_id, order_id, created_at, format, status, user_id, brand_id",
+        )
+        .eq("user_id", user.id)
+        .eq("type", "carousel_slide")
+        .order("created_at", { ascending: false })
+        .order("slide_index", { ascending: true });
 
-      console.log('[CarouselsTab] Downloading ZIP for:', { carouselId, orderId });
+      // Filtre par brand si pas d’orderId
+      if (!orderId) query = query.eq("brand_id", activeBrandId);
+      // Filtre par order_id si fourni
+      if (orderId) query = query.eq("order_id", orderId);
 
-      const { data, error } = await supabase.functions.invoke('download-job-set-zip', {
-        body: { 
-          carouselId: carouselId || undefined,
-          orderId: orderId || undefined
-        }
+      const { data, error } = await query;
+      if (error) throw error;
+      if (mounted.current) setSlides((data || []) as CarouselSlide[]);
+    } catch (e: any) {
+      console.error("[CarouselsTab] loadSlides error:", e);
+      toast.error("Impossible de charger les carrousels.");
+      if (mounted.current) setSlides([]);
+    } finally {
+      if (mounted.current) setLoading(false);
+    }
+  }, [user?.id, activeBrandId, orderId]);
+
+  useEffect(() => {
+    loadSlides();
+  }, [loadSlides]);
+
+  // Realtime—scope minimal en fonction des filtres actifs
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const filters: Record<string, string> = { user_id: `eq.${user.id}`, type: "eq.carousel_slide" };
+    if (orderId) {
+      filters["order_id"] = `eq.${orderId}`;
+    } else if (activeBrandId) {
+      filters["brand_id"] = `eq.${activeBrandId}`;
+    }
+
+    const channel = supabase
+      .channel(`rt_carousel_slides_${user.id}_${orderId ?? activeBrandId ?? "all"}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "library_assets",
+          filter: Object.entries(filters)
+            .map(([k, v]) => `${k}=${v}`)
+            .join(","),
+        },
+        (payload: any) => {
+          const row = payload.new as CarouselSlide;
+          const old = payload.old as CarouselSlide | undefined;
+
+          setSlides((prev) => {
+            const arr = prev ? [...prev] : [];
+            switch (payload.eventType) {
+              case "INSERT":
+                if (!arr.some((s) => s.id === row.id)) {
+                  arr.unshift(row);
+                }
+                break;
+              case "UPDATE":
+                return arr.map((s) => (s.id === row.id ? { ...s, ...row } : s));
+              case "DELETE":
+                return arr.filter((s) => s.id !== (old?.id || row.id));
+            }
+            return arr;
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, activeBrandId, orderId]);
+
+  // Grouping mémoïsé
+  const grouped = useMemo(() => {
+    const groups = new Map<string, CarouselSlide[]>();
+    for (const s of slides) {
+      const key = s.carousel_id || s.order_id || "unknown";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(s);
+    }
+    // Tri interne par slide_index puis date (stable)
+    for (const [k, arr] of groups) {
+      arr.sort(
+        (a, b) =>
+          (a.slide_index ?? 0) - (b.slide_index ?? 0) ||
+          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+      );
+      groups.set(k, arr);
+    }
+    // Array pour map + titre
+    return Array.from(groups.entries()).map(([k, arr]) => ({
+      key: k,
+      slides: arr,
+      title: arr[0]?.order_id
+        ? `Commande ${arr[0].order_id}`
+        : arr[0]?.carousel_id
+          ? `Carrousel ${arr[0].carousel_id}`
+          : "Carrousel",
+    }));
+  }, [slides]);
+
+  const handleDownloadZip = useCallback(async (carouselKey: string, carouselSlides: CarouselSlide[]) => {
+    if (!carouselSlides.length) return;
+    setDownloadingZip(carouselKey);
+    try {
+      const carouselId = carouselSlides[0]?.carousel_id || undefined;
+      const orderId = carouselSlides[0]?.order_id || undefined;
+      if (!carouselId && !orderId) throw new Error("Aucun identifiant (carrousel / commande)");
+
+      const { data, error } = await supabase.functions.invoke("download-job-set-zip", {
+        body: { carouselId, orderId },
       });
+      if (error) throw error;
+      if (!data?.url) throw new Error("Aucune URL ZIP retournée");
 
-      if (error) {
-        console.error('[CarouselsTab] ZIP download error:', error);
-        throw error;
-      }
-
-      if (!data?.url) {
-        throw new Error('No ZIP URL returned');
-      }
-
-      // Open ZIP download in new tab
-      window.open(data.url, '_blank');
-      
-      const sizeInMB = (data.size / (1024 * 1024)).toFixed(2);
-      toast.success(`ZIP téléchargé : ${data.filename} (${sizeInMB} MB)`);
-      
-    } catch (err: any) {
-      console.error('[CarouselsTab] ZIP download failed:', err);
-      toast.error(`Échec du téléchargement : ${err.message || 'Erreur inconnue'}`);
+      window.open(data.url, "_blank");
+      const sizeInMB = data.size ? (data.size / (1024 * 1024)).toFixed(2) : "—";
+      toast.success(`ZIP lancé : ${data.filename ?? "archive.zip"} (${sizeInMB} Mo)`);
+    } catch (e: any) {
+      console.error("[CarouselsTab] ZIP error:", e);
+      toast.error(`Échec du téléchargement ZIP : ${e?.message ?? "Erreur inconnue"}`);
     } finally {
       setDownloadingZip(null);
     }
-  };
+  }, []);
 
-  const handleGenerateVideo = async (carouselKey: string, carouselSlides: CarouselSlide[]) => {
+  const handleGenerateVideo = useCallback(async (carouselKey: string, carouselSlides: CarouselSlide[]) => {
+    if (!carouselSlides.length) return;
     setGeneratingVideo(carouselKey);
-    
     try {
-      const carouselId = carouselSlides[0]?.carousel_id;
-      const orderId = carouselSlides[0]?.order_id;
-      const format = carouselSlides[0]?.format || '4:5';
-      
-      console.log('[CarouselsTab] Generating video for:', { carouselId, orderId });
+      const carouselId = carouselSlides[0]?.carousel_id || undefined;
+      const orderId = carouselSlides[0]?.order_id || undefined;
+      const format = (carouselSlides[0]?.format || "4:5") as Aspect;
 
-      const videoUrl = await generateCarouselVideoFromLibrary({
-        carouselId: carouselId || undefined,
-        orderId: orderId || undefined,
-        aspect: format as any,
-        title: 'Mon Carrousel',
+      const url = await generateCarouselVideoFromLibrary({
+        carouselId,
+        orderId,
+        aspect: format,
+        title: "Mon Carrousel",
         durationPerSlide: 2,
       });
-
-      // Ouvrir la vidéo dans un nouvel onglet
-      window.open(videoUrl, '_blank');
-      toast.success('Vidéo générée avec succès ! 🎬');
-      
-    } catch (err: any) {
-      console.error('[CarouselsTab] Video generation failed:', err);
-      toast.error(`Échec de la génération : ${err.message || 'Erreur inconnue'}`);
+      if (!url) throw new Error("Aucune URL vidéo générée");
+      window.open(url, "_blank");
+      toast.success("Vidéo générée avec succès 🎬");
+    } catch (e: any) {
+      console.error("[CarouselsTab] Video generation error:", e);
+      toast.error(`Échec de la génération : ${e?.message ?? "Erreur inconnue"}`);
     } finally {
       setGeneratingVideo(null);
     }
-  };
+  }, []);
 
-  // Grouper les slides par carousel_id ou order_id
-  const groupedCarousels = slides.reduce((acc, slide) => {
-    const key = slide.carousel_id || slide.order_id || 'unknown';
-    if (!acc[key]) {
-      acc[key] = [];
-    }
-    acc[key].push(slide);
-    return acc;
-  }, {} as Record<string, CarouselSlide[]>);
+  // Ouverture individuelle (throttle simple pour éviter les bloqueurs)
+  const openIndividually = useCallback((arr: CarouselSlide[]) => {
+    const urls = arr.map((s) => s.cloudinary_url).filter(Boolean);
+    if (!urls.length) return;
+    let i = 0;
+    const step = () => {
+      const url = urls[i++];
+      if (url) {
+        window.open(url, "_blank");
+        setTimeout(step, 180); // léger délai
+      }
+    };
+    step();
+  }, []);
 
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[...Array(3)].map((_, i) => (
+        {Array.from({ length: 3 }).map((_, i) => (
           <Skeleton key={i} className="h-96 rounded-lg" />
         ))}
       </div>
@@ -189,29 +279,31 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     return (
       <div className="text-center py-12 text-muted-foreground">
         <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
-        <p>Aucun carrousel pour l'instant.</p>
-        <p className="text-sm">Générez depuis le chat, ils arrivent ici automatiquement.</p>
+        <p>Aucun carrousel pour l’instant.</p>
+        <p className="text-sm">Générez depuis le chat, ils apparaîtront ici automatiquement.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
-      {Object.entries(groupedCarousels).map(([carouselKey, carouselSlides]) => (
-        <div key={carouselKey} className="border rounded-lg p-4 space-y-3">
+      {grouped.map(({ key, slides: carouselSlides, title }) => (
+        <div key={key} className="border rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold">Carrousel</h3>
+              <h3 className="font-semibold">{title}</h3>
               <Badge variant="secondary">{carouselSlides.length} slides</Badge>
+              {carouselSlides[0]?.format && <Badge variant="outline">{carouselSlides[0].format}</Badge>}
             </div>
             <div className="flex gap-2">
               <Button
                 size="sm"
                 variant="default"
-                onClick={() => handleGenerateVideo(carouselKey, carouselSlides)}
-                disabled={generatingVideo === carouselKey}
+                onClick={() => handleGenerateVideo(key, carouselSlides)}
+                disabled={generatingVideo === key}
+                aria-label="Créer une vidéo à partir du carrousel"
               >
-                {generatingVideo === carouselKey ? (
+                {generatingVideo === key ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
                   <Film className="h-4 w-4 mr-2" />
@@ -221,10 +313,11 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleDownloadZip(carouselKey, carouselSlides)}
-                disabled={downloadingZip === carouselKey}
+                onClick={() => handleDownloadZip(key, carouselSlides)}
+                disabled={downloadingZip === key}
+                aria-label="Télécharger en ZIP"
               >
-                {downloadingZip === carouselKey ? (
+                {downloadingZip === key ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
                   <FileArchive className="h-4 w-4 mr-2" />
@@ -234,14 +327,8 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => {
-                  // Télécharger toutes les slides individuellement (fallback)
-                  carouselSlides.forEach((slide, index) => {
-                    setTimeout(() => {
-                      window.open(slide.cloudinary_url, '_blank');
-                    }, index * 200);
-                  });
-                }}
+                onClick={() => openIndividually(carouselSlides)}
+                aria-label="Télécharger individuellement"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Individual
@@ -250,69 +337,57 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {carouselSlides
-              .sort((a, b) => (a.slide_index ?? 0) - (b.slide_index ?? 0))
-              .map((slide) => {
-                // Mapper l'aspect ratio dynamiquement selon le format
-                const format = slide.format || '4:5';
-                const aspectClass = 
-                  format === '9:16' ? 'aspect-[9/16]' :
-                  format === '16:9' ? 'aspect-video' :
-                  format === '1:1' ? 'aspect-square' :
-                  format === '4:5' ? 'aspect-[4/5]' :
-                  'aspect-[9/16]'; // Défaut portrait
-                
-                return (
-                  <div key={slide.id} className="relative group">
-                    <img
-                      src={(() => {
-                        const base = slide.cloudinary_url ?? '';
-                        
-                        // Need all 3 conditions
-                        if (!slide.cloudinary_public_id || !slide.text_json) return base;
-                        
-                        const cloudName = resolveCloudName(slide);
-                        if (!cloudName) {
-                          console.warn('[CarouselsTab] No cloudName found, fallback to base URL');
-                          return base;
-                        }
-                        
-                        try {
-                          return slideUrl(slide.cloudinary_public_id, {
-                            title: slide.text_json.title,
-                            subtitle: slide.text_json.subtitle,
-                            bulletPoints: slide.text_json.bullets || [],
-                            aspectRatio: (slide.format || '4:5') as '4:5' | '1:1' | '9:16' | '16:9',
-                            cloudName,
-                          });
-                        } catch (e) {
-                          console.warn('[CarouselsTab] Overlay generation failed:', e);
-                          return base;
-                        }
-                      })()}
-                      alt={`Slide ${(slide.slide_index ?? 0) + 1}`}
-                      className={`w-full rounded-lg ${aspectClass} object-cover border`}
-                      onError={(e) => {
-                        console.warn('[CarouselsTab] Overlay image failed, fallback base:', e.currentTarget.src);
-                        if (slide.cloudinary_url?.startsWith('https://')) {
-                          e.currentTarget.src = slide.cloudinary_url;
-                        }
-                      }}
-                    />
+            {carouselSlides.map((slide) => {
+              const aspect = aspectClassFor(slide.format);
+              const base = slide.cloudinary_url ?? "";
+              const canOverlay = Boolean(slide.cloudinary_public_id && slide.text_json);
+              const cloudName = canOverlay ? resolveCloudName(slide) : undefined;
+
+              const src = (() => {
+                if (!canOverlay || !cloudName) return base;
+                try {
+                  return slideUrl(slide.cloudinary_public_id as string, {
+                    title: slide.text_json?.title,
+                    subtitle: slide.text_json?.subtitle,
+                    bulletPoints: slide.text_json?.bullets || [],
+                    aspectRatio: (slide.format || "4:5") as Aspect,
+                    cloudName,
+                  });
+                } catch (e) {
+                  console.warn("[CarouselsTab] overlay url error => fallback base", e);
+                  return base;
+                }
+              })();
+
+              return (
+                <div key={slide.id} className="relative group">
+                  <img
+                    src={src}
+                    alt={`Slide ${(slide.slide_index ?? 0) + 1}`}
+                    className={cn("w-full rounded-lg object-cover border", aspect)}
+                    loading="lazy"
+                    onError={(e) => {
+                      if (base?.startsWith("https://") && e.currentTarget.src !== base) {
+                        console.warn("[CarouselsTab] overlay failed, fallback base:", e.currentTarget.src);
+                        e.currentTarget.src = base;
+                      }
+                    }}
+                  />
                   <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
                     {(slide.slide_index ?? 0) + 1}
                   </div>
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
                     <Button
                       size="sm"
-                      onClick={() => window.open(slide.cloudinary_url, '_blank')}
+                      onClick={() => window.open(base, "_blank")}
+                      aria-label="Ouvrir la slide dans un nouvel onglet"
                     >
                       <Download className="h-4 w-4" />
                     </Button>
-                    </div>
                   </div>
-                );
-              })}
+                </div>
+              );
+            })}
           </div>
         </div>
       ))}
