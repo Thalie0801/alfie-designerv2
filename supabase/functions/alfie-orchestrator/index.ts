@@ -385,7 +385,7 @@ serve(async (req) => {
           brand_id,
           campaign_name,
           brief_json: context,
-          status: "queued",
+          status: "pending",
         })
         .select()
         .single();
