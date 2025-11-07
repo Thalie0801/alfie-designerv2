@@ -35,11 +35,11 @@ const toInt = (v: any, d = 0) => {
 };
 
 // parse "9:16 • 12s" / "16:9 10s" / "9:16" / "12s"
-function parseFormatDuration(msg: string) {
+function parseFormatDuration(msg: string): { aspectRatio?: "9:16" | "16:9"; durationSec?: number } {
   const fmtMatch = msg.match(/\b(9:16|16:9)\b/i);
   const durMatch = msg.match(/\b(\d{1,2})\s*s\b/i);
   return {
-    aspectRatio: fmtMatch ? fmtMatch[1] : undefined,
+    aspectRatio: fmtMatch ? (fmtMatch[1] as "9:16" | "16:9") : undefined,
     durationSec: durMatch ? parseInt(durMatch[1], 10) : undefined,
   };
 }

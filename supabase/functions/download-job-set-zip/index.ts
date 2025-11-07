@@ -36,10 +36,10 @@ function derivePublicIdFromUrl(url?: string): string | undefined {
   return derivedId;
 }
 
+const CONTROL_CHARS_REGEX = /\p{Cc}|\u00A0|\uFEFF/gu;
+
 function cleanText(text: string, maxLen = 220): string {
-  // Built with RegExp to avoid ESLint no-control-regex error
-  const controlCharsRegex = new RegExp('[\\u0000-\\u001F\\u007F\\u00A0\\uFEFF]', 'g');
-  let cleaned = text.replace(controlCharsRegex, '');
+  let cleaned = text.replace(CONTROL_CHARS_REGEX, '');
   // Remove emojis
   try {
     cleaned = cleaned.replace(/\p{Extended_Pictographic}/gu, '');

@@ -5,6 +5,7 @@ import { Upload, X, Film } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { uploadToChatBucket } from "@/lib/chatUploads";
 
 interface FileUploaderProps {
   onFileUploaded: (url: string, file: File) => void;
@@ -37,7 +38,7 @@ export function FileUploader({
   const [items, setItems] = useState<PreviewItem[]>([]);
 
   // --- Helpers Cloudinary (inline pour éviter les imports)
-  async function cldSign(params: Record<string, any> = {}) {
+  async function cldSign(params: Record<string, unknown> = {}) {
     const r = await fetch("/functions/v1/cloudinary-asset", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -84,23 +85,7 @@ export function FileUploader({
     if (authError) throw authError;
     if (!user) throw new Error("Utilisateur non authentifié");
 
-    const safeName = file.name.replace(/\s+/g, "_");
-    const fileName = `${Date.now()}_${safeName}`;
-    const path = `${user.id}/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("chat-uploads")
-      .upload(path, file, { cacheControl: "3600", upsert: false });
-
-    if (uploadError) throw uploadError;
-
-    const { data: signed, error: signedError } = await supabase.storage
-      .from("chat-uploads")
-      .createSignedUrl(path, 60 * 60);
-    if (signedError) throw signedError;
-
-    const signedUrl = signed?.signedUrl;
-    if (!signedUrl) throw new Error("Impossible de générer l’URL signée");
+    const { signedUrl } = await uploadToChatBucket(file, supabase, user.id);
     return signedUrl;
   };
 
@@ -138,9 +123,16 @@ export function FileUploader({
           onFileUploaded(finalUrl, file);
           toast.success(`${file.name} uploadé`);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Upload error:", err);
-        toast.error(`Erreur lors de l'upload${err?.message ? `: ${err.message}` : ""}`);
+        const message = err instanceof Error ? err.message : (() => {
+          try {
+            return JSON.stringify(err);
+          } catch {
+            return String(err);
+          }
+        })();
+        toast.error(`Erreur lors de l'upload${message ? `: ${message}` : ""}`);
       } finally {
         setUploading(false);
       }

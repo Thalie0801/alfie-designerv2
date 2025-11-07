@@ -16,8 +16,8 @@ export interface ConversationContext {
   numCarousels?: number;
   currentImageIndex?: number;
   currentCarouselIndex?: number;
-  imageBriefs?: any[];
-  carouselBriefs?: any[];
+  imageBriefs?: Array<Record<string, unknown>>;
+  carouselBriefs?: Array<Record<string, unknown>>;
   globalStyle?: string;
   campaign?: string;
   video?: {

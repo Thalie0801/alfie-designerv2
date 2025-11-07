@@ -1,17 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { ChatContext } from "./chat-context";
 
-type Message = { text: string; quick?: string[] };
-
-type ChatCtx = {
-  chatId?: string;
-  send: (text: string) => Promise<Message[]>;
-};
-
-const ChatContext = createContext<ChatCtx>({
-  send: async () => [],
-});
-
-export const useChat = () => useContext(ChatContext);
+export { useChat } from "./chat-context";
 
 export function ChatProvider({
   brandId,

@@ -16,16 +16,16 @@ export interface SlideContent {
   kpis?: Array<{ label: string; delta: string }>;
 }
 
+const CONTROL_CHARS_REGEX = /\p{Cc}|\u00A0|\uFEFF/gu;
+
 /**
  * Sanitize text by removing control characters, NBSP, BOM, and other invisible characters
  * that can break Cloudinary overlays
  */
 function sanitizeText(text: string): string {
   if (!text) return '';
-  // Built with RegExp to avoid ESLint no-control-regex error
-  const controlCharsRegex = new RegExp('[\\u0000-\\u001F\\u007F\\u00A0\\uFEFF]', 'g');
   return text
-    .replace(controlCharsRegex, '') // Remove control chars, NBSP, BOM
+    .replace(CONTROL_CHARS_REGEX, '') // Remove control chars, NBSP, BOM
     .trim();
 }
 

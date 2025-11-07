@@ -491,6 +491,8 @@ async function processRenderCarousels(payload: any) {
   return { carousels: results };
 }
 
+type AssembleResp = { video_url?: string; error?: string };
+
 async function processGenerateVideo(payload: any) {
   console.log("🎥 [processGenerateVideo]", payload?.orderId);
 
@@ -499,11 +501,12 @@ async function processGenerateVideo(payload: any) {
   const { data, error } = await supabaseAdmin.functions.invoke("alfie-assemble-video", {
     body: { aspectRatio, duration, prompt, sourceUrl, brandId, orderId },
   });
-  if (error || data?.error) {
-    throw new Error(data?.error || error?.message || "Video assembly failed");
+  const res = (data ?? {}) as AssembleResp;
+  if (error || res.error) {
+    throw new Error(res.error || error?.message || "Video assembly failed");
   }
 
-  const videoUrl = data?.video_url;
+  const videoUrl = res.video_url;
   if (!videoUrl) throw new Error("Missing video_url from assembler response");
 
   const { error: assetErr } = await supabaseAdmin.from("media_generations").insert({

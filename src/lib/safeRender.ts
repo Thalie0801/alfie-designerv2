@@ -2,12 +2,12 @@
  * Regex to match control characters that should be removed from text
  * Built with RegExp constructor to avoid ESLint no-control-regex error
  */
-export const CONTROL_CHARS_REGEX = new RegExp('[\\u0000-\\u001F\\u007F\\u00A0\\uFEFF]', 'g');
+export const CONTROL_CHARS_REGEX = /\p{Cc}|\u00A0|\uFEFF/gu;
 
 /**
  * Safely converts any value to a renderable string
  */
-export function safeString(value: any): string {
+export function safeString(value: unknown): string {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string') return value;
   if (typeof value === 'number') return String(value);
@@ -22,7 +22,7 @@ export function safeString(value: any): string {
 /**
  * Safely performs arithmetic and returns a number
  */
-export function safeNumber(value: any, fallback: number = 0): number {
+export function safeNumber(value: unknown, fallback: number = 0): number {
   const num = Number(value);
   return Number.isFinite(num) ? num : fallback;
 }

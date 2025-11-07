@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthHeader } from "@/lib/auth";
+import { uploadToChatBucket } from "@/lib/chatUploads";
 import { Button } from "@/components/ui/button";
 import TextareaAutosize from "react-textarea-autosize";
 import { CreateHeader } from "@/components/create/CreateHeader";
@@ -44,8 +45,17 @@ const normalizeConversationState = (state?: string | null): ConversationState =>
 // UUID safe (fallback si randomUUID indisponible)
 const safeUuid = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? (crypto as any).randomUUID()
+    ? (crypto as Crypto).randomUUID()
     : Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+function toErrorMessage(err: unknown) {
+  if (err instanceof Error) return err.message;
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return String(err);
+  }
+}
 
 // Limites & backoff
 const MAX_INPUT_LEN = 2000;
@@ -78,7 +88,7 @@ interface Message {
   type?: "text" | "image" | "video" | "carousel" | "reasoning" | "bulk-carousel";
   assetUrl?: string;
   assetId?: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
   reasoning?: string;
   brandAlignment?: string;
   quickReplies?: string[];
@@ -406,21 +416,7 @@ export function AlfieChat() {
       if (authError) throw authError;
       if (!user) throw new Error("Authentification requise");
 
-      const safeName = file.name.replace(/\s+/g, "_");
-      const filePath = `${user.id}/${Date.now()}_${safeName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("chat-uploads")
-        .upload(filePath, file, { cacheControl: "3600", upsert: false });
-      if (uploadError) throw uploadError;
-
-      const { data: signed, error: signedError } = await supabase.storage
-        .from("chat-uploads")
-        .createSignedUrl(filePath, 60 * 60);
-      if (signedError) throw signedError;
-
-      const signedUrl = signed?.signedUrl;
-      if (!signedUrl) throw new Error("Impossible de générer l’URL signée");
+      const { signedUrl } = await uploadToChatBucket(file, supabase, user.id);
 
       const previewUrl = URL.createObjectURL(file);
       clearUploadedSource();
@@ -432,9 +428,11 @@ export function AlfieChat() {
       });
 
       toast.success(isVideo ? "Vidéo importée ! Décris ce que tu veux en faire." : "Image importée ! Décris ce que tu veux en faire.");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[Upload] Error:", error);
-      toast.error(`Erreur lors de l’upload${error?.message ? ` : ${error.message}` : ""}`);
+      toast.error(
+        `Erreur lors de l’upload${error ? ` : ${toErrorMessage(error)}` : ""}`,
+      );
     } finally {
       setUploadingSource(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -610,7 +608,7 @@ export function AlfieChat() {
         setIsLoading(false);
         inFlightRef.current = false;
         return;
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error(`[Chat] Error (attempt ${attempt}/${maxRetries}):`, error);
         if (attempt < maxRetries) {
           await sleep(backoffMs(attempt));

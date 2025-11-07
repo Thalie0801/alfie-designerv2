@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { VIDEO_ENGINE_CONFIG } from "@/config/videoEngine";
 import { imageToVideoUrl, spliceVideoUrl, extractCloudNameFromUrl } from '@/lib/cloudinary/videoSimple';
+import { uploadToChatBucket } from "@/lib/chatUploads";
 
 type GeneratedAsset = {
   url: string;
@@ -246,26 +247,7 @@ export function ChatGenerator() {
         if (authError) throw authError;
         if (!user) throw new Error("Utilisateur non authentifié");
 
-        const safeName = file.name.replace(/\s+/g, "_");
-        const fileName = `${Date.now()}_${safeName}`;
-        const filePath = `${user.id}/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("chat-uploads")
-          .upload(filePath, file, {
-            cacheControl: "3600",
-            upsert: false,
-          });
-
-        if (uploadError) throw uploadError;
-
-        const { data: signed, error: signedError } = await supabase.storage
-          .from("chat-uploads")
-          .createSignedUrl(filePath, 60 * 60);
-        if (signedError) throw signedError;
-
-        const uploadedSourceUrl = signed?.signedUrl;
-        if (!uploadedSourceUrl) throw new Error("Impossible de générer l’URL signée");
+        const { signedUrl: uploadedSourceUrl } = await uploadToChatBucket(file, supabase, user.id);
 
         setUploadedSource({
           type: isImage ? "image" : "video",
@@ -277,11 +259,21 @@ export function ChatGenerator() {
           title: "Média uploadé",
           description: "Prêt à être utilisé",
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Upload error:", err);
+        let description = "";
+        if (err instanceof Error) {
+          description = err.message;
+        } else {
+          try {
+            description = JSON.stringify(err);
+          } catch {
+            description = String(err);
+          }
+        }
         toast({
           title: "Erreur d'upload",
-          description: err.message,
+          description,
           variant: "destructive",
         });
       }
