@@ -32,6 +32,7 @@ serve(async (req) => {
     console.log(`[download-zip] User ${user.id} requesting ZIP for carousel=${carouselId}, order=${orderId}`);
 
     // Récupérer toutes les slides du carrousel depuis library_assets
+    // PRIORITÉ: order_id (plus stable) > carousel_id (change entre régénérations)
     let query = supabase
       .from('library_assets')
       .select('id, slide_index, cloudinary_url, metadata, carousel_id, order_id')
@@ -39,23 +40,32 @@ serve(async (req) => {
       .eq('user_id', user.id)
       .order('slide_index');
 
-    if (carouselId) {
-      query = query.eq('carousel_id', carouselId);
-    } else {
+    // Utiliser order_id en priorité car il est stable entre régénérations
+    if (orderId) {
       query = query.eq('order_id', orderId);
+      console.log(`[download-zip] Querying by order_id: ${orderId}`);
+    } else if (carouselId) {
+      query = query.eq('carousel_id', carouselId);
+      console.log(`[download-zip] Querying by carousel_id: ${carouselId}`);
     }
 
     const { data: slides, error: slidesErr } = await query;
 
-    if (slidesErr) throw slidesErr;
+    if (slidesErr) {
+      console.error('[download-zip] Query error:', slidesErr);
+      throw slidesErr;
+    }
     if (!slides || slides.length === 0) {
+      console.error('[download-zip] No slides found for carousel/order');
       throw new Error('No slides found for this carousel');
     }
 
-    console.log(`[download-zip] Found ${slides.length} slides`);
+    console.log(`[download-zip] Found ${slides.length} slides for ${orderId ? 'order' : 'carousel'}`);
 
     // Créer le ZIP
     const zip = new JSZip();
+    let successCount = 0;
+    let failureCount = 0;
 
     for (const slide of slides) {
       // Priorité 1: cloudinary_url (avec overlay texte)
@@ -69,14 +79,35 @@ serve(async (req) => {
       }
 
       if (!imageUrl) {
-        console.warn(`[download-zip] No URL found for slide ${slide.id}`);
+        console.warn(`[download-zip] ⚠️ No URL found for slide ${slide.id} (index ${slide.slide_index})`);
+        failureCount++;
         continue;
       }
 
       try {
+        console.log(`[download-zip] Fetching slide ${slide.slide_index}: ${imageUrl.substring(0, 100)}...`);
+        
         const response = await fetch(imageUrl);
         if (!response.ok) {
-          console.warn(`[download-zip] Failed to fetch ${imageUrl}: ${response.status}`);
+          console.warn(`[download-zip] ⚠️ Failed to fetch (${response.status}): ${imageUrl.substring(0, 150)}`);
+          
+          // Try fallback to base_url if main URL failed
+          if (meta.cloudinary_base_url && imageUrl !== meta.cloudinary_base_url) {
+            console.log(`[download-zip] Trying fallback base_url...`);
+            const fallbackResp = await fetch(meta.cloudinary_base_url);
+            if (fallbackResp.ok) {
+              const blob = await fallbackResp.blob();
+              const arrayBuffer = await blob.arrayBuffer();
+              const slideNum = (slide.slide_index ?? 0) + 1;
+              const filename = `slide-${slideNum.toString().padStart(2, '0')}.png`;
+              zip.file(filename, new Uint8Array(arrayBuffer));
+              console.log(`[download-zip] ✅ Added ${filename} via fallback (${arrayBuffer.byteLength} bytes)`);
+              successCount++;
+              continue;
+            }
+          }
+          
+          failureCount++;
           continue;
         }
 
@@ -86,10 +117,18 @@ serve(async (req) => {
         const slideNum = (slide.slide_index ?? 0) + 1;
         const filename = `slide-${slideNum.toString().padStart(2, '0')}.png`;
         zip.file(filename, new Uint8Array(arrayBuffer));
-        console.log(`[download-zip] Added ${filename} to ZIP`);
+        console.log(`[download-zip] ✅ Added ${filename} to ZIP (${arrayBuffer.byteLength} bytes)`);
+        successCount++;
       } catch (err) {
-        console.error(`[download-zip] Error fetching slide ${slide.id}:`, err);
+        console.error(`[download-zip] ❌ Error fetching slide ${slide.id}:`, err);
+        failureCount++;
       }
+    }
+
+    console.log(`[download-zip] Summary: ${successCount} successful, ${failureCount} failed`);
+    
+    if (successCount === 0) {
+      throw new Error('No slides could be downloaded - all images failed to load');
     }
 
     // Générer le ZIP en blob

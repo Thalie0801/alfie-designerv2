@@ -247,23 +247,30 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
 
                         const original = slide.cloudinary_url;
                         
-                        // Try to repair the overlay first (if not already repaired)
+                        // Try to repair the overlay first (if not already repaired and has valid structure)
                         if (!alreadyRepaired) {
-                          try {
-                            console.log('[CarouselsTab] Attempting to repair overlay for slide:', slide.id);
-                            img.dataset.repaired = 'true'; // Mark as repaired to prevent loops
-                            
-                            const { data, error } = await supabase.functions.invoke('repair-carousel-overlay', {
-                              body: { slideId: slide.id }
-                            });
-                            
-                            if (!error && data?.cloudinary_url) {
-                              console.log('[CarouselsTab] ✅ Overlay repaired, reloading image');
-                              img.src = data.cloudinary_url;
-                              return; // Success, no need for fallback
+                          const meta = slide.metadata || {};
+                          const hasValidSource = meta.cloudinary_base_url || slide.cloudinary_public_id;
+                          
+                          if (hasValidSource) {
+                            try {
+                              console.log('[CarouselsTab] Attempting to repair overlay for slide:', slide.id);
+                              img.dataset.repaired = 'true'; // Mark as repaired to prevent loops
+                              
+                              const { data, error } = await supabase.functions.invoke('repair-carousel-overlay', {
+                                body: { slideId: slide.id }
+                              });
+                              
+                              if (!error && data?.cloudinary_url) {
+                                console.log('[CarouselsTab] ✅ Overlay repaired, reloading image');
+                                img.src = data.cloudinary_url;
+                                return; // Success, no need for fallback
+                              }
+                            } catch (repairError) {
+                              console.warn('[CarouselsTab] Repair failed (expected for old slides):', repairError);
                             }
-                          } catch (repairError) {
-                            console.warn('[CarouselsTab] Repair failed:', repairError);
+                          } else {
+                            console.log('[CarouselsTab] Skipping repair - no valid source found');
                           }
                         }
                         
@@ -275,15 +282,12 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                         // Priority order for fallback
                         const fallback = metaBase || baseFromOriginal || baseFromPublicId;
                         
-                        console.warn('[CarouselsTab] Using fallback image:', {
-                          metaBase: metaBase?.substring(0, 120),
-                          baseFromOriginal: baseFromOriginal?.substring(0, 120),
-                          baseFromPublicId: baseFromPublicId?.substring(0, 120)
-                        });
-
                         if (fallback && img.src !== fallback) {
+                          console.log('[CarouselsTab] Using fallback image');
                           img.dataset.fallbackTried = 'true';
                           img.src = fallback;
+                        } else {
+                          console.warn('[CarouselsTab] No fallback available for slide:', slide.id);
                         }
                       }}
                     />
