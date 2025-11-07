@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import { TourProvider, useTour, HelpLauncher } from "./InteractiveTour";
@@ -56,9 +56,6 @@ function TestTourConsumer() {
   );
 }
 
-// helpers DOM boutons
-const getButton = (txt: string) => screen.getByRole("button", { name: txt });
-
 describe("InteractiveTour", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -78,52 +75,53 @@ describe("InteractiveTour", () => {
   });
 
   it("should provide tour context", () => {
-    render(
+    const { getByTestId } = render(
       <TourProvider>
         <TestTourConsumer />
       </TourProvider>,
     );
 
-    expect(screen.getByTestId("tour-status")).toHaveTextContent("inactive");
-    expect(screen.getByTestId("tour-step")).toHaveTextContent("0");
+    expect(getByTestId("tour-status")).toHaveTextContent("inactive");
+    expect(getByTestId("tour-step")).toHaveTextContent("0");
   });
 
   it("should start tour when start() is called", async () => {
     const user = userEvent.setup();
 
-    render(
+    const { getByRole, getByTestId } = render(
       <TourProvider>
         <TestTourConsumer />
       </TourProvider>,
     );
 
-    await user.click(getButton("Start"));
+    await user.click(getByRole("button", { name: "Start" }));
 
-    await screen.findByText("active"); // attend le passage à actif
-    expect(screen.getByTestId("tour-status")).toHaveTextContent("active");
+    await vi.waitFor(() => {
+      expect(getByTestId("tour-status")).toHaveTextContent("active");
+    });
   });
 
   it("should navigate through steps", async () => {
     const user = userEvent.setup();
 
-    render(
+    const { getByRole, getByTestId } = render(
       <TourProvider>
         <TestTourConsumer />
       </TourProvider>,
     );
 
-    await user.click(getButton("Start"));
-    expect(screen.getByTestId("tour-step")).toHaveTextContent("0");
+    await user.click(getByRole("button", { name: "Start" }));
+    expect(getByTestId("tour-step")).toHaveTextContent("0");
 
-    await user.click(getButton("Next"));
+    await user.click(getByRole("button", { name: "Next" }));
     // attend incrément
     await vi.waitFor(() => {
-      expect(screen.getByTestId("tour-step")).toHaveTextContent("1");
+      expect(getByTestId("tour-step")).toHaveTextContent("1");
     });
 
-    await user.click(getButton("Prev"));
+    await user.click(getByRole("button", { name: "Prev" }));
     await vi.waitFor(() => {
-      expect(screen.getByTestId("tour-step")).toHaveTextContent("0");
+      expect(getByTestId("tour-step")).toHaveTextContent("0");
     });
   });
 
@@ -131,14 +129,14 @@ describe("InteractiveTour", () => {
     const user = userEvent.setup();
     const email = "test@example.com";
 
-    render(
+    const { getByRole } = render(
       <TourProvider options={{ userEmail: email }}>
         <TestTourConsumer />
       </TourProvider>,
     );
 
-    await user.click(getButton("Start"));
-    await user.click(getButton("Stop"));
+    await user.click(getByRole("button", { name: "Start" }));
+    await user.click(getByRole("button", { name: "Stop" }));
 
     await vi.waitFor(() => {
       expect(lsSet).toHaveBeenCalledWith(autoCompletedKey(email), "1");
@@ -150,25 +148,25 @@ describe("InteractiveTour", () => {
     const email = "completed@example.com";
     (lsGet as any).mockReturnValue("1"); // déjà complété
 
-    render(
+    const { getByRole, getByTestId } = render(
       <TourProvider options={{ userEmail: email, autoStart: "on-first-login" }}>
         <TestTourConsumer />
       </TourProvider>,
     );
 
     // Même si on clique Start (simule une garde côté start)
-    await user.click(getButton("Start"));
-    expect(screen.getByTestId("tour-status")).toHaveTextContent("inactive");
+    await user.click(getByRole("button", { name: "Start" }));
+    expect(getByTestId("tour-status")).toHaveTextContent("inactive");
   });
 
   it("should render HelpLauncher", () => {
-    render(
+    const { getByRole } = render(
       <TourProvider>
         <HelpLauncher />
       </TourProvider>,
     );
-    // au moins un bouton (le lanceur d’aide)
-    expect(screen.getByRole("button")).toBeInTheDocument();
+    // au moins un bouton (le lanceur d'aide)
+    expect(getByRole("button")).toBeInTheDocument();
   });
 
   it("should allow manual restart via force parameter", async () => {
@@ -186,16 +184,16 @@ describe("InteractiveTour", () => {
       );
     }
 
-    render(
+    const { getByRole, getByTestId } = render(
       <TourProvider options={{ userEmail: email }}>
         <TestForceStart />
       </TourProvider>,
     );
 
-    await user.click(getButton("Force Start"));
+    await user.click(getByRole("button", { name: "Force Start" }));
 
     await vi.waitFor(() => {
-      expect(screen.getByTestId("tour-status")).toHaveTextContent("active");
+      expect(getByTestId("tour-status")).toHaveTextContent("active");
     });
   });
 });
@@ -232,16 +230,17 @@ describe("Mobile detection", () => {
   it("should adapt to mobile viewport", async () => {
     const user = userEvent.setup();
 
-    render(
+    const { getByRole, getByTestId } = render(
       <TourProvider>
         <TestTourConsumer />
       </TourProvider>,
     );
 
-    await user.click(getButton("Start"));
+    await user.click(getByRole("button", { name: "Start" }));
 
-    await screen.findByText("active");
-    expect(screen.getByTestId("tour-status")).toHaveTextContent("active");
-    // Le positionnement précis n’est pas testé ici ; on valide l’activation en viewport mobile.
+    await vi.waitFor(() => {
+      expect(getByTestId("tour-status")).toHaveTextContent("active");
+    });
+    // Le positionnement précis n'est pas testé ici ; on valide l'activation en viewport mobile.
   });
 });

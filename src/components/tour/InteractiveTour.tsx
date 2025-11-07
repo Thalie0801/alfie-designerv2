@@ -496,11 +496,9 @@ export function HelpLauncher() {
   }, [start]);
 
   useEffect(() => {
-    const onVis = () => {
-      if (document.visibilityState === "visible") safeStart();
-    };
+    // Empty effect - kept for potential future visibility listeners
     return () => {
-      /* noop cleanup placeholder if you add listeners */
+      /* noop cleanup placeholder */
     };
   }, [safeStart]);
 
