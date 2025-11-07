@@ -30,7 +30,7 @@ function human(n: number) {
 }
 
 export function ActivityCard({ activeBrandId }: ActivityCardProps) {
-  const { stats, loading, error } = useActivityStats(activeBrandId);
+  const { stats, loading } = useActivityStats(activeBrandId);
 
   if (loading) {
     return (
@@ -56,12 +56,12 @@ export function ActivityCard({ activeBrandId }: ActivityCardProps) {
     );
   }
 
-  if (error || !stats) {
+  if (!stats) {
     return (
       <Card>
         <CardContent className="pt-6">
           <div className="text-center text-muted-foreground">
-            {error ? "Impossible de charger les statistiques." : "Aucune donnée disponible."}
+            Aucune donnée disponible.
           </div>
         </CardContent>
       </Card>

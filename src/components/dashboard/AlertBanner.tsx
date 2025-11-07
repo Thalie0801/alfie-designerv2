@@ -146,7 +146,6 @@ export function AlertBanner() {
           <BrandDialog
             brand={activeBrand}
             onSuccess={() => setShowBrandDialog(false)}
-            onOpenChange={setShowBrandDialog} // si ton dialog supporte le contrôle
           />
         )}
       </>
