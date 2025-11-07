@@ -85,7 +85,12 @@ async function callFn<T = unknown>(name: string, body: unknown): Promise<T> {
 
     const text = await resp.text().catch(() => "");
     if (!resp.ok) {
-      throw new Error(`${name} failed: ${resp.status} ${resp.statusText} ${text}`);
+      console.error(`❌ ${name} failed:`, {
+        status: resp.status,
+        statusText: resp.statusText,
+        response: text.substring(0, 500)
+      });
+      throw new Error(`${name} failed: ${resp.status} ${resp.statusText} - ${text.substring(0, 200)}`);
     }
 
     try {

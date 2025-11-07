@@ -15,6 +15,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log("[alfie-generate-ai-image] Request received");
+    
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
@@ -116,6 +118,10 @@ serve(async (req) => {
     }
 
     const { prompt, aspectRatio = "1:1" } = await req.json();
+    console.log("[alfie-generate-ai-image] Processing", {
+      hasPrompt: !!prompt,
+      aspectRatio
+    });
 
     if (!prompt) {
       return new Response(
