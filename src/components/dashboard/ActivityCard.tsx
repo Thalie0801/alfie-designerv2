@@ -1,28 +1,101 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { BarChart3, Image, Video, Zap } from 'lucide-react';
-import { useActivityStats } from '@/hooks/useActivityStats';
+import { useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { BarChart3, Image as ImageIcon, Video as VideoIcon, Zap } from "lucide-react";
+import { useActivityStats } from "@/hooks/useActivityStats";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 interface ActivityCardProps {
   activeBrandId: string | null;
 }
 
-export function ActivityCard({ activeBrandId }: ActivityCardProps) {
-  const { stats, loading } = useActivityStats(activeBrandId);
+type QuotaBlock = {
+  label: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  used: number;
+  quota: number;
+  testId: string;
+};
 
-  if (loading || !stats) {
+function percent(used: number, quota: number) {
+  if (!quota || quota <= 0) return 0;
+  const p = (used / quota) * 100;
+  return Number.isFinite(p) ? Math.max(0, Math.min(100, p)) : 0;
+}
+
+function human(n: number) {
+  return new Intl.NumberFormat("fr-FR").format(n);
+}
+
+export function ActivityCard({ activeBrandId }: ActivityCardProps) {
+  const { stats, loading, error } = useActivityStats(activeBrandId);
+
+  if (loading) {
     return (
       <Card>
-        <CardContent className="pt-6">
-          <div className="text-center text-muted-foreground">Chargement...</div>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            Activité ce mois
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+              <Skeleton className="h-2 w-full" />
+            </div>
+          ))}
         </CardContent>
       </Card>
     );
   }
 
-  const imagesPercentage = stats.imagesQuota > 0 ? (stats.imagesCount / stats.imagesQuota) * 100 : 0;
-  const videosPercentage = stats.videosQuota > 0 ? (stats.videosCount / stats.videosQuota) * 100 : 0;
-  const woofsPercentage = stats.woofsQuota > 0 ? (stats.totalWoofsUsed / stats.woofsQuota) * 100 : 0;
+  if (error || !stats) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-center text-muted-foreground">
+            {error ? "Impossible de charger les statistiques." : "Aucune donnée disponible."}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const blocks: QuotaBlock[] = useMemo(
+    () => [
+      {
+        label: "Visuels",
+        icon: ImageIcon,
+        used: stats.imagesCount ?? 0,
+        quota: stats.imagesQuota ?? 0,
+        testId: "images",
+      },
+      {
+        label: "Vidéos",
+        icon: VideoIcon,
+        used: stats.videosCount ?? 0,
+        quota: stats.videosQuota ?? 0,
+        testId: "videos",
+      },
+      {
+        label: "Woofs",
+        icon: Zap,
+        used: stats.totalWoofsUsed ?? 0,
+        quota: stats.woofsQuota ?? 0,
+        testId: "woofs",
+      },
+    ],
+    [stats],
+  );
+
+  const overAnyQuota = blocks.some((b) => b.quota > 0 && b.used > b.quota);
 
   return (
     <Card className="bg-gradient-to-br from-primary/5 to-accent/10">
@@ -30,50 +103,58 @@ export function ActivityCard({ activeBrandId }: ActivityCardProps) {
         <CardTitle className="flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-primary" />
           Activité ce mois
+          {overAnyQuota && (
+            <Badge variant="destructive" className="ml-2">
+              Sur quota
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Visuels */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2">
-              <Image className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">Visuels</span>
-            </div>
-            <span className="text-muted-foreground">
-              {stats.imagesCount} / {stats.imagesQuota}
-            </span>
-          </div>
-          <Progress value={Math.min(imagesPercentage, 100)} className="h-2" />
-        </div>
 
-        {/* Vidéos */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2">
-              <Video className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">Vidéos</span>
-            </div>
-            <span className="text-muted-foreground">
-              {stats.videosCount} / {stats.videosQuota}
-            </span>
-          </div>
-          <Progress value={Math.min(videosPercentage, 100)} className="h-2" />
-        </div>
+      <CardContent className="space-y-5">
+        {blocks.map(({ label, icon: Icon, used, quota, testId }) => {
+          const p = percent(used, quota);
+          const over = quota > 0 && used > quota;
+          const remaining = Math.max(0, quota - used);
 
-        {/* Woofs */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">Woofs</span>
+          return (
+            <div key={testId} className="space-y-2" data-testid={`activity-${testId}`}>
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
+                  <span className="font-medium">{label}</span>
+                  {quota > 0 && (
+                    <Badge variant={over ? "destructive" : "secondary"} className="ml-1">
+                      {over ? "Dépassement" : `${human(remaining)} restants`}
+                    </Badge>
+                  )}
+                </div>
+
+                <span
+                  className={cn("text-muted-foreground tabular-nums", over && "text-destructive font-medium")}
+                  aria-label={`${human(used)} utilisés sur ${human(quota)}`}
+                >
+                  {human(used)} {quota ? <>/ {human(quota)}</> : null}
+                </span>
+              </div>
+
+              <Progress
+                value={p}
+                className={cn("h-2", over && "bg-destructive/10")}
+                aria-valuenow={p}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`Progression ${label}`}
+              />
+
+              {over && (
+                <p className="text-xs text-destructive">
+                  Vous avez dépassé le quota de {label.toLowerCase()} de {human(used - quota)}.
+                </p>
+              )}
             </div>
-            <span className="text-muted-foreground">
-              {stats.totalWoofsUsed} / {stats.woofsQuota}
-            </span>
-          </div>
-          <Progress value={Math.min(woofsPercentage, 100)} className="h-2" />
-        </div>
+          );
+        })}
       </CardContent>
     </Card>
   );
