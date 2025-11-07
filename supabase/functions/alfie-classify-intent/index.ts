@@ -143,33 +143,33 @@ serve(async (req) => {
     let intent: IntentType = "other";
     let confidence = 0.2;
     let matched = "";
-    const keywords: string[] = [];
+    let keywords: string[] = [];
 
     if (k.carousel.test(msg)) {
       intent = "carousel";
       confidence = 0.9;
       matched = "carousel";
-      keywords.push("carousel");
+      keywords = [...keywords, "carousel"];
     } else if (k.video.test(msg)) {
       intent = "video";
       confidence = 0.88;
       matched = "video";
-      keywords.push("video");
+      keywords = [...keywords, "video"];
     } else if (k.image.test(msg)) {
       intent = "image";
       confidence = 0.85;
       matched = "image";
-      keywords.push("image");
+      keywords = [...keywords, "image"];
     } else if (k.credits.test(msg)) {
       intent = "credits";
       confidence = 0.8;
       matched = "credits";
-      keywords.push("credits");
+      keywords = [...keywords, "credits"];
     } else if (k.brandkit.test(msg)) {
       intent = "brandkit";
       confidence = 0.75;
       matched = "brandkit";
-      keywords.push("brandkit");
+      keywords = [...keywords, "brandkit"];
     }
 
     // Post-règles : Canva & templates (si pas déjà classé en génération explicite)
@@ -177,13 +177,13 @@ serve(async (req) => {
       intent = "open_canva";
       confidence = 0.7;
       matched = "canva";
-      keywords.push("canva");
+      keywords = [...keywords, "canva"];
     }
     if (intent === "other" && k.templates.test(msg)) {
       intent = "templates";
       confidence = 0.7;
       matched = "templates";
-      keywords.push("templates");
+      keywords = [...keywords, "templates"];
     }
 
     // Bonus de confiance si ratio/slide count présents pour carousel
@@ -196,7 +196,7 @@ serve(async (req) => {
     // Bonus si approbation (utile pour enchaîner un tool call déjà planifié)
     if (approval && ["carousel", "image", "video"].includes(intent)) {
       confidence = Math.min(0.98, confidence + 0.02);
-      keywords.push("approval");
+      keywords = [...keywords, "approval"];
     }
 
     const result: IntentResponse = {

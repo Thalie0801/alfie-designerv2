@@ -187,7 +187,7 @@ function AlertBannerInner({ brand }: { brand: Brand }) {
             size="sm"
             onClick={() => {
               // brancher ton handler réel ici (modal, route d'intégration, etc.)
-              // e.g. openCanvaConnectModal() ou router.push('/integrations/canva')
+              // e.g. openCanvaConnectModal() ou navigate('/integrations/canva')
             }}
           >
             Connecter Canva
