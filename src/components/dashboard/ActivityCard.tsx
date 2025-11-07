@@ -29,9 +29,70 @@ function human(n: number) {
   return new Intl.NumberFormat("fr-FR").format(n);
 }
 
+/**
+ * Parent component: only checks if activeBrandId is available
+ * No conditional hooks here - stable hook count
+ */
 export function ActivityCard({ activeBrandId }: ActivityCardProps) {
+  if (!activeBrandId) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-center text-muted-foreground">
+            Sélectionnez une marque pour voir l'activité.
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return <ActivityCardInner activeBrandId={activeBrandId} />;
+}
+
+/**
+ * Child component: contains all hooks and logic
+ * Only mounted when activeBrandId exists, so hooks are always called consistently
+ */
+function ActivityCardInner({ activeBrandId }: { activeBrandId: string }) {
   const { stats, loading } = useActivityStats(activeBrandId);
 
+  // All hooks called unconditionally
+  const blocks: QuotaBlock[] = useMemo(
+    () =>
+      stats
+        ? [
+            {
+              label: "Visuels",
+              icon: ImageIcon,
+              used: stats.imagesCount ?? 0,
+              quota: stats.imagesQuota ?? 0,
+              testId: "images",
+            },
+            {
+              label: "Vidéos",
+              icon: VideoIcon,
+              used: stats.videosCount ?? 0,
+              quota: stats.videosQuota ?? 0,
+              testId: "videos",
+            },
+            {
+              label: "Woofs",
+              icon: Zap,
+              used: stats.totalWoofsUsed ?? 0,
+              quota: stats.woofsQuota ?? 0,
+              testId: "woofs",
+            },
+          ]
+        : [],
+    [stats]
+  );
+
+  const overAnyQuota = useMemo(
+    () => blocks.some((b) => b.quota > 0 && b.used > b.quota),
+    [blocks]
+  );
+
+  // Early returns AFTER all hooks
   if (loading) {
     return (
       <Card>
@@ -67,35 +128,6 @@ export function ActivityCard({ activeBrandId }: ActivityCardProps) {
       </Card>
     );
   }
-
-  const blocks: QuotaBlock[] = useMemo(
-    () => [
-      {
-        label: "Visuels",
-        icon: ImageIcon,
-        used: stats.imagesCount ?? 0,
-        quota: stats.imagesQuota ?? 0,
-        testId: "images",
-      },
-      {
-        label: "Vidéos",
-        icon: VideoIcon,
-        used: stats.videosCount ?? 0,
-        quota: stats.videosQuota ?? 0,
-        testId: "videos",
-      },
-      {
-        label: "Woofs",
-        icon: Zap,
-        used: stats.totalWoofsUsed ?? 0,
-        quota: stats.woofsQuota ?? 0,
-        testId: "woofs",
-      },
-    ],
-    [stats],
-  );
-
-  const overAnyQuota = blocks.some((b) => b.quota > 0 && b.used > b.quota);
 
   return (
     <Card className="bg-gradient-to-br from-primary/5 to-accent/10">

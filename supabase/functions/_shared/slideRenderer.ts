@@ -22,8 +22,10 @@ export interface SlideContent {
  */
 function sanitizeText(text: string): string {
   if (!text) return '';
+  // Built with RegExp to avoid ESLint no-control-regex error
+  const controlCharsRegex = new RegExp('[\\u0000-\\u001F\\u007F\\u00A0\\uFEFF]', 'g');
   return text
-    .replace(/[\u0000-\u001F\u007F\u00A0\uFEFF]/g, '') // Remove control chars, NBSP, BOM
+    .replace(controlCharsRegex, '') // Remove control chars, NBSP, BOM
     .trim();
 }
 

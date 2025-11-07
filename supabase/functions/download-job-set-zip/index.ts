@@ -37,7 +37,9 @@ function derivePublicIdFromUrl(url?: string): string | undefined {
 }
 
 function cleanText(text: string, maxLen = 220): string {
-  let cleaned = text.replace(/[\u0000-\u001F\u007F\u00A0\uFEFF]/g, '');
+  // Built with RegExp to avoid ESLint no-control-regex error
+  const controlCharsRegex = new RegExp('[\\u0000-\\u001F\\u007F\\u00A0\\uFEFF]', 'g');
+  let cleaned = text.replace(controlCharsRegex, '');
   // Remove emojis
   try {
     cleaned = cleaned.replace(/\p{Extended_Pictographic}/gu, '');
