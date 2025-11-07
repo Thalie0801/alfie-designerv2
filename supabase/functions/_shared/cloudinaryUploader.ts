@@ -97,15 +97,44 @@ export async function uploadToCloudinary(
 
 // Encode texte pour URL Cloudinary (robuste, identique à imageCompositor)
 export function encodeCloudinaryText(text: string): string {
-  let encoded = encodeURIComponent(text);
-  // Protéger les caractères sensibles Cloudinary
-  encoded = encoded.replace(/%2C/g, '%252C'); // virgule
+  const input = String(text ?? '');
+
+  // Remove unmatched surrogate pairs to avoid URIError
+  const sanitizeSurrogates = (s: string) =>
+    s
+      .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '') // high without low
+      .replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, ''); // low without high
+
+  const safeDecode = (s: string) => {
+    try { return decodeURIComponent(s); } catch { return s; }
+  };
+
+  const cleaned = sanitizeSurrogates(input).replace(/\r\n/g, '\n');
+
+  // If looks already percent-encoded, decode once then re-encode exactly once
+  const looksEncoded = /%[0-9A-Fa-f]{2}/.test(cleaned);
+  const decodedOnce = looksEncoded ? safeDecode(cleaned) : cleaned;
+
+  // Protect stray % that would break encoding in some runtimes
+  const prepped = decodedOnce.replace(/%(?![0-9A-Fa-f]{2})/g, '%25');
+
+  let encoded: string;
+  try {
+    encoded = encodeURIComponent(prepped);
+  } catch {
+    const fallback = sanitizeSurrogates(prepped.normalize('NFC'));
+    encoded = encodeURIComponent(fallback);
+  }
+
+  // Protect Cloudinary special characters
+  encoded = encoded.replace(/%2C/g, '%252C'); // comma
   encoded = encoded.replace(/%2F/g, '%252F'); // slash
-  encoded = encoded.replace(/%3A/g, '%253A'); // deux-points
+  encoded = encoded.replace(/%3A/g, '%253A'); // colon
   encoded = encoded.replace(/%23/g, '%2523'); // hash
   encoded = encoded.replace(/\(/g, '%28');
   encoded = encoded.replace(/\)/g, '%29');
-  encoded = encoded.replace(/\n/g, '%0A'); // newline
+  // newline already encoded as %0A by encodeURIComponent
+
   return encoded;
 }
 

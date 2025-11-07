@@ -51,65 +51,50 @@ serve(async (req) => {
     const extractPublicIdFromUrl = (url?: string | null): string | null => {
       if (!url) return null;
       try {
-        // Extract part after /upload/
-        const afterUpload = url.split('/upload/')[1];
+        // Accept both full URLs and already-sliced paths
+        const afterUpload = url.includes('/upload/') ? url.split('/upload/')[1] : url;
         if (!afterUpload) return null;
-        
-        // Split by slashes
-        const parts = afterUpload.split('/');
-        
-        // Strategy 1: Find version pattern (v followed by timestamp)
-        // e.g., v1762415878/brands/...
-        for (let i = 0; i < parts.length; i++) {
-          if (/^v\d{10,}$/.test(parts[i])) {
-            // Found version, everything after is the path
-            const pathParts = parts.slice(i);
-            const fullPath = pathParts.join('/');
-            const noQuery = fullPath.split('?')[0];
-            const noExt = noQuery.replace(/\.(png|jpg|jpeg|webp|gif)$/i, '');
-            console.log('[repair-carousel-overlay] Extracted via version pattern:', noExt);
-            return noExt;
-          }
+
+        // Remove query and extension early
+        const noQuery = afterUpload.split('?')[0];
+        const noExt = noQuery.replace(/\.(png|jpg|jpeg|webp|gif)$/i, '');
+        const parts = noExt.split('/').filter(Boolean);
+
+        // Strategy A: If we have our folder root, always start from there
+        const brandsIdx = parts.indexOf('brands');
+        if (brandsIdx >= 0) {
+          const fromBrands = parts.slice(brandsIdx).join('/');
+          const cleaned = fromBrands.replace(/^(?:v\d+\/)*/i, ''); // drop any leading version tokens
+          console.log('[repair-carousel-overlay] Extracted via brands root:', cleaned);
+          return cleaned;
         }
-        
-        // Strategy 2: Find 'brands/' pattern (our folder structure)
-        // e.g., brands/xxx/carousels/yyy/slide_01
-        for (let i = 0; i < parts.length; i++) {
-          if (parts[i] === 'brands') {
-            const pathParts = parts.slice(i);
-            const fullPath = pathParts.join('/');
-            const noQuery = fullPath.split('?')[0];
-            const noExt = noQuery.replace(/\.(png|jpg|jpeg|webp|gif)$/i, '');
-            console.log('[repair-carousel-overlay] Extracted via brands pattern:', noExt);
-            return noExt;
-          }
+
+        // Strategy B: If a version token exists (v123...), drop it and everything before it
+        const vIndex = parts.findIndex(p => /^v\d+$/i.test(p));
+        if (vIndex >= 0 && vIndex + 1 < parts.length) {
+          const cleaned = parts.slice(vIndex + 1).join('/');
+          console.log('[repair-carousel-overlay] Extracted via version token:', cleaned);
+          return cleaned;
         }
-        
-        // Strategy 3: Skip transformation patterns
-        // Transformations typically start with a letter followed by underscore
-        // e.g., l_text, f_png, e_outline, etc.
-        let pathStart = 0;
+
+        // Strategy C: Skip transformation-like segments at the start (contain ':' or ',' or look like x_xxx)
+        let start = 0;
         for (let i = 0; i < parts.length; i++) {
           const part = parts[i];
-          // Check if it looks like a transformation (starts with x_xxx pattern)
-          if (!/^[a-z]_/.test(part) && !part.includes(':') && !part.includes(',')) {
-            // This looks like a real path segment
-            pathStart = i;
-            break;
-          }
+          if (part.includes(':') || part.includes(',') || /^[a-z]_/.test(part)) continue; // transform
+          if (/^v\d+$/i.test(part)) continue; // version
+          start = i; break;
         }
-        
-        if (pathStart > 0 && pathStart < parts.length) {
-          const pathParts = parts.slice(pathStart);
-          const fullPath = pathParts.join('/');
-          const noQuery = fullPath.split('?')[0];
-          const noExt = noQuery.replace(/\.(png|jpg|jpeg|webp|gif)$/i, '');
-          console.log('[repair-carousel-overlay] Extracted via transformation skip:', noExt);
-          return noExt;
+        if (start > 0 && start < parts.length) {
+          const cleaned = parts.slice(start).join('/').replace(/^(?:v\d+\/)*/i, '');
+          console.log('[repair-carousel-overlay] Extracted via transform-skip:', cleaned);
+          return cleaned;
         }
-        
-        console.warn('[repair-carousel-overlay] Could not extract public_id from:', url.substring(0, 200));
-        return null;
+
+        // Fallback: return last segments as best-effort
+        const fallback = parts.slice(-4).join('/');
+        console.warn('[repair-carousel-overlay] Fallback public_id used:', fallback);
+        return fallback || null;
       } catch (err) {
         console.warn('[repair-carousel-overlay] Failed to extract public_id:', err);
         return null;
