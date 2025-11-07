@@ -676,14 +676,9 @@ export function AlfieChat() {
 
                         const aspectClass = getAspectClass(item.format || '4:5');
                         
-                        // ✅ Phase 1: Regenerate URL client-side using SDK
                         const imageUrl = (() => {
+                          // Regenerate with overlays if we have publicId + text
                           if (item.publicId && item.text) {
-                            console.log('[Chat] Regenerating slide URL:', { 
-                              publicId: item.publicId, 
-                              hasText: !!item.text,
-                              format: item.format 
-                            });
                             return slideUrl(item.publicId, {
                               title: item.text.title,
                               subtitle: item.text.subtitle,
@@ -691,7 +686,18 @@ export function AlfieChat() {
                               aspectRatio: item.format || '4:5'
                             });
                           }
-                          return item.url;
+                          
+                          // Use URL directly if it's complete
+                          if (item.url?.startsWith('https://')) {
+                            return item.url;
+                          }
+                          
+                          // Build from publicId if URL is not complete
+                          if (item.url) {
+                            return `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${item.url}`;
+                          }
+                          
+                          return '/placeholder.svg';
                         })();
 
                         return (
@@ -702,10 +708,8 @@ export function AlfieChat() {
                               className="absolute inset-0 w-full h-full object-cover"
                               loading="lazy"
                               onError={(e) => {
-                                // Fallback: try base image without overlays
-                                if (item.publicId && e.currentTarget.src !== `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${item.publicId}`) {
-                                  console.log('[Chat] Image error, falling back to base URL:', item.publicId);
-                                  e.currentTarget.src = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${item.publicId}`;
+                                if (item.url?.startsWith('https://')) {
+                                  e.currentTarget.src = item.url;
                                 }
                               }}
                             />
@@ -745,10 +749,6 @@ export function AlfieChat() {
                             src={(() => {
                               const firstSlide = carousel.slides[0];
                               if (firstSlide.cloudinary_public_id && firstSlide.text_json) {
-                                console.log('[Chat] Regenerating preview URL:', { 
-                                  publicId: firstSlide.cloudinary_public_id,
-                                  hasText: !!firstSlide.text_json 
-                                });
                                 return slideUrl(firstSlide.cloudinary_public_id, {
                                   title: firstSlide.text_json.title,
                                   subtitle: firstSlide.text_json.subtitle,
@@ -762,9 +762,8 @@ export function AlfieChat() {
                             className="w-full object-cover"
                             onError={(e) => {
                               const firstSlide = carousel.slides[0];
-                              if (firstSlide.cloudinary_public_id && e.currentTarget.src !== `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${firstSlide.cloudinary_public_id}`) {
-                                console.log('[Chat] Preview error, falling back to base URL');
-                                e.currentTarget.src = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${firstSlide.cloudinary_public_id}`;
+                              if (firstSlide.cloudinary_url?.startsWith('https://')) {
+                                e.currentTarget.src = firstSlide.cloudinary_url;
                               }
                             }}
                           />

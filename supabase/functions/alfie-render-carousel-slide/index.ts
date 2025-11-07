@@ -257,17 +257,7 @@ serve(async (req) => {
       format: uploadData.format
     };
 
-    console.log('[Render Slide] ✅ Uploaded to Cloudinary:', {
-      publicId: uploadResult.publicId,
-      secureUrl: uploadResult.secureUrl.substring(0, 100)
-    });
-
-    // ✅ Phase 2: Store only BASE URL without overlays (SDK will regenerate client-side)
-    console.log('[Render Slide] Step 4/4: Storing base URL (overlays generated client-side)...');
-    
-    const cloudinaryPublicId = uploadResult.publicId; // ✅ Clean publicId ONLY (no URL, no extension)
-
-    console.log('[Render Slide] ✅ Public ID stored:', cloudinaryPublicId);
+    const cloudinaryPublicId = uploadResult.publicId;
 
     // 6. ✅ Stocker dans library_assets avec idempotence check
     console.log('[Render Slide] Step 6/6: Checking for existing asset and saving to library_assets...');
@@ -314,8 +304,8 @@ serve(async (req) => {
         slide_index: slideIndex,
         format: normalizedAspectRatio,
         campaign,
-        cloudinary_url: cloudinaryPublicId, // ✅ Clean publicId (no URL, SDK regenerates)
-        cloudinary_public_id: cloudinaryPublicId, // ✅ Same clean publicId
+        cloudinary_url: uploadResult.secureUrl, // ✅ Full base URL for display
+        cloudinary_public_id: cloudinaryPublicId, // ✅ Clean publicId for SDK regeneration
         text_json: {
           title: slideContent.title,
           subtitle: slideContent.subtitle || '',

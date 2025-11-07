@@ -125,36 +125,6 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     }
   };
 
-  // Utility functions for robust fallback
-  const buildBaseUrlFromOriginal = (originalUrl: string): string | null => {
-    try {
-      const url = new URL(originalUrl);
-      // Remove all transformations after /image/upload/ and keep version path
-      const match = url.pathname.match(/^(\/[^/]+)\/image\/upload(?:\/[^/]+)?(\/v\d+\/.+)$/);
-      if (match) {
-        return `${url.origin}${match[1]}/image/upload${match[2]}`;
-      }
-      // If no version, try without transform part
-      const noTransform = url.pathname.replace(/(\/image\/upload)\/[^/]+(\/.+)/, '$1$2');
-      return `${url.origin}${noTransform}`;
-    } catch {
-      return null;
-    }
-  };
-
-  const buildBaseUrlFromPublicId = (originalUrl: string, publicId?: string | null): string | null => {
-    if (!publicId) return null;
-    try {
-      const url = new URL(originalUrl);
-      const segments = url.pathname.split('/');
-      const cloudName = segments[1];
-      if (!cloudName) return null;
-      return `${url.origin}/${cloudName}/image/upload/${publicId}.png`;
-    } catch {
-      return null;
-    }
-  };
-
   // Grouper les slides par carousel_id ou order_id
   const groupedCarousels = slides.reduce((acc, slide) => {
     const key = slide.carousel_id || slide.order_id || 'unknown';
@@ -242,57 +212,25 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                 return (
                   <div key={slide.id} className="relative group">
                     <img
-                      src={slide.cloudinary_url}
+                      src={(() => {
+                        // Regenerate with overlays if we have publicId + text
+                        if (slide.cloudinary_public_id && slide.text_json) {
+                          return slideUrl(slide.cloudinary_public_id, {
+                            title: slide.text_json.title,
+                            subtitle: slide.text_json.subtitle,
+                            bulletPoints: slide.text_json.bullets || [],
+                            aspectRatio: slide.format || '4:5'
+                          });
+                        }
+                        // Otherwise use base URL
+                        return slide.cloudinary_url;
+                      })()}
                       alt={`Slide ${(slide.slide_index ?? 0) + 1}`}
                       className={`w-full rounded-lg ${aspectClass} object-cover border`}
-                      onError={async (e) => {
-                        const img = e.currentTarget;
-                        const alreadyRepaired = img.dataset.repaired === 'true';
-                        const alreadyTried = img.dataset.fallbackTried === 'true';
-                        
-                        if (alreadyTried) return; // Prevent infinite loop
-
-                        const original = slide.cloudinary_url;
-                        
-                        // Try to regenerate URL using SDK (Phase 3 new architecture)
-                        if (!alreadyRepaired && slide.cloudinary_public_id && slide.text_json) {
-                          try {
-                            console.log('[CarouselsTab] Regenerating slide URL with SDK:', slide.id);
-                            img.dataset.repaired = 'true'; // Mark as repaired to prevent loops
-                            
-                            const regeneratedUrl = slideUrl(slide.cloudinary_public_id, {
-                              title: slide.text_json.title,
-                              subtitle: slide.text_json.subtitle,
-                              bulletPoints: slide.text_json.bullets?.filter(b => b) || [],
-                              aspectRatio: slide.format || '9:16',
-                            });
-                            
-                            if (regeneratedUrl) {
-                              console.log('[CarouselsTab] ✅ URL regenerated with SDK, reloading image');
-                              img.src = regeneratedUrl;
-                              return; // Success, no need for fallback
-                            }
-                          } catch (regenerateError) {
-                            console.warn('[CarouselsTab] SDK regeneration failed:', regenerateError);
-                          }
-                        } else {
-                          console.log('[CarouselsTab] Skipping SDK regeneration - missing public_id or text_json');
-                        }
-                        
-                        // If SDK regeneration failed or was already tried, use fallback
-                        const metaBase = slide.metadata?.cloudinary_base_url || null;
-                        const baseFromOriginal = buildBaseUrlFromOriginal(original);
-                        const baseFromPublicId = buildBaseUrlFromPublicId(original, slide.cloudinary_public_id);
-
-                        // Priority order for fallback
-                        const fallback = metaBase || baseFromOriginal || baseFromPublicId;
-                        
-                        if (fallback && img.src !== fallback) {
-                          console.log('[CarouselsTab] Using fallback image');
-                          img.dataset.fallbackTried = 'true';
-                          img.src = fallback;
-                        } else {
-                          console.warn('[CarouselsTab] No fallback available for slide:', slide.id);
+                      onError={(e) => {
+                        // Simple fallback: use base URL without overlays
+                        if (slide.cloudinary_url?.startsWith('https://')) {
+                          e.currentTarget.src = slide.cloudinary_url;
                         }
                       }}
                     />
