@@ -1,5 +1,5 @@
 // functions/alfie-render-carousel-slide/index.ts
-// v2.3.0 — Slide renderer (idempotent, retries, clean outputs)
+// v2.4.0 — Slide renderer (idempotent, retries + timeout, normalized inputs)
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
@@ -15,7 +15,7 @@ const corsHeaders = {
 type Lang = "FR" | "EN";
 
 interface SlideRequest {
-  userId?: string; // ✅ Required or deduced from orderId
+  userId?: string;               // ✅ Required or deduced from orderId
   prompt: string;
   globalStyle: string;
   slideContent: {
@@ -29,7 +29,7 @@ interface SlideRequest {
   carouselId: string;
   slideIndex: number;
   totalSlides: number;
-  aspectRatio: string; // "4:5" / "1080x1350" etc.
+  aspectRatio: string;           // "4:5" / "1080x1350" etc.
   textVersion: number;
   renderVersion: number;
   campaign: string;
@@ -41,9 +41,9 @@ type GenSize = { w: number; h: number };
 const MODEL_IMAGE = "google/gemini-2.5-flash-image-preview";
 
 const AR_MAP: Record<string, GenSize> = {
-  "1:1": { w: 1024, h: 1024 },
-  "4:5": { w: 1024, h: 1280 },
-  "9:16": { w: 720, h: 1280 },
+  "1:1":  { w: 1024, h: 1024 },
+  "4:5":  { w: 1024, h: 1280 },
+  "9:16": { w: 720,  h: 1280 },
   "16:9": { w: 1280, h: 720 },
 };
 
@@ -54,6 +54,9 @@ const PIXEL_TO_AR: Record<string, string> = {
   "1080x1080": "1:1",
 };
 
+// -----------------------------
+// Small helpers
+// -----------------------------
 function json(data: any, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -87,10 +90,20 @@ Background only. No text, no typography, no letters, no logos, no watermark.
 Clean, professional, high quality, detailed, natural light, soft shadows.`;
 }
 
+async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, ms = 30000) {
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(input, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 async function fetchWithRetries(url: string, init: RequestInit, maxRetries = 2) {
   let attempt = 0;
   while (true) {
-    const res = await fetch(url, init);
+    const res = await fetchWithTimeout(url, init, 30000);
     if (res.ok) return res;
 
     const body = await res.text().catch(() => "");
@@ -109,9 +122,22 @@ async function fetchWithRetries(url: string, init: RequestInit, maxRetries = 2) 
   }
 }
 
+// -----------------------------
+// Handler
+// -----------------------------
 serve(async (req) => {
-  console.log("[alfie-render-carousel-slide] v2.3.0 — invoked");
+  console.log("[alfie-render-carousel-slide] v2.4.0 — invoked");
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  // Early ENV checks
+  const missingEnv = [
+    ["SUPABASE_URL", Deno.env.get("SUPABASE_URL")],
+    ["SUPABASE_SERVICE_ROLE_KEY", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")],
+    ["LOVABLE_API_KEY", Deno.env.get("LOVABLE_API_KEY")],
+  ].filter(([, v]) => !v).map(([k]) => k);
+  if (missingEnv.length) {
+    return json({ error: `Missing env vars: ${missingEnv.join(", ")}` }, 500);
+  }
 
   try {
     const params = (await req.json()) as SlideRequest;
@@ -136,7 +162,7 @@ serve(async (req) => {
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { autoRefreshToken: false, persistSession: false } },
+      { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
     // —— Validations d’entrée minimales
@@ -149,8 +175,18 @@ serve(async (req) => {
     if (!orderId) missing.push("orderId");
     if (!carouselId) missing.push("carouselId");
 
+    if (!Number.isInteger(slideIndex) || slideIndex < 0) {
+      missing.push("slideIndex(non-negative integer)");
+    }
+    if (!Number.isInteger(totalSlides) || totalSlides <= 0) {
+      missing.push("totalSlides(positive integer)");
+    }
+    if (Number.isInteger(slideIndex) && Number.isInteger(totalSlides) && slideIndex >= totalSlides) {
+      missing.push(`slideIndex(${slideIndex}) < totalSlides(${totalSlides})`);
+    }
+
     if (missing.length) {
-      return json({ error: `Missing fields: ${missing.join(", ")}` }, 400);
+      return json({ error: `Missing/invalid fields: ${missing.join(", ")}` }, 400);
     }
 
     // —— userId: déduction depuis orderId si absent
@@ -173,25 +209,46 @@ serve(async (req) => {
     const lang = normalizeLang(language);
     const { ar: normalizedAR, size } = normalizeAspectRatio(aspectRatio);
 
-    console.log("[render-slide] ▶️ Context", {
+    const logCtx = `order=${orderId} car=${carouselId} slide=${slideIndex + 1}/${totalSlides}`;
+    console.log(`[render-slide] ${logCtx} context`, {
       userId,
-      orderId,
-      carouselId,
-      idx: `${slideIndex + 1}/${totalSlides}`,
       ar: normalizedAR,
       size,
       lang,
     });
 
+    // ------------------------------------------
+    // Normalize textual content + soft limits
+    // ------------------------------------------
+    const MAX_TITLE = 80;
+    const MAX_SUB   = 160;
+    const MAX_BUL   = 4;
+    const MAX_BUL_LEN = 90;
+
+    const normTitle = String(slideContent.title || "").trim().slice(0, MAX_TITLE);
+    const normSubtitle = String(slideContent.subtitle || "").trim().slice(0, MAX_SUB);
+    const normBullets = (Array.isArray(slideContent.bullets) ? slideContent.bullets : [])
+      .map(b => String(b || "").trim())
+      .filter(b => b.length > 0)
+      .slice(0, MAX_BUL)
+      .map(b => b.slice(0, MAX_BUL_LEN));
+
+    if (!normTitle) {
+      return json({ error: "slideContent.title cannot be empty after normalization" }, 400);
+    }
+    if (!slideContent.alt || !String(slideContent.alt).trim()) {
+      return json({ error: "slideContent.alt is required" }, 400);
+    }
+
     // =========================================
     // STEP 1/4 — Upload texte JSON (RAW)
     // =========================================
-    console.log("[render-slide] 1/4 Upload text JSON → Cloudinary RAW");
+    console.log(`[render-slide] ${logCtx} 1/4 Upload text JSON → Cloudinary RAW`);
     const textPublicId = await uploadTextAsRaw(
       {
-        title: slideContent.title,
-        subtitle: slideContent.subtitle || "",
-        bullets: slideContent.bullets || [],
+        title: normTitle,
+        subtitle: normSubtitle,
+        bullets: normBullets,
         alt: slideContent.alt,
       },
       {
@@ -200,23 +257,17 @@ serve(async (req) => {
         carouselId,
         textVersion,
         language: lang,
-      },
+      }
     );
-    console.log("[render-slide]   ↳ text_public_id:", textPublicId);
+    console.log(`[render-slide] ${logCtx}   ↳ text_public_id: ${textPublicId}`);
 
     // =========================================
     // STEP 2/4 — Générer background (Lovable AI)
     // =========================================
-    console.log("[render-slide] 2/4 Generate background via Lovable AI");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return json({ error: "LOVABLE_API_KEY not configured" }, 500);
-    }
-
+    console.log(`[render-slide] ${logCtx} 2/4 Generate background via Lovable AI`);
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
     const enrichedPrompt = buildImagePrompt(globalStyle, prompt);
 
-    // NB: L’API Lovable chat+images peut retourner différentes formes.
-    // On tente la voie “chat/completions” multi-modal, avec retries.
     const aiRes = await fetchWithRetries(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
       {
@@ -228,31 +279,29 @@ serve(async (req) => {
         body: JSON.stringify({
           model: MODEL_IMAGE,
           messages: [{ role: "user", content: enrichedPrompt }],
-          // Indique l’intention image
           modalities: ["image", "text"],
-          // (Optionnel) on peut passer des hints de taille si supportés par le modèle
-          // size: `${size.w}x${size.h}`,
+          // hint de taille — ignoré si non supporté
+          size_hint: { width: size.w, height: size.h },
         }),
       },
-      2,
+      2
     );
 
     if (aiRes.status === 429) {
-      console.error("[render-slide] ⏱️ Rate limit (429) after retries");
+      console.error(`[render-slide] ${logCtx} ⏱️ Rate limit (429) after retries`);
       return json({ error: "Rate limit exceeded, please try again shortly." }, 429);
     }
     if (aiRes.status === 402) {
-      console.error("[render-slide] 💳 Insufficient credits (402)");
+      console.error(`[render-slide] ${logCtx} 💳 Insufficient credits (402)`);
       return json({ error: "Insufficient credits for AI generation" }, 402);
     }
     if (!aiRes.ok) {
       const errTxt = await aiRes.text().catch(() => "");
-      console.error("[render-slide] ❌ AI error:", aiRes.status, errTxt.slice(0, 600));
+      console.error(`[render-slide] ${logCtx} ❌ AI error:`, aiRes.status, errTxt.slice(0, 600));
       return json({ error: `Background generation failed (${aiRes.status})` }, 502);
     }
 
     const aiData = await aiRes.json().catch(() => ({}));
-    // Tenter divers chemins possibles pour l’URL d’image retournée
     const bgUrl =
       aiData?.choices?.[0]?.message?.images?.[0]?.image_url?.url ||
       aiData?.choices?.[0]?.message?.content?.[0]?.image_url?.url ||
@@ -261,15 +310,15 @@ serve(async (req) => {
       null;
 
     if (!bgUrl) {
-      console.error("[render-slide] ❌ No background URL in AI response:", JSON.stringify(aiData).slice(0, 1200));
+      console.error(`[render-slide] ${logCtx} ❌ No background URL in AI response:`, JSON.stringify(aiData).slice(0, 1200));
       return json({ error: "AI did not return an image URL", details: aiData }, 500);
     }
-    console.log("[render-slide]   ↳ background_url:", bgUrl.substring(0, 120));
+    console.log(`[render-slide] ${logCtx}   ↳ background_url: ${String(bgUrl).slice(0, 120)}`);
 
     // =========================================
-    // STEP 3/4 — Upload image → Cloudinary (fonction centralisée)
+    // STEP 3/4 — Upload image → Cloudinary (edge)
     // =========================================
-    console.log("[render-slide] 3/4 Upload background → Cloudinary (edge function)");
+    console.log(`[render-slide] ${logCtx} 3/4 Upload background → Cloudinary`);
     const slidePublicId = `slide_${String(slideIndex + 1).padStart(2, "0")}`;
     const slideFolder = `alfie/${brandId}/${carouselId}/slides`;
 
@@ -281,8 +330,7 @@ serve(async (req) => {
           folder: slideFolder,
           public_id: slidePublicId,
           resource_type: "image",
-          // overwrite true pour idempotence du même slide_public_id
-          overwrite: true,
+          overwrite: true, // idempotence sur le même slide_public_id
           tags: [brandId, carouselId, "carousel_slide", campaign, "alfie"],
           context: {
             brand: brandId,
@@ -292,13 +340,14 @@ serve(async (req) => {
             render_version: String(renderVersion),
             text_version: String(textVersion),
             aspect_ratio: normalizedAR,
+            size_hint: `${size.w}x${size.h}`,
           },
         },
       },
     });
 
     if (uploadErr || !uploadData) {
-      console.error("[render-slide] ❌ Cloudinary upload error:", uploadErr);
+      console.error(`[render-slide] ${logCtx} ❌ Cloudinary upload error:`, uploadErr);
       return json({ error: `Failed to upload to Cloudinary: ${uploadErr?.message || "Unknown error"}` }, 502);
     }
 
@@ -310,7 +359,7 @@ serve(async (req) => {
       format: uploadData.format,
     };
 
-    console.log("[render-slide]   ↳ uploaded:", {
+    console.log(`[render-slide] ${logCtx}   ↳ uploaded:`, {
       publicId: cloudinaryPublicId,
       url: cloudinarySecureUrl?.slice(0, 120),
       ...uploadMeta,
@@ -319,7 +368,7 @@ serve(async (req) => {
     // =========================================
     // STEP 4/4 — Upsert DB (idempotent)
     // =========================================
-    console.log("[render-slide] 4/4 Save to library_assets (idempotence check)");
+    console.log(`[render-slide] ${logCtx} 4/4 Save to library_assets (idempotence check)`);
     const { data: existing } = await supabaseAdmin
       .from("library_assets")
       .select("id, cloudinary_url, cloudinary_public_id")
@@ -329,7 +378,7 @@ serve(async (req) => {
       .maybeSingle();
 
     if (existing) {
-      console.log(`[render-slide] ♻️ Asset already exists: ${existing.id}`);
+      console.log(`[render-slide] ${logCtx} ♻️ Asset already exists: ${existing.id}`);
       return json({
         success: true,
         idempotent: true,
@@ -337,9 +386,9 @@ serve(async (req) => {
         cloudinary_public_id: existing.cloudinary_public_id,
         text_public_id: textPublicId,
         slide_metadata: {
-          title: slideContent.title,
-          subtitle: slideContent.subtitle || "",
-          bullets: slideContent.bullets || [],
+          title: normTitle,
+          subtitle: normSubtitle,
+          bullets: normBullets,
           slideIndex,
           renderVersion,
           textVersion,
@@ -357,12 +406,12 @@ serve(async (req) => {
       slide_index: slideIndex,
       format: normalizedAR,
       campaign,
-      cloudinary_url: cloudinarySecureUrl, // URL complète pour affichage
-      cloudinary_public_id: cloudinaryPublicId, // public_id pour transformations ultérieures
+      cloudinary_url: cloudinarySecureUrl,       // URL complète pour affichage
+      cloudinary_public_id: cloudinaryPublicId,  // public_id pour transformations ultérieures
       text_json: {
-        title: slideContent.title,
-        subtitle: slideContent.subtitle || "",
-        bullets: slideContent.bullets || [],
+        title: normTitle,
+        subtitle: normSubtitle,
+        bullets: normBullets,
         alt: slideContent.alt,
         text_public_id: textPublicId,
         text_version: textVersion,
@@ -373,25 +422,26 @@ serve(async (req) => {
         cloudinary_base_url: cloudinarySecureUrl,
         original_public_id: cloudinaryPublicId,
         totalSlides,
+        aspectRatio: normalizedAR,
+        size_hint: `${size.w}x${size.h}`,
       },
     });
 
     if (insertErr) {
-      console.error("[render-slide] ❌ DB insert error:", insertErr);
+      console.error(`[render-slide] ${logCtx} ❌ DB insert error:`, insertErr);
       return json({ error: `Failed to save slide: ${insertErr.message}` }, 500);
     }
 
-    console.log("[render-slide] ✅ Slide saved:", { orderId, carouselId, slideIndex });
-
+    console.log(`[render-slide] ${logCtx} ✅ Slide saved`);
     return json({
       success: true,
       cloudinary_url: cloudinarySecureUrl,
       cloudinary_public_id: cloudinaryPublicId,
       text_public_id: textPublicId,
       slide_metadata: {
-        title: slideContent.title,
-        subtitle: slideContent.subtitle || "",
-        bullets: slideContent.bullets || [],
+        title: normTitle,
+        subtitle: normSubtitle,
+        bullets: normBullets,
         slideIndex,
         totalSlides,
         renderVersion,
@@ -406,7 +456,7 @@ serve(async (req) => {
         error: err?.message || "Unknown error",
         details: err?.stack,
       },
-      500,
+      500
     );
   }
 });
