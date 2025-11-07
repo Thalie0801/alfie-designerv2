@@ -13,6 +13,9 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { useLibraryAssetsSubscription } from '@/hooks/useLibraryAssetsSubscription';
 import { getAspectClass, type ConversationState, type OrchestratorResponse } from '@/types/chat';
+import { slideUrl } from '@/lib/cloudinary/imageUrls';
+
+const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dkad5vdyo';
 
 const normalizeConversationState = (state?: string | null): ConversationState => {
   switch (state) {
@@ -672,14 +675,39 @@ export function AlfieChat() {
                         if (!item?.url) return null;
 
                         const aspectClass = getAspectClass(item.format || '4:5');
+                        
+                        // ✅ Phase 1: Regenerate URL client-side using SDK
+                        const imageUrl = (() => {
+                          if (item.publicId && item.text) {
+                            console.log('[Chat] Regenerating slide URL:', { 
+                              publicId: item.publicId, 
+                              hasText: !!item.text,
+                              format: item.format 
+                            });
+                            return slideUrl(item.publicId, {
+                              title: item.text.title,
+                              subtitle: item.text.subtitle,
+                              bulletPoints: item.text.bullets,
+                              aspectRatio: item.format || '4:5'
+                            });
+                          }
+                          return item.url;
+                        })();
 
                         return (
                           <div key={i} className={`relative ${aspectClass} rounded-lg overflow-hidden`}>
                             <img
-                              src={item.url}
+                              src={imageUrl}
                               alt={`Slide ${i + 1}`}
                               className="absolute inset-0 w-full h-full object-cover"
                               loading="lazy"
+                              onError={(e) => {
+                                // Fallback: try base image without overlays
+                                if (item.publicId && e.currentTarget.src !== `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${item.publicId}`) {
+                                  console.log('[Chat] Image error, falling back to base URL:', item.publicId);
+                                  e.currentTarget.src = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${item.publicId}`;
+                                }
+                              }}
                             />
                           </div>
                         );
@@ -711,12 +739,34 @@ export function AlfieChat() {
                       </div>
                       
                       {/* Aperçu principal: afficher la première slide avec text overlays */}
-                      {carousel.slides?.[0]?.cloudinary_url && (
+                      {carousel.slides?.[0] && (
                         <div className="mb-3 rounded-lg overflow-hidden border border-border">
                           <img 
-                            src={carousel.slides[0].cloudinary_url} 
+                            src={(() => {
+                              const firstSlide = carousel.slides[0];
+                              if (firstSlide.cloudinary_public_id && firstSlide.text_json) {
+                                console.log('[Chat] Regenerating preview URL:', { 
+                                  publicId: firstSlide.cloudinary_public_id,
+                                  hasText: !!firstSlide.text_json 
+                                });
+                                return slideUrl(firstSlide.cloudinary_public_id, {
+                                  title: firstSlide.text_json.title,
+                                  subtitle: firstSlide.text_json.subtitle,
+                                  bulletPoints: firstSlide.text_json.bullets,
+                                  aspectRatio: firstSlide.format || '4:5'
+                                });
+                              }
+                              return firstSlide.cloudinary_url || firstSlide.storage_url;
+                            })()}
                             alt={`Aperçu carrousel ${carousel.carousel_index}`}
                             className="w-full object-cover"
+                            onError={(e) => {
+                              const firstSlide = carousel.slides[0];
+                              if (firstSlide.cloudinary_public_id && e.currentTarget.src !== `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${firstSlide.cloudinary_public_id}`) {
+                                console.log('[Chat] Preview error, falling back to base URL');
+                                e.currentTarget.src = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${firstSlide.cloudinary_public_id}`;
+                              }
+                            }}
                           />
                         </div>
                       )}
@@ -725,14 +775,31 @@ export function AlfieChat() {
                       <div className="grid grid-cols-5 gap-2">
                         {carousel.slides?.slice(0, 5).map((slide: any, slideIdx: number) => {
                           const aspectClass = getAspectClass(slide.format || '4:5');
+                          
+                          const thumbUrl = (() => {
+                            if (slide.cloudinary_public_id && slide.text_json) {
+                              return slideUrl(slide.cloudinary_public_id, {
+                                title: slide.text_json.title,
+                                subtitle: slide.text_json.subtitle,
+                                bulletPoints: slide.text_json.bullets,
+                                aspectRatio: slide.format || '4:5'
+                              });
+                            }
+                            return slide.cloudinary_url || slide.storage_url;
+                          })();
 
                           return (
                             <div key={slideIdx} className={`relative ${aspectClass} rounded overflow-hidden border border-border`}>
                               <img
-                                src={slide.cloudinary_url || slide.storage_url}
+                                src={thumbUrl}
                                 alt={`Slide ${slideIdx + 1}`}
                                 className="absolute inset-0 w-full h-full object-cover"
                                 loading="lazy"
+                                onError={(e) => {
+                                  if (slide.cloudinary_public_id && e.currentTarget.src !== `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${slide.cloudinary_public_id}`) {
+                                    e.currentTarget.src = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${slide.cloudinary_public_id}`;
+                                  }
+                                }}
                               />
                             </div>
                           );

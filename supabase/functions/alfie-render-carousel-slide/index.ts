@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { buildCarouselSlideUrl } from "../_shared/cloudinary.ts";
 import { uploadTextAsRaw } from "../_shared/cloudinaryUploader.ts";
 
 const corsHeaders = {
@@ -263,26 +262,12 @@ serve(async (req) => {
       secureUrl: uploadResult.secureUrl.substring(0, 100)
     });
 
-    // 4. Build final URL with text overlays using SDK
-    console.log('[Render Slide] Step 4/4: Building final URL with text overlays using SDK...');
+    // ✅ Phase 2: Store only BASE URL without overlays (SDK will regenerate client-side)
+    console.log('[Render Slide] Step 4/4: Storing base URL (overlays generated client-side)...');
     
-    const cloudinaryUrl = buildCarouselSlideUrl({
-      publicId: uploadResult.publicId, // ✅ Clean base public_id
-      title: slideContent.title,
-      subtitle: slideContent.subtitle,
-      bullets: slideContent.bullets,
-      cta: slideContent.alt,
-      colors: {
-        title: primaryColor,
-        subtitle: secondaryColor
-      },
-      fonts: {
-        title: fonts.primary || 'Inter',
-        subtitle: fonts.secondary || 'Inter'
-      }
-    });
+    const cloudinaryUrl = uploadResult.secureUrl; // ✅ Base URL ONLY, no overlays
 
-    console.log('[Render Slide] ✅ Final URL with overlays:', cloudinaryUrl.substring(0, 150));
+    console.log('[Render Slide] ✅ Base URL stored:', cloudinaryUrl.substring(0, 150));
 
     // 6. ✅ Stocker dans library_assets avec idempotence check
     console.log('[Render Slide] Step 6/6: Checking for existing asset and saving to library_assets...');
@@ -317,7 +302,7 @@ serve(async (req) => {
       );
     }
     
-    // ✅ Insert with SDK-generated URLs and proper public_id storage
+    // ✅ Phase 2: Insert with BASE URL only (no overlays) - SDK regenerates client-side
     const { error: insertError } = await supabaseAdmin
       .from('library_assets')
       .insert({
@@ -329,8 +314,8 @@ serve(async (req) => {
         slide_index: slideIndex,
         format: normalizedAspectRatio,
         campaign,
-        cloudinary_url: cloudinaryUrl, // ✅ Full URL with overlays (SDK-generated)
-        cloudinary_public_id: uploadResult.publicId, // ✅ Clean base public_id (e.g., brands/xxx/carousels/yyy/slide_01)
+        cloudinary_url: cloudinaryUrl, // ✅ Base URL ONLY (no overlays)
+        cloudinary_public_id: uploadResult.publicId, // ✅ Clean base public_id for SDK regeneration
         text_json: {
           title: slideContent.title,
           subtitle: slideContent.subtitle || '',
@@ -344,10 +329,18 @@ serve(async (req) => {
           width: uploadResult.width,
           height: uploadResult.height,
           format: uploadResult.format,
-          cloudinary_base_url: uploadResult.secureUrl, // ✅ Base URL without overlays
+          cloudinary_base_url: uploadResult.secureUrl, // ✅ Same as cloudinary_url (base only)
           original_public_id: uploadResult.publicId // ✅ Backup reference
         }
       });
+    
+    console.log('[Render Slide] ✅ Saved to library_assets:', { 
+      orderId, 
+      slideIndex, 
+      userId, 
+      publicId: uploadResult.publicId,
+      baseUrl: cloudinaryUrl.substring(0, 100)
+    });
 
     if (insertError) {
       console.error('[Render Slide] ❌ Database insert error:', insertError);
