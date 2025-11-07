@@ -87,7 +87,7 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = { cloudNam
 
   // Add title overlay if provided
   if (cleanTitle) {
-    const titleStyle = new TextStyle('Inter', 72)
+    const titleStyle = new TextStyle('Arial', 72)
       .fontWeight('bold')
       .textAlignment('center');
 
@@ -103,7 +103,7 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = { cloudNam
 
   // Add subtitle overlay if provided
   if (cleanSubtitle) {
-    const subtitleStyle = new TextStyle('Inter', 48)
+    const subtitleStyle = new TextStyle('Arial', 48)
       .fontWeight('normal')
       .textAlignment('center');
 
@@ -121,7 +121,7 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = { cloudNam
   cleanBullets.forEach((bullet, index) => {
     if (!bullet) return;
     
-    const bulletStyle = new TextStyle('Inter', 40)
+    const bulletStyle = new TextStyle('Arial', 40)
       .fontWeight('normal')
       .textAlignment('left');
 
@@ -139,7 +139,7 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = { cloudNam
 
   // Add CTA overlay if provided
   if (cleanCta) {
-    const ctaStyle = new TextStyle('Inter', 56)
+    const ctaStyle = new TextStyle('Arial', 56)
       .fontWeight('bold')
       .textAlignment('center');
 

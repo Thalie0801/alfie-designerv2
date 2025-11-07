@@ -249,6 +249,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                       alt={`Slide ${(slide.slide_index ?? 0) + 1}`}
                       className={`w-full rounded-lg ${aspectClass} object-cover border`}
                       onError={(e) => {
+                        console.warn('[CarouselsTab] Overlay image failed, fallback base:', e.currentTarget.src);
                         if (slide.cloudinary_url?.startsWith('https://')) {
                           e.currentTarget.src = slide.cloudinary_url;
                         }
