@@ -7,6 +7,7 @@ import { Eye, Download, FileArchive, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { slideUrl } from '@/lib/cloudinary/imageUrls';
 
 interface CarouselSlide {
   id: string;
@@ -17,6 +18,12 @@ interface CarouselSlide {
   created_at: string | null;
   format: string | null;
   cloudinary_public_id?: string | null;
+  text_json?: {
+    title?: string;
+    subtitle?: string;
+    bullets?: string[];
+    [k: string]: any;
+  } | null;
   metadata?: {
     cloudinary_base_url?: string;
     [k: string]: any;
@@ -48,7 +55,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
 
     let query = supabase
       .from('library_assets')
-      .select('id, cloudinary_url, cloudinary_public_id, metadata, slide_index, carousel_id, order_id, created_at, format')
+      .select('id, cloudinary_url, cloudinary_public_id, metadata, text_json, slide_index, carousel_id, order_id, created_at, format')
       .eq('user_id', user.id)
       .eq('type', 'carousel_slide')
       .order('created_at', { ascending: false })
@@ -247,34 +254,32 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
 
                         const original = slide.cloudinary_url;
                         
-                        // Try to repair the overlay first (if not already repaired and has valid structure)
-                        if (!alreadyRepaired) {
-                          const meta = slide.metadata || {};
-                          const hasValidSource = meta.cloudinary_base_url || slide.cloudinary_public_id;
-                          
-                          if (hasValidSource) {
-                            try {
-                              console.log('[CarouselsTab] Attempting to repair overlay for slide:', slide.id);
-                              img.dataset.repaired = 'true'; // Mark as repaired to prevent loops
-                              
-                              const { data, error } = await supabase.functions.invoke('repair-carousel-overlay', {
-                                body: { slideId: slide.id }
-                              });
-                              
-                              if (!error && data?.cloudinary_url) {
-                                console.log('[CarouselsTab] ✅ Overlay repaired, reloading image');
-                                img.src = data.cloudinary_url;
-                                return; // Success, no need for fallback
-                              }
-                            } catch (repairError) {
-                              console.warn('[CarouselsTab] Repair failed (expected for old slides):', repairError);
+                        // Try to regenerate URL using SDK (Phase 3 new architecture)
+                        if (!alreadyRepaired && slide.cloudinary_public_id && slide.text_json) {
+                          try {
+                            console.log('[CarouselsTab] Regenerating slide URL with SDK:', slide.id);
+                            img.dataset.repaired = 'true'; // Mark as repaired to prevent loops
+                            
+                            const regeneratedUrl = slideUrl(slide.cloudinary_public_id, {
+                              title: slide.text_json.title,
+                              subtitle: slide.text_json.subtitle,
+                              bulletPoints: slide.text_json.bullets?.filter(b => b) || [],
+                              aspectRatio: slide.format || '9:16',
+                            });
+                            
+                            if (regeneratedUrl) {
+                              console.log('[CarouselsTab] ✅ URL regenerated with SDK, reloading image');
+                              img.src = regeneratedUrl;
+                              return; // Success, no need for fallback
                             }
-                          } else {
-                            console.log('[CarouselsTab] Skipping repair - no valid source found');
+                          } catch (regenerateError) {
+                            console.warn('[CarouselsTab] SDK regeneration failed:', regenerateError);
                           }
+                        } else {
+                          console.log('[CarouselsTab] Skipping SDK regeneration - missing public_id or text_json');
                         }
                         
-                        // If repair failed or was already tried, use fallback
+                        // If SDK regeneration failed or was already tried, use fallback
                         const metaBase = slide.metadata?.cloudinary_base_url || null;
                         const baseFromOriginal = buildBaseUrlFromOriginal(original);
                         const baseFromPublicId = buildBaseUrlFromPublicId(original, slide.cloudinary_public_id);
