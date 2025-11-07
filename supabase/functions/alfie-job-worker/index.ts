@@ -509,6 +509,15 @@ async function processGenerateVideo(payload: any) {
   const videoUrl = res.video_url;
   if (!videoUrl) throw new Error("Missing video_url from assembler response");
 
+  const seconds = Number(duration) || 12;
+  const woofs = Math.max(1, Math.ceil(seconds / 12));
+
+  const { error: debitError } = await supabaseAdmin.rpc("debit_woofs", {
+    user_id_input: userId,
+    amount: woofs,
+  });
+  if (debitError) throw new Error(debitError.message);
+
   const { error: assetErr } = await supabaseAdmin.from("media_generations").insert({
     user_id: userId,
     brand_id: brandId,
@@ -516,7 +525,7 @@ async function processGenerateVideo(payload: any) {
     type: "video",
     status: "completed",
     output_url: videoUrl,
-    metadata: { aspectRatio, duration, prompt, sourceUrl, generator: "assemble-video" },
+    metadata: { aspectRatio, duration: seconds, prompt, sourceUrl, generator: "assemble-video", woofs },
   });
   if (assetErr) throw new Error(assetErr.message);
 

@@ -1,5 +1,6 @@
 import { edgeHandler } from '../_shared/edgeHandler.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
+import { woofsForVideo } from '../_shared/woofs.ts';
 
 interface SelectProviderRequest {
   brief: {
@@ -135,10 +136,10 @@ function estimateCost(
     const base = costJson.base_per_image || 1;
     const hiRes = /3840x|4k|2048x/i.test(format) ? (costJson.hi_res_multiplier || 1.5) : 1;
     cost = Math.ceil(base * hiRes * (quality === "premium" ? 1.25 : 1));
+  } else if (modality === "video") {
+    cost = woofsForVideo(duration_s);
   } else {
-    const tier = /3840x|4k/i.test(format) ? "4k_per_5s" : "1080p_per_5s";
-    const perChunk = costJson[tier] || costJson["1080p_per_5s"] || 2;
-    cost = Math.ceil((duration_s / 5) * perChunk * (quality === "premium" ? 1.25 : 1));
+    cost = 0;
   }
 
   return cost;
