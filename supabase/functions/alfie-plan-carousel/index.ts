@@ -123,7 +123,7 @@ function fixBullets(slide: SlideContent) {
 }
 
 function distributeTypes(slides: SlideContent[]) {
-  // Si l’IA ne respecte pas la structure, on la force :
+  // Si l'IA ne respecte pas la structure, on la force :
   if (slides.length === 0) return slides;
   slides[0].type = "hero";
   if (slides.length >= 2) {
@@ -183,7 +183,7 @@ function applyHardValidations(plan: CarouselPlan, slideCount: number) {
         errors.push(`Slide ${n}/hero → cta_primary manquant (fallback ajouté)`);
       }
       if (titleLen < 10 || titleLen > 40) {
-        slide.title = trimLen(slide.title || "Titre d’ouverture percutant", 40);
+        slide.title = trimLen(slide.title || "Titre d'ouverture percutant", 40);
       }
     }
 
@@ -203,7 +203,7 @@ function applyHardValidations(plan: CarouselPlan, slideCount: number) {
         errors.push(`Slide ${n}/cta → cta_primary manquant (fallback ajouté)`);
       }
       if (titleLen < 10 || titleLen > 40) {
-        slide.title = trimLen(slide.title || "Passe à l’action", 40);
+        slide.title = trimLen(slide.title || "Passe à l'action", 40);
       }
     }
   });
@@ -495,13 +495,13 @@ serve(async (req) => {
           ),
         ),
         slides: [
-          { type: "hero", title: "Titre d’ouverture", cta_primary: "Découvrir" },
-          ...Array.from({ length: Math.max(0, slideCount - 2) }, () => ({
-            type: "problem",
+          { type: "hero" as SlideType, title: "Titre d'ouverture", cta_primary: "Découvrir" },
+          ...Array.from({ length: Math.max(0, slideCount - 2) }, (): SlideContent => ({
+            type: "problem" as SlideType,
             title: "Point clé",
             bullets: ["Bénéfice 1", "Bénéfice 2", "Bénéfice 3"],
           })),
-          { type: "cta", title: "Passe à l’action", cta_primary: "En savoir plus" },
+          { type: "cta" as SlideType, title: "Passe à l'action", cta_primary: "En savoir plus" },
         ],
       };
     }
