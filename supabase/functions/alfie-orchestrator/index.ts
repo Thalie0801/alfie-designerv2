@@ -385,7 +385,7 @@ serve(async (req) => {
           brand_id,
           campaign_name,
           brief_json: context,
-          status: "pending",
+          status: "draft",
         })
         .select()
         .single();
