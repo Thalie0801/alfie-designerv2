@@ -917,17 +917,21 @@ export function AlfieChat() {
               {message.type === "carousel" && (
                 <div className="space-y-2">
                   <p className="text-sm">{message.content}</p>
-                  {message.metadata?.total && message.metadata?.done && (
+                  {message.metadata?.total && message.metadata?.done ? (
                     <Progress value={(Number(message.metadata.done) / Number(message.metadata.total)) * 100} className="w-full" />
-                  )}
-                  {message.metadata?.assetUrls && Array.isArray(message.metadata.assetUrls) && (
+                  ) : null}
+                  {message.metadata?.assetUrls && Array.isArray(message.metadata.assetUrls) ? (
                     <div className="grid grid-cols-2 gap-2 mt-2">
-                      {message.metadata.assetUrls.map((entry: any, i: number) => {
-...
-                        );
-                      })}
+                      {message.metadata.assetUrls.map((entry: any, i: number) => (
+                          <img
+                            key={i}
+                            src={typeof entry === 'string' ? entry : entry.url}
+                            alt={`Asset ${i + 1}`}
+                            className="rounded-lg w-full"
+                          />
+                        ))}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               )}
 
