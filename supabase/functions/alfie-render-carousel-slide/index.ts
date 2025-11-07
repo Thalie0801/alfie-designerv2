@@ -265,9 +265,9 @@ serve(async (req) => {
     // ✅ Phase 2: Store only BASE URL without overlays (SDK will regenerate client-side)
     console.log('[Render Slide] Step 4/4: Storing base URL (overlays generated client-side)...');
     
-    const cloudinaryUrl = uploadResult.secureUrl; // ✅ Base URL ONLY, no overlays
+    const cloudinaryPublicId = uploadResult.publicId; // ✅ Clean publicId ONLY (no URL, no extension)
 
-    console.log('[Render Slide] ✅ Base URL stored:', cloudinaryUrl.substring(0, 150));
+    console.log('[Render Slide] ✅ Public ID stored:', cloudinaryPublicId);
 
     // 6. ✅ Stocker dans library_assets avec idempotence check
     console.log('[Render Slide] Step 6/6: Checking for existing asset and saving to library_assets...');
@@ -314,8 +314,8 @@ serve(async (req) => {
         slide_index: slideIndex,
         format: normalizedAspectRatio,
         campaign,
-        cloudinary_url: cloudinaryUrl, // ✅ Base URL ONLY (no overlays)
-        cloudinary_public_id: uploadResult.publicId, // ✅ Clean base public_id for SDK regeneration
+        cloudinary_url: cloudinaryPublicId, // ✅ Clean publicId (no URL, SDK regenerates)
+        cloudinary_public_id: cloudinaryPublicId, // ✅ Same clean publicId
         text_json: {
           title: slideContent.title,
           subtitle: slideContent.subtitle || '',
@@ -339,7 +339,7 @@ serve(async (req) => {
       slideIndex, 
       userId, 
       publicId: uploadResult.publicId,
-      baseUrl: cloudinaryUrl.substring(0, 100)
+      baseUrl: cloudinaryPublicId
     });
 
     if (insertError) {
@@ -351,7 +351,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      cloudinary_url: cloudinaryUrl,
+      cloudinary_url: cloudinaryPublicId,
       cloudinary_public_id: uploadResult.publicId,
       text_public_id: textPublicId,
       slide_metadata: {

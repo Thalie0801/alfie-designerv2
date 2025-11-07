@@ -30,6 +30,19 @@ export interface SlideUrlOptions {
  * Uses @cloudinary/url-gen SDK for proper transformation handling
  */
 export function slideUrl(publicId: string, options: SlideUrlOptions = {}): string {
+  // ✅ Validation : rejeter si c'est une URL complète
+  if (publicId.startsWith('http://') || publicId.startsWith('https://')) {
+    console.error('[slideUrl] ❌ ERREUR : publicId doit être un chemin, pas une URL complète:', publicId);
+    // Tenter d'extraire le publicId depuis l'URL
+    const match = publicId.match(/\/v\d+\/(.+)\.(jpg|png|webp)/);
+    if (match) {
+      publicId = match[1];
+      console.log('[slideUrl] ✅ Public ID extrait:', publicId);
+    } else {
+      throw new Error('Invalid publicId: must not be a full URL');
+    }
+  }
+
   const {
     title,
     subtitle,
@@ -39,6 +52,8 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = {}): strin
     height,
     aspectRatio = '9:16',
   } = options;
+
+  console.log('[slideUrl] Generating URL:', { publicId, title, subtitle, aspectRatio });
 
   // Start with base image
   let img = cld.image(publicId);
@@ -63,7 +78,7 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = {}): strin
 
   // Add title overlay if provided
   if (title) {
-    const titleStyle = new TextStyle('Montserrat', 72)
+    const titleStyle = new TextStyle('Arial', 72)
       .fontWeight('bold')
       .textAlignment('center');
 
@@ -80,7 +95,7 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = {}): strin
 
   // Add subtitle overlay if provided
   if (subtitle) {
-    const subtitleStyle = new TextStyle('Montserrat', 48)
+    const subtitleStyle = new TextStyle('Arial', 48)
       .fontWeight('normal')
       .textAlignment('center');
 
@@ -97,7 +112,7 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = {}): strin
 
   // Add bullet points if provided
   bulletPoints.forEach((bullet, index) => {
-    const bulletStyle = new TextStyle('Montserrat', 40)
+    const bulletStyle = new TextStyle('Arial', 40)
       .fontWeight('normal')
       .textAlignment('left');
 
@@ -116,7 +131,7 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = {}): strin
 
   // Add CTA overlay if provided
   if (cta) {
-    const ctaStyle = new TextStyle('Montserrat', 56)
+    const ctaStyle = new TextStyle('Arial', 56)
       .fontWeight('bold')
       .textAlignment('center');
 
