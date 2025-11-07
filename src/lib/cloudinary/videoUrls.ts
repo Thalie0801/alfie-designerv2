@@ -1,184 +1,76 @@
-import { Cloudinary } from '@cloudinary/url-gen';
-import { scale } from '@cloudinary/url-gen/actions/resize';
-import { source } from '@cloudinary/url-gen/actions/overlay';
-import { text } from '@cloudinary/url-gen/qualifiers/source';
-import { TextStyle } from '@cloudinary/url-gen/qualifiers/textStyle';
-import { Position } from '@cloudinary/url-gen/qualifiers/position';
-import { compass } from '@cloudinary/url-gen/qualifiers/gravity';
+import { cleanText } from './utils';
 
-const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dkad5vdyo';
-
-const cld = new Cloudinary({
-  cloud: {
-    cloudName,
-  },
-});
-
-export interface ReelUrlOptions {
-  title?: string;
-  subtitle?: string;
-  start?: number; // Start time in seconds
-  duration?: number; // Duration in seconds
-  width?: number;
-  height?: number;
-  aspectRatio?: string; // e.g., "9:16", "16:9", "1:1"
-  quality?: number | 'auto';
-  format?: string;
-}
+const enc = (t: string) => encodeURIComponent(t);
 
 /**
- * Generate a Cloudinary URL for a video reel with text overlays
- * Uses @cloudinary/url-gen SDK for proper transformation handling
- */
-export function reelUrl(publicId: string, options: ReelUrlOptions = {}): string {
-  const {
-    title,
-    subtitle,
-    start,
-    duration,
-    width,
-    height,
-    aspectRatio = '9:16',
-    quality = 'auto',
-    format = 'mp4',
-  } = options;
-
-  // Start with base video
-  let video = cld.video(publicId);
-
-  // Apply aspect ratio or dimensions
-  if (width && height) {
-    video = video.resize(scale().width(width).height(height));
-  } else if (aspectRatio) {
-    // Common aspect ratios for videos
-    const ratios: Record<string, { w: number; h: number }> = {
-      '9:16': { w: 1080, h: 1920 }, // Instagram/TikTok vertical
-      '16:9': { w: 1920, h: 1080 }, // YouTube landscape
-      '1:1': { w: 1080, h: 1080 },  // Instagram square
-      '4:5': { w: 1080, h: 1350 },  // Instagram portrait
-    };
-    const ratio = ratios[aspectRatio] || ratios['9:16'];
-    video = video.resize(scale().width(ratio.w).height(ratio.h));
-  }
-
-  // Add title overlay if provided
-  if (title) {
-    const titleStyle = new TextStyle('Montserrat', 64)
-      .fontWeight('bold')
-      .textAlignment('center');
-
-    video = video.overlay(
-      source(
-        text(title, titleStyle)
-          .textColor('#FFFFFF')
-          .backgroundColor('rgba(0,0,0,0.7)')
-      ).position(
-        new Position().gravity(compass('north')).offsetY(150)
-      )
-    );
-  }
-
-  // Add subtitle overlay if provided
-  if (subtitle) {
-    const subtitleStyle = new TextStyle('Montserrat', 42)
-      .fontWeight('normal')
-      .textAlignment('center');
-
-    video = video.overlay(
-      source(
-        text(subtitle, subtitleStyle)
-          .textColor('#FFFFFF')
-          .backgroundColor('rgba(0,0,0,0.6)')
-      ).position(
-        new Position().gravity(compass('south')).offsetY(150)
-      )
-    );
-  }
-
-  // Note: The SDK doesn't directly support start/duration trimming in the URL builder
-  // For now, we'll need to manually append these transformations
-  let url = video.toURL();
-
-  // Add start offset if provided (so_X.Xs in Cloudinary)
-  if (start !== undefined && start > 0) {
-    url = url.replace('/upload/', `/upload/so_${start}s/`);
-  }
-
-  // Add duration if provided (du_X.Xs in Cloudinary)
-  if (duration !== undefined && duration > 0) {
-    if (url.includes('/upload/so_')) {
-      url = url.replace(/\/upload\/so_(\d+\.?\d*)s\//, `/upload/so_$1s,du_${duration}s/`);
-    } else {
-      url = url.replace('/upload/', `/upload/du_${duration}s/`);
-    }
-  }
-
-  // Add quality if not auto
-  if (quality !== 'auto') {
-    url = url.replace('/upload/', `/upload/q_${quality}/`);
-  }
-
-  // Add format
-  if (format && format !== 'mp4') {
-    url = url.replace(/\.(mp4|mov|avi)$/, `.${format}`);
-  }
-
-  return url;
-}
-
-/**
- * Simple video URL without overlays
+ * Générer une URL Cloudinary pour vidéo avec overlays texte
  */
 export function videoUrl(
+  publicId: string,
+  o: {
+    cloudName: string;
+    title?: string;
+    subtitle?: string;
+    start?: number;
+    duration?: number;
+    width?: number;
+    height?: number;
+  }
+): string {
+  const w = o.width ?? 1080;
+  const h = o.height ?? 1920;
+
+  const base = `w_${w},h_${h},c_fill${o.start != null ? `,so_${Math.max(0, o.start)}` : ''}${
+    o.duration != null ? `,du_${Math.max(1, o.duration)}` : ''
+  },f_mp4`;
+
+  const overlays: string[] = [];
+  const t = cleanText(o.title ?? '', 120);
+  const s = cleanText(o.subtitle ?? '', 220);
+
+  if (t) {
+    overlays.push(
+      `l_text:Arial_72_bold:${enc(t)},co_rgb:FFFFFF,g_south,y_280,w_${Math.round(w * 0.9)},c_fit`
+    );
+  }
+  if (s) {
+    overlays.push(
+      `l_text:Arial_42:${enc(s)},co_rgb:E5E7EB,g_south,y_160,w_${Math.round(w * 0.84)},c_fit`
+    );
+  }
+
+  const tf = overlays.length ? `/${overlays.join('/')}` : '';
+  return `https://res.cloudinary.com/${o.cloudName}/video/upload/${base}${tf}/${publicId}.mp4`;
+}
+
+/**
+ * Simple video URL sans overlays (backward compat)
+ */
+export function simpleVideoUrl(
   publicId: string,
   options: {
     width?: number;
     height?: number;
     quality?: number | 'auto';
     format?: string;
+    cloudName?: string;
   } = {}
 ): string {
-  let video = cld.video(publicId);
+  const cloudName =
+    options.cloudName || (import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined);
+  if (!cloudName) throw new Error('cloudName missing');
 
+  const parts: string[] = [];
   if (options.width && options.height) {
-    video = video.resize(
-      scale()
-        .width(options.width)
-        .height(options.height)
-    );
+    parts.push(`w_${options.width},h_${options.height},c_scale`);
   } else if (options.width) {
-    video = video.resize(scale().width(options.width));
+    parts.push(`w_${options.width}`);
   } else if (options.height) {
-    video = video.resize(scale().height(options.height));
+    parts.push(`h_${options.height}`);
   }
+  if (options.quality) parts.push(`q_${options.quality}`);
+  if (options.format) parts.push(`f_${options.format}`);
 
-  return video.toURL();
-}
-
-/**
- * Get video thumbnail
- */
-export function videoThumbnail(
-  publicId: string,
-  options: {
-    time?: number; // Time in seconds to grab thumbnail from
-    width?: number;
-    height?: number;
-  } = {}
-): string {
-  const { time = 0, width = 640, height = 360 } = options;
-
-  // Get thumbnail as image at specific time
-  let img = cld.image(publicId.replace(/\.(mp4|mov|avi)$/, ''));
-  
-  img = img.resize(scale().width(width).height(height));
-
-  let url = img.toURL();
-  
-  // Add video thumbnail transformation (so_X.Xs for specific frame)
-  if (time > 0) {
-    url = url.replace('/image/upload/', `/image/upload/so_${time}s/`);
-  }
-
-  return url;
+  const transform = parts.length ? `/${parts.join(',')}` : '';
+  return `https://res.cloudinary.com/${cloudName}/video/upload${transform}/${publicId}.mp4`;
 }

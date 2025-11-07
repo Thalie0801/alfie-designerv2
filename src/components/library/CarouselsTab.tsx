@@ -237,9 +237,8 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                             title: slide.text_json.title,
                             subtitle: slide.text_json.subtitle,
                             bulletPoints: slide.text_json.bullets || [],
-                            aspectRatio: slide.format || '4:5',
+                            aspectRatio: (slide.format || '4:5') as '4:5' | '1:1' | '9:16' | '16:9',
                             cloudName,
-                            baseUrlForCloudGuess: base || slide.metadata?.cloudinary_base_url,
                           });
                         } catch (e) {
                           console.warn('[CarouselsTab] Overlay generation failed:', e);

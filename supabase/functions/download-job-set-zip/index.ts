@@ -53,34 +53,42 @@ function encodeCloudinaryText(text: string): string {
 
 function buildOverlayUrl(slide: any): string | null {
   const cloudName = extractCloudName(slide.cloudinary_url);
+  const publicId = slide.cloudinary_public_id || derivePublicIdFromUrl(slide.cloudinary_url);
+
+  console.log(
+    `[buildOverlayUrl] slide=${slide.id} cloudName=${cloudName} publicId=${publicId} has_text=${!!slide.text_json}`
+  );
+
   if (!cloudName) {
-    console.warn(`[buildOverlay] Missing cloudName for slide ${slide.id}`);
+    console.warn(`[buildOverlayUrl] ❌ Missing cloudName for slide ${slide.id}`);
     return null;
   }
-  
-  // Tenter d'obtenir public_id depuis la colonne ou dériver depuis l'URL
-  let publicId = slide.cloudinary_public_id;
-  if (!publicId || publicId.trim() === '') {
-    publicId = derivePublicIdFromUrl(slide.cloudinary_url);
-    if (!publicId) {
-      console.warn(`[buildOverlay] Could not derive public_id from URL for slide ${slide.id}`);
-      return null;
-    }
+
+  if (!publicId) {
+    console.warn(`[buildOverlayUrl] ❌ Missing publicId for slide ${slide.id}`);
+    return null;
   }
-  
+
   if (!slide.text_json) {
-    console.warn(`[buildOverlay] Missing text_json for slide ${slide.id}`);
+    console.warn(`[buildOverlayUrl] ❌ Missing text_json for slide ${slide.id}`);
     return null;
   }
 
   const { title, subtitle } = slide.text_json;
   const cleanTitle = cleanText(title || '', 120);
   const cleanSubtitle = cleanText(subtitle || '', 220);
-  
+
   if (!cleanTitle || cleanTitle.trim() === '') {
-    console.warn(`[buildOverlay] Empty title after cleaning for slide ${slide.id}`);
+    console.warn(`[buildOverlayUrl] ❌ Empty title after cleaning for slide ${slide.id}`);
     return null;
   }
+
+  console.log(
+    `[buildOverlayUrl] ✅ Building overlay for slide ${slide.id}, title="${cleanTitle.substring(
+      0,
+      30
+    )}..."`
+  );
   
   const format = slide.format || '4:5';
   const dimensions = 
@@ -185,8 +193,14 @@ serve(async (req) => {
       }
 
       try {
-        console.log(`[download-zip] Fetching slide ${slide.slide_index} ${imageUrl.includes('l_text:') ? 'WITH OVERLAY' : 'base'}: ${imageUrl.substring(0, 150)}...`);
-        
+        const overlayIndicator = imageUrl.includes('l_text:') ? '🎨 WITH OVERLAY' : '📦 base';
+        console.log(
+          `[download-zip] Downloading slide ${slide.slide_index} ${overlayIndicator}: ${imageUrl.substring(
+            0,
+            120
+          )}...`
+        );
+
         const response = await fetch(imageUrl);
         
         if (!response.ok) {

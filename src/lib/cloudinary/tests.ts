@@ -7,7 +7,7 @@
 
 import { ping, sign } from './upload';
 import { slideUrl } from './imageUrls';
-import { reelUrl } from './videoUrls';
+import { videoUrl, simpleVideoUrl } from './videoUrls';
 
 export interface TestResult {
   name: string;
@@ -98,10 +98,8 @@ export function testImageUrlGeneration(): TestResult {
       title: 'Test Title',
       subtitle: 'Test Subtitle',
       bulletPoints: ['Point 1', 'Point 2'],
-      width: 1080,
-      height: 1920,
       aspectRatio: '9:16',
-      cloudName: 'dkad5vdyo'
+      cloudName: 'dkad5vdyo',
     });
     const duration = Date.now() - start;
     
@@ -136,12 +134,8 @@ export function testImageUrlGeneration(): TestResult {
 export function testVideoUrlGeneration(): TestResult {
   const start = Date.now();
   try {
-    const url = reelUrl('test/sample_video', {
-      title: 'Test Video',
-      subtitle: 'Test Description',
-      start: 5,
-      duration: 10,
-      aspectRatio: '9:16'
+    const url = simpleVideoUrl('test/sample_video', {
+      cloudName: 'dkad5vdyo',
     });
     const duration = Date.now() - start;
     

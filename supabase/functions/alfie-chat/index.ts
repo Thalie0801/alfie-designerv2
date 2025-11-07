@@ -993,23 +993,20 @@ Example: "Professional product photography, 45° angle, gradient background (${b
             }
 
             case 'create_carousel': {
-              // ✅ GUARD RENFORCÉ : Vérifier que aspect_ratio est fourni
+              // ✅ GUARD : Retour immédiat si aspect_ratio manquant
               if (!toolArgs.aspect_ratio) {
-                const userMessage = '⚠️ Je ne peux pas générer sans connaître le format ! Quel format préfères-tu ? 📐\n\n📱 1:1 (carré Instagram)\n📲 4:5 (portrait feed)\n📺 9:16 (Story/Reel vertical)\n🖥️ 16:9 (YouTube paysage)';
-                
-                toolResult = {
-                  error: 'aspect_ratio_required',
-                  message: userMessage,
-                  options: ['1:1', '4:5', '9:16', '16:9']
-                };
-                
-                // Forcer l'AI à répondre avec ce message
-                conversationMessages.push({
-                  role: 'assistant',
-                  content: userMessage
-                });
-                
-                break;
+                const msg = '⚠️ Choisis un format 📐 : 1:1, 4:5, 9:16 ou 16:9';
+                return new Response(
+                  JSON.stringify({
+                    ok: true,
+                    choices: [{ message: { role: 'assistant', content: msg } }],
+                    requiresInput: true,
+                    formatOptions: ['1:1', '4:5', '9:16', '16:9'],
+                  }),
+                  {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                  }
+                );
               }
               
               const count = toolArgs.count || 5;
@@ -1193,22 +1190,24 @@ Example: "Professional product photography, 45° angle, gradient background (${b
             }
 
             case 'generate_image': {
-              // ✅ GUARD RENFORCÉ : Vérifier que aspect_ratio est fourni
+              // ✅ GUARD : Retour immédiat si aspect_ratio manquant
               if (!toolArgs.aspect_ratio) {
-                const userMessage = '⚠️ Je ne peux pas générer sans connaître le format ! Quel format tu veux ? 📐\n\n📱 1:1 (carré Instagram)\n📲 4:5 (portrait feed)\n📺 9:16 (Story/Reel vertical)\n🖥️ 16:9 (YouTube paysage)';
-                
-                toolResult = {
-                  error: 'aspect_ratio_required',
-                  message: userMessage,
-                  options: ['1:1', '4:5', '9:16', '16:9']
-                };
-                
-                // Forcer l'AI à répondre avec ce message
-                conversationMessages.push({
-                  role: 'assistant',
-                  content: userMessage
-                });
-                
+                const msg = '⚠️ Format image ? 📐 1:1, 4:5, 9:16 ou 16:9';
+                return new Response(
+                  JSON.stringify({
+                    ok: true,
+                    choices: [{ message: { role: 'assistant', content: msg } }],
+                    requiresInput: true,
+                    formatOptions: ['1:1', '4:5', '9:16', '16:9'],
+                  }),
+                  {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                  }
+                );
+              }
+
+              const theme = toolArgs.theme || toolArgs.prompt || 'professional visual';
+              const aspectRatio = toolArgs.aspect_ratio;
                 break;
               }
               
@@ -1275,23 +1274,20 @@ Example: "Professional product photography, 45° angle, gradient background (${b
             }
 
             case 'generate_video': {
-              // ✅ GUARD RENFORCÉ : Vérifier que aspectRatio est fourni
+              // ✅ GUARD : Retour immédiat si aspectRatio manquant
               if (!toolArgs.aspectRatio) {
-                const userMessage = '⚠️ Je ne peux pas générer de vidéo sans connaître le format ! Quel format tu veux ? 🎬\n\n🖥️ 16:9 (paysage YouTube)\n📱 9:16 (vertical TikTok/Reel)';
-                
-                toolResult = {
-                  error: 'aspect_ratio_required',
-                  message: userMessage,
-                  options: ['16:9', '9:16']
-                };
-                
-                // Forcer l'AI à répondre avec ce message
-                conversationMessages.push({
-                  role: 'assistant',
-                  content: userMessage
-                });
-                
-                break;
+                const msg = '⚠️ Format vidéo ? 🎬 9:16 ou 16:9';
+                return new Response(
+                  JSON.stringify({
+                    ok: true,
+                    choices: [{ message: { role: 'assistant', content: msg } }],
+                    requiresInput: true,
+                    formatOptions: ['9:16', '16:9'],
+                  }),
+                  {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                  }
+                );
               }
               
               const { data: videoData, error: videoError } = await supabase.functions.invoke('generate-video', {

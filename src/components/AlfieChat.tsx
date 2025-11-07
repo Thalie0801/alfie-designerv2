@@ -702,9 +702,8 @@ export function AlfieChat() {
                                 title: item.text.title,
                                 subtitle: item.text.subtitle,
                                 bulletPoints: item.text.bullets,
-                                aspectRatio: item.format || '4:5',
+                                aspectRatio: (item.format || '4:5') as '4:5' | '1:1' | '9:16' | '16:9',
                                 cloudName,
-                                baseUrlForCloudGuess: item.url,
                               });
                             } catch {
                               return item.url ?? '/placeholder.svg';
