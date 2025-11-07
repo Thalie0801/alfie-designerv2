@@ -7,6 +7,59 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ========== CLOUDINARY OVERLAY HELPERS ==========
+
+function extractCloudName(url?: string): string | undefined {
+  if (!url) return undefined;
+  const match = url.match(/https?:\/\/res\.cloudinary\.com\/([^/]+)\//i);
+  return match?.[1];
+}
+
+function cleanText(text: string, maxLen = 220): string {
+  let cleaned = text.replace(/[\u0000-\u001F\u007F\u00A0\uFEFF]/g, '');
+  // Remove emojis
+  try {
+    cleaned = cleaned.replace(/\p{Extended_Pictographic}/gu, '');
+  } catch {
+    cleaned = cleaned.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '');
+  }
+  return cleaned.length > maxLen ? cleaned.slice(0, maxLen).trim() : cleaned.trim();
+}
+
+function encodeCloudinaryText(text: string): string {
+  return encodeURIComponent(text).replace(/%20/g, '%20');
+}
+
+function buildOverlayUrl(slide: any): string | null {
+  const cloudName = extractCloudName(slide.cloudinary_url);
+  if (!cloudName || !slide.cloudinary_public_id || !slide.text_json) {
+    return null;
+  }
+
+  const { title, subtitle } = slide.text_json;
+  const cleanTitle = cleanText(title || '', 120);
+  const cleanSubtitle = cleanText(subtitle || '', 220);
+  
+  if (!cleanTitle) return null;
+  
+  const format = slide.format || '4:5';
+  const dimensions = 
+    format === '9:16' ? 'w_1080,h_1920' :
+    format === '16:9' ? 'w_1920,h_1080' :
+    format === '1:1' ? 'w_1080,h_1080' :
+    'w_1080,h_1350'; // 4:5 par défaut
+
+  const baseTransform = `${dimensions},c_fill,r_max,f_png`;
+  
+  let overlays = `l_text:Arial_72_bold:${encodeCloudinaryText(cleanTitle)},co_rgb:FFFFFF,g_north,y_200`;
+  
+  if (cleanSubtitle) {
+    overlays += `/l_text:Arial_48_normal:${encodeCloudinaryText(cleanSubtitle)},co_rgb:E5E7EB,g_center`;
+  }
+
+  return `https://res.cloudinary.com/${cloudName}/image/upload/${baseTransform}/${overlays}/${slide.cloudinary_public_id}`;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -35,7 +88,7 @@ serve(async (req) => {
     // PRIORITÉ: order_id (plus stable) > carousel_id (change entre régénérations)
     let query = supabase
       .from('library_assets')
-      .select('id, slide_index, cloudinary_url, metadata, carousel_id, order_id')
+      .select('id, slide_index, cloudinary_url, cloudinary_public_id, text_json, format, metadata, carousel_id, order_id')
       .eq('type', 'carousel_slide')
       .eq('user_id', user.id)
       .order('slide_index');
@@ -68,40 +121,45 @@ serve(async (req) => {
     let failureCount = 0;
 
     for (const slide of slides) {
-      // Priorité 1: cloudinary_url (avec overlay texte)
-      // Priorité 2: metadata.cloudinary_base_url (fallback sans texte)
       const meta = (slide.metadata as any) || {};
-      let imageUrl = slide.cloudinary_url;
+      
+      // ✅ NOUVEAU : Tenter d'abord l'URL overlay
+      let imageUrl = buildOverlayUrl(slide);
+      
+      // Fallback vers images de base si pas d'overlay possible
+      if (!imageUrl) {
+        imageUrl = slide.cloudinary_url;
+        console.log(`[download-zip] No overlay for slide ${slide.id}, using base image`);
+      }
       
       if (!imageUrl && meta.cloudinary_base_url) {
         imageUrl = meta.cloudinary_base_url;
-        console.log(`[download-zip] Using base URL for slide ${slide.id}`);
       }
 
       if (!imageUrl) {
-        console.warn(`[download-zip] ⚠️ No URL found for slide ${slide.id} (index ${slide.slide_index})`);
+        console.warn(`[download-zip] ⚠️ No URL found for slide ${slide.id}`);
         failureCount++;
         continue;
       }
 
       try {
-        console.log(`[download-zip] Fetching slide ${slide.slide_index}: ${imageUrl.substring(0, 100)}...`);
+        console.log(`[download-zip] Fetching slide ${slide.slide_index} ${imageUrl.includes('l_text:') ? 'WITH OVERLAY' : 'base'}: ${imageUrl.substring(0, 150)}...`);
         
         const response = await fetch(imageUrl);
+        
         if (!response.ok) {
-          console.warn(`[download-zip] ⚠️ Failed to fetch (${response.status}): ${imageUrl.substring(0, 150)}`);
+          console.warn(`[download-zip] ⚠️ Overlay failed (${response.status}), trying base...`);
           
-          // Try fallback to base_url if main URL failed
-          if (meta.cloudinary_base_url && imageUrl !== meta.cloudinary_base_url) {
-            console.log(`[download-zip] Trying fallback base_url...`);
-            const fallbackResp = await fetch(meta.cloudinary_base_url);
+          // Fallback vers image de base si overlay échoue
+          if (slide.cloudinary_url) {
+            const fallbackResp = await fetch(slide.cloudinary_url);
             if (fallbackResp.ok) {
               const blob = await fallbackResp.blob();
               const arrayBuffer = await blob.arrayBuffer();
               const slideNum = (slide.slide_index ?? 0) + 1;
               const filename = `slide-${slideNum.toString().padStart(2, '0')}.png`;
               zip.file(filename, new Uint8Array(arrayBuffer));
-              console.log(`[download-zip] ✅ Added ${filename} via fallback (${arrayBuffer.byteLength} bytes)`);
+              console.log(`[download-zip] ✅ Added ${filename} via base fallback`);
               successCount++;
               continue;
             }
@@ -111,14 +169,15 @@ serve(async (req) => {
           continue;
         }
 
+        // Success - ajouter au ZIP
         const blob = await response.blob();
         const arrayBuffer = await blob.arrayBuffer();
-
         const slideNum = (slide.slide_index ?? 0) + 1;
         const filename = `slide-${slideNum.toString().padStart(2, '0')}.png`;
         zip.file(filename, new Uint8Array(arrayBuffer));
-        console.log(`[download-zip] ✅ Added ${filename} to ZIP (${arrayBuffer.byteLength} bytes)`);
+        console.log(`[download-zip] ✅ Added ${filename} (${arrayBuffer.byteLength} bytes) ${imageUrl.includes('l_text:') ? '🎨 WITH OVERLAY' : '📦 base'}`);
         successCount++;
+        
       } catch (err) {
         console.error(`[download-zip] ❌ Error fetching slide ${slide.id}:`, err);
         failureCount++;
