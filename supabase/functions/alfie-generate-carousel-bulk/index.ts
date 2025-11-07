@@ -2,6 +2,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
+const INTERNAL_SECRET = Deno.env.get("INTERNAL_FN_SECRET") ?? "";
+
 type AspectRatio = "1:1" | "4:5" | "9:16" | "16:9";
 
 type SlideInput = Record<string, unknown>; // ton schema de slide texte (title, subtitle, bullets, etc.)
@@ -133,6 +135,14 @@ serve(async (req) => {
   }
 
   try {
+    if (!INTERNAL_SECRET) {
+      console.error("[Carousel Bulk] Missing INTERNAL_FN_SECRET");
+      return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing authorization header" }), {
@@ -220,6 +230,10 @@ serve(async (req) => {
         const label = `carousel=${carouselId} slide=${job.slideIndex + 1}/${totalSlides}`;
 
         const exec = async () => {
+          const headers = forwardAuth && authHeader
+            ? { Authorization: authHeader, "X-Internal-Secret": INTERNAL_SECRET }
+            : { "X-Internal-Secret": INTERNAL_SECRET };
+
           const { data: slideData, error: slideError } = await supabaseAdmin.functions.invoke(
             "alfie-render-carousel-slide",
             {
@@ -229,6 +243,7 @@ serve(async (req) => {
                 globalStyle: carousel.globalStyle ?? body.globalStyle ?? {},
                 brandId,
                 orderId,
+                orderItemId: null,
                 carouselId,
                 slideIndex: job.slideIndex,
                 totalSlides,
@@ -236,9 +251,9 @@ serve(async (req) => {
                 textVersion,
                 renderVersion: "v1",
                 context: "bulk",
+                requestId: null,
               },
-              // Si ta fonction slide attend un contexte utilisateur, tu peux propager l’Authorization ici.
-              headers: forwardAuth ? { Authorization: authHeader } : undefined,
+              headers,
             },
           );
 

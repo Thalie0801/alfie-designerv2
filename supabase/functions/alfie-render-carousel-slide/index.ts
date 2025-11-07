@@ -5,6 +5,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { uploadTextAsRaw } from "../_shared/cloudinaryUploader.ts";
 
+const INTERNAL_SECRET = Deno.env.get("INTERNAL_FN_SECRET") ?? "";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -26,6 +28,7 @@ interface SlideRequest {
   };
   brandId: string;
   orderId: string;
+  orderItemId?: string | null;
   carouselId: string;
   slideIndex: number;
   totalSlides: number;
@@ -34,6 +37,7 @@ interface SlideRequest {
   renderVersion: number;
   campaign: string;
   language?: Lang | string;
+  requestId?: string | null;
 }
 
 type GenSize = { w: number; h: number };
@@ -129,6 +133,10 @@ serve(async (req) => {
   console.log("[alfie-render-carousel-slide] v2.4.0 — invoked");
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  if (!INTERNAL_SECRET || req.headers.get("x-internal-secret") !== INTERNAL_SECRET) {
+    return json({ error: "Forbidden" }, 403);
+  }
+
   // Early ENV checks
   const missingEnv = [
     ["SUPABASE_URL", Deno.env.get("SUPABASE_URL")],
@@ -148,6 +156,7 @@ serve(async (req) => {
       slideContent,
       brandId,
       orderId,
+      orderItemId,
       carouselId,
       slideIndex,
       totalSlides,
@@ -156,6 +165,7 @@ serve(async (req) => {
       renderVersion,
       campaign,
       language = "FR",
+      requestId = null,
     } = params;
 
     // —— Supabase admin client (service role)
@@ -369,13 +379,20 @@ serve(async (req) => {
     // STEP 4/4 — Upsert DB (idempotent)
     // =========================================
     console.log(`[render-slide] ${logCtx} 4/4 Save to library_assets (idempotence check)`);
-    const { data: existing } = await supabaseAdmin
+    const existingQuery = supabaseAdmin
       .from("library_assets")
       .select("id, cloudinary_url, cloudinary_public_id")
       .eq("order_id", orderId)
       .eq("carousel_id", carouselId)
-      .eq("slide_index", slideIndex)
-      .maybeSingle();
+      .eq("slide_index", slideIndex);
+
+    if (orderItemId) {
+      existingQuery.eq("order_item_id", orderItemId);
+    } else {
+      existingQuery.is("order_item_id", null);
+    }
+
+    const { data: existing } = await existingQuery.maybeSingle();
 
     if (existing) {
       console.log(`[render-slide] ${logCtx} ♻️ Asset already exists: ${existing.id}`);
@@ -401,6 +418,7 @@ serve(async (req) => {
       user_id: userId,
       brand_id: brandId,
       order_id: orderId,
+      order_item_id: orderItemId ?? null,
       carousel_id: carouselId,
       type: "carousel_slide",
       slide_index: slideIndex,
@@ -424,6 +442,8 @@ serve(async (req) => {
         totalSlides,
         aspectRatio: normalizedAR,
         size_hint: `${size.w}x${size.h}`,
+        orderItemId: orderItemId ?? null,
+        requestId,
       },
     });
 

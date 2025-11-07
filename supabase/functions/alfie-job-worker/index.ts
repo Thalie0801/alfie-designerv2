@@ -59,29 +59,47 @@ function isHttp402(e: unknown) {
 async function callFn<T = unknown>(name: string, body: unknown): Promise<T> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const internalSecret = Deno.env.get("INTERNAL_FN_SECRET");
 
   if (!supabaseUrl || !anonKey) {
     throw new Error(`Missing Supabase configuration for ${name}`);
   }
-
-  const resp = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${anonKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body ?? {}),
-  });
-
-  const text = await resp.text().catch(() => "");
-  if (!resp.ok) {
-    throw new Error(`${name} failed: ${resp.status} ${resp.statusText} ${text}`);
+  if (!internalSecret) {
+    throw new Error(`Missing INTERNAL_FN_SECRET for ${name}`);
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60000);
+
   try {
-    return JSON.parse(text) as T;
-  } catch {
-    return text as unknown as T;
+    const resp = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${anonKey}`,
+        "X-Internal-Secret": internalSecret,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body ?? {}),
+      signal: controller.signal,
+    });
+
+    const text = await resp.text().catch(() => "");
+    if (!resp.ok) {
+      throw new Error(`${name} failed: ${resp.status} ${resp.statusText} ${text}`);
+    }
+
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      return text as unknown as T;
+    }
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error(`${name} timed out after 60s`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -353,6 +371,10 @@ async function processRenderImages(payload: any) {
     return processRenderImage(payload);
   }
 
+  if (!payload?.userId || !payload?.orderId) {
+    throw new Error("Invalid render_images payload: missing userId or orderId");
+  }
+
   const results: Array<{ url: string; aspectRatio: string; resolution: string }> = [];
   let imagesToRender: Array<{
     prompt: string;
@@ -416,7 +438,14 @@ Format: ${aspectRatio} aspect ratio optimized.`;
         prompt: img.prompt,
         resolution: img.resolution,
         backgroundOnly: false,
-        brandKit: await loadBrandMini(img.brandId),
+        brandKit: await loadBrandMini(img.brandId ?? payload.brandId),
+        userId: payload.userId,
+        brandId: img.brandId ?? payload.brandId ?? null,
+        orderId: payload.orderId,
+        orderItemId: payload.orderItemId ?? null,
+        requestId: payload.requestId ?? null,
+        templateImageUrl: img.templateImageUrl ?? payload.sourceUrl ?? null,
+        uploadedSourceUrl: payload.sourceUrl ?? null,
       });
 
       const imagePayload = unwrapResult<any>(imageResult);
@@ -667,6 +696,7 @@ async function processRenderCarousels(payload: any) {
             slideContent: slide,
             brandId: carousel.brandId,
             orderId: payload.orderId,
+            orderItemId: payload.orderItemId ?? null,
             carouselId: carousel.id,
             slideIndex: i,
             totalSlides: carousel.slides.length,
@@ -675,6 +705,7 @@ async function processRenderCarousels(payload: any) {
             renderVersion: 1,
             campaign: "carousel_generation",
             language: "FR",
+            requestId: payload.requestId ?? null,
           });
 
           const slidePayload = unwrapResult<any>(slideResult);

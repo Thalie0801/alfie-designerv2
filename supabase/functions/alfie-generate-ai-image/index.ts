@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
+const INTERNAL_SECRET = Deno.env.get("INTERNAL_FN_SECRET") ?? "";
+
 /* ------------------------------- CORS ------------------------------- */
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,7 +28,13 @@ interface BrandKit {
 }
 
 interface GenerateRequest {
+  userId?: string;
+  brandId?: string | null;
+  orderId?: string | null;
+  orderItemId?: string | null;
+  requestId?: string | null;
   templateImageUrl?: string;
+  uploadedSourceUrl?: string | null;
   brandKit?: BrandKit;
   prompt?: string;
   resolution?: string;
@@ -187,33 +195,35 @@ serve(async (req) => {
     return jsonRes({ error: "Method not allowed" }, { status: 405 });
   }
 
+  if (!INTERNAL_SECRET || req.headers.get("x-internal-secret") !== INTERNAL_SECRET) {
+    return jsonRes({ error: "Forbidden" }, { status: 403 });
+  }
+
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error("Supabase env not configured");
     }
 
     const body = (await req.json()) as GenerateRequest;
 
-    // --- Auth: extraire le JWT utilisateur ---
-    const bearer = req.headers.get("Authorization") || "";
-    const jwt = bearer.startsWith("Bearer ") ? bearer.slice(7).trim() : null;
-    if (!jwt) return jsonRes({ error: "Unauthorized" }, { status: 401 });
+    const userId = typeof body.userId === "string" ? body.userId : null;
+    const brandId = typeof body.brandId === "string" ? body.brandId : null;
+    const orderId = typeof body.orderId === "string" ? body.orderId : null;
+    const orderItemId = typeof body.orderItemId === "string" ? body.orderItemId : null;
+    const requestId = typeof body.requestId === "string" ? body.requestId : null;
 
-    // Client "auth" pour valider le token
-    const sbAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: `Bearer ${jwt}` } },
-    });
-    const { data: authData, error: authErr } = await sbAuth.auth.getUser();
-    if (authErr || !authData?.user) return jsonRes({ error: "Invalid token" }, { status: 401 });
-    const user = authData.user;
+    if (!userId) {
+      return jsonRes({ error: "Missing userId" }, { status: 400 });
+    }
+    if (!orderId) {
+      console.warn("[alfie-generate-ai-image] Missing orderId in payload");
+    }
 
-    // Client service pour insertions
     const sbService = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // --- Construire prompts & payload ---
@@ -222,8 +232,9 @@ serve(async (req) => {
     const negative = buildNegativePrompt(body);
 
     const userContent: any[] = [{ type: "text", text: fullPrompt }];
-    if (body.templateImageUrl?.trim()) {
-      userContent.push({ type: "image_url", image_url: { url: body.templateImageUrl } });
+    const referenceImage = body.templateImageUrl?.trim() || body.uploadedSourceUrl?.trim();
+    if (referenceImage) {
+      userContent.push({ type: "image_url", image_url: { url: referenceImage } });
     }
     if (negative) {
       // On peut glisser le negative prompt explicitement dans le message
@@ -281,13 +292,15 @@ serve(async (req) => {
     let errorDetail: string | null = null;
 
     try {
-      const brandId = typeof body.brandKit?.id === "string" ? body.brandKit.id : null;
+      const brandIdForMetadata = brandId ?? (typeof body.brandKit?.id === "string" ? body.brandKit.id : null);
       const slideIdx = typeof body.slideIndex === "number" ? body.slideIndex : null;
       const totalSlides = typeof body.totalSlides === "number" ? body.totalSlides : null;
 
       const insertPayload = {
-        user_id: user.id,
-        brand_id: brandId,
+        user_id: userId,
+        brand_id: brandIdForMetadata,
+        order_id: orderId ?? null,
+        order_item_id: orderItemId,
         type: "image" as const,
         status: "completed" as const,
         // On log uniquement un résumé court pour conformité
@@ -307,6 +320,10 @@ serve(async (req) => {
           negativePrompt: body.negativePrompt ?? null,
           generatedAt: new Date().toISOString(),
           engine: "gemini-2.5-flash-image-preview",
+          orderId,
+          orderItemId,
+          requestId,
+          referenceImageUrl: referenceImage ?? null,
         },
       };
 
@@ -320,7 +337,7 @@ serve(async (req) => {
         console.error("Save error:", insertError);
         errorDetail = insertError.message ?? "insert error";
       } else {
-        console.log(`Saved media id=${inserted?.id} user=${user.id} brand=${brandId ?? "null"}`);
+        console.log(`Saved media id=${inserted?.id} user=${userId} brand=${brandIdForMetadata ?? "null"}`);
         saved = true;
       }
     } catch (e: any) {
