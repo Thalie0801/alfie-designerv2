@@ -341,9 +341,23 @@ export function AlfieChat() {
         const headers = await getAuthHeader();
         const { data, error } = await supabase.functions.invoke('queue-monitor', { headers });
         if (error) throw error;
-        const c = (data as any)?.counts || {};
-        const oldest = (data as any)?.backlogSeconds ?? null;
-        const stuck = (data as any)?.stuck?.runningStuckCount ?? 0;
+        
+        interface QueueMonitorResponse {
+          counts?: { 
+            completed_24h?: number; 
+            pending?: number; 
+            running?: number;
+            queued?: number;
+            failed?: number;
+          };
+          backlogSeconds?: number;
+          stuck?: { runningStuckCount?: number };
+        }
+        
+        const response = data as QueueMonitorResponse;
+        const c = response?.counts || {};
+        const oldest = response?.backlogSeconds ?? null;
+        const stuck = response?.stuck?.runningStuckCount ?? 0;
         const completed24h = c.completed_24h ?? 0;
         const minutes = oldest ? Math.max(0, Math.round((oldest as number) / 60)) : null;
 
