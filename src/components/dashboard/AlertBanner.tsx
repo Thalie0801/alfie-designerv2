@@ -52,9 +52,7 @@ export function AlertBanner() {
   const { stats } = useActivityStats(activeBrandId);
   const [showBrandDialog, setShowBrandDialog] = useState(false);
 
-  if (!activeBrand || !stats) return null;
-
-  // -- Quotas
+  // Extract stats with defaults (before early return)
   const {
     imagesCount = 0,
     imagesQuota = 0,
@@ -62,8 +60,9 @@ export function AlertBanner() {
     videosQuota = 0,
     totalWoofsUsed = 0,
     woofsQuota = 0,
-  } = stats;
+  } = stats || {};
 
+  // Always call useMemo (hook must be called unconditionally)
   const usage = useMemo(() => {
     const items = [
       { key: "Visuels", used: imagesCount, quota: imagesQuota },
@@ -79,6 +78,9 @@ export function AlertBanner() {
 
     return { items, anyNear, anyOver, mostCritical };
   }, [imagesCount, imagesQuota, videosCount, videosQuota, totalWoofsUsed, woofsQuota]);
+
+  // Check for missing data AFTER all hooks
+  if (!activeBrand || !stats) return null;
 
   // 1) Quota critique (near or over)
   if (usage.anyNear || usage.anyOver) {
