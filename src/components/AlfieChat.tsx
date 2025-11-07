@@ -14,8 +14,7 @@ import { Progress } from '@/components/ui/progress';
 import { useLibraryAssetsSubscription } from '@/hooks/useLibraryAssetsSubscription';
 import { getAspectClass, type ConversationState, type OrchestratorResponse } from '@/types/chat';
 import { slideUrl } from '@/lib/cloudinary/imageUrls';
-
-const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dkad5vdyo';
+import { extractCloudNameFromUrl } from '@/lib/cloudinary/utils';
 
 const normalizeConversationState = (state?: string | null): ConversationState => {
   switch (state) {
@@ -693,22 +692,20 @@ export function AlfieChat() {
                         const imageUrl = (() => {
                           // Regenerate with overlays if we have publicId + text
                           if (item.publicId && item.text) {
+                            const cloudName = extractCloudNameFromUrl(item.url);
                             return slideUrl(item.publicId, {
                               title: item.text.title,
                               subtitle: item.text.subtitle,
                               bulletPoints: item.text.bullets,
-                              aspectRatio: item.format || '4:5'
+                              aspectRatio: item.format || '4:5',
+                              cloudName,
+                              baseUrlForCloudGuess: item.url,
                             });
                           }
                           
                           // Use URL directly if it's complete
                           if (item.url?.startsWith('https://')) {
                             return item.url;
-                          }
-                          
-                          // Build from publicId if URL is not complete
-                          if (item.url) {
-                            return `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${item.url}`;
                           }
                           
                           return '/placeholder.svg';
@@ -763,11 +760,14 @@ export function AlfieChat() {
                             src={(() => {
                               const firstSlide = carousel.slides[0];
                               if (firstSlide.cloudinary_public_id && firstSlide.text_json) {
+                                const cloudName = extractCloudNameFromUrl(firstSlide.cloudinary_url);
                                 return slideUrl(firstSlide.cloudinary_public_id, {
                                   title: firstSlide.text_json.title,
                                   subtitle: firstSlide.text_json.subtitle,
                                   bulletPoints: firstSlide.text_json.bullets,
-                                  aspectRatio: firstSlide.format || '4:5'
+                                  aspectRatio: firstSlide.format || '4:5',
+                                  cloudName,
+                                  baseUrlForCloudGuess: firstSlide.cloudinary_url,
                                 });
                               }
                               return firstSlide.cloudinary_url || firstSlide.storage_url;
@@ -791,11 +791,14 @@ export function AlfieChat() {
                           
                           const thumbUrl = (() => {
                             if (slide.cloudinary_public_id && slide.text_json) {
+                              const cloudName = extractCloudNameFromUrl(slide.cloudinary_url);
                               return slideUrl(slide.cloudinary_public_id, {
                                 title: slide.text_json.title,
                                 subtitle: slide.text_json.subtitle,
                                 bulletPoints: slide.text_json.bullets,
-                                aspectRatio: slide.format || '4:5'
+                                aspectRatio: slide.format || '4:5',
+                                cloudName,
+                                baseUrlForCloudGuess: slide.cloudinary_url,
                               });
                             }
                             return slide.cloudinary_url || slide.storage_url;
@@ -809,8 +812,11 @@ export function AlfieChat() {
                                 className="absolute inset-0 w-full h-full object-cover"
                                 loading="lazy"
                                 onError={(e) => {
-                                  if (slide.cloudinary_public_id && e.currentTarget.src !== `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${slide.cloudinary_public_id}`) {
-                                    e.currentTarget.src = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${slide.cloudinary_public_id}`;
+                                  // Fallback to base Cloudinary URL if overlay fails
+                                  if (slide.cloudinary_url && e.currentTarget.src !== slide.cloudinary_url) {
+                                    e.currentTarget.src = slide.cloudinary_url;
+                                  } else if (slide.storage_url && e.currentTarget.src !== slide.storage_url) {
+                                    e.currentTarget.src = slide.storage_url;
                                   }
                                 }}
                               />

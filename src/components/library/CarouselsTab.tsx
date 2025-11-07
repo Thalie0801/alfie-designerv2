@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { slideUrl } from '@/lib/cloudinary/imageUrls';
+import { extractCloudNameFromUrl } from '@/lib/cloudinary/utils';
 
 interface CarouselSlide {
   id: string;
@@ -215,11 +216,14 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                       src={(() => {
                         // Regenerate with overlays if we have publicId + text
                         if (slide.cloudinary_public_id && slide.text_json) {
+                          const cloudName = extractCloudNameFromUrl(slide.cloudinary_url);
                           return slideUrl(slide.cloudinary_public_id, {
                             title: slide.text_json.title,
                             subtitle: slide.text_json.subtitle,
                             bulletPoints: slide.text_json.bullets || [],
-                            aspectRatio: slide.format || '4:5'
+                            aspectRatio: slide.format || '4:5',
+                            cloudName,
+                            baseUrlForCloudGuess: slide.cloudinary_url,
                           });
                         }
                         // Otherwise use base URL

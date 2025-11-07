@@ -1,19 +1,12 @@
 import { Cloudinary } from '@cloudinary/url-gen';
-import { scale } from '@cloudinary/url-gen/actions/resize';
+import { fill, scale } from '@cloudinary/url-gen/actions/resize';
 import { source } from '@cloudinary/url-gen/actions/overlay';
 import { text } from '@cloudinary/url-gen/qualifiers/source';
 import { TextStyle } from '@cloudinary/url-gen/qualifiers/textStyle';
 import { Position } from '@cloudinary/url-gen/qualifiers/position';
 import { compass } from '@cloudinary/url-gen/qualifiers/gravity';
 import { max } from '@cloudinary/url-gen/actions/roundCorners';
-
-const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dkad5vdyo';
-
-const cld = new Cloudinary({
-  cloud: {
-    cloudName,
-  },
-});
+import { extractCloudNameFromUrl, cleanText } from './utils';
 
 export interface SlideUrlOptions {
   title?: string;
@@ -23,6 +16,8 @@ export interface SlideUrlOptions {
   width?: number;
   height?: number;
   aspectRatio?: string; // e.g., "9:16", "16:9", "1:1"
+  cloudName?: string; // Explicit cloudName override
+  baseUrlForCloudGuess?: string; // URL to extract cloudName from if not provided
 }
 
 /**
@@ -32,16 +27,26 @@ export interface SlideUrlOptions {
 export function slideUrl(publicId: string, options: SlideUrlOptions = {}): string {
   // ✅ Validation : rejeter si c'est une URL complète
   if (publicId.startsWith('http://') || publicId.startsWith('https://')) {
-    console.error('[slideUrl] ❌ ERREUR : publicId doit être un chemin, pas une URL complète:', publicId);
     // Tenter d'extraire le publicId depuis l'URL
     const match = publicId.match(/\/v\d+\/(.+)\.(jpg|png|webp)/);
     if (match) {
       publicId = match[1];
-      console.log('[slideUrl] ✅ Public ID extrait:', publicId);
     } else {
       throw new Error('Invalid publicId: must not be a full URL');
     }
   }
+
+  // Determine cloudName: explicit > env > extracted from URL
+  const envCloud = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined;
+  const guessed = extractCloudNameFromUrl(options.baseUrlForCloudGuess);
+  const cloudName = options.cloudName || envCloud || guessed;
+  
+  if (!cloudName) {
+    throw new Error('cloudName introuvable pour Cloudinary. Passez cloudName ou baseUrlForCloudGuess.');
+  }
+
+  // Create Cloudinary instance with determined cloudName
+  const cld = new Cloudinary({ cloud: { cloudName } });
 
   const {
     title,
@@ -53,14 +58,18 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = {}): strin
     aspectRatio = '9:16',
   } = options;
 
-  console.log('[slideUrl] Generating URL:', { publicId, title, subtitle, aspectRatio });
+  // Clean texts to remove emojis, control characters, and clamp length
+  const cleanTitle = cleanText(title, 120);
+  const cleanSubtitle = cleanText(subtitle, 220);
+  const cleanBullets = bulletPoints.map(b => cleanText(b, 80)).slice(0, 6);
+  const cleanCta = cleanText(cta, 60);
 
   // Start with base image
   let img = cld.image(publicId);
 
-  // Apply aspect ratio or dimensions
+  // Apply aspect ratio or dimensions using fill for better cropping
   if (width && height) {
-    img = img.resize(scale().width(width).height(height));
+    img = img.resize(fill().width(width).height(height));
   } else if (aspectRatio) {
     // Common aspect ratios
     const ratios: Record<string, { w: number; h: number }> = {
@@ -70,23 +79,22 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = {}): strin
       '4:5': { w: 1080, h: 1350 },
     };
     const ratio = ratios[aspectRatio] || ratios['9:16'];
-    img = img.resize(scale().width(ratio.w).height(ratio.h));
+    img = img.resize(fill().width(ratio.w).height(ratio.h));
   }
 
   // Add rounded corners for modern look
   img = img.roundCorners(max());
 
   // Add title overlay if provided
-  if (title) {
-    const titleStyle = new TextStyle('Arial', 72)
+  if (cleanTitle) {
+    const titleStyle = new TextStyle('Inter', 72)
       .fontWeight('bold')
       .textAlignment('center');
 
     img = img.overlay(
       source(
-        text(title, titleStyle)
+        text(cleanTitle, titleStyle)
           .textColor('#FFFFFF')
-          .backgroundColor('rgba(0,0,0,0.6)')
       ).position(
         new Position().gravity(compass('north')).offsetY(200)
       )
@@ -94,16 +102,15 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = {}): strin
   }
 
   // Add subtitle overlay if provided
-  if (subtitle) {
-    const subtitleStyle = new TextStyle('Arial', 48)
+  if (cleanSubtitle) {
+    const subtitleStyle = new TextStyle('Inter', 48)
       .fontWeight('normal')
       .textAlignment('center');
 
     img = img.overlay(
       source(
-        text(subtitle, subtitleStyle)
-          .textColor('#FFFFFF')
-          .backgroundColor('rgba(0,0,0,0.5)')
+        text(cleanSubtitle, subtitleStyle)
+          .textColor('#E5E7EB')
       ).position(
         new Position().gravity(compass('center')).offsetY(0)
       )
@@ -111,8 +118,10 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = {}): strin
   }
 
   // Add bullet points if provided
-  bulletPoints.forEach((bullet, index) => {
-    const bulletStyle = new TextStyle('Arial', 40)
+  cleanBullets.forEach((bullet, index) => {
+    if (!bullet) return;
+    
+    const bulletStyle = new TextStyle('Inter', 40)
       .fontWeight('normal')
       .textAlignment('left');
 
@@ -122,7 +131,6 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = {}): strin
       source(
         text(`• ${bullet}`, bulletStyle)
           .textColor('#FFFFFF')
-          .backgroundColor('rgba(0,0,0,0.4)')
       ).position(
         new Position().gravity(compass('center')).offsetY(offsetY).offsetX(-400)
       )
@@ -130,21 +138,23 @@ export function slideUrl(publicId: string, options: SlideUrlOptions = {}): strin
   });
 
   // Add CTA overlay if provided
-  if (cta) {
-    const ctaStyle = new TextStyle('Arial', 56)
+  if (cleanCta) {
+    const ctaStyle = new TextStyle('Inter', 56)
       .fontWeight('bold')
       .textAlignment('center');
 
     img = img.overlay(
       source(
-        text(cta, ctaStyle)
+        text(cleanCta, ctaStyle)
           .textColor('#FFFFFF')
-          .backgroundColor('rgba(255,100,100,0.9)')
       ).position(
         new Position().gravity(compass('south')).offsetY(200)
       )
     );
   }
+
+  // Force PNG format for stable rendering
+  img = img.format('png');
 
   return img.toURL();
 }
@@ -159,8 +169,13 @@ export function imageUrl(
     height?: number;
     quality?: number | 'auto';
     format?: string;
+    cloudName?: string;
   } = {}
 ): string {
+  const envCloud = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined;
+  const cloudName = options.cloudName || envCloud || 'dkad5vdyo';
+  
+  const cld = new Cloudinary({ cloud: { cloudName } });
   let img = cld.image(publicId);
 
   if (options.width && options.height) {
