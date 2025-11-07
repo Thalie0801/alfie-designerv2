@@ -44,15 +44,34 @@ function human(n: number | undefined): string {
   return new Intl.NumberFormat("fr-FR").format(n);
 }
 
+/**
+ * Parent léger : NE fait que récupérer la brand active et
+ * ne rend l'enfant que lorsque la brand est disponible.
+ * -> Aucun hook conditionnel ici.
+ */
 export function AlertBanner() {
-  const { activeBrand, activeBrandId } = useBrandKit() as {
+  const { activeBrand } = useBrandKit() as {
     activeBrand: Brand | null;
-    activeBrandId: string | null;
   };
-  const { stats } = useActivityStats(activeBrandId);
+
+  if (!activeBrand) return null; // pas d'enfant monté => aucun hook d'enfant appelé
+
+  return <AlertBannerInner brand={activeBrand} />;
+}
+
+/**
+ * Enfant : contient l'appel à useActivityStats qui dépend de brand.id.
+ * Cet enfant n'est monté que quand la brand existe,
+ * donc le nombre de hooks du parent ne varie jamais.
+ */
+function AlertBannerInner({ brand }: { brand: Brand }) {
+  const { id: brandId, name, palette, voice, canva_connected, plan } = brand;
+
+  // ✅ Toujours appelé, car ce composant n'est monté que si brand est défini
+  const { stats } = useActivityStats(brandId);
   const [showBrandDialog, setShowBrandDialog] = useState(false);
 
-  // Extract stats with defaults (before early return)
+  // Valeurs par défaut quand stats n'est pas encore chargée
   const {
     imagesCount = 0,
     imagesQuota = 0,
@@ -62,7 +81,6 @@ export function AlertBanner() {
     woofsQuota = 0,
   } = stats || {};
 
-  // Always call useMemo (hook must be called unconditionally)
   const usage = useMemo(() => {
     const items = [
       { key: "Visuels", used: imagesCount, quota: imagesQuota },
@@ -72,22 +90,22 @@ export function AlertBanner() {
 
     const anyNear = items.some((i) => nearQuota(i.used, i.quota));
     const anyOver = items.some((i) => overQuota(i.used, i.quota));
-    const mostCritical = items
-      .map((i) => ({ ...i, pct: percentSafe(i.used, i.quota) }))
-      .sort((a, b) => b.pct - a.pct)[0];
+    const mostCritical =
+      items
+        .map((i) => ({ ...i, pct: percentSafe(i.used, i.quota) }))
+        .sort((a, b) => b.pct - a.pct)[0] || { key: "", used: 0, quota: 0, pct: 0 };
 
     return { items, anyNear, anyOver, mostCritical };
   }, [imagesCount, imagesQuota, videosCount, videosQuota, totalWoofsUsed, woofsQuota]);
 
-  // Check for missing data AFTER all hooks
-  if (!activeBrand || !stats) return null;
+  // Si les stats n'ont pas encore été chargées, on ne montre rien (évite le flicker)
+  if (!stats) return null;
 
   // 1) Quota critique (near or over)
   if (usage.anyNear || usage.anyOver) {
-    const k = usage.mostCritical.key.toLowerCase();
     const pct = Math.round(percentSafe(usage.mostCritical.used, usage.mostCritical.quota));
     const remaining =
-      usage.mostCritical.quota > 0 ? Math.max(0, usage.mostCritical.quota - usage.mostCritical.used) : 0;
+      usage.mostCritical.quota > 0 ? Math.max(0, usage.mostCritical.quota - (usage.mostCritical.used ?? 0)) : 0;
 
     return (
       <Alert variant="destructive" className="mb-4">
@@ -103,19 +121,19 @@ export function AlertBanner() {
             <span className="text-xs text-muted-foreground">
               {usage.mostCritical.quota > 0 ? (
                 <>
-                  ({human(usage.mostCritical.used ?? 0)} / {human(usage.mostCritical.quota ?? 0)} · {pct}%) — {human(remaining ?? 0)}{" "}
-                  restant(s)
+                  ({human(usage.mostCritical.used ?? 0)} / {human(usage.mostCritical.quota ?? 0)} · {pct}%) —{" "}
+                  {human(remaining)} restant(s)
                 </>
               ) : (
-                <>Aucun quota défini pour {k}</>
+                <>Aucun quota défini pour {usage.mostCritical.key.toLowerCase()}</>
               )}
             </span>
           </span>
 
           <BrandUpgradeDialog
-            brandId={activeBrand.id}
-            brandName={activeBrand.name}
-            currentTier={(activeBrand.plan as BrandTier) || "starter"}
+            brandId={brandId}
+            brandName={name}
+            currentTier={(plan as BrandTier) || "starter"}
           />
         </AlertDescription>
       </Alert>
@@ -123,8 +141,8 @@ export function AlertBanner() {
   }
 
   // 2) Brand Kit incomplet
-  const hasPalette = !!(activeBrand.palette && activeBrand.palette.length > 0);
-  const hasVoice = !!activeBrand.voice;
+  const hasPalette = !!(palette && palette.length > 0);
+  const hasVoice = !!voice;
 
   if (!hasPalette || !hasVoice) {
     return (
@@ -138,7 +156,12 @@ export function AlertBanner() {
               {!hasVoice && !hasPalette && " ·"}
               {!hasVoice && " ton de marque manquant"}
             </span>
-            <Button variant="outline" size="sm" onClick={() => setShowBrandDialog(true)} className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowBrandDialog(true)}
+              className="gap-2"
+            >
               <Palette className="h-4 w-4" />
               Compléter
             </Button>
@@ -146,17 +169,14 @@ export function AlertBanner() {
         </Alert>
 
         {showBrandDialog && (
-          <BrandDialog
-            brand={activeBrand}
-            onSuccess={() => setShowBrandDialog(false)}
-          />
+          <BrandDialog brand={brand} onSuccess={() => setShowBrandDialog(false)} />
         )}
       </>
     );
   }
 
   // 3) Canva non connecté
-  if (!activeBrand.canva_connected) {
+  if (!canva_connected) {
     return (
       <Alert className="mb-4 border-accent/50 bg-accent/5">
         <Info className="h-4 w-4 text-accent-foreground" />
@@ -166,7 +186,7 @@ export function AlertBanner() {
             variant="outline"
             size="sm"
             onClick={() => {
-              // TODO: branche ton handler réel ici
+              // brancher ton handler réel ici (modal, route d'intégration, etc.)
               // e.g. openCanvaConnectModal() ou router.push('/integrations/canva')
             }}
           >
