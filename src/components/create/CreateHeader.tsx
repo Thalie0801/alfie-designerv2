@@ -176,6 +176,36 @@ export function CreateHeader({ onClearChat }: CreateHeaderProps) {
                       {/* Vidéos IA (désactivées si pas de backend) */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
-                          <span
-                            className={cn(
-                              isVideoIADisabled
+                          <span className={cn(isVideoIADisabled && 'text-slate-400')}>
+                            Vidéos IA
+                          </span>
+                          <span className="font-medium">
+                            {videosRemaining}/{videos.limit || 0}
+                          </span>
+                        </div>
+                        <Progress value={clampPct(videos.percentage)} />
+                      </div>
+
+                      {/* Woofs */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Woofs</span>
+                          <span className="font-medium">
+                            {woofs.remaining}/{woofs.limit || 0}
+                          </span>
+                        </div>
+                        <Progress value={clampPct(100 - (woofs.remaining / (woofs.limit || 1)) * 100)} />
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">Chargement...</p>
+                  )}
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
