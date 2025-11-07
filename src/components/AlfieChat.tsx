@@ -104,6 +104,7 @@ interface Message {
     totalCarousels: number;
     slidesPerCarousel: number;
   };
+  orderId?: string | null;
   timestamp: Date;
 }
 
@@ -600,6 +601,7 @@ export function AlfieChat() {
             quickReplies,
             reasoning: payload.reasoning,
             brandAlignment: payload.brandAlignment,
+            orderId: payload.orderId ?? null,
           });
         }
 
@@ -727,6 +729,14 @@ export function AlfieChat() {
                           </Button>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {message.orderId && (
+                    <div className="mt-3">
+                      <Button asChild variant="link" className="px-0">
+                        <a href={`/studio?order=${message.orderId}`}>Voir dans Studio →</a>
+                      </Button>
                     </div>
                   )}
                 </div>

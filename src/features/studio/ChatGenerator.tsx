@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { Upload, Wand2, Download, X, Sparkles } from "lucide-react";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { Upload, Wand2, Download, X, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -9,6 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { VIDEO_ENGINE_CONFIG } from "@/config/videoEngine";
 import { imageToVideoUrl, spliceVideoUrl, extractCloudNameFromUrl } from '@/lib/cloudinary/videoSimple';
 import { uploadToChatBucket } from "@/lib/chatUploads";
+import { useLocation } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 type GeneratedAsset = {
   url: string;
@@ -22,6 +24,27 @@ type UploadedSource = {
   type: "image" | "video";
   url: string;
   name: string;
+};
+
+type JobEntry = {
+  id: string;
+  type: string;
+  status: string;
+  order_id: string | null;
+  created_at: string;
+  updated_at: string;
+  error?: string | null;
+};
+
+type MediaEntry = {
+  id: string;
+  type: string;
+  status: string;
+  order_id: string | null;
+  output_url: string | null;
+  thumbnail_url?: string | null;
+  metadata?: Record<string, any> | null;
+  created_at: string;
 };
 
 // Exemples de prompts suggérés (Phase 3)
@@ -214,17 +237,150 @@ async function generateVideoWithFfmpeg(
 }
 
 export function ChatGenerator() {
+  const { user } = useAuth();
+  const location = useLocation();
+  const orderId =
+    useMemo(() => {
+      const params = new URLSearchParams(location.search);
+      return params.get("order");
+    }, [location.search]) || null;
+  const orderLabel = useMemo(
+    () => (orderId ? `Commande ${orderId}` : "Toutes les commandes"),
+    [orderId],
+  );
+
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
   const [contentType, setContentType] = useState<ContentType>("image");
   const [uploadedSource, setUploadedSource] = useState<UploadedSource | null>(
-    null
+    null,
   );
   const [generatedAsset, setGeneratedAsset] = useState<GeneratedAsset | null>(
-    null
+    null,
   );
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
+  const [jobs, setJobs] = useState<JobEntry[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(false);
+  const [media, setMedia] = useState<MediaEntry[]>([]);
+  const [mediaLoading, setMediaLoading] = useState(false);
+
   const { toast } = useToast();
+
+  const jobBadgeVariant = (status: string): "default" | "secondary" | "outline" | "destructive" => {
+    switch (status) {
+      case "queued":
+        return "secondary";
+      case "running":
+        return "default";
+      case "failed":
+        return "destructive";
+      case "completed":
+      default:
+        return "outline";
+    }
+  };
+
+  const mediaBadgeVariant = (status: string): "default" | "secondary" | "outline" | "destructive" => {
+    switch (status) {
+      case "queued":
+        return "secondary";
+      case "running":
+        return "default";
+      case "failed":
+        return "destructive";
+      case "completed":
+      default:
+        return "outline";
+    }
+  };
+
+  const formatDate = (value: string) => {
+    if (!value) return "";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  };
+
+  const refetchJobs = useCallback(async () => {
+    if (!user?.id) return;
+    setJobsLoading(true);
+    try {
+      let query = supabase
+        .from("job_queue")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (orderId) {
+        query = query.eq("order_id", orderId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setJobs((data as JobEntry[]) ?? []);
+    } catch (error) {
+      console.error("[Studio] fetchJobs error:", error);
+    } finally {
+      setJobsLoading(false);
+    }
+  }, [user?.id, orderId]);
+
+  const refetchMedia = useCallback(async () => {
+    if (!user?.id) return;
+    setMediaLoading(true);
+    try {
+      let query = supabase
+        .from("media_generations")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (orderId) {
+        query = query.eq("order_id", orderId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setMedia((data as MediaEntry[]) ?? []);
+    } catch (error) {
+      console.error("[Studio] fetchMedia error:", error);
+    } finally {
+      setMediaLoading(false);
+    }
+  }, [user?.id, orderId]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    void refetchJobs();
+    void refetchMedia();
+  }, [user?.id, refetchJobs, refetchMedia]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel("studio-stream")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "job_queue", filter: `user_id=eq.${user.id}` },
+        () => {
+          void refetchJobs();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "media_generations", filter: `user_id=eq.${user.id}` },
+        () => {
+          void refetchMedia();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, refetchJobs, refetchMedia]);
 
   const handleSourceUpload = useCallback(
     async (file: File) => {
@@ -600,6 +756,146 @@ export function ChatGenerator() {
             )}
           </Button>
         </Card>
+
+        <div className="grid gap-6 mt-6 lg:grid-cols-2">
+          <Card className="p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">Jobs en file</h3>
+                <p className="text-xs text-muted-foreground">{orderLabel}</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  void refetchJobs();
+                }}
+                disabled={jobsLoading || !user?.id}
+              >
+                Rafraîchir
+              </Button>
+            </div>
+
+            {jobsLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Chargement des jobs…
+              </div>
+            ) : jobs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aucun job {orderId ? "pour cette commande pour le moment." : "en cours pour le moment."}
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {jobs.map((job) => (
+                  <div key={job.id} className="rounded-lg border p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium capitalize">
+                          {job.type.replace(/_/g, " ")}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{formatDate(job.created_at)}</p>
+                      </div>
+                      <Badge variant={jobBadgeVariant(job.status)} className="uppercase">
+                        {job.status}
+                      </Badge>
+                    </div>
+                    {job.order_id && (
+                      <p className="mt-1 text-xs text-muted-foreground">Order #{job.order_id}</p>
+                    )}
+                    {job.error && (
+                      <p className="mt-2 text-xs text-destructive break-words">
+                        {job.error}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">Médias générés</h3>
+                <p className="text-xs text-muted-foreground">{orderLabel}</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  void refetchMedia();
+                }}
+                disabled={mediaLoading || !user?.id}
+              >
+                Rafraîchir
+              </Button>
+            </div>
+
+            {mediaLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Chargement des médias…
+              </div>
+            ) : media.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aucun média {orderId ? "pour cette commande." : "enregistré pour le moment."}
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {media.map((item) => {
+                  const previewUrl = item.thumbnail_url || item.output_url || "";
+                  const woofs =
+                    typeof item.metadata === "object" && item.metadata && "woofs" in item.metadata
+                      ? (item.metadata as Record<string, any>).woofs
+                      : null;
+
+                  return (
+                    <div key={item.id} className="rounded-lg border p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium capitalize">{item.type}</p>
+                          <p className="text-xs text-muted-foreground">{formatDate(item.created_at)}</p>
+                        </div>
+                        <Badge variant={mediaBadgeVariant(item.status)} className="uppercase">
+                          {item.status}
+                        </Badge>
+                      </div>
+                      {item.order_id && (
+                        <p className="mt-1 text-xs text-muted-foreground">Order #{item.order_id}</p>
+                      )}
+                      {previewUrl && (
+                        <div className="mt-3 overflow-hidden rounded-md bg-muted">
+                          {item.type === "video" ? (
+                            <video
+                              src={item.output_url ?? undefined}
+                              controls
+                              className="w-full"
+                            />
+                          ) : (
+                            <img src={previewUrl} alt="Media généré" className="w-full" />
+                          )}
+                        </div>
+                      )}
+                      {woofs !== null && woofs !== undefined && (
+                        <p className="mt-2 text-xs text-muted-foreground">Woofs consommés : {woofs}</p>
+                      )}
+                      {item.output_url && (
+                        <div className="mt-2">
+                          <Button asChild size="sm" variant="link" className="px-0">
+                            <a href={item.output_url} target="_blank" rel="noopener noreferrer">
+                              Ouvrir l’asset →
+                            </a>
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        </div>
 
         {/* Result preview */}
         {generatedAsset && (

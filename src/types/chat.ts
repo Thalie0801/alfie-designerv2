@@ -39,6 +39,7 @@ export interface Message {
   brandAlignment?: string;
   quickReplies?: string[];
   bulkCarouselData?: BulkCarouselData;
+  orderId?: string | null;
   timestamp: Date;
 }
 
