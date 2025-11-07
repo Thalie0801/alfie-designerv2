@@ -16,6 +16,14 @@ import { getAspectClass, type ConversationState, type OrchestratorResponse } fro
 import { slideUrl } from '@/lib/cloudinary/imageUrls';
 import { extractCloudNameFromUrl } from '@/lib/cloudinary/utils';
 
+// Détection d'intention vidéo
+const VIDEO_KEYWORDS = /\b(vid[ée]o|reel|r[ée]el|tiktok|shorts?|clip)\b/i;
+
+function detectIntent(message: string): 'video' | 'default' {
+  if (VIDEO_KEYWORDS.test(message)) return 'video';
+  return 'default';
+}
+
 const normalizeConversationState = (state?: string | null): ConversationState => {
   switch (state) {
     case 'generating':
@@ -393,15 +401,30 @@ export function AlfieChat() {
       try {
         const headers = await getAuthHeader();
 
+        // Détecter l'intention
+        const intent = detectIntent(userMessage);
         
         console.log(`[Chat] Calling orchestrator (attempt ${attempt}/${maxRetries}):`, {
           message: userMessage.substring(0, 50),
           conversationId,
-          brandId: activeBrandId
+          brandId: activeBrandId,
+          intent
         });
 
+        // Construire le payload
+        const requestPayload: any = {
+          message: userMessage,
+          conversationId,
+          brandId: activeBrandId
+        };
+
+        // Si intention vidéo, forcer le flux vidéo
+        if (intent === 'video') {
+          requestPayload.forceTool = 'generate_video';
+        }
+
         const { data, error } = await supabase.functions.invoke('alfie-orchestrator', {
-          body: { message: userMessage, conversationId, brandId: activeBrandId },
+          body: requestPayload,
           headers
         });
 

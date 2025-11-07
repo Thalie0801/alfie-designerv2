@@ -97,14 +97,15 @@ serve(async (req) => {
     }
 
     // --- Parse body (ASCII keys) ---
-    const { messages, brandId, stream = false, expertMode = false } =
+    const { messages, brandId, stream = false, expertMode = false, forceTool } =
       await req.json();
     
     // ✅ [TRACE] Log précoce de parsing
     console.log('[TRACE] Parsed request body:', {
       messagesCount: messages?.length || 0,
       brandId: brandId || 'none',
-      expertMode
+      expertMode,
+      forceTool: forceTool || 'none'
     });
     
     // ✅ Contrôle de garde : messages obligatoire
@@ -113,6 +114,18 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Messages array is required and must not be empty' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // ✅ Si forceTool=generate_video, court-circuiter et demander le format
+    if (forceTool === 'generate_video') {
+      const msg = '🎬 Tu veux quel format vidéo ? 9:16 (vertical TikTok/Reel) ou 16:9 (paysage YouTube) ?';
+      return new Response(JSON.stringify({ 
+        choices: [{ message: { role: 'assistant', content: msg } }],
+        requiresInput: true,
+        formatOptions: ['9:16', '16:9']
+      }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
     }
     
@@ -1223,7 +1236,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                       niche: brandKit.niche,
                     },
                   },
-                  headers: { Authorization: authHeader },
+                  headers: { Authorization: authHeader! },
                 });
                 optimizedPrompt = opt?.optimizedPrompt ?? toolArgs.prompt;
               }
@@ -1245,7 +1258,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                 format,
                 brand_id: brandId,
               },
-              headers: { Authorization: authHeader },
+              headers: { Authorization: authHeader! },
             });
 
             if (imageError) throw imageError;
@@ -1271,7 +1284,6 @@ Example: "Professional product photography, 45° angle, gradient background (${b
               generationId: imageData?.generation_id,
             };
               break;
-            }
 
             case 'generate_video': {
               // ✅ GUARD : Retour immédiat si aspectRatio manquant

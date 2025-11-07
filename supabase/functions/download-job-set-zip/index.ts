@@ -74,9 +74,10 @@ function buildOverlayUrl(slide: any): string | null {
     return null;
   }
 
-  const { title, subtitle } = slide.text_json;
+  const { title, subtitle, bullets = [] } = slide.text_json;
   const cleanTitle = cleanText(title || '', 120);
   const cleanSubtitle = cleanText(subtitle || '', 220);
+  const cleanBullets = (bullets || []).map((b: string) => cleanText(b, 80)).slice(0, 6);
 
   if (!cleanTitle || cleanTitle.trim() === '') {
     console.warn(`[buildOverlayUrl] ❌ Empty title after cleaning for slide ${slide.id}`);
@@ -84,28 +85,55 @@ function buildOverlayUrl(slide: any): string | null {
   }
 
   console.log(
-    `[buildOverlayUrl] ✅ Building overlay for slide ${slide.id}, title="${cleanTitle.substring(
-      0,
-      30
-    )}..."`
+    `[buildOverlayUrl] ✅ Building overlay for slide ${slide.id}, title="${cleanTitle.substring(0, 30)}..."`
   );
   
   const format = slide.format || '4:5';
-  const dimensions = 
-    format === '9:16' ? 'w_1080,h_1920' :
-    format === '16:9' ? 'w_1920,h_1080' :
-    format === '1:1' ? 'w_1080,h_1080' :
-    'w_1080,h_1350'; // 4:5 par défaut
-
-  const baseTransform = `${dimensions},c_fill,r_max,f_png`;
   
-  let overlays = `l_text:Arial_72_bold:${encodeCloudinaryText(cleanTitle)},co_rgb:FFFFFF,g_north,y_200`;
+  // Dimensions selon format
+  const dims = 
+    format === '9:16' ? { w: 1080, h: 1920 } :
+    format === '16:9' ? { w: 1920, h: 1080 } :
+    format === '1:1' ? { w: 1080, h: 1080 } :
+    { w: 1080, h: 1350 }; // 4:5
   
+  const baseTransform = `w_${dims.w},h_${dims.h},c_fill,r_20,f_png`;
+  
+  const overlays: string[] = [];
+  
+  // Titre centré en haut (même logique que slideUrl)
+  const titleSize = format === '9:16' ? 80 : format === '16:9' ? 64 : 72;
+  const titleY = Math.round(dims.h * 0.1);
+  overlays.push(
+    `l_text:Arial_${titleSize}_bold:${encodeCloudinaryText(cleanTitle)},co_rgb:FFFFFF,g_north,y_${titleY},w_${Math.round(dims.w * 0.9)},c_fit`
+  );
+  
+  // Sous-titre centré bas
   if (cleanSubtitle && cleanSubtitle.trim() !== '') {
-    overlays += `/l_text:Arial_48_normal:${encodeCloudinaryText(cleanSubtitle)},co_rgb:E5E7EB,g_center`;
+    const subSize = format === '9:16' ? 52 : format === '16:9' ? 38 : 42;
+    const subY = format === '9:16' ? 220 : 140;
+    overlays.push(
+      `l_text:Arial_${subSize}:${encodeCloudinaryText(cleanSubtitle)},co_rgb:E5E7EB,g_south,y_${subY},w_${Math.round(dims.w * 0.84)},c_fit`
+    );
+  }
+  
+  // Bullets centrés
+  if (cleanBullets.length > 0) {
+    const bulletSize = format === '16:9' ? 32 : 36;
+    const startY = Math.round(dims.h * 0.45);
+    const step = 56;
+    cleanBullets.forEach((b: string, i: number) => {
+      if (b.trim() !== '') {
+        overlays.push(
+          `l_text:Arial_${bulletSize}:${encodeCloudinaryText('• ' + b)},co_rgb:FFFFFF,g_center,y_${startY + i * step},w_${Math.round(dims.w * 0.8)},c_fit`
+        );
+      }
+    });
   }
 
-  const finalUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${baseTransform}/${overlays}/${publicId}`;
+  const overlayTransforms = overlays.length > 0 ? '/' + overlays.join('/') : '';
+  const finalUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${baseTransform}${overlayTransforms}/${publicId}`;
+  
   console.log(`[buildOverlay] ✅ Built overlay URL for slide ${slide.id} (${format})`);
   return finalUrl;
 }
