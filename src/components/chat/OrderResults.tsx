@@ -106,7 +106,7 @@ export function OrderResults({ assets, total, orderId }: OrderResultsProps) {
                         >
                           <img
                             src={img.url}
-                            alt={img.alt ?? `Image ${img.slideIndex != null ? img.slideIndex + 1 : ""}`}
+                            alt={img.text?.title ?? `Image ${img.slideIndex != null ? img.slideIndex + 1 : ""}`}
                             className="absolute inset-0 w-full h-full object-cover"
                             loading="lazy"
                           />
@@ -129,7 +129,7 @@ export function OrderResults({ assets, total, orderId }: OrderResultsProps) {
                   <h4 className="text-xs font-medium text-muted-foreground">Vidéos ({videos.length})</h4>
                   <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
                     {videos.map((vid) => {
-                      const poster = vid.thumbnailUrl || cloudinaryPosterFromVideoUrl(vid.url);
+                      const poster = cloudinaryPosterFromVideoUrl(vid.url);
                       return (
                         <div key={vid.id} className="relative group">
                           <div
@@ -185,7 +185,7 @@ export function OrderResults({ assets, total, orderId }: OrderResultsProps) {
                           {slide.url ? (
                             <img
                               src={slide.url}
-                              alt={slide.alt ?? `Slide ${slide.slideIndex + 1}`}
+                              alt={`Slide ${slide.slideIndex + 1}`}
                               className="absolute inset-0 w-full h-full object-cover"
                               loading="lazy"
                             />
