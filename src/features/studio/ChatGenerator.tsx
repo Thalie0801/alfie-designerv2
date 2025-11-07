@@ -6,11 +6,11 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
-import { VIDEO_ENGINE_CONFIG } from "@/config/videoEngine";
-import { imageToVideoUrl, spliceVideoUrl, extractCloudNameFromUrl } from '@/lib/cloudinary/videoSimple';
 import { uploadToChatBucket } from "@/lib/chatUploads";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useBrandKit } from "@/hooks/useBrandKit";
+import { toast } from "sonner";
 
 type GeneratedAsset = {
   url: string;
@@ -76,15 +76,6 @@ const MEDIA_URL_KEYS = [
   "video_url",
 ];
 
-const STATUS_URL_KEYS = [
-  "statusUrl",
-  "status_url",
-  "pollUrl",
-  "poll_url",
-  "jobUrl",
-  "job_url",
-];
-
 const ASPECT_TO_TW: Record<AspectRatio, string> = {
   "1:1": "aspect-square",
   "9:16": "aspect-[9/16]",
@@ -117,131 +108,11 @@ function extractMediaUrl(payload: unknown): string | null {
   return null;
 }
 
-function extractStatusUrls(payload: unknown): string[] {
-  const urls: string[] = [];
-  if (!payload || typeof payload !== "object") return urls;
-
-  const obj = payload as Record<string, unknown>;
-  for (const key of STATUS_URL_KEYS) {
-    const val = obj[key];
-    if (typeof val === "string" && val.trim()) {
-      urls.push(val.trim());
-    }
-  }
-
-  for (const v of Object.values(obj)) {
-    if (typeof v === "object" && v !== null) {
-      urls.push(...extractStatusUrls(v));
-    }
-  }
-  return urls;
-}
-
-async function pollForVideoUrl(
-  urls: string[],
-  maxAttempts = 60,
-  intervalMs = 2000,
-  signal?: AbortSignal
-): Promise<string | null> {
-  if (urls.length === 0) return null;
-
-  for (let i = 0; i < maxAttempts; i++) {
-    if (signal?.aborted) throw new Error("Polling cancelled");
-
-    for (const url of urls) {
-      try {
-        const res = await fetch(url, { signal });
-        if (!res.ok) continue;
-        const data = await res.json();
-
-        const status =
-          data.status ||
-          data.state ||
-          data.jobStatus ||
-          data.job_status ||
-          "";
-        if (
-          status.toLowerCase() === "completed" ||
-          status.toLowerCase() === "succeeded" ||
-          status.toLowerCase() === "success"
-        ) {
-          const mediaUrl = extractMediaUrl(data);
-          if (mediaUrl) return mediaUrl;
-        }
-
-        if (
-          status.toLowerCase() === "failed" ||
-          status.toLowerCase() === "error"
-        ) {
-          throw new Error(data.error || "Video generation failed");
-        }
-      } catch (err: any) {
-        if (err.message === "Polling cancelled") throw err;
-        continue;
-      }
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  }
-
-  throw new Error("Polling timeout exceeded");
-}
-
-interface VideoGenerationParams {
-  prompt?: string;
-  aspectRatio: string;
-  source?: UploadedSource;
-  duration?: number;
-  fps?: number;
-}
-
-async function generateVideoWithFfmpeg(
-  params: VideoGenerationParams,
-  signal?: AbortSignal
-): Promise<string> {
-  const backendUrl = VIDEO_ENGINE_CONFIG.FFMPEG_BACKEND_URL;
-
-  // Message d'erreur amélioré si backend non configuré (Phase 3)
-  if (!backendUrl) {
-    throw new Error(
-      "Backend vidéo non configuré. Veuillez configurer FFMPEG_BACKEND_URL dans les variables d'environnement."
-    );
-  }
-
-  const { data, error } = await supabase.functions.invoke(
-    "chat-generate-video",
-    {
-      body: {
-        prompt: params.prompt || "",
-        aspectRatio: params.aspectRatio,
-        source: params.source || null,
-        duration: params.duration || null,
-        fps: params.fps || null,
-      },
-    }
-  );
-
-  if (error) throw error;
-
-  const directUrl = extractMediaUrl(data);
-  if (directUrl) return directUrl;
-
-  const statusUrls = extractStatusUrls(data);
-  if (statusUrls.length === 0) {
-    throw new Error("No video URL or status URL in response");
-  }
-
-  const videoUrl = await pollForVideoUrl(statusUrls, 60, 2000, signal);
-  if (!videoUrl) {
-    throw new Error("Could not retrieve video URL after polling");
-  }
-
-  return videoUrl;
-}
-
 export function ChatGenerator() {
   const { user } = useAuth();
+  const { activeBrandId } = useBrandKit();
   const location = useLocation();
+  const navigate = useNavigate();
   const orderId =
     useMemo(() => {
       const params = new URLSearchParams(location.search);
@@ -253,7 +124,7 @@ export function ChatGenerator() {
   );
 
   const [prompt, setPrompt] = useState("");
-  const [generating, setGenerating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [contentType, setContentType] = useState<ContentType>("image");
   const [uploadedSource, setUploadedSource] = useState<UploadedSource | null>(
     null,
@@ -267,7 +138,7 @@ export function ChatGenerator() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { toast } = useToast();
+  const { toast: showToast } = useToast();
 
   const jobBadgeVariant = (status: string): "default" | "secondary" | "outline" | "destructive" => {
     switch (status) {
@@ -429,7 +300,7 @@ export function ChatGenerator() {
 
         if (insertError) throw insertError;
 
-        toast({
+        showToast({
           title: "Job relancé",
           description: "Le job a été renvoyé en file d'attente",
         });
@@ -437,14 +308,14 @@ export function ChatGenerator() {
         await refetchAll();
       } catch (err) {
         console.error("[Studio] requeueJob error:", err);
-        toast({
+        showToast({
           title: "Échec du renvoi",
           description: err instanceof Error ? err.message : "Erreur inconnue lors du renvoi du job",
           variant: "destructive",
         });
       }
     },
-    [refetchAll, toast],
+    [refetchAll, showToast],
   );
 
   const handleSourceUpload = useCallback(
@@ -452,7 +323,7 @@ export function ChatGenerator() {
       const isImage = file.type.startsWith("image/");
       const isVideo = file.type.startsWith("video/");
       if (!isImage && !isVideo) {
-        toast({
+        showToast({
           title: "Format non supporté",
           description: "Veuillez uploader une image ou une vidéo",
           variant: "destructive",
@@ -476,7 +347,7 @@ export function ChatGenerator() {
           name: file.name,
         });
 
-        toast({
+        showToast({
           title: "Média uploadé",
           description: "Prêt à être utilisé",
         });
@@ -492,19 +363,21 @@ export function ChatGenerator() {
             description = String(err);
           }
         }
-        toast({
+        showToast({
           title: "Erreur d'upload",
           description,
           variant: "destructive",
         });
       }
     },
-    [toast]
+    [showToast]
   );
 
-  const handleGenerate = useCallback(async () => {
+  const videoDuration = 12;
+
+  const handleGenerateImage = useCallback(async () => {
     if (!prompt.trim() && !uploadedSource) {
-      toast({
+      showToast({
         title: "Prompt requis",
         description: "Veuillez entrer un prompt ou uploader un média",
         variant: "destructive",
@@ -512,126 +385,109 @@ export function ChatGenerator() {
       return;
     }
 
-    setGenerating(true);
+    setIsSubmitting(true);
     setGeneratedAsset(null);
 
     try {
-      if (contentType === "image") {
-        const targetFunction = uploadedSource
-          ? "alfie-generate-ai-image"
-          : "alfie-render-image";
+      const targetFunction = uploadedSource
+        ? "alfie-generate-ai-image"
+        : "alfie-render-image";
 
-        const payload: Record<string, unknown> = {
-          prompt: prompt || "transform this",
-          aspectRatio,
-        };
+      const payload: Record<string, unknown> = {
+        prompt: prompt || "transform this",
+        aspectRatio,
+      };
 
-        if (uploadedSource) {
-          payload.sourceUrl = uploadedSource.url;
-        } else {
-          const size = IMAGE_SIZE_MAP[aspectRatio];
-          payload.width = size.width;
-          payload.height = size.height;
-        }
-
-        const { data, error } = await supabase.functions.invoke(
-          targetFunction,
-          { body: payload }
-        );
-
-        if (error) throw error;
-
-        const imageUrl = extractMediaUrl(data);
-        if (!imageUrl) throw new Error("No image URL in response");
-
-        setGeneratedAsset({ url: imageUrl, type: "image" });
-        toast({ title: "Image générée !", description: "Prête à télécharger" });
+      if (uploadedSource) {
+        payload.sourceUrl = uploadedSource.url;
       } else {
-        const ffmpegBackend = VIDEO_ENGINE_CONFIG.FFMPEG_BACKEND_URL;
-        
-        // ✅ NOUVEAU : Si pas de backend FFmpeg → Cloudinary-only
-        if (!ffmpegBackend) {
-          // 1️⃣ Récupérer cloudName
-          const envCloud = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined;
-          const guessed = extractCloudNameFromUrl(uploadedSource?.url);
-          const cloudName = guessed || envCloud;
-          
-          if (!cloudName) {
-            throw new Error("Cloudinary cloudName manquant. Configurez VITE_CLOUDINARY_CLOUD_NAME dans .env.local");
-          }
-
-          let videoUrl: string;
-
-          // 2️⃣ Cas 1 : Utilisateur a uploadé une IMAGE
-          if (uploadedSource?.type === 'image') {
-            // Extraire publicId depuis l'URL Cloudinary
-            const publicId = uploadedSource.url.replace(
-              /^https?:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/[^/]*\//i, 
-              ''
-            ).replace(/\.[^.]+$/, '');
-
-            videoUrl = imageToVideoUrl({
-              cloudName,
-              imagePublicId: publicId,
-              aspect: aspectRatio as any,
-              durationSec: 3,
-              zoomPercent: 18,
-              pan: 'center',
-              title: prompt.slice(0, 80) || 'Alfie Studio',
-              subtitle: undefined,
-              cta: 'Découvrir',
-            });
-          }
-          // 3️⃣ Cas 2 : Utilisateur a uploadé une VIDÉO
-          else if (uploadedSource?.type === 'video') {
-            const publicId = uploadedSource.url.replace(
-              /^https?:\/\/res\.cloudinary\.com\/[^/]+\/video\/upload\/[^/]*\//i, 
-              ''
-            ).replace(/\.[^.]+$/, '');
-
-            videoUrl = spliceVideoUrl({
-              cloudName,
-              items: [{ type: 'video', publicId }],
-              aspect: aspectRatio as any,
-              title: prompt.slice(0, 80) || 'Alfie Studio',
-            });
-          }
-          // 4️⃣ Cas 3 : Pas de média uploadé → fallback
-          else {
-            throw new Error("Veuillez uploader une image ou vidéo pour générer une vidéo (Cloudinary-only)");
-          }
-
-          setGeneratedAsset({ url: videoUrl, type: "video" });
-          toast({ title: "Vidéo générée via Cloudinary ✨" });
-          return;
-        }
-
-        // ⏭️ Sinon : continuer avec generateVideoWithFfmpeg (backend FFmpeg)
-        const abortController = new AbortController();
-
-        const videoUrl = await generateVideoWithFfmpeg(
-          {
-            prompt: prompt.trim(),
-            aspectRatio,
-            source: uploadedSource || undefined,
-          },
-          abortController.signal
-        );
-
-        setGeneratedAsset({ url: videoUrl, type: "video" });
-        toast({ title: "Vidéo générée !", description: "Prête à télécharger" });
+        const size = IMAGE_SIZE_MAP[aspectRatio];
+        payload.width = size.width;
+        payload.height = size.height;
       }
-    } catch (err: any) {
-      console.error("Generation error:", err);
-      toast({
+
+      const { data, error } = await supabase.functions.invoke(targetFunction, {
+        body: payload,
+      });
+
+      if (error) throw error;
+
+      const imageUrl = extractMediaUrl(data);
+      if (!imageUrl) throw new Error("No image URL in response");
+
+      setGeneratedAsset({ url: imageUrl, type: "image" });
+      showToast({ title: "Image générée !", description: "Prête à télécharger" });
+    } catch (err: unknown) {
+      console.error("[Studio] image generation error:", err);
+      const message = err instanceof Error ? err.message : "Une erreur est survenue";
+      showToast({
         title: "Erreur de génération",
-        description: err.message || "Une erreur est survenue",
+        description: message,
         variant: "destructive",
       });
     } finally {
-      setGenerating(false);
+      setIsSubmitting(false);
     }
-  }, [prompt, contentType, uploadedSource, aspectRatio, toast]);
+  }, [prompt, uploadedSource, aspectRatio, showToast]);
+
+  const handleGenerateVideo = useCallback(async () => {
+    try {
+      setIsSubmitting(true);
+      setGeneratedAsset(null);
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      if (!user) throw new Error("Tu dois être connecté pour lancer une génération.");
+      if (!activeBrandId) throw new Error("Sélectionne une marque.");
+
+      const promptText = (prompt || "").trim();
+      if (!promptText) throw new Error("Ajoute un prompt (1–2 phrases suffisent).");
+      if (!aspectRatio) throw new Error("Choisis un format (9:16, 16:9, ...).");
+
+      const durationSec = Number(videoDuration) > 0 ? Number(videoDuration) : 12;
+
+      const sourceUrl = uploadedSource?.url ?? null;
+      const sourceType = uploadedSource?.type ?? null;
+
+      const { data, error } = await supabase.functions.invoke("alfie-orchestrator", {
+        body: {
+          message: promptText,
+          user_message: promptText,
+          brandId: activeBrandId,
+          forceTool: "generate_video",
+          aspectRatio,
+          durationSec,
+          uploadedSourceUrl: sourceUrl,
+          uploadedSourceType: sourceType,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error as string);
+
+      const orderId = data?.orderId as string | undefined;
+      if (!orderId) throw new Error("L’orchestrateur n’a pas renvoyé d’orderId.");
+
+      toast.success("🚀 Vidéo lancée ! Retrouve-la dans le Studio.");
+      navigate(`/studio?order=${orderId}`);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.error("[Studio] generate video error:", e);
+      toast.error(`Échec de génération : ${message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [activeBrandId, aspectRatio, navigate, prompt, uploadedSource, videoDuration]);
+
+  const handleGenerate = useCallback(() => {
+    if (contentType === "image") {
+      return handleGenerateImage();
+    }
+    return handleGenerateVideo();
+  }, [contentType, handleGenerateImage, handleGenerateVideo]);
 
   const handleDownload = useCallback(async () => {
     if (!generatedAsset) return;
@@ -650,7 +506,7 @@ export function ChatGenerator() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      toast({
+      showToast({
         title: "Téléchargement réussi",
         description: `${
           contentType === "image" ? "Image" : "Vidéo"
@@ -658,13 +514,13 @@ export function ChatGenerator() {
       });
     } catch (err: any) {
       console.error("Download error:", err);
-      toast({
+      showToast({
         title: "Erreur de téléchargement",
         description: err.message,
         variant: "destructive",
       });
     }
-  }, [generatedAsset, contentType, toast]);
+  }, [generatedAsset, contentType, showToast]);
 
   // Handler pour insérer un prompt suggéré (Phase 3)
   const handleExampleClick = (example: string) => {
@@ -801,12 +657,17 @@ export function ChatGenerator() {
 
           {/* Generate button */}
           <Button
-            onClick={handleGenerate}
-            disabled={generating || (!prompt.trim() && !uploadedSource)}
+            onClick={() => {
+              void handleGenerate();
+            }}
+            disabled={
+              isSubmitting ||
+              (contentType === "image" && !prompt.trim() && !uploadedSource)
+            }
             size="lg"
             className="w-full"
           >
-            {generating ? (
+            {isSubmitting ? (
               <>
                 <Wand2 className="w-5 h-5 mr-2 animate-spin" />
                 Génération en cours...

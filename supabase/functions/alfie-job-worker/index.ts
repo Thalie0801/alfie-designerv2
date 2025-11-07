@@ -604,13 +604,14 @@ async function processRenderCarousels(payload: any) {
 async function processGenerateVideo(payload: any) {
   console.log("🎥 [processGenerateVideo]", payload?.orderId);
 
-  const { userId, brandId, orderId, aspectRatio, duration, prompt, sourceUrl } = payload;
+  const { userId, brandId, orderId, aspectRatio, duration, prompt, sourceUrl, sourceType } = payload;
 
   const assembleResult = await callFn<any>("alfie-assemble-video", {
     aspectRatio,
     duration,
     prompt,
     sourceUrl,
+    sourceType,
     brandId,
     orderId,
   });
@@ -643,7 +644,15 @@ async function processGenerateVideo(payload: any) {
     type: "video",
     status: "completed",
     output_url: videoUrl,
-    metadata: { aspectRatio, duration: seconds, prompt, sourceUrl, generator: "assemble-video", woofs },
+    metadata: {
+      aspectRatio,
+      duration: seconds,
+      prompt,
+      sourceUrl,
+      sourceType,
+      generator: "assemble-video",
+      woofs,
+    },
   });
   if (assetErr) throw new Error(assetErr.message);
 

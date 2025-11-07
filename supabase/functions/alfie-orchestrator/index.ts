@@ -76,7 +76,20 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { message: user_message, conversationId: session_id, brandId: brand_id, forceTool } = body;
+    const {
+      message,
+      user_message: userMessageField,
+      conversationId: session_id,
+      brandId: brand_id,
+      forceTool,
+    } = body;
+
+    const user_message =
+      typeof message === "string" && message.trim().length > 0
+        ? message
+        : typeof userMessageField === "string"
+        ? userMessageField
+        : "";
 
     console.log("[ORCH] 📩 Received:", {
       session_id,
@@ -130,6 +143,70 @@ serve(async (req) => {
 
     console.log("[ORCH] 📊 State:", state, "Context:", context);
 
+    if (forceTool === "generate_video" && (body?.aspectRatio || body?.durationSec || body?.uploadedSourceUrl)) {
+      const aspectRatio = (body?.aspectRatio as "9:16" | "16:9" | "1:1") ?? "9:16";
+      const duration = Number(body?.durationSec) || 12;
+      const promptText = (user_message || "").trim();
+      const sourceUrl = body?.uploadedSourceUrl || null;
+      const sourceType = body?.uploadedSourceType || null;
+
+      let orderId = session.order_id;
+      if (!orderId) {
+        const { data: order, error: oErr } = await sb
+          .from("orders")
+          .insert({
+            user_id: user.id,
+            brand_id: brand_id,
+            campaign_name: `Video_${Date.now()}`,
+            brief_json: {
+              video: { aspectRatio, durationSec: duration, prompt: promptText, sourceUrl, sourceType },
+            },
+            status: "pending",
+          })
+          .select()
+          .single();
+        if (oErr) return json({ error: "order_creation_failed", details: oErr.message }, 500);
+        orderId = order.id;
+        await sb.from("alfie_conversation_sessions").update({ order_id: orderId }).eq("id", session.id);
+      }
+
+      await sb.from("job_queue").insert({
+        user_id: user.id,
+        order_id: orderId,
+        type: "generate_video",
+        status: "queued",
+        payload: {
+          userId: user.id,
+          brandId: brand_id,
+          orderId,
+          aspectRatio,
+          duration,
+          prompt: promptText,
+          sourceUrl,
+          sourceType,
+        },
+      });
+
+      try {
+        await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/alfie-job-worker`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ trigger: "video" }),
+        });
+      } catch {}
+
+      await appendMessage(session.id, "assistant", "🚀 Vidéo lancée depuis le Studio.");
+      await sb
+        .from("alfie_conversation_sessions")
+        .update({ conversation_state: "generating" })
+        .eq("id", session.id);
+
+      return json({ response: "OK", orderId, conversationId: session.id, state: "generating" });
+    }
+
     const VIDEO_RE = /\b(vid[ée]o|reel|r[ée]el|tiktok|shorts?|clip)\b/i;
     const isVideoFlowActive =
       state === "awaiting_video_params" ||
@@ -145,6 +222,7 @@ serve(async (req) => {
         durationSec: null,
         prompt: null,
         sourceUrl: body?.uploadedSourceUrl || null,
+        sourceType: body?.uploadedSourceType || null,
       };
       state = "awaiting_video_params";
       await sb
@@ -170,6 +248,7 @@ serve(async (req) => {
         durationSec: null,
         prompt: null,
         sourceUrl: body?.uploadedSourceUrl || null,
+        sourceType: body?.uploadedSourceType || null,
       };
 
       const { aspectRatio, durationSec } = parseFormatDuration(user_message || "");
@@ -177,6 +256,9 @@ serve(async (req) => {
       if (durationSec) context.video!.durationSec = durationSec;
       if (!context.video!.sourceUrl && body?.uploadedSourceUrl) {
         context.video!.sourceUrl = body.uploadedSourceUrl;
+      }
+      if (!context.video!.sourceType && body?.uploadedSourceType) {
+        context.video!.sourceType = body.uploadedSourceType;
       }
 
       await sb
@@ -220,6 +302,7 @@ serve(async (req) => {
         durationSec: null,
         prompt: null,
         sourceUrl: body?.uploadedSourceUrl || null,
+        sourceType: body?.uploadedSourceType || null,
       }) as any;
       const promptText = (user_message || "").trim();
       if (!promptText) {
@@ -269,6 +352,7 @@ serve(async (req) => {
           duration: v.durationSec,
           prompt: v.prompt,
           sourceUrl: v.sourceUrl || null,
+          sourceType: v.sourceType || null,
         },
       };
       await sb.from("job_queue").insert(job);
