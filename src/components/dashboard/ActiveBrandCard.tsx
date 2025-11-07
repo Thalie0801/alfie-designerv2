@@ -62,10 +62,10 @@ export function ActiveBrandCard() {
       <CardContent className="space-y-6">
         {/* Sélecteur de marque */}
         <div className="space-y-2">
-          <label className="text-sm font-medium" htmlFor="brand-selector">
+          <label className="text-sm font-medium">
             Sélectionner une marque
           </label>
-          <BrandSelector id="brand-selector" />
+          <BrandSelector />
         </div>
 
         {/* Détails de la marque active */}
