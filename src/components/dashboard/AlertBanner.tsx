@@ -39,8 +39,9 @@ function overQuota(used?: number, quota?: number) {
   return !!quota && (used ?? 0) > quota;
 }
 
-function human(n: number | undefined) {
-  return new Intl.NumberFormat("fr-FR").format(n ?? 0);
+function human(n: number | undefined): string {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return '0';
+  return new Intl.NumberFormat("fr-FR").format(n);
 }
 
 export function AlertBanner() {
@@ -100,7 +101,7 @@ export function AlertBanner() {
             <span className="text-xs text-muted-foreground">
               {usage.mostCritical.quota > 0 ? (
                 <>
-                  ({human(usage.mostCritical.used)} / {human(usage.mostCritical.quota)} · {pct}%) — {human(remaining)}{" "}
+                  ({human(usage.mostCritical.used ?? 0)} / {human(usage.mostCritical.quota ?? 0)} · {pct}%) — {human(remaining ?? 0)}{" "}
                   restant(s)
                 </>
               ) : (

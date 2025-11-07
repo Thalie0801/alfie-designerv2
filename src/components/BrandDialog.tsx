@@ -17,9 +17,17 @@ interface BrandDialogProps {
 
 // Normalise la palette en tableau de chaînes hex, nettoie les guillemets/backslashes
 const mapPaletteToHexStrings = (palette: any): string[] => {
-  if (!Array.isArray(palette)) return [];
+  if (!palette) return [];
+  if (!Array.isArray(palette)) {
+    console.warn('Palette is not an array:', palette);
+    return [];
+  }
   
-  const toHex = (s: string) => {
+  const toHex = (s: any): string => {
+    if (typeof s !== 'string') {
+      console.warn('Palette item is not a string:', s);
+      return '#000000';
+    }
     const cleaned = s.trim().replace(/["'\\]/g, "");
     const hex = cleaned.startsWith("#") ? cleaned.slice(1) : cleaned;
     if (/^[0-9A-Fa-f]{6}$/.test(hex)) return ("#" + hex).toUpperCase();

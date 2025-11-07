@@ -7,6 +7,7 @@ import { useBrandKit } from "@/hooks/useBrandKit";
 import { BrandSelector } from "@/components/BrandSelector";
 import { BrandDialog } from "@/components/BrandDialog";
 import { cn } from "@/lib/utils";
+import { safeString } from "@/lib/safeRender";
 
 type Plan = "free" | "pro" | "team" | "enterprise";
 
@@ -88,7 +89,7 @@ export function ActiveBrandCard() {
                       className="w-10 h-10 rounded border flex items-center justify-center text-xs font-semibold bg-muted"
                       title="Pas de logo"
                     >
-                      {activeBrand.name?.slice(0, 2).toUpperCase() ?? "BR"}
+                      {activeBrand?.name?.slice(0, 2)?.toUpperCase() ?? "BR"}
                     </div>
                   )}
                   <h3 className="font-semibold text-lg truncate">{activeBrand.name}</h3>
@@ -96,7 +97,7 @@ export function ActiveBrandCard() {
 
                 <div className="flex gap-2 flex-wrap">
                   <Badge variant={activeBrand.plan ? "default" : "secondary"}>
-                    {(activeBrand.plan ?? "aucun").toString().toUpperCase()}
+                    {safeString(activeBrand.plan ?? "aucun").toUpperCase()}
                   </Badge>
 
                   <Badge variant={activeBrand.canva_connected ? "default" : "secondary"}>
