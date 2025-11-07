@@ -35,8 +35,11 @@ type JobEntry = {
   updated_at: string;
   error?: string | null;
   error_message?: string | null;
-  payload?: Record<string, any> | null;
+  payload?: unknown;
   user_id: string;
+  archived_at: string | null;
+  is_archived: boolean;
+  job_version: number | null;
 };
 
 type MediaEntry = {
@@ -87,6 +90,8 @@ const IMAGE_SIZE_MAP: Record<AspectRatio, { width: number; height: number }> = {
   "9:16": { width: 1024, height: 1820 },
   "16:9": { width: 1820, height: 1024 },
 };
+
+const CURRENT_JOB_VERSION = 2;
 
 function extractMediaUrl(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
@@ -188,7 +193,7 @@ export function ChatGenerator() {
       if (!currentUser) throw new Error("Non authentifié");
 
       let jobsQuery = supabase
-        .from("job_queue")
+        .from("v_job_queue_active")
         .select("*")
         .eq("user_id", currentUser.id)
         .order("created_at", { ascending: false })
@@ -316,6 +321,56 @@ export function ChatGenerator() {
       }
     },
     [refetchAll, showToast],
+  );
+
+  const cleanupLegacyJobs = useCallback(async () => {
+    const {
+      data: { user: currentUser },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) {
+      toast.error(`Nettoyage échoué: ${authError.message}`);
+      return;
+    }
+
+    if (!currentUser) {
+      toast.error("Nettoyage impossible: utilisateur non authentifié");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("job_queue")
+      .update({ is_archived: true, archived_at: new Date().toISOString() })
+      .match({ user_id: currentUser.id })
+      .in("status", ["failed", "queued"])
+      .lt("job_version", CURRENT_JOB_VERSION);
+
+    if (error) {
+      toast.error(`Nettoyage échoué: ${error.message}`);
+      return;
+    }
+
+    toast.success("Anciennes tâches masquées ✅");
+    await refetchAll();
+  }, [refetchAll]);
+
+  const archiveJob = useCallback(
+    async (jobId: string) => {
+      const { error } = await supabase
+        .from("job_queue")
+        .update({ is_archived: true, archived_at: new Date().toISOString() })
+        .eq("id", jobId);
+
+      if (error) {
+        toast.error(`Impossible de masquer le job: ${error.message}`);
+        return;
+      }
+
+      toast.success("Job masqué ✅");
+      await refetchAll();
+    },
+    [refetchAll],
   );
 
   const handleSourceUpload = useCallback(
@@ -690,23 +745,35 @@ export function ChatGenerator() {
                 <h3 className="text-lg font-semibold">Jobs en file</h3>
                 <p className="text-xs text-muted-foreground">{orderLabel}</p>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  void refetchAll();
-                }}
-                disabled={loading}
-              >
-                {loading ? (
-                  <span className="flex items-center gap-1 text-xs">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    …
-                  </span>
-                ) : (
-                  "Rafraîchir"
-                )}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    void cleanupLegacyJobs();
+                  }}
+                  disabled={loading}
+                >
+                  Nettoyer
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    void refetchAll();
+                  }}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <span className="flex items-center gap-1 text-xs">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      …
+                    </span>
+                  ) : (
+                    "Rafraîchir"
+                  )}
+                </Button>
+              </div>
             </div>
             {error && <div className="text-xs text-red-600 mt-2">{error}</div>}
 
@@ -723,19 +790,31 @@ export function ChatGenerator() {
               <div className="space-y-3">
                 {jobs.map((job) => {
                   const jobError = job.error_message || job.error;
+                  const isLegacy = (job.job_version ?? 1) < CURRENT_JOB_VERSION;
 
                   return (
                     <div key={job.id} className="rounded-lg border p-3">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="text-sm font-medium capitalize">
                             {job.type.replace(/_/g, " ")}
                           </p>
                           <p className="text-xs text-muted-foreground">{formatDate(job.created_at)}</p>
                         </div>
-                        <Badge variant={jobBadgeVariant(job.status)} className="uppercase">
-                          {job.status}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="text-xs underline"
+                            onClick={() => {
+                              void archiveJob(job.id);
+                            }}
+                          >
+                            Masquer
+                          </button>
+                          <Badge variant={jobBadgeVariant(job.status)} className="uppercase">
+                            {job.status}
+                          </Badge>
+                        </div>
                       </div>
                       {job.order_id && (
                         <p className="mt-1 text-xs text-muted-foreground">Order #{job.order_id}</p>
@@ -743,15 +822,23 @@ export function ChatGenerator() {
                       {jobError && (
                         <div className="mt-2 text-xs text-red-600 flex flex-wrap items-center gap-2">
                           <span className="break-words flex-1">{jobError}</span>
-                          <button
-                            type="button"
-                            className="underline"
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            disabled={isLegacy}
+                            title={
+                              isLegacy
+                                ? "Ancienne version : impossible de relancer"
+                                : "Retenter"
+                            }
                             onClick={() => {
-                              void requeueJob(job);
+                              if (!isLegacy) {
+                                void requeueJob(job);
+                              }
                             }}
                           >
                             Retenter
-                          </button>
+                          </Button>
                         </div>
                       )}
                     </div>
