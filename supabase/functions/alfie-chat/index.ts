@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { userHasAccess } from "../_shared/access.ts";
 import { callAIWithFallback, type AgentContext, type AIResponse } from "../_shared/aiOrchestrator.ts";
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY, env, LOVABLE_API_KEY } from "../_shared/env.ts";
 
 /* ------------------------------------------
  * Helpers très simples
@@ -33,7 +34,7 @@ function isApproval(message: string): boolean {
 
 // --- AI config (ASCII only) ---
 const AI_CONFIG = {
-  model: Deno.env.get("ALFIE_AI_MODEL") ?? "google/gemini-2.5-flash",
+  model: env("ALFIE_AI_MODEL") ?? "google/gemini-2.5-flash",
   endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions",
 };
 
@@ -53,9 +54,7 @@ serve(async (req) => {
     }
 
     // --- Supabase service client ---
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(SUPABASE_URL ?? "", SUPABASE_SERVICE_ROLE_KEY ?? "");
 
     // --- Validate user token ---
     const token = authHeader.replace("Bearer ", "").trim();
@@ -106,7 +105,7 @@ serve(async (req) => {
       );
     }
 
-    // Force vidéo (intent immédiat pour UI)
+      // Force vidéo (intent immédiat pour UI)
     if (forceTool === "generate_video") {
       const msg =
         "🎬 Tu veux quel format vidéo ? 9:16 (vertical TikTok/Reel) ou 16:9 (paysage YouTube) ?";
@@ -120,7 +119,6 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     // Récupérer Brand Kit

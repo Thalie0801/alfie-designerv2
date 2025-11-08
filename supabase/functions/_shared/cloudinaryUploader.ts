@@ -1,4 +1,5 @@
 // Upload et gestion Cloudinary avancée
+import { env } from "./env.ts";
 
 export interface CloudinaryUploadResult {
   publicId: string;
@@ -18,9 +19,9 @@ export async function uploadToCloudinary(
     context?: Record<string, string>;
   }
 ): Promise<CloudinaryUploadResult> {
-  const cloudName = Deno.env.get('CLOUDINARY_CLOUD_NAME');
-  const apiKey = Deno.env.get('CLOUDINARY_API_KEY');
-  const apiSecret = Deno.env.get('CLOUDINARY_API_SECRET');
+  const cloudName = env('CLOUDINARY_CLOUD_NAME');
+  const apiKey = env('CLOUDINARY_API_KEY');
+  const apiSecret = env('CLOUDINARY_API_SECRET');
 
   if (!cloudName || !apiKey || !apiSecret) {
     throw new Error('Cloudinary credentials not configured');
@@ -291,7 +292,7 @@ export function buildCloudinaryTextOverlayUrl(
     lineSpacing?: number;
   }
 ): string {
-  const cloudName = Deno.env.get('CLOUDINARY_CLOUD_NAME');
+  const cloudName = env('CLOUDINARY_CLOUD_NAME');
   if (!cloudName) throw new Error('CLOUDINARY_CLOUD_NAME not configured');
 
   const transformString = buildTextOverlayTransform(options);
@@ -331,9 +332,9 @@ export async function uploadWithRichMetadata(
   imageData: string,
   metadata: RichMetadata
 ): Promise<CloudinaryUploadResult> {
-  const cloudName = Deno.env.get('CLOUDINARY_CLOUD_NAME');
-  const apiKey = Deno.env.get('CLOUDINARY_API_KEY');
-  const apiSecret = Deno.env.get('CLOUDINARY_API_SECRET');
+  const cloudName = env('CLOUDINARY_CLOUD_NAME');
+  const apiKey = env('CLOUDINARY_API_KEY');
+  const apiSecret = env('CLOUDINARY_API_SECRET');
 
   if (!cloudName || !apiKey || !apiSecret) {
     throw new Error('Cloudinary credentials not configured');
@@ -463,9 +464,9 @@ export async function uploadTextAsRaw(
     language: string;
   }
 ): Promise<string> {
-  const cloudName = Deno.env.get('CLOUDINARY_CLOUD_NAME');
-  const apiKey = Deno.env.get('CLOUDINARY_API_KEY');
-  const apiSecret = Deno.env.get('CLOUDINARY_API_SECRET');
+  const cloudName = env('CLOUDINARY_CLOUD_NAME');
+  const apiKey = env('CLOUDINARY_API_KEY');
+  const apiSecret = env('CLOUDINARY_API_SECRET');
 
   if (!cloudName || !apiKey || !apiSecret) {
     throw new Error('Cloudinary credentials not configured');

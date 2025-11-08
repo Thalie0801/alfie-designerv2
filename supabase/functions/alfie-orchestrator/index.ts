@@ -1,6 +1,7 @@
 // functions/alfie-orchestrator/index.ts
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
 import {
   type ConversationState,
   type ConversationContext,
@@ -12,7 +13,7 @@ import {
 } from "../_shared/conversationFlow.ts";
 
 // ---- Supabase (service role pour la persistance session/ordres/jobs)
-const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+const sb = createClient(SUPABASE_URL ?? "", SUPABASE_SERVICE_ROLE_KEY ?? "");
 
 // ---- CORS / helpers
 const corsHeaders = {

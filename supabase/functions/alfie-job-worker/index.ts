@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { uploadToCloudinary } from "../_shared/cloudinaryUploader.ts";
 import { consumeBrandQuotas } from "../_shared/quota.ts";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, INTERNAL_FN_SECRET } from "../_shared/env.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,8 +23,8 @@ type JobRow = {
 };
 
 const supabaseAdmin = createClient(
-  Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  SUPABASE_URL ?? "",
+  SUPABASE_SERVICE_ROLE_KEY ?? "",
   { auth: { autoRefreshToken: false, persistSession: false } },
 );
 
@@ -57,14 +58,10 @@ function isHttp402(e: unknown) {
 }
 
 async function callFn<T = unknown>(name: string, body: unknown): Promise<T> {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  const internalSecret = Deno.env.get("INTERNAL_FN_SECRET");
-
-  if (!supabaseUrl || !anonKey) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error(`Missing Supabase configuration for ${name}`);
   }
-  if (!internalSecret) {
+  if (!INTERNAL_FN_SECRET) {
     throw new Error(`Missing INTERNAL_FN_SECRET for ${name}`);
   }
 
@@ -72,11 +69,11 @@ async function callFn<T = unknown>(name: string, body: unknown): Promise<T> {
   const timeout = setTimeout(() => controller.abort(), 60_000);
 
   try {
-    const resp = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${anonKey}`,
-        "X-Internal-Secret": internalSecret,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "X-Internal-Secret": INTERNAL_FN_SECRET,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body ?? {}),
