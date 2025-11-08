@@ -1,7 +1,7 @@
 // functions/alfie-orchestrator/index.ts
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY, INTERNAL_FN_SECRET } from "../_shared/env.ts";
 import {
   type ConversationState,
   type ConversationContext,
@@ -102,7 +102,7 @@ serve(async (req) => {
     const authHeader = req.headers.get("authorization");
     if (!authHeader) return json({ error: "Missing authorization" }, 401);
 
-    const userClient = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+    const userClient = createClient(SUPABASE_URL ?? "", SUPABASE_ANON_KEY ?? "", {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: auth } = await userClient.auth.getUser();
@@ -187,15 +187,18 @@ serve(async (req) => {
       });
 
       try {
-        await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/alfie-job-worker`, {
+        await fetch(`${SUPABASE_URL}/functions/v1/alfie-job-worker`, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            "X-Internal-Secret": INTERNAL_FN_SECRET || "",
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ trigger: "video" }),
         });
-      } catch {}
+      } catch (workerErr) {
+        console.warn("[ORCH] Worker trigger failed (non-blocking):", workerErr);
+      }
 
       await appendMessage(session.id, "assistant", "🚀 Vidéo lancée depuis le Studio.");
       await sb
@@ -247,15 +250,18 @@ serve(async (req) => {
       });
 
       try {
-        await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/alfie-job-worker`, {
+        await fetch(`${SUPABASE_URL}/functions/v1/alfie-job-worker`, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            "X-Internal-Secret": INTERNAL_FN_SECRET || "",
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ trigger: "image" }),
         });
-      } catch {}
+      } catch (workerErr) {
+        console.warn("[ORCH] Worker trigger failed (non-blocking):", workerErr);
+      }
 
       const responseText = "🚀 Génération lancée !";
       await appendMessage(session.id, "assistant", responseText);
@@ -312,15 +318,18 @@ serve(async (req) => {
       });
 
       try {
-        await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/alfie-job-worker`, {
+        await fetch(`${SUPABASE_URL}/functions/v1/alfie-job-worker`, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            "X-Internal-Secret": INTERNAL_FN_SECRET || "",
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ trigger: "carousel" }),
         });
-      } catch {}
+      } catch (workerErr) {
+        console.warn("[ORCH] Worker trigger failed (non-blocking):", workerErr);
+      }
 
       const responseText = "🚀 Génération lancée !";
       await appendMessage(session.id, "assistant", responseText);
@@ -481,15 +490,18 @@ serve(async (req) => {
       await sb.from("job_queue").insert(job);
 
       try {
-        await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/alfie-job-worker`, {
+        await fetch(`${SUPABASE_URL}/functions/v1/alfie-job-worker`, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            "X-Internal-Secret": INTERNAL_FN_SECRET || "",
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ trigger: "video" }),
         });
-      } catch {}
+      } catch (workerErr) {
+        console.warn("[ORCH] Worker trigger failed (non-blocking):", workerErr);
+      }
 
       state = "generating";
       await sb

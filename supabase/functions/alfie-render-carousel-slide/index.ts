@@ -1,5 +1,5 @@
 // functions/alfie-render-carousel-slide/index.ts
-// v2.4.0 — Slide renderer (idempotent, retries + timeout, normalized inputs)
+// v2.5.0 — Slide renderer (idempotent, retries + timeout, env.ts, internal secret)
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
@@ -134,21 +134,20 @@ async function fetchWithRetries(url: string, init: RequestInit, maxRetries = 2) 
 // Handler
 // -----------------------------
 serve(async (req) => {
-  console.log("[alfie-render-carousel-slide] v2.4.0 — invoked");
+  console.log("[alfie-render-carousel-slide] v2.5.0 — invoked");
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  if (!INTERNAL_FN_SECRET || req.headers.get("x-internal-secret") !== INTERNAL_FN_SECRET) {
-    return json({ error: "Forbidden" }, 403);
+  // ✅ Validate internal secret FIRST
+  const secret = req.headers.get("x-internal-secret");
+  if (!secret || secret !== INTERNAL_FN_SECRET) {
+    console.error("[alfie-render-carousel-slide] ❌ Invalid or missing internal secret");
+    return json({ error: "Forbidden: invalid internal secret" }, 403);
   }
 
-  // Early ENV checks
-  const missingEnv = [
-    ["SUPABASE_URL", Deno.env.get("SUPABASE_URL")],
-    ["SUPABASE_SERVICE_ROLE_KEY", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")],
-    ["LOVABLE_API_KEY", Deno.env.get("LOVABLE_API_KEY")],
-  ].filter(([, v]) => !v).map(([k]) => k);
-  if (missingEnv.length) {
-    return json({ error: `Missing env vars: ${missingEnv.join(", ")}` }, 500);
+  // ✅ ENV validation using imported variables
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !LOVABLE_API_KEY) {
+    console.error("[alfie-render-carousel-slide] ❌ Missing critical env vars");
+    return json({ error: "Missing required environment variables" }, 500);
   }
 
   try {
@@ -174,8 +173,8 @@ serve(async (req) => {
 
     // —— Supabase admin client (service role)
     const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY,
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 

@@ -13,13 +13,14 @@ import {
 export default {
   async fetch(req: Request) {
     return edgeHandler(req, async ({ jwt, input }) => {
-      if (!jwt) throw new Error('MISSING_AUTH');
+      // ✅ Check internal secret FIRST (before JWT)
+      const internalSecret = req.headers.get("x-internal-secret");
+      const isInternalCall = internalSecret && internalSecret === INTERNAL_FN_SECRET;
       
-      // ✅ Validate internal secret if present (for worker calls)
-      const internalHeader = req.headers.get("x-internal-secret");
-      if (internalHeader && internalHeader !== INTERNAL_FN_SECRET) {
-        console.error("[alfie-render-image] ❌ Invalid internal secret");
-        throw new Error('FORBIDDEN');
+      // JWT required ONLY if not internal call
+      if (!isInternalCall && !jwt) {
+        console.error("[alfie-render-image] ❌ Missing authentication");
+        throw new Error('MISSING_AUTH');
       }
 
         const { 
@@ -51,28 +52,50 @@ export default {
         SUPABASE_SERVICE_ROLE_KEY
       );
 
-      const supabaseAuth = createClient(
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY,
-        { global: { headers: { Authorization: `Bearer ${jwt}` } } }
-      );
+      // ✅ Conditional user authentication
+      let userId: string;
+      let supabaseAuth;
 
-      const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
-      if (userError || !user) throw new Error('INVALID_TOKEN');
+      if (isInternalCall) {
+        // Internal call: userId MUST be in input
+        if (!input.userId) {
+          console.error("[alfie-render-image] ❌ Missing userId in internal call");
+          throw new Error('MISSING_USER_ID_IN_INTERNAL_CALL');
+        }
+        userId = input.userId;
+        console.log("[alfie-render-image] ✅ Internal call authenticated, userId:", userId);
+      } else {
+        // External call: authenticate via JWT
+        supabaseAuth = createClient(
+          SUPABASE_URL,
+          SUPABASE_ANON_KEY,
+          { global: { headers: { Authorization: `Bearer ${jwt}` } } }
+        );
+        
+        const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
+        if (userError || !user) {
+          console.error("[alfie-render-image] ❌ Invalid JWT token");
+          throw new Error('INVALID_TOKEN');
+        }
+        userId = user.id;
+        console.log("[alfie-render-image] ✅ External call authenticated, userId:", userId);
+      }
 
-      // 1. Vérifier quota
-      const { data: checkData, error: checkError } = await supabaseAuth.functions.invoke('alfie-check-quota', {
-        body: { cost_woofs, brand_id },
-      });
+      // 1. Vérifier quota (skip for internal calls or use admin)
+      if (!isInternalCall && supabaseAuth) {
+        const { data: checkData, error: checkError } = await supabaseAuth.functions.invoke('alfie-check-quota', {
+          body: { cost_woofs, brand_id },
+        });
 
-      if (checkError || !checkData?.ok || !checkData.data?.ok) {
-        console.error('Quota check failed:', checkError, checkData);
-        throw new Error('INSUFFICIENT_QUOTA');
+        if (checkError || !checkData?.ok || !checkData.data?.ok) {
+          console.error('Quota check failed:', checkError, checkData);
+          throw new Error('INSUFFICIENT_QUOTA');
+        }
       }
 
       // 2. Débiter (via RPC)
       const { error: consumeError } = await supabaseAdmin.rpc('consume_woofs', { 
-        user_id_param: user.id, 
+        user_id_param: userId, 
         woofs_amount: cost_woofs 
       });
 
@@ -310,7 +333,7 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
         const { data: generation, error: insertError } = await supabaseAdmin
           .from('media_generations')
           .insert({
-            user_id: user.id,
+            user_id: userId,
             brand_id: brand_id || null,
             type: 'image',
             modality: 'image',
@@ -372,7 +395,7 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
         console.error('[Render] Generation failed, refunding woofs:', genError);
         
         const { error: refundError } = await supabaseAdmin.rpc('refund_woofs', { 
-          user_id_param: user.id, 
+          user_id_param: userId, 
           woofs_amount: cost_woofs 
         });
 

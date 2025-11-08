@@ -135,13 +135,16 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.alfie-render-image]
-verify_jwt = true
+verify_jwt = false
+
+[functions.alfie-render-carousel-slide]
+verify_jwt = false
 
 [functions.alfie-score-coherence]
 verify_jwt = true
 
 [functions.alfie-render-video]
-verify_jwt = true
+verify_jwt = false
 
 [functions.alfie-video-upscale]
 verify_jwt = true
