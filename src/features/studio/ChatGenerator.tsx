@@ -441,6 +441,10 @@ export function ChatGenerator() {
     setGeneratedAsset(null);
 
     try {
+      // ✅ Phase A: Get session token for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       const targetFunction = uploadedSource
         ? "alfie-generate-ai-image"
         : "alfie-render-image";
@@ -448,6 +452,7 @@ export function ChatGenerator() {
       const payload: Record<string, unknown> = {
         prompt: prompt || "transform this",
         aspectRatio,
+        brand_id: activeBrandId ?? null, // ✅ Phase A: Pass brand_id
       };
 
       if (uploadedSource) {
@@ -458,8 +463,12 @@ export function ChatGenerator() {
         payload.height = size.height;
       }
 
+      // ✅ Phase A: Include Authorization header if token is available
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+
       const { data, error } = await supabase.functions.invoke(targetFunction, {
         body: payload,
+        headers,
       });
 
       if (error) throw error;
@@ -480,7 +489,7 @@ export function ChatGenerator() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [prompt, uploadedSource, aspectRatio, showToast]);
+  }, [prompt, uploadedSource, aspectRatio, activeBrandId, showToast]);
 
   const handleGenerateVideo = useCallback(async () => {
     try {

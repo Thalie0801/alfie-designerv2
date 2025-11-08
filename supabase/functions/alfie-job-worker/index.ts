@@ -587,75 +587,29 @@ async function processRenderCarousels(payload: any) {
     orderId: payload?.orderId
   });
 
-  if (Array.isArray(payload?.slides) && payload.slides.length > 0) {
-    const { userId, brandId, orderId } = payload || {};
-    if (!userId || !brandId || !orderId) {
-      throw new Error("Invalid render_carousels payload");
-    }
-
-    const resp = await callFn<any>("alfie-render-carousel", {
-      brandId,
-      orderId,
-      slides: payload.slides,
-      sourceUrl: payload?.sourceUrl ?? null,
-      userId,
-    });
-    const data = resp as any;
-    const error = data && data.error ? { message: data.error } : null;
-    if (error || (data as any)?.error) {
-      const message = (data as any)?.error || error?.message || "render_carousel_failed";
-      throw new Error(message);
-    }
-
-    const slideUrls: string[] = Array.isArray((data as any)?.slide_urls)
-      ? ((data as any).slide_urls as string[])
-      : Array.isArray((data as any)?.slides)
-        ? (data as any).slides
-            .map((item: any) => (typeof item === "string" ? item : item?.url))
-            .filter((url: unknown): url is string => typeof url === "string" && url.startsWith("http"))
-        : [];
-
-    if (!slideUrls.length) {
-      throw new Error("No slides returned");
-    }
-
-    const expiresAt = new Date(Date.now() + THIRTY_DAYS_MS).toISOString();
-
-    const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
-      user_id: userId,
-      brand_id: brandId,
-      order_id: orderId,
-      type: "carousel",
-      status: "completed",
-      output_url: slideUrls[0],
-      metadata: { slides_count: slideUrls.length, slides: slideUrls },
-      expires_at: expiresAt,
-    });
-    if (mediaErr) throw new Error(mediaErr.message);
-
-    await Promise.all(
-      slideUrls.map((url, idx) =>
-        supabaseAdmin.from("library_assets").insert({
-          user_id: userId,
-          brand_id: brandId,
-          order_id: orderId,
-          type: "image",
-          cloudinary_url: url,
-          src_url: url,
-          title: `Slide ${idx + 1}`,
-          tags: ["carousel", `slide_${idx + 1}`],
-          expires_at: expiresAt,
-          metadata: { orderId, slideIndex: idx, total: slideUrls.length },
-        } as any),
-      ),
-    );
-
-    return { slide_urls: slideUrls };
-  }
+  // ✅ Phase B: Removed alfie-render-carousel call (function doesn't exist)
+  // Always convert payload.slides to carousel object and use slide-by-slide rendering
 
   let carouselsToRender: any[] = [];
 
-  if (payload.carousels) {
+  // ✅ Phase B: Handle payload.slides by converting to carousel format
+  if (Array.isArray(payload?.slides) && payload.slides.length > 0) {
+    const { userId, brandId, orderId } = payload || {};
+    if (!userId || !brandId || !orderId) {
+      throw new Error("Invalid render_carousels payload: missing userId, brandId, or orderId");
+    }
+
+    // Convert slides array to carousel object for slide-by-slide processing
+    carouselsToRender = [{
+      id: crypto.randomUUID(),
+      aspectRatio: payload.aspectRatio || "9:16",
+      textVersion: 1,
+      slides: payload.slides,
+      prompts: payload.slides.map((_: any, i: number) => `Slide ${i + 1}`),
+      style: "minimalist",
+      brandId,
+    }];
+  } else if (payload.carousels) {
     carouselsToRender = payload.carousels;
   } else if (payload.brief) {
     const { briefs } = payload.brief;
@@ -806,7 +760,9 @@ async function processGenerateVideo(payload: any) {
 
   const { userId, brandId, orderId, aspectRatio, duration, prompt, sourceUrl, sourceType } = payload;
 
-  const assembleResult = await callFn<any>("alfie-assemble-video", {
+  // ✅ Phase C: Use existing generate-video function instead of non-existent alfie-assemble-video
+  const renderResult = await callFn<any>("generate-video", {
+    userId, // ✅ Required for internal call validation
     aspectRatio,
     duration,
     prompt,
@@ -816,17 +772,17 @@ async function processGenerateVideo(payload: any) {
     orderId,
   });
 
-  const assemblePayload = unwrapResult<any>(assembleResult);
-  const assembleError = extractError(assembleResult) ?? extractError(assemblePayload);
-  if (assembleError) throw new Error(assembleError || "Video assembly failed");
+  const renderPayload = unwrapResult<any>(renderResult);
+  const renderError = extractError(renderResult) ?? extractError(renderPayload);
+  if (renderError) throw new Error(renderError || "Video render failed");
 
   let videoUrl =
-    (typeof assemblePayload === "string"
-      ? assemblePayload
-      : getResultValue<string>(assemblePayload, ["video_url", "videoUrl", "output_url", "outputUrl"])) ??
-    getResultValue<string>(assembleResult, ["video_url", "videoUrl", "output_url", "outputUrl"]);
+    (typeof renderPayload === "string"
+      ? renderPayload
+      : getResultValue<string>(renderPayload, ["video_url", "videoUrl", "output_url", "outputUrl"])) ??
+    getResultValue<string>(renderResult, ["video_url", "videoUrl", "output_url", "outputUrl"]);
 
-  if (!videoUrl) throw new Error("Missing video_url from assembler response");
+  if (!videoUrl) throw new Error("Missing video_url from renderer response");
 
   const seconds = Number(duration) || 12;
   const woofs = Math.max(1, Math.ceil(seconds / 12));
@@ -850,7 +806,7 @@ async function processGenerateVideo(payload: any) {
       prompt,
       sourceUrl,
       sourceType,
-      generator: "assemble-video",
+      generator: "generate-video",
       woofs,
     },
   });
