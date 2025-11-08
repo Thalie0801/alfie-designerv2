@@ -69,7 +69,7 @@ async function callFn<T = unknown>(name: string, body: unknown): Promise<T> {
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60000);
+  const timeout = setTimeout(() => controller.abort(), 60_000);
 
   try {
     const resp = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
@@ -85,12 +85,7 @@ async function callFn<T = unknown>(name: string, body: unknown): Promise<T> {
 
     const text = await resp.text().catch(() => "");
     if (!resp.ok) {
-      console.error(`❌ ${name} failed:`, {
-        status: resp.status,
-        statusText: resp.statusText,
-        response: text.substring(0, 500)
-      });
-      throw new Error(`${name} failed: ${resp.status} ${resp.statusText} - ${text.substring(0, 200)}`);
+      throw new Error(`${name} failed: ${resp.status} ${resp.statusText} ${text}`);
     }
 
     try {
@@ -98,8 +93,11 @@ async function callFn<T = unknown>(name: string, body: unknown): Promise<T> {
     } catch {
       return text as unknown as T;
     }
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
+  } catch (error: unknown) {
+    const isAbort =
+      (error as any)?.name === "AbortError" ||
+      (error instanceof DOMException && error.name === "AbortError");
+    if (isAbort) {
       throw new Error(`${name} timed out after 60s`);
     }
     throw error;
