@@ -192,9 +192,10 @@ export function ChatGenerator() {
       if (!currentUser) throw new Error("Non authentifié");
 
       let jobsQuery = supabase
-        .from("v_job_queue_active")
+        .from("job_queue")
         .select("*")
         .eq("user_id", currentUser.id)
+        .in("status", ["queued", "running", "completed", "failed"])
         .order("created_at", { ascending: false })
         .limit(50);
 
