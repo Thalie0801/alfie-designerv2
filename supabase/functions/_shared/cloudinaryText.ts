@@ -1,4 +1,4 @@
-import { encodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
+import { encode as encodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 const CONTROL_CHARS_REGEX = /[\u0000-\u001f\u007f]/g;
 
