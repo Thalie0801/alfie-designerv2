@@ -797,7 +797,7 @@ async function processGenerateVideo(payload: any) {
   const renderError = extractError(renderResult) ?? extractError(renderPayload);
   if (renderError) throw new Error(renderError || "Video render failed");
 
-  let videoUrl =
+  const videoUrl =
     (typeof renderPayload === "string"
       ? renderPayload
       : getResultValue<string>(renderPayload, ["video_url", "videoUrl", "output_url", "outputUrl"])) ??

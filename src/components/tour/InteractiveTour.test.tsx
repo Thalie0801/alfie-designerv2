@@ -26,7 +26,7 @@ beforeEach(() => {
   });
 
   // requestIdleCallback
-  (window as any).requestIdleCallback = (cb: Function) => setTimeout(cb, 0);
+  (window as any).requestIdleCallback = (cb: IdleRequestCallback) => setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 0 }), 0);
   (window as any).cancelIdleCallback = (id: number) => clearTimeout(id);
 });
 

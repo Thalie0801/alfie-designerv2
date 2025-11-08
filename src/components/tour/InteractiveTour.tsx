@@ -315,7 +315,7 @@ function TourBubble({ step, currentStep, totalSteps, onVisibilityChange, forceCe
     const vw = window.innerWidth,
       vh = window.innerHeight;
 
-    let placement: Placement = step.placement || (isMobile ? "bottom" : "right");
+    const placement: Placement = step.placement || (isMobile ? "bottom" : "right");
     const offset = isMobile ? 14 : 10,
       pad = 20;
     let top = 0,

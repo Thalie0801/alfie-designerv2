@@ -31,7 +31,7 @@ serve(async (req) => {
     console.log(`[admin-delete-user] Suppression de l'utilisateur: ${targetUserId}`);
 
     let authUserExists = false;
-    let deletedItems = [];
+    const deletedItems = [];
 
     // 1. Vérifier si l'utilisateur auth existe
     const { data: userData, error: getUserError } = await admin.auth.admin.getUserById(targetUserId);

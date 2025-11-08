@@ -47,7 +47,7 @@ export async function renderSlideToSVG(
   
   // Couche de texte (typo contrôlée, pas d'IA)
   for (const layer of template.textLayers) {
-    let text = sanitizeText(getTextForLayer(layer, slideContent));
+    const text = sanitizeText(getTextForLayer(layer, slideContent));
     if (!text) continue;
     
     // Use consistent font from brand kit

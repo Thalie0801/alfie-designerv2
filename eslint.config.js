@@ -49,6 +49,7 @@ export default tseslint.config(
       "no-undef": "off",
       "@typescript-eslint/no-explicit-any": "off",
       "prefer-const": "warn",
+      "no-control-regex": "off",
     },
   },
   {
@@ -61,6 +62,12 @@ export default tseslint.config(
     files: ["src/components/ui/**/*.{ts,tsx}"],
     rules: {
       "@typescript-eslint/no-empty-object-type": "off",
+    },
+  },
+  {
+    files: ["src/lib/safeRender.ts", "src/lib/cloudinary/text.ts"],
+    rules: {
+      "no-control-regex": "off",
     },
   },
 );

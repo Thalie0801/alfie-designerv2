@@ -146,7 +146,7 @@ export default function Creator() {
         }
         
         setDecision(providerRes);
-        let finalCost = providerRes.cost_woofs;
+        const finalCost = providerRes.cost_woofs;
 
         if (batchNight) {
           await supabase.from("batch_requests").insert({ user_id: user.id, modality: mode, payload_json: { prompt: slidePrompt, format, duration, quality }, process_after: new Date(Date.now() + 8 * 3600 * 1000).toISOString() });

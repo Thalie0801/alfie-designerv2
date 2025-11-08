@@ -531,7 +531,7 @@ Utilise **classify_intent** en premier !`;
     });
 
     // ====== Boucle tool-calls ======
-    let conversationMessages: any[] = [
+    const conversationMessages: any[] = [
       { role: "system", content: systemPrompt },
       ...transformedMessages,
     ];
@@ -540,7 +540,7 @@ Utilise **classify_intent** en premier !`;
     const maxIterations = 5;
     const collectedAssets: any[] = [];
     let finalJobSetId: string | undefined;
-    let fallbackAttempted = false;
+    const fallbackAttempted = false;
     let syntheticInjectionDone = false;
 
     console.log("[TRACE] Starting tool execution loop...");

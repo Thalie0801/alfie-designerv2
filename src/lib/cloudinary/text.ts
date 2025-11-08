@@ -53,7 +53,7 @@ export function overlayText(source?: string, fallback?: string): string {
   return encodeOverlayText(candidate);
 }
 
-const CONTROL_CHAR_REGEX = /[\u0000-\u0008\u000B-\u001F\u007F]/g;
+const CONTROL_CHAR_REGEX = new RegExp('[\\x00-\\x08\\x0B-\\x1F\\x7F]', 'g');
 
 function sanitize(input: string): string {
   let value = input.replace(CONTROL_CHAR_REGEX, '');

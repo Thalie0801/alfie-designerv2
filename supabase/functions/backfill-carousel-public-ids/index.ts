@@ -191,7 +191,7 @@ function extractPublicIdFromUrl(url: string | null | undefined): string | null {
     const uploadMarker = '/image/upload/';
     const idx = url.indexOf(uploadMarker);
     if (idx === -1) return null;
-    let rest = url.substring(idx + uploadMarker.length);
+    const rest = url.substring(idx + uploadMarker.length);
 
     // If version segment exists, everything after it is the public_id
     const vMatch = rest.match(/v\d+\/(.+)$/);

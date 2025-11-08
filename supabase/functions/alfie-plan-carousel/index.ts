@@ -408,7 +408,7 @@ serve(async (req) => {
 
     // Compatibilité entrée
     const rawPrompt = body.prompt || body.topic;
-    let slideCount = clamp(toInt(body.slideCount ?? body.numSlides ?? 5, 5), MIN_SLIDES, MAX_SLIDES);
+    const slideCount = clamp(toInt(body.slideCount ?? body.numSlides ?? 5, 5), MIN_SLIDES, MAX_SLIDES);
 
     const brandKit: BrandKit | undefined = body.brandKit || (body.brandVoice ? { voice: body.brandVoice } : undefined);
 

@@ -319,13 +319,13 @@ export function AlfieChat() {
         type: "text",
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
 
   // Realtime job monitoring (avec garde si l'order change)
   useEffect(() => {
     if (!orderId) return;
-    let currentOrder = orderId;
+    const currentOrder = orderId;
 
     const channel = supabase
       .channel("job_queue_changes")

@@ -277,7 +277,7 @@ serve(async (req) => {
     console.log(`✅ Payment session stored for ${customerEmail}, plan: ${plan}`);
 
     // If user is already logged in (rare case), update their profile
-    let targetUserId = userId;
+    const targetUserId = userId;
     if (targetUserId) {
       await supabaseClient
         .from("profiles")
