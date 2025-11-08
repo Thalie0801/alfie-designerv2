@@ -2,8 +2,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { uploadToCloudinary } from "../_shared/cloudinaryUploader.ts";
+import { buildSpliceVideoUrl } from "../_shared/cloudinaryVideo.ts";
+import { buildImageThumbnailUrl, extractCloudName } from "../_shared/cloudinaryUtils.ts";
 import { consumeBrandQuotas } from "../_shared/quota.ts";
-import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, INTERNAL_FN_SECRET } from "../_shared/env.ts";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, INTERNAL_FN_SECRET, CLOUDINARY_CLOUD_NAME } from "../_shared/env.ts";
 import { attachJobIdempotency } from "../_shared/idempotency.ts";
 
 const corsHeaders = {
@@ -15,7 +17,7 @@ type JobRow = {
   id: string;
   user_id: string;
   order_id: string;
-  type: "generate_texts" | "render_images" | "render_carousels" | "generate_video";
+  type: "generate_texts" | "render_images" | "render_carousels" | "generate_video" | "stitch_carousel_video";
   status: "queued" | "running" | "completed" | "failed";
   retry_count: number | null;
   max_retries: number | null;
@@ -209,6 +211,9 @@ serve(async (req) => {
             break;
           case "generate_video":
             result = await processGenerateVideo(job.payload);
+            break;
+          case "stitch_carousel_video":
+            result = await processStitchCarouselVideo(job.payload);
             break;
           default:
             throw new Error(`Unknown job type: ${job.type}`);
@@ -834,6 +839,134 @@ async function processGenerateVideo(payload: any) {
   if (assetErr) throw new Error(assetErr.message);
 
   return { videoUrl };
+}
+
+async function processStitchCarouselVideo(payload: any) {
+  console.log("🎞️ [processStitchCarouselVideo]", {
+    orderId: payload?.orderId,
+    carouselId: payload?.carouselId,
+    slides: Array.isArray(payload?.slides) ? payload.slides.length : 0,
+  });
+
+  const userId = payload?.userId as string | undefined;
+  const brandId = payload?.brandId as string | undefined;
+  const orderId = payload?.orderId as string | undefined;
+  const carouselId = payload?.carouselId as string | undefined;
+  const slides = Array.isArray(payload?.slides) ? payload.slides : [];
+
+  if (!userId || !brandId || !orderId) {
+    throw new Error("Invalid payload: missing userId, brandId or orderId");
+  }
+  if (!slides.length) {
+    throw new Error("Invalid payload: no slides provided for stitching");
+  }
+
+  const aspectRaw = typeof payload?.aspect === "string" ? payload.aspect.trim() : "";
+  const allowedAspects = new Set(["1:1", "16:9", "9:16", "4:3", "3:4", "4:5"]);
+  const aspect = allowedAspects.has(aspectRaw) ? (aspectRaw as any) : "4:5";
+
+  const durationPerSlide = Math.max(
+    1,
+    Number.isFinite(payload?.durationPerSlide) ? Number(payload.durationPerSlide) : 2,
+  );
+
+  const normalizedSlides = slides
+    .map((slide: any, index: number) => {
+      const publicId = slide?.cloudinary_public_id ?? slide?.publicId ?? null;
+      if (!publicId || typeof publicId !== "string") return null;
+      const durationCandidate = Number(slide?.durationSec ?? durationPerSlide);
+      return {
+        publicId,
+        url: typeof slide?.cloudinary_url === "string" ? slide.cloudinary_url : slide?.url ?? null,
+        format: typeof slide?.format === "string" ? slide.format : null,
+        durationSec: Math.max(1, Number.isFinite(durationCandidate) ? durationCandidate : durationPerSlide),
+        slideIndex: typeof slide?.slide_index === "number" ? slide.slide_index : index,
+      };
+    })
+    .filter((item): item is {
+      publicId: string;
+      url: string | null;
+      format: string | null;
+      durationSec: number;
+      slideIndex: number;
+    } => !!item);
+
+  if (!normalizedSlides.length) {
+    throw new Error("Unable to stitch carousel video: slides missing public IDs");
+  }
+
+  const referenceSlide = normalizedSlides[0];
+  const resolvedCloudName = extractCloudName(referenceSlide.url ?? undefined) || CLOUDINARY_CLOUD_NAME;
+  if (!resolvedCloudName) {
+    throw new Error("Missing Cloudinary cloud name for carousel video stitching");
+  }
+
+  const videoUrl = buildSpliceVideoUrl({
+    cloudName: resolvedCloudName,
+    items: normalizedSlides.map((slide) => ({
+      type: "image" as const,
+      publicId: slide.publicId,
+      durationSec: slide.durationSec,
+    })),
+    aspect,
+    title: typeof payload?.title === "string" ? payload.title : undefined,
+    subtitle: typeof payload?.subtitle === "string" ? payload.subtitle : undefined,
+    cta: typeof payload?.cta === "string" ? payload.cta : undefined,
+    audioPublicId:
+      typeof payload?.audioPublicId === "string" && payload.audioPublicId.trim()
+        ? payload.audioPublicId.trim()
+        : null,
+  });
+
+  const thumbnailUrl = buildImageThumbnailUrl({
+    secureUrl: referenceSlide.url ?? undefined,
+    publicId: referenceSlide.publicId,
+    format: referenceSlide.format,
+    cloudName: resolvedCloudName,
+    width: aspect === "16:9" ? 640 : 600,
+    height: aspect === "9:16" ? 1066 : 600,
+  });
+
+  const metadata: Record<string, unknown> = {
+    source: "carousel_video",
+    carousel_id: carouselId ?? null,
+    slide_count: normalizedSlides.length,
+    aspect_ratio: aspect,
+    duration_per_slide: durationPerSlide,
+    audio_public_id:
+      typeof payload?.audioPublicId === "string" && payload.audioPublicId.trim()
+        ? payload.audioPublicId.trim()
+        : null,
+    slide_public_ids: normalizedSlides.map((slide) => slide.publicId),
+    slide_indexes: normalizedSlides.map((slide) => slide.slideIndex),
+    request_id: payload?.requestId ?? null,
+  };
+
+  const { data: mediaRecord, error: mediaError } = await supabaseAdmin
+    .from("media_generations")
+    .insert({
+      user_id: userId,
+      brand_id: brandId,
+      order_id: orderId,
+      type: "video",
+      status: "completed",
+      prompt: typeof payload?.title === "string" ? payload.title.slice(0, 500) : null,
+      output_url: videoUrl,
+      thumbnail_url: thumbnailUrl,
+      metadata,
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (mediaError) {
+    throw new Error(mediaError.message);
+  }
+
+  return {
+    video_url: videoUrl,
+    thumbnail_url: thumbnailUrl,
+    media_generation_id: mediaRecord?.id ?? null,
+  };
 }
 
 // ========== CASCADE JOB CREATION ==========

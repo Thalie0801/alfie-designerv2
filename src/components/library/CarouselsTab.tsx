@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useBrandKit } from "@/hooks/useBrandKit";
@@ -9,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { slideUrl } from "@/lib/cloudinary/imageUrls";
 import { extractCloudNameFromUrl } from "@/lib/cloudinary/utils";
-import { generateCarouselVideoFromLibrary } from "@/lib/cloudinary/carouselToVideo";
 import { cn } from "@/lib/utils";
 
 interface CarouselSlide {
@@ -71,6 +71,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
   const [downloadingZip, setDownloadingZip] = useState<string | null>(null);
   const [generatingVideo, setGeneratingVideo] = useState<string | null>(null);
   const mounted = useRef(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     mounted.current = true;
@@ -228,26 +229,39 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     setGeneratingVideo(carouselKey);
     try {
       const carouselId = carouselSlides[0]?.carousel_id || undefined;
-      const orderId = carouselSlides[0]?.order_id || undefined;
+      const orderRef = carouselSlides[0]?.order_id || undefined;
       const format = (carouselSlides[0]?.format || "4:5") as Aspect;
+      const suggestedTitle = carouselSlides[0]?.text_json?.title;
 
-      const url = await generateCarouselVideoFromLibrary({
-        carouselId,
-        orderId,
-        aspect: format,
-        title: "Mon Carrousel",
-        durationPerSlide: 2,
+      const { data, error } = await supabase.functions.invoke("generate-carousel-video", {
+        body: {
+          carousel_id: carouselId,
+          order_id: orderRef,
+          aspect: format,
+          title: suggestedTitle,
+          duration_per_slide: 2,
+        },
       });
-      if (!url) throw new Error("Aucune URL vidéo générée");
-      window.open(url, "_blank");
-      toast.success("Vidéo générée avec succès 🎬");
+
+      if (error) throw error;
+      if (!data?.order_id || !data?.job_id) {
+        throw new Error("Aucune tâche de génération vidéo n'a été créée");
+      }
+
+      if (data?.duplicate) {
+        toast.info("Une génération vidéo est déjà en cours pour ce carrousel. Direction le Studio !");
+      } else {
+        toast.success("Vidéo en cours de génération... Retrouvez-la dans le Studio 🎬");
+      }
+
+      navigate(`/studio?order=${data.order_id}`);
     } catch (e: any) {
       console.error("[CarouselsTab] Video generation error:", e);
       toast.error(`Échec de la génération : ${e?.message ?? "Erreur inconnue"}`);
     } finally {
       setGeneratingVideo(null);
     }
-  }, []);
+  }, [navigate]);
 
   // Ouverture individuelle (throttle simple pour éviter les bloqueurs)
   const openIndividually = useCallback((arr: CarouselSlide[]) => {
