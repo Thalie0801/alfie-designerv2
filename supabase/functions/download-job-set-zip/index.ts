@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+// @ts-expect-error
 import JSZip from "https://esm.sh/jszip@3.10.1";
 import { encodeOverlayText as encodeCloudinaryText } from "../_shared/cloudinaryText.ts";
 

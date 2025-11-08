@@ -242,7 +242,9 @@ function normalizeFonts(fonts: any): string {
     try {
       const values = Object.values(fonts).filter(v => typeof v === 'string');
       if (values.length) return values.join(', ');
-    } catch (_) {}
+    } catch (_) {
+      // ignore parsing errors from unexpected font shapes
+    }
   }
 
   // Chaîne simple
