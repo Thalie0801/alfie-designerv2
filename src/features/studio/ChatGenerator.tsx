@@ -84,11 +84,6 @@ const ASPECT_TO_TW: Record<AspectRatio, string> = {
   "16:9": "aspect-video",
 };
 
-const IMAGE_SIZE_MAP: Record<AspectRatio, { width: number; height: number }> = {
-  "1:1": { width: 1024, height: 1024 },
-  "9:16": { width: 1024, height: 1820 },
-  "16:9": { width: 1820, height: 1024 },
-};
 
 const CURRENT_JOB_VERSION = 2;
 
@@ -445,22 +440,23 @@ export function ChatGenerator() {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const targetFunction = uploadedSource
-        ? "alfie-generate-ai-image"
-        : "alfie-render-image";
+      const targetFunction = "alfie-render-image";
+
+      const resolutionMap: Record<AspectRatio, string> = {
+        "1:1": "1024x1024",
+        "9:16": "1080x1920",
+        "16:9": "1920x1080",
+      };
 
       const payload: Record<string, unknown> = {
         prompt: prompt || "transform this",
-        aspectRatio,
-        brand_id: activeBrandId ?? null, // ✅ Phase A: Pass brand_id
+        brand_id: activeBrandId ?? null,
+        resolution: resolutionMap[aspectRatio],
       };
 
       if (uploadedSource) {
-        payload.sourceUrl = uploadedSource.url;
-      } else {
-        const size = IMAGE_SIZE_MAP[aspectRatio];
-        payload.width = size.width;
-        payload.height = size.height;
+        // Pass uploaded image as reference for style/composition
+        payload.templateImageUrl = uploadedSource.url;
       }
 
       // ✅ Phase A: Include Authorization header if token is available
