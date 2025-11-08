@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { Upload, Wand2, Download, X, Sparkles, Loader2 } from "lucide-react";
+import { Upload, Wand2, Download, X, Sparkles, Loader2, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -10,6 +10,8 @@ import { uploadToChatBucket } from "@/lib/chatUploads";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { toast } from "sonner";
+import { useQueueMonitor } from "@/hooks/useQueueMonitor";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type GeneratedAsset = {
   url: string;
@@ -135,8 +137,12 @@ export function ChatGenerator() {
   const [assets, setAssets] = useState<MediaEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isTriggeringWorker, setIsTriggeringWorker] = useState(false);
 
   const { toast: showToast } = useToast();
+
+  // ✅ Monitor queue status
+  const { data: queueData } = useQueueMonitor(true);
 
   const jobBadgeVariant = (status: string): "default" | "secondary" | "outline" | "destructive" => {
     switch (status) {
@@ -584,6 +590,26 @@ export function ChatGenerator() {
     setPrompt(example);
   };
 
+  // ✅ Trigger manual worker
+  const handleTriggerWorker = useCallback(async () => {
+    setIsTriggeringWorker(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('trigger-job-worker', {});
+      
+      if (error) throw error;
+      
+      toast.success(`Worker déclenché: ${data?.jobsQueued || 0} jobs à traiter`);
+      
+      // Refresh jobs after triggering
+      await refetchAll();
+    } catch (err) {
+      console.error('[Studio] trigger worker error:', err);
+      toast.error(`Échec du déclenchement: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+    } finally {
+      setIsTriggeringWorker(false);
+    }
+  }, [refetchAll]);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -597,6 +623,50 @@ export function ChatGenerator() {
             Créez des images et vidéos avec l'IA
           </p>
         </div>
+
+        {/* ✅ Queue Monitor */}
+        {queueData && (
+          <Alert className="mb-6">
+            <Clock className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="text-sm">
+                  <strong>{queueData.counts.queued}</strong> en attente
+                </span>
+                <span className="text-sm">
+                  <strong>{queueData.counts.running}</strong> en cours
+                </span>
+                {queueData.counts.failed > 0 && (
+                  <span className="text-sm text-destructive">
+                    <AlertCircle className="inline w-3 h-3 mr-1" />
+                    <strong>{queueData.counts.failed}</strong> échecs
+                  </span>
+                )}
+                {queueData.counts.completed_24h !== undefined && (
+                  <span className="text-sm text-muted-foreground">
+                    <CheckCircle className="inline w-3 h-3 mr-1" />
+                    {queueData.counts.completed_24h} générés (24h)
+                  </span>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleTriggerWorker}
+                disabled={isTriggeringWorker || queueData.counts.queued === 0}
+              >
+                {isTriggeringWorker ? (
+                  <>
+                    <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                    Traitement...
+                  </>
+                ) : (
+                  'Forcer le traitement'
+                )}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Controls */}
         <Card className="p-6 mb-6 space-y-6">

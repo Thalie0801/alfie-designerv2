@@ -13,8 +13,8 @@ import {
 export default {
   async fetch(req: Request) {
     return edgeHandler(req, async ({ jwt, input }) => {
-      // ✅ Check internal secret FIRST (before JWT)
-      const internalSecret = req.headers.get("x-internal-secret");
+      // ✅ Check internal secret FIRST (before JWT) - uppercase header
+      const internalSecret = req.headers.get("X-Internal-Secret");
       const isInternalCall = internalSecret && internalSecret === INTERNAL_FN_SECRET;
       
       // JWT required ONLY if not internal call
