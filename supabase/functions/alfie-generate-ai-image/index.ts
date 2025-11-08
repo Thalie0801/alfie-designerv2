@@ -1,5 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { 
+  SUPABASE_URL, 
+  SUPABASE_SERVICE_ROLE_KEY,
+  INTERNAL_FN_SECRET,
+  LOVABLE_API_KEY 
+} from '../_shared/env.ts';
 
 /* ------------------------------- CORS ------------------------------- */
 const corsHeaders = {
@@ -194,21 +200,16 @@ serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const INTERNAL = Deno.env.get("INTERNAL_FN_SECRET");
-
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error("Supabase env not configured");
     }
-    if (!INTERNAL) throw new Error("INTERNAL_FN_SECRET not configured");
+    if (!INTERNAL_FN_SECRET) throw new Error("INTERNAL_FN_SECRET not configured");
 
     const body = (await req.json()) as GenerateRequest;
 
     const secret = req.headers.get("x-internal-secret");
-    if (secret !== INTERNAL) {
+    if (secret !== INTERNAL_FN_SECRET) {
       return jsonRes({ error: "Forbidden" }, { status: 403 });
     }
 
