@@ -354,53 +354,34 @@ export function AlfieChat() {
       });
     }
 
-    // Fin de génération (si total connu)
     const targetTotal = expectedTotal ?? orderTotal ?? 0;
-    const canAnnounce =
+    const alreadyAnnounced = finishAnnouncedRef.current === orderId;
+
+    const canAnnounceCompletion =
       conversationState === "generating" &&
       targetTotal > 0 &&
       orderAssets.length >= targetTotal &&
-      finishAnnouncedRef.current !== orderId;
+      !alreadyAnnounced;
 
-    if (canAnnounce) {
+    if (canAnnounceCompletion) {
       setConversationState("completed");
       finishAnnouncedRef.current = orderId;
-      setConversationState('completed');
-      finishAnnouncedRef.current = orderId;
-      setConversationState('completed');
-      finishAnnouncedRef.current = orderId;
-      setConversationState('completed');
-      finishAnnouncedRef.current = orderId;
-      setConversationState('completed');
-      finishAnnouncedRef.current = orderId;
-    const canAnnounce =
-      conversationState === 'generating' &&
-      (orderTotal ?? 0) > 0 &&
-      orderAssets.length >= (orderTotal ?? 0) &&
-      finishAnnouncedRef.current !== orderId;
-
-    if (canAnnounce) {
-      setConversationState('completed');
-      finishAnnouncedRef.current = orderId!;
-        assetUrl: asset.url,
-        metadata: isCarouselSlide
-          ? { assetUrls: [{ url: asset.url, format: asset.format }] }
-          : undefined
       addMessage({
         role: "assistant",
         content: "🎉 Génération terminée ! Tes visuels sont prêts dans la Bibliothèque.",
         quickReplies: ["Voir la bibliothèque", "Créer un nouveau visuel"],
         type: "text",
       });
+      return;
     }
 
-    // Fallback si total inconnu
-    if (
+    const canAnnouncePartial =
       conversationState === "generating" &&
       orderAssets.length > 0 &&
-      !targetTotal &&
-      finishAnnouncedRef.current !== orderId
-    ) {
+      targetTotal === 0 &&
+      !alreadyAnnounced;
+
+    if (canAnnouncePartial) {
       finishAnnouncedRef.current = orderId;
       addMessage({
         role: "assistant",
@@ -409,19 +390,7 @@ export function AlfieChat() {
         type: "text",
       });
     }
-     
   }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
-    }
-  }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
-    }
-  }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
-    }
-  }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
-    }
-  }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
-      setQuickReplies(['Voir la bibliothèque', 'Créer un nouveau carrousel']);
-    }
-  }, [orderAssets, orderId, conversationState, orderTotal]);
 
   // Realtime job monitoring (avec garde si l'order change)
   useEffect(() => {
@@ -824,7 +793,6 @@ export function AlfieChat() {
   // =====================
   return (
     <div className="flex flex-col h-full min-h-0 bg-background">
-    <div className="flex flex-col h-screen bg-background">
       {/* Header */}
       <CreateHeader />
 
