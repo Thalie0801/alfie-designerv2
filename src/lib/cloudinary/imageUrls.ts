@@ -44,6 +44,24 @@ const MAX_SUBTITLE_LEN = 220;
 const MAX_BULLET_LEN = 80;
 const MAX_CTA_LEN = 60;
 
+const CONTROL_CHAR_REGEX = /[\u0000-\u0008\u000B-\u001F\u007F]/g;
+
+function cleanOverlay(value: string | undefined, maxLen: number): string {
+  let s = (value ?? "").toString();
+  s = s.replace(CONTROL_CHAR_REGEX, "");
+  s = s
+    .normalize("NFC")
+    .replace(/[ \t\f\v]+/g, " ")
+    .trim();
+  if (!s) return "";
+  if (s.length > maxLen) {
+    s = `${s.slice(0, maxLen - 1).trimEnd()}…`;
+  }
+  return s;
+}
+
+function prepareOverlayText(value: string | undefined, maxLen: number): string | null {
+  const cleaned = cleanOverlay(value, maxLen);
 function prepareOverlayText(value: string | undefined, maxLen: number): string | null {
   const cleaned = cleanText(value ?? "", maxLen);
   if (!cleaned) return null;
@@ -124,6 +142,7 @@ export function slideUrl(publicId: string, o: SlideUrlOptions = {}): string {
   }
 
   const bulletTexts = (o.bulletPoints ?? [])
+    .map((b) => cleanOverlay(b, MAX_BULLET_LEN))
     .map((b) => cleanText(b ?? "", MAX_BULLET_LEN))
     .filter((b): b is string => Boolean(b))
     .slice(0, 6);
