@@ -819,6 +819,17 @@ async function processGenerateVideo(payload: any) {
   });
   if (debitError) throw new Error(debitError.message);
 
+  const seconds = Number(duration) || 12;
+  const woofs = Math.max(1, Math.ceil(seconds / 12));
+
+  const { error: usageErr } = await supabaseAdmin.rpc("debit_woofs", {
+    user_id_input: userId,
+    amount: woofs,
+  });
+  if (usageErr) {
+    console.warn("woofs debit failed", usageErr);
+  }
+
   const { error: assetErr } = await supabaseAdmin.from("media_generations").insert({
     user_id: userId,
     brand_id: brandId,
@@ -826,6 +837,7 @@ async function processGenerateVideo(payload: any) {
     type: "video",
     status: "completed",
     output_url: videoUrl,
+    metadata: { aspectRatio, duration, prompt, sourceUrl, generator: "assemble-video", woofs },
     metadata: {
       aspectRatio,
       duration: seconds,
@@ -838,7 +850,7 @@ async function processGenerateVideo(payload: any) {
   });
   if (assetErr) throw new Error(assetErr.message);
 
-  return { videoUrl };
+  return { videoUrl, woofs };
 }
 
 async function processStitchCarouselVideo(payload: any) {
