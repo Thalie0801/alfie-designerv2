@@ -7,6 +7,7 @@ import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { useQueueMonitor } from "@/hooks/useQueueMonitor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { sanitizeOrderId } from "@/lib/jobs/requeue";
 
 type JobEntry = {
   id: string;
@@ -65,7 +66,10 @@ function resolveRefreshErrorMessage(error: unknown): string {
 export function ChatGenerator() {
   const location = useLocation();
 
-  const orderId = useMemo(() => new URLSearchParams(location.search).get("order"), [location.search]) || null;
+  const orderId = useMemo(() => {
+    const rawOrderId = new URLSearchParams(location.search).get("order");
+    return sanitizeOrderId(rawOrderId);
+  }, [location.search]);
 
   const [jobs, setJobs] = useState<JobEntry[]>([]);
   const [_assets, setAssets] = useState<MediaEntry[]>([]);
@@ -169,8 +173,7 @@ export function ChatGenerator() {
       console.error("[Studio] refetchAll error:", err);
       const msg = resolveRefreshErrorMessage(err);
       if (isMountedRef.current && refetchSeqRef.current === requestId) {
-        setJobs([]);
-        setAssets([]);
+        // DO NOT clear jobs/assets on error - keep previous state
         setError(msg);
       }
     } finally {

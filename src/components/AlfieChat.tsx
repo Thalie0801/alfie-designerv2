@@ -90,6 +90,7 @@ type SendOptions = {
 
 interface Message {
   id: string;
+  key?: string; // Optional deduplication key (e.g., "order:<orderId>")
   role: "user" | "assistant";
   content: string;
   type?: "text" | "image" | "video" | "carousel" | "reasoning" | "bulk-carousel";
@@ -248,19 +249,27 @@ export function AlfieChat() {
     scrollToBottom();
   }, [messages]);
 
-  // System message during generation
+  // System message during generation (deduplicated by orderId)
   useEffect(() => {
     if (conversationState === "generating" && orderId) {
-      const hasGeneratingMessage = messages.some(
-        (m) => m.role === "assistant" && m.content.includes("🚀 Génération en cours"),
-      );
-      if (!hasGeneratingMessage) {
-        addMessage({
-          role: "assistant",
-          content: "🚀 Génération en cours... Je te tiens au courant dès que c'est prêt !",
-          type: "text",
-        });
-      }
+      const key = `order:${orderId}`;
+      setMessages((prev) => {
+        const withoutKey = prev.filter((m) => m.key !== key);
+        return [
+          ...withoutKey,
+          {
+            id: safeUuid(),
+            key,
+            role: "assistant",
+            content: "🚀 Génération en cours... Je te tiens au courant dès que c'est prêt !",
+            type: "text",
+            links: [
+              { label: "Voir dans Studio", href: "/studio" },
+              { label: "Voir la Bibliothèque", href: "/library" },
+            ],
+          },
+        ];
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationState, orderId]);

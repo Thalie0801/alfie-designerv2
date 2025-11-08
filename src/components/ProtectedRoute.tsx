@@ -2,6 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect, useState } from 'react';
 import { hasRole } from '@/lib/access';
+import { useBrandKit } from '@/hooks/useBrandKit';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -15,6 +16,7 @@ export function ProtectedRoute({
   allowPending = false,
 }: ProtectedRouteProps) {
   const { user, isAdmin, isAuthorized, roles, loading, refreshProfile } = useAuth();
+  const { brands, activeBrandId } = useBrandKit();
   const [checkingAdmin, setCheckingAdmin] = useState(false);
 
   // ============================================================================
@@ -55,13 +57,19 @@ export function ProtectedRoute({
     return <Navigate to="/dashboard" replace />;
   }
 
+  // Bypass onboarding if user has at least one brand or is enterprise
+  const hasBrand = Boolean(activeBrandId) || (brands?.length ?? 0) > 0;
+  const isEnterprise = hasRole(roles, 'enterprise');
+  
   // Vérifier les accès généraux (abonnement/autorisation)
-  if (!hasAccess) {
+  if (!hasAccess && !hasBrand && !isEnterprise) {
     console.debug('[ProtectedRoute] Access denied, redirecting to /onboarding/activate', {
       email: user?.email,
       effectiveIsAuthorized,
       allowPending,
       isWhitelisted,
+      hasBrand,
+      isEnterprise,
     });
     return <Navigate to="/onboarding/activate" replace />;
   }
