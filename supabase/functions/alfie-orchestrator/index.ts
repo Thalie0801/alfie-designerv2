@@ -30,7 +30,7 @@ const json = (data: any, status = 200) =>
     headers: { "content-type": "application/json", ...corsHeaders },
   });
 
-async function enqueueJob(job: Record<string, unknown>) {
+async function enqueueJob(job: { payload: unknown; type: string; order_id?: string | null; user_id?: string | null } & Record<string, unknown>) {
   const jobWithKey = attachJobIdempotency(job);
   const { data, error } = await sb
     .from("job_queue")

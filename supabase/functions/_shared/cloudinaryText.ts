@@ -1,4 +1,4 @@
-import { encode as base64Encode } from "https://deno.land/std@0.224.0/encoding/base64.ts";
+import { encodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 const CONTROL_CHARS_REGEX = /[\u0000-\u001f\u007f]/g;
 
@@ -24,7 +24,7 @@ export function encodeOverlayText(value: string): string {
   try {
     const normalized = cleaned.normalize("NFC");
     const bytes = new TextEncoder().encode(normalized);
-    return `b64:${base64Encode(bytes)}`;
+    return `b64:${encodeBase64(bytes)}`;
   } catch (error) {
     console.warn("[cloudinaryText] Falling back to URL encoding", error);
     return encodeURIComponent(cleaned);

@@ -46,7 +46,7 @@ serve(async (req) => {
         auth: { autoRefreshToken: false, persistSession: false },
       });
       const { data: watchdogData, error: watchdogError } = await adminClient
-        .rpc('reset_stuck_jobs', { timeout_minutes: 10, max_attempts: 3 });
+        .rpc('reset_stuck_jobs', { age_minutes: 10 });
       if (watchdogError) {
         console.error('[trigger-job-worker] reset_stuck_jobs failed:', watchdogError);
       } else if (watchdogData) {
