@@ -89,6 +89,34 @@ serve(async (req) => {
       return json({ error: "No slides found for this carousel" }, 404);
     }
 
+    let brandId = (slides.find((s) => typeof s.brand_id === "string" && s.brand_id)?.brand_id as string | null) ?? null;
+    let resolvedOrderId =
+      (slides.find((s) => typeof s.order_id === "string" && s.order_id)?.order_id as string | null) ??
+      (orderIdRaw || null);
+    const derivedCarouselId =
+      (slides.find((s) => typeof s.carousel_id === "string" && s.carousel_id)?.carousel_id as string | null) ??
+      (carouselIdRaw || null);
+
+    if ((!resolvedOrderId || !brandId) && derivedCarouselId) {
+      const { data: carouselRow, error: carouselError } = await clientForData
+        .from("media_generations")
+        .select("order_id, brand_id")
+        .eq("id", derivedCarouselId)
+        .maybeSingle();
+
+      if (carouselError) {
+        console.error("[generate-carousel-video] Failed to resolve carousel context", carouselError);
+      }
+
+      if (!resolvedOrderId && carouselRow?.order_id) {
+        resolvedOrderId = carouselRow.order_id as string;
+      }
+      if (!brandId && carouselRow?.brand_id) {
+        brandId = carouselRow.brand_id as string;
+      }
+    }
+
+    if (!brandId || !resolvedOrderId) {
     const brandId = slides[0]?.brand_id as string | null;
     const derivedOrderId = (slides[0]?.order_id as string | null) ?? (orderIdRaw || null);
     const derivedCarouselId = (slides[0]?.carousel_id as string | null) ?? (carouselIdRaw || null);
@@ -124,6 +152,7 @@ serve(async (req) => {
     const jobPayload: Record<string, unknown> = {
       userId: user.id,
       brandId,
+      orderId: resolvedOrderId,
       orderId: derivedOrderId,
       carouselId: derivedCarouselId,
       slides: normalizedSlides,
@@ -165,6 +194,7 @@ serve(async (req) => {
       return json({
         ok: true,
         job_id: duplicateCheck.data.id,
+        order_id: resolvedOrderId,
         order_id: derivedOrderId,
         carousel_id: derivedCarouselId,
         slide_count: normalizedSlides.length,
@@ -176,6 +206,7 @@ serve(async (req) => {
       .from("job_queue")
       .insert({
         user_id: user.id,
+        order_id: resolvedOrderId,
         order_id: derivedOrderId,
         type: "stitch_carousel_video",
         payload: jobPayload,
@@ -197,6 +228,7 @@ serve(async (req) => {
     return json({
       ok: true,
       job_id: jobRow?.id ?? null,
+      order_id: resolvedOrderId,
       order_id: derivedOrderId,
       carousel_id: derivedCarouselId,
       slide_count: normalizedSlides.length,
