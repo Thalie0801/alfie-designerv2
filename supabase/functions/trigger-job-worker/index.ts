@@ -63,7 +63,7 @@ serve(async (req) => {
     console.log(`[trigger-job-worker] Found ${count} jobs queued, invoking worker...`);
 
     // Invoke the worker
-    const workerResp = await fetch(`${SUPABASE_URL}/functions/v1/process-job-worker`, {
+    const workerResp = await fetch(`${SUPABASE_URL}/functions/v1/alfie-job-worker`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,

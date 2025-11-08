@@ -144,6 +144,17 @@ export function ChatGenerator() {
   // ✅ Monitor queue status
   const { data: queueData } = useQueueMonitor(true);
 
+  // Calculate stuck jobs
+  const stuckJobs = useMemo(() => {
+    return jobs.filter(j => {
+      if (j.status !== "queued") return false;
+      const updatedAt = new Date(j.updated_at).getTime();
+      const now = Date.now();
+      const minutesSinceUpdate = (now - updatedAt) / (1000 * 60);
+      return minutesSinceUpdate > 10; // Stuck if queued for >10 minutes
+    });
+  }, [jobs]);
+
   const jobBadgeVariant = (status: string): "default" | "secondary" | "outline" | "destructive" => {
     switch (status) {
       case "queued":
@@ -849,6 +860,25 @@ export function ChatGenerator() {
               </div>
             </div>
             {error && <div className="text-xs text-red-600 mt-2">{error}</div>}
+
+            {/* Stuck Jobs Alert */}
+            {stuckJobs.length > 0 && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {stuckJobs.length} job{stuckJobs.length > 1 ? 's' : ''} bloqué{stuckJobs.length > 1 ? 's' : ''} détecté{stuckJobs.length > 1 ? 's' : ''} (&gt;10 min en attente).
+                  <Button 
+                    variant="link" 
+                    size="sm"
+                    className="ml-2 h-auto p-0 text-destructive underline"
+                    onClick={handleTriggerWorker}
+                    disabled={isTriggeringWorker}
+                  >
+                    Forcer le traitement
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
 
             {loading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
