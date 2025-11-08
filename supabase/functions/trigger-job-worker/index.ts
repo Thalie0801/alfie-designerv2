@@ -62,29 +62,15 @@ serve(async (req) => {
 
     console.log(`[trigger-job-worker] Found ${count} jobs queued, invoking worker...`);
 
-    // Invoke the worker
-    const workerResp = await fetch(`${SUPABASE_URL}/functions/v1/alfie-job-worker`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        "X-Internal-Secret": INTERNAL_FN_SECRET,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ trigger: "manual" }),
-    });
+    // Invoke the worker using Supabase client
+    const { data: workerData, error: workerError } = await supabase.functions.invoke(
+      'alfie-job-worker',
+      { body: { trigger: 'manual' } }
+    );
 
-    const workerText = await workerResp.text().catch(() => "");
-
-    if (!workerResp.ok) {
-      console.error(`[trigger-job-worker] Worker failed: ${workerResp.status} ${workerText}`);
-      throw new Error(`Worker invocation failed: ${workerResp.status}`);
-    }
-
-    let workerData;
-    try {
-      workerData = JSON.parse(workerText);
-    } catch {
-      workerData = { raw: workerText };
+    if (workerError) {
+      console.error(`[trigger-job-worker] Worker failed:`, workerError);
+      throw new Error(`Worker invocation failed: ${workerError.message}`);
     }
 
     return new Response(
