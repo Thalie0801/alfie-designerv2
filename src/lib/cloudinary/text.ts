@@ -1,5 +1,3 @@
-import { cleanText } from './utils';
-
 function encodeBase64(cleaned: string): string {
   const normalized = cleaned.normalize('NFC');
   const encoder = new TextEncoder();
@@ -34,7 +32,7 @@ function encodeBase64(cleaned: string): string {
  * Encode overlay text for Cloudinary using base64 (UTF-8 safe)
  */
 export function encodeOverlayText(value?: string): string {
-  const cleaned = cleanText(value ?? '');
+  const cleaned = sanitize(value ?? '');
   if (!cleaned) return '';
 
   try {
@@ -53,4 +51,12 @@ export function encodeOverlayText(value?: string): string {
 export function overlayText(source?: string, fallback?: string): string {
   const candidate = source && source.trim().length > 0 ? source : fallback ?? '';
   return encodeOverlayText(candidate);
+}
+
+const CONTROL_CHAR_REGEX = /[\u0000-\u0008\u000B-\u001F\u007F]/g;
+
+function sanitize(input: string): string {
+  let value = input.replace(CONTROL_CHAR_REGEX, '');
+  value = value.normalize('NFC').replace(/[ \t\f\v]+/g, ' ').trim();
+  return value;
 }
