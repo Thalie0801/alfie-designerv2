@@ -788,9 +788,6 @@ export function AlfieChat() {
       {/* Header */}
       <CreateHeader />
 
-      {/* Quota Bar */}
-      {activeBrandId && <QuotaBar activeBrandId={activeBrandId} />}
-
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => (

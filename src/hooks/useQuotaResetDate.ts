@@ -8,17 +8,22 @@ export interface Subscription {
 }
 
 export function useQuotaResetDate(subscription?: Subscription | null): Date {
-  // If subscription has a current_period_end, use it
+  const today = new Date();
+  
+  // If subscription has a current_period_end, use it only if it's in the future
   if (subscription?.current_period_end) {
     try {
-      return new Date(subscription.current_period_end);
+      const resetDate = new Date(subscription.current_period_end);
+      if (resetDate > today) {
+        return resetDate;
+      }
+      // Date is in the past, fall through to fallback
     } catch {
       // Invalid date, fall through to fallback
     }
   }
 
   // Fallback: first day of next month
-  const today = new Date();
   return new Date(today.getFullYear(), today.getMonth() + 1, 1);
 }
 
