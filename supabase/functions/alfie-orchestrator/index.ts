@@ -106,6 +106,26 @@ serve(async (req) => {
       forceTool,
     } = body;
 
+    const referenceMediaUrl = (() => {
+      if (typeof body?.referenceMediaUrl === "string" && body.referenceMediaUrl.trim().length > 0) {
+        return body.referenceMediaUrl.trim();
+      }
+      if (typeof body?.reference_media_url === "string" && body.reference_media_url.trim().length > 0) {
+        return (body.reference_media_url as string).trim();
+      }
+      return null;
+    })();
+
+    const referenceMediaType = (() => {
+      if (typeof body?.referenceMediaType === "string" && body.referenceMediaType.trim().length > 0) {
+        return body.referenceMediaType.trim();
+      }
+      if (typeof body?.reference_media_type === "string" && body.reference_media_type.trim().length > 0) {
+        return (body.reference_media_type as string).trim();
+      }
+      return null;
+    })();
+
     const user_message =
       typeof message === "string" && message.trim().length > 0
         ? message
@@ -165,11 +185,14 @@ serve(async (req) => {
 
     console.log("[ORCH] 📊 State:", state, "Context:", context);
 
-    if (forceTool === "generate_video" && (body?.aspectRatio || body?.durationSec || body?.uploadedSourceUrl)) {
+    if (
+      forceTool === "generate_video" &&
+      (body?.aspectRatio || body?.durationSec || body?.uploadedSourceUrl || referenceMediaUrl)
+    ) {
       const aspectRatio = (body?.aspectRatio as "9:16" | "16:9" | "1:1") ?? "9:16";
       const duration = Number(body?.durationSec) || 12;
       const promptText = (user_message || "").trim();
-      const sourceUrl = body?.uploadedSourceUrl || null;
+      const sourceUrl = body?.uploadedSourceUrl || referenceMediaUrl || null;
 
       let orderId: string | null = session.order_id;
       if (!orderId) {
@@ -203,6 +226,9 @@ serve(async (req) => {
           duration,
           prompt: promptText,
           sourceUrl,
+          referenceMediaUrl,
+          reference_media_url: referenceMediaUrl,
+          referenceMediaType,
         },
       });
 
@@ -233,7 +259,7 @@ serve(async (req) => {
       const promptText = (user_message || body?.prompt || "").trim();
       if (!promptText) return json({ error: "missing_prompt" }, 400);
 
-      const sourceUrl = body?.uploadedSourceUrl || null;
+      const sourceUrl = body?.uploadedSourceUrl || referenceMediaUrl || null;
 
       let orderId = session.order_id;
       if (!orderId) {
@@ -265,6 +291,9 @@ serve(async (req) => {
           orderId: finalOrderId,
           prompt: promptText,
           sourceUrl,
+          referenceMediaUrl,
+          reference_media_url: referenceMediaUrl,
+          referenceMediaType,
         },
       });
 
@@ -332,6 +361,9 @@ serve(async (req) => {
           brandId: brand_id,
           orderId: finalOrderId,
           slides,
+          referenceMediaUrl,
+          reference_media_url: referenceMediaUrl,
+          referenceMediaType,
         },
       });
 
@@ -378,7 +410,7 @@ serve(async (req) => {
         aspectRatio: null,
         durationSec: null,
         prompt: null,
-        sourceUrl: body?.uploadedSourceUrl || null,
+        sourceUrl: body?.uploadedSourceUrl || referenceMediaUrl || null,
       };
       state = "awaiting_video_params";
       await sb
@@ -403,14 +435,14 @@ serve(async (req) => {
         aspectRatio: null,
         durationSec: null,
         prompt: null,
-        sourceUrl: body?.uploadedSourceUrl || null,
+        sourceUrl: body?.uploadedSourceUrl || referenceMediaUrl || null,
       };
 
       const { aspectRatio, durationSec } = parseFormatDuration(user_message || "");
       if (aspectRatio) context.video!.aspectRatio = aspectRatio;
       if (durationSec) context.video!.durationSec = durationSec;
-      if (!context.video!.sourceUrl && body?.uploadedSourceUrl) {
-        context.video!.sourceUrl = body.uploadedSourceUrl;
+      if (!context.video!.sourceUrl && (body?.uploadedSourceUrl || referenceMediaUrl)) {
+        context.video!.sourceUrl = body?.uploadedSourceUrl || referenceMediaUrl;
       }
 
       await sb
@@ -453,7 +485,7 @@ serve(async (req) => {
         aspectRatio: null,
         durationSec: null,
         prompt: null,
-        sourceUrl: body?.uploadedSourceUrl || null,
+        sourceUrl: body?.uploadedSourceUrl || referenceMediaUrl || null,
       }) as any;
       const promptText = (user_message || "").trim();
       if (!promptText) {
@@ -502,6 +534,9 @@ serve(async (req) => {
           duration: v.durationSec,
           prompt: v.prompt,
           sourceUrl: v.sourceUrl || null,
+          referenceMediaUrl: v.sourceUrl || referenceMediaUrl || null,
+          reference_media_url: v.sourceUrl || referenceMediaUrl || null,
+          referenceMediaType,
         },
       });
 
@@ -877,6 +912,9 @@ serve(async (req) => {
             orderId: order.id,
             orderItemId: imageItem?.id,
             brief: { count: nI, briefs: context.imageBriefs },
+            referenceMediaUrl,
+            reference_media_url: referenceMediaUrl,
+            referenceMediaType,
           },
         });
       }
@@ -893,6 +931,9 @@ serve(async (req) => {
             orderId: order.id,
             orderItemId: carouselItem?.id,
             brief: { count: nC, briefs: context.carouselBriefs },
+            referenceMediaUrl,
+            reference_media_url: referenceMediaUrl,
+            referenceMediaType,
           },
         });
       }
