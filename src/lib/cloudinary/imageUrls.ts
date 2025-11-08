@@ -1,3 +1,5 @@
+import { cleanText } from './utils';
+import { encodeOverlayText } from './text';
 // src/lib/cloudinary/imageUrls.ts
 
 /** Ratios pris en charge */
@@ -102,6 +104,9 @@ export function slideUrl(publicId: string, o: SlideUrlOptions = {}): string {
   // Titre (haut)
   if (title) {
     overlays.push(
+      `l_text:Arial_${size}_bold:${encodeOverlayText(title)},co_rgb:FFFFFF,g_north,y_${y},w_${Math.round(
+        w * 0.9
+      )},c_fit`
       `l_text:${font}_${titleSize}_bold:${encodeOverlayText(title)},co_rgb:${color},g_north,y_${titleY},w_${Math.round(
         w * 0.9,
       )},c_fit`,
@@ -111,6 +116,9 @@ export function slideUrl(publicId: string, o: SlideUrlOptions = {}): string {
   // Sous-titre (bas)
   if (subtitle) {
     overlays.push(
+      `l_text:Arial_${size}:${encodeOverlayText(sub)},co_rgb:E5E7EB,g_south,y_${y},w_${Math.round(
+        w * 0.84
+      )},c_fit`
       `l_text:${font}_${subSize}:${encodeOverlayText(
         subtitle,
       )},co_rgb:${subColor},g_south,y_${subY},w_${Math.round(w * 0.84)},c_fit`,
@@ -120,6 +128,9 @@ export function slideUrl(publicId: string, o: SlideUrlOptions = {}): string {
   // Puces (centre)
   bullets.forEach((b, i) => {
     overlays.push(
+      `l_text:Arial_${size}:${encodeOverlayText('• ' + b)},co_rgb:FFFFFF,g_center,y_${
+        startY + i * 60
+      },w_${Math.round(w * 0.8)},c_fit`
       `l_text:${font}_${bulletSize}:${encodeOverlayText(
         "• " + b,
       )},co_rgb:${color},g_center,y_${bulletStartY + i * 60},w_${Math.round(w * 0.8)},c_fit`,
@@ -128,6 +139,8 @@ export function slideUrl(publicId: string, o: SlideUrlOptions = {}): string {
 
   // CTA (bas)
   if (cta) {
+    const size = o.aspectRatio === '16:9' ? 44 : 48;
+    overlays.push(`l_text:Arial_${size}_bold:${encodeOverlayText(cta)},co_rgb:FFFFFF,g_south,y_80`);
     overlays.push(`l_text:${font}_${ctaSize}_bold:${encodeOverlayText(cta)},co_rgb:${color},g_south,y_80`);
   }
 

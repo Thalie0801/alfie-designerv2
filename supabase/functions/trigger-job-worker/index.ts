@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY, INTERNAL_FN_SECRET } from "../_shared/env.ts";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, INTERNAL_FN_SECRET, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,6 +40,25 @@ serve(async (req) => {
 
     console.log(`[trigger-job-worker] Manual trigger by user ${user.id}`);
 
+    let watchdogSummary: { reset_count: number; failed_count: number } | null = null;
+    if (SUPABASE_SERVICE_ROLE_KEY) {
+      const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const { data: watchdogData, error: watchdogError } = await adminClient
+        .rpc('reset_stuck_jobs', { timeout_minutes: 10, max_attempts: 3 });
+      if (watchdogError) {
+        console.error('[trigger-job-worker] reset_stuck_jobs failed:', watchdogError);
+      } else if (watchdogData) {
+        const summary = Array.isArray(watchdogData) ? watchdogData[0] : watchdogData;
+        watchdogSummary = {
+          reset_count: summary?.reset_count ?? 0,
+          failed_count: summary?.failed_count ?? 0,
+        };
+      }
+    }
+
+
     // Check if there are jobs to process
     const { count } = await supabase
       .from("job_queue")
@@ -51,7 +70,8 @@ serve(async (req) => {
         JSON.stringify({ 
           ok: true, 
           message: "No jobs to process",
-          jobsQueued: 0
+          jobsQueued: 0,
+          watchdog: watchdogSummary,
         }),
         {
           status: 200,
@@ -79,6 +99,7 @@ serve(async (req) => {
         message: `Worker triggered successfully`,
         jobsQueued: count,
         workerResponse: workerData,
+        watchdog: watchdogSummary,
       }),
       {
         status: 200,

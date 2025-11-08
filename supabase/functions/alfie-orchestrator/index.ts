@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY, INTERNAL_FN_SECRET } from "../_shared/env.ts";
+import { attachJobIdempotency } from "../_shared/idempotency.ts";
 import {
   type ConversationState,
   type ConversationContext,
@@ -28,6 +29,26 @@ const json = (data: any, status = 200) =>
     status,
     headers: { "content-type": "application/json", ...corsHeaders },
   });
+
+async function enqueueJob(job: Record<string, unknown>) {
+  const jobWithKey = attachJobIdempotency(job);
+  const { data, error } = await sb
+    .from("job_queue")
+    .upsert(jobWithKey, { onConflict: "idempotency_key", ignoreDuplicates: true })
+    .select("id, idempotency_key")
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    console.log('[ORCH] duplicate job skipped', { key: jobWithKey.idempotency_key, type: jobWithKey.type });
+    return jobWithKey;
+  }
+
+  return { ...jobWithKey, ...data };
+}
 
 // ---- Small utils
 const toInt = (v: any, d = 0) => {
@@ -169,7 +190,7 @@ serve(async (req) => {
         await sb.from("alfie_conversation_sessions").update({ order_id: orderId }).eq("id", session.id);
       }
 
-      await sb.from("job_queue").insert({
+      await enqueueJob({
         user_id: user.id,
         order_id: orderId,
         type: "generate_video",
@@ -233,7 +254,7 @@ serve(async (req) => {
 
       const finalOrderId = orderId as string;
 
-      await sb.from("job_queue").insert({
+      await enqueueJob({
         user_id: user.id,
         order_id: finalOrderId,
         type: "render_images",
@@ -301,7 +322,7 @@ serve(async (req) => {
 
       const finalOrderId = orderId as string;
 
-      await sb.from("job_queue").insert({
+      await enqueueJob({
         user_id: user.id,
         order_id: finalOrderId,
         type: "render_carousels",
@@ -468,7 +489,7 @@ serve(async (req) => {
           .eq("id", session.id);
       }
 
-      const job = {
+      await enqueueJob({
         user_id: user.id,
         order_id: orderId,
         type: "generate_video",
@@ -482,8 +503,7 @@ serve(async (req) => {
           prompt: v.prompt,
           sourceUrl: v.sourceUrl || null,
         },
-      };
-      await sb.from("job_queue").insert(job);
+      });
 
       try {
         await fetch(`${SUPABASE_URL}/functions/v1/alfie-job-worker`, {
@@ -888,7 +908,10 @@ serve(async (req) => {
         const newJobs = renderJobs.filter((j) => !existingKeys.has(j.type));
 
         if (newJobs.length > 0) {
-          const { error: jobError } = await sb.from("job_queue").insert(newJobs);
+          const keyedJobs = newJobs.map((job) => attachJobIdempotency(job));
+          const { error: jobError } = await sb
+            .from("job_queue")
+            .upsert(keyedJobs, { onConflict: "idempotency_key", ignoreDuplicates: true });
           if (jobError) {
             console.error("[ORCH] ❌ Queue jobs failed:", jobError);
             return json({ error: "failed_to_queue_jobs" }, 500);

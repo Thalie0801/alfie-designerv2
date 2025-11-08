@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Upload, Wand2, Download, X, Sparkles, Loader2, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,7 @@ import { useBrandKit } from "@/hooks/useBrandKit";
 import { toast } from "sonner";
 import { useQueueMonitor } from "@/hooks/useQueueMonitor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { buildJobIdempotencyKey } from "@/lib/jobs/idempotency";
 
 type GeneratedAsset = {
   url: string;
@@ -41,6 +42,12 @@ type JobEntry = {
   archived_at: string | null;
   is_archived: boolean;
   job_version: number | null;
+  retry_count?: number | null;
+  max_retries?: number | null;
+  locked_by?: string | null;
+  started_at?: string | null;
+  attempts?: number | null;
+  idempotency_key?: string | null;
 };
 
 type MediaEntry = {
@@ -179,6 +186,9 @@ export function ChatGenerator() {
   const [error, setError] = useState<string | null>(null);
   const [isTriggeringWorker, setIsTriggeringWorker] = useState(false);
 
+  const isMountedRef = useRef(true);
+  const refetchSeqRef = useRef(0);
+
   const { toast: showToast } = useToast();
 
   // ✅ Monitor queue status
@@ -230,8 +240,33 @@ export function ChatGenerator() {
   };
 
   const refetchAll = useCallback(async () => {
+    const requestId = (refetchSeqRef.current += 1);
+
+    if (!isMountedRef.current) {
+      return;
+    }
+
     setLoading(true);
     setError(null);
+
+    const dedupeById = <T extends { id?: string | number }>(items: readonly T[] | null | undefined) => {
+      if (!items) return [] as T[];
+      const seen = new Set<string>();
+      const result: T[] = [];
+      for (const item of items) {
+        if (!item) continue;
+        const value = (item as { id?: string | number }).id;
+        if (typeof value !== "string" && typeof value !== "number") {
+          result.push(item);
+          continue;
+        }
+        const key = String(value);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        result.push(item);
+      }
+      return result;
+    };
 
     try {
       const {
@@ -270,16 +305,33 @@ export function ChatGenerator() {
       if (jobsResponse.error) throw jobsResponse.error;
       if (assetsResponse.error) throw assetsResponse.error;
 
-      setJobs((jobsResponse.data as JobEntry[]) ?? []);
-      setAssets((assetsResponse.data || []) as MediaEntry[]);
+      if (isMountedRef.current && refetchSeqRef.current === requestId) {
+        const jobsData = (jobsResponse.data as JobEntry[] | null | undefined) ?? [];
+        const assetsData = (assetsResponse.data as MediaEntry[] | null | undefined) ?? [];
+        setJobs(dedupeById(jobsData));
+        setAssets(dedupeById(assetsData));
+        setError(null);
+      }
     } catch (err) {
       console.error("[Studio] refetchAll error:", err);
       const message = resolveRefreshErrorMessage(err);
+      if (isMountedRef.current && refetchSeqRef.current === requestId) {
+        setError(message);
+      }
       setError(message);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current && refetchSeqRef.current === requestId) {
+        setLoading(false);
+      }
     }
   }, [orderId]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -344,14 +396,34 @@ export function ChatGenerator() {
           throw new Error("Impossible de relancer ce job sans payload");
         }
 
-        const { error: insertError } = await supabase.from("job_queue").insert([{
-          order_id: job.order_id,
+        const idempotencyKey = buildJobIdempotencyKey({
+          orderId: job.order_id ?? null,
+          userId: job.user_id,
           type: job.type,
-          status: "queued" as const,
           payload,
-        }] as any);
+        });
 
-        if (insertError) throw insertError;
+        const { data: updatedJob, error: updateError } = await supabase
+          .from("job_queue")
+          .update({
+            status: "queued" as const,
+            error: null,
+            result: null,
+            locked_by: null,
+            started_at: null,
+            updated_at: new Date().toISOString(),
+            attempts: 0,
+            idempotency_key: idempotencyKey,
+          })
+          .eq("id", job.id)
+          .eq("user_id", job.user_id)
+          .select("id")
+          .maybeSingle();
+
+        if (updateError) throw updateError;
+        if (!updatedJob) {
+          throw new Error("Impossible de relancer ce job (introuvable)");
+        }
 
         showToast({
           title: "Job relancé",
@@ -645,11 +717,19 @@ export function ChatGenerator() {
     setIsTriggeringWorker(true);
     try {
       const { data, error } = await supabase.functions.invoke('trigger-job-worker', {});
-      
+
       if (error) throw error;
-      
-      toast.success(`Worker déclenché: ${data?.jobsQueued || 0} jobs à traiter`);
-      
+
+      const summary = (data || {}) as { jobsQueued?: number; watchdog?: { reset_count?: number; failed_count?: number } };
+      const queued = summary.jobsQueued ?? 0;
+      const resetCount = summary.watchdog?.reset_count ?? 0;
+      const failedCount = summary.watchdog?.failed_count ?? 0;
+      const extra = summary.watchdog
+        ? ` — ${resetCount} débloqué(s), ${failedCount} passé(s) en échec`
+        : '';
+
+      toast.success(`Worker déclenché: ${queued} job(s) à traiter${extra}`);
+
       // Refresh jobs after triggering
       await refetchAll();
     } catch (err) {

@@ -1,12 +1,3 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "./env.ts";
-
-const admin = createClient(
-  SUPABASE_URL ?? "",
-  SUPABASE_SERVICE_ROLE_KEY ?? "",
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
-
 const HASH_PREFIX = "v1:";
 
 function canonicalize(value: unknown): unknown {
@@ -113,61 +104,4 @@ export function attachJobIdempotency<T extends { payload: unknown; type: string;
     payload: job.payload,
   });
   return { ...job, idempotency_key };
-}
-
-export async function withIdempotency<T>(
-  key: string,
-  fn: () => Promise<{ ref: string; data: T }>
-): Promise<T> {
-  const { data: inserted, error: insertErr } = await admin
-    .from('idempotency_keys')
-    .insert({ key, status: 'pending' })
-    .select()
-    .maybeSingle();
-
-  if (insertErr) {
-    const { data: existing } = await admin
-      .from('idempotency_keys')
-      .select('*')
-      .eq('key', key)
-      .single();
-
-    if (existing?.status === 'applied') {
-      console.log(`[Idempotency] Key ${key} already applied, returning cached result`);
-      const [type, id] = existing.result_ref.split(':');
-      if (type === 'job_set') {
-        const { data: jobSet } = await admin
-          .from('job_sets')
-          .select('*')
-          .eq('id', id)
-          .single();
-        return jobSet as T;
-      }
-      throw new Error('Unknown result_ref format');
-    }
-
-    if (existing?.status === 'pending') {
-      throw new Error('REQUEST_IN_PROGRESS');
-    }
-
-    throw new Error('IDEMPOTENCY_ERROR');
-  }
-
-  try {
-    const result = await fn();
-
-    await admin
-      .from('idempotency_keys')
-      .update({ status: 'applied', result_ref: result.ref })
-      .eq('key', key);
-
-    return result.data;
-  } catch (err) {
-    await admin
-      .from('idempotency_keys')
-      .update({ status: 'failed' })
-      .eq('key', key);
-
-    throw err;
-  }
 }
