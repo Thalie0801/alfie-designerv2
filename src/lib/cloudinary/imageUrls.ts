@@ -1,4 +1,5 @@
 import { cleanText } from './utils';
+import { encodeOverlayText } from './text';
 
 export type SlideUrlOptions = {
   cloudName: string;
@@ -15,8 +16,6 @@ function dims(ar: SlideUrlOptions['aspectRatio']) {
   if (ar === '1:1') return { w: 1080, h: 1080 };
   return { w: 1080, h: 1350 }; // 4:5
 }
-
-const enc = (t: string) => encodeURIComponent(t);
 
 /**
  * Générer une URL Cloudinary avec overlays texte
@@ -44,7 +43,7 @@ export function slideUrl(publicId: string, o: SlideUrlOptions): string {
     const size = o.aspectRatio === '9:16' ? 80 : o.aspectRatio === '16:9' ? 64 : 72;
     const y = o.aspectRatio === '9:16' ? 140 : 120;
     overlays.push(
-      `l_text:Arial_${size}_bold:${enc(title)},co_rgb:FFFFFF,g_north,y_${y},w_${Math.round(
+      `l_text:Arial_${size}_bold:${encodeOverlayText(title)},co_rgb:FFFFFF,g_north,y_${y},w_${Math.round(
         w * 0.9
       )},c_fit`
     );
@@ -54,7 +53,7 @@ export function slideUrl(publicId: string, o: SlideUrlOptions): string {
     const size = o.aspectRatio === '9:16' ? 52 : o.aspectRatio === '16:9' ? 38 : 42;
     const y = o.aspectRatio === '9:16' ? 220 : 140;
     overlays.push(
-      `l_text:Arial_${size}:${enc(sub)},co_rgb:E5E7EB,g_south,y_${y},w_${Math.round(
+      `l_text:Arial_${size}:${encodeOverlayText(sub)},co_rgb:E5E7EB,g_south,y_${y},w_${Math.round(
         w * 0.84
       )},c_fit`
     );
@@ -64,7 +63,7 @@ export function slideUrl(publicId: string, o: SlideUrlOptions): string {
     const size = o.aspectRatio === '16:9' ? 32 : 36;
     const startY = o.aspectRatio === '9:16' ? 380 : 300;
     overlays.push(
-      `l_text:Arial_${size}:${enc('• ' + b)},co_rgb:FFFFFF,g_center,y_${
+      `l_text:Arial_${size}:${encodeOverlayText('• ' + b)},co_rgb:FFFFFF,g_center,y_${
         startY + i * 60
       },w_${Math.round(w * 0.8)},c_fit`
     );
@@ -72,7 +71,7 @@ export function slideUrl(publicId: string, o: SlideUrlOptions): string {
 
   if (cta) {
     const size = o.aspectRatio === '16:9' ? 44 : 48;
-    overlays.push(`l_text:Arial_${size}_bold:${enc(cta)},co_rgb:FFFFFF,g_south,y_80`);
+    overlays.push(`l_text:Arial_${size}_bold:${encodeOverlayText(cta)},co_rgb:FFFFFF,g_south,y_80`);
   }
 
   const tf = overlays.length ? `/${overlays.join('/')}` : '';

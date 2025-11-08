@@ -1,4 +1,5 @@
 import { edgeHandler } from "../_shared/edgeHandler.ts";
+import { encodeOverlayText } from "../_shared/cloudinaryText.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 /* ===============================
@@ -45,8 +46,7 @@ function hexFromBuffer(buf: ArrayBuffer) {
 
 /** Encode texte pour l’overlay Cloudinary */
 function encodeText(t: string) {
-  // Cloudinary attend un encodage URL strict (espaces inclus)
-  return encodeURIComponent(t).replace(/%20/g, "%20");
+  return encodeOverlayText(t);
 }
 
 /* ===============================
