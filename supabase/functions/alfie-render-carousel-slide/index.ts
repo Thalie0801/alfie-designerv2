@@ -137,7 +137,7 @@ serve(async (req) => {
   console.log("[alfie-render-carousel-slide] v2.4.0 — invoked");
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  if (!INTERNAL_SECRET || req.headers.get("x-internal-secret") !== INTERNAL_SECRET) {
+  if (!INTERNAL_FN_SECRET || req.headers.get("x-internal-secret") !== INTERNAL_FN_SECRET) {
     return json({ error: "Forbidden" }, 403);
   }
 

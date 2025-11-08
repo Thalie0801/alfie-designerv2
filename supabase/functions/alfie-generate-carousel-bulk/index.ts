@@ -249,8 +249,8 @@ serve(async (req) => {
 
         const exec = async () => {
           const headers: Record<string, string> = forwardAuth && authHeader
-            ? { Authorization: authHeader, "X-Internal-Secret": INTERNAL_FN_SECRET }
-            : { "X-Internal-Secret": INTERNAL_FN_SECRET };
+            ? { Authorization: authHeader, "X-Internal-Secret": INTERNAL_FN_SECRET || "" }
+            : { "X-Internal-Secret": INTERNAL_FN_SECRET || "" };
 
           const { data: slideData, error: slideError } = await supabaseAdmin.functions.invoke(
             "alfie-render-carousel-slide",
