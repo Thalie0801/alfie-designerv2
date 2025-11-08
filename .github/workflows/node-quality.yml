@@ -112,6 +112,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+      - name: Force public npm registry
+        run: npm config set registry https://registry.npmjs.org/
 
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
@@ -253,6 +255,7 @@ jobs:
               body += `❌ **Found ${errors} error(s) and ${warnings} warning(s)**\n\n`;
               if (fs.existsSync('typecheck-summary.txt')) {
                 const content = fs.readFileSync('typecheck-summary.txt', 'utf8');
+                body += '<details><summary>First 20 lines</summary>\n\n````\n' + content + '\n````\n</details>\n';
                 body += '<details><summary>First 20 lines</summary>\n\n```\n' + content + '\n```\n</details>\n';
               }
               body += '📥 Full logs in the Actions run.\n';
@@ -331,6 +334,9 @@ jobs:
               body += '📥 Full logs in the Actions run.\n';
             }
             github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+      - name: Warn if lint failed
+        if: steps.lint.outputs.exit_code != '0'
+        run: echo "::warning::ESLint found issues but continuing build"
 
       - name: Warn if lint failed
         if: steps.lint.outputs.exit_code != '0'

@@ -367,6 +367,27 @@ export function AlfieChat() {
     if (canAnnounce) {
       setConversationState("completed");
       finishAnnouncedRef.current = orderId;
+      setConversationState('completed');
+      finishAnnouncedRef.current = orderId;
+      setConversationState('completed');
+      finishAnnouncedRef.current = orderId;
+      setConversationState('completed');
+      finishAnnouncedRef.current = orderId;
+      setConversationState('completed');
+      finishAnnouncedRef.current = orderId;
+    const canAnnounce =
+      conversationState === 'generating' &&
+      (orderTotal ?? 0) > 0 &&
+      orderAssets.length >= (orderTotal ?? 0) &&
+      finishAnnouncedRef.current !== orderId;
+
+    if (canAnnounce) {
+      setConversationState('completed');
+      finishAnnouncedRef.current = orderId!;
+        assetUrl: asset.url,
+        metadata: isCarouselSlide
+          ? { assetUrls: [{ url: asset.url, format: asset.format }] }
+          : undefined
       addMessage({
         role: "assistant",
         content: "🎉 Génération terminée ! Tes visuels sont prêts dans la Bibliothèque.",
@@ -392,6 +413,17 @@ export function AlfieChat() {
     }
      
   }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
+    }
+  }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
+    }
+  }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
+    }
+  }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
+    }
+  }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
+      setQuickReplies(['Voir la bibliothèque', 'Créer un nouveau carrousel']);
+    }
+  }, [orderAssets, orderId, conversationState, orderTotal]);
 
   // Realtime job monitoring (avec garde si l'order change)
   useEffect(() => {
