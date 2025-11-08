@@ -208,7 +208,7 @@ serve(async (req) => {
 
     const body = (await req.json()) as GenerateRequest;
 
-    const secret = req.headers.get("x-internal-secret");
+    const secret = req.headers.get("X-Internal-Secret");
     if (secret !== INTERNAL_FN_SECRET) {
       return jsonRes({ error: "Forbidden" }, { status: 403 });
     }
