@@ -82,8 +82,8 @@ jobs:
             - Passage du flux push ➜ pull request
             - Autopublish désactivé
             - Ajout du flag de confirmation premium
-          branch: codex/refonte-alfie-2025-${{ github.run_id }}
-          base: refonte-alfie-2025
+          branch: codex/main-${{ github.run_id }}
+          base: main
           author: "alfie-codex-bot <codex@alfie.local>"
           committer: "alfie-codex-bot <codex@alfie.local>"
           labels: |
