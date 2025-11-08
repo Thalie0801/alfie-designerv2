@@ -89,6 +89,46 @@ const ASPECT_TO_TW: Record<AspectRatio, string> = {
 
 const CURRENT_JOB_VERSION = 2;
 
+const UNKNOWN_REFRESH_ERROR = "Erreur inconnue pendant le rafraîchissement";
+
+function resolveRefreshErrorMessage(error: unknown): string {
+  if (!error) return UNKNOWN_REFRESH_ERROR;
+
+  if (error instanceof Error && error.message?.trim()) {
+    return error.message;
+  }
+
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+
+  if (typeof error === "object") {
+    const candidate = error as Record<string, unknown>;
+    const status =
+      typeof candidate.status === "number"
+        ? candidate.status
+        : typeof candidate.code === "number"
+          ? candidate.code
+          : undefined;
+
+    const messages: Array<unknown> = [
+      candidate.message,
+      candidate.error_description,
+      candidate.error,
+      candidate.details,
+      candidate.hint,
+    ];
+
+    for (const value of messages) {
+      if (typeof value === "string" && value.trim()) {
+        return status ? `${value} (code ${status})` : value;
+      }
+    }
+  }
+
+  return UNKNOWN_REFRESH_ERROR;
+}
+
 function extractMediaUrl(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
 
@@ -234,9 +274,7 @@ export function ChatGenerator() {
       setAssets((assetsResponse.data || []) as MediaEntry[]);
     } catch (err) {
       console.error("[Studio] refetchAll error:", err);
-      setJobs([]);
-      setAssets([]);
-      const message = err instanceof Error ? err.message : "Erreur inconnue pendant le rafraîchissement";
+      const message = resolveRefreshErrorMessage(err);
       setError(message);
     } finally {
       setLoading(false);
