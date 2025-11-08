@@ -4,8 +4,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { uploadTextAsRaw } from "../_shared/cloudinaryUploader.ts";
-
-const INTERNAL_SECRET = Deno.env.get("INTERNAL_FN_SECRET") ?? "";
+import { 
+  SUPABASE_URL, 
+  SUPABASE_SERVICE_ROLE_KEY, 
+  INTERNAL_FN_SECRET,
+  LOVABLE_API_KEY 
+} from "../_shared/env.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -275,7 +279,6 @@ serve(async (req) => {
     // STEP 2/4 — Générer background (Lovable AI)
     // =========================================
     console.log(`[render-slide] ${logCtx} 2/4 Generate background via Lovable AI`);
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
     const enrichedPrompt = buildImagePrompt(globalStyle, prompt);
 
     const aiRes = await fetchWithRetries(

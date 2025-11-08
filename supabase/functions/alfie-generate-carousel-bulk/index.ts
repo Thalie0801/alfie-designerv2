@@ -1,8 +1,11 @@
 // functions/alfie-render-carousel-bulk/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-
-const INTERNAL_SECRET = Deno.env.get("INTERNAL_FN_SECRET") ?? "";
+import { 
+  SUPABASE_URL, 
+  SUPABASE_SERVICE_ROLE_KEY, 
+  INTERNAL_FN_SECRET 
+} from "../_shared/env.ts";
 
 type AspectRatio = "1:1" | "4:5" | "9:16" | "16:9";
 
@@ -47,11 +50,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const supabaseAdmin = createClient(
-  Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-  { auth: { autoRefreshToken: false, persistSession: false } },
-);
+// Validate env at module level
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  console.error("[carousel-bulk] ❌ Missing SUPABASE credentials");
+}
+
+const supabaseAdmin = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(
+      SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+  : null as any;
 
 /** Utilitaires */
 
@@ -135,8 +145,16 @@ serve(async (req) => {
   }
 
   try {
-    if (!INTERNAL_SECRET) {
-      console.error("[Carousel Bulk] Missing INTERNAL_FN_SECRET");
+    if (!INTERNAL_FN_SECRET) {
+      console.error("[Carousel Bulk] ❌ Missing INTERNAL_FN_SECRET");
+      return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    
+    if (!supabaseAdmin) {
+      console.error("[Carousel Bulk] ❌ Supabase client not initialized");
       return new Response(JSON.stringify({ error: "Server misconfigured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -231,8 +249,8 @@ serve(async (req) => {
 
         const exec = async () => {
           const headers: Record<string, string> = forwardAuth && authHeader
-            ? { Authorization: authHeader, "X-Internal-Secret": INTERNAL_SECRET }
-            : { "X-Internal-Secret": INTERNAL_SECRET };
+            ? { Authorization: authHeader, "X-Internal-Secret": INTERNAL_FN_SECRET }
+            : { "X-Internal-Secret": INTERNAL_FN_SECRET };
 
           const { data: slideData, error: slideError } = await supabaseAdmin.functions.invoke(
             "alfie-render-carousel-slide",

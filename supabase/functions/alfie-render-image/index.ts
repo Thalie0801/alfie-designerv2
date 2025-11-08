@@ -2,11 +2,25 @@ import { edgeHandler } from '../_shared/edgeHandler.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { enrichPromptWithBrandKit } from '../_shared/aiOrchestrator.ts';
 import { uploadWithRichMetadata, type RichMetadata } from '../_shared/cloudinaryUploader.ts';
+import { 
+  SUPABASE_URL, 
+  SUPABASE_ANON_KEY, 
+  SUPABASE_SERVICE_ROLE_KEY,
+  INTERNAL_FN_SECRET,
+  LOVABLE_API_KEY 
+} from '../_shared/env.ts';
 
 export default {
   async fetch(req: Request) {
     return edgeHandler(req, async ({ jwt, input }) => {
       if (!jwt) throw new Error('MISSING_AUTH');
+      
+      // ✅ Validate internal secret if present (for worker calls)
+      const internalHeader = req.headers.get("x-internal-secret");
+      if (internalHeader && internalHeader !== INTERNAL_FN_SECRET) {
+        console.error("[alfie-render-image] ❌ Invalid internal secret");
+        throw new Error('FORBIDDEN');
+      }
 
         const { 
         provider, 
@@ -27,14 +41,19 @@ export default {
         globalStyle // ✅ NOUVEAU: style global pour cohérence
       } = input;
 
+      if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY) {
+        console.error("[alfie-render-image] ❌ Missing Supabase credentials");
+        throw new Error('MISSING_ENV');
+      }
+
       const supabaseAdmin = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        SUPABASE_URL,
+        SUPABASE_SERVICE_ROLE_KEY
       );
 
       const supabaseAuth = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_ANON_KEY')!,
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY,
         { global: { headers: { Authorization: `Bearer ${jwt}` } } }
       );
 
@@ -88,8 +107,10 @@ export default {
         }
 
         // 4. Génération IA
-        const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-        if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY_MISSING');
+        if (!LOVABLE_API_KEY) {
+          console.error("[alfie-render-image] ❌ Missing LOVABLE_API_KEY");
+          throw new Error('LOVABLE_API_KEY_MISSING');
+        }
 
         // System prompt de base (orthographe FR, 1 seule image)
         let systemPrompt = `You are a professional image generator for social media content.
