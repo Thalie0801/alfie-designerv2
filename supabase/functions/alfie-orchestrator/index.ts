@@ -888,35 +888,35 @@ serve(async (req) => {
         }
       }
 
-      // Invoke worker (avec timeout)
-      const workerUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/alfie-job-worker`;
+      // Invoke worker via Supabase client
       try {
-        console.log("[ORCH] ▶️ Invoking worker:", workerUrl);
-        const controller = new AbortController();
-        const t = setTimeout(() => controller.abort(), 8000);
-
-        const workerRes = await fetch(workerUrl, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ trigger: "orchestrator", orderId: order.id }),
-          signal: controller.signal,
-        }).catch((e) => {
-          console.error("[ORCH] Worker fetch error:", e);
-          return { ok: false, status: 0 } as any;
+        console.log("[ORCH] ▶️ Invoking alfie-job-worker for order:", order.id);
+        
+        const { data: workerData, error: workerError } = await sb.functions.invoke("alfie-job-worker", {
+          body: { trigger: "orchestrator", orderId: order.id }
         });
-
-        clearTimeout(t);
-
-        if (!workerRes?.ok) {
-          const txt = (await workerRes?.text?.()) || "unknown";
-          console.warn("[ORCH] Worker not ok:", workerRes?.status, txt);
+        
+        if (workerError) {
+          console.error("[ORCH] ❌ Worker invoke error:", workerError);
+          throw new Error(`Worker invoke failed: ${workerError.message}`);
         }
+        
+        console.log("[ORCH] ✅ Worker response:", workerData);
       } catch (e) {
-        console.error("[ORCH] Worker call failed:", e);
+        console.error("[ORCH] ❌ Worker call failed:", e);
+        // Ne pas continuer si le worker échoue
+        return json({ 
+          error: "worker_invocation_failed", 
+          details: e instanceof Error ? e.message : String(e) 
+        }, 500);
       }
+
+      // Log queue status for monitoring
+      const { data: queueStatus } = await sb
+        .from("job_queue")
+        .select("id, status, type")
+        .eq("order_id", order.id);
+      console.log("[ORCH] 📊 Queue status for order:", order.id, queueStatus);
 
       const text = "🚀 Génération lancée ! Je te tiens au courant.";
       await appendMessage(session.id, "assistant", text);

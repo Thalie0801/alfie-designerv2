@@ -152,10 +152,12 @@ function deepGet(obj: any, key: string): any {
 
 // ---------- HTTP Entrypoint ----------
 serve(async (req) => {
+  console.log("[alfie-job-worker] 🚀 Invoked at", new Date().toISOString());
+  
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    console.log("🚀 [Worker] Boot");
+    console.log("🚀 [Worker] Starting job processing...");
 
     // Basic env sanity
     console.log("🧪 env", {
@@ -169,7 +171,7 @@ serve(async (req) => {
       .from("job_queue")
       .select("*", { count: "exact", head: true })
       .eq("status", "queued");
-    console.log("🧪 probe.queue_count", queued ?? 0);
+    console.log("[WORKER] Boot: " + (queued ?? 0) + " jobs queued in job_queue");
 
     // Process a small batch to avoid function timeout
     const results: Array<{ job_id: string; success: boolean; error?: string; retried?: boolean }> = [];
@@ -219,6 +221,27 @@ serve(async (req) => {
         console.log("✅ job_done", { id: job.id, type: job.type });
         processed++;
         results.push({ job_id: job.id, success: true });
+
+        // Check for remaining jobs and reinvoke if needed
+        const { data: remainingJobs } = await supabaseAdmin
+          .from("job_queue")
+          .select("id")
+          .eq("status", "queued")
+          .limit(1);
+
+        if (remainingJobs && remainingJobs.length > 0) {
+          console.log("[alfie-job-worker] 🔁 Remaining jobs detected, reinvoking...");
+          try {
+            const { error: invokeError } = await supabaseAdmin.functions.invoke("alfie-job-worker", {
+              body: { trigger: "self-reinvoke" }
+            });
+            if (invokeError) {
+              console.error("[alfie-job-worker] ⚠️ Reinvoke failed:", invokeError);
+            }
+          } catch (e) {
+            console.error("[alfie-job-worker] ⚠️ Reinvoke error:", e);
+          }
+        }
 
         // Cascade for text → generate children jobs
         if (job.type === "generate_texts") {
@@ -559,7 +582,15 @@ Format: ${aspectRatio} aspect ratio optimized.`;
 }
 
 async function processRenderCarousels(payload: any) {
-  console.log("📚 [processRenderCarousels]");
+  console.log("📚 [processRenderCarousels] START", {
+    hasSlides: !!payload?.slides,
+    slidesCount: Array.isArray(payload?.slides) ? payload.slides.length : 0,
+    hasBrief: !!payload?.brief,
+    briefCount: payload?.brief?.briefs?.length || 0,
+    userId: payload?.userId,
+    brandId: payload?.brandId,
+    orderId: payload?.orderId
+  });
 
   if (Array.isArray(payload?.slides) && payload.slides.length > 0) {
     const { userId, brandId, orderId } = payload || {};
