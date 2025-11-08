@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { getAuthHeader } from '@/lib/auth';
+import { callEdge } from '@/lib/edgeClient';
 import { useAuth } from '@/hooks/useAuth';
 
 export type QueueMonitorPayload = {
@@ -25,10 +25,12 @@ export function useQueueMonitor(enabled: boolean) {
     setLoading(true);
     setError(null);
     try {
-      const headers = await getAuthHeader();
-      const { data, error } = await supabase.functions.invoke('queue-monitor', { headers });
-      if (error) throw error;
-      setData(data as QueueMonitorPayload);
+      const response = await callEdge<QueueMonitorPayload>('queue-monitor', {}, { silent: true });
+      if (response.ok && response.data) {
+        setData(response.data);
+      } else {
+        throw new Error(response.error || 'Monitoring indisponible');
+      }
     } catch (e: any) {
       setError(e?.message || 'Monitoring indisponible');
     } finally {
