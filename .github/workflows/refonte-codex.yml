@@ -31,7 +31,7 @@ jobs:
           cache: 'npm'
 
       - name: Configure npm auth (optional)
-        if: ${{ secrets.NPM_TOKEN }}
+        if: ${{ secrets.NPM_TOKEN != '' }}
         run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -45,7 +45,7 @@ jobs:
         run: |
           bash scripts/codex/run.sh
 
-      # GARDE SIMPLE & FIABLE : bloque toute modif dans apps/landing/, www/, site/
+      # GARDE SIMPLE & FIABLE bloque toute modif dans apps/landing/, www/, site/
       - name: "Guard: No landing changes"
         shell: bash
         run: |
@@ -94,4 +94,5 @@ jobs:
             automated
             codex
           draft: false
+
 
