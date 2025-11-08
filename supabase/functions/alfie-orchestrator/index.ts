@@ -161,7 +161,7 @@ serve(async (req) => {
             brief_json: {
               video: { aspectRatio, durationSec: duration, prompt: promptText, sourceUrl },
             },
-            status: "pending",
+            status: "draft",
           })
           .select()
           .single();
@@ -224,7 +224,7 @@ serve(async (req) => {
             brand_id: brand_id,
             campaign_name: `Image_${Date.now()}`,
             brief_json: { image: { prompt: promptText, sourceUrl } },
-            status: "pending",
+            status: "draft",
           })
           .select()
           .single();
@@ -293,7 +293,7 @@ serve(async (req) => {
             brand_id: brand_id,
             campaign_name: `Carousel_${Date.now()}`,
             brief_json: { carousel: { slides } },
-            status: "pending",
+            status: "draft",
           })
           .select()
           .single();
@@ -460,7 +460,7 @@ serve(async (req) => {
             brand_id: brand_id,
             campaign_name: `Video_${Date.now()}`,
             brief_json: { video: v },
-            status: "pending",
+            status: "draft",
           })
           .select()
           .single();
