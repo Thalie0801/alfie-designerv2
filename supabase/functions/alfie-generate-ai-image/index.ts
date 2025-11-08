@@ -1,8 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
-const INTERNAL_SECRET = Deno.env.get("INTERNAL_FN_SECRET") ?? "";
-
 /* ------------------------------- CORS ------------------------------- */
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -195,21 +193,24 @@ serve(async (req) => {
     return jsonRes({ error: "Method not allowed" }, { status: 405 });
   }
 
-  if (!INTERNAL_SECRET || req.headers.get("x-internal-secret") !== INTERNAL_SECRET) {
-    return jsonRes({ error: "Forbidden" }, { status: 403 });
-  }
-
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const INTERNAL = Deno.env.get("INTERNAL_FN_SECRET");
 
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error("Supabase env not configured");
     }
+    if (!INTERNAL) throw new Error("INTERNAL_FN_SECRET not configured");
 
     const body = (await req.json()) as GenerateRequest;
+
+    const secret = req.headers.get("x-internal-secret");
+    if (secret !== INTERNAL) {
+      return jsonRes({ error: "Forbidden" }, { status: 403 });
+    }
 
     const userId = typeof body.userId === "string" ? body.userId : null;
     const brandId = typeof body.brandId === "string" ? body.brandId : null;
@@ -231,8 +232,9 @@ serve(async (req) => {
     const fullPrompt = buildMainPrompt(body);
     const negative = buildNegativePrompt(body);
 
+    const referenceImage =
+      body.uploadedSourceUrl?.trim() || body.templateImageUrl?.trim() || null;
     const userContent: any[] = [{ type: "text", text: fullPrompt }];
-    const referenceImage = body.templateImageUrl?.trim() || body.uploadedSourceUrl?.trim();
     if (referenceImage) {
       userContent.push({ type: "image_url", image_url: { url: referenceImage } });
     }
@@ -269,8 +271,8 @@ serve(async (req) => {
         fullPrompt +
         "\n\nIMPORTANT: You MUST return an image. Generate a single canvas, no tiles, no grids, no multiple frames. One composition.";
       const retryContent = [{ type: "text", text: retryPrompt }] as any[];
-      if (body.templateImageUrl?.trim()) {
-        retryContent.push({ type: "image_url", image_url: { url: body.templateImageUrl } });
+      if (referenceImage) {
+        retryContent.push({ type: "image_url", image_url: { url: referenceImage } });
       }
       if (negative) retryContent.push({ type: "text", text: `Negative prompt: ${negative}` });
 
