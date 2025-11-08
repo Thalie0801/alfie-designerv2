@@ -39,24 +39,11 @@ function dims(ar?: AspectRatio) {
 
 const enc = (s: string) => encodeURIComponent(s);
 
-const CONTROL_CHAR_REGEX = /[\u0000-\u0008\u000B-\u001F\u007F]/g;
 const MAX_TITLE_LEN = 120;
 const MAX_SUBTITLE_LEN = 220;
 const MAX_BULLET_LEN = 80;
 const MAX_CTA_LEN = 60;
 
-function sanitizeText(value: string | undefined, maxLen: number): string {
-  let sanitized = (value ?? "").replace(CONTROL_CHAR_REGEX, "");
-  sanitized = sanitized.normalize("NFC").replace(/[ \t\f\v]+/g, " ").trim();
-  if (!sanitized) return "";
-  if (sanitized.length > maxLen) {
-    sanitized = `${sanitized.slice(0, maxLen - 1).trimEnd()}…`;
-  }
-  return sanitized;
-}
-
-function encodeText(value: string | undefined, maxLen: number): string | null {
-  const cleaned = sanitizeText(value, maxLen);
 function prepareOverlayText(value: string | undefined, maxLen: number): string | null {
   const cleaned = cleanText(value ?? "", maxLen);
   if (!cleaned) return null;
@@ -66,12 +53,6 @@ function prepareOverlayText(value: string | undefined, maxLen: number): string |
 }
 
 function sanitizeColor(hex: string | undefined, fallback: string): string {
-  const trimmed = (hex ?? fallback).trim().replace(/^#/, "");
-  return trimmed.length ? trimmed : fallback;
-}
-
-function sanitizeFont(font: string | undefined): string {
-  return (font ?? "Nunito").trim().replace(/\s+/g, "%20");
   const value = (hex ?? fallback).trim().replace(/^#/, "");
   return value.length ? value : fallback;
 }
@@ -99,21 +80,6 @@ function overlayWidth(totalWidth: number, ratio: AspectRatio | undefined, kind: 
   return Math.round(totalWidth * multiplier);
 }
 
-const buildTextOverlay = (options: {
-  font: string;
-  size: number;
-  encodedText: string | null;
-  color: string;
-  gravity: "north" | "center" | "south";
-  y: number;
-  width: number;
-  bold?: boolean;
-}) => {
-  if (!options.encodedText) return null;
-  const weight = options.bold ? `_bold` : "";
-  return `l_text:${options.font}_${options.size}${weight}:${options.encodedText},co_rgb:${options.color},g_${options.gravity},y_${options.y},w_${options.width},c_fit`;
-};
-
 /**
  * Génère une URL Cloudinary AVEC overlays texte.
  * Le texte vient des champs du payload (title/subtitle/bullets/cta) – pas de “intent”.
@@ -131,69 +97,12 @@ export function slideUrl(publicId: string, o: SlideUrlOptions = {}): string {
   const font = sanitizeFont(o.fontFamily);
   const color = sanitizeColor(o.textColorHex, "FFFFFF");
   const subColor = sanitizeColor(o.subTextColorHex, "E5E7EB");
-  const color = sanitizeColor(o.textColorHex, "FFFFFF");
-  const subColor = sanitizeColor(o.subTextColorHex, "E5E7EB");
-  const font = sanitizeFont(o.fontFamily);
 
   const titleSize = o.aspectRatio === "9:16" ? 80 : o.aspectRatio === "16:9" ? 64 : 72;
   const subtitleSize = o.aspectRatio === "9:16" ? 52 : o.aspectRatio === "16:9" ? 38 : 42;
   const bulletSize = o.aspectRatio === "16:9" ? 32 : 36;
   const ctaSize = o.aspectRatio === "16:9" ? 44 : 48;
 
-  const titleOverlay = buildTextOverlay({
-    font,
-    size: titleSize,
-    encodedText: encodeText(o.title, MAX_TITLE_LEN),
-    color,
-    gravity: "north",
-    y: o.aspectRatio === "9:16" ? 140 : 120,
-    width: overlayWidth(w, o.aspectRatio, "title"),
-    bold: true,
-  });
-  if (titleOverlay) overlays.push(titleOverlay);
-
-  const subtitleOverlay = buildTextOverlay({
-    font,
-    size: subtitleSize,
-    encodedText: encodeText(o.subtitle, MAX_SUBTITLE_LEN),
-    color: subColor,
-    gravity: "north",
-    y: o.aspectRatio === "9:16" ? 220 : 140,
-    width: overlayWidth(w, o.aspectRatio, "subtitle"),
-  });
-  if (subtitleOverlay) overlays.push(subtitleOverlay);
-
-  const bulletTexts = (o.bulletPoints ?? [])
-    .map((bullet) => sanitizeText(bullet, MAX_BULLET_LEN))
-    .filter((bullet): bullet is string => bullet.length > 0)
-    .slice(0, 6);
-
-  const bulletStartY = o.aspectRatio === "9:16" ? 380 : 300;
-  const bulletStep = o.aspectRatio === "16:9" ? 54 : 60;
-  bulletTexts.forEach((bullet, index) => {
-    const overlay = buildTextOverlay({
-      font,
-      size: bulletSize,
-      encodedText: encodeText(`• ${bullet}`, MAX_BULLET_LEN + 2),
-      color,
-      gravity: "center",
-      y: bulletStartY + index * bulletStep,
-      width: overlayWidth(w, o.aspectRatio, "bullets"),
-    });
-    if (overlay) overlays.push(overlay);
-  });
-
-  const ctaOverlay = buildTextOverlay({
-    font,
-    size: ctaSize,
-    encodedText: encodeText(o.cta, MAX_CTA_LEN),
-    color,
-    gravity: "south",
-    y: o.aspectRatio === "9:16" ? 120 : 80,
-    width: overlayWidth(w, o.aspectRatio, "cta"),
-    bold: true,
-  });
-  if (ctaOverlay) overlays.push(ctaOverlay);
   const titleY = o.aspectRatio === "9:16" ? 140 : 120;
   const subtitleY = o.aspectRatio === "9:16" ? 220 : 140;
   const bulletStartY = o.aspectRatio === "9:16" ? 380 : 300;

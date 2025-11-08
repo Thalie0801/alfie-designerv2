@@ -1,25 +1,12 @@
 // src/features/studio/ChatGenerator.tsx
-import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { Upload, Wand2, Download, X, Sparkles, Loader2, AlertCircle, CheckCircle, Clock } from "lucide-react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabaseClient";
-import { useToast } from "@/hooks/use-toast";
-import { uploadToChatBucket } from "@/lib/chatUploads";
-import { useLocation, useNavigate } from "react-router-dom";
-import { useBrandKit } from "@/hooks/useBrandKit";
+import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { useQueueMonitor } from "@/hooks/useQueueMonitor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { buildJobIdempotencyKey } from "@/lib/jobs/idempotency";
-
-type GeneratedAsset = { url: string; type: "image" | "video" };
-type AspectRatio = "1:1" | "9:16" | "16:9";
-type ContentType = "image" | "video";
-
-type UploadedSource = { type: "image" | "video"; url: string; name: string };
 
 type JobEntry = {
   id: string;
@@ -54,30 +41,6 @@ type MediaEntry = {
   created_at: string;
 };
 
-const PROMPT_EXAMPLES = {
-  image: [
-    "Une plage tropicale au coucher du soleil avec des palmiers",
-    "Un café parisien avec des tables en terrasse, style aquarelle",
-    "Un paysage de montagne enneigé avec un lac gelé",
-    "Une rue animée de Tokyo la nuit avec des néons",
-  ],
-  video: [
-    "Une cascade qui coule dans une forêt tropicale",
-    "Des nuages qui défilent rapidement au-dessus d'une ville",
-    "Un feu de camp qui crépite la nuit sous les étoiles",
-    "Une route qui traverse un désert au lever du soleil",
-  ],
-};
-
-const MEDIA_URL_KEYS = ["imageUrl", "image_url", "url", "outputUrl", "output_url", "videoUrl", "video_url"] as const;
-
-const ASPECT_TO_TW: Record<AspectRatio, string> = {
-  "1:1": "aspect-square",
-  "9:16": "aspect-[9/16]",
-  "16:9": "aspect-video",
-};
-
-const CURRENT_JOB_VERSION = 2;
 const UNKNOWN_REFRESH_ERROR = "Erreur inconnue pendant le rafraîchissement";
 
 function resolveRefreshErrorMessage(error: unknown): string {
@@ -99,49 +62,20 @@ function resolveRefreshErrorMessage(error: unknown): string {
   return UNKNOWN_REFRESH_ERROR;
 }
 
-function extractMediaUrl(payload: unknown): string | null {
-  if (!payload || typeof payload !== "object") return null;
-  const obj = payload as Record<string, unknown>;
-
-  for (const key of MEDIA_URL_KEYS) {
-    const v = obj[key as keyof typeof obj];
-    if (typeof v === "string" && v.trim()) return v.trim();
-  }
-  for (const v of Object.values(obj)) {
-    if (typeof v === "object" && v !== null) {
-      const nested = extractMediaUrl(v);
-      if (nested) return nested;
-    }
-  }
-  return null;
-}
-
 export function ChatGenerator() {
-  const { activeBrandId } = useBrandKit();
   const location = useLocation();
-  const navigate = useNavigate();
 
   const orderId = useMemo(() => new URLSearchParams(location.search).get("order"), [location.search]) || null;
 
-  const orderLabel = useMemo(() => (orderId ? `Commande ${orderId}` : "Toutes les commandes"), [orderId]);
-
-  const [prompt, setPrompt] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [contentType, setContentType] = useState<ContentType>("image");
-  const [uploadedSource, setUploadedSource] = useState<UploadedSource | null>(null);
-  const [generatedAsset, setGeneratedAsset] = useState<GeneratedAsset | null>(null);
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
   const [jobs, setJobs] = useState<JobEntry[]>([]);
-  const [assets, setAssets] = useState<MediaEntry[]>([]);
+  const [_assets, setAssets] = useState<MediaEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [_error, setError] = useState<string | null>(null);
   const [isTriggeringWorker, setIsTriggeringWorker] = useState(false);
 
   const isMountedRef = useRef(true);
   const refetchSeqRef = useRef(0);
   const refetchAbortRef = useRef<AbortController | null>(null);
-
-  const { toast: showToast } = useToast();
 
   // Monitor queue status (affichage ailleurs si besoin)
   useQueueMonitor(true);
@@ -157,28 +91,6 @@ export function ChatGenerator() {
       }),
     [jobs],
   );
-
-  const jobBadgeVariant = (status: string): "default" | "secondary" | "outline" | "destructive" => {
-    switch (status) {
-      case "queued":
-        return "secondary";
-      case "running":
-        return "default";
-      case "failed":
-        return "destructive";
-      case "completed":
-      default:
-        return "outline";
-    }
-  };
-
-  const mediaBadgeVariant = jobBadgeVariant;
-
-  const formatDate = (value: string) => {
-    if (!value) return "";
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
-  };
 
   const refetchAll = useCallback(async () => {
     const requestId = (refetchSeqRef.current += 1);
@@ -323,114 +235,6 @@ export function ChatGenerator() {
       if (channel) supabase.removeChannel(channel);
     };
   }, [refetchAll, loading]);
-
-  const requeueJob = useCallback(
-    async (job: JobEntry) => {
-      try {
-        // 1) parser payload si string
-        let payload: unknown = job.payload ?? null;
-        if (typeof payload === "string" && payload.trim()) {
-          try {
-            payload = JSON.parse(payload);
-          } catch {
-            throw new Error("Impossible de relancer le job: payload invalide");
-          }
-        }
-        if (payload == null) {
-          throw new Error("Impossible de relancer ce job sans payload");
-        }
-
-        // 2) clé d’idempotence (pour le prochain traitement réel)
-        const idempotencyKey = buildJobIdempotencyKey({
-          orderId: job.order_id ?? null,
-          userId: job.user_id,
-          type: job.type,
-          payload,
-        });
-
-        // 3) on remet le **même job** en queued (on n’insère pas un doublon)
-        const { data: updated, error: updateError } = await supabase
-          .from("job_queue")
-          .update({
-            status: "queued",
-            error: null,
-            error_message: null,
-            locked_by: null,
-            started_at: null,
-            attempts: 0,
-            idempotency_key: idempotencyKey,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", job.id)
-          .eq("user_id", job.user_id)
-          .select("id")
-          .maybeSingle();
-
-        if (updateError) throw updateError;
-        if (!updated) throw new Error("Impossible de relancer ce job (introuvable)");
-
-        showToast({
-          title: "Job relancé",
-          description: "Le job a été renvoyé en file d'attente",
-        });
-
-        await refetchAll();
-      } catch (err) {
-        console.error("[Studio] requeueJob error:", err);
-        showToast({
-          title: "Échec du renvoi",
-          description: err instanceof Error ? err.message : "Erreur inconnue lors du renvoi du job",
-          variant: "destructive",
-        });
-      }
-    },
-    [refetchAll, showToast],
-  );
-
-  const cleanupLegacyJobs = useCallback(async () => {
-    const {
-      data: { user: currentUser },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError || !currentUser) return;
-
-    await supabase
-      .from("job_queue")
-      .update({ is_archived: true, archived_at: new Date().toISOString() })
-      .eq("user_id", currentUser.id)
-      .eq("job_version", 1);
-    await refetchAll();
-  }, [refetchAll]);
-
-  const { toast: toastShadcn } = useToast();
-
-  const handleDownload = useCallback(async () => {
-    if (!generatedAsset?.url) return;
-    try {
-      const res = await fetch(generatedAsset.url);
-      if (!res.ok) throw new Error("Téléchargement impossible");
-      const blob = await res.blob();
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = generatedAsset.type === "image" ? "alfie-image.png" : "alfie-video.mp4";
-      a.click();
-      URL.revokeObjectURL(a.href);
-
-      toastShadcn({
-        title: "Téléchargement réussi",
-        description: `${generatedAsset.type === "image" ? "Image" : "Vidéo"} sauvegardée`,
-      });
-    } catch (err: any) {
-      console.error("Download error:", err);
-      toastShadcn({
-        title: "Erreur de téléchargement",
-        description: err.message,
-        variant: "destructive",
-      });
-    }
-  }, [generatedAsset, toastShadcn]);
-
-  const handleExampleClick = (example: string) => setPrompt(example);
 
   // Déclenchement manuel du worker + watchdog
   const handleTriggerWorker = useCallback(async () => {
