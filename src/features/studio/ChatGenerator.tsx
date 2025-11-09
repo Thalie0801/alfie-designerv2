@@ -141,7 +141,7 @@ export function ChatGenerator() {
   const [assets, setAssets] = useState<MediaEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isTriggeringWorker, setIsTriggeringWorker] = useState(false);
+  const [isForcing, setIsForcing] = useState(false);
 
   const { toast: showToast } = useToast();
 
@@ -551,8 +551,9 @@ export function ChatGenerator() {
   };
 
   // ✅ Trigger manual worker
-  const onForce = useCallback(async () => {
-    setIsTriggeringWorker(true);
+  const handleTriggerWorker = useCallback(async () => {
+    if (isForcing) return;
+    setIsForcing(true);
     try {
       const result = await forceProcess();
       const processed =
@@ -562,13 +563,12 @@ export function ChatGenerator() {
       await refetchAll();
     } catch (err) {
       console.error("[Studio] trigger worker error:", err);
-      const message =
-        err instanceof Error ? err.message : "Erreur inconnue";
+      const message = err instanceof Error ? err.message : "Erreur inconnue";
       toast.error(`Forçage échoué: ${message}`);
     } finally {
-      setIsTriggeringWorker(false);
+      setIsForcing(false);
     }
-  }, [forceProcess, refetchAll]);
+  }, [forceProcess, isForcing, refetchAll]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -612,10 +612,10 @@ export function ChatGenerator() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={onForce}
-                disabled={isTriggeringWorker || queueData.counts.queued === 0}
+                onClick={handleTriggerWorker}
+                disabled={isForcing || queueData.counts.queued === 0}
               >
-                {isTriggeringWorker ? (
+                {isForcing ? (
                   <>
                     <Loader2 className="w-3 h-3 mr-2 animate-spin" />
                     Traitement...
@@ -805,14 +805,21 @@ export function ChatGenerator() {
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
                   {stuckJobs.length} job{stuckJobs.length > 1 ? 's' : ''} bloqué{stuckJobs.length > 1 ? 's' : ''} détecté{stuckJobs.length > 1 ? 's' : ''} (&gt;10 min en attente).
-                  <Button 
-                    variant="link" 
+                  <Button
+                    variant="link"
                     size="sm"
                     className="ml-2 h-auto p-0 text-destructive underline"
                     onClick={handleTriggerWorker}
-                    disabled={isTriggeringWorker}
+                    disabled={isForcing}
                   >
-                    Forcer le traitement
+                    {isForcing ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Traitement…
+                      </span>
+                    ) : (
+                      "Forcer le traitement"
+                    )}
                   </Button>
                 </AlertDescription>
               </Alert>
