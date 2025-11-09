@@ -1,13 +1,14 @@
-import { useState, useEffect, useMemo, type MouseEvent } from "react";
+import React, { MouseEvent } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Download, Trash2, PlayCircle, Image as ImageIcon, AlertCircle } from "lucide-react";
+import { Trash2, PlayCircle, Image as ImageIcon, AlertCircle } from "lucide-react";
 import { LibraryAsset } from "@/hooks/useLibraryAssets";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { toThumbUrl, toOriginalUrl, toDownloadUrl } from "@/lib/cloudinary/url";
 
 interface AssetCardProps {
   asset: LibraryAsset;
@@ -39,14 +40,14 @@ function safeTimeAgo(dateISO?: string | null) {
 }
 
 export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, daysUntilExpiry }: AssetCardProps) {
-  const [imageError, setImageError] = useState(false);
+  const [imageError, setImageError] = React.useState(false);
 
   // Reset l'état d'erreur si l’URL change
-  useEffect(() => {
+  React.useEffect(() => {
     setImageError(false);
   }, [asset.output_url, asset.thumbnail_url, asset.type]);
 
-  const expiryBadge = useMemo(() => {
+  const expiryBadge = React.useMemo(() => {
     if (daysUntilExpiry < 0) {
       return (
         <Badge variant="destructive" className="text-xs">
@@ -76,24 +77,30 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
   const fileSize = formatFileSize((asset as any).file_size_bytes);
   const engine = (asset.engine || "").toString();
 
-  const downloadDisabled = asset.type === "video" && !asset.output_url;
+  // URLs preview / open / download (une seule version)
+  const previewSrc =
+    asset.thumbnail_url ?? (asset.url ? toThumbUrl(asset.url) : undefined);
+
+  const openHref = asset.url ? toOriginalUrl(asset.url) : undefined;
+
+  // Priorité: fichier final vidéo si présent, sinon l'original
+  const downloadHref = asset.output_url
+    ? toDownloadUrl(asset.output_url)
+    : asset.url
+      ? toDownloadUrl(asset.url)
+      : undefined;
 
   const handleDownloadClick = (event: MouseEvent<HTMLAnchorElement>) => {
-    event.preventDefault();
+    // ne pas propager au clic sur la carte
     event.stopPropagation();
+    // pas de preventDefault: on veut que le navigateur télécharge
 
-    if (downloadDisabled) {
+    if (!downloadHref) {
       return;
     }
 
     onDownload();
   };
-
-  const downloadClasses = cn(
-    buttonVariants({ variant: "outline", size: "sm" }),
-    "flex-1",
-    downloadDisabled && "pointer-events-none opacity-50"
-  );
 
   return (
     <Card className={`group hover:shadow-lg transition-all ${selected ? "ring-2 ring-primary" : ""}`}>
@@ -132,15 +139,15 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
                 <video
                   src={asset.output_url}
                   className="w-full h-full object-cover"
-                  poster={asset.thumbnail_url || undefined}
+                  poster={previewSrc || undefined}
                   preload="metadata"
                   controls
                   onError={() => setImageError(true)}
                   aria-label="Aperçu vidéo"
                 />
-              ) : asset.thumbnail_url && !imageError ? (
+              ) : previewSrc && !imageError ? (
                 <img
-                  src={asset.thumbnail_url}
+                  src={previewSrc}
                   alt="Miniature vidéo"
                   className="w-full h-full object-cover"
                   onError={() => setImageError(true)}
@@ -173,9 +180,9 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
                   onError={() => setImageError(true)}
                   loading="lazy"
                 />
-              ) : asset.thumbnail_url && !imageError ? (
+              ) : previewSrc && !imageError ? (
                 <img
-                  src={asset.thumbnail_url}
+                  src={previewSrc}
                   alt="Miniature"
                   className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
                   onError={() => setImageError(true)}
@@ -210,17 +217,43 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
       </CardContent>
 
       <CardFooter className="p-3 pt-0 gap-2">
-        <a
-          href={asset.output_url || asset.thumbnail_url || "#"}
-          download
-          className={downloadClasses}
-          onClick={handleDownloadClick}
-          title={asset.type === "video" && !asset.output_url ? "Vidéo en cours de génération" : "Télécharger"}
-          aria-disabled={downloadDisabled || undefined}
-        >
-          <Download className="h-4 w-4 mr-2" />
-          {asset.type === "video" && !asset.output_url ? "En génération…" : "Télécharger"}
-        </a>
+        <div className="flex flex-1 items-center gap-2">
+          <div className="flex items-center gap-2">
+            {/* Ouvrir */}
+            <a
+              href={openHref}
+              target="_blank"
+              rel="noopener"
+              onClick={(event) => event.stopPropagation()}
+              className={cn(
+                "inline-flex items-center gap-1 px-3 py-2 rounded-lg border text-sm",
+                openHref
+                  ? "hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                  : "pointer-events-none opacity-50"
+              )}
+              aria-disabled={!openHref}
+            >
+              {/* Icône si besoin */}
+              Ouvrir l’asset
+            </a>
+
+            {/* Télécharger */}
+            <a
+              href={downloadHref}
+              download
+              onClick={handleDownloadClick}
+              className={cn(
+                "inline-flex items-center gap-1 px-3 py-2 rounded-lg border text-sm",
+                downloadHref
+                  ? "hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                  : "pointer-events-none opacity-50"
+              )}
+              aria-disabled={!downloadHref}
+            >
+              Télécharger
+            </a>
+          </div>
+        </div>
         <Button
           size="sm"
           variant="ghost"
