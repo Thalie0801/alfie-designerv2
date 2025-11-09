@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { slideUrl } from "@/lib/cloudinary/imageUrls";
 import { extractCloudNameFromUrl } from "@/lib/cloudinary/utils";
-import { generateCarouselVideoFromLibrary } from "@/lib/cloudinary/carouselToVideo";
 import { cn } from "@/lib/utils";
 
 interface CarouselSlide {
@@ -44,6 +43,7 @@ function resolveCloudName(slide: CarouselSlide): string | undefined {
 }
 
 type Aspect = "4:5" | "1:1" | "9:16" | "16:9";
+const SUPPORTED_VIDEO_RATIOS = new Set<"9:16" | "16:9" | "1:1">(["9:16", "16:9", "1:1"]);
 function aspectClassFor(format?: string | null) {
   const f = (format || "4:5") as Aspect;
   switch (f) {
@@ -64,7 +64,7 @@ interface CarouselsTabProps {
 }
 
 export function CarouselsTab({ orderId }: CarouselsTabProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { activeBrandId } = useBrandKit();
   const [slides, setSlides] = useState<CarouselSlide[]>([]);
   const [loading, setLoading] = useState(true);
@@ -223,31 +223,59 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     }
   }, []);
 
-  const handleGenerateVideo = useCallback(async (carouselKey: string, carouselSlides: CarouselSlide[]) => {
-    if (!carouselSlides.length) return;
-    setGeneratingVideo(carouselKey);
-    try {
-      const carouselId = carouselSlides[0]?.carousel_id || undefined;
-      const orderId = carouselSlides[0]?.order_id || undefined;
-      const format = (carouselSlides[0]?.format || "4:5") as Aspect;
+  const handleGenerateVideo = useCallback(
+    async (carouselKey: string, carouselSlides: CarouselSlide[]) => {
+      if (!carouselSlides.length) return;
+      const firstSlide = carouselSlides[0];
+      const brandId =
+        firstSlide?.brand_id || profile?.active_brand_id || activeBrandId || undefined;
+      if (!brandId) {
+        toast.error("Impossible de déterminer la marque active pour cette vidéo.");
+        return;
+      }
 
-      const url = await generateCarouselVideoFromLibrary({
-        carouselId,
-        orderId,
-        aspect: format,
-        title: "Mon Carrousel",
-        durationPerSlide: 2,
-      });
-      if (!url) throw new Error("Aucune URL vidéo générée");
-      window.open(url, "_blank");
-      toast.success("Vidéo générée avec succès 🎬");
-    } catch (e: any) {
-      console.error("[CarouselsTab] Video generation error:", e);
-      toast.error(`Échec de la génération : ${e?.message ?? "Erreur inconnue"}`);
-    } finally {
-      setGeneratingVideo(null);
-    }
-  }, []);
+      const ratioInput = (firstSlide?.format || undefined) as
+        | "9:16"
+        | "16:9"
+        | "1:1"
+        | undefined;
+      const ratio: "9:16" | "16:9" | "1:1" = ratioInput && SUPPORTED_VIDEO_RATIOS.has(ratioInput)
+        ? ratioInput
+        : "9:16";
+
+      const carouselId = firstSlide?.carousel_id || undefined;
+      if (!carouselId) {
+        toast.error("Carrousel introuvable pour cette vidéo.");
+        return;
+      }
+
+      setGeneratingVideo(carouselKey);
+      toast.loading("Création de la vidéo en file…", { id: carouselKey });
+      try {
+        const { data, error } = await supabase.functions.invoke("alfie-render-video", {
+          body: {
+            brandId,
+            carouselId,
+            orderId: firstSlide?.order_id ?? null,
+            ratio,
+          },
+        });
+        if (error) throw error;
+        if (data && typeof data === "object" && "error" in data && data.error) {
+          throw new Error(String((data as { error: unknown }).error));
+        }
+        toast.success("Vidéo en file !", { id: carouselKey });
+      } catch (e: any) {
+        console.error("[CarouselsTab] Video generation error:", e);
+        toast.error(`Impossible de créer la vidéo: ${e?.message ?? "Erreur"}`, {
+          id: carouselKey,
+        });
+      } finally {
+        setGeneratingVideo(null);
+      }
+    },
+    [activeBrandId, profile?.active_brand_id],
+  );
 
   // Ouverture individuelle (throttle simple pour éviter les bloqueurs)
   const openIndividually = useCallback((arr: CarouselSlide[]) => {
