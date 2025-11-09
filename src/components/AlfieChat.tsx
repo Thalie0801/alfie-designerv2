@@ -588,6 +588,8 @@ export function AlfieChat() {
     // Retry orchestrator (3 tentatives)
     const maxRetries = 3;
 
+    let lastError: unknown = null;
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const headers = await getAuthHeader();
@@ -708,6 +710,7 @@ export function AlfieChat() {
         inFlightRef.current = false;
         return;
       } catch (error: unknown) {
+        lastError = error;
         console.error(`[Chat] Error (attempt ${attempt}/${maxRetries}):`, error);
         if (attempt < maxRetries) {
           await sleep(backoffMs(attempt));
@@ -717,12 +720,13 @@ export function AlfieChat() {
 
     // Échec toutes tentatives
     if (mountedRef.current) {
+      const errorDetails = lastError ? toErrorMessage(lastError) : "Erreur inconnue";
       addMessage({
         role: "assistant",
         content: "❌ Impossible de lancer la génération après plusieurs tentatives. Réessaie dans quelques instants.",
         type: "text",
       });
-      toast.error("Échec après 3 tentatives");
+      toast.error(`Échec après 3 tentatives : ${errorDetails}`);
       setIsLoading(false);
       inFlightRef.current = false;
     }
