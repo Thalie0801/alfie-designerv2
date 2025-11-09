@@ -1,6 +1,13 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+// Lazy-load Supabase client to avoid crashing before envs are injected
+let supabasePromise: Promise<any> | null = null;
+async function getSupabase() {
+  if (!supabasePromise) {
+    supabasePromise = import('@/integrations/supabase/client').then(m => m.supabase);
+  }
+  return supabasePromise;
+}
 import { isAuthorized as computeIsAuthorized } from '@/utils/authz-helpers';
 import { hasRole } from '@/lib/access';
 import { hasActiveSubscriptionByEmail } from '@/lib/billing';
@@ -39,12 +46,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Vérifier si l'utilisateur a un rôle VIP ou Admin via la DB
-    const { data: rolesData } = await supabase
+    const sb = await getSupabase();
+    const { data: rolesData } = await sb
       .from('user_roles')
       .select('role')
       .eq('user_id', currentUser.id);
     
-    const userRoles = (rolesData || []).map(r => r.role);
+    const userRoles = (rolesData || []).map((r: any) => r.role);
     const isVipOrAdmin = userRoles.includes('vip') || userRoles.includes('admin');
 
     if (isVipOrAdmin) {
@@ -83,7 +91,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const { data: profileData } = await supabase
+    const sb = await getSupabase();
+
+    const { data: profileData } = await sb
       .from('profiles')
       .select('*')
       .eq('id', session.user.id)
@@ -101,16 +111,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.debug('[Auth] refreshProfile: cookies set', { plan, grantedByAdmin });
     }
 
-    const { data: rolesData } = await supabase
+    const { data: rolesData } = await sb
       .from('user_roles')
       .select('role')
       .eq('user_id', session.user.id);
 
-    if (rolesData) setRoles(rolesData.map(r => r.role));
+    if (rolesData) setRoles(rolesData.map((r: any) => r.role));
 
     // Récupérer l'état d'abonnement via la fonction edge
     try {
-      const { data, error } = await supabase.functions.invoke('check-subscription');
+      const { data, error } = await sb.functions.invoke('check-subscription');
       if (!error && data) {
         const isExpired = data.current_period_end ? new Date(data.current_period_end) < new Date() : false;
         setSubscription({
@@ -126,30 +136,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // Set up auth state listener first
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, currentSession) => {
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        
-        // Defer profile fetch with setTimeout
-        if (currentSession?.user) {
-          setTimeout(() => {
-            refreshProfile();
-          }, 0);
-        } else {
-          setProfile(null);
-          setSubscription(null);
-          setRoles([]);
-        }
-      }
-    );
+    let unsub: { unsubscribe: () => void } | null = null;
 
-    // Then check for existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+    (async () => {
+      const sb = await getSupabase();
+      const { data: { subscription } } = sb.auth.onAuthStateChange(
+        (_event: any, currentSession: any) => {
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+          if (currentSession?.user) {
+            setTimeout(() => {
+              refreshProfile();
+            }, 0);
+          } else {
+            setProfile(null);
+            setSubscription(null);
+            setRoles([]);
+          }
+        }
+      );
+      unsub = subscription;
+
+      // Then check for existing session
+      const { data: { session: currentSession } } = await sb.auth.getSession();
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
-      
       if (currentSession?.user) {
         setTimeout(() => {
           refreshProfile().then(() => setLoading(false));
@@ -158,13 +169,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
         setSubscription(null);
       }
-    });
+    })();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      unsub?.unsubscribe?.();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const sb = await getSupabase();
+    const { data, error } = await sb.auth.signInWithPassword({
       email,
       password,
     });
@@ -175,17 +189,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userFromAuth = data.user ?? null;
 
     if (!userFromAuth?.email) {
-      await supabase.auth.signOut();
+      await sb.auth.signOut();
       return { error: new Error('NO_ACTIVE_SUBSCRIPTION') };
     }
 
     // Vérifier si l'utilisateur a un rôle VIP ou Admin via la DB
-    const { data: rolesData } = await supabase
+    const { data: rolesData } = await sb
       .from('user_roles')
       .select('role')
       .eq('user_id', userFromAuth.id);
     
-    const userRoles = (rolesData || []).map(r => r.role);
+    const userRoles = (rolesData || []).map((r: any) => r.role);
     const isVipOrAdmin = userRoles.includes('vip') || userRoles.includes('admin');
 
     if (isVipOrAdmin) {
@@ -203,7 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!hasSubscription) {
       console.debug('[Auth] signIn: no active subscription, signing out');
-      await supabase.auth.signOut();
+      await sb.auth.signOut();
       return { error: new Error('NO_ACTIVE_SUBSCRIPTION') };
     }
 
@@ -212,13 +226,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
+    const sb = await getSupabase();
     const redirectUrl = `${window.location.origin}/`;
 
     // Vérifier qu'une session de paiement validée existe pour cet email
     const {
       data: paymentSession,
       error: paymentError,
-    } = await supabase
+    } = await sb
       .from('payment_sessions')
       .select('*')
       .eq('email', email)
@@ -235,7 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
     }
 
-    const { error, data } = await supabase.auth.signUp({
+    const { error, data } = await sb.auth.signUp({
       email,
       password,
       options: {
@@ -257,7 +272,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    const sb = await getSupabase();
+    await sb.auth.signOut();
   };
 
   // Calculer les statuts VIP et Admin depuis les rôles de la DB
