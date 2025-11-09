@@ -555,23 +555,20 @@ export function ChatGenerator() {
     setIsTriggeringWorker(true);
     try {
       const result = await forceProcess();
-      toast.success("Traitement forcé OK");
-      console.log("forceProcess result:", result);
+      const processed =
+        typeof result?.processed === "number" ? result.processed : 0;
+      toast.success(`Traitement forcé: ${processed} job(s).`);
 
       await refetchAll();
     } catch (err) {
       console.error("[Studio] trigger worker error:", err);
-      toast.error(`Forçage échoué: ${err instanceof Error ? err.message : "Erreur inconnue"}`);
-      toast.success(`Traitement forcé: ${result.processed} job(s).`);
-
-      await refetchAll();
-    } catch (err) {
-      console.error('[Studio] trigger worker error:', err);
-      toast.error(`Forçage échoué: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+      const message =
+        err instanceof Error ? err.message : "Erreur inconnue";
+      toast.error(`Forçage échoué: ${message}`);
     } finally {
       setIsTriggeringWorker(false);
     }
-  }, [refetchAll]);
+  }, [forceProcess, refetchAll]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
