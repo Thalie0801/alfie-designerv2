@@ -1,3 +1,5 @@
+import { fetchJSON } from '@/lib/http';
+import { EDGE_BASE } from '@/lib/env';
 import { supabase } from '@/lib/supabaseSafeClient';
 
 type GenerationResponse = {
@@ -8,19 +10,19 @@ type GenerationResponse = {
 
 type ForceProcessJobsResponse = {
   processed: number;
-  queuedBefore?: number;
-  queuedAfter?: number;
-};
-
-type TriggerJobWorkerResponse = {
-  processed?: number;
-  queuedBefore?: number;
-  queuedAfter?: number;
-  ok?: boolean;
-  error?: string;
+  queuedBefore: number;
+  queuedAfter: number;
 };
 
 export async function createGeneration(brandId: string, payload: unknown) {
+  const edgeResponse = await callEdgeFunction<GenerationResponse & { ok: boolean }>(
+    'alfie-generate',
+    { brand_id: brandId, payload },
+  );
+  if (edgeResponse) {
+    return edgeResponse;
+  }
+
   const { data, error } = await supabase.functions.invoke('alfie-generate', {
     body: { brand_id: brandId, payload },
   });
@@ -42,7 +44,7 @@ export async function createGeneration(brandId: string, payload: unknown) {
     throw wrapped;
   }
   if (!data) {
-    throw new Error("Réponse invalide du backend");
+    throw new Error('Réponse invalide du backend');
   }
   return data as GenerationResponse;
 }
@@ -54,7 +56,19 @@ type SupabaseFunctionError = Error & {
 
 type WorkerError = Error & { status?: number; originalError?: unknown };
 
-export async function forceProcessJobs(): Promise<ForceProcessJobsResponse | undefined> {
+export async function forceProcessJobs(): Promise<ForceProcessJobsResponse> {
+  const edgeResponse = await callEdgeFunction<ForceProcessJobsResponse & { ok: boolean }>(
+    'trigger-job-worker',
+    { source: 'studio-force' },
+  );
+  if (edgeResponse) {
+    return {
+      processed: edgeResponse.processed,
+      queuedBefore: edgeResponse.queuedBefore,
+      queuedAfter: edgeResponse.queuedAfter,
+    };
+  }
+
   const { data, error } = await supabase.functions.invoke('trigger-job-worker', {
     body: { source: 'studio-force' },
   });
@@ -83,18 +97,56 @@ export async function forceProcessJobs(): Promise<ForceProcessJobsResponse | und
     throw wrappedError;
   }
 
-  const payload = data as TriggerJobWorkerResponse | undefined;
-  if (payload && payload.ok === false && payload.error) {
-    throw new Error(`trigger-job-worker: ${payload.error}`);
+  const payload = data as ForceProcessJobsResponse | undefined;
+  if (!payload) {
+    throw new Error('Réponse invalide du backend');
   }
 
-  if (!payload) return undefined;
-
-  const processed = typeof payload.processed === 'number' ? payload.processed : 0;
-
   return {
-    processed,
-    queuedBefore: typeof payload.queuedBefore === 'number' ? payload.queuedBefore : undefined,
-    queuedAfter: typeof payload.queuedAfter === 'number' ? payload.queuedAfter : undefined,
+    processed: typeof payload.processed === 'number' ? payload.processed : 0,
+    queuedBefore: typeof payload.queuedBefore === 'number' ? payload.queuedBefore : 0,
+    queuedAfter: typeof payload.queuedAfter === 'number' ? payload.queuedAfter : 0,
   };
+}
+
+const SUPABASE_EDGE_KEY =
+  import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
+
+async function callEdgeFunction<T>(
+  path: string,
+  body: Record<string, unknown>,
+): Promise<T | null> {
+  if (!EDGE_BASE) {
+    return null;
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const token = session?.access_token;
+  if (!token) {
+    const error = new Error('401 Session expirée. Réauthentification requise.');
+    (error as Error & { status?: number }).status = 401;
+    throw error;
+  }
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    'content-type': 'application/json',
+  };
+
+  if (SUPABASE_EDGE_KEY) {
+    headers.apikey = SUPABASE_EDGE_KEY;
+  }
+
+  const url = `${EDGE_BASE}/${path}`;
+  const response = await fetchJSON<T>(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+    timeoutMs: 60_000,
+  });
+
+  return response;
 }

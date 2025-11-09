@@ -1,126 +1,121 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY, INTERNAL_FN_SECRET } from "../_shared/env.ts";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { cors, fail, ok } from "../_shared/http.ts";
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from "../_shared/env.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED = [
+  "https://lovable.dev",
+  "https://*.lovable.app",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+];
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+let RUNNING = false;
+
+Deno.serve(async (req) => {
+  const headers = cors(req.headers.get("origin"), ALLOWED);
+  if (req.method === "OPTIONS") return ok({ preflight: true }, headers);
+
+  const url = new URL(req.url);
+  if (req.method === "GET" && url.searchParams.get("health") === "1") {
+    return ok({ health: "up" }, headers);
   }
 
+  if (req.method !== "POST") {
+    return fail(405, "Method not allowed", null, headers);
+  }
+
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    return fail(500, "Missing environment configuration", null, headers);
+  }
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    return fail(401, "Missing authorization", null, headers);
+  }
+
+  if (RUNNING) {
+    return fail(409, "Un traitement est déjà en cours", null, headers);
+  }
+
+  RUNNING = true;
   try {
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !INTERNAL_FN_SECRET) {
-      throw new Error("Missing environment configuration");
-    }
-
-    // Verify authentication
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing authorization" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return fail(401, "Unauthorized", authError?.message, headers);
     }
 
     console.log(`[trigger-job-worker] Manual trigger by user ${user.id}`);
 
-    const countQueued = async () => {
-      const { count } = await supabase
-        .from("job_queue")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "queued");
-      return count ?? 0;
-    };
+    const queuedBefore = await countPendingJobs(supabase);
+    console.log(`[trigger-job-worker] queuedBefore=${queuedBefore}`);
 
-    const queuedBefore = await countQueued();
+    const processedNow = await runPendingJobs(supabase);
+    const queuedAfter = await countPendingJobs(supabase);
 
-    if (queuedBefore === 0) {
-      return new Response(
-        JSON.stringify({
-          processed: 0,
-          queuedBefore,
-          queuedAfter: queuedBefore,
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    console.log(`[trigger-job-worker] Found ${queuedBefore} jobs queued, invoking worker...`);
-
-    // Invoke the worker using Supabase client
-    const { data: workerData, error: workerError } = await supabase.functions.invoke(
-      "alfie-job-worker",
-      { body: { trigger: "manual" } },
-    );
-
-    if (workerError) {
-      console.error(`[trigger-job-worker] Worker failed:`, workerError);
-      throw new Error(`Worker invocation failed: ${workerError.message}`);
-    }
-
-    const queuedAfter = await countQueued();
-
-    const extractProcessed = (input: any): number | null => {
-      if (input == null) return null;
-      if (typeof input === "number") return input;
-      if (typeof input === "object") {
-        if (typeof input.processed === "number") return input.processed;
-        if ("data" in input) return extractProcessed((input as any).data);
-      }
-      return null;
-    };
-
-    const workerProcessed = extractProcessed(workerData);
-    const processed = workerProcessed ?? Math.max(queuedBefore - queuedAfter, 0);
+    const processed =
+      typeof processedNow === "number"
+        ? processedNow
+        : Math.max(queuedBefore - queuedAfter, 0);
 
     if (processed === 0 && queuedBefore > 0) {
       console.warn(
-        `[trigger-job-worker] ⚠️ processed=0 with queuedBefore=${queuedBefore}, queuedAfter=${queuedAfter}`,
-        { workerData },
+        `[trigger-job-worker] processed=0 with queuedBefore=${queuedBefore}, queuedAfter=${queuedAfter}`,
       );
     }
 
-    return new Response(
-      JSON.stringify({
-        processed,
-        queuedBefore,
-        queuedAfter,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
-  } catch (error) {
-    console.error("[trigger-job-worker] Error:", error);
-    return new Response(
-      JSON.stringify({
-        ok: false,
-        error: error instanceof Error ? error.message : "Unknown error" 
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return ok({ processed, queuedBefore, queuedAfter }, headers);
+  } catch (e) {
+    const details = e instanceof Error ? e.message : String(e);
+    return fail(500, "Trigger worker failed", details, headers);
+  } finally {
+    RUNNING = false;
   }
 });
+
+async function countPendingJobs(client: SupabaseClient) {
+  const { count, error } = await client
+    .from("job_queue")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "queued");
+
+  if (error) {
+    throw new Error(`countPendingJobs failed: ${error.message}`);
+  }
+
+  return count ?? 0;
+}
+
+async function runPendingJobs(client: SupabaseClient) {
+  const signal = typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+    ? AbortSignal.timeout(55_000)
+    : undefined;
+
+  const { data, error } = await client.functions.invoke("alfie-job-worker", {
+    body: { trigger: "manual" },
+    signal,
+  });
+
+  if (error) {
+    console.error("[trigger-job-worker] Worker failed", error);
+    throw new Error(error.message || "Worker invocation failed");
+  }
+
+  return extractProcessed(data);
+}
+
+function extractProcessed(input: unknown): number | undefined {
+  if (input == null) return undefined;
+  if (typeof input === "number") return input;
+  if (typeof input === "object") {
+    const maybeRecord = input as Record<string, unknown>;
+    if (typeof maybeRecord.processed === "number") return maybeRecord.processed;
+    if ("data" in maybeRecord) {
+      return extractProcessed(maybeRecord.data);
+    }
+  }
+  return undefined;
+}

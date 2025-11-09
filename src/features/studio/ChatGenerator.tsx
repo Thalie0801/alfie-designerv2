@@ -587,7 +587,15 @@ export function ChatGenerator() {
     } catch (err) {
       console.error("[Studio] trigger worker error:", err);
       const errMsg = err instanceof Error ? err.message : "Erreur inconnue";
-      toast.error(`Forçage échoué: ${errMsg}`);
+      const status = err instanceof Error && typeof (err as any).status === "number"
+        ? (err as any).status
+        : undefined;
+
+      if (status === 409 || errMsg.startsWith("409 ")) {
+        toast.info("Un traitement est déjà en cours. Réessaie dans quelques secondes.");
+      } else {
+        toast.error(errMsg);
+      }
     } finally {
       setIsForcing(false);
     }
