@@ -17,12 +17,15 @@ type Asset = {
 type AssetCardProps = {
   asset: Asset;
   className?: string;
+  /** Action pour transformer un carrousel en vidéo */
   onEnqueueVideo?: (asset: Asset) => void;
 };
 
 export function AssetCard({ asset, className, onEnqueueVideo }: AssetCardProps) {
   const hasUrl = Boolean(asset?.url);
   const openHref = hasUrl ? String(asset.url) : undefined;
+
+  // Lien de téléchargement Cloudinary (force le download)
   const downloadHref =
     hasUrl ? `${asset!.url!}${asset!.url!.includes("?") ? "&" : "?"}fl_attachment` : undefined;
 
@@ -38,6 +41,7 @@ export function AssetCard({ asset, className, onEnqueueVideo }: AssetCardProps) 
         className
       )}
     >
+      {/* Aperçu */}
       <div className="aspect-video w-full overflow-hidden rounded-xl bg-neutral-100 dark:bg-neutral-800">
         {isCarousel && asset.coverUrl ? (
           <img
@@ -60,6 +64,7 @@ export function AssetCard({ asset, className, onEnqueueVideo }: AssetCardProps) 
         )}
       </div>
 
+      {/* Métadonnées */}
       <div className="flex items-center justify-between">
         <div className="min-w-0">
           <div className="text-sm font-medium truncate">
@@ -75,7 +80,9 @@ export function AssetCard({ asset, className, onEnqueueVideo }: AssetCardProps) 
         </div>
       </div>
 
+      {/* Actions */}
       <div className="flex items-center gap-2">
+        {/* Ouvrir */}
         <a
           href={openHref}
           target="_blank"
@@ -90,6 +97,7 @@ export function AssetCard({ asset, className, onEnqueueVideo }: AssetCardProps) 
           Ouvrir l’asset
         </a>
 
+        {/* Télécharger */}
         <a
           href={downloadHref}
           download
@@ -103,6 +111,7 @@ export function AssetCard({ asset, className, onEnqueueVideo }: AssetCardProps) 
           Télécharger
         </a>
 
+        {/* Transformer en vidéo (carrousel uniquement) */}
         {isCarousel && typeof onEnqueueVideo === "function" && (
           <button
             type="button"
