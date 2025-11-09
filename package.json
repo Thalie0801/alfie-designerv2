@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "verify:trycatch": "node scripts/verify-trycatch.js",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "maintain:old-prs": "node scripts/maintain-old-prs.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
