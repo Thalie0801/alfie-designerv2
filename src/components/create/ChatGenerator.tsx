@@ -361,14 +361,25 @@ export function ChatGenerator() {
         return;
       }
 
+      if (!brandKit?.id) {
+        toast.error("Sélectionnez une marque avant de générer.");
+        return;
+      }
+
       if (contentType === "image") {
         const promptText = prompt || "Creative social image";
         const referenceUrl = uploadedSource?.type === "image" ? uploadedSource.url : undefined;
+        const safeRatio: "1:1" | "9:16" | "16:9" | "3:4" =
+          aspectRatio === "1:1" || aspectRatio === "9:16" || aspectRatio === "16:9" || aspectRatio === "3:4"
+            ? aspectRatio
+            : "1:1";
 
         const imageUrl = await generateImage({
           prompt: promptText,
+          brandId: brandKit.id,
+          ratio: safeRatio,
+          mode: "image",
           imageUrl: referenceUrl,
-          brandId: brandKit?.id ?? undefined,
         });
 
         setGeneratedAsset({

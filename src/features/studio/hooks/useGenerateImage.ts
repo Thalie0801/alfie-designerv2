@@ -1,94 +1,58 @@
-import { z } from "zod";
+import { supabase } from "@/lib/supabaseClient";
 
-function createTimeoutAbort(signal?: AbortSignal, timeoutMs?: number) {
-  const controller = new AbortController();
-  const timeout = timeoutMs ?? 60000;
-  const timerId = setTimeout(() => controller.abort(), timeout);
-
-  let abortListener: (() => void) | undefined;
-  if (signal) {
-    if (signal.aborted) {
-      controller.abort();
-    } else {
-      abortListener = () => controller.abort();
-      signal.addEventListener("abort", abortListener);
+async function fetchJSON<T>(url: string, init: RequestInit & { timeoutMs?: number } = {}) {
+  const { timeoutMs = 60000, ...rest } = init;
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...rest, signal: ctrl.signal });
+    const isJSON = (res.headers.get("content-type") || "").includes("application/json");
+    const data = isJSON ? await res.json() : await res.text();
+    if (!res.ok) {
+      const msg = isJSON ? (data?.message || res.statusText) : res.statusText;
+      const details = isJSON ? data?.details || "" : typeof data === "string" ? data : "";
+      throw new Error(`${res.status} ${msg}${details ? " — " + JSON.stringify(details).slice(0, 200) : ""}`);
     }
+    return data as T;
+  } finally {
+    clearTimeout(id);
   }
-
-  const cleanup = () => {
-    clearTimeout(timerId);
-    if (signal && abortListener) {
-      signal.removeEventListener("abort", abortListener);
-    }
-  };
-
-  return { controller, cleanup };
 }
 
-export function fetchWithTimeout(
-  input: RequestInfo,
-  init: RequestInit & { timeoutMs?: number } = {},
-) {
-  const { timeoutMs = 60000, signal, ...rest } = init;
-  const { controller, cleanup } = createTimeoutAbort(signal, timeoutMs);
-
-  return fetch(input, { ...rest, signal: controller.signal }).finally(cleanup);
-}
-
-const SyncSchema = z.object({
-  imageUrl: z.string().url(),
-  assetId: z.string().optional(),
-  meta: z.any().optional(),
-});
-
-const AsyncSchema = z.object({
-  jobId: z.string(),
-});
-
-const JobSchema = z.object({
-  status: z.enum(["queued", "running", "done", "error"]),
-  imageUrl: z.string().url().optional(),
-  error: z.string().optional(),
-});
+type SyncResp = { imageUrl: string };
+type AsyncResp = { jobId: string };
 
 export async function generateImage(payload: {
   prompt: string;
+  brandId: string;
+  ratio: "1:1" | "9:16" | "16:9" | "3:4";
+  mode: "image" | "video";
   imageUrl?: string;
-  brandId?: string;
+  imageBase64?: string;
 }) {
-  const res = await fetchWithTimeout("/api/generate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    timeoutMs: 60000,
+  const { data, error } = await supabase.functions.invoke<SyncResp | AsyncResp>("alfie-generate", {
+    body: payload,
+    headers: { "content-type": "application/json" },
   });
+  if (error) throw new Error(error.message || "Edge Function error");
 
-  if (res.status === 200) {
-    const data = await res.json();
-    const parsed = SyncSchema.safeParse(data);
-    if (!parsed.success) throw new Error("Réponse invalide: pas d'imageUrl");
-    return parsed.data.imageUrl;
+  if ((data as SyncResp | undefined)?.imageUrl) {
+    return (data as SyncResp).imageUrl;
   }
 
-  if (res.status === 202) {
-    const { jobId } = AsyncSchema.parse(await res.json());
+  if ((data as AsyncResp | undefined)?.jobId) {
     const started = Date.now();
-    const POLL_EVERY = 1500;
-    const POLL_TIMEOUT = 90_000;
-
-    while (Date.now() - started < POLL_TIMEOUT) {
-      await new Promise((resolve) => setTimeout(resolve, POLL_EVERY));
-      const jobResponse = await fetchWithTimeout(`/api/jobs/${jobId}`, {
-        method: "GET",
-        timeoutMs: 60000,
-      });
-      const job = JobSchema.parse(await jobResponse.json());
+    while (Date.now() - started < 90_000) {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      const job = await fetchJSON<{ status: string; imageUrl?: string; error?: string }>(
+        `/api/jobs/${(data as AsyncResp).jobId}`,
+        { method: "GET", timeoutMs: 15_000 },
+      );
       if (job.status === "done" && job.imageUrl) return job.imageUrl;
-      if (job.status === "error") throw new Error(job.error ?? "Génération échouée");
+      if (job.status === "error") throw new Error(job.error || "Génération échouée");
     }
-    throw new Error("Timeout: génération trop longue");
+    throw new Error("Timeout: la génération prend trop de temps");
   }
 
-  const text = await res.text().catch(() => "");
-  throw new Error(`Génération a échoué: ${res.status} ${res.statusText} — ${text}`);
+  throw new Error("Réponse inattendue de alfie-generate (ni imageUrl ni jobId).");
 }

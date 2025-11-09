@@ -45,11 +45,12 @@ type JobEntry = {
 type MediaEntry = {
   id: string;
   type: string;
-  status: string;
-  output_url: string | null;
-  thumbnail_url?: string | null;
+  cloudinary_url: string | null;
   metadata?: Record<string, any> | null;
   created_at: string;
+  brand_id?: string | null;
+  order_id?: string | null;
+  status?: string | null;
 };
 
 // Exemples de prompts suggérés (Phase 3)
@@ -112,6 +113,21 @@ function resolveRefreshErrorMessage(error: unknown): string {
   }
 
   return UNKNOWN_REFRESH_ERROR;
+}
+
+function fetchWithTimeoutPromise<T>(promise: Promise<T>, ms: number) {
+  return new Promise<T>((resolve, reject) => {
+    const id = setTimeout(() => reject(new Error("Timeout: La requête prend trop de temps")), ms);
+    promise
+      .then((value) => {
+        clearTimeout(id);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(id);
+        reject(error);
+      });
+  });
 }
 
 export function ChatGenerator() {
@@ -220,39 +236,32 @@ export function ChatGenerator() {
       if (authError) throw authError;
       if (!currentUser) throw new Error("Non authentifié");
 
-      // ✅ Simplifier les requêtes pour éviter les timeouts
       let jobsQuery = supabase
         .from("job_queue")
         .select("id, type, status, order_id, created_at, updated_at, error, payload, user_id, retry_count")
         .eq("user_id", currentUser.id)
         .order("created_at", { ascending: false })
-        .limit(30);
+        .limit(50);
 
       let assetsQuery = supabase
-        .from("media_generations")
-        .select("id, type, status, output_url, thumbnail_url, metadata, created_at")
+        .from("library_assets")
+        .select("id, type, cloudinary_url, created_at, brand_id, order_id, metadata")
         .eq("user_id", currentUser.id)
         .order("created_at", { ascending: false })
-        .limit(30);
+        .limit(50);
 
       if (orderId) {
         jobsQuery = jobsQuery.eq("order_id", orderId);
+        assetsQuery = assetsQuery.eq("order_id", orderId);
       }
 
-      const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error("Timeout: La requête prend trop de temps")), 10000)
-      );
-
-      const [jobsResponse, assetsResponse] = await Promise.race([
-        Promise.all([jobsQuery, assetsQuery]),
-        timeoutPromise
-      ]);
+      const [jobsResponse, assetsResponse] = await Promise.all([jobsQuery, assetsQuery]);
 
       if (jobsResponse.error) throw jobsResponse.error;
       if (assetsResponse.error) throw assetsResponse.error;
 
       setJobs((jobsResponse.data as JobEntry[]) ?? []);
-      setAssets((assetsResponse.data || []) as MediaEntry[]);
+      setAssets((assetsResponse.data as MediaEntry[]) ?? []);
     } catch (err) {
       console.error("[Studio] refetchAll error:", err);
       const message = resolveRefreshErrorMessage(err);
@@ -271,12 +280,12 @@ export function ChatGenerator() {
     const debouncedRefetch = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
-        if (mounted) void refetchAll();
+        if (mounted) void fetchWithTimeoutPromise(refetchAll(), 15000);
       }, 1000);
     };
 
     (async () => {
-      await refetchAll();
+      await fetchWithTimeoutPromise(refetchAll(), 15000);
 
       const {
         data: { user: currentUser },
@@ -302,7 +311,7 @@ export function ChatGenerator() {
         )
         .on(
           "postgres_changes",
-          { event: "*", schema: "public", table: "media_generations", filter: `user_id=eq.${currentUser.id}` },
+          { event: "*", schema: "public", table: "library_assets", filter: `user_id=eq.${currentUser.id}` },
           () => {
             if (mounted) debouncedRefetch();
           },
@@ -349,7 +358,7 @@ export function ChatGenerator() {
           description: "Le job a été renvoyé en file d'attente",
         });
 
-        await refetchAll();
+        await fetchWithTimeoutPromise(refetchAll(), 15000);
       } catch (err) {
         console.error("[Studio] requeueJob error:", err);
         showToast({
@@ -467,7 +476,7 @@ export function ChatGenerator() {
       const res = await createGeneration(activeBrandId, payload);
       toast.success(`Commande créée #${res.order_id}`);
 
-      await refetchAll();
+      await fetchWithTimeoutPromise(refetchAll(), 15000);
     } catch (err: unknown) {
       console.error("[Studio] image generation error:", err);
       showGenerationError(err);
@@ -516,7 +525,7 @@ export function ChatGenerator() {
       const res = await createGeneration(activeBrandId, payload);
       toast.success(`Commande créée #${res.order_id}`);
 
-      await refetchAll();
+      await fetchWithTimeoutPromise(refetchAll(), 15000);
     } catch (err: unknown) {
       console.error("[Studio] generate video error:", err);
       showGenerationError(err);
@@ -583,7 +592,7 @@ export function ChatGenerator() {
           : 0;
 
       toast.success(`Traitement forcé: ${processed} job(s).`);
-      await refetchAll();
+      await fetchWithTimeoutPromise(refetchAll(), 15000);
     } catch (err) {
       console.error("[Studio] trigger worker error:", err);
       const errMsg = err instanceof Error ? err.message : "Erreur inconnue";
@@ -813,7 +822,7 @@ export function ChatGenerator() {
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    void refetchAll();
+                    void fetchWithTimeoutPromise(refetchAll(), 15000);
                   }}
                   disabled={loading}
                 >
@@ -918,7 +927,7 @@ export function ChatGenerator() {
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  void refetchAll();
+                  void fetchWithTimeoutPromise(refetchAll(), 15000);
                 }}
                 disabled={loading}
               >
@@ -945,11 +954,23 @@ export function ChatGenerator() {
             ) : (
               <div className="space-y-4">
                 {assets.map((item) => {
-                  const previewUrl = item.thumbnail_url || item.output_url || "";
-                  const woofs =
-                    typeof item.metadata === "object" && item.metadata && "woofs" in item.metadata
-                      ? (item.metadata as Record<string, any>).woofs
+                  const metadata =
+                    typeof item.metadata === "object" && item.metadata !== null
+                      ? (item.metadata as Record<string, any>)
                       : null;
+                  const previewUrl =
+                    (metadata && typeof metadata.thumbnail_url === "string" ? metadata.thumbnail_url : null) ??
+                    (metadata && typeof metadata.preview_url === "string" ? metadata.preview_url : null) ??
+                    item.cloudinary_url ??
+                    "";
+                  const assetStatus =
+                    (metadata && typeof metadata.status === "string" ? metadata.status : null) ??
+                    (item.status ?? "done");
+                  const woofs = metadata && "woofs" in metadata ? metadata.woofs : null;
+                  const assetHref =
+                    (metadata && typeof metadata.download_url === "string" ? metadata.download_url : null) ??
+                    item.cloudinary_url ??
+                    null;
 
                   return (
                     <div key={item.id} className="rounded-lg border p-3">
@@ -958,15 +979,19 @@ export function ChatGenerator() {
                           <p className="text-sm font-medium capitalize">{item.type}</p>
                           <p className="text-xs text-muted-foreground">{formatDate(item.created_at)}</p>
                         </div>
-                        <Badge variant={mediaBadgeVariant(item.status)} className="uppercase">
-                          {item.status}
+                        <Badge variant={mediaBadgeVariant(assetStatus)} className="uppercase">
+                          {assetStatus}
                         </Badge>
                       </div>
                       {previewUrl && (
                         <div className="mt-3 overflow-hidden rounded-md bg-muted">
                           {item.type === "video" ? (
                             <video
-                              src={item.output_url ?? undefined}
+                              src={
+                                (metadata && typeof metadata.video_url === "string" ? metadata.video_url : null) ??
+                                item.cloudinary_url ??
+                                undefined
+                              }
                               controls
                               className="w-full"
                             />
@@ -978,10 +1003,10 @@ export function ChatGenerator() {
                       {woofs !== null && woofs !== undefined && (
                         <p className="mt-2 text-xs text-muted-foreground">Woofs consommés : {woofs}</p>
                       )}
-                      {item.output_url && (
+                      {assetHref && (
                         <div className="mt-2">
                           <Button asChild size="sm" variant="link" className="px-0">
-                            <a href={item.output_url} target="_blank" rel="noopener noreferrer">
+                            <a href={assetHref} target="_blank" rel="noopener noreferrer">
                               Ouvrir l’asset →
                             </a>
                           </Button>
