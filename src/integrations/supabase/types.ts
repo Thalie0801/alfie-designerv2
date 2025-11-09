@@ -2500,3 +2500,25 @@ export const Constants = {
     },
   },
 } as const
+
+export interface SupabaseIntegration {
+  projectId: string;
+  url: string;
+  connected: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ConnectSupabasePayload {
+  url: string;
+  anonKey?: string;
+  serviceRoleKey?: string; // ← garde-le côté serveur si possible !
+  notes?: string;
+}
+
+export interface LovableResult<T> {
+  ok: boolean;
+  status: number;
+  data?: T;
+  error?: string;
+}

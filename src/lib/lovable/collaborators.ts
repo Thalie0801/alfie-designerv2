@@ -1,12 +1,20 @@
-const LOVABLE_API_ORIGIN = "https://api.lovable.dev";
+const EDGE_BASE = import.meta.env.VITE_EDGE_BASE_URL;
+
+function assertEdgeBase(): asserts EDGE_BASE is string {
+  if (!EDGE_BASE) {
+    throw new Error("VITE_EDGE_BASE_URL manquant (Lovable Edge Function base URL)");
+  }
+}
 
 export function buildLovableProjectUrl(projectId: string, path: string) {
   if (!projectId) {
     throw new Error("Missing projectId before calling collaborators API");
   }
 
+  assertEdgeBase();
+
   const normalizedPath = (path.startsWith("/") ? path : `/${path}`).replace(/\/{2,}/g, "/");
-  return `${LOVABLE_API_ORIGIN}/projects/${encodeURIComponent(projectId)}${normalizedPath}`;
+  return `${EDGE_BASE}/lovable-proxy/projects/${encodeURIComponent(projectId)}${normalizedPath}`;
 }
 
 async function handleLovableResponse<T>(response: Response): Promise<T> {
@@ -35,13 +43,12 @@ async function handleLovableResponse<T>(response: Response): Promise<T> {
 
 export async function listProjectCollaborators<T = unknown>(
   projectId: string,
-  lovableToken: string,
 ): Promise<T> {
   const url = buildLovableProjectUrl(projectId, "/collaborators");
   const response = await fetch(url, {
     method: "GET",
     headers: {
-      Authorization: `Bearer ${lovableToken}`,
+      "Content-Type": "application/json",
     },
   });
 
@@ -50,7 +57,6 @@ export async function listProjectCollaborators<T = unknown>(
 
 export async function inviteProjectCollaborator<T = unknown>(
   projectId: string,
-  lovableToken: string,
   email: string,
 ): Promise<T> {
   if (!email) {
@@ -62,7 +68,6 @@ export async function inviteProjectCollaborator<T = unknown>(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${lovableToken}`,
     },
     body: JSON.stringify({ email }),
   });
