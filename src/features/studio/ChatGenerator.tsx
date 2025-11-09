@@ -1,5 +1,15 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { Upload, Wand2, Download, X, Sparkles, Loader2, Clock, CheckCircle2 } from "lucide-react";
+import {
+  Upload,
+  Wand2,
+  Download,
+  X,
+  Sparkles,
+  Loader2,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
