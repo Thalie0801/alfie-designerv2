@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabaseSafeClient';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { AspectFormat, LibraryAsset } from '@/types/chat';
 

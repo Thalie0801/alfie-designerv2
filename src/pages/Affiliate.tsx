@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabaseSafeClient';
 import { useAuth } from '@/hooks/useAuth';
 import { Copy, DollarSign, MousePointerClick, TrendingUp, Users, Award, Target, Crown } from 'lucide-react';
 import { toast } from 'sonner';

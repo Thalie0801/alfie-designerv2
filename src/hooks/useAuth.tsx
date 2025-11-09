@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabaseSafeClient';
 import { isAuthorized as computeIsAuthorized } from '@/utils/authz-helpers';
 import { hasRole } from '@/lib/access';
 import { hasActiveSubscriptionByEmail } from '@/lib/billing';

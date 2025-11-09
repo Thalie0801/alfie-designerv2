@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabaseSafeClient';
 import { spliceVideoUrl, extractCloudNameFromUrl } from './videoSimple';
 
 type Aspect = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '4:5';

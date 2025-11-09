@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabaseSafeClient';
 
 // Cache pour éviter les appels répétés
 const roleCache = new Map<string, { roles: string[], timestamp: number }>();

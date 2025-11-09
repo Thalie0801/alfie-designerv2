@@ -1,42 +1,52 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+// src/integrations/supabase/client.ts
+
 import { IS_LOVABLE_PREVIEW, CAN_USE_PROXY, EDGE_BASE } from "@/lib/env";
 import type {
-  Database,
   SupabaseIntegration,
-  ConnectSupabasePayload,
   LovableResult,
+  ConnectSupabasePayload,
 } from "./types";
 
+/** Helpers résultat typé */
 function ok<T>(data: T, status = 200): LovableResult<T> {
   return { ok: true, status, data };
 }
-
 function fail<T = never>(msg: string, status = 409): LovableResult<T> {
   return { ok: false, status, error: msg };
 }
 
-async function fetchJSON<T>(input: RequestInfo, init?: RequestInit): Promise<LovableResult<T>> {
+/** Fetch JSON sûr (retourne toujours LovableResult) */
+async function fetchJSON<T>(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<LovableResult<T>> {
   try {
     const res = await fetch(input, init);
-    const isJSON = (res.headers.get("content-type") || "").includes("application/json");
+    const ct = res.headers.get("content-type") || "";
+    const isJSON = ct.includes("application/json");
     const payload = isJSON ? await res.json() : await res.text();
 
     if (!res.ok) {
-      return fail(
-        typeof payload === "string" ? payload : payload?.error || res.statusText,
-        res.status,
-      );
+      const msg =
+        typeof payload === "string"
+          ? payload
+          : (payload?.error as string) || res.statusText;
+      return fail<T>(msg, res.status);
     }
-    return ok(payload as T, res.status);
+    return ok<T>(payload as T, res.status);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return fail(msg, 0);
+    return fail<T>(msg, 0);
   }
 }
 
-export async function getSupabaseIntegration(projectId: string) {
-  if (!projectId) throw new Error("projectId requis");
+/** Lecture de l’intégration Supabase (Lovable) */
+export async function getSupabaseIntegration(
+  projectId: string
+): Promise<LovableResult<SupabaseIntegration>> {
+  if (!projectId) return fail("projectId requis", 400);
 
+  // En preview Lovable: pas d'appel réel (bypass propre)
   if (IS_LOVABLE_PREVIEW) {
     return ok({
       projectId,
@@ -46,11 +56,11 @@ export async function getSupabaseIntegration(projectId: string) {
     });
   }
 
+  // Hors preview: on utilise le proxy s’il est configuré
   if (CAN_USE_PROXY) {
     const url = `${EDGE_BASE}/lovable-proxy/projects/${encodeURIComponent(
-      projectId,
+      projectId
     )}/integrations/supabase`;
-
     return fetchJSON<SupabaseIntegration>(url, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
@@ -59,26 +69,29 @@ export async function getSupabaseIntegration(projectId: string) {
 
   return fail(
     "Proxy non configuré (VITE_EDGE_BASE_URL absent) — preview Lovable OK, activer proxy pour prod/staging",
-    501,
+    501
   );
 }
 
+/** Connexion de l’intégration Supabase (Lovable) */
 export async function connectSupabaseIntegration(
   projectId: string,
-  payload: ConnectSupabasePayload,
-) {
-  if (!projectId) throw new Error("projectId requis");
+  payload: ConnectSupabasePayload
+): Promise<LovableResult<SupabaseIntegration>> {
+  if (!projectId) return fail("projectId requis", 400);
 
+  // En preview Lovable: c’est géré par Lovable (évite CORS)
   if (IS_LOVABLE_PREVIEW) {
     return fail(
       "Connexion gérée automatiquement par Lovable en preview. Utilise l’onglet Intégrations Lovable.",
-      409,
+      409
     );
   }
 
+  // Hors preview: passer par le proxy si dispo
   if (CAN_USE_PROXY) {
     const url = `${EDGE_BASE}/lovable-proxy/projects/${encodeURIComponent(
-      projectId,
+      projectId
     )}/integrations/supabase`;
 
     return fetchJSON<SupabaseIntegration>(url, {
@@ -90,41 +103,6 @@ export async function connectSupabaseIntegration(
 
   return fail(
     "Proxy non configuré (VITE_EDGE_BASE_URL absent) — preview Lovable OK, activer proxy pour prod/staging",
-    501,
+    501
   );
 }
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-type DatabaseClient = SupabaseClient<Database>;
-
-type GlobalWithSupabase = typeof globalThis & {
-  __lovableSupabaseClient?: DatabaseClient;
-};
-
-function createSupabaseClient(): DatabaseClient {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    throw new Error("Supabase environment variables are missing.");
-  }
-
-  const authConfig =
-    typeof window !== "undefined" && typeof window.localStorage !== "undefined"
-      ? {
-          storage: window.localStorage,
-          persistSession: true,
-          autoRefreshToken: true,
-        }
-      : undefined;
-
-  return createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: authConfig,
-  });
-}
-
-const globalForSupabase = globalThis as GlobalWithSupabase;
-
-export const supabase: DatabaseClient =
-  globalForSupabase.__lovableSupabaseClient ||
-  (globalForSupabase.__lovableSupabaseClient = createSupabaseClient());

@@ -3,7 +3,7 @@
  * Handles retries, error reporting, and consistent response handling
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabaseSafeClient';
 import { toast } from 'sonner';
 
 export interface EdgeResponse<T = any> {

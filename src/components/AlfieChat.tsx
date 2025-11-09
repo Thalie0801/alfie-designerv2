@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { Send, ImagePlus, Loader2, Download } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useBrandKit } from "@/hooks/useBrandKit";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseSafeClient";
 import { getAuthHeader } from "@/lib/auth";
 import { uploadToChatBucket } from "@/lib/chatUploads";
 import { Button } from "@/components/ui/button";

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabaseSafeClient';
 import { toast } from 'sonner';
 import { Loader2, User, Mail, CreditCard } from 'lucide-react';
 import { useCustomerPortal } from '@/hooks/useCustomerPortal';

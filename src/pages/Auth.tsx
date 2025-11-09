@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Sparkles, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabaseSafeClient';
 import { hasRole } from '@/lib/access';
 
 const authSchema = z.object({
