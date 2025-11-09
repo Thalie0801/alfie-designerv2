@@ -1,36 +1,44 @@
 import type { ComponentType } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { AlertCircle, CheckCircle, Clock, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, Loader2, ExternalLink } from "lucide-react";
+import { Link } from "react-router-dom";
 import type { JobEntry } from "../types";
 
 type NormalizedStatus = "queued" | "running" | "done" | "error" | "unknown";
 
-const STATUS_MAP: Record<NormalizedStatus, { label: string; badgeClass: string; icon?: ComponentType<{ className?: string }> }> = {
+const STATUS_MAP: Record<
+  NormalizedStatus,
+  {
+    label: string;
+    badgeClass: string;
+    icon?: ComponentType<{ className?: string; size?: number }>;
+    iconClassName?: string;
+  }
+> = {
   queued: {
     label: "En attente",
-    badgeClass: "bg-amber-100 text-amber-800 border border-amber-200",
+    badgeClass: "inline-flex items-center gap-1 rounded-full bg-yellow-100 text-yellow-800 px-2 py-0.5 text-xs",
     icon: Clock,
   },
   running: {
     label: "En cours",
-    badgeClass: "bg-sky-100 text-sky-700 border border-sky-200",
+    badgeClass: "inline-flex items-center gap-1 rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-xs",
     icon: Loader2,
+    iconClassName: "animate-spin",
   },
   done: {
     label: "Terminé",
-    badgeClass: "bg-emerald-100 text-emerald-700 border border-emerald-200",
-    icon: CheckCircle,
+    badgeClass: "inline-flex items-center gap-1 rounded-full bg-green-100 text-green-800 px-2 py-0.5 text-xs",
+    icon: CheckCircle2,
   },
   error: {
     label: "Erreur",
-    badgeClass: "bg-red-100 text-red-700 border border-red-200",
+    badgeClass: "inline-flex items-center gap-1 rounded-full bg-red-100 text-red-800 px-2 py-0.5 text-xs",
     icon: AlertCircle,
   },
   unknown: {
     label: "Statut inconnu",
-    badgeClass: "bg-secondary text-secondary-foreground",
+    badgeClass: "inline-flex items-center gap-1 rounded-full bg-secondary text-secondary-foreground px-2 py-0.5 text-xs",
   },
 };
 
@@ -65,23 +73,21 @@ export function JobCard({ job, createdAt, onRetry, isStuck }: JobCardProps) {
           <p className="text-sm font-medium capitalize">{job.type.replace(/_/g, " ")}</p>
           <p className="text-xs text-muted-foreground">{createdAt}</p>
           {job.order_id && (
-            <p className="text-xs text-muted-foreground">Commande #{job.order_id}</p>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Commande #{job.order_id}</span>
+              <Link to={`/library?order=${job.order_id}`} className="inline-flex items-center gap-1 text-primary hover:underline">
+                <ExternalLink size={14} /> Voir
+              </Link>
+            </div>
           )}
           {isStuck && normalized === "queued" && (
             <p className="text-[11px] text-amber-600 font-medium">Bloqué depuis &gt; 10 min</p>
           )}
         </div>
-        <Badge
-          variant="secondary"
-          className={cn(
-            "flex items-center gap-1 uppercase tracking-wide text-[11px]",
-            config.badgeClass,
-            normalized === "running" && "[&>svg]:animate-spin",
-          )}
-        >
-          {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
+        <span className={config.badgeClass}>
+          {Icon ? <Icon size={14} className={config.iconClassName} /> : null}
           {config.label}
-        </Badge>
+        </span>
       </div>
 
       {jobError && (

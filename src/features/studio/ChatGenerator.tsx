@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { Upload, Wand2, Download, X, Sparkles, Loader2, AlertCircle } from "lucide-react";
+import { Upload, Wand2, Download, X, Sparkles, Loader2, AlertCircle, Clock, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -594,7 +594,7 @@ export function ChatGenerator() {
                 )}
                 {queueData.counts.completed_24h !== undefined && (
                   <span className="text-sm text-muted-foreground">
-                    <CheckCircle className="inline w-3 h-3 mr-1" />
+                    <CheckCircle2 className="inline w-3 h-3 mr-1" />
                     {queueData.counts.completed_24h} générés (24h)
                   </span>
                 )}
