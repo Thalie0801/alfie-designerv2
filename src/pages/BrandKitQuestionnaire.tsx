@@ -11,6 +11,7 @@ import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseSafeClient';
 import { useAuth } from '@/hooks/useAuth';
+import { Dict, Json } from '@/types/safe';
 
 const questions = [
   {
@@ -89,14 +90,17 @@ export default function BrandKitQuestionnaire() {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [answers, setAnswers] = useState<Dict<Json>>({});
 
   const currentQuestion = questions[currentStep];
   const progress = ((currentStep + 1) / questions.length) * 100;
 
   const handleNext = () => {
     const answer = answers[currentQuestion.field];
-    if (!answer || (typeof answer === 'string' && !answer.trim())) {
+    if (
+      answer == null ||
+      (typeof answer === 'string' && answer.trim().length === 0)
+    ) {
       toast.error('Veuillez répondre à la question avant de continuer');
       return;
     }
@@ -123,18 +127,21 @@ export default function BrandKitQuestionnaire() {
     setLoading(true);
     try {
       // Construire la voix de marque à partir des réponses
-      const voice = `Ton ${answers.tone || 'professionnel'}. Secteur: ${answers.industry || 'général'}. 
-Public cible: ${answers.target_audience || 'large public'}. 
-Valeur unique: ${answers.value_proposition || 'excellence'}. 
-Mots-clés: ${answers.keywords || 'qualité, innovation'}.`;
+      const voice = `Ton ${typeof answers.tone === 'string' ? answers.tone : 'professionnel'}. Secteur: ${typeof answers.industry === 'string' ? answers.industry : 'général'}.
+Public cible: ${typeof answers.target_audience === 'string' ? answers.target_audience : 'large public'}.
+Valeur unique: ${typeof answers.value_proposition === 'string' ? answers.value_proposition : 'excellence'}.
+Mots-clés: ${typeof answers.keywords === 'string' ? answers.keywords : 'qualité, innovation'}.`;
 
       // Créer la marque
       const { data: brand, error } = await supabase
         .from('brands')
         .insert({
           user_id: user.id,
-          name: answers.name,
-          palette: answers.palette ? answers.palette.split(',').map((c: string) => c.trim()) : [],
+          name: typeof answers.name === 'string' ? answers.name : undefined,
+          palette:
+            typeof answers.palette === 'string'
+              ? answers.palette.split(',').map((c) => c.trim())
+              : [],
           voice: voice.trim(),
           fonts: { heading: 'Inter', body: 'Inter' }
         })
@@ -151,7 +158,7 @@ Mots-clés: ${answers.keywords || 'qualité, innovation'}.`;
 
       toast.success('🎉 Brand Kit créé avec succès !');
       navigate('/dashboard');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating brand:', error);
       toast.error('Erreur lors de la création du Brand Kit');
     } finally {
@@ -159,8 +166,8 @@ Mots-clés: ${answers.keywords || 'qualité, innovation'}.`;
     }
   };
 
-  const updateAnswer = (value: any) => {
-    setAnswers(prev => ({
+  const updateAnswer = (value: Json) => {
+    setAnswers((prev) => ({
       ...prev,
       [currentQuestion.field]: value
     }));

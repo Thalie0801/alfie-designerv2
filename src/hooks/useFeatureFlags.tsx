@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseSafeClient';
+import { Dict } from '@/types/safe';
+
+type FeatureFlag = {
+  enabled: boolean;
+  allowed_plans: string[] | null;
+  allowed_roles: string[] | null;
+};
 
 export function useFeatureFlags() {
-  const [flags, setFlags] = useState<Record<string, any>>({});
+  const [flags, setFlags] = useState<Dict<FeatureFlag>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,14 +28,22 @@ export function useFeatureFlags() {
       return;
     }
 
-    const flagsMap = (data || []).reduce((acc, flag) => {
+    const flagsMap = (data ?? []).reduce<Dict<FeatureFlag>>((acc, flag) => {
+      if (!flag || typeof flag.feature !== 'string') {
+        return acc;
+      }
+
       acc[flag.feature] = {
-        enabled: flag.enabled,
-        allowed_plans: flag.allowed_plans,
-        allowed_roles: flag.allowed_roles,
+        enabled: Boolean(flag.enabled),
+        allowed_plans: Array.isArray(flag.allowed_plans)
+          ? (flag.allowed_plans as string[])
+          : null,
+        allowed_roles: Array.isArray(flag.allowed_roles)
+          ? (flag.allowed_roles as string[])
+          : null,
       };
       return acc;
-    }, {} as Record<string, any>);
+    }, {});
 
     setFlags(flagsMap);
     setLoading(false);

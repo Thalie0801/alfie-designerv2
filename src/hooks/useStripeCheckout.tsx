@@ -31,9 +31,11 @@ export function useStripeCheckout() {
         // Open checkout in new tab
         window.open(data.url, '_blank');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Checkout error:', error);
-      toast.error('Erreur lors de la création du paiement: ' + error.message);
+      const message =
+        error instanceof Error ? error.message : 'Erreur inconnue';
+      toast.error('Erreur lors de la création du paiement: ' + message);
     } finally {
       setLoading(false);
     }
