@@ -87,10 +87,15 @@ jobs:
           cache: npm
 
       - name: Restore node_modules cache
+        id: cache-node-modules
         uses: actions/cache@v4
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('**/package-lock.json','**/pnpm-lock.yaml','**/yarn.lock') }}
+
+      - name: Install dependencies (cache miss)
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund
 
       - name: Type check
         id: tsc
@@ -139,6 +144,7 @@ jobs:
               body += `❌ **Found ${errors} error(s) and ${warnings} warning(s)**\n\n`;
               if (fs.existsSync('typecheck-summary.txt')) {
                 const content = fs.readFileSync('typecheck-summary.txt', 'utf8');
+                body += '<details><summary>First 20 lines</summary>\n\n````\n' + content + '\n````\n</details>\n';
                 body += '<details><summary>First 20 lines</summary>\n\n```\n' + content + '\n```\n</details>\n';
               }
               body += '📥 Full logs in the Actions run.\n';
@@ -168,10 +174,15 @@ jobs:
           cache: npm
 
       - name: Restore node_modules cache
+        id: cache-node-modules
         uses: actions/cache@v4
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('**/package-lock.json','**/pnpm-lock.yaml','**/yarn.lock') }}
+
+      - name: Install dependencies (cache miss)
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund
 
       - name: Lint
         id: lint
@@ -237,10 +248,15 @@ jobs:
           cache: npm
 
       - name: Restore node_modules cache
+        id: cache-node-modules
         uses: actions/cache@v4
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('**/package-lock.json','**/pnpm-lock.yaml','**/yarn.lock') }}
+
+      - name: Install dependencies (cache miss)
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund
 
       - name: Restore Vite cache
         uses: actions/cache@v4
