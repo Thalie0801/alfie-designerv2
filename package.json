@@ -8,6 +8,7 @@
     "build": "node ./scripts/run-build.js",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "verify:trycatch": "node scripts/verify-trycatch.js",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview"
   },

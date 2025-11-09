@@ -2,7 +2,7 @@
 
 import { SlideTemplate, TextLayer } from './slideTemplates.ts';
 import { BrandSnapshot } from './brandResolver.ts';
-import { stripControlChars } from '../../../src/lib/regex.ts';
+import { normalizeSpaces } from '../../../src/lib/regex.ts';
 
 export interface SlideContent {
   title?: string;
@@ -25,7 +25,7 @@ const EXTRA_INVISIBLE_RE = new RegExp('[\\x7F\\u00A0\\uFEFF]', 'g');
  */
 function sanitizeText(text: string): string {
   if (!text) return '';
-  return stripControlChars(text).replace(EXTRA_INVISIBLE_RE, '').trim();
+  return normalizeSpaces(text).replace(EXTRA_INVISIBLE_RE, '').trim();
 }
 
 export async function renderSlideToSVG(

@@ -1,13 +1,19 @@
 export function escapeRegExp(input: string): string {
-  // Échappe tous les métacaractères regex
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// ATTENTION: ne pas utiliser /[\x00-\x1F]/g en literal (no-control-regex)
-// On passe par RegExp pour satisfaire ESLint
-const CONTROL_CHARS_PATTERN = String.raw`\x00-\x1F`;
-export const CONTROL_CHARS_RE = new RegExp(`[${CONTROL_CHARS_PATTERN}]`, "g"); // U+0000..U+001F
+// ⚠️ Pas de literal /[\x00-\x1F]/g : no-control-regex.
+// On génère la plage dynamiquement pour satisfaire ESLint.
+const CONTROL_CHAR_RANGE = Array.from({ length: 32 }, (_, index) =>
+  `\\x${index.toString(16).padStart(2, "0")}`,
+).join("");
+
+export const CONTROL_CHARS_RE = new RegExp(`[${CONTROL_CHAR_RANGE}]`, "g");
 
 export function stripControlChars(input: string): string {
-  return input.replace(CONTROL_CHARS_RE, "");
+  return typeof input === "string" ? input.replace(CONTROL_CHARS_RE, "") : (input as any);
+}
+
+export function normalizeSpaces(input: string): string {
+  return stripControlChars(input).replace(/\s+/g, " ").trim();
 }

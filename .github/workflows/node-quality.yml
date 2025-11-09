@@ -315,6 +315,17 @@ jobs:
     needs: [typecheck, lint, build]
     if: always()
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Verify try/catch hygiene
+        run: npm run verify:trycatch
+
       - name: Summarize results
         run: |
           echo "Typecheck: ${{ needs.typecheck.result }}"

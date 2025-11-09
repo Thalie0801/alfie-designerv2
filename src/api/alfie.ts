@@ -12,6 +12,14 @@ type ForceProcessJobsResponse = {
   queuedAfter?: number;
 };
 
+type TriggerJobWorkerResponse = {
+  processed?: number;
+  queuedBefore?: number;
+  queuedAfter?: number;
+  ok?: boolean;
+  error?: string;
+};
+
 export async function createGeneration(brandId: string, payload: unknown) {
   const { data, error } = await supabase.functions.invoke('alfie-generate', {
     body: { brand_id: brandId, payload },
@@ -27,9 +35,7 @@ type SupabaseFunctionError = Error & {
 
 type WorkerError = Error & { status?: number; originalError?: unknown };
 
-export async function forceProcessJobs() {
-  const { data, error } = await supabase.functions.invoke('process-job-worker', {
-export async function forceProcessJobs() {
+export async function forceProcessJobs(): Promise<ForceProcessJobsResponse | undefined> {
   const { data, error } = await supabase.functions.invoke('trigger-job-worker', {
     body: { source: 'studio-force' },
   });
@@ -47,7 +53,7 @@ export async function forceProcessJobs() {
     const message =
       status === 409
         ? 'Un traitement est déjà en cours.'
-        : `process-job-worker: ${baseMessage}`;
+        : `trigger-job-worker: ${baseMessage}`;
 
     const wrappedError = new Error(message) as WorkerError;
     if (status !== undefined) {
@@ -58,8 +64,18 @@ export async function forceProcessJobs() {
     throw wrappedError;
   }
 
-  return data as ProcessJobWorkerResponse | undefined;
-    throw new Error(`trigger-job-worker: ${error.message}`);
+  const payload = data as TriggerJobWorkerResponse | undefined;
+  if (payload && payload.ok === false && payload.error) {
+    throw new Error(`trigger-job-worker: ${payload.error}`);
   }
-  return data as ForceProcessJobsResponse | undefined;
+
+  if (!payload) return undefined;
+
+  const processed = typeof payload.processed === 'number' ? payload.processed : 0;
+
+  return {
+    processed,
+    queuedBefore: typeof payload.queuedBefore === 'number' ? payload.queuedBefore : undefined,
+    queuedAfter: typeof payload.queuedAfter === 'number' ? payload.queuedAfter : undefined,
+  };
 }

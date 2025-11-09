@@ -303,7 +303,7 @@ export function ChatGenerator() {
         supabase.removeChannel(channel);
       }
     };
-  }, [forceProcessJobs, refetchAll]);
+  }, [refetchAll]);
 
   const requeueJob = useCallback(
     async (job: JobEntry) => {
@@ -553,10 +553,10 @@ export function ChatGenerator() {
   // ✅ Trigger manual worker
   const handleTriggerWorker = useCallback(async () => {
     if (isForcing) return; // anti double-clic
-    if (isForcing) return;
     setIsForcing(true);
     try {
       const result = await forceProcessJobs();
+
       const processed =
         typeof result?.processed === "number" && Number.isFinite(result.processed)
           ? result.processed
@@ -571,18 +571,7 @@ export function ChatGenerator() {
     } finally {
       setIsForcing(false);
     }
-  }, [isForcing, forceProcessJobs, refetchAll]);
-    } finally {
-      setIsForcing(false);
-    }
-  }, [isForcing, forceProcessJobs, refetchAll]);
-      const message = err instanceof Error ? err.message : "Erreur inconnue";
-      toast.error(`Forçage échoué: ${message}`);
-    } finally {
-      setIsForcing(false);
-    }
-  }, [forceProcessJobs, refetchAll]);
-  }, [forceProcess, isForcing, refetchAll]);
+  }, [isForcing, refetchAll]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -628,7 +617,6 @@ export function ChatGenerator() {
                 size="sm"
                 onClick={handleTriggerWorker}
                 disabled={isForcing}
-                disabled={isForcing || queueData.counts.queued === 0}
               >
                 {isForcing ? (
                   <>

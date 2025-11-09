@@ -1,6 +1,6 @@
 // src/lib/cloudinary/imageUrls.ts
 
-import { stripControlChars } from "@/lib/regex";
+import { normalizeSpaces } from "@/lib/regex";
 
 const EXTRA_INVISIBLE_RE = new RegExp("[\\x7F\\u00A0\\uFEFF]", "g");
 
@@ -21,16 +21,9 @@ export type SlideUrlOptions = {
 
 /* ----------------------------- utilitaires ----------------------------- */
 
-function normalizeSpaces(s: string): string {
-  return stripControlChars(s)
-    .replace(EXTRA_INVISIBLE_RE, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 /** Nettoie et tronque pour l’affichage (pas pour l’encodage). */
 function cleanText(input: string, maxLen?: number): string {
-  let s = normalizeSpaces((input ?? "").toString());
+  let s = normalizeSpaces((input ?? "").toString()).replace(EXTRA_INVISIBLE_RE, "");
   s = s.normalize("NFC");
   if (maxLen && s.length > maxLen) s = s.slice(0, maxLen - 1).trimEnd() + "…";
   return s;
