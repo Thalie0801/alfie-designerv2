@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseSafeClient';
+import { useState, useEffect, useCallback } from 'react';
+import { useSupabase } from '@/lib/supabaseClient';
 import { useAuth } from './useAuth';
 
 interface VideoQuota {
@@ -19,8 +19,9 @@ export function useVideoQuota() {
   const [quota, setQuota] = useState<VideoQuota | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const supabase = useSupabase();
 
-  const fetchQuota = async () => {
+  const fetchQuota = useCallback(async () => {
     if (!user) {
       setQuota(null);
       setLoading(false);
@@ -52,11 +53,11 @@ export function useVideoQuota() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase, user]);
 
   useEffect(() => {
     fetchQuota();
-  }, [user]);
+  }, [fetchQuota]);
 
   return {
     quota,

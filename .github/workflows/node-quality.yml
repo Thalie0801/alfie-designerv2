@@ -309,10 +309,36 @@ jobs:
               : '## 🏗️ Build Results\n\n❌ **Build failed**\n\nPlease check the logs for details.';
             github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
 
+  verify:
+    name: Typecheck + Lint + Build
+    runs-on: ubuntu-latest
+    needs: install
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Restore node_modules cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Strict pipeline
+        run: |
+          set -euo pipefail
+          npm run typecheck
+          npm run lint
+          npm run build
+
   quality-check-summary:
     name: Quality summary
     runs-on: ubuntu-latest
-    needs: [typecheck, lint, build]
+    needs: [typecheck, lint, build, verify]
     if: always()
     steps:
       - uses: actions/checkout@v4
@@ -331,12 +357,15 @@ jobs:
           echo "Typecheck: ${{ needs.typecheck.result }}"
           echo "Lint: ${{ needs.lint.result }}"
           echo "Build: ${{ needs.build.result }}"
+          echo "Verify: ${{ needs.verify.result }}"
           if [ "${{ needs.typecheck.result }}" != "success" ]; then
             echo "::error::Typecheck failed"; exit 1; fi
           if [ "${{ needs.build.result }}" != "success" ]; then
             echo "::error::Build failed"; exit 1; fi
           if [ "${{ needs.lint.result }}" != "success" ]; then
             echo "::warning::Lint had issues but not blocking"; fi
+          if [ "${{ needs.verify.result }}" != "success" ]; then
+            echo "::error::Strict pipeline failed"; exit 1; fi
           echo "✅ Quality checks completed"
 
    

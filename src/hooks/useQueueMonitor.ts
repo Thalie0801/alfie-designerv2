@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseSafeClient";
+import { useSupabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 
 export type QueueMonitorCounts = {
@@ -27,6 +27,7 @@ const INITIAL_COUNTS: QueueMonitorCounts = { queued: 0, running: 0, done24h: 0 }
 export function useQueueMonitor(_brandId?: string) {
   const { user } = useAuth();
   const [counts, setCounts] = useState<QueueMonitorCounts>(INITIAL_COUNTS);
+  const supabase = useSupabase();
 
   const refresh = useCallback(async () => {
     if (!user?.id) {
@@ -73,7 +74,7 @@ export function useQueueMonitor(_brandId?: string) {
     }
 
     setCounts({ queued, running, done24h });
-  }, [user?.id]);
+  }, [supabase, user?.id]);
 
   useEffect(() => {
     refresh();
@@ -97,7 +98,7 @@ export function useQueueMonitor(_brandId?: string) {
       if (intervalId) window.clearInterval(intervalId);
       supabase.removeChannel(channel);
     };
-  }, [refresh, user?.id]);
+  }, [refresh, supabase, user?.id]);
 
   return { ...counts, refresh };
 }

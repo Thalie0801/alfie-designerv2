@@ -1,6 +1,6 @@
 import { fetchJSON } from '@/lib/http';
 import { EDGE_BASE } from '@/lib/env';
-import { supabase } from '@/lib/supabaseSafeClient';
+import { supabase } from '@/lib/supabaseClient';
 
 type GenerationResponse = {
   ok: boolean;

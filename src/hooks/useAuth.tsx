@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabaseSafeClient';
+import { useSupabase } from '@/lib/supabaseClient';
 import { isAuthorized as computeIsAuthorized } from '@/utils/authz-helpers';
 import { hasRole } from '@/lib/access';
 import { hasActiveSubscriptionByEmail } from '@/lib/billing';
@@ -25,6 +25,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const supabase = useSupabase();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<any | null>(null);

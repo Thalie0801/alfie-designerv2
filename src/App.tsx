@@ -28,6 +28,7 @@ import Templates from "./pages/Templates";
 import Library from "./pages/Library";
 import Videos from "./pages/Videos";
 import CloudinaryTest from "./pages/CloudinaryTest";
+import DebugPage from "./pages/Debug";
 
 import ActivateAccess from "./pages/onboarding/Activate";
 import { AlfieChat } from "./components/AlfieChat";
@@ -115,6 +116,16 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute requireAdmin>
                 <CloudinaryTest />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/debug"
+            element={
+              <ProtectedRoute requireAdmin>
+                <AppLayoutWithSidebar>
+                  <DebugPage />
+                </AppLayoutWithSidebar>
               </ProtectedRoute>
             }
           />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseSafeClient';
+import { useSupabase } from '@/lib/supabaseClient';
 import { useAuth } from './useAuth';
 
 // Quotas mensuels par plan
@@ -14,6 +14,7 @@ export function useAlfieOptimizations() {
   const { profile } = useAuth();
   const [requestsThisMonth, setRequestsThisMonth] = useState(0);
   const [quota, setQuota] = useState(0);
+  const supabase = useSupabase();
   
   useEffect(() => {
     if (profile) {
