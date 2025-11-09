@@ -31,10 +31,15 @@ jobs:
           cache: 'npm'
 
       - name: Configure npm auth (optional)
-        if: ${{ secrets.NPM_TOKEN }}
-        run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+  env:
+    NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+  run: |
+    if [ -n "${NPM_TOKEN}" ]; then
+      echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
+      echo "NPM auth configured."
+    else
+      echo "No NPM_TOKEN secret; skipping npm auth."
+    fi
 
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
