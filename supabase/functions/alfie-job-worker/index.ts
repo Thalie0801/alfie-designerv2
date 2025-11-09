@@ -1,7 +1,7 @@
 // supabase/functions/alfie-job-worker/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { uploadToCloudinary } from "../_shared/cloudinaryUploader.ts";
+import { uploadToCloudinary } from "../_shared/cloudinary.ts";
 import { consumeBrandQuotas } from "../_shared/quota.ts";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, INTERNAL_FN_SECRET } from "../_shared/env.ts";
 
@@ -491,26 +491,35 @@ Format: ${aspectRatio} aspect ratio optimized.`;
 
       // 2) upload cloudinary
       console.log("📤 upload cloudinary");
-      const cloud = await uploadToCloudinary(imageUrl, {
-        folder: `brands/${img.brandId}/images`,
-        publicId: `order_${payload.orderId}_img_${results.length + 1}`,
-        tags: ["ai-generated", "worker", `order-${payload.orderId}`],
-        context: {
-          order_id: String(payload.orderId),
-          order_item_id: String(payload.orderItemId ?? ""),
-          brand_id: String(img.brandId ?? ""),
-          aspect_ratio: aspectRatio,
-        },
+      const targetBrandId = img.brandId ?? payload.brandId ?? null;
+      const folder = targetBrandId
+        ? `brands/${targetBrandId}/images`
+        : `users/${payload.userId}/images`;
+      const context: Record<string, string> = {
+        order_id: String(payload.orderId),
+        aspect_ratio: aspectRatio,
+      };
+      if (payload.orderItemId) context.order_item_id = String(payload.orderItemId);
+      if (targetBrandId) context.brand_id = String(targetBrandId);
+
+      const tags = ["ai-generated", "worker", `order-${payload.orderId}`];
+      if (targetBrandId) tags.push(`brand-${targetBrandId}`);
+
+      const cloud = await uploadToCloudinary({
+        file: imageUrl,
+        folder,
+        tags,
+        context,
       });
 
       // 3) persist media_generations (best-effort)
       await supabaseAdmin.from("media_generations").insert({
         user_id: payload.userId,
-        brand_id: img.brandId ?? null,
+        brand_id: targetBrandId,
         type: "image",
         status: "completed",
-        output_url: cloud.secureUrl,
-        thumbnail_url: cloud.secureUrl,
+        output_url: cloud.url,
+        thumbnail_url: cloud.url,
         prompt: img.prompt,
         metadata: {
           orderId: payload.orderId,
@@ -528,17 +537,17 @@ Format: ${aspectRatio} aspect ratio optimized.`;
         .select("id")
         .eq("order_id", payload.orderId)
         .eq("order_item_id", payload.orderItemId ?? null)
-        .eq("cloudinary_url", cloud.secureUrl)
+        .eq("cloudinary_url", cloud.url)
         .maybeSingle();
 
       if (!existing) {
         await supabaseAdmin.from("library_assets").insert({
           user_id: payload.userId,
-          brand_id: img.brandId ?? null,
+          brand_id: targetBrandId,
           order_id: payload.orderId,
           order_item_id: payload.orderItemId ?? null,
           type: "image",
-          cloudinary_url: cloud.secureUrl,
+          cloudinary_url: cloud.url,
           format: aspectRatio,
           metadata: {
             orderId: payload.orderId,
@@ -551,7 +560,7 @@ Format: ${aspectRatio} aspect ratio optimized.`;
         });
       }
 
-      results.push({ url: cloud.secureUrl, aspectRatio, resolution: img.resolution });
+      results.push({ url: cloud.url, aspectRatio, resolution: img.resolution });
     } catch (e) {
       console.error("❌ image_failed", e);
       if (isHttp429(e)) {

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { uploadToCloudinary } from "../_shared/cloudinary.ts";
 import { 
   SUPABASE_URL, 
   SUPABASE_SERVICE_ROLE_KEY,
@@ -304,12 +305,38 @@ serve(async (req) => {
       if (!generatedImageUrl) throw new Error("No image generated");
     }
 
+    const brandIdForMetadata = brandId ?? (typeof body.brandKit?.id === "string" ? body.brandKit.id : null);
+    const folder = brandIdForMetadata
+      ? `brands/${brandIdForMetadata}/images`
+      : `users/${userId}/images`;
+    const context: Record<string, string> = {
+      user_id: userId,
+    };
+    if (brandIdForMetadata) context.brand_id = brandIdForMetadata;
+    if (orderId) context.order_id = orderId;
+    if (orderItemId) context.order_item_id = orderItemId;
+    if (requestId) context.request_id = requestId;
+    if (body.carouselId) context.carousel_id = body.carouselId;
+
+    const tags = ["ai-generated", "lovable", `user-${userId}`];
+    if (brandIdForMetadata) tags.push(`brand-${brandIdForMetadata}`);
+    if (body.backgroundOnly) tags.push("background-only");
+
+    const uploadResult = await uploadToCloudinary({
+      file: generatedImageUrl,
+      folder,
+      context,
+      tags,
+    });
+
+    generatedImageUrl = uploadResult.url;
+    const cloudinaryPublicId = uploadResult.publicId;
+
     // --- Sauvegarde bibliothèque ---
     let saved = false;
     let errorDetail: string | null = null;
 
     try {
-      const brandIdForMetadata = brandId ?? (typeof body.brandKit?.id === "string" ? body.brandKit.id : null);
       const slideIdx = typeof body.slideIndex === "number" ? body.slideIndex : null;
       const totalSlides = typeof body.totalSlides === "number" ? body.totalSlides : null;
 
@@ -341,6 +368,7 @@ serve(async (req) => {
           orderItemId,
           requestId,
           referenceImageUrl: referenceImage ?? null,
+          cloudinary_public_id: cloudinaryPublicId,
         },
       };
 
@@ -364,6 +392,7 @@ serve(async (req) => {
 
     return jsonRes({
       imageUrl: generatedImageUrl,
+      cloudinaryPublicId,
       message: data?.choices?.[0]?.message?.content || "Image générée avec succès",
       saved,
       errorDetail,
