@@ -1,11 +1,15 @@
 // functions/alfie-render-carousel-slide/index.ts
-// v2.4.0 — Slide renderer (idempotent, retries + timeout, normalized inputs)
+// v2.5.0 — Slide renderer (idempotent, retries + timeout, env.ts, internal secret)
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { uploadTextAsRaw } from "../_shared/cloudinaryUploader.ts";
-
-const INTERNAL_SECRET = Deno.env.get("INTERNAL_FN_SECRET") ?? "";
+import { 
+  SUPABASE_URL, 
+  SUPABASE_SERVICE_ROLE_KEY, 
+  INTERNAL_FN_SECRET,
+  LOVABLE_API_KEY 
+} from "../_shared/env.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -130,21 +134,20 @@ async function fetchWithRetries(url: string, init: RequestInit, maxRetries = 2) 
 // Handler
 // -----------------------------
 serve(async (req) => {
-  console.log("[alfie-render-carousel-slide] v2.4.0 — invoked");
+  console.log("[alfie-render-carousel-slide] v2.5.0 — invoked");
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  if (!INTERNAL_SECRET || req.headers.get("x-internal-secret") !== INTERNAL_SECRET) {
-    return json({ error: "Forbidden" }, 403);
+  // ✅ Validate internal secret FIRST
+  const secret = req.headers.get("x-internal-secret");
+  if (!secret || secret !== INTERNAL_FN_SECRET) {
+    console.error("[alfie-render-carousel-slide] ❌ Invalid or missing internal secret");
+    return json({ error: "Forbidden: invalid internal secret" }, 403);
   }
 
-  // Early ENV checks
-  const missingEnv = [
-    ["SUPABASE_URL", Deno.env.get("SUPABASE_URL")],
-    ["SUPABASE_SERVICE_ROLE_KEY", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")],
-    ["LOVABLE_API_KEY", Deno.env.get("LOVABLE_API_KEY")],
-  ].filter(([, v]) => !v).map(([k]) => k);
-  if (missingEnv.length) {
-    return json({ error: `Missing env vars: ${missingEnv.join(", ")}` }, 500);
+  // ✅ ENV validation using imported variables
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !LOVABLE_API_KEY) {
+    console.error("[alfie-render-carousel-slide] ❌ Missing critical env vars");
+    return json({ error: "Missing required environment variables" }, 500);
   }
 
   try {
@@ -170,8 +173,8 @@ serve(async (req) => {
 
     // —— Supabase admin client (service role)
     const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY,
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
@@ -180,7 +183,6 @@ serve(async (req) => {
     if (!prompt) missing.push("prompt");
     if (!globalStyle) missing.push("globalStyle");
     if (!slideContent?.title) missing.push("slideContent.title");
-    if (!slideContent?.alt) missing.push("slideContent.alt");
     if (!brandId) missing.push("brandId");
     if (!orderId) missing.push("orderId");
     if (!carouselId) missing.push("carouselId");
@@ -246,9 +248,11 @@ serve(async (req) => {
     if (!normTitle) {
       return json({ error: "slideContent.title cannot be empty after normalization" }, 400);
     }
-    if (!slideContent.alt || !String(slideContent.alt).trim()) {
-      return json({ error: "slideContent.alt is required" }, 400);
-    }
+    
+    // Generate alt text if missing
+    const altText = slideContent.alt && String(slideContent.alt).trim()
+      ? String(slideContent.alt).trim()
+      : normTitle || normSubtitle || "Carousel slide image";
 
     // =========================================
     // STEP 1/4 — Upload texte JSON (RAW)
@@ -259,7 +263,7 @@ serve(async (req) => {
         title: normTitle,
         subtitle: normSubtitle,
         bullets: normBullets,
-        alt: slideContent.alt,
+        alt: altText,
       },
       {
         brandId,
@@ -275,7 +279,6 @@ serve(async (req) => {
     // STEP 2/4 — Générer background (Lovable AI)
     // =========================================
     console.log(`[render-slide] ${logCtx} 2/4 Generate background via Lovable AI`);
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
     const enrichedPrompt = buildImagePrompt(globalStyle, prompt);
 
     const aiRes = await fetchWithRetries(
@@ -406,6 +409,7 @@ serve(async (req) => {
           title: normTitle,
           subtitle: normSubtitle,
           bullets: normBullets,
+          alt: altText,
           slideIndex,
           renderVersion,
           textVersion,
@@ -430,7 +434,7 @@ serve(async (req) => {
         title: normTitle,
         subtitle: normSubtitle,
         bullets: normBullets,
-        alt: slideContent.alt,
+        alt: altText,
         text_public_id: textPublicId,
         text_version: textVersion,
         render_version: renderVersion,
@@ -462,6 +466,7 @@ serve(async (req) => {
         title: normTitle,
         subtitle: normSubtitle,
         bullets: normBullets,
+        alt: altText,
         slideIndex,
         totalSlides,
         renderVersion,

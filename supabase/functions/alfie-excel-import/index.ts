@@ -61,7 +61,6 @@ serve(async (req) => {
         brand_id: brandId || null,
         campaign_name: campaignName || 'Imported Campaign',
         brief_json: {},
-        status: 'draft',
       })
       .select()
       .single();

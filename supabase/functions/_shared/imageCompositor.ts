@@ -1,3 +1,5 @@
+import { encodeCloudinaryText } from "./cloudinaryText.ts";
+
 // Phase 5: Compositeur d'images via Cloudinary - Text Overlay natif
 
 // ============= TYPES =============
@@ -30,18 +32,6 @@ type TextLayer = {
 };
 
 // ============= ENCODING & LAYER BUILDING =============
-
-/**
- * Encode text safely for Cloudinary URLs
- */
-function encodeCloudinaryText(text: string): string {
-  return encodeURIComponent(text)
-    .replace(/%2C/g, '%252C')
-    .replace(/%2F/g, '%252F')
-    .replace(/%3A/g, '%253A')
-    .replace(/%23/g, '%2523')
-    .replace(/\n/g, '%0A');
-}
 
 /**
  * Build a single text layer transformation for Cloudinary

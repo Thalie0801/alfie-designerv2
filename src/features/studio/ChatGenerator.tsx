@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { Upload, Wand2, Download, X, Sparkles, Loader2 } from "lucide-react";
+import { Upload, Wand2, Download, X, Sparkles, Loader2, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -8,9 +8,10 @@ import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { uploadToChatBucket } from "@/lib/chatUploads";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { toast } from "sonner";
+import { useQueueMonitor } from "@/hooks/useQueueMonitor";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type GeneratedAsset = {
   url: string;
@@ -46,7 +47,7 @@ type MediaEntry = {
   id: string;
   type: string;
   status: string;
-  order_id: string | null;
+  order_id?: string | null;
   output_url: string | null;
   thumbnail_url?: string | null;
   metadata?: Record<string, any> | null;
@@ -85,13 +86,48 @@ const ASPECT_TO_TW: Record<AspectRatio, string> = {
   "16:9": "aspect-video",
 };
 
-const IMAGE_SIZE_MAP: Record<AspectRatio, { width: number; height: number }> = {
-  "1:1": { width: 1024, height: 1024 },
-  "9:16": { width: 1024, height: 1820 },
-  "16:9": { width: 1820, height: 1024 },
-};
 
 const CURRENT_JOB_VERSION = 2;
+
+const UNKNOWN_REFRESH_ERROR = "Erreur inconnue pendant le rafraîchissement";
+
+function resolveRefreshErrorMessage(error: unknown): string {
+  if (!error) return UNKNOWN_REFRESH_ERROR;
+
+  if (error instanceof Error && error.message?.trim()) {
+    return error.message;
+  }
+
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+
+  if (typeof error === "object") {
+    const candidate = error as Record<string, unknown>;
+    const status =
+      typeof candidate.status === "number"
+        ? candidate.status
+        : typeof candidate.code === "number"
+          ? candidate.code
+          : undefined;
+
+    const messages: Array<unknown> = [
+      candidate.message,
+      candidate.error_description,
+      candidate.error,
+      candidate.details,
+      candidate.hint,
+    ];
+
+    for (const value of messages) {
+      if (typeof value === "string" && value.trim()) {
+        return status ? `${value} (code ${status})` : value;
+      }
+    }
+  }
+
+  return UNKNOWN_REFRESH_ERROR;
+}
 
 function extractMediaUrl(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
@@ -114,7 +150,6 @@ function extractMediaUrl(payload: unknown): string | null {
 }
 
 export function ChatGenerator() {
-  const { user } = useAuth();
   const { activeBrandId } = useBrandKit();
   const location = useLocation();
   const navigate = useNavigate();
@@ -142,8 +177,23 @@ export function ChatGenerator() {
   const [assets, setAssets] = useState<MediaEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isTriggeringWorker, setIsTriggeringWorker] = useState(false);
 
   const { toast: showToast } = useToast();
+
+  // ✅ Monitor queue status
+  const { data: queueData } = useQueueMonitor(true);
+
+  // Calculate stuck jobs
+  const stuckJobs = useMemo(() => {
+    return jobs.filter(j => {
+      if (j.status !== "queued") return false;
+      const updatedAt = new Date(j.updated_at).getTime();
+      const now = Date.now();
+      const minutesSinceUpdate = (now - updatedAt) / (1000 * 60);
+      return minutesSinceUpdate > 10; // Stuck if queued for >10 minutes
+    });
+  }, [jobs]);
 
   const jobBadgeVariant = (status: string): "default" | "secondary" | "outline" | "destructive" => {
     switch (status) {
@@ -193,9 +243,10 @@ export function ChatGenerator() {
       if (!currentUser) throw new Error("Non authentifié");
 
       let jobsQuery = supabase
-        .from("v_job_queue_active")
+        .from("job_queue")
         .select("*")
         .eq("user_id", currentUser.id)
+        .in("status", ["queued", "running", "completed", "failed"])
         .order("created_at", { ascending: false })
         .limit(50);
 
@@ -220,12 +271,10 @@ export function ChatGenerator() {
       if (assetsResponse.error) throw assetsResponse.error;
 
       setJobs((jobsResponse.data as JobEntry[]) ?? []);
-      setAssets((assetsResponse.data as MediaEntry[]) ?? []);
+      setAssets((assetsResponse.data || []) as MediaEntry[]);
     } catch (err) {
       console.error("[Studio] refetchAll error:", err);
-      setJobs([]);
-      setAssets([]);
-      const message = err instanceof Error ? err.message : "Erreur inconnue pendant le rafraîchissement";
+      const message = resolveRefreshErrorMessage(err);
       setError(message);
     } finally {
       setLoading(false);
@@ -295,13 +344,12 @@ export function ChatGenerator() {
           throw new Error("Impossible de relancer ce job sans payload");
         }
 
-        const { error: insertError } = await supabase.from("job_queue").insert({
-          user_id: job.user_id,
+        const { error: insertError } = await supabase.from("job_queue").insert([{
           order_id: job.order_id,
           type: job.type,
-          status: "queued",
+          status: "queued" as const,
           payload,
-        });
+        }] as any);
 
         if (insertError) throw insertError;
 
@@ -444,25 +492,35 @@ export function ChatGenerator() {
     setGeneratedAsset(null);
 
     try {
-      const targetFunction = uploadedSource
-        ? "alfie-generate-ai-image"
-        : "alfie-render-image";
+      // ✅ Phase A: Get session token for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const targetFunction = "alfie-render-image";
+
+      const resolutionMap: Record<AspectRatio, string> = {
+        "1:1": "1024x1024",
+        "9:16": "1080x1920",
+        "16:9": "1920x1080",
+      };
 
       const payload: Record<string, unknown> = {
         prompt: prompt || "transform this",
-        aspectRatio,
+        brand_id: activeBrandId ?? null,
+        resolution: resolutionMap[aspectRatio],
       };
 
       if (uploadedSource) {
-        payload.sourceUrl = uploadedSource.url;
-      } else {
-        const size = IMAGE_SIZE_MAP[aspectRatio];
-        payload.width = size.width;
-        payload.height = size.height;
+        // Pass uploaded image as reference for style/composition
+        payload.templateImageUrl = uploadedSource.url;
       }
+
+      // ✅ Phase A: Include Authorization header if token is available
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
 
       const { data, error } = await supabase.functions.invoke(targetFunction, {
         body: payload,
+        headers,
       });
 
       if (error) throw error;
@@ -483,7 +541,7 @@ export function ChatGenerator() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [prompt, uploadedSource, aspectRatio, showToast]);
+  }, [prompt, uploadedSource, aspectRatio, activeBrandId, showToast]);
 
   const handleGenerateVideo = useCallback(async () => {
     try {
@@ -582,6 +640,26 @@ export function ChatGenerator() {
     setPrompt(example);
   };
 
+  // ✅ Trigger manual worker
+  const handleTriggerWorker = useCallback(async () => {
+    setIsTriggeringWorker(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('trigger-job-worker', {});
+      
+      if (error) throw error;
+      
+      toast.success(`Worker déclenché: ${data?.jobsQueued || 0} jobs à traiter`);
+      
+      // Refresh jobs after triggering
+      await refetchAll();
+    } catch (err) {
+      console.error('[Studio] trigger worker error:', err);
+      toast.error(`Échec du déclenchement: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+    } finally {
+      setIsTriggeringWorker(false);
+    }
+  }, [refetchAll]);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -595,6 +673,50 @@ export function ChatGenerator() {
             Créez des images et vidéos avec l'IA
           </p>
         </div>
+
+        {/* ✅ Queue Monitor */}
+        {queueData && (
+          <Alert className="mb-6">
+            <Clock className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="text-sm">
+                  <strong>{queueData.counts.queued}</strong> en attente
+                </span>
+                <span className="text-sm">
+                  <strong>{queueData.counts.running}</strong> en cours
+                </span>
+                {queueData.counts.failed > 0 && (
+                  <span className="text-sm text-destructive">
+                    <AlertCircle className="inline w-3 h-3 mr-1" />
+                    <strong>{queueData.counts.failed}</strong> échecs
+                  </span>
+                )}
+                {queueData.counts.completed_24h !== undefined && (
+                  <span className="text-sm text-muted-foreground">
+                    <CheckCircle className="inline w-3 h-3 mr-1" />
+                    {queueData.counts.completed_24h} générés (24h)
+                  </span>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleTriggerWorker}
+                disabled={isTriggeringWorker || queueData.counts.queued === 0}
+              >
+                {isTriggeringWorker ? (
+                  <>
+                    <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                    Traitement...
+                  </>
+                ) : (
+                  'Forcer le traitement'
+                )}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Controls */}
         <Card className="p-6 mb-6 space-y-6">
@@ -777,6 +899,25 @@ export function ChatGenerator() {
             </div>
             {error && <div className="text-xs text-red-600 mt-2">{error}</div>}
 
+            {/* Stuck Jobs Alert */}
+            {stuckJobs.length > 0 && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {stuckJobs.length} job{stuckJobs.length > 1 ? 's' : ''} bloqué{stuckJobs.length > 1 ? 's' : ''} détecté{stuckJobs.length > 1 ? 's' : ''} (&gt;10 min en attente).
+                  <Button 
+                    variant="link" 
+                    size="sm"
+                    className="ml-2 h-auto p-0 text-destructive underline"
+                    onClick={handleTriggerWorker}
+                    disabled={isTriggeringWorker}
+                  >
+                    Forcer le traitement
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+
             {loading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -824,7 +965,7 @@ export function ChatGenerator() {
                           <span className="break-words flex-1">{jobError}</span>
                           <Button
                             variant="ghost"
-                            size="xs"
+                            size="sm"
                             disabled={isLegacy}
                             title={
                               isLegacy

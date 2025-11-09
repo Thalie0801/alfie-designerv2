@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { uploadToCloudinary } from "../_shared/cloudinaryUploader.ts";
 import { consumeBrandQuotas } from "../_shared/quota.ts";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, INTERNAL_FN_SECRET } from "../_shared/env.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,8 +23,8 @@ type JobRow = {
 };
 
 const supabaseAdmin = createClient(
-  Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  SUPABASE_URL ?? "",
+  SUPABASE_SERVICE_ROLE_KEY ?? "",
   { auth: { autoRefreshToken: false, persistSession: false } },
 );
 
@@ -57,26 +58,22 @@ function isHttp402(e: unknown) {
 }
 
 async function callFn<T = unknown>(name: string, body: unknown): Promise<T> {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  const internalSecret = Deno.env.get("INTERNAL_FN_SECRET");
-
-  if (!supabaseUrl || !anonKey) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error(`Missing Supabase configuration for ${name}`);
   }
-  if (!internalSecret) {
+  if (!INTERNAL_FN_SECRET) {
     throw new Error(`Missing INTERNAL_FN_SECRET for ${name}`);
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60000);
+  const timeout = setTimeout(() => controller.abort(), 60_000);
 
   try {
-    const resp = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${anonKey}`,
-        "X-Internal-Secret": internalSecret,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "X-Internal-Secret": INTERNAL_FN_SECRET,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body ?? {}),
@@ -85,12 +82,7 @@ async function callFn<T = unknown>(name: string, body: unknown): Promise<T> {
 
     const text = await resp.text().catch(() => "");
     if (!resp.ok) {
-      console.error(`❌ ${name} failed:`, {
-        status: resp.status,
-        statusText: resp.statusText,
-        response: text.substring(0, 500)
-      });
-      throw new Error(`${name} failed: ${resp.status} ${resp.statusText} - ${text.substring(0, 200)}`);
+      throw new Error(`${name} failed: ${resp.status} ${resp.statusText} ${text}`);
     }
 
     try {
@@ -98,8 +90,11 @@ async function callFn<T = unknown>(name: string, body: unknown): Promise<T> {
     } catch {
       return text as unknown as T;
     }
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
+  } catch (error: unknown) {
+    const isAbort =
+      (error as any)?.name === "AbortError" ||
+      (error instanceof DOMException && error.name === "AbortError");
+    if (isAbort) {
       throw new Error(`${name} timed out after 60s`);
     }
     throw error;
@@ -152,10 +147,12 @@ function deepGet(obj: any, key: string): any {
 
 // ---------- HTTP Entrypoint ----------
 serve(async (req) => {
+  console.log("[alfie-job-worker] 🚀 Invoked at", new Date().toISOString());
+  
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    console.log("🚀 [Worker] Boot");
+    console.log("🚀 [Worker] Starting job processing...");
 
     // Basic env sanity
     console.log("🧪 env", {
@@ -169,7 +166,7 @@ serve(async (req) => {
       .from("job_queue")
       .select("*", { count: "exact", head: true })
       .eq("status", "queued");
-    console.log("🧪 probe.queue_count", queued ?? 0);
+    console.log("[WORKER] Boot: " + (queued ?? 0) + " jobs queued in job_queue");
 
     // Process a small batch to avoid function timeout
     const results: Array<{ job_id: string; success: boolean; error?: string; retried?: boolean }> = [];
@@ -219,6 +216,27 @@ serve(async (req) => {
         console.log("✅ job_done", { id: job.id, type: job.type });
         processed++;
         results.push({ job_id: job.id, success: true });
+
+        // Check for remaining jobs and reinvoke if needed
+        const { data: remainingJobs } = await supabaseAdmin
+          .from("job_queue")
+          .select("id")
+          .eq("status", "queued")
+          .limit(1);
+
+        if (remainingJobs && remainingJobs.length > 0) {
+          console.log("[alfie-job-worker] 🔁 Remaining jobs detected, reinvoking...");
+          try {
+            const { error: invokeError } = await supabaseAdmin.functions.invoke("alfie-job-worker", {
+              body: { trigger: "self-reinvoke" }
+            });
+            if (invokeError) {
+              console.error("[alfie-job-worker] ⚠️ Reinvoke failed:", invokeError);
+            }
+          } catch (e) {
+            console.error("[alfie-job-worker] ⚠️ Reinvoke error:", e);
+          }
+        }
 
         // Cascade for text → generate children jobs
         if (job.type === "generate_texts") {
@@ -393,6 +411,7 @@ async function processRenderImages(payload: any) {
     aspectRatio: "1:1" | "4:5" | "9:16" | "16:9";
     brandId?: string;
     briefIndex?: number;
+    templateImageUrl?: string;
   }> = [];
 
   if (payload.images) {
@@ -558,77 +577,39 @@ Format: ${aspectRatio} aspect ratio optimized.`;
 }
 
 async function processRenderCarousels(payload: any) {
-  console.log("📚 [processRenderCarousels]");
+  console.log("📚 [processRenderCarousels] START", {
+    hasSlides: !!payload?.slides,
+    slidesCount: Array.isArray(payload?.slides) ? payload.slides.length : 0,
+    hasBrief: !!payload?.brief,
+    briefCount: payload?.brief?.briefs?.length || 0,
+    userId: payload?.userId,
+    brandId: payload?.brandId,
+    orderId: payload?.orderId
+  });
 
-  if (Array.isArray(payload?.slides) && payload.slides.length > 0) {
-    const { userId, brandId, orderId } = payload || {};
-    if (!userId || !brandId || !orderId) {
-      throw new Error("Invalid render_carousels payload");
-    }
-
-    const resp = await callFn<any>("alfie-render-carousel", {
-      brandId,
-      orderId,
-      slides: payload.slides,
-      sourceUrl: payload?.sourceUrl ?? null,
-      userId,
-    });
-    const data = resp as any;
-    const error = data && data.error ? { message: data.error } : null;
-    if (error || (data as any)?.error) {
-      const message = (data as any)?.error || error?.message || "render_carousel_failed";
-      throw new Error(message);
-    }
-
-    const slideUrls: string[] = Array.isArray((data as any)?.slide_urls)
-      ? ((data as any).slide_urls as string[])
-      : Array.isArray((data as any)?.slides)
-        ? (data as any).slides
-            .map((item: any) => (typeof item === "string" ? item : item?.url))
-            .filter((url: unknown): url is string => typeof url === "string" && url.startsWith("http"))
-        : [];
-
-    if (!slideUrls.length) {
-      throw new Error("No slides returned");
-    }
-
-    const expiresAt = new Date(Date.now() + THIRTY_DAYS_MS).toISOString();
-
-    const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
-      user_id: userId,
-      brand_id: brandId,
-      order_id: orderId,
-      type: "carousel",
-      status: "completed",
-      output_url: slideUrls[0],
-      metadata: { slides_count: slideUrls.length, slides: slideUrls },
-      expires_at: expiresAt,
-    });
-    if (mediaErr) throw new Error(mediaErr.message);
-
-    await Promise.all(
-      slideUrls.map((url, idx) =>
-        supabaseAdmin.from("library_assets").insert({
-          user_id: userId,
-          brand_id: brandId,
-          order_id: orderId,
-          type: "image",
-          cloudinary_url: url,
-          src_url: url,
-          title: `Slide ${idx + 1}`,
-          tags: ["carousel", `slide_${idx + 1}`],
-          expires_at: expiresAt,
-          metadata: { orderId, slideIndex: idx, total: slideUrls.length },
-        } as any),
-      ),
-    );
-
-    return { slide_urls: slideUrls };
-  }
+  // ✅ Phase B: Removed alfie-render-carousel call (function doesn't exist)
+  // Always convert payload.slides to carousel object and use slide-by-slide rendering
 
   let carouselsToRender: any[] = [];
 
-  if (payload.carousels) {
+  // ✅ Phase B: Handle payload.slides by converting to carousel format
+  if (Array.isArray(payload?.slides) && payload.slides.length > 0) {
+    const { userId, brandId, orderId } = payload || {};
+    if (!userId || !brandId || !orderId) {
+      throw new Error("Invalid render_carousels payload: missing userId, brandId, or orderId");
+    }
+
+    // Convert slides array to carousel object for slide-by-slide processing
+    carouselsToRender = [{
+      id: crypto.randomUUID(),
+      aspectRatio: payload.aspectRatio || "9:16",
+      textVersion: 1,
+      slides: payload.slides,
+      prompts: payload.slides.map((_: any, i: number) => `Slide ${i + 1}`),
+      style: "minimalist",
+      brandId,
+    }];
+  } else if (payload.carousels) {
     carouselsToRender = payload.carousels;
   } else if (payload.brief) {
     const { briefs } = payload.brief;
@@ -779,7 +760,9 @@ async function processGenerateVideo(payload: any) {
 
   const { userId, brandId, orderId, aspectRatio, duration, prompt, sourceUrl, sourceType } = payload;
 
-  const assembleResult = await callFn<any>("alfie-assemble-video", {
+  // ✅ Phase C: Use existing generate-video function instead of non-existent alfie-assemble-video
+  const renderResult = await callFn<any>("generate-video", {
+    userId, // ✅ Required for internal call validation
     aspectRatio,
     duration,
     prompt,
@@ -789,17 +772,17 @@ async function processGenerateVideo(payload: any) {
     orderId,
   });
 
-  const assemblePayload = unwrapResult<any>(assembleResult);
-  const assembleError = extractError(assembleResult) ?? extractError(assemblePayload);
-  if (assembleError) throw new Error(assembleError || "Video assembly failed");
+  const renderPayload = unwrapResult<any>(renderResult);
+  const renderError = extractError(renderResult) ?? extractError(renderPayload);
+  if (renderError) throw new Error(renderError || "Video render failed");
 
   let videoUrl =
-    (typeof assemblePayload === "string"
-      ? assemblePayload
-      : getResultValue<string>(assemblePayload, ["video_url", "videoUrl", "output_url", "outputUrl"])) ??
-    getResultValue<string>(assembleResult, ["video_url", "videoUrl", "output_url", "outputUrl"]);
+    (typeof renderPayload === "string"
+      ? renderPayload
+      : getResultValue<string>(renderPayload, ["video_url", "videoUrl", "output_url", "outputUrl"])) ??
+    getResultValue<string>(renderResult, ["video_url", "videoUrl", "output_url", "outputUrl"]);
 
-  if (!videoUrl) throw new Error("Missing video_url from assembler response");
+  if (!videoUrl) throw new Error("Missing video_url from renderer response");
 
   const seconds = Number(duration) || 12;
   const woofs = Math.max(1, Math.ceil(seconds / 12));
@@ -823,7 +806,7 @@ async function processGenerateVideo(payload: any) {
       prompt,
       sourceUrl,
       sourceType,
-      generator: "assemble-video",
+      generator: "generate-video",
       woofs,
     },
   });

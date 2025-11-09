@@ -3,6 +3,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { consumeBrandQuotas } from "../_shared/quota.ts";
 import { incrementMonthlyVisuals } from "../_shared/quotaUtils.ts";
 import { userHasAccess } from "../_shared/accessControl.ts";
+import { 
+  SUPABASE_URL, 
+  SUPABASE_SERVICE_ROLE_KEY,
+  LOVABLE_API_KEY 
+} from "../_shared/env.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,9 +22,14 @@ serve(async (req) => {
   try {
     console.log("[alfie-generate-ai-image] Request received");
     
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
+      console.error("[generate-ai-image] ❌ Missing LOVABLE_API_KEY");
       throw new Error('LOVABLE_API_KEY is not configured');
+    }
+    
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("[generate-ai-image] ❌ Missing Supabase credentials");
+      throw new Error('Missing Supabase configuration');
     }
 
     // Get authenticated user
@@ -34,9 +44,7 @@ serve(async (req) => {
       );
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseClient = createClient(supabaseUrl, supabaseKey);
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Verify user and get active brand
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(authHeader);
@@ -226,11 +234,8 @@ serve(async (req) => {
 
     let finalUrl = generatedImageUrl;
     try {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL');
-      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-      if (supabaseUrl && supabaseKey) {
-        const assetClient = createClient(supabaseUrl, supabaseKey, {
+      if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+        const assetClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
           auth: { autoRefreshToken: false, persistSession: false }
         });
 

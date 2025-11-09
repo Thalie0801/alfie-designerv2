@@ -1,6 +1,5 @@
 import { cleanText } from './utils';
-
-const enc = (t: string) => encodeURIComponent(t);
+import { encodeOverlayText } from './text';
 
 /**
  * Générer un reel animé depuis une image statique
@@ -25,10 +24,10 @@ export function reelFromImageUrl(
   const s = cleanText(o.subtitle ?? '', 220);
 
   if (t) {
-    overlays.push(`l_text:Arial_72_bold:${enc(t)},co_rgb:FFFFFF,g_south,y_280,w_980,c_fit`);
+    overlays.push(`l_text:Arial_72_bold:${encodeOverlayText(t)},co_rgb:FFFFFF,g_south,y_280,w_980,c_fit`);
   }
   if (s) {
-    overlays.push(`l_text:Arial_42:${enc(s)},co_rgb:E5E7EB,g_south,y_160,w_900,c_fit`);
+    overlays.push(`l_text:Arial_42:${encodeOverlayText(s)},co_rgb:E5E7EB,g_south,y_160,w_900,c_fit`);
   }
 
   const tf = `du_${dur},f_mp4/${overlays.join('/')}`;
