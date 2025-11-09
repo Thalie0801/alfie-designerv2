@@ -6,6 +6,9 @@ type GenerationResponse = {
   job_id: string;
 };
 
+type ProcessJobWorkerResponse = {
+  ok?: boolean;
+  processed?: number;
 type ProcessQueueResponse = {
   ok: boolean;
   processed: number;
@@ -20,6 +23,13 @@ export async function createGeneration(brandId: string, payload: any) {
 }
 
 export async function forceProcess() {
+  const { data, error } = await supabase.functions.invoke('process-job-worker', {
+    body: { source: 'studio-force' },
+  });
+  if (error) {
+    throw new Error(`process-job-worker: ${error.message}`);
+  }
+  return data as ProcessJobWorkerResponse | unknown;
   const { data, error } = await supabase.functions.invoke('alfie-process-queue', {
     body: {},
   });

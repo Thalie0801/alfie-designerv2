@@ -19,15 +19,15 @@ export function env(...keys: string[]): string | undefined {
 }
 
 // ✅ Public variables (accept VITE_* prefix for Lovable compatibility)
-export const SUPABASE_URL = env('SUPABASE_URL', 'VITE_SUPABASE_URL');
-export const SUPABASE_ANON_KEY = env('SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY');
+export const SUPABASE_URL = env('SUPABASE_URL', 'VITE_SUPABASE_URL') ?? '';
+export const SUPABASE_ANON_KEY = env('SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY') ?? '';
 
 // ✅ Private secrets (no VITE_ prefix - these must stay secret)
-export const SUPABASE_SERVICE_ROLE_KEY = env('SUPABASE_SERVICE_ROLE_KEY', 'SERVICE_ROLE_KEY', 'VITE_SUPABASE_SERVICE_ROLE_KEY');
-export const INTERNAL_FN_SECRET = env('INTERNAL_FN_SECRET', 'INTERNAL_SECRET');
+export const SUPABASE_SERVICE_ROLE_KEY = env('SUPABASE_SERVICE_ROLE_KEY', 'SERVICE_ROLE_KEY', 'VITE_SUPABASE_SERVICE_ROLE_KEY') ?? '';
+export const INTERNAL_FN_SECRET = env('INTERNAL_FN_SECRET', 'INTERNAL_SECRET') ?? '';
 
 // ✅ API Keys and other secrets
-export const LOVABLE_API_KEY = env('LOVABLE_API_KEY');
+export const LOVABLE_API_KEY = env('LOVABLE_API_KEY') ?? '';
 export const CLOUDINARY_CLOUD_NAME = env('CLOUDINARY_CLOUD_NAME');
 export const CLOUDINARY_API_KEY = env('CLOUDINARY_API_KEY');
 export const CLOUDINARY_API_SECRET = env('CLOUDINARY_API_SECRET');

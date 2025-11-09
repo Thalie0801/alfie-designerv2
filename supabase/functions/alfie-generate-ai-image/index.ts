@@ -204,16 +204,32 @@ serve(async (req) => {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error("Supabase env not configured");
     }
-    if (!INTERNAL_FN_SECRET) throw new Error("INTERNAL_FN_SECRET not configured");
 
     const body = (await req.json()) as GenerateRequest;
 
-    const secret = req.headers.get("X-Internal-Secret");
-    if (secret !== INTERNAL_FN_SECRET) {
-      return jsonRes({ error: "Forbidden" }, { status: 403 });
+    const sbService = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    const authHeader = req.headers.get("Authorization");
+    const bearer = authHeader?.replace(/^Bearer\s+/i, "").trim();
+
+    const isInternal =
+      !!INTERNAL_FN_SECRET &&
+      req.headers.get("X-Internal-Secret") === INTERNAL_FN_SECRET;
+
+    let userIdFromJwt: string | null = null;
+    if (bearer) {
+      const { data, error } = await sbService.auth.getUser(bearer);
+      if (!error && data?.user?.id) {
+        userIdFromJwt = data.user.id;
+      }
     }
 
-    const userId = typeof body.userId === "string" ? body.userId : null;
+    if (!isInternal && !userIdFromJwt) {
+      return jsonRes({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userId =
+      typeof body.userId === "string" ? body.userId : userIdFromJwt ?? null;
     const brandId = typeof body.brandId === "string" ? body.brandId : null;
     const orderId = typeof body.orderId === "string" ? body.orderId : null;
     const orderItemId = typeof body.orderItemId === "string" ? body.orderItemId : null;
@@ -225,8 +241,6 @@ serve(async (req) => {
     if (!orderId) {
       console.warn("[alfie-generate-ai-image] Missing orderId in payload");
     }
-
-    const sbService = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // --- Construire prompts & payload ---
     const systemPrompt = buildSystemPrompt(body.resolution);
