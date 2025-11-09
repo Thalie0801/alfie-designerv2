@@ -14,7 +14,12 @@ type JobRow = {
   id: string;
   user_id: string;
   order_id: string;
-  type: "generate_texts" | "render_images" | "render_carousels" | "generate_video";
+  type:
+    | "generate_texts"
+    | "render_images"
+    | "render_carousels"
+    | "generate_video"
+    | "api_generate_image";
   status: "queued" | "running" | "completed" | "failed";
   retry_count: number | null;
   max_retries: number | null;
@@ -145,6 +150,21 @@ function deepGet(obj: any, key: string): any {
   return null;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function pickStringRecord(value: unknown): Record<string, string> | undefined {
+  if (!isRecord(value)) return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(value)) {
+    if (typeof raw === "string" && raw.trim().length > 0) {
+      out[key] = raw.trim();
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 // ---------- HTTP Entrypoint ----------
 serve(async (req) => {
   console.log("[alfie-job-worker] 🚀 Invoked at", new Date().toISOString());
@@ -203,6 +223,9 @@ serve(async (req) => {
             break;
           case "generate_video":
             result = await processGenerateVideo(job.payload);
+            break;
+          case "api_generate_image":
+            result = await processApiGenerateImage(job);
             break;
           default:
             throw new Error(`Unknown job type: ${job.type}`);
@@ -326,6 +349,107 @@ async function processGenerateTexts(payload: any) {
   const content = data?.choices?.[0]?.message?.content ?? "{}";
 
   return { texts: content, count, type };
+}
+
+async function processApiGenerateImage(job: JobRow) {
+  const payload = isRecord(job.payload) ? job.payload : {};
+
+  const provider = typeof payload.provider === "string" ? payload.provider : "alfie-generate-ai-image";
+  if (provider !== "alfie-generate-ai-image") {
+    throw new Error(`Unsupported provider ${provider}`);
+  }
+
+  const promptRaw = payload.prompt;
+  const prompt = typeof promptRaw === "string" && promptRaw.trim().length > 0 ? promptRaw : null;
+  if (!prompt) {
+    throw new Error("Missing prompt in api_generate_image payload");
+  }
+
+  const userId =
+    typeof payload.userId === "string" && payload.userId.trim().length > 0 ? payload.userId : job.user_id;
+  if (!userId) {
+    throw new Error("Missing userId in api_generate_image payload");
+  }
+
+  const brandId = typeof payload.brandId === "string" && payload.brandId ? payload.brandId : null;
+  const jobSetId = typeof payload.jobSetId === "string" && payload.jobSetId ? payload.jobSetId : null;
+
+  const providerBody: Record<string, unknown> = {
+    prompt,
+    brandId,
+    brandKit: payload.brandKit ?? null,
+    userId,
+  };
+
+  if (typeof payload.orderId === "string") providerBody.orderId = payload.orderId;
+  if (typeof payload.orderItemId === "string") providerBody.orderItemId = payload.orderItemId;
+  if (typeof payload.requestId === "string") providerBody.requestId = payload.requestId;
+  if (typeof payload.backgroundOnly === "boolean") providerBody.backgroundOnly = payload.backgroundOnly;
+  if (typeof payload.templateImageUrl === "string") providerBody.templateImageUrl = payload.templateImageUrl;
+  if (typeof payload.uploadedSourceUrl === "string") providerBody.uploadedSourceUrl = payload.uploadedSourceUrl;
+  if (typeof payload.resolution === "string") providerBody.resolution = payload.resolution;
+  if (typeof payload.overlayText === "string") providerBody.overlayText = payload.overlayText;
+  if (typeof payload.negativePrompt === "string") providerBody.negativePrompt = payload.negativePrompt;
+  if (typeof payload.slideIndex === "number") providerBody.slideIndex = payload.slideIndex;
+  if (typeof payload.totalSlides === "number") providerBody.totalSlides = payload.totalSlides;
+  if (typeof payload.carouselId === "string") providerBody.carouselId = payload.carouselId;
+  if (typeof payload.seed === "string") providerBody.seed = payload.seed;
+
+  const providerResponse = await callFn<any>(provider, providerBody);
+  const responseData = unwrapResult<any>(providerResponse);
+  const providerError = extractError(providerResponse) ?? extractError(responseData);
+  if (providerError) {
+    throw new Error(providerError);
+  }
+
+  const directUrl =
+    getResultValue<string>(responseData, [
+      "imageUrl",
+      "image_url",
+      "url",
+      "secure_url",
+      "secureUrl",
+      "outputUrl",
+      "output_url",
+    ]) ?? (typeof responseData === "string" ? responseData : null);
+
+  if (!directUrl) {
+    throw new Error("Provider did not return imageUrl");
+  }
+
+  const uploadRaw = isRecord(payload.upload) ? payload.upload : undefined;
+  const folderRaw = typeof uploadRaw?.folder === "string" ? uploadRaw.folder.trim() : null;
+  let tags: string[] | undefined;
+  if (uploadRaw && Array.isArray(uploadRaw.tags)) {
+    const filtered = uploadRaw.tags.filter(
+      (tag): tag is string => typeof tag === "string" && tag.trim().length > 0,
+    );
+    if (filtered.length) tags = filtered;
+  }
+  const context = pickStringRecord(uploadRaw?.context);
+
+  let folder = folderRaw && folderRaw.length > 0 ? folderRaw : null;
+  if (!folder) {
+    const segments = ["alfie"];
+    if (brandId) segments.push(String(brandId));
+    if (jobSetId) segments.push(String(jobSetId));
+    folder = segments.join("/");
+  }
+
+  const cloud = await uploadToCloudinary(directUrl, {
+    folder: folder ?? undefined,
+    tags,
+    context,
+  });
+
+  return {
+    provider,
+    imageUrl: cloud.secureUrl,
+    publicId: cloud.publicId,
+    brandId,
+    jobSetId,
+    meta: payload.metadata ?? payload.meta ?? null,
+  };
 }
 
 async function processRenderImage(payload: any) {
