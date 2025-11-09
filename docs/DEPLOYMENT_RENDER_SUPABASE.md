@@ -30,6 +30,7 @@ Les variables suivantes doivent être définies (déjà en place par défaut) :
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_SUPABASE_PROJECT_ID`
+- `VITE_EDGE_BASE_URL` (ex : `https://<YOUR-PROJECT-REF>.functions.supabase.co` pour activer le proxy hors preview)
 
 Si vous changez de projet Supabase, pensez à mettre à jour ces valeurs.
 
