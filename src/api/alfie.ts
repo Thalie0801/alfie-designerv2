@@ -6,9 +6,10 @@ type GenerationResponse = {
   job_id: string;
 };
 
-type ProcessJobWorkerResponse = {
-  ok?: boolean;
-  processed?: number;
+type ForceProcessJobsResponse = {
+  processed: number;
+  queuedBefore?: number;
+  queuedAfter?: number;
 };
 
 export async function createGeneration(brandId: string, payload: any) {
@@ -19,12 +20,12 @@ export async function createGeneration(brandId: string, payload: any) {
   return data as GenerationResponse;
 }
 
-export async function forceProcess() {
-  const { data, error } = await supabase.functions.invoke('process-job-worker', {
+export async function forceProcessJobs() {
+  const { data, error } = await supabase.functions.invoke('trigger-job-worker', {
     body: { source: 'studio-force' },
   });
   if (error) {
-    throw new Error(`process-job-worker: ${error.message}`);
+    throw new Error(`trigger-job-worker: ${error.message}`);
   }
-  return data as ProcessJobWorkerResponse | undefined;
+  return data as ForceProcessJobsResponse | undefined;
 }

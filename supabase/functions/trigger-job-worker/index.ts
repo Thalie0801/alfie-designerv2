@@ -40,18 +40,22 @@ serve(async (req) => {
 
     console.log(`[trigger-job-worker] Manual trigger by user ${user.id}`);
 
-    // Check if there are jobs to process
-    const { count } = await supabase
-      .from("job_queue")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "queued");
+    const countQueued = async () => {
+      const { count } = await supabase
+        .from("job_queue")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "queued");
+      return count ?? 0;
+    };
 
-    if (!count || count === 0) {
+    const queuedBefore = await countQueued();
+
+    if (queuedBefore === 0) {
       return new Response(
-        JSON.stringify({ 
-          ok: true, 
-          message: "No jobs to process",
-          jobsQueued: 0
+        JSON.stringify({
+          processed: 0,
+          queuedBefore,
+          queuedAfter: queuedBefore,
         }),
         {
           status: 200,
@@ -60,12 +64,12 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[trigger-job-worker] Found ${count} jobs queued, invoking worker...`);
+    console.log(`[trigger-job-worker] Found ${queuedBefore} jobs queued, invoking worker...`);
 
     // Invoke the worker using Supabase client
     const { data: workerData, error: workerError } = await supabase.functions.invoke(
-      'alfie-job-worker',
-      { body: { trigger: 'manual' } }
+      "alfie-job-worker",
+      { body: { trigger: "manual" } },
     );
 
     if (workerError) {
@@ -73,12 +77,33 @@ serve(async (req) => {
       throw new Error(`Worker invocation failed: ${workerError.message}`);
     }
 
+    const queuedAfter = await countQueued();
+
+    const extractProcessed = (input: any): number | null => {
+      if (input == null) return null;
+      if (typeof input === "number") return input;
+      if (typeof input === "object") {
+        if (typeof input.processed === "number") return input.processed;
+        if ("data" in input) return extractProcessed((input as any).data);
+      }
+      return null;
+    };
+
+    const workerProcessed = extractProcessed(workerData);
+    const processed = workerProcessed ?? Math.max(queuedBefore - queuedAfter, 0);
+
+    if (processed === 0 && queuedBefore > 0) {
+      console.warn(
+        `[trigger-job-worker] ⚠️ processed=0 with queuedBefore=${queuedBefore}, queuedAfter=${queuedAfter}`,
+        { workerData },
+      );
+    }
+
     return new Response(
       JSON.stringify({
-        ok: true,
-        message: `Worker triggered successfully`,
-        jobsQueued: count,
-        workerResponse: workerData,
+        processed,
+        queuedBefore,
+        queuedAfter,
       }),
       {
         status: 200,
@@ -88,7 +113,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("[trigger-job-worker] Error:", error);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         ok: false,
         error: error instanceof Error ? error.message : "Unknown error" 
       }),

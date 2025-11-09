@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabaseClient";
-import { createGeneration, forceProcess } from "@/api/alfie";
+import { createGeneration, forceProcessJobs } from "@/api/alfie";
 import { useToast } from "@/hooks/use-toast";
 import { uploadToChatBucket } from "@/lib/chatUploads";
 import { useLocation } from "react-router-dom";
@@ -303,7 +303,7 @@ export function ChatGenerator() {
         supabase.removeChannel(channel);
       }
     };
-  }, [refetchAll]);
+  }, [forceProcessJobs, refetchAll]);
 
   const requeueJob = useCallback(
     async (job: JobEntry) => {
@@ -555,7 +555,7 @@ export function ChatGenerator() {
     if (isForcing) return;
     setIsForcing(true);
     try {
-      const result = await forceProcess();
+      const result = await forceProcessJobs();
       const processed =
         typeof result?.processed === "number" ? result.processed : 0;
       toast.success(`Traitement forcé: ${processed} job(s).`);
@@ -568,6 +568,7 @@ export function ChatGenerator() {
     } finally {
       setIsForcing(false);
     }
+  }, [forceProcessJobs, refetchAll]);
   }, [forceProcess, isForcing, refetchAll]);
 
   return (
