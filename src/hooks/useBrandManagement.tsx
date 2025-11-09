@@ -3,12 +3,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { SYSTEM_CONFIG } from '@/config/systemConfig';
+import {
+  inviteProjectCollaborator,
+  listProjectCollaborators,
+} from '@/lib/lovable/collaborators';
 
 export type BrandTier = 'starter' | 'pro' | 'studio';
 
 export function useBrandManagement() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [collaboratorsLoading, setCollaboratorsLoading] = useState(false);
 
   /**
    * Crée une nouvelle marque (add-on "Marque +")
@@ -169,11 +174,74 @@ export function useBrandManagement() {
     return SYSTEM_CONFIG.UPGRADE_DIFF[key] || 0;
   };
 
+  const resolveLovableCredentials = (
+    projectId?: string,
+    token?: string,
+  ) => {
+    const resolvedProjectId = projectId ?? import.meta.env.VITE_LOVABLE_PROJECT_ID;
+    const resolvedToken = token ?? import.meta.env.VITE_LOVABLE_TOKEN;
+
+    if (!resolvedProjectId) {
+      throw new Error('Lovable projectId manquant');
+    }
+
+    if (!resolvedToken) {
+      throw new Error('Lovable token manquant');
+    }
+
+    return { projectId: resolvedProjectId, token: resolvedToken };
+  };
+
+  const fetchCollaborators = async (
+    projectId?: string,
+    token?: string,
+  ) => {
+    try {
+      setCollaboratorsLoading(true);
+      const creds = resolveLovableCredentials(projectId, token);
+      return await listProjectCollaborators(creds.projectId, creds.token);
+    } catch (error: any) {
+      console.error('Error fetching collaborators:', error);
+      toast.error(error?.message || 'Erreur lors du chargement des collaborateurs');
+      throw error;
+    } finally {
+      setCollaboratorsLoading(false);
+    }
+  };
+
+  const inviteCollaborator = async (
+    email: string,
+    projectId?: string,
+    token?: string,
+  ) => {
+    if (!email) {
+      toast.error('Email du collaborateur requis');
+      return null;
+    }
+
+    try {
+      setCollaboratorsLoading(true);
+      const creds = resolveLovableCredentials(projectId, token);
+      const result = await inviteProjectCollaborator(creds.projectId, creds.token, email);
+      toast.success(`Invitation envoyée à ${email}`);
+      return result;
+    } catch (error: any) {
+      console.error('Error inviting collaborator:', error);
+      toast.error(error?.message || "Erreur lors de l'invitation du collaborateur");
+      throw error;
+    } finally {
+      setCollaboratorsLoading(false);
+    }
+  };
+
   return {
     createAddonBrand,
     upgradeBrand,
     addWoofsPack,
     getUpgradeCost,
+    fetchCollaborators,
+    inviteCollaborator,
     loading,
+    collaboratorsLoading,
   };
 }
