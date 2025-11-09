@@ -1,36 +1,29 @@
 name: Refonte Codex (push→pull, disable autopublish)
-
 on:
   workflow_dispatch: {}
   push:
     branches: [ main, refonte-alfie-2025 ]
   pull_request:
     branches: [ main, refonte-alfie-2025 ]
-
 permissions:
   contents: write
   pull-requests: write
-
 concurrency:
   group: codex-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   codex:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-
       - name: Configure npm auth (optional)
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -41,18 +34,14 @@ jobs:
           else
             echo "No NPM_TOKEN secret; skipping npm auth."
           fi
-
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
-
       - name: Install dependencies
         run: |
           npm ci --prefer-online || (echo "retry npm ci…" && sleep 3 && npm ci --prefer-online)
-
       - name: Run Codex script
         shell: bash
         run: bash scripts/codex/run.sh
-
       # ---- Diff + Guard ----
       - name: Compute diff
         id: diff
@@ -73,7 +62,6 @@ jobs:
           echo "${FILES}" >> "$GITHUB_OUTPUT"
           echo "__EOF__" >> "$GITHUB_OUTPUT"
           echo "has_changes=true" >> "$GITHUB_OUTPUT"
-
       - name: "Guard — No landing changes"
         if: steps.diff.outputs.has_changes == 'true'
         shell: bash
@@ -88,7 +76,6 @@ jobs:
             exit 1
           fi
           echo "OK: aucune modification dans apps/landing, www ou site."
-
       # ---- PR seulement si changements + pas depuis un event PR ----
       - name: Create Pull Request
         if: steps.diff.outputs.has_changes == 'true' && github.event_name != 'pull_request'
