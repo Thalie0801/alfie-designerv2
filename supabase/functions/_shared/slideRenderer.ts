@@ -274,9 +274,9 @@ function escapeXml(text: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;')
-    // Échapper tous les caractères non-ASCII pour Cloudinary
-    .replace(/[^\p{ASCII}]/gu, (char) => `&#${char.charCodeAt(0)};`);
-    .replace(/[^\u0000-\u007F]/g, (char) => `&#${char.charCodeAt(0)};`);
-    // Use \u0020-\u007E to exclude control characters (0x00-0x1F and 0x7F)
-    .replace(/[^\u0020-\u007E]/g, (char) => `&#${char.charCodeAt(0)};`);
+    // Escape every non printable ASCII character for Cloudinary overlays
+    .replace(/[^\u0020-\u007E]/gu, (char) => {
+      const codePoint = char.codePointAt(0);
+      return codePoint ? `&#${codePoint};` : '';
+    });
 }

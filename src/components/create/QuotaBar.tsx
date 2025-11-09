@@ -308,16 +308,6 @@ export function QuotaBar({ activeBrandId }: QuotaBarProps) {
           <p className="text-xs text-muted-foreground">
             Plan actuel : <span className="font-semibold text-foreground">{quota.plan || "—"}</span>
           </p>
-        <div className="py-3">
-          <p className="text-xs text-muted-foreground">
-            Les vidéos consomment des Woofs : <strong>1 Woof par 12s</strong>. Les quotas se réinitialisent le 1er de chaque
-            mois.
-          </p>
-          <ul className="text-sm text-muted-foreground mt-2">
-            <li>• Draft 10s : version courte et économique (1 Woof).</li>
-            <li>• Batch de nuit : génère plusieurs assets d’un coup.</li>
-            <li>• Templates : adaptation auto avec ton Brand Kit.</li>
-          </ul>
         </div>
       </div>
     </details>
