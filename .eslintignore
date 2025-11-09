@@ -1,5 +1,0 @@
-# Exclude examples, demos, and assistant code from CI linting
-examples/**
-apps/assistant/**
-**/*.generated.*
-**/vendor/**

@@ -5,27 +5,24 @@ import { cn } from "@/lib/utils";
 type Asset = {
   id: string;
   type: "image" | "carousel" | "video" | string;
-  url?: string | null;               // secure_url Cloudinary
-  coverUrl?: string | null;          // pour carrousel
-  slideUrls?: string[] | null;       // pour carrousel
+  url?: string | null;
+  coverUrl?: string | null;
+  slideUrls?: string[] | null;
   ratio?: "1:1" | "9:16" | "16:9" | "3:4" | string;
   title?: string | null;
   created_at?: string | null;
-  meta?: Record<string, any> | null;
+  meta?: Record<string, unknown> | null;
 };
 
 type AssetCardProps = {
   asset: Asset;
   className?: string;
-  onEnqueueVideo?: (asset: Asset) => void; // transformer carrousel → vidéo
+  onEnqueueVideo?: (asset: Asset) => void;
 };
 
 export function AssetCard({ asset, className, onEnqueueVideo }: AssetCardProps) {
   const hasUrl = Boolean(asset?.url);
   const openHref = hasUrl ? String(asset.url) : undefined;
-
-  // Download direct Cloudinary
-  // Si tu veux forcer un nom: fl_attachment:alfie_<id>
   const downloadHref =
     hasUrl ? `${asset!.url!}${asset!.url!.includes("?") ? "&" : "?"}fl_attachment` : undefined;
 
@@ -41,7 +38,6 @@ export function AssetCard({ asset, className, onEnqueueVideo }: AssetCardProps) 
         className
       )}
     >
-      {/* Media preview */}
       <div className="aspect-video w-full overflow-hidden rounded-xl bg-neutral-100 dark:bg-neutral-800">
         {isCarousel && asset.coverUrl ? (
           <img
@@ -64,7 +60,6 @@ export function AssetCard({ asset, className, onEnqueueVideo }: AssetCardProps) 
         )}
       </div>
 
-      {/* Meta */}
       <div className="flex items-center justify-between">
         <div className="min-w-0">
           <div className="text-sm font-medium truncate">
@@ -75,25 +70,19 @@ export function AssetCard({ asset, className, onEnqueueVideo }: AssetCardProps) 
             {asset.created_at ? ` • ${new Date(asset.created_at).toLocaleString()}` : ""}
           </div>
         </div>
-
-        {/* Badges simples */}
         <div className="text-xs px-2 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800">
           {asset.type}
         </div>
       </div>
 
-      {/* Actions */}
       <div className="flex items-center gap-2">
-        {/* Ouvrir */}
         <a
           href={openHref}
           target="_blank"
           rel="noopener"
           className={cn(
             "inline-flex items-center gap-1 px-3 py-2 rounded-lg border text-sm",
-            hasUrl
-              ? "hover:bg-neutral-50 dark:hover:bg-neutral-800"
-              : "pointer-events-none opacity-50"
+            hasUrl ? "hover:bg-neutral-50 dark:hover:bg-neutral-800" : "pointer-events-none opacity-50"
           )}
           aria-disabled={!hasUrl}
         >
@@ -101,15 +90,12 @@ export function AssetCard({ asset, className, onEnqueueVideo }: AssetCardProps) 
           Ouvrir l’asset
         </a>
 
-        {/* Télécharger */}
         <a
           href={downloadHref}
           download
           className={cn(
             "inline-flex items-center gap-1 px-3 py-2 rounded-lg border text-sm",
-            hasUrl
-              ? "hover:bg-neutral-50 dark:hover:bg-neutral-800"
-              : "pointer-events-none opacity-50"
+            hasUrl ? "hover:bg-neutral-50 dark:hover:bg-neutral-800" : "pointer-events-none opacity-50"
           )}
           aria-disabled={!hasUrl}
         >
@@ -117,7 +103,6 @@ export function AssetCard({ asset, className, onEnqueueVideo }: AssetCardProps) 
           Télécharger
         </a>
 
-        {/* Transformer en vidéo (pour carrousel) */}
         {isCarousel && typeof onEnqueueVideo === "function" && (
           <button
             type="button"
