@@ -552,17 +552,26 @@ export function ChatGenerator() {
 
   // ✅ Trigger manual worker
   const handleTriggerWorker = useCallback(async () => {
+    if (isForcing) return; // anti double-clic
     if (isForcing) return;
     setIsForcing(true);
     try {
       const result = await forceProcessJobs();
       const processed =
-        typeof result?.processed === "number" ? result.processed : 0;
-      toast.success(`Traitement forcé: ${processed} job(s).`);
+        typeof result?.processed === "number" && Number.isFinite(result.processed)
+          ? result.processed
+          : 0;
 
+      toast.success(`Traitement forcé: ${processed} job(s).`);
       await refetchAll();
     } catch (err) {
       console.error("[Studio] trigger worker error:", err);
+      const errMsg = err instanceof Error ? err.message : "Erreur inconnue";
+      toast.error(`Forçage échoué: ${errMsg}`);
+    } finally {
+      setIsForcing(false);
+    }
+  }, [isForcing, forceProcessJobs, refetchAll]);
       const message = err instanceof Error ? err.message : "Erreur inconnue";
       toast.error(`Forçage échoué: ${message}`);
     } finally {
@@ -614,6 +623,7 @@ export function ChatGenerator() {
                 variant="outline"
                 size="sm"
                 onClick={handleTriggerWorker}
+                disabled={isForcing}
                 disabled={isForcing || queueData.counts.queued === 0}
               >
                 {isForcing ? (
