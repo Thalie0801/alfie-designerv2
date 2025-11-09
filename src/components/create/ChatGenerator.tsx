@@ -237,6 +237,20 @@ export function ChatGenerator() {
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  const showGenerationError = (err: unknown) => {
+    if (err instanceof Error && err.name === "AbortError") {
+      toast.error("Timeout: la génération a pris trop de temps.");
+      return;
+    }
+    const message =
+      err instanceof Error
+        ? err.message
+        : typeof err === "string"
+          ? err
+          : "";
+    toast.error(message || "Erreur de génération");
+  };
   const { brandKit } = useBrandKit();
 
   // Forcer des ratios valides pour la vidéo
@@ -318,6 +332,10 @@ export function ChatGenerator() {
   };
 
   const handleGenerate = async () => {
+    if (isGenerating) {
+      return;
+    }
+
     if (!prompt.trim() && !uploadedSource) {
       toast.error("Ajoutez un prompt ou un média");
       return;
@@ -403,9 +421,14 @@ export function ChatGenerator() {
 
         toast.success("Vidéo générée avec succès ! 🎬");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Generation error:", error);
-      const message = error?.message || "Erreur lors de la génération";
+      const message =
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : "";
 
       if (/Session expirée|reconnecter/i.test(message)) {
         toast.error(message, { action: { label: "Se reconnecter", onClick: () => (window.location.href = "/auth") } });
@@ -416,7 +439,7 @@ export function ChatGenerator() {
       } else if (message?.includes("AbortError")) {
         // silencieux : action utilisateur/unmount
       } else {
-        toast.error(message);
+        showGenerationError(error);
       }
     } finally {
       setIsGenerating(false);

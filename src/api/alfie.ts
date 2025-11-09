@@ -24,7 +24,26 @@ export async function createGeneration(brandId: string, payload: unknown) {
   const { data, error } = await supabase.functions.invoke('alfie-generate', {
     body: { brand_id: brandId, payload },
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    const wrapped = new Error(error.message);
+    const errorName = (error as { name?: string }).name;
+    if (typeof errorName === 'string' && errorName.trim()) {
+      wrapped.name = errorName;
+    }
+    const status =
+      typeof (error as { context?: { status?: number } })?.context?.status === 'number'
+        ? (error as { context?: { status?: number } }).context!.status
+        : typeof (error as { status?: number }).status === 'number'
+          ? (error as { status?: number }).status
+          : undefined;
+    if (typeof status === 'number') {
+      (wrapped as Error & { status?: number }).status = status;
+    }
+    throw wrapped;
+  }
+  if (!data) {
+    throw new Error("Réponse invalide du backend");
+  }
   return data as GenerationResponse;
 }
 

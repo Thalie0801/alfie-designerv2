@@ -23,11 +23,11 @@ export default {
         throw new Error('MISSING_AUTH');
       }
 
-        const { 
-        provider, 
-        prompt, 
-        format = '1024x1024', 
-        brand_id, 
+        const {
+        provider,
+        prompt,
+        format = '1024x1024',
+        brand_id,
         cost_woofs = 1,
         // Nouveaux params carrousel (optionnels)
         backgroundOnly = false,
@@ -39,7 +39,8 @@ export default {
         resolution,
         backgroundStyle = 'gradient',
         textContrast = 'dark',
-        globalStyle // ✅ NOUVEAU: style global pour cohérence
+        globalStyle, // ✅ NOUVEAU: style global pour cohérence
+        jobId
       } = input;
 
       if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY) {
@@ -277,7 +278,8 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
 
         console.log('[Render] AI Payload:', JSON.stringify(aiPayload, null, 2));
 
-        const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        const requestStartedAt = performance.now();
+        const providerResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${LOVABLE_API_KEY}`,
@@ -286,15 +288,37 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
           body: JSON.stringify(aiPayload),
         });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('AI Gateway error:', response.status, errorText);
-          throw new Error(`AI_GATEWAY_ERROR: ${response.status} - ${errorText}`);
+        const durationMs = Math.round(performance.now() - requestStartedAt);
+        const responseBody = await providerResponse.text();
+        const bodyPreview = responseBody.length > 500 ? `${responseBody.slice(0, 500)}…` : responseBody;
+
+        console.log('[Render] Provider response', {
+          status: providerResponse.status,
+          durationMs,
+          brandId: brand_id ?? null,
+          jobId: jobId ?? null,
+          bodyPreview,
+        });
+
+        let data: any = null;
+        if (responseBody) {
+          try {
+            data = JSON.parse(responseBody);
+          } catch (parseError) {
+            console.warn('[Render] Unable to parse provider response as JSON:', parseError);
+          }
         }
 
-        const data = await response.json();
+        if (!providerResponse.ok) {
+          const errorMessage =
+            (data && (data.error || data.message)) || bodyPreview || 'Provider returned an error';
+          const error = new Error(`AI_GATEWAY_ERROR: ${providerResponse.status} - ${errorMessage}`);
+          (error as Error & { status?: number }).status = providerResponse.status;
+          throw error;
+        }
+
         const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-        
+
         if (!imageUrl) {
           console.error('No image in response:', JSON.stringify(data));
           throw new Error('NO_IMAGE_GENERATED');

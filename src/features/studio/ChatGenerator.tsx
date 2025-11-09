@@ -145,6 +145,20 @@ export function ChatGenerator() {
 
   const { toast: showToast } = useToast();
 
+  const showGenerationError = useCallback((err: unknown) => {
+    if (err instanceof Error && err.name === "AbortError") {
+      toast.error("Timeout: la génération a pris trop de temps.");
+      return;
+    }
+    const message =
+      err instanceof Error
+        ? err.message
+        : typeof err === "string"
+          ? err
+          : "";
+    toast.error(message || "Erreur de génération");
+  }, []);
+
   // ✅ Monitor queue status
   const { data: queueData } = useQueueMonitor(true);
 
@@ -408,6 +422,10 @@ export function ChatGenerator() {
   const handleGenerateImage = useCallback(async () => {
     const trimmedPrompt = prompt.trim();
 
+    if (isSubmitting) {
+      return;
+    }
+
     if (!activeBrandId) {
       toast.error("Sélectionne une marque avant de générer.");
       return;
@@ -452,17 +470,20 @@ export function ChatGenerator() {
       await refetchAll();
     } catch (err: unknown) {
       console.error("[Studio] image generation error:", err);
-      const message = err instanceof Error ? err.message : "Une erreur est survenue";
-      toast.error(`Génération impossible: ${message}`);
+      showGenerationError(err);
     } finally {
       setIsSubmitting(false);
     }
-  }, [activeBrandId, aspectRatio, prompt, refetchAll, showToast, uploadedSource]);
+  }, [activeBrandId, aspectRatio, isSubmitting, prompt, refetchAll, showGenerationError, showToast, uploadedSource]);
 
   const handleGenerateVideo = useCallback(async () => {
     const promptText = (prompt || "").trim();
 
     try {
+      if (isSubmitting) {
+        return;
+      }
+
       setIsSubmitting(true);
       setGeneratedAsset(null);
 
@@ -497,13 +518,12 @@ export function ChatGenerator() {
 
       await refetchAll();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
       console.error("[Studio] generate video error:", err);
-      toast.error(`Génération impossible: ${message}`);
+      showGenerationError(err);
     } finally {
       setIsSubmitting(false);
     }
-  }, [activeBrandId, aspectRatio, prompt, refetchAll, uploadedSource, videoDuration]);
+  }, [activeBrandId, aspectRatio, isSubmitting, prompt, refetchAll, showGenerationError, uploadedSource, videoDuration]);
 
   const handleGenerate = useCallback(() => {
     if (contentType === "image") {

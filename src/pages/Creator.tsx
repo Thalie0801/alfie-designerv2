@@ -274,7 +274,13 @@ Colors: ${brandKit?.palette?.join(', ') || 'default'}`;
 
         loadQuotaInfo();
       } catch (err: any) {
-        toast.error(`Erreur création ${i + 1}/${quantity}: ${err.message}`);
+        console.error(`Erreur création ${i + 1}/${quantity}:`, err);
+        if (err instanceof Error && err.name === "AbortError") {
+          toast.error("Timeout: la génération a pris trop de temps.");
+        } else {
+          const message = err instanceof Error ? err.message : String(err ?? "");
+          toast.error(message || "Erreur de génération");
+        }
         break;
       }
     }

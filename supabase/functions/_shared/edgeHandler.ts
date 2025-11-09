@@ -37,15 +37,31 @@ export async function edgeHandler(
       JSON.stringify({ ok: true, data: result }),
       { status: 200, headers: { 'Content-Type': 'application/json', ...cors } }
     );
-  } catch (e: any) {
-    console.error('[edgeHandler] Error:', e.message, e.stack);
+  } catch (e: unknown) {
+    if (e instanceof Response) {
+      return e;
+    }
+
+    const errorMessage =
+      e && typeof (e as { message?: string }).message === 'string'
+        ? (e as { message: string }).message
+        : 'unexpected_error';
+    const status =
+      typeof (e as { status?: number })?.status === 'number'
+        ? (e as { status: number }).status
+        : typeof (e as { context?: { status?: number } })?.context?.status === 'number'
+          ? (e as { context: { status: number } }).context.status
+          : 500;
+    const code =
+      typeof (e as { code?: string })?.code === 'string'
+        ? (e as { code: string }).code
+        : 'INTERNAL_ERROR';
+
+    console.error('[edgeHandler] Error:', errorMessage, (e as { stack?: string })?.stack);
+
     return new Response(
-      JSON.stringify({ 
-        ok: false, 
-        error: e?.message || 'unexpected_error',
-        code: e?.code || 'INTERNAL_ERROR'
-      }),
-      { status: 200, headers: { 'Content-Type': 'application/json', ...cors } }
+      JSON.stringify({ ok: false, error: errorMessage, code }),
+      { status, headers: { 'Content-Type': 'application/json', ...cors } }
     );
   }
 }
