@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import JSZip from "https://esm.sh/jszip@3.10.1";
 import { encodeOverlayText as encodeCloudinaryText } from "../_shared/cloudinaryText.ts";
+import { stripControlChars } from "../../../../src/lib/regex.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -37,10 +38,14 @@ function derivePublicIdFromUrl(url?: string): string | undefined {
   return derivedId;
 }
 
-const CONTROL = new RegExp('[\\x00-\\x1F\\x7F\\u00A0\\uFEFF]', 'g');
+const EXTRA_INVISIBLE_RE = new RegExp('[\\x7F\\u00A0\\uFEFF]', 'g');
+
+function normalizeSpaces(text: string): string {
+  return stripControlChars(text).replace(EXTRA_INVISIBLE_RE, '').replace(/\s+/g, ' ').trim();
+}
 
 function cleanText(text: string, maxLen = 220): string {
-  let cleaned = text.replace(CONTROL, '');
+  let cleaned = normalizeSpaces(text);
   // Remove emojis
   try {
     cleaned = cleaned.replace(/\p{Extended_Pictographic}/gu, '');

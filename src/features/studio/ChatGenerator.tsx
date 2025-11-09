@@ -572,6 +572,10 @@ export function ChatGenerator() {
       setIsForcing(false);
     }
   }, [isForcing, forceProcessJobs, refetchAll]);
+    } finally {
+      setIsForcing(false);
+    }
+  }, [isForcing, forceProcessJobs, refetchAll]);
       const message = err instanceof Error ? err.message : "Erreur inconnue";
       toast.error(`Forçage échoué: ${message}`);
     } finally {

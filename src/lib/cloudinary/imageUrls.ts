@@ -1,5 +1,9 @@
 // src/lib/cloudinary/imageUrls.ts
 
+import { stripControlChars } from "@/lib/regex";
+
+const EXTRA_INVISIBLE_RE = new RegExp("[\\x7F\\u00A0\\uFEFF]", "g");
+
 /** Ratios pris en charge */
 export type AspectRatio = "4:5" | "1:1" | "9:16" | "16:9";
 
@@ -17,14 +21,17 @@ export type SlideUrlOptions = {
 
 /* ----------------------------- utilitaires ----------------------------- */
 
+function normalizeSpaces(s: string): string {
+  return stripControlChars(s)
+    .replace(EXTRA_INVISIBLE_RE, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /** Nettoie et tronque pour l’affichage (pas pour l’encodage). */
 function cleanText(input: string, maxLen?: number): string {
-  let s = (input ?? "").toString();
-  s = s.replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, ""); // contrôle
-  s = s
-    .normalize("NFC")
-    .replace(/[ \t\f\v]+/g, " ")
-    .trim(); // espaces
+  let s = normalizeSpaces((input ?? "").toString());
+  s = s.normalize("NFC");
   if (maxLen && s.length > maxLen) s = s.slice(0, maxLen - 1).trimEnd() + "…";
   return s;
 }
