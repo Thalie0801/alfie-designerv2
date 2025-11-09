@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { Upload, Wand2, Download, X, Sparkles, Loader2, AlertCircle, Clock, CheckCircle2 } from "lucide-react";
+import { Upload, Wand2, Download, X, Sparkles, Loader2, Clock, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -154,7 +154,7 @@ export function ChatGenerator() {
   }, []);
 
   // ✅ Monitor queue status
-  const { data: queueData } = useQueueMonitor(true);
+  const { queued, running, done24h } = useQueueMonitor(activeBrandId ?? undefined);
 
   // Calculate stuck jobs
   const stuckJobs = useMemo(() => {
@@ -575,48 +575,33 @@ export function ChatGenerator() {
         </div>
 
         {/* ✅ Queue Monitor */}
-        {queueData && (
-          <Alert className="mb-6">
-            <Clock className="h-4 w-4" />
-            <AlertDescription className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <span className="text-sm">
-                  <strong>{queueData.counts.queued}</strong> en attente
-                </span>
-                <span className="text-sm">
-                  <strong>{queueData.counts.running}</strong> en cours
-                </span>
-                {queueData.counts.failed > 0 && (
-                  <span className="text-sm text-destructive">
-                    <AlertCircle className="inline w-3 h-3 mr-1" />
-                    <strong>{queueData.counts.failed}</strong> échecs
-                  </span>
-                )}
-                {queueData.counts.completed_24h !== undefined && (
-                  <span className="text-sm text-muted-foreground">
-                    <CheckCircle2 className="inline w-3 h-3 mr-1" />
-                    {queueData.counts.completed_24h} générés (24h)
-                  </span>
-                )}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleTriggerWorker}
-                disabled={isForcing}
-              >
-                {isForcing ? (
-                  <>
-                    <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                    Traitement...
-                  </>
-                ) : (
-                  'Forcer le traitement'
-                )}
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
+        <Alert className="mb-6">
+          <Clock className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="text-sm">
+                <strong>{queued}</strong> en attente
+              </span>
+              <span className="text-sm">
+                <strong>{running}</strong> en cours
+              </span>
+              <span className="text-sm text-muted-foreground">
+                <CheckCircle2 className="inline w-3 h-3 mr-1" />
+                {done24h} générés (24h)
+              </span>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleTriggerWorker} disabled={isForcing}>
+              {isForcing ? (
+                <>
+                  <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                  Traitement...
+                </>
+              ) : (
+                "Forcer le traitement"
+              )}
+            </Button>
+          </AlertDescription>
+        </Alert>
 
         {/* Controls */}
         <Card className="p-6 mb-6 space-y-6">
