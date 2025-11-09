@@ -46,7 +46,7 @@ jobs:
           bash scripts/codex/run.sh
 
       # GARDE SIMPLE & FIABLE : bloque toute modif dans apps/landing/, www/, site/
-      - name: Guard: No landing changes
+      - name: "Guard — No landing changes"
         shell: bash
         run: |
           set -euo pipefail
