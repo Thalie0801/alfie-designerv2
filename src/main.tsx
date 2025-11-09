@@ -5,6 +5,14 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './index.css';
 
+if (import.meta.env.DEV) {
+  console.info('[ENV]', {
+    hasUrl: Boolean(import.meta.env.VITE_SUPABASE_URL),
+    hasAnon: Boolean(import.meta.env.VITE_SUPABASE_ANON_KEY),
+    hasPubl: Boolean(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY),
+  });
+}
+
 type ErrorBoundaryState = { error?: Error };
 
 class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
