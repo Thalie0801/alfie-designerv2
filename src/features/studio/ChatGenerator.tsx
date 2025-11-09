@@ -38,16 +38,13 @@ type JobEntry = {
   error_message?: string | null;
   payload?: unknown;
   user_id: string;
-  archived_at: string | null;
-  is_archived: boolean;
-  job_version: number | null;
+  retry_count: number;
 };
 
 type MediaEntry = {
   id: string;
   type: string;
   status: string;
-  order_id?: string | null;
   output_url: string | null;
   thumbnail_url?: string | null;
   metadata?: Record<string, any> | null;
@@ -85,9 +82,6 @@ const ASPECT_TO_TW: Record<AspectRatio, string> = {
   "9:16": "aspect-[9/16]",
   "16:9": "aspect-video",
 };
-
-
-const CURRENT_JOB_VERSION = 2;
 
 const UNKNOWN_REFRESH_ERROR = "Erreur inconnue pendant le rafraîchissement";
 
@@ -242,29 +236,32 @@ export function ChatGenerator() {
       if (authError) throw authError;
       if (!currentUser) throw new Error("Non authentifié");
 
+      // ✅ Simplifier les requêtes pour éviter les timeouts
       let jobsQuery = supabase
         .from("job_queue")
-        .select("*")
+        .select("id, type, status, order_id, created_at, updated_at, error, payload, user_id, retry_count")
         .eq("user_id", currentUser.id)
-        .in("status", ["queued", "running", "completed", "failed"])
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(30);
 
       let assetsQuery = supabase
         .from("media_generations")
-        .select("*")
+        .select("id, type, status, output_url, thumbnail_url, metadata, created_at")
         .eq("user_id", currentUser.id)
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(30);
 
       if (orderId) {
         jobsQuery = jobsQuery.eq("order_id", orderId);
-        assetsQuery = assetsQuery.eq("order_id", orderId);
       }
 
-      const [jobsResponse, assetsResponse] = await Promise.all([
-        jobsQuery,
-        assetsQuery,
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error("Timeout: La requête prend trop de temps")), 10000)
+      );
+
+      const [jobsResponse, assetsResponse] = await Promise.race([
+        Promise.all([jobsQuery, assetsQuery]),
+        timeoutPromise
       ]);
 
       if (jobsResponse.error) throw jobsResponse.error;
@@ -284,6 +281,15 @@ export function ChatGenerator() {
   useEffect(() => {
     let mounted = true;
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    let debounceTimer: NodeJS.Timeout | null = null;
+
+    // ✅ Debounce refetch pour éviter trop d'appels
+    const debouncedRefetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        if (mounted) void refetchAll();
+      }, 1000);
+    };
 
     (async () => {
       await refetchAll();
@@ -307,14 +313,14 @@ export function ChatGenerator() {
           "postgres_changes",
           { event: "*", schema: "public", table: "job_queue", filter: `user_id=eq.${currentUser.id}` },
           () => {
-            if (mounted) void refetchAll();
+            if (mounted) debouncedRefetch();
           },
         )
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "media_generations", filter: `user_id=eq.${currentUser.id}` },
           () => {
-            if (mounted) void refetchAll();
+            if (mounted) debouncedRefetch();
           },
         )
         .subscribe();
@@ -322,6 +328,7 @@ export function ChatGenerator() {
 
     return () => {
       mounted = false;
+      if (debounceTimer) clearTimeout(debounceTimer);
       if (channel) {
         supabase.removeChannel(channel);
       }
@@ -369,56 +376,6 @@ export function ChatGenerator() {
       }
     },
     [refetchAll, showToast],
-  );
-
-  const cleanupLegacyJobs = useCallback(async () => {
-    const {
-      data: { user: currentUser },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError) {
-      toast.error(`Nettoyage échoué: ${authError.message}`);
-      return;
-    }
-
-    if (!currentUser) {
-      toast.error("Nettoyage impossible: utilisateur non authentifié");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("job_queue")
-      .update({ is_archived: true, archived_at: new Date().toISOString() })
-      .match({ user_id: currentUser.id })
-      .in("status", ["failed", "queued"])
-      .lt("job_version", CURRENT_JOB_VERSION);
-
-    if (error) {
-      toast.error(`Nettoyage échoué: ${error.message}`);
-      return;
-    }
-
-    toast.success("Anciennes tâches masquées ✅");
-    await refetchAll();
-  }, [refetchAll]);
-
-  const archiveJob = useCallback(
-    async (jobId: string) => {
-      const { error } = await supabase
-        .from("job_queue")
-        .update({ is_archived: true, archived_at: new Date().toISOString() })
-        .eq("id", jobId);
-
-      if (error) {
-        toast.error(`Impossible de masquer le job: ${error.message}`);
-        return;
-      }
-
-      toast.success("Job masqué ✅");
-      await refetchAll();
-    },
-    [refetchAll],
   );
 
   const handleSourceUpload = useCallback(
@@ -869,16 +826,6 @@ export function ChatGenerator() {
               </div>
               <div className="flex items-center gap-2">
                 <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    void cleanupLegacyJobs();
-                  }}
-                  disabled={loading}
-                >
-                  Nettoyer
-                </Button>
-                <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => {
@@ -931,7 +878,6 @@ export function ChatGenerator() {
               <div className="space-y-3">
                 {jobs.map((job) => {
                   const jobError = job.error_message || job.error;
-                  const isLegacy = (job.job_version ?? 1) < CURRENT_JOB_VERSION;
 
                   return (
                     <div key={job.id} className="rounded-lg border p-3">
@@ -942,20 +888,9 @@ export function ChatGenerator() {
                           </p>
                           <p className="text-xs text-muted-foreground">{formatDate(job.created_at)}</p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            className="text-xs underline"
-                            onClick={() => {
-                              void archiveJob(job.id);
-                            }}
-                          >
-                            Masquer
-                          </button>
-                          <Badge variant={jobBadgeVariant(job.status)} className="uppercase">
-                            {job.status}
-                          </Badge>
-                        </div>
+                        <Badge variant={jobBadgeVariant(job.status)} className="uppercase">
+                          {job.status}
+                        </Badge>
                       </div>
                       {job.order_id && (
                         <p className="mt-1 text-xs text-muted-foreground">Order #{job.order_id}</p>
@@ -966,16 +901,9 @@ export function ChatGenerator() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            disabled={isLegacy}
-                            title={
-                              isLegacy
-                                ? "Ancienne version : impossible de relancer"
-                                : "Retenter"
-                            }
+                            title="Retenter"
                             onClick={() => {
-                              if (!isLegacy) {
-                                void requeueJob(job);
-                              }
+                              void requeueJob(job);
                             }}
                           >
                             Retenter
@@ -1043,9 +971,6 @@ export function ChatGenerator() {
                           {item.status}
                         </Badge>
                       </div>
-                      {item.order_id && (
-                        <p className="mt-1 text-xs text-muted-foreground">Order #{item.order_id}</p>
-                      )}
                       {previewUrl && (
                         <div className="mt-3 overflow-hidden rounded-md bg-muted">
                           {item.type === "video" ? (
