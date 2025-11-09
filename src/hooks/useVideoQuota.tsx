@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { woofsForVideo } from '@/lib/woofs';
 
 interface VideoQuota {
   woofsTotal: number;
@@ -65,8 +64,4 @@ export function useVideoQuota() {
     error,
     refetch: fetchQuota
   };
-}
-
-export function calculateWoofsForDuration(seconds: number): number {
-  return woofsForVideo(seconds);
 }

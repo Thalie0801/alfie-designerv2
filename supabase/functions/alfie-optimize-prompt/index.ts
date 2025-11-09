@@ -123,7 +123,7 @@ serve(async (req) => {
       "gemini", // preferred provider
     );
 
-    const content = aiResp?.choices?.[0]?.message?.content ?? "";
+    let content = aiResp?.choices?.[0]?.message?.content ?? "";
     if (!content || typeof content !== "string") {
       throw new Error("No optimization content from AI");
     }

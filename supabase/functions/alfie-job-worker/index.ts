@@ -2,11 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { uploadToCloudinary } from "../_shared/cloudinaryUploader.ts";
-import { buildSpliceVideoUrl } from "../_shared/cloudinaryVideo.ts";
-import { buildImageThumbnailUrl, extractCloudName } from "../_shared/cloudinaryUtils.ts";
 import { consumeBrandQuotas } from "../_shared/quota.ts";
-import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, INTERNAL_FN_SECRET, CLOUDINARY_CLOUD_NAME } from "../_shared/env.ts";
-import { attachJobIdempotency } from "../_shared/idempotency.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,21 +13,17 @@ type JobRow = {
   id: string;
   user_id: string;
   order_id: string;
-  type: "generate_texts" | "render_images" | "render_carousels" | "generate_video" | "stitch_carousel_video";
+  type: "generate_texts" | "render_images" | "render_carousels" | "generate_video";
   status: "queued" | "running" | "completed" | "failed";
   retry_count: number | null;
   max_retries: number | null;
   payload: any;
   error?: string | null;
-  attempts?: number | null;
-  locked_by?: string | null;
-  started_at?: string | null;
-  idempotency_key?: string | null;
 };
 
 const supabaseAdmin = createClient(
-  SUPABASE_URL ?? "",
-  SUPABASE_SERVICE_ROLE_KEY ?? "",
+  Deno.env.get("SUPABASE_URL") ?? "",
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   { auth: { autoRefreshToken: false, persistSession: false } },
 );
 
@@ -65,22 +57,26 @@ function isHttp402(e: unknown) {
 }
 
 async function callFn<T = unknown>(name: string, body: unknown): Promise<T> {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const internalSecret = Deno.env.get("INTERNAL_FN_SECRET");
+
+  if (!supabaseUrl || !anonKey) {
     throw new Error(`Missing Supabase configuration for ${name}`);
   }
-  if (!INTERNAL_FN_SECRET) {
+  if (!internalSecret) {
     throw new Error(`Missing INTERNAL_FN_SECRET for ${name}`);
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60_000);
+  const timeout = setTimeout(() => controller.abort(), 60000);
 
   try {
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+    const resp = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        "X-Internal-Secret": INTERNAL_FN_SECRET,
+        Authorization: `Bearer ${anonKey}`,
+        "X-Internal-Secret": internalSecret,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body ?? {}),
@@ -89,7 +85,12 @@ async function callFn<T = unknown>(name: string, body: unknown): Promise<T> {
 
     const text = await resp.text().catch(() => "");
     if (!resp.ok) {
-      throw new Error(`${name} failed: ${resp.status} ${resp.statusText} ${text}`);
+      console.error(`❌ ${name} failed:`, {
+        status: resp.status,
+        statusText: resp.statusText,
+        response: text.substring(0, 500)
+      });
+      throw new Error(`${name} failed: ${resp.status} ${resp.statusText} - ${text.substring(0, 200)}`);
     }
 
     try {
@@ -97,11 +98,8 @@ async function callFn<T = unknown>(name: string, body: unknown): Promise<T> {
     } catch {
       return text as unknown as T;
     }
-  } catch (error: unknown) {
-    const isAbort =
-      (error as any)?.name === "AbortError" ||
-      (error instanceof DOMException && error.name === "AbortError");
-    if (isAbort) {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
       throw new Error(`${name} timed out after 60s`);
     }
     throw error;
@@ -154,12 +152,10 @@ function deepGet(obj: any, key: string): any {
 
 // ---------- HTTP Entrypoint ----------
 serve(async (req) => {
-  console.log("[alfie-job-worker] 🚀 Invoked at", new Date().toISOString());
-  
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    console.log("🚀 [Worker] Starting job processing...");
+    console.log("🚀 [Worker] Boot");
 
     // Basic env sanity
     console.log("🧪 env", {
@@ -173,27 +169,26 @@ serve(async (req) => {
       .from("job_queue")
       .select("*", { count: "exact", head: true })
       .eq("status", "queued");
-    console.log("[WORKER] Boot: " + (queued ?? 0) + " jobs queued in job_queue");
+    console.log("🧪 probe.queue_count", queued ?? 0);
 
     // Process a small batch to avoid function timeout
-    const workerId = `worker-${crypto.randomUUID().slice(0, 8)}`;
     const results: Array<{ job_id: string; success: boolean; error?: string; retried?: boolean }> = [];
     const maxJobs = 5;
     let processed = 0;
 
     for (let i = 0; i < maxJobs; i++) {
-      const { data: claimed, error: claimError } = await supabaseAdmin.rpc("claim_next_job", { worker_id: workerId });
+      const { data: claimed, error: claimError } = await supabaseAdmin.rpc("claim_next_job");
       if (claimError) {
         console.error("❌ claim_next_job", claimError);
         break;
       }
-      const job = claimed as JobRow | null;
-      if (!job) {
+      if (!claimed || claimed.length === 0) {
         if ((queued ?? 0) > 0) console.warn("🧪 claim_empty_but_queued_gt0");
         console.log(`ℹ️ No more jobs to process (processed ${processed})`);
         break;
       }
 
+      const job: JobRow = claimed[0];
       console.log("🟢 start_job", { id: job.id, type: job.type, order_id: job.order_id });
 
       try {
@@ -212,50 +207,18 @@ serve(async (req) => {
           case "generate_video":
             result = await processGenerateVideo(job.payload);
             break;
-          case "stitch_carousel_video":
-            result = await processStitchCarouselVideo(job.payload);
-            break;
           default:
             throw new Error(`Unknown job type: ${job.type}`);
         }
 
         await supabaseAdmin
           .from("job_queue")
-          .update({
-            status: "completed",
-            result,
-            updated_at: new Date().toISOString(),
-            locked_by: null,
-            started_at: null,
-            attempts: 0,
-            error: null,
-          })
+          .update({ status: "completed", result, updated_at: new Date().toISOString() })
           .eq("id", job.id);
 
         console.log("✅ job_done", { id: job.id, type: job.type });
         processed++;
         results.push({ job_id: job.id, success: true });
-
-        // Check for remaining jobs and reinvoke if needed
-        const { data: remainingJobs } = await supabaseAdmin
-          .from("job_queue")
-          .select("id")
-          .eq("status", "queued")
-          .limit(1);
-
-        if (remainingJobs && remainingJobs.length > 0) {
-          console.log("[alfie-job-worker] 🔁 Remaining jobs detected, reinvoking...");
-          try {
-            const { error: invokeError } = await supabaseAdmin.functions.invoke("alfie-job-worker", {
-              body: { trigger: "self-reinvoke" }
-            });
-            if (invokeError) {
-              console.error("[alfie-job-worker] ⚠️ Reinvoke failed:", invokeError);
-            }
-          } catch (e) {
-            console.error("[alfie-job-worker] ⚠️ Reinvoke error:", e);
-          }
-        }
 
         // Cascade for text → generate children jobs
         if (job.type === "generate_texts") {
@@ -276,11 +239,7 @@ serve(async (req) => {
               status: "queued",
               retry_count: retryCount + 1,
               error: message,
-              result: null,
               updated_at: new Date().toISOString(),
-              locked_by: null,
-              started_at: null,
-              attempts: 0,
             })
             .eq("id", job.id);
 
@@ -292,10 +251,7 @@ serve(async (req) => {
             .update({
               status: "failed",
               error: message,
-              result: null,
               updated_at: new Date().toISOString(),
-              locked_by: null,
-              started_at: null,
             })
             .eq("id", job.id);
 
@@ -437,7 +393,6 @@ async function processRenderImages(payload: any) {
     aspectRatio: "1:1" | "4:5" | "9:16" | "16:9";
     brandId?: string;
     briefIndex?: number;
-    templateImageUrl?: string;
   }> = [];
 
   if (payload.images) {
@@ -603,39 +558,77 @@ Format: ${aspectRatio} aspect ratio optimized.`;
 }
 
 async function processRenderCarousels(payload: any) {
-  console.log("📚 [processRenderCarousels] START", {
-    hasSlides: !!payload?.slides,
-    slidesCount: Array.isArray(payload?.slides) ? payload.slides.length : 0,
-    hasBrief: !!payload?.brief,
-    briefCount: payload?.brief?.briefs?.length || 0,
-    userId: payload?.userId,
-    brandId: payload?.brandId,
-    orderId: payload?.orderId
-  });
+  console.log("📚 [processRenderCarousels]");
 
-  // ✅ Phase B: Removed alfie-render-carousel call (function doesn't exist)
-  // Always convert payload.slides to carousel object and use slide-by-slide rendering
-
-  let carouselsToRender: any[] = [];
-
-  // ✅ Phase B: Handle payload.slides by converting to carousel format
   if (Array.isArray(payload?.slides) && payload.slides.length > 0) {
     const { userId, brandId, orderId } = payload || {};
     if (!userId || !brandId || !orderId) {
-      throw new Error("Invalid render_carousels payload: missing userId, brandId, or orderId");
+      throw new Error("Invalid render_carousels payload");
     }
 
-    // Convert slides array to carousel object for slide-by-slide processing
-    carouselsToRender = [{
-      id: crypto.randomUUID(),
-      aspectRatio: payload.aspectRatio || "9:16",
-      textVersion: 1,
-      slides: payload.slides,
-      prompts: payload.slides.map((_: any, i: number) => `Slide ${i + 1}`),
-      style: "minimalist",
+    const resp = await callFn<any>("alfie-render-carousel", {
       brandId,
-    }];
-  } else if (payload.carousels) {
+      orderId,
+      slides: payload.slides,
+      sourceUrl: payload?.sourceUrl ?? null,
+      userId,
+    });
+    const data = resp as any;
+    const error = data && data.error ? { message: data.error } : null;
+    if (error || (data as any)?.error) {
+      const message = (data as any)?.error || error?.message || "render_carousel_failed";
+      throw new Error(message);
+    }
+
+    const slideUrls: string[] = Array.isArray((data as any)?.slide_urls)
+      ? ((data as any).slide_urls as string[])
+      : Array.isArray((data as any)?.slides)
+        ? (data as any).slides
+            .map((item: any) => (typeof item === "string" ? item : item?.url))
+            .filter((url: unknown): url is string => typeof url === "string" && url.startsWith("http"))
+        : [];
+
+    if (!slideUrls.length) {
+      throw new Error("No slides returned");
+    }
+
+    const expiresAt = new Date(Date.now() + THIRTY_DAYS_MS).toISOString();
+
+    const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
+      user_id: userId,
+      brand_id: brandId,
+      order_id: orderId,
+      type: "carousel",
+      status: "completed",
+      output_url: slideUrls[0],
+      metadata: { slides_count: slideUrls.length, slides: slideUrls },
+      expires_at: expiresAt,
+    });
+    if (mediaErr) throw new Error(mediaErr.message);
+
+    await Promise.all(
+      slideUrls.map((url, idx) =>
+        supabaseAdmin.from("library_assets").insert({
+          user_id: userId,
+          brand_id: brandId,
+          order_id: orderId,
+          type: "image",
+          cloudinary_url: url,
+          src_url: url,
+          title: `Slide ${idx + 1}`,
+          tags: ["carousel", `slide_${idx + 1}`],
+          expires_at: expiresAt,
+          metadata: { orderId, slideIndex: idx, total: slideUrls.length },
+        } as any),
+      ),
+    );
+
+    return { slide_urls: slideUrls };
+  }
+
+  let carouselsToRender: any[] = [];
+
+  if (payload.carousels) {
     carouselsToRender = payload.carousels;
   } else if (payload.brief) {
     const { briefs } = payload.brief;
@@ -786,9 +779,7 @@ async function processGenerateVideo(payload: any) {
 
   const { userId, brandId, orderId, aspectRatio, duration, prompt, sourceUrl, sourceType } = payload;
 
-  // ✅ Phase C: Use existing generate-video function instead of non-existent alfie-assemble-video
-  const renderResult = await callFn<any>("generate-video", {
-    userId, // ✅ Required for internal call validation
+  const assembleResult = await callFn<any>("alfie-assemble-video", {
     aspectRatio,
     duration,
     prompt,
@@ -798,17 +789,17 @@ async function processGenerateVideo(payload: any) {
     orderId,
   });
 
-  const renderPayload = unwrapResult<any>(renderResult);
-  const renderError = extractError(renderResult) ?? extractError(renderPayload);
-  if (renderError) throw new Error(renderError || "Video render failed");
+  const assemblePayload = unwrapResult<any>(assembleResult);
+  const assembleError = extractError(assembleResult) ?? extractError(assemblePayload);
+  if (assembleError) throw new Error(assembleError || "Video assembly failed");
 
-  const videoUrl =
-    (typeof renderPayload === "string"
-      ? renderPayload
-      : getResultValue<string>(renderPayload, ["video_url", "videoUrl", "output_url", "outputUrl"])) ??
-    getResultValue<string>(renderResult, ["video_url", "videoUrl", "output_url", "outputUrl"]);
+  let videoUrl =
+    (typeof assemblePayload === "string"
+      ? assemblePayload
+      : getResultValue<string>(assemblePayload, ["video_url", "videoUrl", "output_url", "outputUrl"])) ??
+    getResultValue<string>(assembleResult, ["video_url", "videoUrl", "output_url", "outputUrl"]);
 
-  if (!videoUrl) throw new Error("Missing video_url from renderer response");
+  if (!videoUrl) throw new Error("Missing video_url from assembler response");
 
   const seconds = Number(duration) || 12;
   const woofs = Math.max(1, Math.ceil(seconds / 12));
@@ -819,17 +810,6 @@ async function processGenerateVideo(payload: any) {
   });
   if (debitError) throw new Error(debitError.message);
 
-  const seconds = Number(duration) || 12;
-  const woofs = Math.max(1, Math.ceil(seconds / 12));
-
-  const { error: usageErr } = await supabaseAdmin.rpc("debit_woofs", {
-    user_id_input: userId,
-    amount: woofs,
-  });
-  if (usageErr) {
-    console.warn("woofs debit failed", usageErr);
-  }
-
   const { error: assetErr } = await supabaseAdmin.from("media_generations").insert({
     user_id: userId,
     brand_id: brandId,
@@ -837,148 +817,19 @@ async function processGenerateVideo(payload: any) {
     type: "video",
     status: "completed",
     output_url: videoUrl,
-    metadata: { aspectRatio, duration, prompt, sourceUrl, generator: "assemble-video", woofs },
     metadata: {
       aspectRatio,
       duration: seconds,
       prompt,
       sourceUrl,
       sourceType,
-      generator: "generate-video",
+      generator: "assemble-video",
       woofs,
     },
   });
   if (assetErr) throw new Error(assetErr.message);
 
-  return { videoUrl, woofs };
-}
-
-async function processStitchCarouselVideo(payload: any) {
-  console.log("🎞️ [processStitchCarouselVideo]", {
-    orderId: payload?.orderId,
-    carouselId: payload?.carouselId,
-    slides: Array.isArray(payload?.slides) ? payload.slides.length : 0,
-  });
-
-  const userId = payload?.userId as string | undefined;
-  const brandId = payload?.brandId as string | undefined;
-  const orderId = payload?.orderId as string | undefined;
-  const carouselId = payload?.carouselId as string | undefined;
-  const slides = Array.isArray(payload?.slides) ? payload.slides : [];
-
-  if (!userId || !brandId || !orderId) {
-    throw new Error("Invalid payload: missing userId, brandId or orderId");
-  }
-  if (!slides.length) {
-    throw new Error("Invalid payload: no slides provided for stitching");
-  }
-
-  const aspectRaw = typeof payload?.aspect === "string" ? payload.aspect.trim() : "";
-  const allowedAspects = new Set(["1:1", "16:9", "9:16", "4:3", "3:4", "4:5"]);
-  const aspect = allowedAspects.has(aspectRaw) ? (aspectRaw as any) : "4:5";
-
-  const durationPerSlide = Math.max(
-    1,
-    Number.isFinite(payload?.durationPerSlide) ? Number(payload.durationPerSlide) : 2,
-  );
-
-  const normalizedSlides = slides
-    .map((slide: any, index: number) => {
-      const publicId = slide?.cloudinary_public_id ?? slide?.publicId ?? null;
-      if (!publicId || typeof publicId !== "string") return null;
-      const durationCandidate = Number(slide?.durationSec ?? durationPerSlide);
-      return {
-        publicId,
-        url: typeof slide?.cloudinary_url === "string" ? slide.cloudinary_url : slide?.url ?? null,
-        format: typeof slide?.format === "string" ? slide.format : null,
-        durationSec: Math.max(1, Number.isFinite(durationCandidate) ? durationCandidate : durationPerSlide),
-        slideIndex: typeof slide?.slide_index === "number" ? slide.slide_index : index,
-      };
-    })
-    .filter((item): item is {
-      publicId: string;
-      url: string | null;
-      format: string | null;
-      durationSec: number;
-      slideIndex: number;
-    } => !!item);
-
-  if (!normalizedSlides.length) {
-    throw new Error("Unable to stitch carousel video: slides missing public IDs");
-  }
-
-  const referenceSlide = normalizedSlides[0];
-  const resolvedCloudName = extractCloudName(referenceSlide.url ?? undefined) || CLOUDINARY_CLOUD_NAME;
-  if (!resolvedCloudName) {
-    throw new Error("Missing Cloudinary cloud name for carousel video stitching");
-  }
-
-  const videoUrl = buildSpliceVideoUrl({
-    cloudName: resolvedCloudName,
-    items: normalizedSlides.map((slide) => ({
-      type: "image" as const,
-      publicId: slide.publicId,
-      durationSec: slide.durationSec,
-    })),
-    aspect,
-    title: typeof payload?.title === "string" ? payload.title : undefined,
-    subtitle: typeof payload?.subtitle === "string" ? payload.subtitle : undefined,
-    cta: typeof payload?.cta === "string" ? payload.cta : undefined,
-    audioPublicId:
-      typeof payload?.audioPublicId === "string" && payload.audioPublicId.trim()
-        ? payload.audioPublicId.trim()
-        : null,
-  });
-
-  const thumbnailUrl = buildImageThumbnailUrl({
-    secureUrl: referenceSlide.url ?? undefined,
-    publicId: referenceSlide.publicId,
-    format: referenceSlide.format,
-    cloudName: resolvedCloudName,
-    width: aspect === "16:9" ? 640 : 600,
-    height: aspect === "9:16" ? 1066 : 600,
-  });
-
-  const metadata: Record<string, unknown> = {
-    source: "carousel_video",
-    carousel_id: carouselId ?? null,
-    slide_count: normalizedSlides.length,
-    aspect_ratio: aspect,
-    duration_per_slide: durationPerSlide,
-    audio_public_id:
-      typeof payload?.audioPublicId === "string" && payload.audioPublicId.trim()
-        ? payload.audioPublicId.trim()
-        : null,
-    slide_public_ids: normalizedSlides.map((slide) => slide.publicId),
-    slide_indexes: normalizedSlides.map((slide) => slide.slideIndex),
-    request_id: payload?.requestId ?? null,
-  };
-
-  const { data: mediaRecord, error: mediaError } = await supabaseAdmin
-    .from("media_generations")
-    .insert({
-      user_id: userId,
-      brand_id: brandId,
-      order_id: orderId,
-      type: "video",
-      status: "completed",
-      prompt: typeof payload?.title === "string" ? payload.title.slice(0, 500) : null,
-      output_url: videoUrl,
-      thumbnail_url: thumbnailUrl,
-      metadata,
-    })
-    .select("id")
-    .maybeSingle();
-
-  if (mediaError) {
-    throw new Error(mediaError.message);
-  }
-
-  return {
-    video_url: videoUrl,
-    thumbnail_url: thumbnailUrl,
-    media_generation_id: mediaRecord?.id ?? null,
-  };
+  return { videoUrl };
 }
 
 // ========== CASCADE JOB CREATION ==========
@@ -1044,15 +895,22 @@ async function createCascadeJobs(job: JobRow, result: any, sb: SupabaseClient) {
     });
 
     if (cascadeJobs.length) {
-      const keyedJobs = cascadeJobs.map((job) => attachJobIdempotency(job));
-      const { data: inserted, error: insErr } = await sb
+      const { data: existing } = await sb
         .from("job_queue")
-        .upsert(keyedJobs, { onConflict: "idempotency_key", ignoreDuplicates: true })
-        .select("id");
-      if (insErr) console.error("❌ fallback cascade insert", insErr);
-      else if (inserted && inserted.length) {
-        console.log(`✅ fallback cascade created: ${inserted.length}`);
-        await safeReinvoke(sb);
+        .select("id, type, status")
+        .eq("order_id", job.order_id)
+        .in("status", ["queued", "running"]);
+
+      const existingKeys = new Set(existing?.map((j: any) => `${j.type}_${j.status}`) || []);
+      const toInsert = cascadeJobs.filter((j) => !existingKeys.has(`${j.type}_${j.status}`));
+
+      if (toInsert.length) {
+        const { error: insErr } = await sb.from("job_queue").insert(toInsert);
+        if (insErr) console.error("❌ fallback cascade insert", insErr);
+        else {
+          console.log(`✅ fallback cascade created: ${toInsert.length}`);
+          await safeReinvoke(sb);
+        }
       } else {
         console.log("ℹ️ fallback: all jobs already exist");
       }
@@ -1109,17 +967,11 @@ async function createCascadeJobs(job: JobRow, result: any, sb: SupabaseClient) {
     const toInsert = toCreate.filter((j) => !existingKeys.has(`${j.type}_${j.status}`));
 
     if (toInsert.length) {
-      const keyedJobs = toInsert.map((job) => attachJobIdempotency(job));
-      const { data: insertedJobs, error: insErr } = await sb
-        .from("job_queue")
-        .upsert(keyedJobs, { onConflict: "idempotency_key", ignoreDuplicates: true })
-        .select("id");
+      const { error: insErr } = await sb.from("job_queue").insert(toInsert);
       if (insErr) console.error("❌ cascade insert", insErr);
-      else if (insertedJobs && insertedJobs.length) {
-        console.log(`✅ cascade created: ${insertedJobs.length}`);
+      else {
+        console.log(`✅ cascade created: ${toInsert.length}`);
         await safeReinvoke(sb);
-      } else {
-        console.log("ℹ️ cascade: jobs already exist");
       }
     } else {
       console.log("ℹ️ cascade: jobs already exist");
@@ -1162,30 +1014,26 @@ async function safeReinvoke(sb: SupabaseClient) {
 /**
  * 🔧 SQL attendu côté DB pour claim_next_job:
  *
- * create or replace function claim_next_job(worker_id text)
- * returns job_queue
+ * create or replace function claim_next_job()
+ * returns setof job_queue
  * language plpgsql
  * as $$
- * declare claimed job_queue%rowtype;
+ * declare r job_queue%rowtype;
  * begin
- *   with next_job as (
+ *   update job_queue
+ *   set status = 'running',
+ *       updated_at = now()
+ *   where id in (
  *     select id from job_queue
  *     where status = 'queued'
  *     order by created_at asc
  *     limit 1
  *     for update skip locked
  *   )
- *   update job_queue
- *   set status = 'running',
- *       locked_by = worker_id,
- *       started_at = now(),
- *       attempts = coalesce(attempts, 0) + 1,
- *       updated_at = now()
- *   from next_job
- *   where job_queue.id = next_job.id
- *   returning job_queue.* into claimed;
- *
- *   return claimed;
+ *   returning * into r;
+ *   if found then
+ *     return next r;
+ *   end if;
  * end;
  * $$;
  */

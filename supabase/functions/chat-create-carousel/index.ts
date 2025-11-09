@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY, env } from "../_shared/env.ts";
 import { generateMasterSeed } from "../_shared/seedGenerator.ts";
 
 const corsHeaders = {
@@ -36,14 +35,14 @@ serve(async (req) => {
 
     // Admin client for service operations
     const adminClient = createClient(
-      SUPABASE_URL ?? "",
-      SUPABASE_SERVICE_ROLE_KEY ?? ""
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
     // User client for auth
     const userClient = createClient(
-      SUPABASE_URL ?? "",
-      SUPABASE_ANON_KEY ?? "",
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } }
     );
 
@@ -201,7 +200,7 @@ serve(async (req) => {
       console.log(`[CreateCarousel] Calling alfie-plan-carousel for structured content...`);
       
       const planResponse = await fetch(
-        `${SUPABASE_URL}/functions/v1/alfie-plan-carousel`,
+        `${Deno.env.get("SUPABASE_URL")}/functions/v1/alfie-plan-carousel`,
         {
           method: 'POST',
           headers: {

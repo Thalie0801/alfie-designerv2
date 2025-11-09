@@ -58,12 +58,10 @@ export async function callAIWithFallback(
   iterationCount: number = 0
 ): Promise<AIResponse> {
   
-  // Import env at top of file would be better, but for minimal changes:
-  const LOVABLE_API_KEY = (() => {
-    const k = Deno.env.get('LOVABLE_API_KEY') || Deno.env.get('VITE_LOVABLE_API_KEY');
-    if (!k) throw new Error('LOVABLE_API_KEY not configured');
-    return k;
-  })();
+  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+  if (!LOVABLE_API_KEY) {
+    throw new Error('LOVABLE_API_KEY not configured');
+  }
   
   // Ordre de priorité des providers
   const providers = preferredProvider === 'gemini' 
@@ -242,9 +240,7 @@ function normalizeFonts(fonts: any): string {
     try {
       const values = Object.values(fonts).filter(v => typeof v === 'string');
       if (values.length) return values.join(', ');
-    } catch (_) {
-      // ignore parsing errors from unexpected font shapes
-    }
+    } catch (_) {}
   }
 
   // Chaîne simple

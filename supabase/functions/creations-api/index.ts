@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { INTERNAL_FN_SECRET } from "../_shared/env.ts";
+
+const INTERNAL_SECRET = Deno.env.get('INTERNAL_FN_SECRET') ?? '';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -124,7 +125,7 @@ async function handleCreateDeliverable(req: Request, supabase: any) {
     });
   }
 
-  if (!INTERNAL_FN_SECRET) {
+  if (!INTERNAL_SECRET) {
     return new Response(JSON.stringify({ error: 'Server misconfigured' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -163,7 +164,7 @@ async function handleCreateDeliverable(req: Request, supabase: any) {
           orderId: null,
           requestId: `deliverable:${deliverable.id}`,
         },
-        headers: { 'X-Internal-Secret': INTERNAL_FN_SECRET || "" },
+        headers: { 'X-Internal-Secret': INTERNAL_SECRET },
       });
     }
   }

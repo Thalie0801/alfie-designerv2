@@ -2,7 +2,6 @@
 // v2.1.0 — Planificateur de carrousel robuste (rétro-compat, validations, structured output)
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { LOVABLE_API_KEY } from "../_shared/env.ts";
 
 // ---------------------------
 // CORS
@@ -408,7 +407,7 @@ serve(async (req) => {
 
     // Compatibilité entrée
     const rawPrompt = body.prompt || body.topic;
-    const slideCount = clamp(toInt(body.slideCount ?? body.numSlides ?? 5, 5), MIN_SLIDES, MAX_SLIDES);
+    let slideCount = clamp(toInt(body.slideCount ?? body.numSlides ?? 5, 5), MIN_SLIDES, MAX_SLIDES);
 
     const brandKit: BrandKit | undefined = body.brandKit || (body.brandVoice ? { voice: body.brandVoice } : undefined);
 
@@ -431,8 +430,8 @@ serve(async (req) => {
       aspectRatio,
     });
 
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      console.error("[alfie-plan-carousel] ❌ Missing LOVABLE_API_KEY");
       return json({ error: "LOVABLE_API_KEY not configured" }, 500);
     }
 

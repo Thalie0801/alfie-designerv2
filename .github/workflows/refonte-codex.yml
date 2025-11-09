@@ -31,24 +31,22 @@ jobs:
           cache: 'npm'
 
       - name: Configure npm auth (optional)
-        if: ${{ secrets.NPM_TOKEN != '' }}
+        if: ${{ secrets.NPM_TOKEN }}
         run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
-        
       - name: Install dependencies
         run: npm ci --prefer-online
-        
       - name: Run Codex
         shell: bash
         run: |
           bash scripts/codex/run.sh
 
-      # GARDE SIMPLE & FIABLE bloque toute modif dans apps/landing/, www/, site/
-      - name: "Guard: No landing changes"
+      # GARDE SIMPLE & FIABLE : bloque toute modif dans apps/landing/, www/, site/
+      - name: Guard: No landing changes
         shell: bash
         run: |
           set -euo pipefail
@@ -88,14 +86,12 @@ jobs:
             - Passage du flux push ➜ pull request
             - Autopublish désactivé
             - Ajout du flag de confirmation premium
-          branch: codex/main-${{ github.run_id }}
-          base: main
+          branch: codex/refonte-alfie-2025-${{ github.run_id }}
+          base: refonte-alfie-2025
           author: "alfie-codex-bot <codex@alfie.local>"
           committer: "alfie-codex-bot <codex@alfie.local>"
           labels: |
             automated
             codex
           draft: false
-
-
 

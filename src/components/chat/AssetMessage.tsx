@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Download, FolderOpen, Copy, PlayCircle, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { downloadUrl } from "@/lib/download";
 
 interface AssetMessageProps {
   assetId: string;
@@ -72,11 +71,31 @@ export function AssetMessage(props: AssetMessageProps) {
   const handleDownload = async () => {
     try {
       setDownloading(true);
-      await downloadUrl(outputUrl, `alfie-${type}-${assetId}`);
+      const a = document.createElement("a");
+      a.href = outputUrl;
+      a.rel = "noopener";
+      a.download = `${type}-${assetId}.${type === "image" ? "png" : "mp4"}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       toast.success("Téléchargement démarré");
-    } catch (error) {
-      console.error("Download error:", error);
-      toast.error("Erreur lors du téléchargement");
+    } catch {
+      try {
+        const res = await fetch(outputUrl);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a2 = document.createElement("a");
+        a2.href = url;
+        a2.download = `${type}-${assetId}.${type === "image" ? "png" : "mp4"}`;
+        document.body.appendChild(a2);
+        a2.click();
+        URL.revokeObjectURL(url);
+        document.body.removeChild(a2);
+        toast.success("Téléchargement démarré");
+      } catch (error) {
+        console.error("Download error:", error);
+        toast.error("Erreur lors du téléchargement");
+      }
     } finally {
       setDownloading(false);
     }

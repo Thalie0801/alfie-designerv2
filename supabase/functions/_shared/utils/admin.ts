@@ -1,5 +1,4 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, ADMIN_EMAILS } from "../env.ts";
 
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,15 +8,15 @@ export const corsHeaders = {
 
 export const supabaseAdmin = () =>
   createClient(
-    SUPABASE_URL ?? "",
-    SUPABASE_SERVICE_ROLE_KEY ?? "",
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
 export const supabaseUserFromReq = (req: Request) =>
   createClient(
-    SUPABASE_URL ?? "",
-    SUPABASE_ANON_KEY ?? "",
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_ANON_KEY") ?? "",
     { global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } } }
   );
 
@@ -32,7 +31,7 @@ export async function assertIsAdmin(client: SupabaseClient, userId: string): Pro
   const { data: { user } } = await client.auth.getUser();
   const userEmail = user?.email?.toLowerCase() || "";
   
-  const admins = (ADMIN_EMAILS ?? "")
+  const admins = (Deno.env.get("ADMIN_EMAILS") ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);

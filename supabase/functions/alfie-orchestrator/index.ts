@@ -1,8 +1,6 @@
 // functions/alfie-orchestrator/index.ts
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY, INTERNAL_FN_SECRET } from "../_shared/env.ts";
-import { attachJobIdempotency } from "../_shared/idempotency.ts";
 import {
   type ConversationState,
   type ConversationContext,
@@ -14,7 +12,7 @@ import {
 } from "../_shared/conversationFlow.ts";
 
 // ---- Supabase (service role pour la persistance session/ordres/jobs)
-const sb = createClient(SUPABASE_URL ?? "", SUPABASE_SERVICE_ROLE_KEY ?? "");
+const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
 // ---- CORS / helpers
 const corsHeaders = {
@@ -29,26 +27,6 @@ const json = (data: any, status = 200) =>
     status,
     headers: { "content-type": "application/json", ...corsHeaders },
   });
-
-async function enqueueJob(job: { payload: unknown; type: string; order_id?: string | null; user_id?: string | null } & Record<string, unknown>) {
-  const jobWithKey = attachJobIdempotency(job);
-  const { data, error } = await sb
-    .from("job_queue")
-    .upsert(jobWithKey, { onConflict: "idempotency_key", ignoreDuplicates: true })
-    .select("id, idempotency_key")
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data) {
-    console.log('[ORCH] duplicate job skipped', { key: jobWithKey.idempotency_key, type: jobWithKey.type });
-    return jobWithKey;
-  }
-
-  return { ...jobWithKey, ...data };
-}
 
 // ---- Small utils
 const toInt = (v: any, d = 0) => {
@@ -106,26 +84,6 @@ serve(async (req) => {
       forceTool,
     } = body;
 
-    const referenceMediaUrl = (() => {
-      if (typeof body?.referenceMediaUrl === "string" && body.referenceMediaUrl.trim().length > 0) {
-        return body.referenceMediaUrl.trim();
-      }
-      if (typeof body?.reference_media_url === "string" && body.reference_media_url.trim().length > 0) {
-        return (body.reference_media_url as string).trim();
-      }
-      return null;
-    })();
-
-    const referenceMediaType = (() => {
-      if (typeof body?.referenceMediaType === "string" && body.referenceMediaType.trim().length > 0) {
-        return body.referenceMediaType.trim();
-      }
-      if (typeof body?.reference_media_type === "string" && body.reference_media_type.trim().length > 0) {
-        return (body.reference_media_type as string).trim();
-      }
-      return null;
-    })();
-
     const user_message =
       typeof message === "string" && message.trim().length > 0
         ? message
@@ -143,7 +101,7 @@ serve(async (req) => {
     const authHeader = req.headers.get("authorization");
     if (!authHeader) return json({ error: "Missing authorization" }, 401);
 
-    const userClient = createClient(SUPABASE_URL ?? "", SUPABASE_ANON_KEY ?? "", {
+    const userClient = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: auth } = await userClient.auth.getUser();
@@ -185,14 +143,12 @@ serve(async (req) => {
 
     console.log("[ORCH] 📊 State:", state, "Context:", context);
 
-    if (
-      forceTool === "generate_video" &&
-      (body?.aspectRatio || body?.durationSec || body?.uploadedSourceUrl || referenceMediaUrl)
-    ) {
+    if (forceTool === "generate_video" && (body?.aspectRatio || body?.durationSec || body?.uploadedSourceUrl)) {
       const aspectRatio = (body?.aspectRatio as "9:16" | "16:9" | "1:1") ?? "9:16";
       const duration = Number(body?.durationSec) || 12;
       const promptText = (user_message || "").trim();
-      const sourceUrl = body?.uploadedSourceUrl || referenceMediaUrl || null;
+      const sourceUrl = body?.uploadedSourceUrl || null;
+      const sourceType = body?.uploadedSourceType || null;
 
       let orderId: string | null = session.order_id;
       if (!orderId) {
@@ -203,8 +159,9 @@ serve(async (req) => {
             brand_id: brand_id,
             campaign_name: `Video_${Date.now()}`,
             brief_json: {
-              video: { aspectRatio, durationSec: duration, prompt: promptText, sourceUrl },
+              video: { aspectRatio, durationSec: duration, prompt: promptText, sourceUrl, sourceType },
             },
+            status: "pending",
           })
           .select()
           .single();
@@ -213,7 +170,7 @@ serve(async (req) => {
         await sb.from("alfie_conversation_sessions").update({ order_id: orderId }).eq("id", session.id);
       }
 
-      await enqueueJob({
+      await sb.from("job_queue").insert({
         user_id: user.id,
         order_id: orderId,
         type: "generate_video",
@@ -226,25 +183,20 @@ serve(async (req) => {
           duration,
           prompt: promptText,
           sourceUrl,
-          referenceMediaUrl,
-          reference_media_url: referenceMediaUrl,
-          referenceMediaType,
+          sourceType,
         },
       });
 
       try {
-        await fetch(`${SUPABASE_URL}/functions/v1/alfie-job-worker`, {
+        await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/alfie-job-worker`, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            "X-Internal-Secret": INTERNAL_FN_SECRET || "",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ trigger: "video" }),
         });
-      } catch (workerErr) {
-        console.warn("[ORCH] Worker trigger failed (non-blocking):", workerErr);
-      }
+      } catch {}
 
       await appendMessage(session.id, "assistant", "🚀 Vidéo lancée depuis le Studio.");
       await sb
@@ -259,7 +211,7 @@ serve(async (req) => {
       const promptText = (user_message || body?.prompt || "").trim();
       if (!promptText) return json({ error: "missing_prompt" }, 400);
 
-      const sourceUrl = body?.uploadedSourceUrl || referenceMediaUrl || null;
+      const sourceUrl = body?.uploadedSourceUrl || null;
 
       let orderId = session.order_id;
       if (!orderId) {
@@ -270,6 +222,7 @@ serve(async (req) => {
             brand_id: brand_id,
             campaign_name: `Image_${Date.now()}`,
             brief_json: { image: { prompt: promptText, sourceUrl } },
+            status: "pending",
           })
           .select()
           .single();
@@ -280,7 +233,7 @@ serve(async (req) => {
 
       const finalOrderId = orderId as string;
 
-      await enqueueJob({
+      await sb.from("job_queue").insert({
         user_id: user.id,
         order_id: finalOrderId,
         type: "render_images",
@@ -291,25 +244,19 @@ serve(async (req) => {
           orderId: finalOrderId,
           prompt: promptText,
           sourceUrl,
-          referenceMediaUrl,
-          reference_media_url: referenceMediaUrl,
-          referenceMediaType,
         },
       });
 
       try {
-        await fetch(`${SUPABASE_URL}/functions/v1/alfie-job-worker`, {
+        await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/alfie-job-worker`, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            "X-Internal-Secret": INTERNAL_FN_SECRET || "",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ trigger: "image" }),
         });
-      } catch (workerErr) {
-        console.warn("[ORCH] Worker trigger failed (non-blocking):", workerErr);
-      }
+      } catch {}
 
       const responseText = "🚀 Génération lancée !";
       await appendMessage(session.id, "assistant", responseText);
@@ -341,6 +288,7 @@ serve(async (req) => {
             brand_id: brand_id,
             campaign_name: `Carousel_${Date.now()}`,
             brief_json: { carousel: { slides } },
+            status: "pending",
           })
           .select()
           .single();
@@ -351,7 +299,7 @@ serve(async (req) => {
 
       const finalOrderId = orderId as string;
 
-      await enqueueJob({
+      await sb.from("job_queue").insert({
         user_id: user.id,
         order_id: finalOrderId,
         type: "render_carousels",
@@ -361,25 +309,19 @@ serve(async (req) => {
           brandId: brand_id,
           orderId: finalOrderId,
           slides,
-          referenceMediaUrl,
-          reference_media_url: referenceMediaUrl,
-          referenceMediaType,
         },
       });
 
       try {
-        await fetch(`${SUPABASE_URL}/functions/v1/alfie-job-worker`, {
+        await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/alfie-job-worker`, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            "X-Internal-Secret": INTERNAL_FN_SECRET || "",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ trigger: "carousel" }),
         });
-      } catch (workerErr) {
-        console.warn("[ORCH] Worker trigger failed (non-blocking):", workerErr);
-      }
+      } catch {}
 
       const responseText = "🚀 Génération lancée !";
       await appendMessage(session.id, "assistant", responseText);
@@ -410,7 +352,8 @@ serve(async (req) => {
         aspectRatio: null,
         durationSec: null,
         prompt: null,
-        sourceUrl: body?.uploadedSourceUrl || referenceMediaUrl || null,
+        sourceUrl: body?.uploadedSourceUrl || null,
+        sourceType: body?.uploadedSourceType || null,
       };
       state = "awaiting_video_params";
       await sb
@@ -435,14 +378,18 @@ serve(async (req) => {
         aspectRatio: null,
         durationSec: null,
         prompt: null,
-        sourceUrl: body?.uploadedSourceUrl || referenceMediaUrl || null,
+        sourceUrl: body?.uploadedSourceUrl || null,
+        sourceType: body?.uploadedSourceType || null,
       };
 
       const { aspectRatio, durationSec } = parseFormatDuration(user_message || "");
       if (aspectRatio) context.video!.aspectRatio = aspectRatio;
       if (durationSec) context.video!.durationSec = durationSec;
-      if (!context.video!.sourceUrl && (body?.uploadedSourceUrl || referenceMediaUrl)) {
-        context.video!.sourceUrl = body?.uploadedSourceUrl || referenceMediaUrl;
+      if (!context.video!.sourceUrl && body?.uploadedSourceUrl) {
+        context.video!.sourceUrl = body.uploadedSourceUrl;
+      }
+      if (!context.video!.sourceType && body?.uploadedSourceType) {
+        context.video!.sourceType = body.uploadedSourceType;
       }
 
       await sb
@@ -485,7 +432,8 @@ serve(async (req) => {
         aspectRatio: null,
         durationSec: null,
         prompt: null,
-        sourceUrl: body?.uploadedSourceUrl || referenceMediaUrl || null,
+        sourceUrl: body?.uploadedSourceUrl || null,
+        sourceType: body?.uploadedSourceType || null,
       }) as any;
       const promptText = (user_message || "").trim();
       if (!promptText) {
@@ -510,6 +458,7 @@ serve(async (req) => {
             brand_id: brand_id,
             campaign_name: `Video_${Date.now()}`,
             brief_json: { video: v },
+            status: "pending",
           })
           .select()
           .single();
@@ -521,7 +470,7 @@ serve(async (req) => {
           .eq("id", session.id);
       }
 
-      await enqueueJob({
+      const job = {
         user_id: user.id,
         order_id: orderId,
         type: "generate_video",
@@ -534,25 +483,21 @@ serve(async (req) => {
           duration: v.durationSec,
           prompt: v.prompt,
           sourceUrl: v.sourceUrl || null,
-          referenceMediaUrl: v.sourceUrl || referenceMediaUrl || null,
-          reference_media_url: v.sourceUrl || referenceMediaUrl || null,
-          referenceMediaType,
+          sourceType: v.sourceType || null,
         },
-      });
+      };
+      await sb.from("job_queue").insert(job);
 
       try {
-        await fetch(`${SUPABASE_URL}/functions/v1/alfie-job-worker`, {
+        await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/alfie-job-worker`, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            "X-Internal-Secret": INTERNAL_FN_SECRET || "",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ trigger: "video" }),
         });
-      } catch (workerErr) {
-        console.warn("[ORCH] Worker trigger failed (non-blocking):", workerErr);
-      }
+      } catch {}
 
       state = "generating";
       await sb
@@ -822,6 +767,7 @@ serve(async (req) => {
           brand_id,
           campaign_name,
           brief_json: context,
+          status: "draft",
         })
         .select()
         .single();
@@ -912,9 +858,6 @@ serve(async (req) => {
             orderId: order.id,
             orderItemId: imageItem?.id,
             brief: { count: nI, briefs: context.imageBriefs },
-            referenceMediaUrl,
-            reference_media_url: referenceMediaUrl,
-            referenceMediaType,
           },
         });
       }
@@ -931,9 +874,6 @@ serve(async (req) => {
             orderId: order.id,
             orderItemId: carouselItem?.id,
             brief: { count: nC, briefs: context.carouselBriefs },
-            referenceMediaUrl,
-            reference_media_url: referenceMediaUrl,
-            referenceMediaType,
           },
         });
       }
@@ -949,10 +889,7 @@ serve(async (req) => {
         const newJobs = renderJobs.filter((j) => !existingKeys.has(j.type));
 
         if (newJobs.length > 0) {
-          const keyedJobs = newJobs.map((job) => attachJobIdempotency(job));
-          const { error: jobError } = await sb
-            .from("job_queue")
-            .upsert(keyedJobs, { onConflict: "idempotency_key", ignoreDuplicates: true });
+          const { error: jobError } = await sb.from("job_queue").insert(newJobs);
           if (jobError) {
             console.error("[ORCH] ❌ Queue jobs failed:", jobError);
             return json({ error: "failed_to_queue_jobs" }, 500);
@@ -960,35 +897,35 @@ serve(async (req) => {
         }
       }
 
-      // Invoke worker via Supabase client
+      // Invoke worker (avec timeout)
+      const workerUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/alfie-job-worker`;
       try {
-        console.log("[ORCH] ▶️ Invoking alfie-job-worker for order:", order.id);
-        
-        const { data: workerData, error: workerError } = await sb.functions.invoke("alfie-job-worker", {
-          body: { trigger: "orchestrator", orderId: order.id }
-        });
-        
-        if (workerError) {
-          console.error("[ORCH] ❌ Worker invoke error:", workerError);
-          throw new Error(`Worker invoke failed: ${workerError.message}`);
-        }
-        
-        console.log("[ORCH] ✅ Worker response:", workerData);
-      } catch (e) {
-        console.error("[ORCH] ❌ Worker call failed:", e);
-        // Ne pas continuer si le worker échoue
-        return json({ 
-          error: "worker_invocation_failed", 
-          details: e instanceof Error ? e.message : String(e) 
-        }, 500);
-      }
+        console.log("[ORCH] ▶️ Invoking worker:", workerUrl);
+        const controller = new AbortController();
+        const t = setTimeout(() => controller.abort(), 8000);
 
-      // Log queue status for monitoring
-      const { data: queueStatus } = await sb
-        .from("job_queue")
-        .select("id, status, type")
-        .eq("order_id", order.id);
-      console.log("[ORCH] 📊 Queue status for order:", order.id, queueStatus);
+        const workerRes = await fetch(workerUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ trigger: "orchestrator", orderId: order.id }),
+          signal: controller.signal,
+        }).catch((e) => {
+          console.error("[ORCH] Worker fetch error:", e);
+          return { ok: false, status: 0 } as any;
+        });
+
+        clearTimeout(t);
+
+        if (!workerRes?.ok) {
+          const txt = (await workerRes?.text?.()) || "unknown";
+          console.warn("[ORCH] Worker not ok:", workerRes?.status, txt);
+        }
+      } catch (e) {
+        console.error("[ORCH] Worker call failed:", e);
+      }
 
       const text = "🚀 Génération lancée ! Je te tiens au courant.";
       await appendMessage(session.id, "assistant", text);

@@ -37,36 +37,20 @@ serve(async (req) => {
     const nowIso = new Date().toISOString();
     console.log("[queue-monitor] Start", { userId, nowIso });
 
-    // Fetch recent jobs for the user with retry logic for transient DB errors
-    let jobs = null;
-    let retries = 3;
-    let jobsErr = null;
-    
-    while (retries > 0 && !jobs) {
-      const result = await supabase
-        .from("job_queue")
-        .select("id, type, status, error, retry_count, max_retries, created_at, updated_at")
-        .eq("user_id", userId)
-        .order("updated_at", { ascending: false })
-        .limit(50);
-      
-      if (result.error) {
-        jobsErr = result.error;
-        if (result.error.code === "PGRST002" && retries > 1) {
-          console.warn("[queue-monitor] Schema cache error, retrying...", { retriesLeft: retries - 1 });
-          await new Promise(r => setTimeout(r, 500));
-          retries--;
-          continue;
-        }
-        console.error("[queue-monitor] jobsErr", result.error);
-        return new Response(JSON.stringify({ ok: false, error: result.error.message }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      
-      jobs = result.data;
-      break;
+    // Fetch recent jobs for the user
+    const { data: jobs, error: jobsErr } = await supabase
+      .from("job_queue")
+      .select("id, type, status, error, retry_count, max_retries, created_at, updated_at")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .limit(50);
+
+    if (jobsErr) {
+      console.error("[queue-monitor] jobsErr", jobsErr);
+      return new Response(JSON.stringify({ ok: false, error: jobsErr.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const counts = { queued: 0, running: 0, completed: 0, failed: 0 } as Record<string, number>;

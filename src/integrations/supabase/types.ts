@@ -1006,20 +1006,16 @@ export type Database = {
       job_queue: {
         Row: {
           archived_at: string | null
-          attempts: number
           created_at: string
           error: string | null
           id: string
-          idempotency_key: string | null
           is_archived: boolean
           job_version: number
-          locked_by: string | null
           max_retries: number
           order_id: string | null
           payload: Json
           result: Json | null
           retry_count: number
-          started_at: string | null
           status: string
           type: string
           updated_at: string
@@ -1027,20 +1023,16 @@ export type Database = {
         }
         Insert: {
           archived_at?: string | null
-          attempts?: number
           created_at?: string
           error?: string | null
           id?: string
-          idempotency_key?: string | null
           is_archived?: boolean
           job_version?: number
-          locked_by?: string | null
           max_retries?: number
           order_id?: string | null
           payload: Json
           result?: Json | null
           retry_count?: number
-          started_at?: string | null
           status?: string
           type: string
           updated_at?: string
@@ -1048,20 +1040,16 @@ export type Database = {
         }
         Update: {
           archived_at?: string | null
-          attempts?: number
           created_at?: string
           error?: string | null
           id?: string
-          idempotency_key?: string | null
           is_archived?: boolean
           job_version?: number
-          locked_by?: string | null
           max_retries?: number
           order_id?: string | null
           payload?: Json
           result?: Json | null
           retry_count?: number
-          started_at?: string | null
           status?: string
           type?: string
           updated_at?: string
@@ -2302,18 +2290,14 @@ export type Database = {
         }[]
       }
       claim_next_job: {
-        Args: { worker_id: string }
+        Args: never
         Returns: {
           id: string
-          order_id: string | null
+          order_id: string
           payload: Json
           type: string
           user_id: string
-          status: string
-          attempts: number | null
-          locked_by: string | null
-          started_at: string | null
-        } | null
+        }[]
       }
       consume_visuals: {
         Args: {

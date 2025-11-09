@@ -47,7 +47,7 @@ export async function renderSlideToSVG(
   
   // Couche de texte (typo contrôlée, pas d'IA)
   for (const layer of template.textLayers) {
-    const text = sanitizeText(getTextForLayer(layer, slideContent));
+    let text = sanitizeText(getTextForLayer(layer, slideContent));
     if (!text) continue;
     
     // Use consistent font from brand kit
@@ -274,9 +274,7 @@ function escapeXml(text: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;')
-    // Escape every non printable ASCII character for Cloudinary overlays
-    .replace(/[^\u0020-\u007E]/gu, (char) => {
-      const codePoint = char.codePointAt(0);
-      return codePoint ? `&#${codePoint};` : '';
-    });
+    // Échapper tous les caractères non-ASCII pour Cloudinary
+    // Use \u0020-\u007E to exclude control characters (0x00-0x1F and 0x7F)
+    .replace(/[^\u0020-\u007E]/g, (char) => `&#${char.charCodeAt(0)};`);
 }

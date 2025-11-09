@@ -138,72 +138,6 @@ export function QuotaBar({ activeBrandId }: QuotaBarProps) {
     <details className="sticky top-0 z-30 bg-gradient-to-r from-background via-background/98 to-background backdrop-blur-xl border-b border-border/50 shadow-sm group">
       <summary className="flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-muted/30 transition-all duration-200 list-none">
         <div className="flex items-center gap-3">
-          {/* Badge Visuels */}
-          <div className="flex flex-col gap-1 min-w-[88px]">
-            <div
-              className={cn(
-                "flex items-center gap-2 px-3 py-1 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 text-sm font-semibold border border-blue-200 dark:border-blue-800 shadow-sm",
-                textTone(visualsPercent),
-              )}
-              title="Visuels IA"
-            >
-              <span className="text-xs" aria-hidden>
-                📸
-              </span>
-              <span className="text-xs">{visualsQuota ? `${visualsLeft}/${visualsQuota}` : "—/0"}</span>
-            </div>
-            <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div
-                className={cn("h-full transition-all duration-500", colorFor(visualsPercent))}
-                style={{ width: `${visualsPercent}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Badge Vidéos */}
-          <div className="flex flex-col gap-1 min-w-[88px]">
-            <div
-              className={cn(
-                "flex items-center gap-2 px-3 py-1 rounded-lg bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 text-sm font-semibold border border-purple-200 dark:border-purple-800 shadow-sm",
-                textTone(videosPercent),
-              )}
-              title="Vidéos IA"
-            >
-              <span className="text-xs" aria-hidden>
-                🎬
-              </span>
-              <span className="text-xs">{videosQuota ? `${videosLeft}/${videosQuota}` : "—/0"}</span>
-            </div>
-            <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div
-                className={cn("h-full transition-all duration-500", colorFor(videosPercent))}
-                style={{ width: `${videosPercent}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Badge Woofs */}
-          <div className="flex flex-col gap-1 min-w-[88px]">
-            <div
-              className={cn(
-                "flex items-center gap-2 px-3 py-1 rounded-lg bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 text-sm font-semibold border border-orange-200 dark:border-orange-800 shadow-sm",
-                textTone(woofsPercent),
-              )}
-              title="Budget vidéo (Woofs)"
-            >
-              <span className="text-xs" aria-hidden>
-                🐾
-              </span>
-              <span className="text-xs">{woofsQuota ? `${woofsLeft}/${woofsQuota}` : "—/0"}</span>
-            </div>
-            <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div
-                className={cn("h-full transition-all duration-500", colorFor(woofsPercent))}
-                style={{ width: `${woofsPercent}%` }}
-              />
-            </div>
-          </div>
-
           {!HIDE_BACKEND_BADGES ? (
             <>
               <div className="flex flex-col gap-1 min-w-[88px]">
@@ -295,19 +229,16 @@ export function QuotaBar({ activeBrandId }: QuotaBarProps) {
       </summary>
 
       <div className="px-4 pb-3 text-sm text-muted-foreground border-t border-border bg-muted/30">
-        <div className="py-3 space-y-2">
-          <p className="font-medium text-foreground">💡 Astuces pour économiser tes quotas</p>
-          <ul className="space-y-1 text-sm text-muted-foreground">
-            <li>• Draft 10s : version vidéo courte et économique (1 Woof).</li>
+        <div className="py-3">
+          <p className="text-xs text-muted-foreground">
+            Les vidéos consomment des Woofs : <strong>1 Woof par 12s</strong>. Les quotas se réinitialisent le 1er de chaque
+            mois.
+          </p>
+          <ul className="text-sm text-muted-foreground mt-2">
+            <li>• Draft 10s : version courte et économique (1 Woof).</li>
             <li>• Batch de nuit : génère plusieurs assets d’un coup.</li>
             <li>• Templates : adaptation auto avec ton Brand Kit.</li>
           </ul>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Les vidéos consomment des Woofs (1 Woof / 12s). Les quotas se réinitialisent le 1er de chaque mois.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Plan actuel : <span className="font-semibold text-foreground">{quota.plan || "—"}</span>
-          </p>
         </div>
       </div>
     </details>

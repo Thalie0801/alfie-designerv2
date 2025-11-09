@@ -49,9 +49,9 @@ serve(async (req) => {
       html.match(/<meta name="description" content="([^"]+)"/i) ||
       html.match(/<meta name="twitter:description" content="([^"]+)"/i);
 
-    const title = titleMatch ? titleMatch[1] : 'Untitled Design';
+    let title = titleMatch ? titleMatch[1] : 'Untitled Design';
     let imageUrl = (ogImageMatch?.[1] || twitterImageMatch?.[1] || imageLinkMatch?.[1] || '').trim();
-    const description = (descriptionMatch?.[1] || '').trim();
+    let description = (descriptionMatch?.[1] || '').trim();
 
     // Normalize protocol-relative and root-relative URLs
     if (imageUrl.startsWith('//')) {

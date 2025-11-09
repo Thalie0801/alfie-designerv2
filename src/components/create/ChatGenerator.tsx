@@ -153,31 +153,15 @@ async function pollForVideoUrl(
       if (signal?.aborted) return null;
       try {
         const res = await fetch(url, { method: "GET", signal });
-        
-        // Handle 202 (Accepted) and 204 (No Content) as "not ready yet"
-        if (res.status === 202 || res.status === 204) {
-          await delay(intervalMs);
-          continue;
-        }
-        
         if (!res.ok) {
           await delay(intervalMs);
           continue;
         }
-        
-        // Check content-type to avoid parsing HTML as JSON
-        const ct = res.headers.get("content-type") || "";
-        if (!ct.includes("json")) {
-          await delay(intervalMs);
-          continue;
-        }
-        
         const text = await res.text();
         if (!text) {
           await delay(intervalMs);
           continue;
         }
-        
         let data: unknown;
         try {
           data = JSON.parse(text);

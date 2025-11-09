@@ -112,9 +112,9 @@ serve(async (req) => {
           html.match(/<meta name="description" content="([^"]+)"/i) ||
           html.match(/<meta name="twitter:description" content="([^"]+)"/i);
         
-        const title = (titleMatch?.[1] || 'Design Canva').trim();
+        let title = (titleMatch?.[1] || 'Design Canva').trim();
         let imageUrl = (ogImageMatch?.[1] || twitterImageMatch?.[1] || imageLinkMatch?.[1] || '').trim();
-        const description = (descriptionMatch?.[1] || '').trim();
+        let description = (descriptionMatch?.[1] || '').trim();
 
         if (imageUrl.startsWith('//')) {
           imageUrl = 'https:' + imageUrl;

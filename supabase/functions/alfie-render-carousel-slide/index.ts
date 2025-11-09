@@ -1,16 +1,11 @@
 // functions/alfie-render-carousel-slide/index.ts
-// v2.5.0 — Slide renderer (idempotent, retries + timeout, env.ts, internal secret)
+// v2.4.0 — Slide renderer (idempotent, retries + timeout, normalized inputs)
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { uploadTextAsRaw } from "../_shared/cloudinaryUploader.ts";
-import {
-  SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY,
-  INTERNAL_FN_SECRET,
-  LOVABLE_API_KEY
-} from "../_shared/env.ts";
-import { buildImageThumbnailUrl } from "../_shared/cloudinaryUtils.ts";
+
+const INTERNAL_SECRET = Deno.env.get("INTERNAL_FN_SECRET") ?? "";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,18 +15,6 @@ const corsHeaders = {
 };
 
 type Lang = "FR" | "EN";
-
-const URL_PATTERN = /https?:\/\/\S+/gi;
-
-function removeUrls(value: string): string {
-  return value.replace(URL_PATTERN, " ").replace(/\s+/g, " ").trim();
-}
-
-function clampText(value: string | undefined, max: number): string {
-  const cleaned = removeUrls(String(value ?? "").trim());
-  if (!cleaned) return "";
-  return cleaned.slice(0, max).trim();
-}
 
 interface SlideRequest {
   userId?: string;               // ✅ Required or deduced from orderId
@@ -147,20 +130,21 @@ async function fetchWithRetries(url: string, init: RequestInit, maxRetries = 2) 
 // Handler
 // -----------------------------
 serve(async (req) => {
-  console.log("[alfie-render-carousel-slide] v2.5.0 — invoked");
+  console.log("[alfie-render-carousel-slide] v2.4.0 — invoked");
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  // ✅ Validate internal secret FIRST
-  const secret = req.headers.get("x-internal-secret");
-  if (!secret || secret !== INTERNAL_FN_SECRET) {
-    console.error("[alfie-render-carousel-slide] ❌ Invalid or missing internal secret");
-    return json({ error: "Forbidden: invalid internal secret" }, 403);
+  if (!INTERNAL_SECRET || req.headers.get("x-internal-secret") !== INTERNAL_SECRET) {
+    return json({ error: "Forbidden" }, 403);
   }
 
-  // ✅ ENV validation using imported variables
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !LOVABLE_API_KEY) {
-    console.error("[alfie-render-carousel-slide] ❌ Missing critical env vars");
-    return json({ error: "Missing required environment variables" }, 500);
+  // Early ENV checks
+  const missingEnv = [
+    ["SUPABASE_URL", Deno.env.get("SUPABASE_URL")],
+    ["SUPABASE_SERVICE_ROLE_KEY", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")],
+    ["LOVABLE_API_KEY", Deno.env.get("LOVABLE_API_KEY")],
+  ].filter(([, v]) => !v).map(([k]) => k);
+  if (missingEnv.length) {
+    return json({ error: `Missing env vars: ${missingEnv.join(", ")}` }, 500);
   }
 
   try {
@@ -186,8 +170,8 @@ serve(async (req) => {
 
     // —— Supabase admin client (service role)
     const supabaseAdmin = createClient(
-      SUPABASE_URL,
-      SUPABASE_SERVICE_ROLE_KEY,
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
@@ -196,6 +180,7 @@ serve(async (req) => {
     if (!prompt) missing.push("prompt");
     if (!globalStyle) missing.push("globalStyle");
     if (!slideContent?.title) missing.push("slideContent.title");
+    if (!slideContent?.alt) missing.push("slideContent.alt");
     if (!brandId) missing.push("brandId");
     if (!orderId) missing.push("orderId");
     if (!carouselId) missing.push("carouselId");
@@ -245,25 +230,25 @@ serve(async (req) => {
     // ------------------------------------------
     // Normalize textual content + soft limits
     // ------------------------------------------
-    const MAX_TITLE = 50;
-    const MAX_SUB   = 100;
+    const MAX_TITLE = 80;
+    const MAX_SUB   = 160;
     const MAX_BUL   = 4;
-    const MAX_BUL_LEN = 80;
+    const MAX_BUL_LEN = 90;
 
-    const normTitle = clampText(slideContent.title, MAX_TITLE);
-    const normSubtitle = clampText(slideContent.subtitle, MAX_SUB);
+    const normTitle = String(slideContent.title || "").trim().slice(0, MAX_TITLE);
+    const normSubtitle = String(slideContent.subtitle || "").trim().slice(0, MAX_SUB);
     const normBullets = (Array.isArray(slideContent.bullets) ? slideContent.bullets : [])
-      .map((b) => clampText(b, MAX_BUL_LEN))
-      .filter((b) => b.length > 0)
-      .slice(0, MAX_BUL);
+      .map(b => String(b || "").trim())
+      .filter(b => b.length > 0)
+      .slice(0, MAX_BUL)
+      .map(b => b.slice(0, MAX_BUL_LEN));
 
     if (!normTitle) {
       return json({ error: "slideContent.title cannot be empty after normalization" }, 400);
     }
-    
-    // Generate alt text if missing
-    const altTextCandidate = clampText(slideContent.alt, 120);
-    const altText = altTextCandidate || normTitle || normSubtitle || "Carousel slide image";
+    if (!slideContent.alt || !String(slideContent.alt).trim()) {
+      return json({ error: "slideContent.alt is required" }, 400);
+    }
 
     // =========================================
     // STEP 1/4 — Upload texte JSON (RAW)
@@ -274,7 +259,7 @@ serve(async (req) => {
         title: normTitle,
         subtitle: normSubtitle,
         bullets: normBullets,
-        alt: altText,
+        alt: slideContent.alt,
       },
       {
         brandId,
@@ -290,6 +275,7 @@ serve(async (req) => {
     // STEP 2/4 — Générer background (Lovable AI)
     // =========================================
     console.log(`[render-slide] ${logCtx} 2/4 Generate background via Lovable AI`);
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
     const enrichedPrompt = buildImagePrompt(globalStyle, prompt);
 
     const aiRes = await fetchWithRetries(
@@ -383,14 +369,6 @@ serve(async (req) => {
       format: uploadData.format,
     };
 
-    const thumbnailUrl = buildImageThumbnailUrl({
-      secureUrl: cloudinarySecureUrl,
-      publicId: cloudinaryPublicId,
-      format: uploadData.format,
-      width: 400,
-      height: 400,
-    });
-
     console.log(`[render-slide] ${logCtx}   ↳ uploaded:`, {
       publicId: cloudinaryPublicId,
       url: cloudinarySecureUrl?.slice(0, 120),
@@ -403,7 +381,7 @@ serve(async (req) => {
     console.log(`[render-slide] ${logCtx} 4/4 Save to library_assets (idempotence check)`);
     const existingQuery = supabaseAdmin
       .from("library_assets")
-      .select("id, cloudinary_url, cloudinary_public_id, metadata, text_json")
+      .select("id, cloudinary_url, cloudinary_public_id")
       .eq("order_id", orderId)
       .eq("carousel_id", carouselId)
       .eq("slide_index", slideIndex);
@@ -416,179 +394,74 @@ serve(async (req) => {
 
     const { data: existing } = await existingQuery.maybeSingle();
 
-    const existingMetadata = (existing?.metadata as Record<string, any> | null) ?? {};
-    const libraryMetadata = {
-      ...existingMetadata,
-      ...uploadMeta,
-      cloudinary_base_url: cloudinarySecureUrl,
-      original_public_id: cloudinaryPublicId,
-      totalSlides,
-      aspectRatio: normalizedAR,
-      size_hint: `${size.w}x${size.h}`,
-      orderItemId: orderItemId ?? null,
-      requestId: requestId ?? existingMetadata?.requestId ?? null,
-      thumbnail_url: thumbnailUrl,
-    };
-
-    const libraryTextJson = {
-      title: normTitle,
-      subtitle: normSubtitle,
-      bullets: normBullets,
-      alt: altText,
-      text_public_id: textPublicId,
-      text_version: textVersion,
-      render_version: renderVersion,
-    };
-
-    let libraryAssetId: string | null = existing?.id ?? null;
-    let idempotent = false;
-
     if (existing) {
-      idempotent = true;
-      const { error: updateErr } = await supabaseAdmin
-        .from("library_assets")
-        .update({
-          user_id: userId,
-          brand_id: brandId,
-          order_id: orderId,
-          order_item_id: orderItemId ?? null,
-          carousel_id: carouselId,
-          slide_index: slideIndex,
-          format: normalizedAR,
-          campaign,
-          cloudinary_url: cloudinarySecureUrl,
-          cloudinary_public_id: cloudinaryPublicId,
-          text_json: libraryTextJson,
-          metadata: libraryMetadata,
-        })
-        .eq("id", existing.id);
-
-      if (updateErr) {
-        console.error(`[render-slide] ${logCtx} ❌ DB update error:`, updateErr);
-        return json({ error: `Failed to update slide: ${updateErr.message}` }, 500);
-      }
-    } else {
-      const { data: inserted, error: insertErr } = await supabaseAdmin
-        .from("library_assets")
-        .insert({
-          user_id: userId,
-          brand_id: brandId,
-          order_id: orderId,
-          order_item_id: orderItemId ?? null,
-          carousel_id: carouselId,
-          type: "carousel_slide",
-          slide_index: slideIndex,
-          format: normalizedAR,
-          campaign,
-          cloudinary_url: cloudinarySecureUrl,
-          cloudinary_public_id: cloudinaryPublicId,
-          text_json: libraryTextJson,
-          metadata: libraryMetadata,
-        })
-        .select("id")
-        .single();
-
-      if (insertErr) {
-        console.error(`[render-slide] ${logCtx} ❌ DB insert error:`, insertErr);
-        return json({ error: `Failed to save slide: ${insertErr.message}` }, 500);
-      }
-
-      libraryAssetId = inserted?.id ?? null;
-    }
-
-    // Best-effort: sync carousel_slides table for realtime previews
-    try {
-      await supabaseAdmin
-        .from("carousel_slides")
-        .upsert({
-          brand_id: brandId,
-          order_id: orderId,
-          slide_index: slideIndex,
-          cloudinary_url: cloudinarySecureUrl,
-          cloudinary_public_id: cloudinaryPublicId,
-          data: {
-            carousel_id: carouselId,
-            text: libraryTextJson,
-            metadata: {
-              totalSlides,
-              aspectRatio: normalizedAR,
-              renderVersion,
-              textVersion,
-              requestId,
-              libraryAssetId,
-            },
-          },
-        }, { onConflict: "order_id,slide_index" });
-    } catch (slideErr) {
-      console.warn(`[render-slide] ${logCtx} ⚠️ carousel_slides sync failed`, slideErr);
-    }
-
-    // Best-effort: ensure media_generations entry has thumbnail for dashboards
-    try {
-      const { data: existingMedia } = await supabaseAdmin
-        .from("media_generations")
-        .select("id, metadata")
-        .eq("user_id", userId)
-        .eq("brand_id", brandId)
-        .eq("type", "image")
-        .eq("metadata->>carousel_id", carouselId)
-        .eq("metadata->>slide_index", String(slideIndex))
-        .maybeSingle();
-
-      const mediaMetadata = {
-        ...(existingMedia?.metadata as Record<string, any> | null ?? {}),
-        carousel_id: carouselId,
-        slide_index: slideIndex,
-        total_slides: totalSlides,
-        aspect_ratio: normalizedAR,
-        render_version: renderVersion,
-        text_version: textVersion,
-        request_id: requestId ?? null,
-        cloudinary_public_id: cloudinaryPublicId,
+      console.log(`[render-slide] ${logCtx} ♻️ Asset already exists: ${existing.id}`);
+      return json({
+        success: true,
+        idempotent: true,
+        cloudinary_url: existing.cloudinary_url,
+        cloudinary_public_id: existing.cloudinary_public_id,
         text_public_id: textPublicId,
-        library_asset_id: libraryAssetId,
-      };
+        slide_metadata: {
+          title: normTitle,
+          subtitle: normSubtitle,
+          bullets: normBullets,
+          slideIndex,
+          renderVersion,
+          textVersion,
+          aspectRatio: normalizedAR,
+        },
+      });
+    }
 
-      if (existingMedia?.id) {
-        await supabaseAdmin
-          .from("media_generations")
-          .update({
-            output_url: cloudinarySecureUrl,
-            thumbnail_url: thumbnailUrl,
-            metadata: mediaMetadata,
-            status: "completed",
-          })
-          .eq("id", existingMedia.id);
-      } else {
-        await supabaseAdmin.from("media_generations").insert({
-          user_id: userId,
-          brand_id: brandId,
-          order_id: orderId,
-          type: "image",
-          status: "completed",
-          prompt: clampText(prompt, 120) || null,
-          output_url: cloudinarySecureUrl,
-          thumbnail_url: thumbnailUrl,
-          metadata: mediaMetadata,
-        });
-      }
-    } catch (mediaErr) {
-      console.warn(`[render-slide] ${logCtx} ⚠️ media_generations sync failed`, mediaErr);
+    const { error: insertErr } = await supabaseAdmin.from("library_assets").insert({
+      user_id: userId,
+      brand_id: brandId,
+      order_id: orderId,
+      order_item_id: orderItemId ?? null,
+      carousel_id: carouselId,
+      type: "carousel_slide",
+      slide_index: slideIndex,
+      format: normalizedAR,
+      campaign,
+      cloudinary_url: cloudinarySecureUrl,       // URL complète pour affichage
+      cloudinary_public_id: cloudinaryPublicId,  // public_id pour transformations ultérieures
+      text_json: {
+        title: normTitle,
+        subtitle: normSubtitle,
+        bullets: normBullets,
+        alt: slideContent.alt,
+        text_public_id: textPublicId,
+        text_version: textVersion,
+        render_version: renderVersion,
+      },
+      metadata: {
+        ...uploadMeta,
+        cloudinary_base_url: cloudinarySecureUrl,
+        original_public_id: cloudinaryPublicId,
+        totalSlides,
+        aspectRatio: normalizedAR,
+        size_hint: `${size.w}x${size.h}`,
+        orderItemId: orderItemId ?? null,
+        requestId,
+      },
+    });
+
+    if (insertErr) {
+      console.error(`[render-slide] ${logCtx} ❌ DB insert error:`, insertErr);
+      return json({ error: `Failed to save slide: ${insertErr.message}` }, 500);
     }
 
     console.log(`[render-slide] ${logCtx} ✅ Slide saved`);
     return json({
       success: true,
-      idempotent,
       cloudinary_url: cloudinarySecureUrl,
       cloudinary_public_id: cloudinaryPublicId,
       text_public_id: textPublicId,
-      thumbnail_url: thumbnailUrl,
       slide_metadata: {
         title: normTitle,
         subtitle: normSubtitle,
         bullets: normBullets,
-        alt: altText,
         slideIndex,
         totalSlides,
         renderVersion,

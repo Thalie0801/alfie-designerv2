@@ -30,9 +30,9 @@ import Videos from "./pages/Videos";
 import CloudinaryTest from "./pages/CloudinaryTest";
 
 import ActivateAccess from "./pages/onboarding/Activate";
+import { AlfieChat } from "./components/AlfieChat";
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 import { ChatGenerator } from "@/features/studio";
-import Chat from "./pages/Chat";
 
 const queryClient = new QueryClient();
 
@@ -61,7 +61,7 @@ const AppRoutes = () => {
             element={
               <ProtectedRoute>
                 <AppLayoutWithSidebar>
-                  <Chat />
+                  <AlfieChat />
                 </AppLayoutWithSidebar>
               </ProtectedRoute>
             }
