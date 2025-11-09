@@ -1,5 +1,12 @@
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+// Lazy import to avoid env crash at startup
+let _supabase: any | null = null;
+async function getSupabase() {
+  if (_supabase) return _supabase;
+  const mod = await import('@/integrations/supabase/client');
+  _supabase = mod.supabase;
+  return _supabase;
+}
 import { toast } from 'sonner';
 import { useAffiliate } from './useAffiliate';
 
@@ -16,7 +23,9 @@ export function useStripeCheckout() {
     try {
       const affiliateRef = getAffiliateRef();
 
-      const { data, error } = await supabase.functions.invoke('create-checkout', {
+      const sb = await getSupabase();
+
+      const { data, error } = await sb.functions.invoke('create-checkout', {
         body: {
           plan,
           billing_period: billingPeriod,
