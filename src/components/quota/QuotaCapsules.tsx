@@ -42,8 +42,6 @@ function Capsule({ label, used, limit, icon }: QuotaCapsule) {
 }
 
 export function QuotaCapsules({ visuals, videos, woofs, className }: QuotaCapsulesProps) {
-  const woofsRemaining = Math.max(0, woofs.limit - woofs.consumed);
-
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
       <Capsule label="Visuels" used={visuals.used} limit={visuals.limit} icon="🎨" />

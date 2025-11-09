@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { Send, Loader2, Download } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +18,7 @@ import { getAspectClass, type ConversationState, type OrchestratorResponse } fro
 import { slideUrl } from "@/lib/cloudinary/imageUrls";
 import { extractCloudNameFromUrl } from "@/lib/cloudinary/utils";
 import { cn } from "@/lib/utils";
+import { CreateHeader } from "@/components/create/CreateHeader";
 
 // =====================
 // Détection d'intention vidéo
@@ -323,6 +324,7 @@ export function AlfieChat() {
             role: "assistant",
             content: "🚀 Génération en cours... Je te tiens au courant dès que c'est prêt !",
             type: "text",
+            timestamp: new Date(),
             links: [
               { label: "Voir dans Studio", href: "/studio" },
               { label: "Voir la Bibliothèque", href: "/library" },

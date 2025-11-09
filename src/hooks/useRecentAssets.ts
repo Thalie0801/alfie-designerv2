@@ -58,7 +58,7 @@ export function useRecentAssets(limit = 8): UseRecentAssetsResult {
       if (queryError) throw queryError;
 
       const parsed = (data ?? [])
-        .map((row) => {
+        .map((row: any) => {
           const url = row.render_url || row.output_url;
           if (!url) return null;
           return {
@@ -68,9 +68,9 @@ export function useRecentAssets(limit = 8): UseRecentAssetsResult {
             created_at: row.created_at,
             thumbnail_url: row.thumbnail_url ?? undefined,
             order_id: row.order_id ?? undefined,
-          } satisfies RecentAsset;
+          };
         })
-        .filter((asset): asset is RecentAsset => Boolean(asset));
+        .filter((asset): asset is NonNullable<typeof asset> => asset !== null) as RecentAsset[];
 
       if (mountedRef.current) {
         setAssets(parsed);

@@ -5,35 +5,21 @@ import { getQuotaStatus, QuotaStatus } from '@/utils/quotaManager';
 import { Eraser } from 'lucide-react';
 import { QuotaCapsules } from '@/components/quota/QuotaCapsules';
 import { useQuotaResetDate, formatResetDate } from '@/hooks/useQuotaResetDate';
-import { cn } from '@/lib/utils';
 
 interface CreateHeaderProps {
   onClearChat?: () => void;
 }
 
-function clampPct(n: number | undefined) {
-  const v = typeof n === 'number' && isFinite(n) ? n : 0;
-  return Math.max(0, Math.min(100, v));
-}
-
-
-
 export function CreateHeader({ onClearChat }: CreateHeaderProps) {
   const { brandKit, activeBrandId } = useBrandKit();
   const [quotaStatus, setQuotaStatus] = useState<QuotaStatus | null>(null);
-  const [loading, setLoading] = useState(true);
 
   const brandName = brandKit?.name ?? 'Aeditus';
-
-  // Option 2 (Cloudinary-only) : pas de backend vidéo IA
-  const ffmpegBackend = import.meta.env.VITE_FFMPEG_BACKEND_URL as string | undefined;
-  const isVideoIADisabled = !ffmpegBackend; // on affiche un bandeau d’info dans le popover
 
   useEffect(() => {
     let mounted = true;
 
     async function load() {
-      setLoading(true);
       try {
         if (!activeBrandId) {
           if (mounted) {
@@ -45,8 +31,6 @@ export function CreateHeader({ onClearChat }: CreateHeaderProps) {
         if (mounted) setQuotaStatus(status ?? null);
       } catch {
         if (mounted) setQuotaStatus(null);
-      } finally {
-        if (mounted) setLoading(false);
       }
     }
 
@@ -69,16 +53,6 @@ export function CreateHeader({ onClearChat }: CreateHeaderProps) {
   const visuals = quotaStatus?.visuals ?? { used: 0, limit: 0, percentage: 0 };
   const videos = quotaStatus?.videos ?? { used: 0, limit: 0, percentage: 0 };
   const woofs = quotaStatus?.woofs ?? { consumed: 0, remaining: 0, limit: 0 };
-
-  const visualsRemaining =
-    typeof visuals.limit === 'number' && typeof visuals.used === 'number'
-      ? Math.max(0, visuals.limit - visuals.used)
-      : 0;
-
-  const videosRemaining =
-    typeof videos.limit === 'number' && typeof videos.used === 'number'
-      ? Math.max(0, videos.limit - videos.used)
-      : 0;
 
   const hasBrandAndQuotas = !!brandKit && !!quotaStatus;
 
