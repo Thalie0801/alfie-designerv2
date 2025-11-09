@@ -3,6 +3,17 @@ import { ok, fail, cors } from "../_shared/http.ts"; // helpers déjà vus
 import { z } from "zod";
 import { v2 as cloudinary } from "cloudinary";
 
+const CLOUDINARY_CLOUD_NAME = Deno.env.get("CLOUDINARY_CLOUD_NAME") ?? "";
+
+const RATIO_MAP = {
+  "1:1": { width: 1024, height: 1024, ar: "1:1" },
+  "9:16": { width: 1024, height: 1820, ar: "9:16" },
+  "16:9": { width: 1536, height: 864, ar: "16:9" },
+  "3:4": { width: 1024, height: 1365, ar: "3:4" },
+} as const;
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const ALLOWED = ["https://lovable.dev","https://*.lovable.app","http://localhost:5173","http://127.0.0.1:5173"];
 
 cloudinary.config({
@@ -62,6 +73,19 @@ Deno.serve(async (req) => {
       return ok({ imageUrl: uploaded.url, ratio }, headers);
     }
 
+    const { prompt, brandId, mode, ratio, imageUrl, imageBase64 } = parsed.data;
+    const cfg = RATIO_MAP[ratio] ?? RATIO_MAP["1:1"];
+
+    const transformedImageUrl = imageUrl
+      ? CLOUDINARY_CLOUD_NAME
+        ? `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/fetch/ar_${cfg.ar},c_fill,q_auto,f_auto/${encodeURIComponent(imageUrl)}`
+        : imageUrl
+      : undefined;
+
+    const auth = req.headers.get("Authorization") ?? "";
+    const jwt = auth.replace(/^Bearer\s+/i, "").trim();
+    if (!jwt) {
+      return fail(401, "Missing access token", null, headers);
     // CAROUSEL (async): une exécution MediaFlow peut être plus appropriée — ici on simule un enqueuing → 202
     if (mode === "carousel") {
       // Enqueue côté DB/worker ici si tu as déjà le mécanisme, sinon appelle ton MediaFlow depuis une autre Edge
@@ -75,6 +99,60 @@ Deno.serve(async (req) => {
       const jobId = crypto.randomUUID();
       return new Response(JSON.stringify({ jobId }), { status: 202, headers: { ...headers, "content-type":"application/json" }});
     }
+    const userId = userRes.user.id;
+
+    const payload = {
+      prompt,
+      brandId,
+      mode,
+      ratio,
+      imageUrl: transformedImageUrl,
+      imageBase64,
+      width: cfg.width,
+      height: cfg.height,
+      aspectRatio: cfg.ar,
+    };
+
+    const { data: order, error: orderError } = await supa
+      .from("orders")
+      .insert({
+        user_id: userId,
+        brand_id: brandId,
+        status: "pending",
+        source: "studio",
+        meta: payload,
+      })
+      .select("id")
+      .single();
+
+    if (orderError || !order) {
+      return fail(400, "Order creation failed", orderError?.message, headers);
+    }
+
+    const { data: job, error: jobError } = await supa
+      .from("job_queue")
+      .insert({
+        order_id: order.id,
+        user_id: userId,
+        type: mode === "video" ? "generate_video" : "generate_image",
+        status: "pending",
+        attempts: 0,
+        payload,
+      })
+      .select("id")
+      .single();
+
+    if (jobError || !job) {
+      return fail(400, "Job enqueue failed", jobError?.message, headers);
+    }
+
+    // TODO: appelle ton provider (nano banana / openai / etc.)
+    // const result = await providerGenerate({ prompt, brandId, ratio, imageUrl, imageBase64 });
+    // if (result.async) return new Response(JSON.stringify({ jobId: result.jobId }), { status: 202, headers });
+
+    // Simu: renvoyer 200 avec imageUrl si ok
+    // if (!result?.imageUrl) return fail(502, "Provider returned no imageUrl", result, headers);
+    // return ok({ imageUrl: result.imageUrl }, headers);
 
     return fail(400, "Mode non supporté", { mode }, headers);
   } catch (e) {
