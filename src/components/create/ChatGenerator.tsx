@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { uploadToChatBucket } from "@/lib/chatUploads";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { VIDEO_ENGINE_CONFIG } from "@/config/videoEngine";
+import { generateImage } from "@/features/studio/hooks/useGenerateImage";
 
 type GeneratedAsset = {
   type: "image" | "video";
@@ -63,15 +64,6 @@ const ASPECT_TO_TW: Record<AspectRatio, string> = {
   "4:3": "aspect-[4/3]",
   "3:4": "aspect-[3/4]",
   "4:5": "aspect-[4/5]",
-};
-
-const IMAGE_SIZE_MAP: Record<AspectRatio, string> = {
-  "1:1": "1024x1024",
-  "9:16": "1024x1820",
-  "16:9": "1820x1024",
-  "3:4": "1024x1365",
-  "4:3": "1365x1024",
-  "4:5": "1080x1350",
 };
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
@@ -352,54 +344,36 @@ export function ChatGenerator() {
       }
 
       if (contentType === "image") {
-        const size = IMAGE_SIZE_MAP[aspectRatio] ?? IMAGE_SIZE_MAP["1:1"];
+        const promptText = prompt || "Creative social image";
+        const referenceUrl = uploadedSource?.type === "image" ? uploadedSource.url : undefined;
 
-        if (uploadedSource?.type === "image") {
-          const { data, error } = await supabase.functions.invoke("alfie-generate-ai-image", {
-            body: {
-              templateImageUrl: uploadedSource.url,
-              brandKit: brandKit,
-              prompt: prompt || "Transform this image with a creative style",
-            },
-          });
-          if (error) throw error;
-          if (!data?.imageUrl) throw new Error("Aucune image générée");
+        const imageUrl = await generateImage({
+          prompt: promptText,
+          imageUrl: referenceUrl,
+          brandId: brandKit?.id ?? undefined,
+        });
 
-          const url = data.imageUrl as string;
-          setGeneratedAsset({ type: "image", url, prompt: prompt || "Image transformation", format: aspectRatio });
+        setGeneratedAsset({
+          type: "image",
+          url: imageUrl,
+          prompt: promptText,
+          format: aspectRatio,
+        });
 
-          if (brandKit?.id) {
-            await supabase.from("media_generations").insert({
-              user_id: user.id,
-              brand_id: brandKit.id,
-              type: "image",
-              prompt: prompt || "Image transformation",
-              input_url: uploadedSource.url,
-              output_url: url,
-              status: "completed",
-              metadata: { aspectRatio, sourceType: "image" },
-            } as any);
-          }
-
-          toast.success("Image générée avec succès ! ✨");
-        } else {
-          const { data, error } = await supabase.functions.invoke("alfie-render-image", {
-            body: {
-              provider: "gemini-nano",
-              prompt: prompt,
-              format: size,
-              brand_id: brandKit?.id,
-              cost_woofs: 1,
-            },
-          });
-          if (error) throw error;
-
-          const imageUrl = data?.data?.image_urls?.[0];
-          if (!data?.ok || !imageUrl) throw new Error(data?.error || "Aucune image générée");
-
-          setGeneratedAsset({ type: "image", url: imageUrl, prompt, format: aspectRatio });
-          toast.success("Image générée avec succès ! ✨");
+        if (brandKit?.id) {
+          await supabase.from("media_generations").insert({
+            user_id: user.id,
+            brand_id: brandKit.id,
+            type: "image",
+            prompt: promptText,
+            input_url: referenceUrl ?? null,
+            output_url: imageUrl,
+            status: "completed",
+            metadata: { aspectRatio, sourceType: referenceUrl ? "image" : "prompt" },
+          } as any);
         }
+
+        toast.success("Image générée avec succès ! ✨");
       } else {
         const videoUrl = await generateVideoWithFfmpeg({
           prompt: prompt || "Creative social video",
@@ -437,6 +411,8 @@ export function ChatGenerator() {
         toast.error(message, { action: { label: "Se reconnecter", onClick: () => (window.location.href = "/auth") } });
       } else if (contentType === "video" && /préparation/i.test(message)) {
         toast.info(message);
+      } else if (message?.includes("Timeout: génération trop longue")) {
+        toast.error("Timeout: la génération dépasse 90s");
       } else if (message?.includes("AbortError")) {
         // silencieux : action utilisateur/unmount
       } else {
