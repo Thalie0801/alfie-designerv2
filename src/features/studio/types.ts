@@ -12,6 +12,7 @@ export type JobEntry = {
   payload?: unknown;
   user_id: string;
   retry_count: number;
+  max_retries?: number;
   attempts?: number;
   max_attempts?: number;
 };

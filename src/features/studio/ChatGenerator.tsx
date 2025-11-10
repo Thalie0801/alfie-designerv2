@@ -41,7 +41,7 @@ type GeneratedAsset = {
 };
 
 type AspectRatio = "1:1" | "9:16" | "16:9";
-type ContentType = "image" | "video";
+type ContentType = "image" | "video" | "carousel";
 
 type UploadedSource = {
   type: "image" | "video";
@@ -57,12 +57,24 @@ const PROMPT_EXAMPLES = {
     "Un paysage de montagne enneigé avec un lac gelé",
     "Une rue animée de Tokyo la nuit avec des néons",
   ],
+  carousel: [
+    "5 slides pour une masterclass marketing sur les réseaux sociaux",
+    "Carrousel LinkedIn présentant une nouvelle offre B2B",
+    "Présentation en 4 slides d'un produit de beauté haut de gamme",
+    "Tutoriel en 3 étapes pour utiliser une application mobile",
+  ],
   video: [
     "Une cascade qui coule dans une forêt tropicale",
     "Des nuages qui défilent rapidement au-dessus d'une ville",
     "Un feu de camp qui crépite la nuit sous les étoiles",
     "Une route qui traverse un désert au lever du soleil",
   ],
+};
+
+const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
+  image: "Image",
+  carousel: "Carrousel",
+  video: "Vidéo",
 };
 
 const ASPECT_TO_TW: Record<AspectRatio, string> = {
@@ -126,8 +138,14 @@ function fetchWithTimeoutPromise<T>(promise: Promise<T>, ms: number) {
   });
 }
 
+function parseFlag(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().toLowerCase();
+  return ["1", "true", "on", "enabled", "yes"].includes(normalized);
+}
+
 export function ChatGenerator() {
-  const { activeBrandId } = useBrandKit();
+  const { activeBrandId, brandKit } = useBrandKit();
   const location = useLocation();
   const orderId =
     useMemo(() => {
@@ -138,6 +156,9 @@ export function ChatGenerator() {
     () => (orderId ? `Commande ${orderId}` : "Toutes les commandes"),
     [orderId],
   );
+
+  const enableCarousel = parseFlag(import.meta.env.VITE_FLAG_CAROUSEL);
+  const enableVideo = parseFlag(import.meta.env.VITE_FLAG_VIDEO);
 
   const [prompt, setPrompt] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -154,8 +175,53 @@ export function ChatGenerator() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isForcing, setIsForcing] = useState(false);
+  const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
 
   const { toast: showToast } = useToast();
+
+  const stylePreset = useMemo(() => {
+    if (!brandKit) return null;
+
+    const colors = Array.isArray(brandKit.palette)
+      ? brandKit.palette.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+      : [];
+
+    const preset: Record<string, unknown> = { colors };
+
+    if (brandKit.fonts && typeof brandKit.fonts === "object") {
+      const fonts: Record<string, string> = {};
+      if (typeof brandKit.fonts.primary === "string" && brandKit.fonts.primary.trim()) {
+        fonts.primary = brandKit.fonts.primary;
+      }
+      if (typeof brandKit.fonts.secondary === "string" && brandKit.fonts.secondary.trim()) {
+        fonts.secondary = brandKit.fonts.secondary;
+      }
+      if (Object.keys(fonts).length > 0) {
+        preset.fonts = fonts;
+      }
+    }
+
+    if (typeof brandKit.voice === "string" && brandKit.voice.trim()) {
+      preset.voice = brandKit.voice.trim();
+    }
+
+    return preset;
+  }, [brandKit]);
+
+  const contentTypeOptions = useMemo(() => {
+    const base: ContentType[] = ["image"];
+    if (enableCarousel) base.push("carousel");
+    if (enableVideo) base.push("video");
+    return base;
+  }, [enableCarousel, enableVideo]);
+
+  useEffect(() => {
+    if (!enableVideo && contentType === "video") {
+      setContentType("image");
+    } else if (!enableCarousel && contentType === "carousel") {
+      setContentType("image");
+    }
+  }, [contentType, enableCarousel, enableVideo]);
 
   const showGenerationError = useCallback((err: unknown) => {
     if (err instanceof Error && err.name === "AbortError") {
@@ -185,6 +251,18 @@ export function ChatGenerator() {
     });
   }, [jobs]);
 
+  const hasSelection = selectedJobIds.length > 0;
+
+  const promptExamples = useMemo(() => PROMPT_EXAMPLES[contentType] ?? PROMPT_EXAMPLES.image, [contentType]);
+
+  const disableGenerate = useMemo(() => {
+    const trimmedPrompt = prompt.trim();
+    if (contentType === "image") {
+      return isSubmitting || (!trimmedPrompt && !uploadedSource);
+    }
+    return isSubmitting || trimmedPrompt.length === 0;
+  }, [contentType, isSubmitting, prompt, uploadedSource]);
+
   const formatDate = (value: string) => {
     if (!value) return "";
     const date = new Date(value);
@@ -206,6 +284,7 @@ export function ChatGenerator() {
 
       let jobsQuery = supabase
         .from("job_queue")
+        .select("id, type, status, order_id, created_at, updated_at, error, payload, user_id, retry_count, max_retries")
         .select(
           "id, type, kind, status, brand_id, order_id, created_at, updated_at, error, payload, user_id, retry_count, attempts, max_attempts"
         )
@@ -213,14 +292,23 @@ export function ChatGenerator() {
         .order("created_at", { ascending: false })
         .limit(50);
 
+      if (activeBrandId) {
+        jobsQuery = jobsQuery.contains("payload", { brand_id: activeBrandId });
+      }
+
       let assetsQuery = supabase
         .from("library_assets")
+        .select("id, type, cloudinary_url, preview_url, created_at, brand_id, order_id, metadata")
         .select(
           "id, type, kind, cloudinary_url, secure_url, preview_url, created_at, brand_id, order_id, metadata, meta"
         )
         .eq("user_id", currentUser.id)
         .order("created_at", { ascending: false })
         .limit(50);
+
+      if (activeBrandId) {
+        assetsQuery = assetsQuery.eq("brand_id", activeBrandId);
+      }
 
       if (orderId) {
         jobsQuery = jobsQuery.eq("order_id", orderId);
@@ -232,8 +320,12 @@ export function ChatGenerator() {
       if (jobsResponse.error) throw jobsResponse.error;
       if (assetsResponse.error) throw assetsResponse.error;
 
-      setJobs((jobsResponse.data as JobEntry[]) ?? []);
-      setAssets((assetsResponse.data as MediaEntry[]) ?? []);
+      const jobRows = (jobsResponse.data as JobEntry[]) ?? [];
+      const assetRows = (assetsResponse.data as MediaEntry[]) ?? [];
+
+      setJobs(jobRows);
+      setAssets(assetRows);
+      setSelectedJobIds((prev) => prev.filter((id) => jobRows.some((job) => job.id === id)));
     } catch (err) {
       console.error("[Studio] refetchAll error:", err);
       const message = resolveRefreshErrorMessage(err);
@@ -241,7 +333,7 @@ export function ChatGenerator() {
     } finally {
       setLoading(false);
     }
-  }, [orderId]);
+  }, [activeBrandId, orderId]);
 
   useEffect(() => {
     let mounted = true;
@@ -438,7 +530,6 @@ export function ChatGenerator() {
       };
 
       const payload = {
-        type: "image" as const,
         prompt: trimmedPrompt,
         aspect_ratio: aspectRatio,
         resolution: resolutionMap[aspectRatio],
@@ -451,7 +542,11 @@ export function ChatGenerator() {
           : null,
       };
 
-      const res = await createGeneration(activeBrandId, payload);
+      const res = await createGeneration(activeBrandId, {
+        kind: "image",
+        payload,
+        stylePreset,
+      });
       toast.success(`Commande créée #${res.order_id}`);
 
       await fetchWithTimeoutPromise(refetchAll(), 15000);
@@ -487,7 +582,6 @@ export function ChatGenerator() {
       const durationSec = Number(videoDuration) > 0 ? Number(videoDuration) : 12;
 
       const payload = {
-        type: "video" as const,
         prompt: promptText,
         aspect_ratio: aspectRatio,
         duration: durationSec,
@@ -500,7 +594,11 @@ export function ChatGenerator() {
           : null,
       };
 
-      const res = await createGeneration(activeBrandId, payload);
+      const res = await createGeneration(activeBrandId, {
+        kind: "video",
+        payload,
+        stylePreset,
+      });
       toast.success(`Commande créée #${res.order_id}`);
 
       await fetchWithTimeoutPromise(refetchAll(), 15000);
@@ -510,14 +608,65 @@ export function ChatGenerator() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [activeBrandId, aspectRatio, isSubmitting, prompt, refetchAll, showGenerationError, uploadedSource, videoDuration]);
+  }, [activeBrandId, aspectRatio, isSubmitting, prompt, refetchAll, showGenerationError, stylePreset, uploadedSource, videoDuration]);
+
+  const handleGenerateCarousel = useCallback(async () => {
+    const promptText = prompt.trim();
+
+    if (isSubmitting) {
+      return;
+    }
+
+    if (!activeBrandId) {
+      toast.error("Sélectionne une marque avant de générer.");
+      return;
+    }
+
+    if (!promptText) {
+      showToast({
+        title: "Prompt requis",
+        description: "Décris ton carrousel avant de lancer la génération",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setGeneratedAsset(null);
+
+    try {
+      const payload = {
+        prompt: promptText,
+        aspect_ratio: aspectRatio,
+        slide_count: 5,
+        slides: [],
+      };
+
+      const res = await createGeneration(activeBrandId, {
+        kind: "carousel",
+        payload,
+        stylePreset,
+      });
+
+      toast.success(`Commande créée #${res.order_id}`);
+      await fetchWithTimeoutPromise(refetchAll(), 15000);
+    } catch (err: unknown) {
+      console.error("[Studio] carousel generation error:", err);
+      showGenerationError(err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [activeBrandId, aspectRatio, isSubmitting, prompt, refetchAll, showGenerationError, showToast, stylePreset]);
 
   const handleGenerate = useCallback(() => {
     if (contentType === "image") {
       return handleGenerateImage();
     }
+    if (contentType === "carousel") {
+      return handleGenerateCarousel();
+    }
     return handleGenerateVideo();
-  }, [contentType, handleGenerateImage, handleGenerateVideo]);
+  }, [contentType, handleGenerateCarousel, handleGenerateImage, handleGenerateVideo]);
 
   const handleDownload = useCallback(async () => {
     if (!generatedAsset) return;
@@ -557,36 +706,30 @@ export function ChatGenerator() {
     setPrompt(example);
   };
 
-  // ✅ Trigger manual worker
-  const handleTriggerWorker = useCallback(async () => {
-    if (isForcing) return; // anti double-clic
+  // ✅ Débloquer les jobs sélectionnés
+  const handleUnblockSelection = useCallback(async () => {
+    if (isForcing || selectedJobIds.length === 0) return;
     setIsForcing(true);
     try {
-      const result = await forceProcessJobs();
+      const result = await forceProcessJobs(selectedJobIds);
 
-      const processed =
-        typeof result?.processed === "number" && Number.isFinite(result.processed)
-          ? result.processed
-          : 0;
+      const processed = typeof result.updated === "number" ? result.updated : 0;
+      if (processed > 0) {
+        toast.success(`Jobs débloqués: ${processed}`);
+      } else {
+        toast.info("Aucun job à débloquer");
+      }
 
-      toast.success(`Traitement forcé: ${processed} job(s).`);
+      setSelectedJobIds((prev) => prev.filter((id) => !result.processedIds.includes(id)));
       await fetchWithTimeoutPromise(refetchAll(), 15000);
     } catch (err) {
-      console.error("[Studio] trigger worker error:", err);
+      console.error("[Studio] unblock jobs error:", err);
       const errMsg = err instanceof Error ? err.message : "Erreur inconnue";
-      const status = err instanceof Error && typeof (err as any).status === "number"
-        ? (err as any).status
-        : undefined;
-
-      if (status === 409 || errMsg.startsWith("409 ")) {
-        toast.info("Un traitement est déjà en cours. Réessaie dans quelques secondes.");
-      } else {
-        toast.error(errMsg);
-      }
+      toast.error(errMsg);
     } finally {
       setIsForcing(false);
     }
-  }, [isForcing, refetchAll]);
+  }, [isForcing, refetchAll, selectedJobIds]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -636,8 +779,8 @@ export function ChatGenerator() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleTriggerWorker}
-                disabled={isForcing}
+                onClick={handleUnblockSelection}
+                disabled={isForcing || !hasSelection}
               >
                 {isForcing ? (
                   <>
@@ -645,7 +788,7 @@ export function ChatGenerator() {
                     Traitement...
                   </>
                 ) : (
-                  'Forcer le traitement'
+                  hasSelection ? 'Forcer le traitement' : 'Sélectionne des jobs'
                 )}
               </Button>
             </AlertDescription>
@@ -660,18 +803,15 @@ export function ChatGenerator() {
               Type de rendu
             </label>
             <div className="flex gap-2">
-              <Button
-                variant={contentType === "image" ? "default" : "outline"}
-                onClick={() => setContentType("image")}
-              >
-                Image
-              </Button>
-              <Button
-                variant={contentType === "video" ? "default" : "outline"}
-                onClick={() => setContentType("video")}
-              >
-                Vidéo
-              </Button>
+              {contentTypeOptions.map((type) => (
+                <Button
+                  key={type}
+                  variant={contentType === type ? "default" : "outline"}
+                  onClick={() => setContentType(type)}
+                >
+                  {CONTENT_TYPE_LABELS[type]}
+                </Button>
+              ))}
             </div>
           </div>
 
@@ -734,7 +874,7 @@ export function ChatGenerator() {
               Exemples de prompts
             </label>
             <div className="flex flex-wrap gap-2">
-              {PROMPT_EXAMPLES[contentType].map((example, idx) => (
+              {promptExamples.map((example, idx) => (
                 <Button
                   key={idx}
                   variant="outline"
@@ -759,7 +899,9 @@ export function ChatGenerator() {
               placeholder={
                 contentType === "video"
                   ? "Décrivez la scène vidéo que vous imaginez, ou ajoutez un média pour l'animer..."
-                  : "Décrivez la scène que vous imaginez, ou uploadez une image pour la transformer..."
+                  : contentType === "carousel"
+                    ? "Décrivez le thème et le plan de ton carrousel (nombre de slides, idée principale, CTA)..."
+                    : "Décrivez la scène que vous imaginez, ou uploadez une image pour la transformer..."
               }
               rows={4}
               className="resize-none"
@@ -771,10 +913,7 @@ export function ChatGenerator() {
             onClick={() => {
               void handleGenerate();
             }}
-            disabled={
-              isSubmitting ||
-              (contentType === "image" && !prompt.trim() && !uploadedSource)
-            }
+            disabled={disableGenerate}
             size="lg"
             className="w-full"
           >
@@ -788,7 +927,9 @@ export function ChatGenerator() {
                 <Wand2 className="w-5 h-5 mr-2" />
                 {contentType === "image"
                   ? "Générer l'image"
-                  : "Générer la vidéo"}
+                  : contentType === "carousel"
+                    ? "Générer le carrousel"
+                    : "Générer la vidéo"}
               </>
             )}
           </Button>
@@ -833,8 +974,8 @@ export function ChatGenerator() {
                     variant="link"
                     size="sm"
                     className="ml-2 h-auto p-0 text-destructive underline"
-                    onClick={handleTriggerWorker}
-                    disabled={isForcing}
+                    onClick={handleUnblockSelection}
+                    disabled={isForcing || !hasSelection}
                   >
                     {isForcing ? (
                       <span className="inline-flex items-center gap-1">
@@ -842,7 +983,7 @@ export function ChatGenerator() {
                         Traitement…
                       </span>
                     ) : (
-                      "Forcer le traitement"
+                      hasSelection ? "Forcer le traitement" : "Sélectionne des jobs"
                     )}
                   </Button>
                 </AlertDescription>
@@ -862,6 +1003,7 @@ export function ChatGenerator() {
               <div className="space-y-3">
                 {jobs.map((job) => {
                   const isJobStuck = stuckJobs.some((item) => item.id === job.id);
+                  const isSelected = selectedJobIds.includes(job.id);
                   return (
                     <JobCard
                       key={job.id}
@@ -870,6 +1012,17 @@ export function ChatGenerator() {
                       isStuck={isJobStuck}
                       onRetry={(target) => {
                         void requeueJob(target);
+                      }}
+                      selectable
+                      selected={isSelected}
+                      onSelectionChange={(_, next) => {
+                        setSelectedJobIds((prev) => {
+                          if (next) {
+                            if (prev.includes(job.id)) return prev;
+                            return [...prev, job.id];
+                          }
+                          return prev.filter((id) => id !== job.id);
+                        });
                       }}
                     />
                   );
@@ -917,6 +1070,7 @@ export function ChatGenerator() {
                 {assets.map((item) => {
                   const metadata = (item.metadata ?? item.meta ?? {}) as Record<string, unknown>;
                   const previewUrl =
+                    (typeof item.preview_url === "string" ? item.preview_url : null) ??
                     item.preview_url ??
                     (typeof metadata.thumbnail_url === "string" ? metadata.thumbnail_url : null) ??
                     (typeof metadata.preview_url === "string" ? metadata.preview_url : null) ??
