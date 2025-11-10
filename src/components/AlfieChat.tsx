@@ -104,6 +104,8 @@ export function AlfieChat() {
     ? `Je peux créer pour toi :\n• ${capabilities.join("\n• ")}`
     : "Je peux t'aider à structurer tes idées créatives.";
 
+export default function AlfieChat() {
+  const activeBrandId = "default-brand"; // TODO: brancher sur ton contexte réel
   // === ÉTATS (déclare UNE SEULE fois) ===
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -154,6 +156,7 @@ export function AlfieChat() {
       addMessage({
         id: crypto.randomUUID(),
         role: "assistant",
+        content: Templates.confirmAfterEnqueue(orderId, studioLink(orderId), libraryLink(intent.brandId)),
         content: Templates.confirmAfterEnqueue(
           orderId,
           studioLink(orderId),
@@ -165,6 +168,10 @@ export function AlfieChat() {
     [activeBrandId, addMessage]
   );
 
+  useEffect(() => {
+    if (!lastIntent) return;
+    void search_assets({ brandId: lastIntent.brandId }).catch((error) => {
+      console.error("search_assets failed", error);
   // === Hook proprement fermé (pas de virgule orpheline) ===
   useEffect(() => {
     // Exemple: rafraîchir périodiquement (noop pour l’instant)
@@ -577,7 +584,35 @@ export function AlfieChat() {
       assetUrl: uploadedSource ? uploadedSource.previewUrl || uploadedSource.url : undefined,
       metadata: uploadedSource ? { name: uploadedSource.name, signedUrl: uploadedSource.url } : undefined,
     });
+  }, [lastIntent]);
 
+  return (
+    <div className="p-4 space-y-4">
+      <div className="space-y-2">
+        {messages.map((m) => (
+          <div key={m.id} className={m.role === "user" ? "text-right" : "text-left"}>
+            <div className="inline-block rounded-xl px-3 py-2 border">
+              <pre className="whitespace-pre-wrap">{m.content}</pre>
+            </div>
+          </div>
+        ))}
+      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const input = (e.currentTarget.elements.namedItem("chat") as HTMLInputElement) || null;
+          if (!input || !input.value.trim()) return;
+          void handleSend(input.value.trim());
+          input.value = "";
+        }}
+        className="flex gap-2"
+      >
+        <input name="chat" className="flex-1 border rounded-lg px-3 py-2" placeholder="Décris ce que tu veux créer…" />
+        <button type="submit" className="border rounded-lg px-3 py-2">
+          Envoyer
+        </button>
+      </form>
+    </div>
     // Commande /queue (monitoring)
     if (rawMessage.startsWith("/queue")) {
       try {
