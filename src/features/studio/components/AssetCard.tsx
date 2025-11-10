@@ -1,6 +1,5 @@
 import React from "react";
 import { Download, ExternalLink, Film } from "lucide-react";
-import { toThumbUrl, toDownloadUrl, toOriginalUrl } from "@/lib/cloudinary/url";
 import { cn } from "@/lib/utils";
 
 type Asset = {
@@ -23,13 +22,12 @@ type AssetCardProps = {
 };
 
 export function AssetCard({ asset, className, onEnqueueVideo }: AssetCardProps) {
-  // ---- URLs (une seule fois) ----
-  const hasUrl = Boolean(asset?.url || asset?.coverUrl);
-  const srcForPreview = asset.coverUrl ?? asset.url ?? "";
+  const hasUrl = Boolean(asset?.url);
+  const openHref = hasUrl ? String(asset.url) : undefined;
 
-  const previewSrc = srcForPreview ? toThumbUrl(srcForPreview) : undefined;
-  const openHref = asset.url ? toOriginalUrl(asset.url) : undefined;
-  const downloadHref = asset.url ? toDownloadUrl(asset.url) : undefined;
+  // Lien de téléchargement Cloudinary (force le download)
+  const downloadHref =
+    hasUrl ? `${asset!.url!}${asset!.url!.includes("?") ? "&" : "?"}fl_attachment` : undefined;
 
   const isCarousel = asset.type === "carousel";
   const isVideo = asset.type === "video";
@@ -45,16 +43,23 @@ export function AssetCard({ asset, className, onEnqueueVideo }: AssetCardProps) 
     >
       {/* Aperçu */}
       <div className="aspect-video w-full overflow-hidden rounded-xl bg-neutral-100 dark:bg-neutral-800">
-        {previewSrc ? (
+        {isCarousel && asset.coverUrl ? (
           <img
-            src={previewSrc}
+            src={asset.coverUrl}
+            alt={asset.title ?? `Carousel ${asset.id}`}
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
+        ) : hasUrl ? (
+          <img
+            src={asset.url!}
             alt={asset.title ?? `Asset ${asset.id}`}
             className="h-full w-full object-cover"
             loading="lazy"
           />
         ) : (
           <div className="h-full w-full grid place-items-center text-neutral-400">
-            {hasUrl ? "Aucun aperçu" : "Aucun média disponible"}
+            Aucun aperçu
           </div>
         )}
       </div>
@@ -84,9 +89,9 @@ export function AssetCard({ asset, className, onEnqueueVideo }: AssetCardProps) 
           rel="noopener"
           className={cn(
             "inline-flex items-center gap-1 px-3 py-2 rounded-lg border text-sm",
-            openHref ? "hover:bg-neutral-50 dark:hover:bg-neutral-800" : "pointer-events-none opacity-50"
+            hasUrl ? "hover:bg-neutral-50 dark:hover:bg-neutral-800" : "pointer-events-none opacity-50"
           )}
-          aria-disabled={!openHref}
+          aria-disabled={!hasUrl}
         >
           <ExternalLink size={16} />
           Ouvrir l’asset
@@ -98,9 +103,9 @@ export function AssetCard({ asset, className, onEnqueueVideo }: AssetCardProps) 
           download
           className={cn(
             "inline-flex items-center gap-1 px-3 py-2 rounded-lg border text-sm",
-            downloadHref ? "hover:bg-neutral-50 dark:hover:bg-neutral-800" : "pointer-events-none opacity-50"
+            hasUrl ? "hover:bg-neutral-50 dark:hover:bg-neutral-800" : "pointer-events-none opacity-50"
           )}
-          aria-disabled={!downloadHref}
+          aria-disabled={!hasUrl}
         >
           <Download size={16} />
           Télécharger

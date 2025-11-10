@@ -1,103 +1,73 @@
-import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseSafeClient";
-import { useAuth } from "@/hooks/useAuth";
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { supabase } from '@/lib/supabaseSafeClient';
+import { getAuthHeader } from '@/lib/auth';
+import { useAuth } from '@/hooks/useAuth';
 
-export type QueueMonitorCounts = {
-  queued: number;
-  running: number;
-  done24h: number;
+export type QueueMonitorPayload = {
+  ok: boolean;
+  now: string;
+  counts: { queued: number; running: number; failed: number; completed?: number; completed_24h?: number };
+  backlogSeconds: number | null;
+  stuck: { runningStuckCount: number; thresholdSec: number };
+  recent: Array<{ id: string; type: string; status: string; error?: string | null; retry: string; updated_at: string }>;
+  scope: 'user' | 'global';
 };
 
-const STATUSES_TO_TRACK = ["queued", "running", "done", "completed"] as const;
-
-type TrackedStatus = (typeof STATUSES_TO_TRACK)[number];
-
-type JobRow = {
-  status: TrackedStatus | string;
-  created_at: string | null;
-  updated_at: string | null;
-};
-
-function isTrackedStatus(status: string): status is TrackedStatus {
-  return STATUSES_TO_TRACK.includes(status as TrackedStatus);
-}
-
-const INITIAL_COUNTS: QueueMonitorCounts = { queued: 0, running: 0, done24h: 0 };
-
-export function useQueueMonitor(_brandId?: string) {
+export function useQueueMonitor(enabled: boolean) {
   const { user } = useAuth();
-  const [counts, setCounts] = useState<QueueMonitorCounts>(INITIAL_COUNTS);
+  const [data, setData] = useState<QueueMonitorPayload | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const timerRef = useRef<number | null>(null);
 
-  const refresh = useCallback(async () => {
-    if (!user?.id) {
-      setCounts(INITIAL_COUNTS);
-      return;
+  const fetchOnce = useMemo(() => async () => {
+    if (!enabled) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const headers = await getAuthHeader();
+      const { data, error } = await supabase.functions.invoke('queue-monitor', { headers });
+      if (error) throw error;
+      setData(data as QueueMonitorPayload);
+    } catch (e: any) {
+      setError(e?.message || 'Monitoring indisponible');
+    } finally {
+      setLoading(false);
     }
-
-    const since = Date.now() - 24 * 3600 * 1000;
-
-    const { data, error } = await supabase
-      .from("job_queue")
-      .select("status, created_at, updated_at")
-      .eq("user_id", user.id)
-      .in("status", STATUSES_TO_TRACK);
-
-    if (error || !data) {
-      console.warn("useQueueMonitor: failed to fetch counts", error);
-      return;
-    }
-
-    let queued = 0;
-    let running = 0;
-    let done24h = 0;
-
-    for (const row of data as JobRow[]) {
-      if (!row?.status || !isTrackedStatus(row.status)) continue;
-
-      if (row.status === "queued") {
-        queued += 1;
-        continue;
-      }
-
-      if (row.status === "running") {
-        running += 1;
-        continue;
-      }
-
-      if (row.status === "done" || row.status === "completed") {
-        const timestamp = new Date(row.updated_at ?? row.created_at ?? 0).getTime();
-        if (!Number.isNaN(timestamp) && timestamp >= since) {
-          done24h += 1;
-        }
-      }
-    }
-
-    setCounts({ queued, running, done24h });
-  }, [user?.id]);
+  }, [enabled]);
 
   useEffect(() => {
-    refresh();
+    if (!enabled) return;
 
-    if (!user?.id) return;
+    // Première requête immédiate
+    fetchOnce();
+
+    // Intervalle toutes les 8s
+    timerRef.current = window.setInterval(fetchOnce, 8000);
+    return () => {
+      if (timerRef.current) window.clearInterval(timerRef.current);
+    };
+  }, [enabled, fetchOnce]);
+
+  useEffect(() => {
+    if (!enabled || !user?.id) return;
 
     const channel = supabase
-      .channel(`queue-monitor-${user.id}`)
+      .channel('queue-monitor-user')
       .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "job_queue", filter: `user_id=eq.${user.id}` },
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'job_queue', filter: `user_id=eq.${user.id}` },
         () => {
-          refresh();
-        },
+          // Sur tout événement, on rafraîchit rapidement
+          fetchOnce();
+        }
       )
       .subscribe();
 
-    const intervalId = typeof window !== "undefined" ? window.setInterval(refresh, 5000) : null;
-
     return () => {
-      if (intervalId) window.clearInterval(intervalId);
       supabase.removeChannel(channel);
     };
-  }, [refresh, user?.id]);
+  }, [enabled, user?.id, fetchOnce]);
 
-  return { ...counts, refresh };
+  return { data, loading, error } as const;
 }

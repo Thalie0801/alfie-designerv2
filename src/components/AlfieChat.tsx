@@ -16,7 +16,6 @@ import { useLibraryAssetsSubscription } from "@/hooks/useLibraryAssetsSubscripti
 import { getAspectClass, type ConversationState, type OrchestratorResponse } from "@/types/chat";
 import { slideUrl } from "@/lib/cloudinary/imageUrls";
 import { extractCloudNameFromUrl } from "@/lib/cloudinary/utils";
-import { useNavigate } from "react-router-dom";
 
 // =====================
 // Détection d'intention vidéo
@@ -123,7 +122,6 @@ interface Message {
 export function AlfieChat() {
   const { user } = useAuth();
   const { activeBrandId, brandKit } = useBrandKit();
-  const navigate = useNavigate();
 
   // États
   const [messages, setMessages] = useState<Message[]>([
@@ -131,7 +129,7 @@ export function AlfieChat() {
       id: "welcome",
       role: "assistant",
       content:
-        "👋 Hey ! Je suis Alfie, ton assistant créatif.\n\nJe peux créer pour toi :\n• Des **images** percutantes\n• Des **carrousels** complets\n\nQu'est-ce que tu veux créer aujourd'hui ?",
+        "👋 Hey ! Je suis Alfie, ton assistant créatif.\n\nJe peux créer pour toi :\n• Des **images** percutantes\n• Des **vidéos** engageantes\n• Des **carrousels** complets\n\nQu'est-ce que tu veux créer aujourd'hui ?",
       type: "text",
       timestamp: new Date(),
     },
@@ -522,32 +520,6 @@ export function AlfieChat() {
 
     const intent = options?.intentOverride ?? detectIntent(trimmed || rawMessage);
 
-    if (intent === "video") {
-      setInput("");
-
-      addMessage({
-        role: "user",
-        content: trimmed || (uploadedSource ? "(média uniquement)" : "(message vide)"),
-        type: (uploadedSource?.type as Message["type"]) || "text",
-        assetUrl: uploadedSource ? uploadedSource.previewUrl || uploadedSource.url : undefined,
-        metadata: uploadedSource ? { name: uploadedSource.name, signedUrl: uploadedSource.url } : undefined,
-      });
-
-      addMessage({
-        role: "assistant",
-        content:
-          "Pour la vidéo, rendez-vous dans **Studio** (upload audio/vidéo, choix 9:16/16:9). J’ai ouvert l’onglet pour toi.",
-        type: "text",
-      });
-
-      if (uploadedSource) {
-        clearUploadedSource();
-      }
-
-      navigate("/studio");
-      return;
-    }
-
     // lock UI
     setIsLoading(true);
     inFlightRef.current = true;
@@ -642,9 +614,11 @@ export function AlfieChat() {
           requestPayload.conversationId = conversationId;
         }
 
-        // intention / outils forcés
+        // intention vidéo
         if (options?.forceTool) {
           requestPayload.forceTool = options.forceTool;
+        } else if (intent === "video") {
+          requestPayload.forceTool = "generate_video";
         }
 
         if (promptOverride.length > 0) {
