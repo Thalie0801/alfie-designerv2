@@ -57,6 +57,9 @@ const INITIAL_ASSISTANT: ChatMessage = {
 export function AlfieChat() {
   const { activeBrandId, brandKit } = useBrandKit();
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_ASSISTANT]);
+export function AlfieChat() {
+  const { activeBrandId, brandKit } = useBrandKit();
+  const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_ASSISTANT]);
 type Message = {
   id: string;
   role: "user" | "assistant";
@@ -301,6 +304,19 @@ export default function AlfieChat() {
         });
 
         if (route.kind === "reply") {
+          addMessage({ id: generateId(), role: "assistant", content: route.text, quickReplies: route.quickReplies });
+          setQuickReplies(route.quickReplies ?? []);
+          setPendingIntent(null);
+          return;
+        }
+
+        setQuickReplies([]);
+        setPendingIntent(route.intent);
+        setLastIntent(route.intent);
+        addMessage({ id: generateId(), role: "assistant", content: route.text });
+        });
+
+        if (route.kind === "reply") {
           addMessage({
             id: generateId(),
             role: "assistant",
@@ -329,6 +345,7 @@ export default function AlfieChat() {
         setIsSending(false);
       }
     },
+    [activeBrandId, addMessage, lastIntent],
     [activeBrandId, addMessage, lastIntent]
   );
 
@@ -343,6 +360,7 @@ export default function AlfieChat() {
         console.error("[AlfieChat] status refresh failed", error);
       }
     },
+    [activeBrandId],
     [activeBrandId]
   );
 
@@ -360,6 +378,7 @@ export default function AlfieChat() {
       event.preventDefault();
       void handleUserMessage(input);
     },
+    [handleUserMessage, input],
     [handleUserMessage, input]
     let currentOrder = orderId;
 
@@ -539,6 +558,7 @@ export default function AlfieChat() {
     (reply: string) => {
       void handleUserMessage(reply);
     },
+    [handleUserMessage],
     [handleUserMessage]
   );
 
