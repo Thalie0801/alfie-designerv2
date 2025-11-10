@@ -170,6 +170,9 @@ verify_jwt = true
 [functions.chat-create-carousel]
 verify_jwt = true
 
+[functions.force-process]
+verify_jwt = true
+
 [functions.process-job-worker]
 verify_jwt = false
 
