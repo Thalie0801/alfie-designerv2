@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import "@testing-library/jest-dom/vitest";
+import "@testing-library/jest-dom";
 import { TourProvider, useTour, HelpLauncher } from "./InteractiveTour";
 import { lsGet, lsSet, autoCompletedKey } from "@/utils/localStorage";
 

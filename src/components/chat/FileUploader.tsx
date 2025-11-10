@@ -147,22 +147,13 @@ export function FileUploader({
     disabled: uploading,
   });
 
-  const safeRevoke = (url: string) => {
-    if (!url.startsWith("blob:")) return;
-    try {
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.warn("[FileUploader] Failed to revoke object URL", error);
-      }
-    }
-  };
-
   const removeItem = (idx: number) => {
     setItems((prev) => {
       const clone = [...prev];
       const it = clone[idx];
-      safeRevoke(it.url);
+      try {
+        URL.revokeObjectURL(it.url);
+      } catch {}
       clone.splice(idx, 1);
       return clone;
     });
@@ -172,7 +163,9 @@ export function FileUploader({
   useEffect(() => {
     return () => {
       items.forEach((it) => {
-        safeRevoke(it.url);
+        try {
+          URL.revokeObjectURL(it.url);
+        } catch {}
       });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -291,7 +291,7 @@ serve(async (req) => {
 
     // 2. Marquer comme "running" ATOMIQUEMENT (seulement si encore queued)
     checkTimeout();
-    const { data: lockedJob, error: statusUpdateErr } = await supabase
+    const { data: lockedJob, error: lockErr } = await supabase
       .from('jobs')
       .update({ status: 'running', started_at: new Date().toISOString() })
       .eq('id', job.id)
@@ -300,7 +300,7 @@ serve(async (req) => {
       .maybeSingle();
 
     // Si le job a déjà été pris par un autre worker, on arrête
-    if (statusUpdateErr || !lockedJob) {
+    if (lockErr || !lockedJob) {
       console.log(`[Worker] Job ${job.id} already taken by another worker, skipping`);
       jobOutcome = { status: 'skipped' };
       return new Response(JSON.stringify({ message: 'Job already taken' }), {

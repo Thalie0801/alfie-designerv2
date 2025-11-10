@@ -5,7 +5,7 @@ export async function uploadToChatBucket(
   supabase: SupabaseClient,
   userId: string,
 ) {
-  const safeName = file.name.replace(/[^\w.-]+/g, "_");
+  const safeName = file.name.replace(/[^\w.\-]+/g, "_");
   const filePath = `${userId}/${Date.now()}_${safeName}`;
 
   const { error: uploadError } = await supabase.storage

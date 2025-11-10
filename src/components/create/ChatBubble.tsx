@@ -22,7 +22,7 @@ interface ChatBubbleProps {
 
 /** transforme les URLs en <a> … */
 function linkify(text: string): (string | JSX.Element)[] {
-  const urlRe = /\b((?:https?:\/\/|www\.)[^\s<>"']+[^\s<>"'.,;!?:)\]])/gi;
+  const urlRe = /\b((?:https?:\/\/|www\.)[^\s<>"']+[^\s<>"'.,;!?:\)\]])/gi;
   const parts: (string | JSX.Element)[] = [];
   let lastIndex = 0;
   let m: RegExpExecArray | null;

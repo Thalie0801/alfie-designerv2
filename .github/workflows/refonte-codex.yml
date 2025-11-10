@@ -1,24 +1,16 @@
 name: Refonte Codex (push→pull, disable autopublish)
-
 on:
   workflow_dispatch: {}
   push:
     branches: [ main, refonte-alfie-2025 ]
   pull_request:
     branches: [ main, refonte-alfie-2025 ]
-
 permissions:
   contents: write
   pull-requests: write
-
 concurrency:
   group: codex-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
-env:
-  NODE_VERSION: '20'
-  CI: true
-
 jobs:
   codex:
     runs-on: ubuntu-latest
@@ -27,13 +19,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
+          node-version: '20'
+          cache: 'npm'
       - name: Configure npm auth (optional)
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -44,46 +34,26 @@ jobs:
           else
             echo "No NPM_TOKEN secret; skipping npm auth."
           fi
-
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
-
-      - name: Install dependencies (robust)
+      - name: Install dependencies
         run: |
-          set -euxo pipefail
-          if [ -f package-lock.json ]; then
-            npm ci --prefer-offline --no-audit --no-fund \
-            || npm ci --prefer-offline --no-audit --no-fund --legacy-peer-deps \
-            || npm install --prefer-online --no-audit --no-fund --legacy-peer-deps
-          else
-            npm install --prefer-online --no-audit --no-fund --legacy-peer-deps
-          fi
-
-      - name: Ensure codex script is executable
-        run: |
-          if [ -f scripts/codex/run.sh ]; then
-            chmod +x scripts/codex/run.sh
-          else
-            echo "::error::scripts/codex/run.sh introuvable"; exit 1
-          fi
-
+          npm ci --prefer-online || (echo "retry npm ci…" && sleep 3 && npm ci --prefer-online)
       - name: Run Codex script
         shell: bash
         run: bash scripts/codex/run.sh
-
       # ---- Diff + Guard ----
       - name: Compute diff
         id: diff
         shell: bash
         run: |
           set -euo pipefail
-          # Lister les modifs sur l'arbre de travail
+          # liste des fichiers modifiés (porcelain propre)
           CHANGED="$(git -c core.quotepath=false status --porcelain)"
           if [ -z "${CHANGED}" ]; then
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # Extraire des chemins propres (ajouts, modifs, renames)
           FILES="$(echo "${CHANGED}" | awk '
             $1 ~ /^\?\?/ { $1=""; sub(/^ +/,""); print; next }
             $1 ~ /^R/   { match($0, /-> (.*)$/, m); if (m[1]!="") print m[1]; next }
@@ -92,28 +62,21 @@ jobs:
           echo "${FILES}" >> "$GITHUB_OUTPUT"
           echo "__EOF__" >> "$GITHUB_OUTPUT"
           echo "has_changes=true" >> "$GITHUB_OUTPUT"
-
-      - name: Guard — No landing changes
+      - name: "Guard — No landing changes"
         if: steps.diff.outputs.has_changes == 'true'
         shell: bash
         run: |
           set -euo pipefail
           FILES="${{ steps.diff.outputs.files }}"
-          echo "Changed files:"; echo "${FILES}" | sed 's/^/ - /'
+          echo "Changed files:"
+          echo "${FILES}" | sed 's/^/ - /'
           if echo "${FILES}" | grep -E -q '^(apps/landing/|www/|site/)'; then
             echo "::error title=Landing modifiée::Ce patch ne doit pas toucher la landing."
             echo "${FILES}" | grep -E '^(apps/landing/|www/|site/)' | sed 's/^/ - /'
             exit 1
           fi
           echo "OK: aucune modification dans apps/landing, www ou site."
-
       # ---- PR seulement si changements + pas depuis un event PR ----
-      - name: Setup git user for PR
-        if: steps.diff.outputs.has_changes == 'true' && github.event_name != 'pull_request'
-        run: |
-          git config user.name "alfie-codex-bot"
-          git config user.email "codex@alfie.local"
-
       - name: Create Pull Request
         if: steps.diff.outputs.has_changes == 'true' && github.event_name != 'pull_request'
         uses: peter-evans/create-pull-request@v6
@@ -133,4 +96,3 @@ jobs:
             automated
             codex
           draft: false
-

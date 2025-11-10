@@ -1,23 +1,23 @@
 import { z } from "zod";
 
-export const generateResponseSyncSchema = z.object({
+export const GenerateResponseSync = z.object({
   imageUrl: z.string().url(),
   assetId: z.string().optional(),
   meta: z.any().optional(),
 });
 
-export type GenerateResponseSync = z.infer<typeof generateResponseSyncSchema>;
+export type GenerateResponseSync = z.infer<typeof GenerateResponseSync>;
 
-export const generateResponseAsyncSchema = z.object({
+export const GenerateResponseAsync = z.object({
   jobId: z.string(),
 });
 
-export type GenerateResponseAsync = z.infer<typeof generateResponseAsyncSchema>;
+export type GenerateResponseAsync = z.infer<typeof GenerateResponseAsync>;
 
-export const jobStatusSchema = z.object({
+export const JobStatus = z.object({
   status: z.enum(["queued", "running", "done", "error"]),
   imageUrl: z.string().url().optional(),
   error: z.string().optional(),
 });
 
-export type JobStatus = z.infer<typeof jobStatusSchema>;
+export type JobStatus = z.infer<typeof JobStatus>;

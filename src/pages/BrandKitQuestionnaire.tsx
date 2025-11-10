@@ -12,7 +12,6 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseSafeClient';
 import { useAuth } from '@/hooks/useAuth';
 import { Dict, Json } from '@/types/safe';
-import type { Database } from '@/integrations/supabase/types';
 
 const questions = [
   {
@@ -91,14 +90,17 @@ export default function BrandKitQuestionnaire() {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [answers, setAnswers] = useState<Dict<string>>({});
+  const [answers, setAnswers] = useState<Dict<Json>>({});
 
   const currentQuestion = questions[currentStep];
   const progress = ((currentStep + 1) / questions.length) * 100;
 
   const handleNext = () => {
     const answer = answers[currentQuestion.field];
-    if (answer == null || answer.trim().length === 0) {
+    if (
+      answer == null ||
+      (typeof answer === 'string' && answer.trim().length === 0)
+    ) {
       toast.error('Veuillez répondre à la question avant de continuer');
       return;
     }
@@ -124,43 +126,25 @@ export default function BrandKitQuestionnaire() {
 
     setLoading(true);
     try {
-      const brandName =
-        typeof answers.name === 'string' ? answers.name.trim() : '';
-      if (!brandName) {
-        toast.error('Nom de marque manquant');
-        return;
-      }
-
-      const paletteValue =
-        typeof answers.palette === 'string'
-          ? answers.palette
-              .split(',')
-              .map((c) => c.trim())
-              .filter((c) => c.length > 0)
-          : [];
-      const paletteJson: Json | null = paletteValue.length ? paletteValue : null;
-      const fontsJson: Json = { heading: 'Inter', body: 'Inter' };
-
       // Construire la voix de marque à partir des réponses
-      const voice = `Ton ${typeof answers.tone === 'string' ? answers.tone : 'professionnel'}.
-Secteur: ${typeof answers.industry === 'string' ? answers.industry : 'général'}.
+      const voice = `Ton ${typeof answers.tone === 'string' ? answers.tone : 'professionnel'}. Secteur: ${typeof answers.industry === 'string' ? answers.industry : 'général'}.
 Public cible: ${typeof answers.target_audience === 'string' ? answers.target_audience : 'large public'}.
 Valeur unique: ${typeof answers.value_proposition === 'string' ? answers.value_proposition : 'excellence'}.
 Mots-clés: ${typeof answers.keywords === 'string' ? answers.keywords : 'qualité, innovation'}.`;
 
-      const payload: Database['public']['Tables']['brands']['Insert'] = {
-        user_id: user.id,
-        name: brandName,
-        palette: paletteJson,
-        voice: voice.trim(),
-        fonts: fontsJson,
-        plan: 'starter',
-      };
-
       // Créer la marque
       const { data: brand, error } = await supabase
         .from('brands')
-        .insert([payload])
+        .insert({
+          user_id: user.id,
+          name: typeof answers.name === 'string' ? answers.name : undefined,
+          palette:
+            typeof answers.palette === 'string'
+              ? answers.palette.split(',').map((c) => c.trim())
+              : [],
+          voice: voice.trim(),
+          fonts: { heading: 'Inter', body: 'Inter' }
+        })
         .select()
         .single();
 
@@ -182,7 +166,7 @@ Mots-clés: ${typeof answers.keywords === 'string' ? answers.keywords : 'qualit�
     }
   };
 
-  const updateAnswer = (value: string) => {
+  const updateAnswer = (value: Json) => {
     setAnswers((prev) => ({
       ...prev,
       [currentQuestion.field]: value
@@ -250,7 +234,7 @@ Mots-clés: ${typeof answers.keywords === 'string' ? answers.keywords : 'qualit�
 
           {currentQuestion.type === 'radio' && (
             <RadioGroup
-              value={answers[currentQuestion.field] ?? ''}
+              value={answers[currentQuestion.field]}
               onValueChange={updateAnswer}
               className="space-y-3"
             >

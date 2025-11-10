@@ -1,18 +1,17 @@
+import type { ComponentType } from "react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { AlertCircle, CheckCircle2, Clock, Loader2, ExternalLink } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { JobEntry } from "../types";
 
-type NormalizedStatus = "queued" | "running" | "done" | "error" | "unknown" | "blocked";
+type NormalizedStatus = "queued" | "running" | "done" | "error" | "unknown";
 
 const STATUS_MAP: Record<
   NormalizedStatus,
   {
     label: string;
     badgeClass: string;
-    icon?: LucideIcon;
+    icon?: ComponentType<{ className?: string; size?: number }>;
     iconClassName?: string;
   }
 > = {
@@ -20,11 +19,6 @@ const STATUS_MAP: Record<
     label: "En attente",
     badgeClass: "inline-flex items-center gap-1 rounded-full bg-yellow-100 text-yellow-800 px-2 py-0.5 text-xs",
     icon: Clock,
-  },
-  blocked: {
-    label: "Bloqué",
-    badgeClass: "inline-flex items-center gap-1 rounded-full bg-red-100 text-red-800 px-2 py-0.5 text-xs",
-    icon: AlertCircle,
   },
   running: {
     label: "En cours",
@@ -52,7 +46,6 @@ function normalizeStatus(status?: string | null): NormalizedStatus {
   if (!status) return "unknown";
   const value = status.toLowerCase();
   if (value === "pending" || value === "queued") return "queued";
-  if (value === "blocked") return "blocked";
   if (value === "processing" || value === "running") return "running";
   if (value === "done" || value === "completed" || value === "success") return "done";
   if (value === "failed" || value === "error") return "error";
@@ -64,12 +57,9 @@ interface JobCardProps {
   createdAt: string;
   onRetry?: (job: JobEntry) => void;
   isStuck?: boolean;
-  selectable?: boolean;
-  selected?: boolean;
-  onSelectionChange?: (job: JobEntry, selected: boolean) => void;
 }
 
-export function JobCard({ job, createdAt, onRetry, isStuck, selectable = false, selected = false, onSelectionChange }: JobCardProps) {
+export function JobCard({ job, createdAt, onRetry, isStuck }: JobCardProps) {
   const normalized = normalizeStatus(job.status);
   const config = STATUS_MAP[normalized];
   const Icon = config.icon;
@@ -79,36 +69,20 @@ export function JobCard({ job, createdAt, onRetry, isStuck, selectable = false, 
   return (
     <div className="rounded-lg border p-3 space-y-2">
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-start gap-3">
-          {selectable ? (
-            <Checkbox
-              checked={selected}
-              onCheckedChange={(next) => {
-                const value = typeof next === "boolean" ? next : Boolean(next);
-                onSelectionChange?.(job, value);
-              }}
-              aria-label={`Sélectionner le job ${job.id}`}
-            />
-          ) : null}
-          <div className="space-y-1">
-            <p className="text-sm font-medium capitalize">{job.type.replace(/_/g, " ")}</p>
-            <p className="text-xs text-muted-foreground">{createdAt}</p>
-            {job.order_id && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>Commande #{job.order_id}</span>
-                <Link to={`/library?order=${job.order_id}`} className="inline-flex items-center gap-1 text-primary hover:underline">
-                  <ExternalLink size={14} /> Voir
-                </Link>
-              </div>
-            )}
-            <p className="text-[11px] text-muted-foreground">
-              Tentative {job.retry_count ?? 0}
-              {typeof job.max_retries === "number" ? ` / ${job.max_retries}` : ""}
-            </p>
-            {isStuck && normalized === "queued" && (
-              <p className="text-[11px] text-amber-600 font-medium">Bloqué depuis &gt; 10 min</p>
-            )}
-          </div>
+        <div className="space-y-1">
+          <p className="text-sm font-medium capitalize">{job.type.replace(/_/g, " ")}</p>
+          <p className="text-xs text-muted-foreground">{createdAt}</p>
+          {job.order_id && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Commande #{job.order_id}</span>
+              <Link to={`/library?order=${job.order_id}`} className="inline-flex items-center gap-1 text-primary hover:underline">
+                <ExternalLink size={14} /> Voir
+              </Link>
+            </div>
+          )}
+          {isStuck && normalized === "queued" && (
+            <p className="text-[11px] text-amber-600 font-medium">Bloqué depuis &gt; 10 min</p>
+          )}
         </div>
         <span className={config.badgeClass}>
           {Icon ? <Icon size={14} className={config.iconClassName} /> : null}

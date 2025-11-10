@@ -51,31 +51,6 @@ export function ChatComposer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const persistDraft = useCallback((key: string, data: string | null) => {
-    try {
-      if (data === null) {
-        localStorage.removeItem(key);
-      } else {
-        localStorage.setItem(key, data);
-      }
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.warn(`[ChatComposer] Failed to persist draft ${key}`, error);
-      }
-    }
-  }, []);
-
-  const readDraft = useCallback((key: string): string | null => {
-    try {
-      return localStorage.getItem(key);
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.warn(`[ChatComposer] Failed to read draft ${key}`, error);
-      }
-      return null;
-    }
-  }, []);
-
   const showQuickGenerate = useMemo(
     () => Boolean(onQuickGenerate) && wantsImageFromText(value) && value.trim().length > 10,
     [onQuickGenerate, value],
@@ -106,22 +81,28 @@ export function ChatComposer({
     const draftKey = `draft-${conversationId}`;
     const val = value || "";
     if (val) {
-      persistDraft(draftKey, val);
+      try {
+        localStorage.setItem(draftKey, val);
+      } catch {}
     } else {
-      persistDraft(draftKey, null);
+      try {
+        localStorage.removeItem(draftKey);
+      } catch {}
     }
-  }, [conversationId, persistDraft, value]);
+  }, [value, conversationId]);
 
   // Charger le brouillon au montage
   useEffect(() => {
     if (!conversationId) return;
     const draftKey = `draft-${conversationId}`;
-    const draft = readDraft(draftKey);
-    if (draft && !value) {
-      onChange(draft);
-    }
+    try {
+      const draft = localStorage.getItem(draftKey);
+      if (draft && !value) {
+        onChange(draft);
+      }
+    } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, readDraft]);
+  }, [conversationId]);
 
   const doSend = useCallback(() => {
     const trimmed = value.trim();
@@ -133,7 +114,9 @@ export function ChatComposer({
     // reset champ et brouillon
     onChange("");
     if (conversationId) {
-      persistDraft(`draft-${conversationId}`, null);
+      try {
+        localStorage.removeItem(`draft-${conversationId}`);
+      } catch {}
     }
 
     // Scroll vers le bas après envoi
@@ -141,7 +124,7 @@ export function ChatComposer({
       const chatBottom = document.getElementById("chat-bottom");
       chatBottom?.scrollIntoView({ behavior: "smooth" });
     });
-  }, [value, uploadedImage, disabled, isLoading, onSend, onChange, conversationId, persistDraft]);
+  }, [value, uploadedImage, disabled, isLoading, onSend, onChange, conversationId]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Shift+Enter = nouvelle ligne

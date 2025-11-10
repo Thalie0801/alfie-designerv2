@@ -1,22 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-// src/components/AlfieChat.tsx
-import React, { useCallback, useEffect, useState } from "react";
-import { enqueue_job, libraryLink, search_assets, studioLink } from "@/ai/tools";
-import { normalizeIntent, type AlfieIntent } from "@/ai/intent";
-import { Templates } from "@/ai/templates";
-
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import TextareaAutosize from "react-textarea-autosize";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Send, ImagePlus, Loader2, Download } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 import { useBrandKit } from "@/hooks/useBrandKit";
-import { routeUserMessage } from "@/features/chat/assistantRouter";
-import type { AlfieIntent } from "@/ai/intent";
-import { enqueueAlfieJob, searchAlfieAssets, type AlfieJobStatus, type LibraryAsset } from "@/api/alfie";
-import { libraryLink, studioLink } from "@/lib/links";
+import { supabase } from "@/lib/supabaseSafeClient";
+import { getAuthHeader } from "@/lib/auth";
+import { uploadToChatBucket } from "@/lib/chatUploads";
+import { Button } from "@/components/ui/button";
 import TextareaAutosize from "react-textarea-autosize";
 import { CreateHeader } from "@/components/create/CreateHeader";
 import { QuotaBar } from "@/components/create/QuotaBar";
@@ -34,66 +24,106 @@ import { setJobContext, captureException } from "@/observability/sentry";
 // =====================
 const VIDEO_KEYWORDS = /\b(vid[ée]o|reel|r[ée]el|tiktok|shorts?|clip)\b/i;
 
-interface ChatMessage {
+function detectIntent(message: string): "video" | "default" {
+  if (VIDEO_KEYWORDS.test(message)) return "video";
+  return "default";
+}
+
+const normalizeConversationState = (state?: string | null): ConversationState => {
+  switch (state) {
+    case "generating":
+      return "generating";
+    case "completed":
+      return "completed";
+    default:
+      return "idle";
+  }
+};
+
+// =====================
+// Helpers robustesse
+// =====================
+
+// UUID safe (fallback si randomUUID indisponible)
+const safeUuid = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? (crypto as Crypto).randomUUID()
+    : Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+function toErrorMessage(err: unknown) {
+  if (err instanceof Error) return err.message;
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return String(err);
+  }
+}
+
+// Limites & backoff
+const MAX_INPUT_LEN = 2000;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const backoffMs = (attempt: number) => {
+  const base = 600 * attempt; // 600, 1200, 1800…
+  const jitter = Math.floor(Math.random() * 200); // 0–199ms
+  return base + jitter;
+};
+
+// Upload image: types + taille max (10 Mo)
+const ALLOWED_IMG = ["image/png", "image/jpeg", "image/webp"];
+const MAX_IMG_BYTES = 10 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
+
+type UploadedSource = {
+  url: string;
+  previewUrl: string;
+  type: "image" | "video";
+  name: string;
+};
+
+// =====================
+// TYPES
+// =====================
+type SendOptions = {
+  forceTool?: "generate_video" | "generate_image" | "render_carousel";
+  slides?: any[];
+  promptOverride?: string;
+  intentOverride?: "video" | "image" | "carousel";
+};
+
+interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  type?: "text" | "image" | "video" | "carousel" | "reasoning" | "bulk-carousel";
+  assetUrl?: string;
+  assetId?: string;
+  metadata?: Record<string, unknown>;
+  reasoning?: string;
+  brandAlignment?: string;
   quickReplies?: string[];
+  links?: Array<{ label: string; href: string }>;
+  bulkCarouselData?: {
+    carousels: Array<{
+      carousel_index: number;
+      slides: Array<{
+        storage_url: string;
+        index: number;
+      }>;
+      zip_url?: string;
+    }>;
+    totalCarousels: number;
+    slidesPerCarousel: number;
+  };
+  orderId?: string | null;
+  timestamp: Date;
 }
 
-function generateId() {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? (crypto as Crypto).randomUUID()
-    : Math.random().toString(36).slice(2);
-}
-
-const INITIAL_ASSISTANT: ChatMessage = {
-  id: "assistant-intro",
-  role: "assistant",
-  content:
-    "👋 Hey ! Je suis Alfie. Donne-moi un brief (format, objectif, CTA) et je te prépare un récap avant de lancer la génération.",
-};
-
+// =====================
+// COMPOSANT PRINCIPAL
+// =====================
 export function AlfieChat() {
+  const { user } = useAuth();
   const { activeBrandId, brandKit } = useBrandKit();
-  const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_ASSISTANT]);
-export function AlfieChat() {
-  const { activeBrandId, brandKit } = useBrandKit();
-  const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_ASSISTANT]);
-type Message = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  quickReplies?: string[];
-};
-
-  role: "user" | "assistant" | "system";
-  content: string;
-  createdAt: string;
-};
-
-export default function AlfieChat() {
-  const activeBrandId = "default-brand"; // TODO: remplace par ton vrai contexte brand
-  quickReplies?: string[];
-};
-
-function generateId() {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? (crypto as Crypto).randomUUID()
-    : Math.random().toString(36).slice(2);
-}
-
-const INITIAL_ASSISTANT: Message = {
-  id: "assistant-intro",
-  role: "assistant",
-  content:
-    "👋 Hey ! Je suis Alfie. Donne-moi un brief (format, objectif, CTA) et je te prépare un récap avant de lancer la génération.",
-  createdAt: new Date().toISOString(),
-};
-
-export function AlfieChat() {
-  const { activeBrandId, brandKit } = useBrandKit();
-  const [messages, setMessages] = useState<Message[]>([INITIAL_ASSISTANT]);
   const videoEnabled = FLAGS.VIDEO;
   const carouselEnabled = FLAGS.CAROUSEL;
 
@@ -107,161 +137,81 @@ export function AlfieChat() {
     ? `Je peux créer pour toi :\n• ${capabilities.join("\n• ")}`
     : "Je peux t'aider à structurer tes idées créatives.";
 
-export default function AlfieChat() {
-  const activeBrandId = "default-brand"; // TODO: brancher sur ton contexte réel
-  // === ÉTATS (déclare UNE SEULE fois) ===
+  // États
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
       role: "assistant",
-      content: "Salut, je suis Alfie. Dis-moi ce que tu veux créer.",
-      createdAt: new Date().toISOString(),
-    },
-  ]);
-  const [lastIntent, setLastIntent] = useState<AlfieIntent | null>(null);
-
-  // === HELPERS (une seule version) ===
-  const addMessage = useCallback((msg: Message) => {
-    setMessages((prev) => [...prev, msg]);
-  }, []);
-
-  const handleSend = useCallback(
-    async (userText: string) => {
-      const userMsg: Message = {
-        id: crypto.randomUUID(),
-        role: "user",
-        content: userText,
-        createdAt: new Date().toISOString(),
-      };
-      addMessage(userMsg);
-
-      const intent = normalizeIntent({
-        brandId: activeBrandId,
-        kind: /carrousel|carousel/i.test(userText)
-          ? "carousel"
-          : /vidéo|video/i.test(userText)
-          ? "video"
-          : "image",
-        copyBrief: userText,
-      });
-      setLastIntent(intent);
-
-      // Récap
-      addMessage({
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: Templates.recapBeforeLaunch(intent),
-        createdAt: new Date().toISOString(),
-      });
-
-      // Lancement direct (exemple)
-      const { orderId } = await enqueue_job({ intent });
-      addMessage({
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: Templates.confirmAfterEnqueue(orderId, studioLink(orderId), libraryLink(intent.brandId)),
-        content: Templates.confirmAfterEnqueue(
-          orderId,
-          studioLink(orderId),
-          libraryLink(intent.brandId)
-        ),
-        createdAt: new Date().toISOString(),
-      });
-    },
-    [activeBrandId, addMessage]
-  );
-
-  useEffect(() => {
-    if (!lastIntent) return;
-    void search_assets({ brandId: lastIntent.brandId }).catch((error) => {
-      console.error("search_assets failed", error);
-  // === Hook proprement fermé (pas de virgule orpheline) ===
-  useEffect(() => {
-    // Exemple: rafraîchir périodiquement (noop pour l’instant)
-    // Tu peux ajouter un interval ici si besoin.
-  }, [activeBrandId, addMessage, lastIntent]);
-
-  return (
-    <div className="p-4 space-y-4">
-      <div className="space-y-2">
-        {messages.map((m) => (
-          <div key={m.id} className={m.role === "user" ? "text-right" : "text-left"}>
-            <div className="inline-block rounded-xl px-3 py-2 border">
-              <pre className="whitespace-pre-wrap">{m.content}</pre>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const input = e.currentTarget.elements.namedItem("chat") as HTMLInputElement | null;
-          if (!input || !input.value.trim()) return;
-          void handleSend(input.value.trim());
-          input.value = "";
-        }}
-        className="flex gap-2"
-      >
-        <input
-          name="chat"
-          className="flex-1 border rounded-lg px-3 py-2"
-          placeholder="Décris ce que tu veux créer…"
-        />
-        <button type="submit" className="border rounded-lg px-3 py-2">
-          Envoyer
-        </button>
-      </form>
-    </div>
       content: `👋 Hey ! Je suis Alfie, ton assistant créatif.\n\n${welcomeLines}\n\nQu'est-ce que tu veux créer aujourd'hui ?`,
       type: "text",
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState("");
-  const [pendingIntent, setPendingIntent] = useState<AlfieIntent | null>(null);
-  const [lastIntent, setLastIntent] = useState<AlfieIntent | null>(null);
-  const [quickReplies, setQuickReplies] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [uploadedSource, setUploadedSource] = useState<UploadedSource | null>(null);
+  const [uploadingSource, setUploadingSource] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
-  const [jobs, setJobs] = useState<AlfieJobStatus[]>([]);
-  const [assets, setAssets] = useState<LibraryAsset[]>([]);
-  const [isSending, setIsSending] = useState(false);
+  const [conversationState, setConversationState] = useState<ConversationState>("idle");
+  const [expectedTotal, setExpectedTotal] = useState<number | null>(null);
+  const [lastContext, setLastContext] = useState<any | null>(null);
 
-  const brandName = brandKit?.name ?? "ta marque";
+  // Subscription aux assets de l'order
+  const { assets: orderAssets, total: orderTotal } = useLibraryAssetsSubscription(orderId);
 
-  const addMessage = useCallback((message: ChatMessage) => {
-    setMessages((current) => [...current, message]);
-  const addMessage = useCallback((message: Message) => {
-    setMessages((current) => [...current, message]);
-    const withTimestamp: Message = {
-      ...message,
-      createdAt: message.createdAt ?? new Date().toISOString(),
-    };
-    setMessages((current) => [...current, withTimestamp]);
+  // Refs
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const seenAssetsRef = useRef(new Set<string>());
+  const finishAnnouncedRef = useRef<string | null>(null);
+  const mountedRef = useRef(true);
+  const inFlightRef = useRef(false);
+
+  const clearUploadedSource = useCallback(() => {
+    setUploadedSource((prev) => {
+      if (prev?.previewUrl?.startsWith("blob:")) {
+        try {
+          URL.revokeObjectURL(prev.previewUrl);
+        } catch (err) {
+          console.warn("[Chat] revoke preview failed", err);
+        }
+      }
+      return null;
+    });
   }, []);
 
-  const handleUserMessage = useCallback(
-    async (text: string) => {
-      if (!activeBrandId) {
-        toast.error("Sélectionne une marque active avant de discuter avec Alfie.");
-        return;
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (uploadedSource?.previewUrl?.startsWith("blob:")) {
+        try {
+          URL.revokeObjectURL(uploadedSource.previewUrl);
+        } catch (err) {
+          console.warn("[Chat] revoke preview cleanup failed", err);
+        }
       }
+    };
+  }, [uploadedSource]);
 
-      const trimmed = text.trim();
-      if (!trimmed) return;
+  useEffect(() => {
+    seenAssetsRef.current = new Set<string>();
+    finishAnnouncedRef.current = null;
+    setExpectedTotal(null);
+  }, [orderId]);
 
-      addMessage({ id: generateId(), role: "user", content: trimmed, createdAt: new Date().toISOString() });
-      setInput("");
-      setIsSending(true);
   useEffect(() => {
     if (orderTotal > 0) {
       setExpectedTotal(orderTotal);
     }
   }, [orderTotal]);
 
-      addMessage({ id: generateId(), role: "user", content: trimmed });
-      setInput("");
-      setIsSending(true);
   useEffect(() => {
     setJobContext(orderId);
   }, [orderId]);
@@ -272,114 +222,126 @@ export default function AlfieChat() {
       if (orderId || !user?.id) return;
 
       try {
-        const route = routeUserMessage(trimmed, {
-          brandId: activeBrandId,
-          baseIntent: lastIntent ?? undefined,
-        });
+        const { data, error } = await supabase
+          .from("alfie_conversation_sessions")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-        if (route.kind === "reply") {
-          addMessage({ id: generateId(), role: "assistant", content: route.text, quickReplies: route.quickReplies });
-          setQuickReplies(route.quickReplies ?? []);
-          setPendingIntent(null);
-          return;
+        if (!error && data?.order_id) {
+          setOrderId(data.order_id);
+          setConversationId(data.id);
+          setConversationState(normalizeConversationState(data.conversation_state));
         }
+      } catch (e) {
+        console.error("[Chat] restoreSessionState error:", e);
+      }
+    };
 
-        setQuickReplies([]);
-        setPendingIntent(route.intent);
-        setLastIntent(route.intent);
-        addMessage({ id: generateId(), role: "assistant", content: route.text });
-        });
+    restoreSessionState();
+  }, [user?.id, orderId]);
 
-        if (route.kind === "reply") {
-          addMessage({ id: generateId(), role: "assistant", content: route.text, quickReplies: route.quickReplies });
-          setQuickReplies(route.quickReplies ?? []);
-          setPendingIntent(null);
-          return;
-        }
+  // Utils
+  const addMessage = (message: Omit<Message, "id" | "timestamp">): string => {
+    const id = safeUuid();
+    if (!mountedRef.current) return id;
+    setMessages((prev) => [
+      ...prev,
+      {
+        ...message,
+        id,
+        timestamp: new Date(),
+      },
+    ]);
+    return id;
+  };
 
-        setQuickReplies([]);
-        setPendingIntent(route.intent);
-        setLastIntent(route.intent);
-        addMessage({ id: generateId(), role: "assistant", content: route.text });
-        });
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
-        if (route.kind === "reply") {
-          addMessage({ id: generateId(), role: "assistant", content: route.text, quickReplies: route.quickReplies });
-          setQuickReplies(route.quickReplies ?? []);
-          setPendingIntent(null);
-          return;
-        }
-
-        setQuickReplies([]);
-        setPendingIntent(route.intent);
-        setLastIntent(route.intent);
-        addMessage({ id: generateId(), role: "assistant", content: route.text });
-        });
-
-        if (route.kind === "reply") {
-          addMessage({
-            id: generateId(),
-            role: "assistant",
-            content: route.text,
-            createdAt: new Date().toISOString(),
-            quickReplies: route.quickReplies,
-          });
-          setQuickReplies(route.quickReplies ?? []);
-          setPendingIntent(null);
-          return;
-        }
-
-        setQuickReplies([]);
-        setPendingIntent(route.intent);
-        setLastIntent(route.intent);
+  // System message during generation
+  useEffect(() => {
+    if (conversationState === "generating" && orderId) {
+      const hasGeneratingMessage = messages.some(
+        (m) => m.role === "assistant" && m.content.includes("🚀 Génération en cours"),
+      );
+      if (!hasGeneratingMessage) {
         addMessage({
-          id: generateId(),
           role: "assistant",
-          content: route.text,
-          createdAt: new Date().toISOString(),
+          content: "🚀 Génération en cours... Je te tiens au courant dès que c'est prêt !",
+          type: "text",
         });
-      } catch (error) {
-        console.error("[AlfieChat] routing failed", error);
-        toast.error("Je n'ai pas compris ce brief, reformule-le en précisant le format et l'objectif.");
-      } finally {
-        setIsSending(false);
       }
-    },
-    [activeBrandId, addMessage, lastIntent],
-    [activeBrandId, addMessage, lastIntent]
-  );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationState, orderId]);
 
-  const refreshStatuses = useCallback(
-    async (targetOrderId: string) => {
-      if (!activeBrandId) return;
-      try {
-        const payload = await searchAlfieAssets(activeBrandId, targetOrderId);
-        setJobs(payload.jobs);
-        setAssets(payload.assets);
-      } catch (error) {
-        console.error("[AlfieChat] status refresh failed", error);
-      }
-    },
-    [activeBrandId],
-    [activeBrandId]
-  );
+  // Affichage en temps réel des nouveaux assets
+  useEffect(() => {
+    if (!orderId || !orderAssets.length) return;
 
+    for (const asset of orderAssets) {
+      const key = asset.url || asset.id;
+      if (!key || seenAssetsRef.current.has(key)) continue;
+
+      seenAssetsRef.current.add(key);
+
+      const isCarouselSlide = asset.type === "carousel_slide";
+      addMessage({
+        role: "assistant",
+        content: isCarouselSlide ? `✅ Slide ${asset.slideIndex + 1} générée !` : "✅ Image générée !",
+        type: isCarouselSlide ? "carousel" : "image",
+        assetUrl: asset.url,
+        metadata: isCarouselSlide ? { assetUrls: [{ url: asset.url, format: asset.format || "4:5" }] } : undefined,
+      });
+    }
+
+    // Fin de génération (si total connu)
+    const targetTotal = expectedTotal ?? orderTotal ?? 0;
+    const canAnnounce =
+      conversationState === "generating" &&
+      targetTotal > 0 &&
+      orderAssets.length >= targetTotal &&
+      finishAnnouncedRef.current !== orderId;
+
+    if (canAnnounce) {
+      setConversationState("completed");
+      finishAnnouncedRef.current = orderId;
+      addMessage({
+        role: "assistant",
+        content: "🎉 Génération terminée ! Tes visuels sont prêts dans la Bibliothèque.",
+        quickReplies: ["Voir la bibliothèque", "Créer un nouveau visuel"],
+        type: "text",
+      });
+    }
+
+    // Fallback si total inconnu
+    if (
+      conversationState === "generating" &&
+      orderAssets.length > 0 &&
+      !targetTotal &&
+      finishAnnouncedRef.current !== orderId
+    ) {
+      finishAnnouncedRef.current = orderId;
+      addMessage({
+        role: "assistant",
+        content: "📦 Des visuels ont été générés ! Retrouve-les dans la Bibliothèque.",
+        quickReplies: ["Voir la bibliothèque"],
+        type: "text",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
+
+  // Realtime job monitoring (avec garde si l'order change)
   useEffect(() => {
     if (!orderId) return;
-    refreshStatuses(orderId);
-    const interval = setInterval(() => {
-      refreshStatuses(orderId);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [orderId, refreshStatuses]);
-
-  const handleSubmit = useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      void handleUserMessage(input);
-    },
-    [handleUserMessage, input],
-    [handleUserMessage, input]
     let currentOrder = orderId;
 
     const channel = supabase
@@ -554,31 +516,28 @@ export default function AlfieChat() {
     [brandKit, carouselEnabled],
   );
 
-  const handleQuickReply = useCallback(
-    (reply: string) => {
-      void handleUserMessage(reply);
-    },
-    [handleUserMessage],
-    [handleUserMessage]
-  );
+  // =====================
+  // Handler principal (orchestrator + retry)
+  // =====================
+  const handleSend = async (override?: string, options?: SendOptions) => {
+    if (isLoading || inFlightRef.current) return;
 
-  const handleCancelRecap = useCallback(() => {
-    setPendingIntent(null);
-  }, []);
-
-  const handleConfirmIntent = useCallback(async () => {
-    if (!pendingIntent) return;
-    if (!activeBrandId) {
-      toast.error("Connecte une marque avant de lancer une génération.");
+    if (uploadingSource) {
+      toast.error("Upload en cours. Patiente quelques secondes avant d’envoyer.");
       return;
     }
 
-    try {
-      setIsSending(true);
-      const result = await enqueueAlfieJob(pendingIntent);
-      setOrderId(result.orderId);
-      toast.success("Génération lancée ! Suis le statut ci-dessous.");
-      setPendingIntent(null);
+    const rawMessage = (override ?? input).trim();
+    const promptOverride = options?.promptOverride ? options.promptOverride.trim() : "";
+    const baseMessage = promptOverride.length > 0 ? promptOverride : rawMessage;
+    const trimmed = baseMessage.slice(0, MAX_INPUT_LEN);
+
+    if (!trimmed && !uploadedSource) return;
+    if (!activeBrandId) {
+      toast.error("Sélectionne une marque d'abord !");
+      return;
+    }
+
     const intent = options?.intentOverride ?? detectIntent(trimmed || rawMessage);
 
     if (!videoEnabled && (options?.forceTool === "generate_video" || intent === "video")) {
@@ -604,35 +563,7 @@ export default function AlfieChat() {
       assetUrl: uploadedSource ? uploadedSource.previewUrl || uploadedSource.url : undefined,
       metadata: uploadedSource ? { name: uploadedSource.name, signedUrl: uploadedSource.url } : undefined,
     });
-  }, [lastIntent]);
 
-  return (
-    <div className="p-4 space-y-4">
-      <div className="space-y-2">
-        {messages.map((m) => (
-          <div key={m.id} className={m.role === "user" ? "text-right" : "text-left"}>
-            <div className="inline-block rounded-xl px-3 py-2 border">
-              <pre className="whitespace-pre-wrap">{m.content}</pre>
-            </div>
-          </div>
-        ))}
-      </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const input = (e.currentTarget.elements.namedItem("chat") as HTMLInputElement) || null;
-          if (!input || !input.value.trim()) return;
-          void handleSend(input.value.trim());
-          input.value = "";
-        }}
-        className="flex gap-2"
-      >
-        <input name="chat" className="flex-1 border rounded-lg px-3 py-2" placeholder="Décris ce que tu veux créer…" />
-        <button type="submit" className="border rounded-lg px-3 py-2">
-          Envoyer
-        </button>
-      </form>
-    </div>
     // Commande /queue (monitoring)
     if (rawMessage.startsWith("/queue")) {
       try {
@@ -829,18 +760,10 @@ export default function AlfieChat() {
     if (mountedRef.current) {
       const errorDetails = lastError ? toErrorMessage(lastError) : "Erreur inconnue";
       addMessage({
-        id: generateId(),
         role: "assistant",
-        content: `C'est parti ! Tu peux suivre l'avancement depuis le Studio ou la Library.`,
-        createdAt: new Date().toISOString(),
+        content: "❌ Impossible de lancer la génération après plusieurs tentatives. Réessaie dans quelques instants.",
+        type: "text",
       });
-      await refreshStatuses(result.orderId);
-    } catch (error) {
-      console.error("[AlfieChat] enqueue failed", error);
-      const message = error instanceof Error ? error.message : "Impossible de lancer la génération.";
-      toast.error(message);
-    } finally {
-      setIsSending(false);
       toast.error(`Échec après 3 tentatives : ${errorDetails}`);
       if (lastError) {
         void captureException(lastError, { brandId: activeBrandId, jobId: orderId });
@@ -848,20 +771,12 @@ export default function AlfieChat() {
       setIsLoading(false);
       inFlightRef.current = false;
     }
-  }, [activeBrandId, addMessage, pendingIntent, refreshStatuses]);
+  };
 
-  const recapLines = useMemo(() => {
-    if (!pendingIntent) return [] as string[];
-    return [
-      `• Format: ${pendingIntent.ratio} — ${pendingIntent.kind}`,
-      `• Objectif: ${pendingIntent.goal}`,
-      `• Tone: ${pendingIntent.tone_pack}`,
-      `• Template: ${pendingIntent.templateId ?? "—"}`,
-      `• Contenu: "${pendingIntent.copyBrief}"`,
-    ];
-  }, [pendingIntent]);
+  const handleQuickReplyClick = useCallback(
+    async (reply: string) => {
+      if (isLoading || inFlightRef.current) return;
 
-  const hasCompletedAsset = assets.some((asset) => asset.status === "ready" || asset.status === "done");
       if (reply === "Voir la bibliothèque" && orderId) {
         window.open(`/library?order=${orderId}`, "_blank");
         return;
@@ -906,205 +821,378 @@ export default function AlfieChat() {
     [handleSend, isLoading, lastContext, orderId, planCarouselSlides, carouselEnabled, activeBrandId],
   );
 
+  // =====================
+  // Rendu
+  // =====================
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-      <div className="rounded-lg border p-6">
-        <div className="mb-4 space-y-3">
-          {messages.map((message) => (
-            <div key={message.id} className="space-y-2">
-              <div className="text-sm font-semibold text-muted-foreground">
-                {message.role === "assistant" ? "Alfie" : "Toi"}
-              </div>
-              <p className="whitespace-pre-line text-base text-foreground">{message.content}</p>
-              {message.quickReplies && message.quickReplies.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {message.quickReplies.map((reply) => (
-                    <Button key={reply} size="sm" variant="secondary" onClick={() => handleQuickReply(reply)}>
-                      {reply}
-                    </Button>
+    <div className="flex flex-col h-screen bg-background">
+      {/* Header */}
+      <CreateHeader />
+
+      {/* Quota Bar */}
+      {activeBrandId && <QuotaBar activeBrandId={activeBrandId} />}
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((message) => (
+          <div key={message.id} className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+            {message.role === "assistant" && (
+              <Avatar className="h-8 w-8 border-2 border-primary">
+                <AvatarFallback className="bg-primary text-primary-foreground">🐾</AvatarFallback>
+              </Avatar>
+            )}
+
+            <div
+              className={`max-w-[70%] rounded-lg p-3 ${
+                message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
+              }`}
+            >
+              {/* Message texte */}
+              {(!message.type || message.type === "text") && (
+                <div className="space-y-2">
+                  <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+
+                  {/* Reasoning */}
+                  {message.reasoning && (
+                    <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg mt-2 text-sm border border-purple-200 dark:border-purple-800">
+                      <div className="flex items-start gap-2">
+                        <span className="text-lg">💡</span>
+                        <div className="flex-1">
+                          <p className="font-semibold text-purple-900 dark:text-purple-100 mb-1">
+                            Pourquoi ce choix créatif ?
+                          </p>
+                          <p className="text-purple-700 dark:text-purple-300 text-xs leading-relaxed">
+                            {message.reasoning}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Alignement Brand Kit */}
+                  {message.brandAlignment && (
+                    <div className="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-lg mt-2 text-sm border border-emerald-200 dark:border-emerald-800">
+                      <div className="flex items-start gap-2">
+                        <span className="text-lg">🎨</span>
+                        <div className="flex-1">
+                          <p className="font-semibold text-emerald-900 dark:text-emerald-100 mb-1">
+                            Cohérence Brand Kit
+                          </p>
+                          <p className="text-emerald-700 dark:text-emerald-300 text-xs leading-relaxed">
+                            {message.brandAlignment}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {message.quickReplies && message.quickReplies.length > 0 && (
+                    <div className="mt-2">
+                      <div className="flex flex-wrap gap-2">
+                        {message.quickReplies.map((reply, idx) => (
+                          <Button
+                            key={idx}
+                            variant="outline"
+                            size="sm"
+                            disabled={isLoading}
+                            onClick={() => {
+                              void handleQuickReplyClick(reply);
+                            }}
+                            className="text-xs"
+                          >
+                            {reply}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {message.orderId && (!message.links || message.links.length === 0) && (
+                    <div className="mt-3">
+                      <Button asChild variant="link" className="px-0">
+                        <a href={`/studio?order=${message.orderId}`}>Voir dans Studio →</a>
+                      </Button>
+                    </div>
+                  )}
+
+                  {message.links && message.links.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {message.links.map((link, linkIdx) => (
+                        <Button key={linkIdx} asChild variant="link" className="px-0 text-xs">
+                          <a href={link.href} target="_blank" rel="noreferrer">
+                            {link.label} →
+                          </a>
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Message image */}
+              {message.type === "image" && message.assetUrl && (
+                <div className="space-y-2">
+                  <p className="text-sm">{message.content}</p>
+                  <img src={message.assetUrl} alt="Generated" className="rounded-lg w-full" />
+
+                  {/* Reasoning pour images */}
+                  {message.reasoning && (
+                    <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg text-sm border border-purple-200 dark:border-purple-800">
+                      <div className="flex items-start gap-2">
+                        <span className="text-lg">💡</span>
+                        <div className="flex-1">
+                          <p className="font-semibold text-purple-900 dark:text-purple-100 mb-1">
+                            Direction artistique
+                          </p>
+                          <p className="text-purple-700 dark:text-purple-300 text-xs leading-relaxed">
+                            {message.reasoning}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Message vidéo */}
+              {message.type === "video" && (
+                <div className="space-y-2">
+                  <p className="text-sm">{message.content}</p>
+                  {message.assetUrl && <video src={message.assetUrl} controls className="rounded-lg w-full" />}
+                  {message.metadata?.status === "processing" && <Loader2 className="h-4 w-4 animate-spin" />}
+                </div>
+              )}
+
+              {/* Message carrousel */}
+              {message.type === "carousel" && (
+                <div className="space-y-2">
+                  <p className="text-sm">{message.content}</p>
+                  {message.metadata?.total && message.metadata?.done ? (
+                    <Progress value={(Number(message.metadata.done) / Number(message.metadata.total)) * 100} className="w-full" />
+                  ) : null}
+                  {message.metadata?.assetUrls && Array.isArray(message.metadata.assetUrls) ? (
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      {message.metadata.assetUrls.map((entry: any, i: number) => (
+                          <img
+                            key={i}
+                            src={typeof entry === 'string' ? entry : entry.url}
+                            alt={`Asset ${i + 1}`}
+                            className="rounded-lg w-full"
+                          />
+                        ))}
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
+              {/* Message bulk carrousel */}
+              {message.type === "bulk-carousel" && message.bulkCarouselData && (
+                <div className="space-y-4 mt-4">
+                  {message.bulkCarouselData.carousels.map((carousel: any, idx: number) => (
+                    <div key={idx} className="border border-border rounded-lg p-4 bg-card">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-semibold text-lg">
+                          Carrousel {carousel.carousel_index}/{message.bulkCarouselData!.totalCarousels}
+                        </h3>
+                        {carousel.zip_url && (
+                          <Button size="sm" onClick={() => window.open(carousel.zip_url, "_blank")} className="gap-2">
+                            <Download className="w-4 h-4" />
+                            Télécharger ZIP
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Aperçu principal (1re slide + overlays si dispo) */}
+                      {carousel.slides?.[0] && (
+                        <div className="mb-3 rounded-lg overflow-hidden border border-border">
+                          <img
+                            src={(() => {
+                              const firstSlide = carousel.slides[0];
+                              if (firstSlide.cloudinary_public_id && firstSlide.text_json) {
+                                const cloudName =
+                                  extractCloudNameFromUrl(firstSlide.cloudinary_url) ||
+                                  (import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined);
+
+                                if (!cloudName) {
+                                  return firstSlide.cloudinary_url || firstSlide.storage_url;
+                                }
+
+                                try {
+                                  return slideUrl(firstSlide.cloudinary_public_id, {
+                                    title: firstSlide.text_json.title,
+                                    subtitle: firstSlide.text_json.subtitle,
+                                    bulletPoints: firstSlide.text_json.bullets,
+                                    aspectRatio: firstSlide.format || "4:5",
+                                    cloudName,
+                                  });
+                                } catch {
+                                  return firstSlide.cloudinary_url || firstSlide.storage_url;
+                                }
+                              }
+                              return firstSlide.cloudinary_url || firstSlide.storage_url;
+                            })()}
+                            alt={`Aperçu carrousel ${carousel.carousel_index}`}
+                            className="w-full object-cover"
+                            onError={(e) => {
+                              const firstSlide = carousel.slides[0];
+                              if (firstSlide.cloudinary_url?.startsWith("https://")) {
+                                (e.currentTarget as HTMLImageElement).src = firstSlide.cloudinary_url;
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {/* Grille de vignettes */}
+                      <div className="grid grid-cols-5 gap-2">
+                        {carousel.slides?.slice(0, 5).map((slide: any, slideIdx: number) => {
+                          const aspectClass = getAspectClass(slide.format || "4:5");
+
+                          const thumbUrl = (() => {
+                            if (slide.cloudinary_public_id && slide.text_json) {
+                              const cloudName =
+                                extractCloudNameFromUrl(slide.cloudinary_url) ||
+                                (import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined);
+
+                              if (!cloudName) {
+                                return slide.cloudinary_url || slide.storage_url;
+                              }
+
+                              try {
+                                return slideUrl(slide.cloudinary_public_id, {
+                                  title: slide.text_json.title,
+                                  subtitle: slide.text_json.subtitle,
+                                  bulletPoints: slide.text_json.bullets,
+                                  aspectRatio: slide.format || "4:5",
+                                  cloudName,
+                                });
+                              } catch {
+                                return slide.cloudinary_url || slide.storage_url;
+                              }
+                            }
+                            return slide.cloudinary_url || slide.storage_url;
+                          })();
+
+                          return (
+                            <div
+                              key={slideIdx}
+                              className={`relative ${aspectClass} rounded overflow-hidden border border-border`}
+                            >
+                              <img
+                                src={thumbUrl}
+                                alt={`Slide ${slideIdx + 1}`}
+                                className="absolute inset-0 w-full h-full object-cover"
+                                loading="lazy"
+                                onError={(e) => {
+                                  if (
+                                    slide.cloudinary_url &&
+                                    (e.currentTarget as HTMLImageElement).src !== slide.cloudinary_url
+                                  ) {
+                                    (e.currentTarget as HTMLImageElement).src = slide.cloudinary_url;
+                                  } else if (
+                                    slide.storage_url &&
+                                    (e.currentTarget as HTMLImageElement).src !== slide.storage_url
+                                  ) {
+                                    (e.currentTarget as HTMLImageElement).src = slide.storage_url;
+                                  }
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
             </div>
-          ))}
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <TextareaAutosize
-            minRows={2}
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            placeholder={`Ex: Carrousel 5 slides pour ${brandName}, objectif lead avec CTA "Demander une démo"`}
-            className="w-full resize-none rounded-md border bg-background p-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            disabled={isSending}
-          />
-          <div className="flex justify-end">
-            <Button type="submit" disabled={isSending || !input.trim()}>
-              Envoyer
-            </Button>
+
+            {message.role === "user" && (
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-secondary text-secondary-foreground">
+                  {user?.email?.charAt(0).toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+            )}
           </div>
-        </form>
+        ))}
+        <div ref={messagesEndRef} />
       </div>
 
-      {pendingIntent && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Récap de ta création</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-1 text-sm text-muted-foreground">
-              {recapLines.map((line) => (
-                <p key={line}>{line}</p>
-              ))}
-            </div>
-            <div className="flex gap-3">
-              <Button onClick={handleConfirmIntent} disabled={isSending}>
-                Oui, lancer
-              </Button>
-              <Button type="button" variant="outline" onClick={handleCancelRecap} disabled={isSending}>
-                Modifier
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {orderId && (
-        <StatusPanel
-          orderId={orderId}
-          jobs={jobs}
-          assets={assets}
-          hasPreview={hasCompletedAsset}
-        />
-      )}
-
-      {quickReplies.length > 0 && !pendingIntent && (
-        <div className="flex flex-wrap gap-2">
-          {quickReplies.map((reply) => (
-            <Button key={reply} size="sm" variant="outline" onClick={() => handleQuickReply(reply)}>
-              {reply}
+      {/* Composer */}
+      <div className="border-t bg-background p-4">
+        {uploadedSource && (
+          <div className="mb-2 relative inline-block">
+            {uploadedSource.type === "image" ? (
+              <img
+                src={uploadedSource.previewUrl || uploadedSource.url}
+                alt="Média uploadé"
+                className="h-20 rounded-lg border object-cover"
+              />
+            ) : (
+              <video
+                src={uploadedSource.previewUrl || uploadedSource.url}
+                className="h-20 rounded-lg border object-cover"
+                muted
+                loop
+                playsInline
+              />
+            )}
+            <Button
+              size="sm"
+              variant="destructive"
+              className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+              onClick={clearUploadedSource}
+              aria-label="Retirer le média"
+              title="Retirer le média"
+            >
+              <span aria-hidden>×</span>
             </Button>
-          ))}
+          </div>
+        )}
+
+        <div className="flex gap-2 items-end">
+          <input type="file" ref={fileInputRef} className="hidden" accept="image/*,video/*" onChange={handleFileUpload} />
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading || uploadingSource}
+            aria-label="Importer un média"
+            title="Importer un média"
+          >
+            {uploadingSource ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+          </Button>
+
+          <TextareaAutosize
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter sans Shift OU Ctrl/Cmd+Enter => envoyer
+              if ((e.key === "Enter" && !e.shiftKey) || ((e.metaKey || e.ctrlKey) && e.key === "Enter")) {
+                e.preventDefault();
+                void handleSend();
+              }
+            }}
+            placeholder="Décris ce que tu veux créer..."
+            className="flex-1 resize-none rounded-lg border bg-background px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            minRows={1}
+            maxRows={5}
+            disabled={isLoading}
+          />
+
+          <Button
+            onClick={() => void handleSend()}
+            disabled={isLoading || uploadingSource || (!input.trim() && !uploadedSource)}
+            size="icon"
+            aria-label="Envoyer"
+            title="Envoyer"
+          >
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </Button>
         </div>
-      )}
+      </div>
     </div>
   );
-}
-
-interface StatusPanelProps {
-  orderId: string;
-  jobs: AlfieJobStatus[];
-  assets: LibraryAsset[];
-  hasPreview: boolean;
-}
-
-interface StatusPanelProps {
-  orderId: string;
-  jobs: AlfieJobStatus[];
-  assets: LibraryAsset[];
-  hasPreview: boolean;
-}
-
-function StatusPanel({ orderId, jobs, assets, hasPreview }: StatusPanelProps) {
-  const primaryStatus = jobs[0]?.status ?? "queued";
-  const statusLabel = statusToLabel(primaryStatus);
-  const studioHref = studioLink(orderId);
-  const libraryHref = libraryLink(orderId);
-
-
-function StatusPanel({ orderId, jobs, assets, hasPreview }: StatusPanelProps) {
-  const primaryStatus = jobs[0]?.status ?? "queued";
-  const statusLabel = statusToLabel(primaryStatus);
-  const studioHref = studioLink(orderId);
-  const libraryHref = libraryLink(orderId);
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle>Statuts de la génération</CardTitle>
-        <Badge variant="outline">{statusLabel}</Badge>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex gap-3">
-          <Button variant="secondary" asChild>
-            <a href={studioHref} target="_blank" rel="noreferrer">
-              Ouvrir Studio
-            </a>
-          </Button>
-          <Button variant="outline" asChild>
-            <a href={libraryHref} target="_blank" rel="noreferrer">
-              Voir Library
-            </a>
-          </Button>
-        </div>
-        <Separator />
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold">Historique</h4>
-          <div className="space-y-2 text-sm text-muted-foreground">
-            {jobs.map((job) => (
-              <div key={job.id} className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-foreground">{job.type}</span>
-                  <Badge variant="secondary">{statusToLabel(job.status)}</Badge>
-                </div>
-                {job.errorMessage && <p className="text-destructive">{job.errorMessage}</p>}
-                {job.events.slice(0, 3).map((event) => (
-                  <p key={event.id} className="text-xs">
-                    {new Date(event.createdAt).toLocaleTimeString()} — {event.kind}
-                    {event.message ? ` · ${event.message}` : ""}
-                  </p>
-                ))}
-              </div>
-            ))}
-            {jobs.length === 0 && <p>Aucun job enregistré pour cette commande.</p>}
-          </div>
-        </div>
-        <Separator />
-        <div className="space-y-2">
-          <h4 className="text-sm font-semibold">Assets générés</h4>
-          {hasPreview ? (
-            <ul className="space-y-1 text-sm text-muted-foreground">
-              {assets.map((asset) => (
-                <li key={asset.id}>
-                  {asset.kind} — {asset.status} {asset.previewUrl && "·"}{" "}
-                  {asset.previewUrl && (
-                    <a
-                      href={asset.previewUrl}
-                      className="text-primary hover:underline"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Prévisualiser
-                    </a>
-                  )}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-muted-foreground">Aucun média généré pour l'instant.</p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function statusToLabel(status: string): string {
-  switch (status) {
-    case "queued":
-    case "pending":
-      return "En attente";
-    case "processing":
-    case "running":
-    case "rendering":
-      return "En cours";
-    case "done":
-    case "completed":
-    case "succeeded":
-      return "Terminé";
-    case "failed":
-    case "error":
-      return "En échec";
-    default:
-      return status;
-  }
 }

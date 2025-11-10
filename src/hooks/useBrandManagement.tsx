@@ -10,20 +10,6 @@ import {
 
 export type BrandTier = "starter" | "pro" | "studio";
 
-type LovableInviteResponse = {
-  ok?: boolean;
-  error?: string | null;
-};
-
-function isLovableInviteResponse(value: unknown): value is LovableInviteResponse {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Record<string, unknown>;
-  const { ok, error } = candidate;
-  const okValid = ok === undefined || typeof ok === "boolean";
-  const errorValid = error === undefined || typeof error === "string" || error === null;
-  return okValid && errorValid;
-}
-
 export function useBrandManagement() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -238,9 +224,9 @@ export function useBrandManagement() {
         const pid = resolveLovableProjectId(projectId);
         if (!pid) throw new Error("ProjectId manquant");
 
-        const result = await inviteProjectCollaborator<LovableInviteResponse>(pid, email);
-        if (!isLovableInviteResponse(result) || result.ok !== true) {
-          const msg = isLovableInviteResponse(result) && result.error ? result.error : "Invitation échouée";
+        const result = await inviteProjectCollaborator(pid, email);
+        if (!result?.ok) {
+          const msg = result?.error ?? "Invitation échouée";
           throw new Error(msg);
         }
 
