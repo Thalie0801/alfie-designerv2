@@ -12,7 +12,6 @@ on:
       - '**/*.json'
       - '**/*.css'
       - 'package.json'
-      - 'package-lock.json'
       - 'pnpm-lock.yaml'
       - 'bun.lockb'
       - 'tsconfig*.json'
@@ -32,7 +31,6 @@ on:
       - '**/*.json'
       - '**/*.css'
       - 'package.json'
-      - 'package-lock.json'
       - 'pnpm-lock.yaml'
       - 'bun.lockb'
       - 'tsconfig*.json'
@@ -58,7 +56,7 @@ env:
 
 jobs:
   install:
-    name: Install deps (with cache)
+    name: Install deps (pnpm + cache)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -68,31 +66,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          cache: 'pnpm'
 
-      - name: Force public npm registry
-        run: npm config set registry https://registry.npmjs.org/
-
-      - name: Cache node_modules
-        id: cache-node-modules
-        uses: actions/cache@v4
+      - name: Setup pnpm (exact)
+        uses: pnpm/action-setup@v4
         with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            node-modules-${{ runner.os }}-
+          version: 9.12.2
+          run_install: false
 
-      - name: Install dependencies (robust)
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
-        run: |
-          set -euxo pipefail
-          if [ -f package-lock.json ]; then
-            npm ci --prefer-offline --no-audit --no-fund \
-            || npm ci --prefer-offline --no-audit --no-fund --legacy-peer-deps \
-            || npm install --prefer-online --no-audit --no-fund --legacy-peer-deps
-          else
-            npm install --prefer-online --no-audit --no-fund --legacy-peer-deps
-          fi
+      - name: Force public registry
+        run: pnpm config set registry https://registry.npmjs.org/
+
+      - name: Install dependencies (frozen)
+        run: pnpm install --frozen-lockfile
 
       - name: Cache Vite build
         uses: actions/cache@v4
@@ -100,9 +86,9 @@ jobs:
           path: |
             dist
             node_modules/.vite
-          key: vite-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
+          key: vite-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
           restore-keys: |
-            vite-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+            vite-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
 
   typecheck:
     name: TypeScript
@@ -117,19 +103,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Restore node_modules cache
-        uses: actions/cache@v4
+          cache: 'pnpm'
+      - uses: pnpm/action-setup@v4
         with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          version: 9.12.2
+          run_install: false
 
-      - name: Type check
+      - name: Install deps (reuse lock)
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check (scopé)
         id: tsc
         run: |
           set -o pipefail
-          npm run typecheck 2>&1 | tee typecheck.txt
+          pnpm run typecheck 2>&1 | tee typecheck.txt
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
           exit ${PIPESTATUS[0]}
 
@@ -197,20 +184,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Restore node_modules cache
-        uses: actions/cache@v4
+          cache: 'pnpm'
+      - uses: pnpm/action-setup@v4
         with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          version: 9.12.2
+          run_install: false
+
+      - name: Install deps (reuse lock)
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
         id: lint
         continue-on-error: true
         run: |
           set -o pipefail
-          npm run lint 2>&1 | tee lint.txt
+          pnpm run lint 2>&1 | tee lint.txt
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
           exit ${PIPESTATUS[0]}
 
@@ -266,13 +254,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Restore node_modules cache
-        uses: actions/cache@v4
+          cache: 'pnpm'
+      - uses: pnpm/action-setup@v4
         with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          version: 9.12.2
+          run_install: false
+
+      - name: Install deps (reuse lock)
+        run: pnpm install --frozen-lockfile
 
       - name: Restore Vite cache
         uses: actions/cache@v4
@@ -280,12 +269,12 @@ jobs:
           path: |
             dist
             node_modules/.vite
-          key: vite-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
+          key: vite-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
 
       - name: Build
         id: build
         run: |
-          npm run build
+          pnpm run build
           echo "Build completed successfully"
 
       - name: Check build output
@@ -322,9 +311,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.2
+          run_install: false
 
       - name: Verify try/catch hygiene
-        run: npm run verify:trycatch
+        run: pnpm run verify:trycatch
 
       - name: Summarize results
         run: |

@@ -1,9 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Fail si des occurrences interdites (ancienne logique Canva push / auto-pub) subsistent dans le code (hors node_modules et docs)
-echo "[validate] scanning repository…"
-if git grep -nE "(push.*canva|auto.?publish)" -- ':!node_modules' ':!docs' ':!*.md' ':!.github/workflows/*.yml' | grep -vE 'scripts/codex/refonte-codemod.js' ; then
-  echo "::error::Des références push/publish subsistent. La V1 est PULL uniquement (Canva + ZIP)."
+
+FILES=$(git ls-files \
+  | grep -E '\.(ts|tsx|js|jsx)$' \
+  | grep -vE '(\.spec\.|\.test\.|/tests/)' \
+  | grep -v '^scripts/codex/')
+FAIL=0
+
+for f in $FILES; do
+  CONTENT=$(sed -E '/^\s*\/\//d; s/\/\*.*\*\///g' "$f")
+  echo "$CONTENT" | grep -nE '\brouter\.push\s*\(' >/dev/null && { echo "$f: contient router.push("; FAIL=1; }
+  echo "$CONTENT" | grep -nE '\bpublish\b' >/dev/null && { echo "$f: contient publish"; FAIL=1; }
+done
+
+if [ $FAIL -eq 1 ]; then
+  echo "Error: Des références interdites subsistent (router.push|publish)."
   exit 1
 fi
+
 echo "[validate] OK"
