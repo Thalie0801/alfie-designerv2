@@ -28,19 +28,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
+          cache: 'npm'
 
-      - name: Setup pnpm (exact)
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.2
-          run_install: false
-
-      - name: Force public registry
-        run: pnpm config set registry https://registry.npmjs.org/
+      - name: Force public npm registry
+        run: npm config set registry https://registry.npmjs.org/
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci --prefer-offline --no-audit --no-fund || npm install --no-audit --no-fund
 
       - name: Run Codex script
         shell: bash
@@ -81,7 +75,6 @@ jobs:
           fi
           echo "OK: aucune modification dans apps/landing, www ou site."
 
-      # ---- PR seulement si changements + pas depuis un event PR ----
       - name: Create Pull Request
         if: steps.diff.outputs.has_changes == 'true' && github.event_name != 'pull_request'
         uses: peter-evans/create-pull-request@v6
@@ -100,6 +93,4 @@ jobs:
           labels: |
             automated
             codex
-          draft: false
-
           draft: false
