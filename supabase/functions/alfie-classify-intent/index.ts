@@ -63,12 +63,13 @@ function isApproval(msg: string): boolean {
 /** Extraction d’un aspect-ratio dans un texte libre */
 function extractAspectRatio(msg: string): "1:1" | "4:5" | "9:16" | "16:9" | undefined {
   // tolère 1:1, 1/1, 1-1, 1 1 ; idem pour 4:5, 9:16, 16:9
+  const ratioRegex = /\b(?:1\s*(?:[:/]|-)\s*1|4\s*(?:[:/]|-)\s*5|9\s*(?:[:/]|-)\s*16|16\s*(?:[:/]|-)\s*9)\b/;
   const ratioRegex = /\b(1\s*[:\/-]\s*1|4\s*[:\/-]\s*5|9\s*[:\/-]\s*16|16\s*[:\/-]\s*9)\b/;
   const ratioRegex = /\b(1\s*[:/-]\s*1|4\s*[:/-]\s*5|9\s*[:/-]\s*16|16\s*[:/-]\s*9)\b/;
   const m = msg.match(ratioRegex);
   if (!m) return undefined;
   const raw = m[1].replace(/\s+/g, "");
-  const norm = raw.replace("/", ":").replace("-", ":");
+  const norm = raw.replace(/[/-]/g, ":");
   const allowed = ["1:1", "4:5", "9:16", "16:9"] as const;
   return (allowed.find((r) => r === norm) as any) ?? undefined;
 }

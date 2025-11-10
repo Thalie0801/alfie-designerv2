@@ -1,5 +1,7 @@
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
+const BRAND_NAME_PATTERN = /^[\p{L}\p{N}\s._'-]+$/u;
+
 // Validation schemas for edge functions
 
 export const CreateUserBody = z.object({
@@ -88,6 +90,7 @@ export const CheckoutSchema = z.object({
     .trim()
     .min(1, 'Nom de marque requis')
     .max(100, 'Nom de marque trop long (max 100 caractères)')
+    .regex(BRAND_NAME_PATTERN, 'Nom de marque contient des caractères non autorisés')
     .regex(/^[a-zA-Z0-9\s._'-]+$/, 'Nom de marque contient des caractères non autorisés')
     .optional()
     .or(z.literal('')),

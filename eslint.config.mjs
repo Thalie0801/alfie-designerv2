@@ -206,6 +206,7 @@ export default [
     },
     rules: {}
   },
+  // ⬇️ Supabase Edge Functions (Deno runtime)
   {
     files: ['supabase/functions/**/*.{ts,tsx}'],
     languageOptions: {
@@ -224,6 +225,10 @@ export default [
     rules: {
       'no-undef': 'off',
       'no-empty': ['error', { allowEmptyCatch: true }],
+      'no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_$', varsIgnorePattern: '^(_|__|_[A-Za-z].*)$' }
+      ]
       'no-unused-vars': ['warn', {
         argsIgnorePattern: '^_$',
         varsIgnorePattern: '^(_|__|_[A-Za-z].*)$'

@@ -971,8 +971,8 @@ serve(async (req) => {
             }
           }
         }
-      } catch (cleanupErr) {
-        console.error('❌ [Worker] Failed to mark job as failed:', cleanupErr);
+      } catch (cleanupError) {
+        console.error('❌ [Worker] Failed to mark job as failed:', cleanupError);
       }
     }
     
@@ -990,8 +990,8 @@ serve(async (req) => {
         await supabase.rpc('release_process_job_worker_mutex', {
           p_owner: lockOwner,
         });
-      } catch (releaseErr) {
-        console.error('❌ [Worker] Failed to release mutex:', releaseErr);
+      } catch (releaseError) {
+        console.error('❌ [Worker] Failed to release mutex:', releaseError);
       }
     }
   }
