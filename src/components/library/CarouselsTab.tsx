@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 interface CarouselSlide {
   id: string;
   cloudinary_url: string;
+  secure_url?: string | null;
+  preview_url?: string | null;
   slide_index: number | null;
   carousel_id: string | null;
   order_id: string | null;
@@ -30,13 +32,14 @@ interface CarouselSlide {
     cloudinary_base_url?: string;
     [k: string]: any;
   } | null;
+  meta?: Record<string, any> | null;
   // champs possibles selon ta table
   user_id?: string;
   brand_id?: string;
 }
 
 function resolveCloudName(slide: CarouselSlide): string | undefined {
-  const fromUrl = extractCloudNameFromUrl(slide.cloudinary_url);
+  const fromUrl = extractCloudNameFromUrl(slide.secure_url || slide.cloudinary_url);
   const fromMeta = extractCloudNameFromUrl(slide.metadata?.cloudinary_base_url || "");
   const fromEnv = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined;
   return fromUrl || fromMeta || fromEnv;
@@ -90,7 +93,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
       let query = supabase
         .from("library_assets")
         .select(
-          "id, cloudinary_url, cloudinary_public_id, metadata, text_json, slide_index, carousel_id, order_id, created_at, format, user_id, brand_id",
+          "id, cloudinary_url, secure_url, preview_url, cloudinary_public_id, metadata, meta, text_json, slide_index, carousel_id, order_id, created_at, format, user_id, brand_id",
         )
         .eq("user_id", user.id)
         .eq("type", "carousel_slide")
@@ -279,7 +282,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
 
   // Ouverture individuelle (throttle simple pour éviter les bloqueurs)
   const openIndividually = useCallback((arr: CarouselSlide[]) => {
-    const urls = arr.map((s) => s.cloudinary_url).filter(Boolean);
+    const urls = arr.map((s) => s.secure_url || s.cloudinary_url).filter(Boolean) as string[];
     if (!urls.length) return;
     let i = 0;
     const step = () => {
@@ -366,7 +369,8 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {carouselSlides.map((slide) => {
               const aspect = aspectClassFor(slide.format);
-              const base = slide.cloudinary_url ?? "";
+              const assetUrl = slide.secure_url || slide.cloudinary_url || "";
+              const base = slide.preview_url || assetUrl;
               const canOverlay = Boolean(slide.cloudinary_public_id && slide.text_json);
               const cloudName = canOverlay ? resolveCloudName(slide) : undefined;
 
@@ -394,9 +398,9 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                     className={cn("w-full rounded-lg object-cover border", aspect)}
                     loading="lazy"
                     onError={(e) => {
-                      if (base?.startsWith("https://") && e.currentTarget.src !== base) {
-                        console.warn("[CarouselsTab] overlay failed, fallback base:", e.currentTarget.src);
-                        e.currentTarget.src = base;
+                      if (assetUrl?.startsWith("https://") && e.currentTarget.src !== assetUrl) {
+                        console.warn("[CarouselsTab] overlay failed, fallback asset:", e.currentTarget.src);
+                        e.currentTarget.src = assetUrl;
                       }
                     }}
                   />
@@ -406,7 +410,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
                     <Button
                       size="sm"
-                      onClick={() => window.open(base, "_blank")}
+                    onClick={() => window.open(assetUrl, "_blank")}
                       aria-label="Ouvrir la slide dans un nouvel onglet"
                     >
                       <Download className="h-4 w-4" />

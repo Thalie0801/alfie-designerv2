@@ -6,10 +6,27 @@ import { useAuth } from '@/hooks/useAuth';
 export type QueueMonitorPayload = {
   ok: boolean;
   now: string;
-  counts: { queued: number; running: number; failed: number; completed?: number; completed_24h?: number };
+  counts: {
+    queued: number;
+    processing: number;
+    error: number;
+    done?: number;
+    done_24h?: number;
+    retrying?: number;
+  };
   backlogSeconds: number | null;
   stuck: { runningStuckCount: number; thresholdSec: number };
-  recent: Array<{ id: string; type: string; status: string; error?: string | null; retry: string; updated_at: string }>;
+  recent: Array<{
+    id: string;
+    type: string;
+    kind?: string;
+    status: string;
+    error?: string | null;
+    retry: string;
+    attempts?: number;
+    max_attempts?: number;
+    updated_at: string;
+  }>;
   scope: 'user' | 'global';
 };
 

@@ -17,6 +17,24 @@ import { JobCard } from "./components/JobCard";
 import { AssetCard as StudioAssetCard } from "./components/AssetCard";
 import type { JobEntry, MediaEntry } from "./types";
 
+const inferKindFromType = (type?: string): "image" | "carousel" | "video" => {
+  switch (type) {
+    case "render_carousels":
+    case "generate_carousel":
+    case "carousel":
+      return "carousel";
+    case "generate_video":
+    case "render_video":
+    case "video":
+      return "video";
+    case "render_images":
+    case "generate_images":
+    case "generate_image":
+    default:
+      return "image";
+  }
+};
+
 type GeneratedAsset = {
   url: string;
   type: "image" | "video";
@@ -188,14 +206,18 @@ export function ChatGenerator() {
 
       let jobsQuery = supabase
         .from("job_queue")
-        .select("id, type, status, order_id, created_at, updated_at, error, payload, user_id, retry_count")
+        .select(
+          "id, type, kind, status, brand_id, order_id, created_at, updated_at, error, payload, user_id, retry_count, attempts, max_attempts"
+        )
         .eq("user_id", currentUser.id)
         .order("created_at", { ascending: false })
         .limit(50);
 
       let assetsQuery = supabase
         .from("library_assets")
-        .select("id, type, cloudinary_url, created_at, brand_id, order_id, metadata")
+        .select(
+          "id, type, kind, cloudinary_url, secure_url, preview_url, created_at, brand_id, order_id, metadata, meta"
+        )
         .eq("user_id", currentUser.id)
         .order("created_at", { ascending: false })
         .limit(50);
@@ -294,12 +316,18 @@ export function ChatGenerator() {
           throw new Error("Impossible de relancer ce job sans payload");
         }
 
-        const { error: insertError } = await supabase.from("job_queue").insert([{
-          order_id: job.order_id,
-          type: job.type,
-          status: "queued" as const,
-          payload,
-        }] as any);
+        const payloadObj = payload as Record<string, any>;
+
+        const { error: insertError } = await supabase.from("job_queue").insert([
+          {
+            order_id: job.order_id,
+            brand_id: job.brand_id ?? payloadObj?.brandId ?? payloadObj?.brand_id ?? 'unassigned',
+            type: job.type,
+            kind: job.kind ?? inferKindFromType(job.type),
+            status: "queued" as const,
+            payload: payloadObj,
+          },
+        ] as any);
 
         if (insertError) throw insertError;
 
@@ -584,18 +612,24 @@ export function ChatGenerator() {
                   <strong>{queueData.counts.queued}</strong> en attente
                 </span>
                 <span className="text-sm">
-                  <strong>{queueData.counts.running}</strong> en cours
+                  <strong>{queueData.counts.processing}</strong> en cours
                 </span>
-                {queueData.counts.failed > 0 && (
+                {queueData.counts.retrying ? (
+                  <span className="text-sm text-amber-600">
+                    <AlertCircle className="inline w-3 h-3 mr-1" />
+                    <strong>{queueData.counts.retrying}</strong> en relance
+                  </span>
+                ) : null}
+                {queueData.counts.error > 0 && (
                   <span className="text-sm text-destructive">
                     <AlertCircle className="inline w-3 h-3 mr-1" />
-                    <strong>{queueData.counts.failed}</strong> échecs
+                    <strong>{queueData.counts.error}</strong> erreurs
                   </span>
                 )}
-                {queueData.counts.completed_24h !== undefined && (
+                {queueData.counts.done_24h !== undefined && (
                   <span className="text-sm text-muted-foreground">
                     <CheckCircle2 className="inline w-3 h-3 mr-1" />
-                    {queueData.counts.completed_24h} générés (24h)
+                    {queueData.counts.done_24h} générés (24h)
                   </span>
                 )}
               </div>
@@ -881,11 +915,13 @@ export function ChatGenerator() {
             ) : (
               <div className="space-y-4">
                 {assets.map((item) => {
-                  const metadata = (item.metadata ?? {}) as Record<string, unknown>;
+                  const metadata = (item.metadata ?? item.meta ?? {}) as Record<string, unknown>;
                   const previewUrl =
+                    item.preview_url ??
                     (typeof metadata.thumbnail_url === "string" ? metadata.thumbnail_url : null) ??
                     (typeof metadata.preview_url === "string" ? metadata.preview_url : null) ??
                     item.cloudinary_url ??
+                    item.secure_url ??
                     undefined;
                   const assetStatus =
                     (typeof metadata.status === "string" ? metadata.status : null) ?? item.status ?? "done";
@@ -903,7 +939,7 @@ export function ChatGenerator() {
                         status: assetStatus,
                         createdAt: formatDate(item.created_at),
                         previewUrl,
-                        assetUrl: item.cloudinary_url ?? undefined,
+                        assetUrl: item.secure_url ?? item.cloudinary_url ?? undefined,
                         downloadUrl,
                         videoUrl,
                         woofs,

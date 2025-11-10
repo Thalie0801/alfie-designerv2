@@ -1005,10 +1005,14 @@ export type Database = {
       }
       job_queue: {
         Row: {
+          attempts: number
+          brand_id: string
           created_at: string
           error: string | null
           id: string
           idempotency_key: string | null
+          kind: string
+          max_attempts: number
           max_retries: number
           order_id: string | null
           payload: Json
@@ -1020,10 +1024,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          attempts?: number
+          brand_id?: string
           created_at?: string
           error?: string | null
           id?: string
           idempotency_key?: string | null
+          kind?: string
+          max_attempts?: number
           max_retries?: number
           order_id?: string | null
           payload: Json
@@ -1035,10 +1043,14 @@ export type Database = {
           user_id: string
         }
         Update: {
+          attempts?: number
+          brand_id?: string
           created_at?: string
           error?: string | null
           id?: string
           idempotency_key?: string | null
+          kind?: string
+          max_attempts?: number
           max_retries?: number
           order_id?: string | null
           payload?: Json
@@ -1191,14 +1203,20 @@ export type Database = {
       library_assets: {
         Row: {
           brand_id: string | null
+          bytes: number | null
           campaign: string | null
           carousel_id: string | null
+          height: number | null
+          meta: Json | null
+          metadata: Json | null
           cloudinary_public_id: string | null
           cloudinary_url: string
           created_at: string | null
           format: string | null
           id: string
-          metadata: Json | null
+          preview_url: string | null
+          public_id: string | null
+          secure_url: string | null
           order_id: string | null
           order_item_id: string | null
           slide_index: number | null
@@ -1207,17 +1225,24 @@ export type Database = {
           type: string
           updated_at: string | null
           user_id: string
+          width: number | null
         }
         Insert: {
           brand_id?: string | null
+          bytes?: number | null
           campaign?: string | null
           carousel_id?: string | null
+          height?: number | null
+          meta?: Json | null
+          metadata?: Json | null
           cloudinary_public_id?: string | null
           cloudinary_url: string
           created_at?: string | null
           format?: string | null
           id?: string
-          metadata?: Json | null
+          preview_url?: string | null
+          public_id?: string | null
+          secure_url?: string | null
           order_id?: string | null
           order_item_id?: string | null
           slide_index?: number | null
@@ -1226,17 +1251,24 @@ export type Database = {
           type: string
           updated_at?: string | null
           user_id: string
+          width?: number | null
         }
         Update: {
           brand_id?: string | null
+          bytes?: number | null
           campaign?: string | null
           carousel_id?: string | null
+          height?: number | null
+          meta?: Json | null
+          metadata?: Json | null
           cloudinary_public_id?: string | null
           cloudinary_url?: string
           created_at?: string | null
           format?: string | null
           id?: string
-          metadata?: Json | null
+          preview_url?: string | null
+          public_id?: string | null
+          secure_url?: string | null
           order_id?: string | null
           order_item_id?: string | null
           slide_index?: number | null
@@ -1245,6 +1277,7 @@ export type Database = {
           type?: string
           updated_at?: string | null
           user_id?: string
+          width?: number | null
         }
         Relationships: [
           {
