@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import {
-  LayoutDashboard, 
+  LayoutDashboard,
   CreditCard,
   TrendingUp,
   Settings,
@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import alfieMain from '@/assets/alfie-main.png';
+import { FLAGS } from '@/config/flags';
 
 export function AppSidebar() {
   const { open, isMobile } = useSidebar();
@@ -47,8 +48,12 @@ export function AppSidebar() {
     tourId?: string;
   }> = [
     { path: '/chat', label: 'Chat Alfie', icon: MessageCircle, tourId: 'chat' },
-    { path: '/studio', label: 'Studio', icon: Sparkles, tourId: 'studio' },
-    { path: '/templates', label: 'Catalogue', icon: Layers, badge: 'Bientôt' },
+    ...(FLAGS.DESIGN_API
+      ? [{ path: '/studio', label: 'Studio', icon: Sparkles, tourId: 'studio' }]
+      : []),
+    ...(FLAGS.CAROUSEL
+      ? [{ path: '/templates', label: 'Catalogue', icon: Layers, badge: 'Bientôt' }]
+      : []),
     { path: '/library', label: 'Bibliothèque', icon: FolderOpen, tourId: 'library' },
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/profile', label: 'Profil', icon: UserCircle },

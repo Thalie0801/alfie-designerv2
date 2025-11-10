@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseSafeClient';
 import { useAuth } from '@/hooks/useAuth';
 import { safeString } from '@/lib/safeRender';
+import { setBrandContext } from '@/observability/sentry';
 
 export interface BrandKit {
   id?: string;
@@ -73,6 +74,7 @@ export function useBrandKit() {
 
       const activeId = profileData?.active_brand_id || brandsData?.[0]?.id || null;
       setActiveBrandId(activeId);
+      setBrandContext(activeId);
 
       // Update profile if no active brand set but brands exist
       if (!profileData?.active_brand_id && brandsData?.length) {
@@ -100,6 +102,7 @@ export function useBrandKit() {
       if (error) throw error;
       
       setActiveBrandId(brandId);
+      setBrandContext(brandId);
     } catch (error) {
       console.error('Error setting active brand:', error);
       throw error;
@@ -107,6 +110,9 @@ export function useBrandKit() {
   };
 
   const activeBrand = brands.find(b => b.id === activeBrandId);
+  useEffect(() => {
+    setBrandContext(activeBrandId);
+  }, [activeBrandId]);
   
   // Convert active brand to BrandKit format for backward compatibility
   const brandKit: BrandKit | null = activeBrand ? {

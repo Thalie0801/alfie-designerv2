@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 
 import App from './App';
 import './index.css';
+import { initSentry, captureException } from '@/observability/sentry';
 
 function enforceIframeSandboxPolicy() {
   if (typeof document === 'undefined') return;
@@ -70,6 +71,7 @@ function enforceIframeSandboxPolicy() {
 }
 
 enforceIframeSandboxPolicy();
+initSentry();
 
 if (import.meta.env.DEV) {
   console.info('[ENV]', {
@@ -92,6 +94,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
     console.error('Runtime error:', error);
     console.error('Component stack:', errorInfo.componentStack);
     console.error('Error type:', error.name, 'Message:', error.message);
+    void captureException(error, { extra: { componentStack: errorInfo.componentStack } });
   }
 
   render() {
