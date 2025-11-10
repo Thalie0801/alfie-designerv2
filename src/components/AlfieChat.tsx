@@ -40,6 +40,11 @@ function detectIntent(message: string): "video" | "default" {
 
 type Message = {
   id: string;
+  role: "user" | "assistant";
+  content: string;
+  quickReplies?: string[];
+};
+
   role: "user" | "assistant" | "system";
   content: string;
   createdAt: string;
@@ -196,6 +201,7 @@ export function AlfieChat() {
   const brandName = brandKit?.name ?? "ta marque";
 
   const addMessage = useCallback((message: Message) => {
+    setMessages((current) => [...current, message]);
     const withTimestamp: Message = {
       ...message,
       createdAt: message.createdAt ?? new Date().toISOString(),
@@ -222,6 +228,9 @@ export function AlfieChat() {
     }
   }, [orderTotal]);
 
+      addMessage({ id: generateId(), role: "user", content: trimmed });
+      setInput("");
+      setIsSending(true);
   useEffect(() => {
     setJobContext(orderId);
   }, [orderId]);
@@ -235,6 +244,19 @@ export function AlfieChat() {
         const route = routeUserMessage(trimmed, {
           brandId: activeBrandId,
           baseIntent: lastIntent ?? undefined,
+        });
+
+        if (route.kind === "reply") {
+          addMessage({ id: generateId(), role: "assistant", content: route.text, quickReplies: route.quickReplies });
+          setQuickReplies(route.quickReplies ?? []);
+          setPendingIntent(null);
+          return;
+        }
+
+        setQuickReplies([]);
+        setPendingIntent(route.intent);
+        setLastIntent(route.intent);
+        addMessage({ id: generateId(), role: "assistant", content: route.text });
         });
 
         if (route.kind === "reply") {
@@ -885,6 +907,13 @@ interface StatusPanelProps {
   assets: LibraryAsset[];
   hasPreview: boolean;
 }
+
+function StatusPanel({ orderId, jobs, assets, hasPreview }: StatusPanelProps) {
+  const primaryStatus = jobs[0]?.status ?? "queued";
+  const statusLabel = statusToLabel(primaryStatus);
+  const studioHref = studioLink(orderId);
+  const libraryHref = libraryLink(orderId);
+
 
 function StatusPanel({ orderId, jobs, assets, hasPreview }: StatusPanelProps) {
   const primaryStatus = jobs[0]?.status ?? "queued";
