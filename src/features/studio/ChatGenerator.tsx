@@ -67,26 +67,39 @@ const ASPECT_TO_TW: Record<AspectRatio, string> = {
 const UNKNOWN_REFRESH_ERROR = "Erreur inconnue pendant le rafraîchissement";
 
 function resolveRefreshErrorMessage(error: unknown): string {
-  if (!error) return UNKNOWN_REFRESH_ERROR;
-
-  if (error instanceof Error && error.message?.trim()) {
-    return error.message;
+  if (!error) {
+    return UNKNOWN_REFRESH_ERROR;
   }
 
-  if (typeof error === "string" && error.trim()) {
-    return error;
+  // Check for Error instances
+  if (error instanceof Error) {
+    const msg = error.message;
+    if (msg && msg.trim()) {
+      return msg;
+    }
   }
 
+  // Check for string errors
+  if (typeof error === "string") {
+    const trimmed = error.trim();
+    if (trimmed) {
+      return trimmed;
+    }
+  }
+
+  // Check for error objects with various properties
   if (typeof error === "object") {
     const candidate = error as Record<string, unknown>;
-    const status =
-      typeof candidate.status === "number"
-        ? candidate.status
-        : typeof candidate.code === "number"
-          ? candidate.code
-          : undefined;
+    
+    let status: number | undefined;
+    if (typeof candidate.status === "number") {
+      status = candidate.status;
+    } else if (typeof candidate.code === "number") {
+      status = candidate.code;
+    }
 
-    const messages: Array<unknown> = [
+    // Check message properties
+    const messageProps = [
       candidate.message,
       candidate.error_description,
       candidate.error,
@@ -94,9 +107,15 @@ function resolveRefreshErrorMessage(error: unknown): string {
       candidate.hint,
     ];
 
-    for (const value of messages) {
-      if (typeof value === "string" && value.trim()) {
-        return status ? `${value} (code ${status})` : value;
+    for (const prop of messageProps) {
+      if (typeof prop === "string") {
+        const trimmed = prop.trim();
+        if (trimmed) {
+          if (status) {
+            return `${trimmed} (code ${status})`;
+          }
+          return trimmed;
+        }
       }
     }
   }
@@ -123,11 +142,11 @@ export function ChatGenerator() {
   const { activeBrandId } = useBrandKit();
   const location = useLocation();
   const supabase = useSupabase();
-  const orderId =
-    useMemo(() => {
-      const params = new URLSearchParams(location.search);
-      return params.get("order");
-    }, [location.search]) || null;
+  const orderId = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const result = params.get("order");
+    return result || null;
+  }, [location.search]);
   const orderLabel = useMemo(
     () => (orderId ? `Commande ${orderId}` : "Toutes les commandes"),
     [orderId],
@@ -159,12 +178,14 @@ export function ChatGenerator() {
       toast.error("Timeout: la génération a pris trop de temps.");
       return;
     }
-    const message =
-      err instanceof Error
-        ? err.message
-        : typeof err === "string"
-          ? err
-          : "";
+    
+    let message = "";
+    if (err instanceof Error) {
+      message = err.message;
+    } else if (typeof err === "string") {
+      message = err;
+    }
+    
     toast.error(message || "Erreur de génération");
   }, []);
 

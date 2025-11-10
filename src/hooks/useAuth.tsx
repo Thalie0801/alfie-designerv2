@@ -114,8 +114,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.functions.invoke('check-subscription');
       if (!error && data) {
         const isExpired = data.current_period_end ? new Date(data.current_period_end) < new Date() : false;
+        
+        let status: 'active' | 'expired' | 'none' = 'none';
+        if (isExpired) {
+          status = 'expired';
+        } else if (data.subscribed) {
+          status = 'active';
+        }
+        
         setSubscription({
-          status: isExpired ? 'expired' : (data.subscribed ? 'active' : 'none'),
+          status,
           current_period_end: data.current_period_end ?? null,
         } as any);
       } else {

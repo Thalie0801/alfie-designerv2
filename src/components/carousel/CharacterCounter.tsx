@@ -21,9 +21,19 @@ export function CharacterCounter({ current, min, max, label, className }: Charac
   const isError = overMax || underMin;
 
   // NOTE: garde tes tokens actuels; change-les si ta palette diffère
-  const color = isError ? "text-destructive" : isWarning ? "text-orange-500" : "text-success";
+  let color = "text-success";
+  if (isError) {
+    color = "text-destructive";
+  } else if (isWarning) {
+    color = "text-orange-500";
+  }
 
-  const bg = isError ? "bg-destructive/20" : isWarning ? "bg-orange-500/20" : "bg-success/20";
+  let bg = "bg-success/20";
+  if (isError) {
+    bg = "bg-destructive/20";
+  } else if (isWarning) {
+    bg = "bg-orange-500/20";
+  }
 
   const helper = overMax
     ? `(${current - max} au-delà du max)`

@@ -88,10 +88,22 @@ export function slideUrl(publicId: string, o: SlideUrlOptions = {}): string {
   const font = o.fontFamily ?? "Nunito";
 
   // Tailles/offsets selon ratio
-  const titleSize = o.aspectRatio === "9:16" ? 80 : o.aspectRatio === "16:9" ? 64 : 72;
+  let titleSize = 72;
+  if (o.aspectRatio === "9:16") {
+    titleSize = 80;
+  } else if (o.aspectRatio === "16:9") {
+    titleSize = 64;
+  }
+  
   const titleY = o.aspectRatio === "9:16" ? 140 : 120;
 
-  const subSize = o.aspectRatio === "9:16" ? 52 : o.aspectRatio === "16:9" ? 38 : 42;
+  let subSize = 42;
+  if (o.aspectRatio === "9:16") {
+    subSize = 52;
+  } else if (o.aspectRatio === "16:9") {
+    subSize = 38;
+  }
+  
   const subY = o.aspectRatio === "9:16" ? 220 : 140;
 
   const bulletSize = o.aspectRatio === "16:9" ? 32 : 36;
