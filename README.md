@@ -103,16 +103,51 @@ For backend integrations, see [`examples/api/express/counters.ts`](examples/api/
 
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/b6ceafb7-5b2f-483f-b988-77dd6e3f8f0e) and click on Share -> Publish.
+Simply open [Lovable](https://lovable.dev/projects/b6ceafb7-5b2f-483f-b988-77dd6e3f8f0e) and click on **Share → Publish**.
 
-### Déploiement sur Vercel
+### Déploiement Lovable
 
-Si vous déployez manuellement le projet sur Vercel, pensez à renseigner les variables d'environnement suivantes dans **Project Settings → Environment Variables** avant de cliquer sur « Open App » :
+- Build command: `npm run build`
+- Output directory: `dist`
+- Base: `/` (configured in `vite.config.ts`)
+- Single Page App fallback: enable the "404 → index.html" option in **Project → Settings → Hosting** to ensure client-side routing works in production.
 
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
+The Vite app no longer relies on Vercel. Preview builds and production publishes happen exclusively on Lovable.
 
-Ces valeurs sont utilisées pour initialiser le client Supabase côté front-end. Sans elles, l'application plante au chargement et Vercel affiche une erreur lors de l'ouverture du déploiement.
+### Supabase Edge Functions & Render backends
+
+All legacy `/api/*` endpoints have been removed. Edge calls now go through Supabase Edge Functions or dedicated services (e.g. `services/ffmpeg-backend` on Render). A lightweight health-check function is available at `supabase/functions/ping` so you can validate the Edge deployment pipeline before wiring more complex handlers.
+
+From Lovable you can call Supabase functions directly via the Supabase client or through the optional Lovable Edge proxy (`VITE_EDGE_BASE_URL`).
+
+## Env / Lovable (frontend)
+
+Expose the following variables in Lovable → **Project → Settings → Environment Variables**. Only values prefixed with `VITE_` are read by the Vite bundle:
+
+| Variable | Mandatory | Description |
+| --- | --- | --- |
+| `VITE_SUPABASE_URL` | ✅ | Supabase project URL (used by the public client). |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` or `VITE_SUPABASE_ANON_KEY` | ✅ | Public Supabase key for client-side auth. |
+| `VITE_EDGE_BASE_URL` | ⚠️ | Optional Lovable Edge proxy base URL (`https://<ref>.functions.supabase.co`) to invoke Supabase functions from the browser when direct calls are blocked. |
+| `VITE_LOVABLE_PROJECT_ID` | ⚠️ | Used by `useBrandManagement` to preselect a Lovable project when collaborating. |
+| `VITE_APP_VERSION` | ⚠️ | Optional build stamp displayed in the UI for cache busting. |
+| `VITE_CLOUDINARY_CLOUD_NAME` | ⚠️ | Required for Cloudinary uploads/thumbnails. |
+| `VITE_AEDITUS_URL` | ⚠️ | Overrides the default Aeditus deep-link target. |
+| `VITE_FFMPEG_BACKEND_URL` | ⚠️ | Points advanced video tools to the Render FFmpeg backend. |
+| `VITE_HIDE_BACKEND_BADGES` | ⚠️ | Set to `true` to hide backend availability badges in staging demos. |
+
+Restart the Lovable build after updating these values so `import.meta.env` reflects the latest configuration.
+
+## Env / backend (Supabase & Render)
+
+For Supabase Edge Functions deploy the following secrets (names without the `VITE_` prefix):
+
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- `FFMPEG_BACKEND_URL`, `FFMPEG_BACKEND_API_KEY`, `FFMPEG_BACKEND_BEARER` (video rendering bridge)
+- `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
+- `INTERNAL_FN_SECRET` and other service credentials referenced in `supabase/functions/*`
+
+On Render, reuse the same `FFMPEG_BACKEND_*` variables so the worker API remains reachable from Supabase. Keep secrets confined to server environments—only expose the public `VITE_*` variables to the Lovable frontend.
 
 ## Variables d'environnement (accès VIP/Admin)
 
