@@ -59,5 +59,17 @@ serve(async (req) => {
   }
 });
 
+function must(k: string) {
+  const v = Deno.env.get(k);
+  if (!v) throw new Error(`Missing env ${k}`);
+  return v;
+}
+
+function json(x: unknown, s = 200) {
+  return new Response(JSON.stringify(x), {
+    status: s,
+    headers: { "Content-Type": "application/json", ...cors },
+  });
+}
 function must(k: string) { const v = Deno.env.get(k); if (!v) throw new Error(`Missing env ${k}`); return v; }
 function json(x: unknown, s = 200) { return new Response(JSON.stringify(x), { status: s, headers: { "Content-Type": "application/json", ...cors } }); }
