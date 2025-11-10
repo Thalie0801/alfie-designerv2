@@ -306,7 +306,7 @@ serve(async (req) => {
     const zipFileName = `zips/carousel-${identifier}-${Date.now()}.zip`;
     console.log(`[download-zip] Uploading ZIP to storage: ${zipFileName}`);
     
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { data: _uploadData, error: uploadError } = await supabase.storage
       .from('media-generations')
       .upload(zipFileName, new Uint8Array(arrayBuffer), {
         contentType: 'application/zip',

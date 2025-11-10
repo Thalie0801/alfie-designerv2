@@ -114,6 +114,20 @@ Si vous déployez manuellement le projet sur Vercel, pensez à renseigner les va
 
 Ces valeurs sont utilisées pour initialiser le client Supabase côté front-end. Sans elles, l'application plante au chargement et Vercel affiche une erreur lors de l'ouverture du déploiement.
 
+## Queue ops (Vite + Supabase)
+
+- **Frontend (Vite)** : définir `VITE_SUPABASE_URL` pour pointer les appels Edge Functions.
+- **Fonctions Edge Supabase** : renseigner `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY` dans le dashboard Supabase (section **Functions → Settings**).
+
+Déployer les fonctions critiques :
+
+```sh
+supabase functions deploy force-process
+supabase functions deploy process-job-worker
+```
+
+Pour débloquer la file d'attente, exécuter le SQL contenu dans `ops/sql/queue-recovery.sql` et `ops/sql/queue-policies.sql` via le Supabase SQL Editor.
+
 ## Variables d'environnement (accès VIP/Admin)
 
 - `VIP_EMAILS` : liste d'adresses e-mail (séparées par des virgules, insensibles à la casse) autorisées à accéder au dashboard même sans abonnement actif.

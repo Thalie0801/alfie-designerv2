@@ -113,7 +113,7 @@ export async function renderSlideToSVG(
   
   // Bullets si présents (centrés)
   if (slideContent.bullets && slideContent.bullets.length > 0) {
-    const bulletColor = brandSnapshot.primary_color || '#000000';
+    const _bulletColor = brandSnapshot.primary_color || '#000000';
     slideContent.bullets.forEach((bullet, i) => {
       const y = 450 + i * 120;
       const bulletLines = wrapText(bullet, Math.floor(width * 0.8), 28);

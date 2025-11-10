@@ -6,7 +6,7 @@
 
 export async function edgeHandler(
   req: Request,
-  logic: (ctx: { jwt: string | null; input: any; req: Request }) => Promise<any>
+  logic: (_ctx: { jwt: string | null; input: any; req: Request }) => Promise<any>
 ): Promise<Response> {
   const origin = req.headers.get('origin') || '*';
   const cors = {

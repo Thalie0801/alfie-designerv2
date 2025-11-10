@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { enrichPromptWithBrand } from "../_shared/brandResolver.ts";
-import { deriveSeed } from "../_shared/seedGenerator.ts";
+import { deriveSeed as _deriveSeed } from "../_shared/seedGenerator.ts";
 import { checkCoherence } from "../_shared/coherenceChecker.ts";
 import { SLIDE_TEMPLATES } from "../_shared/slideTemplates.ts";
 import { renderSlideToSVG } from "../_shared/slideRenderer.ts";
@@ -161,7 +161,7 @@ serve(async (req) => {
 
     // 2. Marquer comme "running" ATOMIQUEMENT (seulement si encore queued)
     checkTimeout();
-    const { data: lockedJob, error: lockErr } = await supabase
+    const { data: lockedJob, error: lockedJobErr } = await supabase
       .from('jobs')
       .update({ status: 'running', started_at: new Date().toISOString() })
       .eq('id', job.id)
@@ -170,7 +170,7 @@ serve(async (req) => {
       .maybeSingle();
 
     // Si le job a déjà été pris par un autre worker, on arrête
-    if (lockErr || !lockedJob) {
+    if (lockedJobErr || !lockedJob) {
       console.log(`[Worker] Job ${job.id} already taken by another worker, skipping`);
       return new Response(JSON.stringify({ message: 'Job already taken' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

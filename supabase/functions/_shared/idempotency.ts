@@ -12,7 +12,7 @@ export async function withIdempotency<T>(
   fn: () => Promise<{ ref: string; data: T }>
 ): Promise<T> {
   // 1. Essayer d'insérer la clé
-  const { data: inserted, error: insertErr } = await admin
+  const { data: _inserted, error: insertErr } = await admin
     .from('idempotency_keys')
     .insert({ key, status: 'pending' })
     .select()

@@ -15,7 +15,7 @@ const parseBody = async (req: Request): Promise<Record<string, string>> => {
     const out: Record<string, string> = {};
     params.forEach((v, k) => (out[k] = v));
     return out;
-  } catch (_) {
+  } catch (__) {
     // Support GET with query params as fallback
     const url = new URL(req.url);
     const out: Record<string, string> = {};

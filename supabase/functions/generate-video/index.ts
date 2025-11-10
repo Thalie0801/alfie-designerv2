@@ -319,7 +319,7 @@ serve(async (req) => {
           if (text) {
             try {
               parsed = JSON.parse(text);
-            } catch (_) {
+            } catch (__) {
               parsed = text;
             }
           }
@@ -596,7 +596,7 @@ serve(async (req) => {
         if (text) {
           try {
             parsed = JSON.parse(text);
-          } catch (_) {
+          } catch (__) {
             parsed = text;
           }
         }

@@ -17,7 +17,7 @@ const parseBody = async (req: Request): Promise<Record<string, string>> => {
     const result: Record<string, string> = {};
     params.forEach((v, k) => (result[k] = v));
     return result;
-  } catch (_) {
+  } catch (__) {
     return {};
   }
 };

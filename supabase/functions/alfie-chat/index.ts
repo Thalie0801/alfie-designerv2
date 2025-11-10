@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { userHasAccess } from "../_shared/access.ts";
 import { callAIWithFallback, type AgentContext, type AIResponse } from "../_shared/aiOrchestrator.ts";
-import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY, env, LOVABLE_API_KEY } from "../_shared/env.ts";
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY as _SUPABASE_ANON_KEY, env, LOVABLE_API_KEY } from "../_shared/env.ts";
 
 /* ------------------------------------------
  * Helpers très simples
@@ -33,7 +33,7 @@ function isApproval(message: string): boolean {
 }
 
 // --- AI config (ASCII only) ---
-const AI_CONFIG = {
+const _AI_CONFIG = {
   model: env("ALFIE_AI_MODEL") ?? "google/gemini-2.5-flash",
   endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions",
 };
@@ -85,7 +85,7 @@ serve(async (req) => {
     const {
       messages,
       brandId,
-      stream = false,
+      stream: _stream = false,
       expertMode = false,
       forceTool,
     } = await req.json();
@@ -540,7 +540,7 @@ Utilise **classify_intent** en premier !`;
     const maxIterations = 5;
     const collectedAssets: any[] = [];
     let finalJobSetId: string | undefined;
-    let fallbackAttempted = false;
+    let _fallbackAttempted = false;
     let syntheticInjectionDone = false;
 
     console.log("[TRACE] Starting tool execution loop...");

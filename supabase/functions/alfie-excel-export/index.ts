@@ -103,7 +103,7 @@ serve(async (req) => {
     });
 
     const carouselsSheet = Object.entries(carouselGroups).flatMap(([carouselId, slides]: [string, any]) => {
-      return slides.map((slide: any, index: number) => ({
+      return slides.map((slide: any, _index: number) => ({
         'Carousel ID': carouselId,
         'Slide Index': slide.slide_index,
         'Total Slides': slides.length,

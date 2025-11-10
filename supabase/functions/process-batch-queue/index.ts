@@ -45,7 +45,7 @@ serve(async (req) => {
           .eq("id", request.id);
 
         const { modality, payload_json, user_id } = request;
-        const { prompt, format, duration, quality, provider } = payload_json;
+        const { prompt, format: _format, duration: _duration, quality: _quality, provider: _provider } = payload_json;
 
         // Full pipeline: select → check → consume → render → score → update_metrics
         // Simplified for Phase 2 stub

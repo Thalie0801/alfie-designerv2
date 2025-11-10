@@ -1,0 +1,32 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/types/**/*.ts",
+    "src/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".next",
+    "coverage",
+    "supabase/functions/**",
+    // ⬇️ Exclusions TEMPORAIRES à remettre progressivement
+    "src/components/studio/**",
+    "src/components/brand/**",
+    "src/components/**",
+    "src/features/**",
+    "src/lib/supabase/**",
+    "src/lib/**",
+    "src/hooks/**",
+    "src/pages/**",
+    "src/services/**",
+    "src/utils/**",
+    "**/*.test.*",
+    "**/*.spec.*"
+  ]
+}

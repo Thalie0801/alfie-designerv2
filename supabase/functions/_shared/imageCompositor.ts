@@ -70,7 +70,7 @@ function buildTextLayer(layer: TextLayer): string {
 /**
  * Generate text layers for hero slide (title + punchline + CTA + badge)
  */
-function layersForHero(slide: Slide, primaryColor: string, secondaryColor: string): TextLayer[] {
+function layersForHero(slide: Slide, primaryColor: string, _secondaryColor: string): TextLayer[] {
   const layers: TextLayer[] = [];
   
   // Badge (top-left)
@@ -139,7 +139,7 @@ function layersForHero(slide: Slide, primaryColor: string, secondaryColor: strin
  * Generate text layers for content slides (problem/solution/impact)
  * Title + bullets list
  */
-function layersForContent(slide: Slide, primaryColor: string): TextLayer[] {
+function layersForContent(slide: Slide, _primaryColor: string): TextLayer[] {
   const layers: TextLayer[] = [];
   
   // Title (top-left)

@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useSupabase } from "@/lib/supabaseClient";
-import { createGeneration, forceProcessJobs } from "@/api/alfie";
+import { createGeneration } from "@/api/alfie";
 import { useToast } from "@/hooks/use-toast";
 import { uploadToChatBucket } from "@/lib/chatUploads";
 import { useLocation } from "react-router-dom";
@@ -570,35 +570,71 @@ export function ChatGenerator() {
     if (isForcing) return; // anti double-clic
     setIsForcing(true);
     try {
-      const result = await forceProcessJobs();
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
 
-      const processed =
-        typeof result?.processed === "number" && Number.isFinite(result.processed)
-          ? result.processed
-          : 0;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/force-process`,
+        {
+          method: "POST",
+          headers: session?.access_token
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : {}
+        }
+      );
 
-      toast.success(`Traitement forcé: ${processed} job(s).`);
+      const text = await response.text();
+
+      if (!response.ok) {
+        const error = new Error(text || "Échec du forçage");
+        (error as Error & { status?: number }).status = response.status;
+        throw error;
+      }
+
+      let successMessage = text.trim();
+      if (!successMessage) {
+        successMessage = "Traitement relancé";
+      } else {
+        try {
+          const parsed = JSON.parse(text) as Record<string, unknown> | undefined;
+          if (parsed) {
+            if (typeof parsed.processed === "number") {
+              successMessage = `Traitement forcé: ${parsed.processed} job(s).`;
+            } else if (typeof parsed.message === "string" && parsed.message.trim()) {
+              successMessage = parsed.message;
+            }
+          }
+        } catch {
+          // ignore JSON parsing errors, keep text message
+        }
+      }
+
+      toast.success(successMessage);
       await fetchWithTimeoutPromise(refetchAll(), 15000);
     } catch (err) {
       console.error("[Studio] trigger worker error:", err);
-      const errMsg = err instanceof Error ? err.message : "Erreur inconnue";
-      const status = err instanceof Error && typeof (err as any).status === "number"
-        ? (err as any).status
-        : undefined;
 
       if (notifyAuthGuard(err)) {
         return;
       }
 
-      if (status === 409 || errMsg.startsWith("409 ")) {
+      const status =
+        typeof (err as { status?: number }).status === "number"
+          ? (err as { status?: number }).status
+          : undefined;
+
+      const message = err instanceof Error && err.message ? err.message : "Erreur inconnue";
+
+      if (status === 409 || message.startsWith("409 ") || /already running/i.test(message)) {
         toast.info("Un traitement est déjà en cours. Réessaie dans quelques secondes.");
       } else {
-        toast.error(errMsg);
+        toast.error(message);
       }
     } finally {
       setIsForcing(false);
     }
-  }, [isForcing, refetchAll]);
+  }, [isForcing, refetchAll, supabase]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">

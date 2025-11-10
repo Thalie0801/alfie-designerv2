@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@18.5.0';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
+import { createClient as _createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,7 +27,7 @@ serve(async (req) => {
     const payload = JSON.parse(atob(padded));
 
     const userEmail: string | undefined = payload.email || payload.user_metadata?.email;
-    const userId: string | undefined = payload.sub;
+    const _userId: string | undefined = payload.sub;
 
     if (!userEmail) throw new Error('User not authenticated or email not available');
 

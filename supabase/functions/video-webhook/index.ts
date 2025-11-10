@@ -83,7 +83,7 @@ const extractUrlFromValue = (value: JsonValue): string | null => {
       try {
         const parsed = JSON.parse(trimmed);
         return extractUrlFromValue(parsed as JsonValue);
-      } catch (_) {
+      } catch (__) {
         return null;
       }
     }

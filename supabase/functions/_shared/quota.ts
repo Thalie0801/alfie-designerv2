@@ -23,7 +23,7 @@ export async function consumeBrandQuotas(
   console.log(`📊 [consumeBrandQuotas] Brand ${brandId} - Images: ${imageCount}, Reels: ${addVideos}, Woofs: ${addWoofs}`);
   
   // Utiliser increment_monthly_counters qui existe déjà
-  const { data, error } = await admin.rpc("increment_monthly_counters", {
+  const { data: _data, error } = await admin.rpc("increment_monthly_counters", {
     p_brand_id: brandId,
     p_period_yyyymm: period,
     p_images: imageCount,     // ✅ Utiliser le paramètre (peut être 5 pour un carrousel de 5 slides)
