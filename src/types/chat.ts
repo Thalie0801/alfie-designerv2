@@ -113,25 +113,3 @@ export const getAspectClass = (format?: AspectFormat | string): string => {
       return 'aspect-[4/5]';
   }
 };
-
-export type Ratio = '1:1' | '9:16' | '16:9' | '3:4';
-
-export interface Slide {
-  title?: string;
-  subtitle?: string;
-  imageUrl?: string;
-}
-
-export interface SendOptions {
-  mode?: 'auto' | 'image' | 'video' | 'text';
-  ratio?: Ratio;
-  slides?: Slide[];
-}
-
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  createdAt: string;
-  meta?: Record<string, unknown>;
-}

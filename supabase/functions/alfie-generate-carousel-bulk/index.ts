@@ -244,7 +244,7 @@ serve(async (req) => {
       }));
 
       // Worker d’exécution pour une slide
-      const worker = async (job: { slideContent: SlideInput; slideIndex: number }, _idx: number) => {
+      const worker = async (job: { slideContent: SlideInput; slideIndex: number }, idx: number) => {
         const label = `carousel=${carouselId} slide=${job.slideIndex + 1}/${totalSlides}`;
 
         const exec = async () => {

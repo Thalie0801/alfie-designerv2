@@ -155,7 +155,7 @@ function applyHardValidations(plan: CarouselPlan, slideCount: number) {
   }
 
   // Forcer structure & longueurs
-  plan.slides = distributeTypes(plan.slides).map((s, _idx) => {
+  plan.slides = distributeTypes(plan.slides).map((s, idx) => {
     s.title = trimLen(s.title, 60); // + souple mais on valide plus bas pour les règles
     s.subtitle = trimLen(s.subtitle, 120);
     s.punchline = trimLen(s.punchline, 120);

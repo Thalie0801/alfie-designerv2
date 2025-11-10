@@ -8,6 +8,12 @@ type GenerationResponse = {
   job_id: string;
 };
 
+type ForceProcessJobsResponse = {
+  processed: number;
+  queuedBefore: number;
+  queuedAfter: number;
+};
+
 export async function createGeneration(brandId: string, payload: unknown) {
   const edgeResponse = await callEdgeFunction<GenerationResponse & { ok: boolean }>(
     'alfie-generate',
@@ -51,35 +57,21 @@ type SupabaseFunctionError = Error & {
 type WorkerError = Error & { status?: number; originalError?: unknown };
 
 export async function forceProcessJobs(): Promise<ForceProcessJobsResponse> {
-  const payload = { source: 'studio-force' } as const;
-
-  try {
-    const edgeResponse = await callEdgeFunction<ForceProcessJobsResponse & { ok: boolean }>(
-      'force-process',
-      payload,
-    );
-    if (edgeResponse) {
-      return normalizeForceProcessPayload(edgeResponse);
-    }
-  } catch (err) {
-    console.warn('[forceProcessJobs] Edge force-process failed, falling back to Supabase', err);
+  const edgeResponse = await callEdgeFunction<ForceProcessJobsResponse & { ok: boolean }>(
+    'trigger-job-worker',
+    { source: 'studio-force' },
+  );
+  if (edgeResponse) {
+    return {
+      processed: edgeResponse.processed,
+      queuedBefore: edgeResponse.queuedBefore,
+      queuedAfter: edgeResponse.queuedAfter,
+    };
   }
 
-  try {
-    return await invokeForceProcessViaSupabase('force-process', payload);
-  } catch (err) {
-    if (isFunctionMissingError(err)) {
-      return await invokeForceProcessViaSupabase('trigger-job-worker', payload);
-    }
-    throw err;
-  }
-}
-
-async function invokeForceProcessViaSupabase(
-  functionName: 'force-process' | 'trigger-job-worker',
-  body: Record<string, unknown>,
-): Promise<ForceProcessJobsResponse> {
-  const { data, error } = await supabase.functions.invoke(functionName, { body });
+  const { data, error } = await supabase.functions.invoke('trigger-job-worker', {
+    body: { source: 'studio-force' },
+  });
 
   if (error) {
     const httpError = error as SupabaseFunctionError;
@@ -94,7 +86,7 @@ async function invokeForceProcessViaSupabase(
     const message =
       status === 409
         ? 'Un traitement est déjà en cours.'
-        : `${functionName}: ${baseMessage}`;
+        : `trigger-job-worker: ${baseMessage}`;
 
     const wrappedError = new Error(message) as WorkerError;
     if (status !== undefined) {
@@ -105,31 +97,16 @@ async function invokeForceProcessViaSupabase(
     throw wrappedError;
   }
 
-  const payload = data as Partial<ForceProcessJobsResponse> | undefined;
+  const payload = data as ForceProcessJobsResponse | undefined;
   if (!payload) {
     throw new Error('Réponse invalide du backend');
   }
 
-  return normalizeForceProcessPayload(payload);
-}
-
-function normalizeForceProcessPayload(payload: Partial<ForceProcessJobsResponse>): ForceProcessJobsResponse {
   return {
     processed: typeof payload.processed === 'number' ? payload.processed : 0,
     queuedBefore: typeof payload.queuedBefore === 'number' ? payload.queuedBefore : 0,
     queuedAfter: typeof payload.queuedAfter === 'number' ? payload.queuedAfter : 0,
   };
-}
-
-function isFunctionMissingError(error: unknown) {
-  if (!error) return false;
-  const message =
-    error instanceof Error
-      ? error.message
-      : typeof error === 'object' && 'message' in (error as Record<string, unknown>)
-        ? String((error as { message?: unknown }).message)
-        : '';
-  return typeof message === 'string' && /not\s+found|does not exist/i.test(message);
 }
 
 const SUPABASE_EDGE_KEY =

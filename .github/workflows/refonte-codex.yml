@@ -2,8 +2,9 @@ name: Refonte Codex (push→pull, disable autopublish)
 on:
   workflow_dispatch: {}
   push:
-    branches:
-      - codex/**
+    branches: [ main, refonte-alfie-2025 ]
+  pull_request:
+    branches: [ main, refonte-alfie-2025 ]
 permissions:
   contents: write
   pull-requests: write
@@ -12,10 +13,6 @@ concurrency:
   cancel-in-progress: true
 jobs:
   codex:
-    # 🔒 Ne s'exécute que si c'est un push sur une branche codex/*
-    if: ${{ github.event_name == 'push' && startsWith(github.ref_name, 'codex/') }}
-    permissions:
-      contents: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

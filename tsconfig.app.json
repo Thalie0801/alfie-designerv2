@@ -20,5 +20,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "actions", "apps", "examples", "middleware.ts", "pages", "packages"]
+  "include": ["src", "actions"]
 }

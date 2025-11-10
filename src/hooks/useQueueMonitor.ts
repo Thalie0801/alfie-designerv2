@@ -53,9 +53,7 @@ export function useQueueMonitor(_brandId?: string) {
     let done24h = 0;
 
     for (const row of data as JobRow[]) {
-      if (!row) continue;
-      if (!row.status) continue;
-      if (!isTrackedStatus(row.status)) continue;
+      if (!row?.status || !isTrackedStatus(row.status)) continue;
 
       if (row.status === "queued") {
         queued += 1;
@@ -68,10 +66,7 @@ export function useQueueMonitor(_brandId?: string) {
       }
 
       if (row.status === "done" || row.status === "completed") {
-        const dateStr = row.updated_at || row.created_at;
-        if (!dateStr) continue;
-        
-        const timestamp = new Date(dateStr).getTime();
+        const timestamp = new Date(row.updated_at ?? row.created_at ?? 0).getTime();
         if (!Number.isNaN(timestamp) && timestamp >= since) {
           done24h += 1;
         }

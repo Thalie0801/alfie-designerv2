@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { jobId, clipCount, prompts, imageUrls, brandId: _brandId } = await req.json();
+    const { jobId, clipCount, prompts, imageUrls, brandId } = await req.json();
     
     if (!jobId || !clipCount || clipCount < 2) {
       return new Response(

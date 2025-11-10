@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useSupabase } from "@/lib/supabaseClient";
-import { createGeneration } from "@/api/alfie";
+import { createGeneration, forceProcessJobs } from "@/api/alfie";
 import { useToast } from "@/hooks/use-toast";
 import { uploadToChatBucket } from "@/lib/chatUploads";
 import { useLocation } from "react-router-dom";
@@ -67,39 +67,26 @@ const ASPECT_TO_TW: Record<AspectRatio, string> = {
 const UNKNOWN_REFRESH_ERROR = "Erreur inconnue pendant le rafraîchissement";
 
 function resolveRefreshErrorMessage(error: unknown): string {
-  if (!error) {
-    return UNKNOWN_REFRESH_ERROR;
+  if (!error) return UNKNOWN_REFRESH_ERROR;
+
+  if (error instanceof Error && error.message?.trim()) {
+    return error.message;
   }
 
-  // Check for Error instances
-  if (error instanceof Error) {
-    const msg = error.message;
-    if (msg && msg.trim()) {
-      return msg;
-    }
+  if (typeof error === "string" && error.trim()) {
+    return error;
   }
 
-  // Check for string errors
-  if (typeof error === "string") {
-    const trimmed = error.trim();
-    if (trimmed) {
-      return trimmed;
-    }
-  }
-
-  // Check for error objects with various properties
   if (typeof error === "object") {
     const candidate = error as Record<string, unknown>;
-    
-    let status: number | undefined;
-    if (typeof candidate.status === "number") {
-      status = candidate.status;
-    } else if (typeof candidate.code === "number") {
-      status = candidate.code;
-    }
+    const status =
+      typeof candidate.status === "number"
+        ? candidate.status
+        : typeof candidate.code === "number"
+          ? candidate.code
+          : undefined;
 
-    // Check message properties
-    const messageProps = [
+    const messages: Array<unknown> = [
       candidate.message,
       candidate.error_description,
       candidate.error,
@@ -107,15 +94,9 @@ function resolveRefreshErrorMessage(error: unknown): string {
       candidate.hint,
     ];
 
-    for (const prop of messageProps) {
-      if (typeof prop === "string") {
-        const trimmed = prop.trim();
-        if (trimmed) {
-          if (status) {
-            return `${trimmed} (code ${status})`;
-          }
-          return trimmed;
-        }
+    for (const value of messages) {
+      if (typeof value === "string" && value.trim()) {
+        return status ? `${value} (code ${status})` : value;
       }
     }
   }
@@ -142,11 +123,11 @@ export function ChatGenerator() {
   const { activeBrandId } = useBrandKit();
   const location = useLocation();
   const supabase = useSupabase();
-  const orderId = useMemo(() => {
-    const params = new URLSearchParams(location.search);
-    const result = params.get("order");
-    return result || null;
-  }, [location.search]);
+  const orderId =
+    useMemo(() => {
+      const params = new URLSearchParams(location.search);
+      return params.get("order");
+    }, [location.search]) || null;
   const orderLabel = useMemo(
     () => (orderId ? `Commande ${orderId}` : "Toutes les commandes"),
     [orderId],
@@ -178,14 +159,12 @@ export function ChatGenerator() {
       toast.error("Timeout: la génération a pris trop de temps.");
       return;
     }
-    
-    let message = "";
-    if (err instanceof Error) {
-      message = err.message;
-    } else if (typeof err === "string") {
-      message = err;
-    }
-    
+    const message =
+      err instanceof Error
+        ? err.message
+        : typeof err === "string"
+          ? err
+          : "";
     toast.error(message || "Erreur de génération");
   }, []);
 
@@ -570,71 +549,35 @@ export function ChatGenerator() {
     if (isForcing) return; // anti double-clic
     setIsForcing(true);
     try {
-      const {
-        data: { session }
-      } = await supabase.auth.getSession();
+      const result = await forceProcessJobs();
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/force-process`,
-        {
-          method: "POST",
-          headers: session?.access_token
-            ? { Authorization: `Bearer ${session.access_token}` }
-            : {}
-        }
-      );
+      const processed =
+        typeof result?.processed === "number" && Number.isFinite(result.processed)
+          ? result.processed
+          : 0;
 
-      const text = await response.text();
-
-      if (!response.ok) {
-        const error = new Error(text || "Échec du forçage");
-        (error as Error & { status?: number }).status = response.status;
-        throw error;
-      }
-
-      let successMessage = text.trim();
-      if (!successMessage) {
-        successMessage = "Traitement relancé";
-      } else {
-        try {
-          const parsed = JSON.parse(text) as Record<string, unknown> | undefined;
-          if (parsed) {
-            if (typeof parsed.processed === "number") {
-              successMessage = `Traitement forcé: ${parsed.processed} job(s).`;
-            } else if (typeof parsed.message === "string" && parsed.message.trim()) {
-              successMessage = parsed.message;
-            }
-          }
-        } catch {
-          // ignore JSON parsing errors, keep text message
-        }
-      }
-
-      toast.success(successMessage);
+      toast.success(`Traitement forcé: ${processed} job(s).`);
       await fetchWithTimeoutPromise(refetchAll(), 15000);
     } catch (err) {
       console.error("[Studio] trigger worker error:", err);
+      const errMsg = err instanceof Error ? err.message : "Erreur inconnue";
+      const status = err instanceof Error && typeof (err as any).status === "number"
+        ? (err as any).status
+        : undefined;
 
       if (notifyAuthGuard(err)) {
         return;
       }
 
-      const status =
-        typeof (err as { status?: number }).status === "number"
-          ? (err as { status?: number }).status
-          : undefined;
-
-      const message = err instanceof Error && err.message ? err.message : "Erreur inconnue";
-
-      if (status === 409 || message.startsWith("409 ") || /already running/i.test(message)) {
+      if (status === 409 || errMsg.startsWith("409 ")) {
         toast.info("Un traitement est déjà en cours. Réessaie dans quelques secondes.");
       } else {
-        toast.error(message);
+        toast.error(errMsg);
       }
     } finally {
       setIsForcing(false);
     }
-  }, [isForcing, refetchAll, supabase]);
+  }, [isForcing, refetchAll]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">

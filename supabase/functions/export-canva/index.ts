@@ -133,7 +133,7 @@ Généré par Alfie Designer
 
     // Uploader le ZIP vers Supabase Storage
     const zipFileName = `canva-export-${user.id}-${Date.now()}.zip`;
-    const { data: _uploadData, error: uploadError } = await supabase.storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from('media-generations')
       .upload(`exports/${zipFileName}`, zipBlob, {
         contentType: 'application/zip',

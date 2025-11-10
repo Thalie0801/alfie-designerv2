@@ -125,7 +125,7 @@ export function buildTextOverlayTransform(options: {
     bullets = [],
     cta = '',
     ctaPrimary = '',
-    ctaSecondary: _ctaSecondary = '',
+    ctaSecondary = '',
     titleColor = '1E1E1E',
     subtitleColor = '5A5A5A',
     titleSize = 64,

@@ -350,15 +350,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Verify try/catch hygiene
-        id: verify_trycatch
-        # On ne l'exécute "plein pot" que sur main/refonte-alfie-2025
-        if: ${{ github.ref_name == 'main' || github.ref_name == 'refonte-alfie-2025' }}
-        continue-on-error: true
-        run: |
-          if echo "${{ github.event.head_commit.message }}" | grep -q "\[skip-verify\]"; then
-            echo "skip verify"; exit 0;
-          fi
-          npm run verify:trycatch
+        run: npm run verify:trycatch
 
       - name: Summarize results
         run: |
@@ -366,14 +358,6 @@ jobs:
           echo "Lint: ${{ needs.lint.result }}"
           echo "Build: ${{ needs.build.result }}"
           echo "Verify: ${{ needs.verify.result }}"
-          TRY_CATCH_OUTCOME="${{ steps.verify_trycatch.outcome }}"
-          if [ -z "$TRY_CATCH_OUTCOME" ]; then
-            TRY_CATCH_OUTCOME="skipped"
-          fi
-          echo "Try/catch hygiene: $TRY_CATCH_OUTCOME"
-          if [ "$TRY_CATCH_OUTCOME" = "failure" ]; then
-            echo "::warning::try/catch hygiene issues detected. Check verify:trycatch output.";
-          fi
           if [ "${{ needs.typecheck.result }}" != "success" ]; then
             echo "::error::Typecheck failed"; exit 1; fi
           if [ "${{ needs.build.result }}" != "success" ]; then
@@ -381,12 +365,7 @@ jobs:
           if [ "${{ needs.lint.result }}" != "success" ]; then
             echo "::warning::Lint had issues but not blocking"; fi
           if [ "${{ needs.verify.result }}" != "success" ]; then
-            if [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.ref_name }}" = "refonte-alfie-2025" ]; then
-              echo "::error::Strict pipeline failed"; exit 1;
-            else
-              echo "::warning::Strict pipeline failed (non-blocking on PR)";
-            fi
-          fi
+            echo "::error::Strict pipeline failed"; exit 1; fi
           echo "✅ Quality checks completed"
 
    

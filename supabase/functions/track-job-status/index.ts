@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface _JobUpdate {
+interface JobUpdate {
   status: JobStatus;
   progress?: number;
   output_data?: any;

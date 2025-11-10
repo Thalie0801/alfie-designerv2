@@ -220,7 +220,7 @@ serve(async (req) => {
 
     // Extraire la première URL valide par slide
     const imageUrls: string[] = imageResults
-      .map((r, _idx) => r.data?.data?.image_urls?.[0] || r.data?.imageUrl || r.data?.url)
+      .map((r, idx) => r.data?.data?.image_urls?.[0] || r.data?.imageUrl || r.data?.url)
       .filter((u: any) => typeof u === "string" && u.startsWith("http"));
 
     if (imageUrls.length !== slides.length) {
