@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
 // src/components/AlfieChat.tsx
 import React, { useCallback, useEffect, useState } from "react";
 import { enqueue_job, libraryLink, search_assets, studioLink } from "@/ai/tools";
@@ -33,11 +34,29 @@ import { setJobContext, captureException } from "@/observability/sentry";
 // =====================
 const VIDEO_KEYWORDS = /\b(vid[ée]o|reel|r[ée]el|tiktok|shorts?|clip)\b/i;
 
-function detectIntent(message: string): "video" | "default" {
-  if (VIDEO_KEYWORDS.test(message)) return "video";
-  return "default";
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  quickReplies?: string[];
 }
 
+function generateId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? (crypto as Crypto).randomUUID()
+    : Math.random().toString(36).slice(2);
+}
+
+const INITIAL_ASSISTANT: ChatMessage = {
+  id: "assistant-intro",
+  role: "assistant",
+  content:
+    "👋 Hey ! Je suis Alfie. Donne-moi un brief (format, objectif, CTA) et je te prépare un récap avant de lancer la génération.",
+};
+
+export function AlfieChat() {
+  const { activeBrandId, brandKit } = useBrandKit();
+  const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_ASSISTANT]);
 type Message = {
   id: string;
   role: "user" | "assistant";
@@ -200,6 +219,8 @@ export function AlfieChat() {
 
   const brandName = brandKit?.name ?? "ta marque";
 
+  const addMessage = useCallback((message: ChatMessage) => {
+    setMessages((current) => [...current, message]);
   const addMessage = useCallback((message: Message) => {
     setMessages((current) => [...current, message]);
     const withTimestamp: Message = {
@@ -244,6 +265,19 @@ export function AlfieChat() {
         const route = routeUserMessage(trimmed, {
           brandId: activeBrandId,
           baseIntent: lastIntent ?? undefined,
+        });
+
+        if (route.kind === "reply") {
+          addMessage({ id: generateId(), role: "assistant", content: route.text, quickReplies: route.quickReplies });
+          setQuickReplies(route.quickReplies ?? []);
+          setPendingIntent(null);
+          return;
+        }
+
+        setQuickReplies([]);
+        setPendingIntent(route.intent);
+        setLastIntent(route.intent);
+        addMessage({ id: generateId(), role: "assistant", content: route.text });
         });
 
         if (route.kind === "reply") {
@@ -899,6 +933,13 @@ export function AlfieChat() {
       )}
     </div>
   );
+}
+
+interface StatusPanelProps {
+  orderId: string;
+  jobs: AlfieJobStatus[];
+  assets: LibraryAsset[];
+  hasPreview: boolean;
 }
 
 interface StatusPanelProps {

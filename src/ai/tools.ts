@@ -1,3 +1,5 @@
+import type { AlfieIntent } from "./intent";
+
 import { createClient } from "@supabase/supabase-js";
 import type { DesignBrief } from "./designBrief";
 

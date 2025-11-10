@@ -1,3 +1,5 @@
+import type { AlfieIntent } from "./intent";
+
 import type { DesignBrief } from "./designBrief";
 import { allowsEmoji, applyTonePack, type TonePack } from "./tone";
 
