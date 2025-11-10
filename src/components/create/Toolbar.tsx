@@ -1,5 +1,4 @@
 import { cn } from "@/lib/utils";
-import { FLAGS } from "@/config/flags";
 
 export type GeneratorMode = "auto" | "image" | "video" | "text";
 export type RatioOption = "1:1" | "9:16" | "16:9" | "3:4" | "4:5";
@@ -11,7 +10,7 @@ interface ToolbarProps {
   onRatioChange: (ratio: RatioOption) => void;
 }
 
-const BASE_MODES: { value: GeneratorMode; label: string }[] = [
+const MODES: { value: GeneratorMode; label: string }[] = [
   { value: "auto", label: "Auto" },
   { value: "image", label: "Image" },
   { value: "video", label: "Vidéo" },
@@ -21,14 +20,13 @@ const BASE_MODES: { value: GeneratorMode; label: string }[] = [
 const RATIO_OPTIONS: RatioOption[] = ["1:1", "9:16", "16:9", "3:4", "4:5"];
 
 export function Toolbar({ mode, onModeChange, ratio, onRatioChange }: ToolbarProps) {
-  const modes = FLAGS.VIDEO ? BASE_MODES : BASE_MODES.filter((mode) => mode.value !== "video");
-  const showRatios = mode === "image" || (mode === "video" && FLAGS.VIDEO);
+  const showRatios = mode === "image" || mode === "video";
 
   return (
     <div className="space-y-2">
       {/* Modes */}
       <div className="flex flex-wrap gap-2">
-        {modes.map(({ value, label }) => {
+        {MODES.map(({ value, label }) => {
           const active = mode === value;
           return (
             <button

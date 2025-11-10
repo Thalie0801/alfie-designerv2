@@ -7,7 +7,6 @@ import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import { Info, ChevronDown, Eraser, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { FLAGS } from '@/config/flags';
 
 interface CreateHeaderProps {
   onClearChat?: () => void;
@@ -43,7 +42,7 @@ export function CreateHeader({ onClearChat }: CreateHeaderProps) {
 
   // Option 2 (Cloudinary-only) : pas de backend vidéo IA
   const ffmpegBackend = import.meta.env.VITE_FFMPEG_BACKEND_URL as string | undefined;
-  const isVideoIADisabled = !FLAGS.VIDEO || !ffmpegBackend; // on affiche un bandeau d’info dans le popover
+  const isVideoIADisabled = !ffmpegBackend; // on affiche un bandeau d’info dans le popover
 
   useEffect(() => {
     let mounted = true;

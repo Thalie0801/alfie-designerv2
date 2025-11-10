@@ -12,110 +12,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-type SentryConfig = {
-  protocol: string;
-  host: string;
-  projectId: string;
-  publicKey: string;
-};
-
-function parseSentryDsn(raw?: string | null): SentryConfig | null {
-  if (!raw) return null;
-  try {
-    const url = new URL(raw);
-    const projectId = url.pathname.replace(/^\//, '');
-    if (!url.username || !projectId) return null;
-    return {
-      protocol: url.protocol.replace(':', ''),
-      host: url.host,
-      projectId,
-      publicKey: url.username,
-    };
-  } catch (error) {
-    console.warn('[Sentry] Invalid DSN', error);
-    return null;
-  }
-}
-
-const sentryConfig = parseSentryDsn(Deno.env.get('SENTRY_DSN'));
-const sentryEnvironment = Deno.env.get('SENTRY_ENVIRONMENT') ?? Deno.env.get('ENVIRONMENT') ?? 'worker';
-const sentryRelease = Deno.env.get('GIT_COMMIT') ?? Deno.env.get('RENDER_GIT_COMMIT') ?? 'local';
-
-async function sendToSentry(error: unknown, context: { jobId?: string; brandId?: string; extra?: Record<string, unknown> } = {}) {
-  if (!sentryConfig) return;
-
-  const err = error instanceof Error ? error : new Error(String(error));
-  const eventId = crypto.randomUUID();
-  const payload = {
-    event_id: eventId,
-    timestamp: new Date().toISOString(),
-    platform: 'javascript',
-    release: sentryRelease,
-    environment: sentryEnvironment,
-    exception: {
-      values: [
-        {
-          type: err.name || 'Error',
-          value: err.message || String(err),
-          stacktrace: err.stack
-            ? {
-                frames: err.stack
-                  .split('\n')
-                  .map((line) => line.trim())
-                  .filter(Boolean)
-                  .slice(0, 50)
-                  .map((line) => ({ filename: line, function: '?', lineno: 0, colno: 0 })),
-              }
-            : undefined,
-        },
-      ],
-    },
-    tags: {
-      job_id: context.jobId ?? 'unknown',
-      brand_id: context.brandId ?? 'unknown',
-    },
-    extra: context.extra ?? {},
-  };
-
-  try {
-    const response = await fetch(`${sentryConfig.protocol}://${sentryConfig.host}/api/${sentryConfig.projectId}/store/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Sentry-Auth': [
-          'Sentry sentry_version=7',
-          'sentry_client=alfie-worker/1.0',
-          `sentry_key=${sentryConfig.publicKey}`,
-          `sentry_timestamp=${Math.floor(Date.now() / 1000)}`,
-        ].join(', '),
-      },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      console.warn('[Sentry] Failed to send', await response.text());
-    }
-  } catch (transportError) {
-    console.warn('[Sentry] Transport error', transportError);
-  }
-}
-
-async function logPerMinuteMetrics(client: ReturnType<typeof createClient>) {
-  const since = new Date(Date.now() - 60_000).toISOString();
-  const statuses = ['queued', 'running', 'completed', 'failed'] as const;
-  const metrics: Record<string, number> = {};
-
-  for (const status of statuses) {
-    const { count } = await client
-      .from('jobs')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', status)
-      .gte('updated_at', since);
-    metrics[status] = count ?? 0;
-  }
-
-  console.log(JSON.stringify({ event: 'jobs.per_minute', since, metrics }));
-}
-
 // Correction orthographique française
 function correctFrenchSpelling(text: string): string {
   const corrections: Record<string, string> = {
@@ -172,10 +68,8 @@ serve(async (req) => {
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
+
   let jobIdForCleanup: string | undefined;
-  let currentBrandId: string | undefined;
-  let currentJobId: string | undefined;
-  let jobOutcome: { status: string; error?: string } = { status: 'noop' };
   const jobStartTime = Date.now();
   const MAX_JOB_DURATION_MS = 5 * 60 * 1000; // 5 minutes
   const LOCK_TTL_SECONDS = Math.ceil(MAX_JOB_DURATION_MS / 1000);
@@ -194,8 +88,6 @@ serve(async (req) => {
 
     if (lockErr) {
       console.error('❌ [Worker] Failed to acquire mutex:', lockErr);
-      jobOutcome = { status: 'error', error: lockErr.message };
-      void sendToSentry(lockErr, { jobId: currentJobId, brandId: currentBrandId });
       return new Response(
         JSON.stringify({ error: 'Failed to acquire worker lock' }),
         {
@@ -207,7 +99,6 @@ serve(async (req) => {
 
     if (!lockData) {
       console.warn('⚠️ [Worker] Another run is already in progress');
-      jobOutcome = { status: 'skipped' };
       return new Response(
         JSON.stringify({ error: 'Worker already running' }),
         {
@@ -238,21 +129,12 @@ serve(async (req) => {
 
     if (jobErr || !job) {
       console.log('ℹ️ [Worker] No jobs to process');
-      jobOutcome = { status: 'empty' };
       return new Response(JSON.stringify({ message: 'No jobs to process' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
     jobIdForCleanup = job.id;
-    currentJobId = job.id;
-    currentBrandId = job.job_sets?.brand_id ?? job.brand_snapshot?.brand_id ?? undefined;
-    console.log(JSON.stringify({
-      event: 'worker.job.start',
-      jobId: currentJobId,
-      brandId: currentBrandId ?? null,
-      source: requestSource,
-    }));
     console.log(`📋 [Worker] Processing job ${job.id} (index: ${job.index_in_set})`);
 
     // Vérifier le timeout avant chaque étape critique
@@ -266,8 +148,6 @@ serve(async (req) => {
     // Fail-fast: verify job_sets join
     if (!job.job_sets) {
       console.error('❌ [Worker] Job has no job_set join (missing FK?)');
-      jobOutcome = { status: 'error', error: 'Invalid job_set FK' };
-      void sendToSentry(new Error('Invalid job_set FK'), { jobId: job.id, brandId: currentBrandId });
       return new Response(JSON.stringify({ error: 'Invalid job_set FK' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -277,7 +157,6 @@ serve(async (req) => {
     // GUARD: Skip if job_set is canceled
     if (['canceled', 'failed'].includes(job.job_sets.status)) {
       console.log(`[Worker] ⏭️  Skipping job ${job.id} - job_set is ${job.job_sets.status}`);
-      jobOutcome = { status: 'skipped' };
       return new Response(JSON.stringify({ message: 'Job set canceled or failed, skipping' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -302,7 +181,6 @@ serve(async (req) => {
     // Si le job a déjà été pris par un autre worker, on arrête
     if (lockErr || !lockedJob) {
       console.log(`[Worker] Job ${job.id} already taken by another worker, skipping`);
-      jobOutcome = { status: 'skipped' };
       return new Response(JSON.stringify({ message: 'Job already taken' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -978,13 +856,8 @@ serve(async (req) => {
     if (assetErr || !asset) {
       console.error('❌ [Worker] Insert into media_generations failed:', assetErr);
       console.error('❌ Asset data:', asset);
-
+      
       // Marquer le job comme failed + refund quota
-      jobOutcome = { status: 'error', error: assetErr?.message || 'Asset creation failed' };
-      void sendToSentry(assetErr ?? new Error('Asset creation failed'), {
-        jobId: job.id,
-        brandId: job.job_sets.brand_id,
-      });
       await supabase
         .from('jobs')
         .update({
@@ -1049,11 +922,10 @@ serve(async (req) => {
 
     console.log(`[Worker] Job ${job.id} completed successfully (set status: ${finalStatus}, coherence: ${coherenceScore.total}/100)`);
 
-    jobOutcome = { status: 'success' };
-    return new Response(JSON.stringify({
-      success: true,
-      jobId: job.id,
-      assetId: asset.id,
+    return new Response(JSON.stringify({ 
+      success: true, 
+      jobId: job.id, 
+      assetId: asset.id, 
       coherenceScore: coherenceScore.total,
       retryCount 
     }), {
@@ -1063,10 +935,7 @@ serve(async (req) => {
   } catch (error: any) {
     console.error('❌ [Worker] Critical error:', error);
     console.error('📍 [Worker] Error stack:', error.stack);
-
-    jobOutcome = { status: 'error', error: error?.message ?? 'unknown error' };
-    void sendToSentry(error, { jobId: jobIdForCleanup, brandId: currentBrandId });
-
+    
     // Tenter de marquer le job comme failed
     if (jobIdForCleanup) {
       try {
@@ -1131,17 +1000,6 @@ serve(async (req) => {
       } catch (releaseErr) {
         console.error('❌ [Worker] Failed to release mutex:', releaseErr);
       }
-    }
-    await logPerMinuteMetrics(supabase);
-    if (currentJobId) {
-      console.log(JSON.stringify({
-        event: 'worker.job.finish',
-        jobId: currentJobId,
-        brandId: currentBrandId ?? null,
-        status: jobOutcome.status,
-        error: jobOutcome.error ?? null,
-        durationMs: Date.now() - jobStartTime,
-      }));
     }
   }
 });

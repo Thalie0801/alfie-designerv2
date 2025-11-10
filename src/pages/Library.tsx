@@ -13,15 +13,6 @@ import { supabase } from '@/lib/supabaseSafeClient';
 import { toast } from 'sonner';
 import { AccessGuard } from '@/components/AccessGuard';
 import { CarouselsTab } from '@/components/library/CarouselsTab';
-import { FLAGS } from '@/config/flags';
-
-const ALLOWED_TABS = [
-  'images',
-  ...(FLAGS.VIDEO ? ['videos'] as const : []),
-  ...(FLAGS.CAROUSEL ? ['carousels'] as const : []),
-] as const;
-
-type LibraryTab = typeof ALLOWED_TABS[number];
 
 export default function Library() {
   const { user } = useAuth();
@@ -30,9 +21,10 @@ export default function Library() {
   // Lire le paramètre ?order= pour filtrer par commande
   const orderIdFromQuery = new URLSearchParams(location.search).get('order');
   
-  const allowedTabs = ALLOWED_TABS;
-  const initialTab: LibraryTab = orderIdFromQuery && FLAGS.CAROUSEL ? 'carousels' : 'images';
-  const [activeTab, setActiveTab] = useState<LibraryTab>(initialTab);
+  // Si ?order= est présent, afficher l'onglet carrousels par défaut
+  const [activeTab, setActiveTab] = useState<'images' | 'videos' | 'carousels'>(
+    orderIdFromQuery ? 'carousels' : 'images'
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
 
@@ -44,23 +36,14 @@ export default function Library() {
     downloadMultiple,
     cleanupProcessingVideos,
     refetch
-  } = useLibraryAssets(
-    user?.id,
-    activeTab === 'carousels' ? 'images' : activeTab
-  );
+  } = useLibraryAssets(user?.id, activeTab === 'carousels' ? 'images' : activeTab);
 
   // Auto cleanup when switching to videos tab
   useEffect(() => {
-    if (activeTab === 'videos' && FLAGS.VIDEO) {
+    if (activeTab === 'videos') {
       cleanupProcessingVideos();
     }
-  }, [activeTab, cleanupProcessingVideos]);
-
-  useEffect(() => {
-    if (!allowedTabs.includes(activeTab)) {
-      setActiveTab('images');
-    }
-  }, [activeTab, allowedTabs]);
+  }, [activeTab]);
 
   const filteredAssets = assets
     .filter(asset => {
@@ -112,10 +95,6 @@ export default function Library() {
   };
 
   const handleDebugGenerate = async () => {
-    if (!FLAGS.VIDEO) {
-      toast.error('La génération vidéo est désactivée sur cet environnement.');
-      return;
-    }
     if (!user?.id) {
       toast.error('Vous devez être connecté.');
       return;
@@ -187,18 +166,11 @@ export default function Library() {
       </div>
 
       {/* Tabs */}
-      <Tabs
-        value={activeTab}
-        onValueChange={(v) => {
-          if (allowedTabs.includes(v as typeof allowedTabs[number])) {
-            setActiveTab(v as typeof allowedTabs[number]);
-          }
-        }}
-      >
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'images' | 'videos' | 'carousels')}>
         <TabsList>
           <TabsTrigger value="images">🖼️ Images</TabsTrigger>
-          {FLAGS.VIDEO && <TabsTrigger value="videos">🎬 Vidéos</TabsTrigger>}
-          {FLAGS.CAROUSEL && <TabsTrigger value="carousels">📱 Carrousels</TabsTrigger>}
+          <TabsTrigger value="videos">🎬 Vidéos</TabsTrigger>
+          <TabsTrigger value="carousels">📱 Carrousels</TabsTrigger>
         </TabsList>
 
         {/* Toolbar */}
@@ -312,7 +284,6 @@ export default function Library() {
         </TabsContent>
 
         {/* Videos Tab */}
-        {FLAGS.VIDEO && (
         <TabsContent value="videos" className="mt-6">
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -342,14 +313,11 @@ export default function Library() {
             </div>
           )}
         </TabsContent>
-        )}
 
         {/* Carousels Tab */}
-        {FLAGS.CAROUSEL && (
-          <TabsContent value="carousels" className="mt-6">
-            <CarouselsTab orderId={orderIdFromQuery ?? null} />
-          </TabsContent>
-        )}
+        <TabsContent value="carousels" className="mt-6">
+          <CarouselsTab orderId={orderIdFromQuery} />
+        </TabsContent>
       </Tabs>
     </div>
     </AccessGuard>

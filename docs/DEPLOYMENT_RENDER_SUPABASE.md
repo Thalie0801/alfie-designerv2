@@ -31,8 +31,6 @@ Les variables suivantes doivent être définies (déjà en place par défaut) :
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_SUPABASE_PROJECT_ID`
 - `VITE_EDGE_BASE_URL` (ex : `https://<YOUR-PROJECT-REF>.functions.supabase.co` pour activer le proxy hors preview)
-- `VITE_FLAG_DESIGN_API`, `VITE_FLAG_CAROUSEL`, `VITE_FLAG_VIDEO` (mettre `0` par défaut sur la canary, n'activer qu'en test)
-- `VITE_SENTRY_DSN` (DSN Sentry canary pour la capture des erreurs runtime)
 
 Si vous changez de projet Supabase, pensez à mettre à jour ces valeurs.
 
@@ -42,7 +40,7 @@ Depuis l'URL Render :
 
 1. **Chargement** : la SPA doit s'afficher, y compris lors d'un refresh sur une route interne.
 2. **Authentification** : tester le login et le sign-up.
-3. **Upload** : téléversez une image puis une vidéo. Vérifiez l'aperçu dans l'UI et la présence des objets dans Supabase Storage sous `userId/...`. Aucun upload Cloudinary direct n'est autorisé : toutes les routes passent par la fonction `cloudinary-asset` pour signer côté serveur.
+3. **Upload** : téléversez une image puis une vidéo. Vérifiez l'aperçu dans l'UI et la présence des objets dans Supabase Storage sous `userId/...`.
 4. **Chat → Orchestrator** : envoyez un prompt vidéo « `9:16 • 12s …` ». Le flux doit passer par `awaiting_video_prompt` puis `generating`.
 5. **Asset final** : le worker doit insérer un enregistrement `media_generations` (type `video`) avec `metadata.woofs = 1` (car 12s = 1 Woof).
 

@@ -132,10 +132,6 @@ Expose the following variables in Lovable → **Project → Settings → Environ
 | `VITE_LOVABLE_PROJECT_ID` | ⚠️ | Used by `useBrandManagement` to preselect a Lovable project when collaborating. |
 | `VITE_APP_VERSION` | ⚠️ | Optional build stamp displayed in the UI for cache busting. |
 | `VITE_CLOUDINARY_CLOUD_NAME` | ⚠️ | Required for Cloudinary uploads/thumbnails. |
-| `VITE_FLAG_DESIGN_API` | ⚠️ | `1` to expose the Studio (Design API) surfaces in the UI. |
-| `VITE_FLAG_CAROUSEL` | ⚠️ | `1` to enable carousel planning/rendering in the chat and library. |
-| `VITE_FLAG_VIDEO` | ⚠️ | `1` to enable video uploads and generation workflows. |
-| `VITE_SENTRY_DSN` | ⚠️ | Frontend DSN used by the lightweight Sentry client for runtime errors. |
 | `VITE_AEDITUS_URL` | ⚠️ | Overrides the default Aeditus deep-link target. |
 | `VITE_FFMPEG_BACKEND_URL` | ⚠️ | Points advanced video tools to the Render FFmpeg backend. |
 | `VITE_HIDE_BACKEND_BADGES` | ⚠️ | Set to `true` to hide backend availability badges in staging demos. |
@@ -149,20 +145,9 @@ For Supabase Edge Functions deploy the following secrets (names without the `VIT
 - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - `FFMPEG_BACKEND_URL`, `FFMPEG_BACKEND_API_KEY`, `FFMPEG_BACKEND_BEARER` (video rendering bridge)
 - `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
-- `SUPABASE_SERVICE_ROLE` (Render worker) and `ALLOWED_ORIGIN` (CORS hardening)
-- `SENTRY_DSN` for the Supabase worker / Render logs pipeline
 - `INTERNAL_FN_SECRET` and other service credentials referenced in `supabase/functions/*`
 
 On Render, reuse the same `FFMPEG_BACKEND_*` variables so the worker API remains reachable from Supabase. Keep secrets confined to server environments—only expose the public `VITE_*` variables to the Lovable frontend.
-
-### Render canary environment
-
-Create a dedicated Render static site + background worker pair for canary validation:
-
-- Start from production settings but lower plan/timeout quotas to surface regressions quickly.
-- Set `VITE_FLAG_DESIGN_API`, `VITE_FLAG_CAROUSEL`, and `VITE_FLAG_VIDEO` to `0` by default so no unfinished surface leaks into preview builds. Flip individual flags to `1` directly in Render when you want to validate a feature.
-- Enable verbose logs on both services—worker logs now emit structured JSON for job start/end/duration and the FFmpeg bridge traces each request. Attach your logging stack (Datadog/Sentry) to this environment before promoting to production.
-- Keep `SENTRY_DSN` pointed at a non-production project to avoid noise in the main dashboard.
 
 ## Variables d'environnement (accès VIP/Admin)
 

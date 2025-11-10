@@ -10,7 +10,6 @@ import { uploadToChatBucket } from "@/lib/chatUploads";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { VIDEO_ENGINE_CONFIG } from "@/config/videoEngine";
 import { generateImage } from "@/features/studio/hooks/useGenerateImage";
-import { FLAGS } from "@/config/flags";
 
 type GeneratedAsset = {
   type: "image" | "video";
@@ -229,7 +228,6 @@ async function generateVideoWithFfmpeg({ prompt, aspectRatio, source, signal }: 
 }
 
 export function ChatGenerator() {
-  const videoEnabled = FLAGS.VIDEO;
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [contentType, setContentType] = useState<ContentType>("image");
@@ -268,9 +266,8 @@ export function ChatGenerator() {
   }, [contentType]);
 
   const canGenerate = useMemo(() => {
-    if (!videoEnabled && contentType === "video") return false;
     return !isGenerating && (!!prompt.trim() || !!uploadedSource);
-  }, [isGenerating, prompt, uploadedSource, contentType, videoEnabled]);
+  }, [isGenerating, prompt, uploadedSource]);
 
   const handleSourceUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -281,11 +278,6 @@ export function ChatGenerator() {
 
     if (!isVideo && !isImage) {
       toast.error("Format non supporté. Choisissez une image ou une vidéo.");
-      return;
-    }
-
-    if (isVideo && !videoEnabled) {
-      toast.error("La génération vidéo est désactivée dans cet environnement.");
       return;
     }
 
@@ -317,7 +309,7 @@ export function ChatGenerator() {
       };
       setUploadedSource(src);
 
-      if (isVideo && videoEnabled) setContentType("video");
+      if (isVideo) setContentType("video");
 
       toast.success(isVideo ? "Vidéo ajoutée ! 🎬" : "Image ajoutée ! 📸");
     } catch (error: unknown) {
@@ -350,10 +342,6 @@ export function ChatGenerator() {
     }
     if (contentType === "image" && uploadedSource?.type === "video") {
       toast.error("Veuillez sélectionner une image pour générer une image.");
-      return;
-    }
-    if (contentType === "video" && !videoEnabled) {
-      toast.error("La génération vidéo est désactivée dans cet environnement.");
       return;
     }
 
@@ -415,7 +403,7 @@ export function ChatGenerator() {
         }
 
         toast.success("Image générée avec succès ! ✨");
-      } else if (videoEnabled) {
+      } else {
         const videoUrl = await generateVideoWithFfmpeg({
           prompt: prompt || "Creative social video",
           aspectRatio,
@@ -468,12 +456,6 @@ export function ChatGenerator() {
       setIsGenerating(false);
     }
   };
-
-  useEffect(() => {
-    if (!videoEnabled && contentType === "video") {
-      setContentType("image");
-    }
-  }, [videoEnabled, contentType]);
 
   useEffect(() => {
     return () => {
@@ -594,30 +576,15 @@ export function ChatGenerator() {
             {/* Type Selector */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Type de rendu</label>
-              <Select
-                value={contentType}
-                onValueChange={(v) => {
-                  const type = v as ContentType;
-                  if (type === "video" && !videoEnabled) {
-                    toast.error("La génération vidéo est désactivée dans cet environnement.");
-                    return;
-                  }
-                  setContentType(type);
-                }}
-              >
+              <Select value={contentType} onValueChange={(v) => setContentType(v as ContentType)}>
                 <SelectTrigger className="bg-muted/50 border-border">
                   <SelectValue placeholder="Sélectionnez un type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="image">Image</SelectItem>
-                  {videoEnabled && <SelectItem value="video">Vidéo</SelectItem>}
+                  <SelectItem value="video">Vidéo</SelectItem>
                 </SelectContent>
               </Select>
-              {!videoEnabled && (
-                <p className="text-xs text-muted-foreground">
-                  La génération vidéo est désactivée dans cet environnement.
-                </p>
-              )}
             </div>
 
             {/* Format Selector */}
@@ -659,7 +626,7 @@ export function ChatGenerator() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept={videoEnabled ? "image/*,video/*" : "image/*"}
+                  accept="image/*,video/*"
                   onChange={handleSourceUpload}
                   className="hidden"
                 />
