@@ -9,7 +9,7 @@
     "skipLibCheck": true,
     "noEmit": true,
 
-    /* alias @ → src */
+    /* === alias @ vers src (IMPORTANT) === */
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
