@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useSupabase } from '@/lib/supabaseClient';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseSafeClient';
 import { useAuth } from '@/hooks/useAuth';
 import { safeString } from '@/lib/safeRender';
 
@@ -33,11 +33,16 @@ export function useBrandKit() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [activeBrandId, setActiveBrandId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = useSupabase();
 
-  const loadBrands = useCallback(async () => {
+  useEffect(() => {
+    if (user) {
+      loadBrands();
+    }
+  }, [user]);
+
+  const loadBrands = async () => {
     if (!user) return;
-
+    
     try {
       // Load all brands for this user
       const { data: brandsData, error: brandsError } = await supabase
@@ -81,13 +86,7 @@ export function useBrandKit() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, user]);
-
-  useEffect(() => {
-    if (user) {
-      void loadBrands();
-    }
-  }, [loadBrands, user]);
+  };
 
   const setActiveBrand = async (brandId: string) => {
     if (!user) return;

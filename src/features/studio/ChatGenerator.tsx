@@ -1,20 +1,10 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import {
-  Upload,
-  Wand2,
-  Download,
-  X,
-  Sparkles,
-  Loader2,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-} from "lucide-react";
+import { Upload, Wand2, Download, X, Sparkles, Loader2, Clock, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useSupabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import { createGeneration, forceProcessJobs } from "@/api/alfie";
 import { useToast } from "@/hooks/use-toast";
 import { uploadToChatBucket } from "@/lib/chatUploads";
@@ -26,7 +16,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { JobCard } from "./components/JobCard";
 import { AssetCard as StudioAssetCard } from "./components/AssetCard";
 import type { JobEntry, MediaEntry } from "./types";
-import { notifyAuthGuard } from "@/lib/authErrors";
 
 type GeneratedAsset = {
   url: string;
@@ -122,7 +111,6 @@ function fetchWithTimeoutPromise<T>(promise: Promise<T>, ms: number) {
 export function ChatGenerator() {
   const { activeBrandId } = useBrandKit();
   const location = useLocation();
-  const supabase = useSupabase();
   const orderId =
     useMemo(() => {
       const params = new URLSearchParams(location.search);
@@ -152,9 +140,6 @@ export function ChatGenerator() {
   const { toast: showToast } = useToast();
 
   const showGenerationError = useCallback((err: unknown) => {
-    if (notifyAuthGuard(err)) {
-      return;
-    }
     if (err instanceof Error && err.name === "AbortError") {
       toast.error("Timeout: la génération a pris trop de temps.");
       return;
@@ -564,10 +549,6 @@ export function ChatGenerator() {
       const status = err instanceof Error && typeof (err as any).status === "number"
         ? (err as any).status
         : undefined;
-
-      if (notifyAuthGuard(err)) {
-        return;
-      }
 
       if (status === 409 || errMsg.startsWith("409 ")) {
         toast.info("Un traitement est déjà en cours. Réessaie dans quelques secondes.");

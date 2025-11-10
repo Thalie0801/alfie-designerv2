@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { Send, ImagePlus, Loader2, Download } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useBrandKit } from "@/hooks/useBrandKit";
-import { useSupabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseSafeClient";
 import { getAuthHeader } from "@/lib/auth";
 import { uploadToChatBucket } from "@/lib/chatUploads";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,6 @@ import { getAspectClass, type ConversationState, type OrchestratorResponse } fro
 import { slideUrl } from "@/lib/cloudinary/imageUrls";
 import { extractCloudNameFromUrl } from "@/lib/cloudinary/utils";
 import { useNavigate } from "react-router-dom";
-import { notifyAuthGuard } from "@/lib/authErrors";
 
 // =====================
 // Détection d'intention vidéo
@@ -125,7 +124,6 @@ export function AlfieChat() {
   const { user } = useAuth();
   const { activeBrandId, brandKit } = useBrandKit();
   const navigate = useNavigate();
-  const supabase = useSupabase();
 
   // États
   const [messages, setMessages] = useState<Message[]>([
@@ -323,12 +321,13 @@ export function AlfieChat() {
         type: "text",
       });
     }
-  }, [addMessage, conversationState, expectedTotal, orderAssets, orderId, orderTotal]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderAssets, orderId, conversationState, orderTotal, expectedTotal]);
 
   // Realtime job monitoring (avec garde si l'order change)
   useEffect(() => {
     if (!orderId) return;
-    const currentOrder = orderId;
+    let currentOrder = orderId;
 
     const channel = supabase
       .channel("job_queue_changes")
@@ -385,7 +384,7 @@ export function AlfieChat() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [orderId, supabase]);
+  }, [orderId]);
 
   // =====================
   // Upload d'image validé
@@ -739,9 +738,6 @@ export function AlfieChat() {
       } catch (error: unknown) {
         lastError = error;
         console.error(`[Chat] Error (attempt ${attempt}/${maxRetries}):`, error);
-        if (notifyAuthGuard(error)) {
-          break;
-        }
         if (attempt < maxRetries) {
           await sleep(backoffMs(attempt));
         }

@@ -1,7 +1,7 @@
 import { memo, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Image as ImageIcon, Library, Layout } from "lucide-react";
+import { Image as ImageIcon, Video as VideoIcon, Library, Layout } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { useActivityStats } from "@/hooks/useActivityStats";
@@ -35,6 +35,7 @@ export const QuickActions = memo(function QuickActions({ className, compact }: Q
 
   const noBrand = !activeBrand;
   const imagesOver = (stats?.imagesQuota ?? 0) > 0 && (stats?.imagesCount ?? 0) >= (stats?.imagesQuota ?? 0);
+  const videosOver = (stats?.videosQuota ?? 0) > 0 && (stats?.videosCount ?? 0) >= (stats?.videosQuota ?? 0);
 
   const actions: Action[] = useMemo(
     () => [
@@ -45,6 +46,14 @@ export const QuickActions = memo(function QuickActions({ className, compact }: Q
         to: "/app?mode=image",
         isDisabled: noBrand || imagesOver,
         disabledReason: noBrand ? "Aucune marque active" : imagesOver ? "Quota visuels atteint" : null,
+      },
+      {
+        id: "video",
+        label: "Créer une vidéo",
+        icon: VideoIcon,
+        to: "/app?mode=video",
+        isDisabled: noBrand || videosOver,
+        disabledReason: noBrand ? "Aucune marque active" : videosOver ? "Quota vidéos atteint" : null,
       },
       {
         id: "library",
@@ -63,7 +72,7 @@ export const QuickActions = memo(function QuickActions({ className, compact }: Q
         disabledReason: null,
       },
     ],
-    [noBrand, imagesOver],
+    [noBrand, imagesOver, videosOver],
   );
 
   const cellClass = cn(
@@ -93,6 +102,11 @@ export const QuickActions = memo(function QuickActions({ className, compact }: Q
               {id === "image" && stats?.imagesQuota ? (
                 <span className="sr-only">
                   {Math.round(percent(stats?.imagesCount, stats?.imagesQuota))}% de votre quota visuels utilisé
+                </span>
+              ) : null}
+              {id === "video" && stats?.videosQuota ? (
+                <span className="sr-only">
+                  {Math.round(percent(stats?.videosCount, stats?.videosQuota))}% de votre quota vidéos utilisé
                 </span>
               ) : null}
             </Button>

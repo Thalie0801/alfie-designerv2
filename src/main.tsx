@@ -4,7 +4,6 @@ import { BrowserRouter } from 'react-router-dom';
 
 import App from './App';
 import './index.css';
-import { SupabaseProvider } from './lib/supabaseClient';
 
 function enforceIframeSandboxPolicy() {
   if (typeof document === 'undefined') return;
@@ -116,12 +115,10 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <SupabaseProvider>
-      <ErrorBoundary>
-        <BrowserRouter basename={import.meta.env.BASE_URL}>
-          <App />
-        </BrowserRouter>
-      </ErrorBoundary>
-    </SupabaseProvider>
+    <ErrorBoundary>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
+        <App />
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>,
 );
