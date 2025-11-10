@@ -125,6 +125,20 @@ jobs:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
+      - name: Ensure deps present (fallback install)
+        run: |
+          if [ ! -d node_modules ] || [ -z "$(ls -A node_modules)" ]; then
+            echo "node_modules cache miss → installing"
+            if [ -f package-lock.json ]; then
+              npm ci --prefer-offline --no-audit --no-fund \
+              || npm ci --prefer-offline --no-audit --no-fund --legacy-peer-deps
+            else
+              npm install --prefer-online --no-audit --no-fund --legacy-peer-deps
+            fi
+          else
+            echo "node_modules cache hit"
+          fi
+
       - name: Type check
         id: tsc
         run: |
@@ -205,6 +219,20 @@ jobs:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
+      - name: Ensure deps present (fallback install)
+        run: |
+          if [ ! -d node_modules ] || [ -z "$(ls -A node_modules)" ]; then
+            echo "node_modules cache miss → installing"
+            if [ -f package-lock.json ]; then
+              npm ci --prefer-offline --no-audit --no-fund \
+              || npm ci --prefer-offline --no-audit --no-fund --legacy-peer-deps
+            else
+              npm install --prefer-online --no-audit --no-fund --legacy-peer-deps
+            fi
+          else
+            echo "node_modules cache hit"
+          fi
+
       - name: Lint
         id: lint
         continue-on-error: true
@@ -273,6 +301,20 @@ jobs:
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Ensure deps present (fallback install)
+        run: |
+          if [ ! -d node_modules ] || [ -z "$(ls -A node_modules)" ]; then
+            echo "node_modules cache miss → installing"
+            if [ -f package-lock.json ]; then
+              npm ci --prefer-offline --no-audit --no-fund \
+              || npm ci --prefer-offline --no-audit --no-fund --legacy-peer-deps
+            else
+              npm install --prefer-online --no-audit --no-fund --legacy-peer-deps
+            fi
+          else
+            echo "node_modules cache hit"
+          fi
 
       - name: Restore Vite cache
         uses: actions/cache@v4
