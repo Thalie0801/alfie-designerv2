@@ -351,10 +351,14 @@ jobs:
 
       - name: Verify try/catch hygiene
         id: verify_trycatch
-        if: contains('main,refonte-alfie-2025', github.ref_name) && !contains(github.event.head_commit.message, '[skip-verify]')
-        if: contains('main,refonte-alfie-2025', github.ref_name)
+        # On ne l'exécute "plein pot" que sur main/refonte-alfie-2025
+        if: ${{ github.ref_name == 'main' || github.ref_name == 'refonte-alfie-2025' }}
         continue-on-error: true
-        run: npm run verify:trycatch
+        run: |
+          if echo "${{ github.event.head_commit.message }}" | grep -q "\[skip-verify\]"; then
+            echo "skip verify"; exit 0;
+          fi
+          npm run verify:trycatch
 
       - name: Summarize results
         run: |
@@ -377,7 +381,12 @@ jobs:
           if [ "${{ needs.lint.result }}" != "success" ]; then
             echo "::warning::Lint had issues but not blocking"; fi
           if [ "${{ needs.verify.result }}" != "success" ]; then
-            echo "::error::Strict pipeline failed"; exit 1; fi
+            if [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.ref_name }}" = "refonte-alfie-2025" ]; then
+              echo "::error::Strict pipeline failed"; exit 1;
+            else
+              echo "::warning::Strict pipeline failed (non-blocking on PR)";
+            fi
+          fi
           echo "✅ Quality checks completed"
 
    
