@@ -1,29 +1,12 @@
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
-import path from "path";
-import { componentTagger } from "lovable-tagger";
+import react from "@vitejs/plugin-react";
+import path from "node:path";
 
-export default defineConfig(({ mode }) => ({
-  plugins: [
-    react(),
-    mode === 'development' && componentTagger(),
-  ].filter(Boolean),
-  base: "/",
+export default defineConfig({
+  plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
-      "@/integrations/supabase/client": path.resolve(
-        __dirname,
-        "./src/lib/supabaseSafeClient.ts"
-      ),
+      "@": path.resolve(__dirname, "src"),
     },
   },
-  server: {
-    host: "::",
-    port: 8080,
-  },
-  build: {
-    outDir: "dist",
-    chunkSizeWarningLimit: 1500,
-  },
-}));
+});
