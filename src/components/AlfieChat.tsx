@@ -1,12 +1,11 @@
+// src/components/AlfieChat.tsx
 import { useCallback, useMemo, useRef, useState } from "react";
+import { cn } from "@/lib/utils"; // ⬅️ utilise ton helper cn (clsx + twMerge)
 
 type Role = "user" | "assistant" | "system";
 type ChatMsg = { id: string; role: Role; content: string };
 
-// util léger pour éviter toute dépendance externe
-function clsx(...parts: Array<string | false | null | undefined>) {
-  return parts.filter(Boolean).join(" ");
-}
+// petit uid sans dépendances
 function uid() {
   return "m_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
@@ -16,8 +15,7 @@ export default function AlfieChat() {
     {
       id: "welcome",
       role: "assistant",
-      content:
-        "Salut, je suis Alfie. Dis-moi ce que tu veux créer (image, carrousel, vidéo) et je m’occupe du reste.",
+      content: "Salut, je suis Alfie. Dis-moi ce que tu veux créer (image, carrousel, vidéo) et je m’occupe du reste.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -31,12 +29,11 @@ export default function AlfieChat() {
 
     const userMsg: ChatMsg = { id: uid(), role: "user", content };
 
-    // ⚠️ Squelette minimal : pas d’appel réseau ici
+    // Squelette minimal : pas d’appel réseau
     const echo: ChatMsg = {
       id: uid(),
       role: "assistant",
-      content:
-        "Reçu. (Squelette minimal) — branchement vers orchestrateur/edge functions à cet endroit.",
+      content: "Reçu. (Squelette minimal) — branchement vers orchestrateur/edge functions à cet endroit.",
     };
 
     setMessages((prev) => [...prev, userMsg, echo]);
@@ -57,17 +54,13 @@ export default function AlfieChat() {
         {messages.map((m) => (
           <div
             key={m.id}
-            className={clsx(
+            className={cn(
               "max-w-[75%] rounded-2xl px-4 py-3 shadow-sm",
-              m.role === "user"
-                ? "ml-auto bg-primary text-primary-foreground"
-                : "mr-auto bg-muted"
+              m.role === "user" ? "ml-auto bg-primary text-primary-foreground" : "mr-auto bg-muted",
             )}
             aria-label={`${m.role} message`}
           >
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">
-              {m.content}
-            </p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">{m.content}</p>
           </div>
         ))}
       </div>
@@ -85,11 +78,9 @@ export default function AlfieChat() {
           <button
             onClick={handleSend}
             disabled={!canSend}
-            className={clsx(
+            className={cn(
               "rounded-xl px-4 py-2",
-              canSend
-                ? "bg-black text-white hover:opacity-90"
-                : "bg-muted text-muted-foreground cursor-not-allowed"
+              canSend ? "bg-black text-white hover:opacity-90" : "bg-muted text-muted-foreground cursor-not-allowed",
             )}
           >
             Envoyer
