@@ -239,10 +239,10 @@ function normalizeFonts(fonts: any): string {
     const candidates = [fonts.primary, fonts.secondary, fonts.tertiary, fonts.headline, fonts.body].filter(Boolean);
     if (candidates.length) return candidates.join(', ');
     // Dernier recours: concat des valeurs propres
-    try {
-      const values = Object.values(fonts).filter(v => typeof v === 'string');
-      if (values.length) return values.join(', ');
-    } catch (_) {}
+    const values = Object.values(fonts as Record<string, unknown>).filter(
+      (value): value is string => typeof value === 'string'
+    );
+    if (values.length) return values.join(', ');
   }
 
   // Chaîne simple

@@ -1,9 +1,14 @@
 const EDGE_BASE = import.meta.env.VITE_EDGE_BASE_URL;
 
-function assertEdgeBase(): asserts EDGE_BASE is string {
-  if (!EDGE_BASE) {
+function assertEdgeBase(value: unknown): asserts value is string {
+  if (typeof value !== "string" || value.trim() === "") {
     throw new Error("VITE_EDGE_BASE_URL manquant (Lovable Edge Function base URL)");
   }
+}
+
+function getEdgeBase(): string {
+  assertEdgeBase(EDGE_BASE);
+  return EDGE_BASE;
 }
 
 export function buildLovableProjectUrl(projectId: string, path: string) {
@@ -11,10 +16,9 @@ export function buildLovableProjectUrl(projectId: string, path: string) {
     throw new Error("Missing projectId before calling collaborators API");
   }
 
-  assertEdgeBase();
-
+  const base = getEdgeBase();
   const normalizedPath = (path.startsWith("/") ? path : `/${path}`).replace(/\/{2,}/g, "/");
-  return `${EDGE_BASE}/lovable-proxy/projects/${encodeURIComponent(projectId)}${normalizedPath}`;
+  return `${base}/lovable-proxy/projects/${encodeURIComponent(projectId)}${normalizedPath}`;
 }
 
 async function handleLovableResponse<T>(response: Response): Promise<T> {

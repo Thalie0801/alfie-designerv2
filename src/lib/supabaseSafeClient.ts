@@ -2,15 +2,15 @@ import {
   createClient,
   type SupabaseClient,
   type SupabaseClientOptions,
-} from '@supabase/supabase-js';
-import type { Database } from '@/integrations/supabase/types';
+} from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
 
 const URL = import.meta.env.VITE_SUPABASE_URL;
 const KEY =
   import.meta.env.VITE_SUPABASE_ANON_KEY ||
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-const authConfig: SupabaseClientOptions<Database>['auth'] =
+const authConfig: SupabaseClientOptions<'public'>['auth'] =
   typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
     ? {
         storage: window.localStorage,
@@ -19,11 +19,11 @@ const authConfig: SupabaseClientOptions<Database>['auth'] =
       }
     : undefined;
 
-const clientOptions: SupabaseClientOptions<Database> | undefined = authConfig
+const clientOptions: SupabaseClientOptions<'public'> | undefined = authConfig
   ? { auth: authConfig }
   : undefined;
 
-type DatabaseClient = SupabaseClient<Database>;
+type DatabaseClient = SupabaseClient<Database, 'public'>;
 
 function createMissingEnvProxy(): DatabaseClient {
   const err = new Error(
@@ -44,5 +44,5 @@ function createMissingEnvProxy(): DatabaseClient {
 
 export const supabase: DatabaseClient =
   URL && KEY
-    ? createClient<Database>(URL, KEY, clientOptions)
+    ? createClient<Database, 'public'>(URL, KEY, clientOptions)
     : createMissingEnvProxy();

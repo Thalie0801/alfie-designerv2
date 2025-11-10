@@ -1,5 +1,45 @@
 import { z } from "zod";
 
+export const AlfieIntentSchema = z
+  .object({
+    brandId: z.string().min(1),
+    kind: z.enum(["image", "carousel", "video", "text"]),
+    language: z.enum(["fr", "en", "es"]).default("fr"),
+    goal: z.enum(["awareness", "lead", "sale"]).default("awareness"),
+    ratio: z.enum(["1:1", "4:5", "9:16", "16:9", "3:4"]).default("1:1"),
+    slides: z.number().int().positive().max(20).nullable().default(null),
+    templateId: z.string().min(1).nullable().default(null),
+    copyBrief: z.string().min(3),
+    cta: z.string().min(1).nullable().default(null),
+    campaign: z.string().min(1).nullable().default(null),
+    paletteLock: z.boolean().default(true),
+    typographyLock: z.boolean().default(false),
+    assetsRefs: z.array(z.string()).default([]),
+    quality: z.enum(["fast", "high"]).default("fast"),
+    tone_pack: z.enum(["brand_default", "apple_like", "playful", "b2b_crisp"]).default("brand_default"),
+  })
+  .refine((value) => value.kind !== "carousel" || (value.slides ?? 0) > 0, {
+    path: ["slides"],
+    message: "slides requis (>0) pour un carrousel",
+  });
+
+export type AlfieIntent = z.infer<typeof AlfieIntentSchema>;
+
+export function normalizeIntent(partial: Partial<AlfieIntent>): AlfieIntent {
+  const defaults: Partial<AlfieIntent> = {
+    language: "fr",
+    goal: "awareness",
+    ratio: "1:1",
+    slides: partial.kind === "carousel" ? partial.slides ?? 5 : null,
+    paletteLock: true,
+    typographyLock: false,
+    assetsRefs: [],
+    quality: "fast",
+    tone_pack: "brand_default",
+  };
+
+  return AlfieIntentSchema.parse({ ...defaults, ...partial });
+}
 export const AlfieIntentSchema = z.object({
   brandId: z.string().min(1, "brandId manquant"),
   kind: z.enum(["image", "carousel", "video", "text"], {
