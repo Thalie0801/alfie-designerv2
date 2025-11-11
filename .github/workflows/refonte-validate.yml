@@ -1,0 +1,11 @@
+name: Refonte — Validate (no push/publish)
+on:
+  pull_request:
+    branches: ["**"]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run validation script
+        run: bash scripts/validate_refonte.sh

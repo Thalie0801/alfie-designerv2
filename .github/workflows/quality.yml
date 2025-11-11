@@ -144,22 +144,15 @@ jobs:
 
       # 2) Ouvrir une PR si des fichiers ont changé
       - name: Create PR with formatting
-        id: cpr
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore(deno): fmt supabase/functions"
           title: "chore(deno): fmt supabase/functions"
           body: "Auto-format via CI (deno fmt)."
-          branch: chore/deno-fmt
-          delete-branch: true
-          base: main
+          branch: chore/deno-fmt-${{ github.run_id }}
+          base: ${{ github.base_ref || 'main' }}
           labels: deno, automated
           draft: false
-
-      - name: Show PR URL
-        if: steps.cpr.outputs.pull-request-url != ''
-        run: echo "PR: ${{ steps.cpr.outputs.pull-request-url }}"
 
       # 3) Check informatif (ne bloque pas)
       - name: deno fmt --check (informative)
