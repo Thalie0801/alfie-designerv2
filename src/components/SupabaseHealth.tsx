@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabaseSafeClient';
+import { supabase } from '@/integrations/supabase/client';
 
 export function SupabaseHealth() {
   const [envOk, setEnvOk] = useState<boolean | null>(null);

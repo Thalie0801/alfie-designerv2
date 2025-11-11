@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Newspaper } from 'lucide-react';
-import { supabase } from '@/lib/supabaseSafeClient';
+import { supabase } from '@/integrations/supabase/client';
 
 interface News {
   id: string;

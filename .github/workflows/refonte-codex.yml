@@ -1,16 +1,20 @@
 name: Refonte Codex (push→pull, disable autopublish)
+
 on:
   workflow_dispatch: {}
   push:
-    branches: [ main, refonte-alfie-2025 ]
+    branches:
+      - main
+      - refonte-alfie-2025
   pull_request:
-    branches: [ main, refonte-alfie-2025 ]
+    branches:
+      - main
+      - refonte-alfie-2025
+
 permissions:
   contents: write
   pull-requests: write
-concurrency:
-  group: codex-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+
 jobs:
   codex:
     runs-on: ubuntu-latest
@@ -19,66 +23,60 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+
       - name: Configure npm auth (optional)
+        if: ${{ secrets.NPM_TOKEN }}
+        run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -n "${NPM_TOKEN}" ]; then
-            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
-            echo "NPM auth configured."
-          else
-            echo "No NPM_TOKEN secret; skipping npm auth."
-          fi
+
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
       - name: Install dependencies
-        run: |
-          npm ci --prefer-online || (echo "retry npm ci…" && sleep 3 && npm ci --prefer-online)
-      - name: Run Codex script
+        run: npm ci --prefer-online
+      - name: Run Codex
         shell: bash
-        run: bash scripts/codex/run.sh
-      # ---- Diff + Guard ----
-      - name: Compute diff
-        id: diff
+        run: |
+          bash scripts/codex/run.sh
+
+      # GARDE SIMPLE & FIABLE : bloque toute modif dans apps/landing/, www/, site/
+      - name: Guard: No landing changes
         shell: bash
         run: |
           set -euo pipefail
-          # liste des fichiers modifiés (porcelain propre)
+
+          # Etat git stable (inclut non suivis avec "??")
           CHANGED="$(git -c core.quotepath=false status --porcelain)"
+
+          # Rien à signaler
           if [ -z "${CHANGED}" ]; then
-            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "OK: aucune modification détectée."
             exit 0
           fi
+
+          # Extrait les chemins (gère ?? et renommages Rxxx old -> new)
           FILES="$(echo "${CHANGED}" | awk '
             $1 ~ /^\?\?/ { $1=""; sub(/^ +/,""); print; next }
             $1 ~ /^R/   { match($0, /-> (.*)$/, m); if (m[1]!="") print m[1]; next }
             { $1=""; sub(/^ +/,""); print }')"
-          echo "files<<__EOF__" >> "$GITHUB_OUTPUT"
-          echo "${FILES}" >> "$GITHUB_OUTPUT"
-          echo "__EOF__" >> "$GITHUB_OUTPUT"
-          echo "has_changes=true" >> "$GITHUB_OUTPUT"
-      - name: "Guard — No landing changes"
-        if: steps.diff.outputs.has_changes == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          FILES="${{ steps.diff.outputs.files }}"
-          echo "Changed files:"
-          echo "${FILES}" | sed 's/^/ - /'
+
+          # Filtre dossiers interdits (slash requis pour cibler le dossier)
           if echo "${FILES}" | grep -E -q '^(apps/landing/|www/|site/)'; then
             echo "::error title=Landing modifiée::Ce patch ne doit pas toucher la landing."
+            echo "Fichiers concernés :"
             echo "${FILES}" | grep -E '^(apps/landing/|www/|site/)' | sed 's/^/ - /'
             exit 1
           fi
+
           echo "OK: aucune modification dans apps/landing, www ou site."
-      # ---- PR seulement si changements + pas depuis un event PR ----
+
       - name: Create Pull Request
-        if: steps.diff.outputs.has_changes == 'true' && github.event_name != 'pull_request'
         uses: peter-evans/create-pull-request@v6
         with:
           commit-message: "Codex: push→pull, autopublish off, premium confirmation flag"
@@ -96,3 +94,4 @@ jobs:
             automated
             codex
           draft: false
+

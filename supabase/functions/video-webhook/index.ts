@@ -1,9 +1,7 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'content-type, x-stripe-signature',
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
 };
@@ -178,40 +176,88 @@ const extractOutputUrl = (payload: PayloadRecord): string | null => {
 };
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  if (req.method !== "POST") {
+    return new Response("Method not allowed", { status: 405, headers: corsHeaders });
   }
 
   try {
-    const stripeSignature = req.headers.get('x-stripe-signature');
-    if (!stripeSignature) {
-      throw new Error('Missing Stripe signature');
+    const payload = (await req.json()) as PayloadRecord;
+    const id = typeof payload.id === "string" ? payload.id : undefined;
+
+    if (!id) {
+      return jsonResponse(JSON.stringify({ error: "missing id" }), 400);
     }
 
-    // TODO: Implémenter la vérification de la signature Stripe
-    // const valid = await verifyStripeWebhook(req.body, stripeSignature);
-    // if (!valid) {
-    //   throw new Error('Invalid Stripe signature');
-    // }
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error("Missing Supabase configuration");
+    }
 
-    const payload = await req.json();
-
-    // TODO: Traiter le webhook validé
-
-    return new Response(JSON.stringify({ received: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    const admin = createClient(supabaseUrl, supabaseKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
     });
 
-  } catch (error: any) {
-    console.error('[video-webhook] Error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    const { data: record, error: selectError } = await admin
+      .from("media_generations")
+      .select("id, metadata, output_url")
+      .or(`job_id.eq.${id},metadata->>predictionId.eq.${id}`)
+      .maybeSingle();
+
+    if (selectError) {
+      console.error("video-webhook select error", selectError);
+      return jsonResponse(JSON.stringify({ error: "select failed" }), 500);
+    }
+
+    if (!record) {
+      console.warn("video-webhook: no media_generation found for", id);
+      return jsonResponse("\"ok\"");
+    }
+
+    const existingMetadata = (record.metadata as Record<string, unknown> | null) ?? {};
+    const normalizedStatus = normalizeStatus(payload);
+    const outputUrl = extractOutputUrl(payload);
+
+    const metadata: Record<string, unknown> = {
+      ...existingMetadata,
+      lastWebhookAt: new Date().toISOString(),
+      lastWebhookStatus: payload.status ?? payload.state ?? normalizedStatus,
+      webhookPayload: payload
+    };
+
+    if (payload.error) {
+      metadata.error = payload.error;
+    }
+
+    const update: Record<string, unknown> = {
+      status: normalizedStatus,
+      updated_at: new Date().toISOString(),
+      metadata
+    };
+
+    if (outputUrl) {
+      update.output_url = outputUrl;
+    }
+
+    const { error: updateError } = await admin
+      .from("media_generations")
+      .update(update)
+      .eq("id", record.id);
+
+    if (updateError) {
+      console.error("video-webhook update error", updateError);
+      return jsonResponse(JSON.stringify({ error: "update failed" }), 500);
+    }
+
+    return jsonResponse("\"ok\"");
+  } catch (error) {
+    console.error("video-webhook error", error);
+    const message = error instanceof Error ? error.message : "webhook error";
+    return jsonResponse(JSON.stringify({ error: message }), 500);
   }
 });

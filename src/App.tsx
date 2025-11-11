@@ -16,7 +16,6 @@ import Admin from "./pages/Admin";
 import AdminCreateCustomerPage from "./pages/admin/CreateCustomer";
 import ManageAmbassadors from "./pages/admin/ManageAmbassadors";
 import ResetUserPassword from "./pages/admin/ResetUserPassword";
-import AdminJobQueueMonitorPage from "./pages/admin/JobQueueMonitor";
 import Affiliate from "./pages/Affiliate";
 import Profile from "./pages/Profile";
 import DevenirPartenaire from "./pages/DevenirPartenaire";
@@ -205,16 +204,6 @@ const AppRoutes = () => {
               <ProtectedRoute requireAdmin>
                 <AppLayoutWithSidebar>
                   <ResetUserPassword />
-                </AppLayoutWithSidebar>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/job-queue"
-            element={
-              <ProtectedRoute requireAdmin>
-                <AppLayoutWithSidebar>
-                  <AdminJobQueueMonitorPage />
                 </AppLayoutWithSidebar>
               </ProtectedRoute>
             }

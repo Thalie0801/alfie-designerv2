@@ -40,9 +40,7 @@ serve(async (req) => {
     // Fetch recent jobs for the user
     const { data: jobs, error: jobsErr } = await supabase
       .from("job_queue")
-      .select(
-        "id, type, kind, status, error, retry_count, attempts, max_retries, max_attempts, created_at, updated_at"
-      )
+      .select("id, type, status, error, retry_count, max_retries, created_at, updated_at")
       .eq("user_id", userId)
       .order("updated_at", { ascending: false })
       .limit(50);
@@ -55,40 +53,20 @@ serve(async (req) => {
       });
     }
 
-    const counts = {
-      queued: 0,
-      retrying: 0,
-      running: 0,
-      completed: 0,
-      failed: 0,
-    } as Record<string, number>;
+    const counts = { queued: 0, running: 0, completed: 0, failed: 0 } as Record<string, number>;
     let oldestQueuedAgeSec: number | null = null;
     let runningStuckCount = 0;
     const STUCK_THRESHOLD_SEC = 5 * 60; // 5 minutes
 
     const now = Date.now();
 
-    const normaliseStatus = (status: string) => {
-      switch (status) {
-        case "processing":
-          return "running";
-        case "done":
-          return "completed";
-        case "error":
-          return "failed";
-        default:
-          return status;
-      }
-    };
-
     for (const j of jobs ?? []) {
-      const status = normaliseStatus(j.status ?? "queued");
-      counts[status] = (counts[status] ?? 0) + 1;
-      if (status === "queued" || status === "retrying") {
+      counts[j.status] = (counts[j.status] ?? 0) + 1;
+      if (j.status === "queued") {
         const ageSec = Math.floor((now - new Date(j.created_at as string).getTime()) / 1000);
         if (oldestQueuedAgeSec === null || ageSec > oldestQueuedAgeSec) oldestQueuedAgeSec = ageSec;
       }
-      if (status === "running") {
+      if (j.status === "running") {
         const ageSec = Math.floor((now - new Date(j.updated_at as string).getTime()) / 1000);
         if (ageSec > STUCK_THRESHOLD_SEC) runningStuckCount += 1;
       }
@@ -103,32 +81,19 @@ serve(async (req) => {
       .eq("status", "completed")
       .gte("updated_at", sinceIso);
 
-    const recent = (jobs ?? []).slice(0, 15).map((j) => {
-      const status = normaliseStatus(j.status ?? "queued");
-      return {
-        id: j.id,
-        type: j.type,
-        kind: j.kind,
-        status,
-        error: j.error,
-        retry: `${j.retry_count}/${j.max_retries ?? j.max_attempts ?? 3}`,
-        attempts: j.attempts,
-        max_attempts: j.max_attempts,
-        updated_at: j.updated_at,
-      };
-    });
+    const recent = (jobs ?? []).slice(0, 15).map((j) => ({
+      id: j.id,
+      type: j.type,
+      status: j.status,
+      error: j.error,
+      retry: `${j.retry_count}/${j.max_retries}`,
+      updated_at: j.updated_at,
+    }));
 
     const payload = {
       ok: true,
       now: nowIso,
-      counts: {
-        queued: counts.queued,
-        running: counts.running,
-        failed: counts.failed,
-        completed: counts.completed,
-        retrying: counts.retrying,
-        completed_24h: completed24h ?? 0,
-      },
+      counts: { ...counts, completed_24h: completed24h ?? 0 },
       backlogSeconds: oldestQueuedAgeSec,
       stuck: { runningStuckCount, thresholdSec: STUCK_THRESHOLD_SEC },
       recent,

@@ -1,32 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabaseSafeClient';
+import { supabase } from '@/integrations/supabase/client';
 import { getAuthHeader } from '@/lib/auth';
 import { useAuth } from '@/hooks/useAuth';
 
 export type QueueMonitorPayload = {
   ok: boolean;
   now: string;
-  counts: {
-    queued: number;
-    running: number;
-    failed: number;
-    completed?: number;
-    completed_24h?: number;
-    retrying?: number;
-  };
+  counts: { queued: number; running: number; failed: number; completed?: number; completed_24h?: number };
   backlogSeconds: number | null;
   stuck: { runningStuckCount: number; thresholdSec: number };
-  recent: Array<{
-    id: string;
-    type: string;
-    kind?: string;
-    status: string;
-    error?: string | null;
-    retry: string;
-    attempts?: number;
-    max_attempts?: number;
-    updated_at: string;
-  }>;
+  recent: Array<{ id: string; type: string; status: string; error?: string | null; retry: string; updated_at: string }>;
   scope: 'user' | 'global';
 };
 

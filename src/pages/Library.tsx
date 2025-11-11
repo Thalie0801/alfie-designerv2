@@ -9,7 +9,7 @@ import { useLibraryAssets } from '@/hooks/useLibraryAssets';
 import { AssetCard } from '@/components/library/AssetCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/lib/supabaseSafeClient';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AccessGuard } from '@/components/AccessGuard';
 import { CarouselsTab } from '@/components/library/CarouselsTab';

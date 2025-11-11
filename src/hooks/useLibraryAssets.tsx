@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseSafeClient';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 const MEDIA_URL_KEYS = [
@@ -391,7 +391,6 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
       }
 
       const SUPABASE_STORAGE_MARKER = '/storage/v1/object/public/media-generations/';
-      let downloadUrl = outputUrl;
       if (outputUrl.includes(SUPABASE_STORAGE_MARKER)) {
         const [, pathPart] = outputUrl.split(SUPABASE_STORAGE_MARKER);
         if (pathPart) {
@@ -399,7 +398,9 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
             .from('media-generations')
             .createSignedUrl(pathPart, 60 * 60);
           if (!signedError && signed?.signedUrl) {
-            downloadUrl = signed.signedUrl;
+            window.open(signed.signedUrl, '_blank');
+            toast.success('Téléchargement prêt');
+            return;
           }
           if (signedError) {
             console.warn('[Download] Signed URL error:', signedError);
@@ -408,23 +409,23 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
       }
 
       let blob: Blob;
-
+      
       // Si c'est une image base64, la convertir en blob
-      if (downloadUrl.startsWith('data:')) {
-        const base64Data = downloadUrl.split(',')[1];
-        const mimeType = downloadUrl.match(/data:([^;]+);/)?.[1] || 'image/png';
+      if (outputUrl.startsWith('data:')) {
+        const base64Data = outputUrl.split(',')[1];
+        const mimeType = outputUrl.match(/data:([^;]+);/)?.[1] || 'image/png';
         const byteString = atob(base64Data);
         const arrayBuffer = new ArrayBuffer(byteString.length);
         const uint8Array = new Uint8Array(arrayBuffer);
-
+        
         for (let i = 0; i < byteString.length; i++) {
           uint8Array[i] = byteString.charCodeAt(i);
         }
-
+        
         blob = new Blob([arrayBuffer], { type: mimeType });
       } else {
         // Sinon, télécharger depuis l'URL
-        const response = await fetch(downloadUrl);
+        const response = await fetch(outputUrl);
         if (!response.ok) throw new Error('Erreur lors du téléchargement');
         blob = await response.blob();
       }

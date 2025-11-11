@@ -2,7 +2,6 @@
 
 import { SlideTemplate, TextLayer } from './slideTemplates.ts';
 import { BrandSnapshot } from './brandResolver.ts';
-import { normalizeSpaces } from '../../../src/lib/regex.ts';
 
 export interface SlideContent {
   title?: string;
@@ -17,7 +16,7 @@ export interface SlideContent {
   kpis?: Array<{ label: string; delta: string }>;
 }
 
-const EXTRA_INVISIBLE_RE = new RegExp('[\\x7F\\u00A0\\uFEFF]', 'g');
+const CONTROL = new RegExp('[\\x00-\\x1F\\x7F\\u00A0\\uFEFF]', 'g');
 
 /**
  * Sanitize text by removing control characters, NBSP, BOM, and other invisible characters
@@ -25,7 +24,9 @@ const EXTRA_INVISIBLE_RE = new RegExp('[\\x7F\\u00A0\\uFEFF]', 'g');
  */
 function sanitizeText(text: string): string {
   if (!text) return '';
-  return normalizeSpaces(text).replace(EXTRA_INVISIBLE_RE, '').trim();
+  return text
+    .replace(CONTROL, '') // Remove control chars, NBSP, BOM
+    .trim();
 }
 
 export async function renderSlideToSVG(
@@ -46,7 +47,7 @@ export async function renderSlideToSVG(
   
   // Couche de texte (typo contrôlée, pas d'IA)
   for (const layer of template.textLayers) {
-    const text = sanitizeText(getTextForLayer(layer, slideContent));
+    let text = sanitizeText(getTextForLayer(layer, slideContent));
     if (!text) continue;
     
     // Use consistent font from brand kit

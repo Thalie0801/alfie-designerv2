@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { Send, ImagePlus, Loader2, Download } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useBrandKit } from "@/hooks/useBrandKit";
-import { supabase } from "@/lib/supabaseSafeClient";
+import { supabase } from "@/integrations/supabase/client";
 import { getAuthHeader } from "@/lib/auth";
 import { uploadToChatBucket } from "@/lib/chatUploads";
 import { Button } from "@/components/ui/button";
@@ -544,11 +544,10 @@ export function AlfieChat() {
         interface QueueMonitorResponse {
           counts?: {
             completed_24h?: number;
+            pending?: number;
             running?: number;
-            retrying?: number;
             queued?: number;
             failed?: number;
-            completed?: number;
           };
           backlogSeconds?: number;
           stuck?: { runningStuckCount?: number };
@@ -557,7 +556,7 @@ export function AlfieChat() {
         const c = response?.counts || {};
         const oldest = response?.backlogSeconds ?? null;
         const stuck = response?.stuck?.runningStuckCount ?? 0;
-        const done24h = c.completed_24h ?? 0;
+        const completed24h = c.completed_24h ?? 0;
         const minutes = oldest ? Math.max(0, Math.round((oldest as number) / 60)) : null;
 
         addMessage({
@@ -566,9 +565,8 @@ export function AlfieChat() {
             "📊 État de la file de jobs:",
             `• queued: ${c.queued ?? 0}`,
             `• running: ${c.running ?? 0}`,
-            `• retrying: ${c.retrying ?? 0}`,
             `• failed: ${c.failed ?? 0}`,
-            `• completed (24h): ${done24h}`,
+            `• completed (24h): ${completed24h}`,
             `• plus ancien en attente: ${minutes !== null ? minutes + " min" : "n/a"}`,
             `• jobs bloqués (>5min): ${stuck}`,
           ].join("\n"),
@@ -589,8 +587,6 @@ export function AlfieChat() {
 
     // Retry orchestrator (3 tentatives)
     const maxRetries = 3;
-
-    let lastError: unknown = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -712,7 +708,6 @@ export function AlfieChat() {
         inFlightRef.current = false;
         return;
       } catch (error: unknown) {
-        lastError = error;
         console.error(`[Chat] Error (attempt ${attempt}/${maxRetries}):`, error);
         if (attempt < maxRetries) {
           await sleep(backoffMs(attempt));
@@ -722,13 +717,12 @@ export function AlfieChat() {
 
     // Échec toutes tentatives
     if (mountedRef.current) {
-      const errorDetails = lastError ? toErrorMessage(lastError) : "Erreur inconnue";
       addMessage({
         role: "assistant",
         content: "❌ Impossible de lancer la génération après plusieurs tentatives. Réessaie dans quelques instants.",
         type: "text",
       });
-      toast.error(`Échec après 3 tentatives : ${errorDetails}`);
+      toast.error("Échec après 3 tentatives");
       setIsLoading(false);
       inFlightRef.current = false;
     }

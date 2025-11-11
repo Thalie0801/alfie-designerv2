@@ -1,5 +1,6 @@
 import { cleanText } from './utils';
-import { encodeOverlayText } from './text';
+
+const enc = (t: string) => encodeURIComponent(t);
 
 /**
  * Générer une URL Cloudinary pour vidéo avec overlays texte
@@ -29,12 +30,12 @@ export function videoUrl(
 
   if (t) {
     overlays.push(
-      `l_text:Arial_72_bold:${encodeOverlayText(t)},co_rgb:FFFFFF,g_south,y_280,w_${Math.round(w * 0.9)},c_fit`
+      `l_text:Arial_72_bold:${enc(t)},co_rgb:FFFFFF,g_south,y_280,w_${Math.round(w * 0.9)},c_fit`
     );
   }
   if (s) {
     overlays.push(
-      `l_text:Arial_42:${encodeOverlayText(s)},co_rgb:E5E7EB,g_south,y_160,w_${Math.round(w * 0.84)},c_fit`
+      `l_text:Arial_42:${enc(s)},co_rgb:E5E7EB,g_south,y_160,w_${Math.round(w * 0.84)},c_fit`
     );
   }
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { supabase } from "@/lib/supabaseSafeClient";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,13 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { slideUrl } from "@/lib/cloudinary/imageUrls";
 import { extractCloudNameFromUrl } from "@/lib/cloudinary/utils";
+import { generateCarouselVideoFromLibrary } from "@/lib/cloudinary/carouselToVideo";
 import { cn } from "@/lib/utils";
 
 interface CarouselSlide {
   id: string;
   cloudinary_url: string;
-  secure_url?: string | null;
-  preview_url?: string | null;
   slide_index: number | null;
   carousel_id: string | null;
   order_id: string | null;
@@ -32,21 +31,19 @@ interface CarouselSlide {
     cloudinary_base_url?: string;
     [k: string]: any;
   } | null;
-  meta?: Record<string, any> | null;
   // champs possibles selon ta table
   user_id?: string;
   brand_id?: string;
 }
 
 function resolveCloudName(slide: CarouselSlide): string | undefined {
-  const fromUrl = extractCloudNameFromUrl(slide.secure_url || slide.cloudinary_url);
+  const fromUrl = extractCloudNameFromUrl(slide.cloudinary_url);
   const fromMeta = extractCloudNameFromUrl(slide.metadata?.cloudinary_base_url || "");
   const fromEnv = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined;
   return fromUrl || fromMeta || fromEnv;
 }
 
 type Aspect = "4:5" | "1:1" | "9:16" | "16:9";
-const SUPPORTED_VIDEO_RATIOS = new Set<"9:16" | "16:9" | "1:1">(["9:16", "16:9", "1:1"]);
 function aspectClassFor(format?: string | null) {
   const f = (format || "4:5") as Aspect;
   switch (f) {
@@ -67,7 +64,7 @@ interface CarouselsTabProps {
 }
 
 export function CarouselsTab({ orderId }: CarouselsTabProps) {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const { activeBrandId } = useBrandKit();
   const [slides, setSlides] = useState<CarouselSlide[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,7 +90,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
       let query = supabase
         .from("library_assets")
         .select(
-          "id, cloudinary_url, secure_url, preview_url, cloudinary_public_id, metadata, meta, text_json, slide_index, carousel_id, order_id, created_at, format, user_id, brand_id",
+          "id, cloudinary_url, cloudinary_public_id, metadata, text_json, slide_index, carousel_id, order_id, created_at, format, user_id, brand_id",
         )
         .eq("user_id", user.id)
         .eq("type", "carousel_slide")
@@ -226,63 +223,35 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     }
   }, []);
 
-  const handleGenerateVideo = useCallback(
-    async (carouselKey: string, carouselSlides: CarouselSlide[]) => {
-      if (!carouselSlides.length) return;
-      const firstSlide = carouselSlides[0];
-      const brandId =
-        firstSlide?.brand_id || profile?.active_brand_id || activeBrandId || undefined;
-      if (!brandId) {
-        toast.error("Impossible de déterminer la marque active pour cette vidéo.");
-        return;
-      }
+  const handleGenerateVideo = useCallback(async (carouselKey: string, carouselSlides: CarouselSlide[]) => {
+    if (!carouselSlides.length) return;
+    setGeneratingVideo(carouselKey);
+    try {
+      const carouselId = carouselSlides[0]?.carousel_id || undefined;
+      const orderId = carouselSlides[0]?.order_id || undefined;
+      const format = (carouselSlides[0]?.format || "4:5") as Aspect;
 
-      const ratioInput = (firstSlide?.format || undefined) as
-        | "9:16"
-        | "16:9"
-        | "1:1"
-        | undefined;
-      const ratio: "9:16" | "16:9" | "1:1" = ratioInput && SUPPORTED_VIDEO_RATIOS.has(ratioInput)
-        ? ratioInput
-        : "9:16";
-
-      const carouselId = firstSlide?.carousel_id || undefined;
-      if (!carouselId) {
-        toast.error("Carrousel introuvable pour cette vidéo.");
-        return;
-      }
-
-      setGeneratingVideo(carouselKey);
-      toast.loading("Création de la vidéo en file…", { id: carouselKey });
-      try {
-        const { data, error } = await supabase.functions.invoke("alfie-render-video", {
-          body: {
-            brandId,
-            carouselId,
-            orderId: firstSlide?.order_id ?? null,
-            ratio,
-          },
-        });
-        if (error) throw error;
-        if (data && typeof data === "object" && "error" in data && data.error) {
-          throw new Error(String((data as { error: unknown }).error));
-        }
-        toast.success("Vidéo en file !", { id: carouselKey });
-      } catch (e: any) {
-        console.error("[CarouselsTab] Video generation error:", e);
-        toast.error(`Impossible de créer la vidéo: ${e?.message ?? "Erreur"}`, {
-          id: carouselKey,
-        });
-      } finally {
-        setGeneratingVideo(null);
-      }
-    },
-    [activeBrandId, profile?.active_brand_id],
-  );
+      const url = await generateCarouselVideoFromLibrary({
+        carouselId,
+        orderId,
+        aspect: format,
+        title: "Mon Carrousel",
+        durationPerSlide: 2,
+      });
+      if (!url) throw new Error("Aucune URL vidéo générée");
+      window.open(url, "_blank");
+      toast.success("Vidéo générée avec succès 🎬");
+    } catch (e: any) {
+      console.error("[CarouselsTab] Video generation error:", e);
+      toast.error(`Échec de la génération : ${e?.message ?? "Erreur inconnue"}`);
+    } finally {
+      setGeneratingVideo(null);
+    }
+  }, []);
 
   // Ouverture individuelle (throttle simple pour éviter les bloqueurs)
   const openIndividually = useCallback((arr: CarouselSlide[]) => {
-    const urls = arr.map((s) => s.secure_url || s.cloudinary_url).filter(Boolean) as string[];
+    const urls = arr.map((s) => s.cloudinary_url).filter(Boolean);
     if (!urls.length) return;
     let i = 0;
     const step = () => {
@@ -369,8 +338,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {carouselSlides.map((slide) => {
               const aspect = aspectClassFor(slide.format);
-              const assetUrl = slide.secure_url || slide.cloudinary_url || "";
-              const base = slide.preview_url || assetUrl;
+              const base = slide.cloudinary_url ?? "";
               const canOverlay = Boolean(slide.cloudinary_public_id && slide.text_json);
               const cloudName = canOverlay ? resolveCloudName(slide) : undefined;
 
@@ -398,9 +366,9 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                     className={cn("w-full rounded-lg object-cover border", aspect)}
                     loading="lazy"
                     onError={(e) => {
-                      if (assetUrl?.startsWith("https://") && e.currentTarget.src !== assetUrl) {
-                        console.warn("[CarouselsTab] overlay failed, fallback asset:", e.currentTarget.src);
-                        e.currentTarget.src = assetUrl;
+                      if (base?.startsWith("https://") && e.currentTarget.src !== base) {
+                        console.warn("[CarouselsTab] overlay failed, fallback base:", e.currentTarget.src);
+                        e.currentTarget.src = base;
                       }
                     }}
                   />
@@ -410,7 +378,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
                     <Button
                       size="sm"
-                    onClick={() => window.open(assetUrl, "_blank")}
+                      onClick={() => window.open(base, "_blank")}
                       aria-label="Ouvrir la slide dans un nouvel onglet"
                     >
                       <Download className="h-4 w-4" />

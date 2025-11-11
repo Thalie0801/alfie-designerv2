@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/lib/supabaseSafeClient';
+import { supabase } from '@/integrations/supabase/client';
 import { useVideoQuota } from '@/hooks/useVideoQuota';
 import { Video, Upload, Download, Clock, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';

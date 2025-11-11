@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '@/lib/supabaseSafeClient';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAffiliate } from './useAffiliate';
 
@@ -31,11 +31,9 @@ export function useStripeCheckout() {
         // Open checkout in new tab
         window.open(data.url, '_blank');
       }
-    } catch (error: unknown) {
+    } catch (error: any) {
       console.error('Checkout error:', error);
-      const message =
-        error instanceof Error ? error.message : 'Erreur inconnue';
-      toast.error('Erreur lors de la création du paiement: ' + message);
+      toast.error('Erreur lors de la création du paiement: ' + error.message);
     } finally {
       setLoading(false);
     }

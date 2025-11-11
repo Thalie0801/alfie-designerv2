@@ -1,6 +1,4 @@
 // Upload et gestion Cloudinary avancée
-import { env } from "./env.ts";
-import { encodeOverlayText as encodeCloudinaryText } from "./cloudinaryText.ts";
 
 export interface CloudinaryUploadResult {
   publicId: string;
@@ -20,9 +18,9 @@ export async function uploadToCloudinary(
     context?: Record<string, string>;
   }
 ): Promise<CloudinaryUploadResult> {
-  const cloudName = env('CLOUDINARY_CLOUD_NAME');
-  const apiKey = env('CLOUDINARY_API_KEY');
-  const apiSecret = env('CLOUDINARY_API_SECRET');
+  const cloudName = Deno.env.get('CLOUDINARY_CLOUD_NAME');
+  const apiKey = Deno.env.get('CLOUDINARY_API_KEY');
+  const apiSecret = Deno.env.get('CLOUDINARY_API_SECRET');
 
   if (!cloudName || !apiKey || !apiSecret) {
     throw new Error('Cloudinary credentials not configured');
@@ -98,7 +96,47 @@ export async function uploadToCloudinary(
 }
 
 // Encode texte pour URL Cloudinary (robuste, identique à imageCompositor)
-export { encodeCloudinaryText };
+export function encodeCloudinaryText(text: string): string {
+  const input = String(text ?? '');
+
+  // Remove unmatched surrogate pairs to avoid URIError
+  const sanitizeSurrogates = (s: string) =>
+    s
+      .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '') // high without low
+      .replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, ''); // low without high
+
+  const safeDecode = (s: string) => {
+    try { return decodeURIComponent(s); } catch { return s; }
+  };
+
+  const cleaned = sanitizeSurrogates(input).replace(/\r\n/g, '\n');
+
+  // If looks already percent-encoded, decode once then re-encode exactly once
+  const looksEncoded = /%[0-9A-Fa-f]{2}/.test(cleaned);
+  const decodedOnce = looksEncoded ? safeDecode(cleaned) : cleaned;
+
+  // Protect stray % that would break encoding in some runtimes
+  const prepped = decodedOnce.replace(/%(?![0-9A-Fa-f]{2})/g, '%25');
+
+  let encoded: string;
+  try {
+    encoded = encodeURIComponent(prepped);
+  } catch {
+    const fallback = sanitizeSurrogates(prepped.normalize('NFC'));
+    encoded = encodeURIComponent(fallback);
+  }
+
+  // Protect Cloudinary special characters
+  encoded = encoded.replace(/%2C/g, '%252C'); // comma
+  encoded = encoded.replace(/%2F/g, '%252F'); // slash
+  encoded = encoded.replace(/%3A/g, '%253A'); // colon
+  encoded = encoded.replace(/%23/g, '%2523'); // hash
+  encoded = encoded.replace(/\(/g, '%28');
+  encoded = encoded.replace(/\)/g, '%29');
+  // newline already encoded as %0A by encodeURIComponent
+
+  return encoded;
+}
 
 // Construire la chaîne de transformation pour text overlay (réutilisable pour eager)
 export function buildTextOverlayTransform(options: {
@@ -253,7 +291,7 @@ export function buildCloudinaryTextOverlayUrl(
     lineSpacing?: number;
   }
 ): string {
-  const cloudName = env('CLOUDINARY_CLOUD_NAME');
+  const cloudName = Deno.env.get('CLOUDINARY_CLOUD_NAME');
   if (!cloudName) throw new Error('CLOUDINARY_CLOUD_NAME not configured');
 
   const transformString = buildTextOverlayTransform(options);
@@ -293,9 +331,9 @@ export async function uploadWithRichMetadata(
   imageData: string,
   metadata: RichMetadata
 ): Promise<CloudinaryUploadResult> {
-  const cloudName = env('CLOUDINARY_CLOUD_NAME');
-  const apiKey = env('CLOUDINARY_API_KEY');
-  const apiSecret = env('CLOUDINARY_API_SECRET');
+  const cloudName = Deno.env.get('CLOUDINARY_CLOUD_NAME');
+  const apiKey = Deno.env.get('CLOUDINARY_API_KEY');
+  const apiSecret = Deno.env.get('CLOUDINARY_API_SECRET');
 
   if (!cloudName || !apiKey || !apiSecret) {
     throw new Error('Cloudinary credentials not configured');
@@ -425,9 +463,9 @@ export async function uploadTextAsRaw(
     language: string;
   }
 ): Promise<string> {
-  const cloudName = env('CLOUDINARY_CLOUD_NAME');
-  const apiKey = env('CLOUDINARY_API_KEY');
-  const apiSecret = env('CLOUDINARY_API_SECRET');
+  const cloudName = Deno.env.get('CLOUDINARY_CLOUD_NAME');
+  const apiKey = Deno.env.get('CLOUDINARY_API_KEY');
+  const apiSecret = Deno.env.get('CLOUDINARY_API_SECRET');
 
   if (!cloudName || !apiKey || !apiSecret) {
     throw new Error('Cloudinary credentials not configured');

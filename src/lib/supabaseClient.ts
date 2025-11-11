@@ -1,1 +1,1 @@
-export { supabase } from "@/lib/supabaseSafeClient";
+export { supabase } from "@/integrations/supabase/client";

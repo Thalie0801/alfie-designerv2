@@ -2,24 +2,10 @@ import js from "@eslint/js";
 import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
-import ts from "@typescript-eslint/eslint-plugin";
-import parser from "@typescript-eslint/parser";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  {
-    ignores: [
-      "dist/**",
-      "build/**",
-      "node_modules/**",
-      "coverage/**",
-      "examples/**",
-      "apps/assistant/**",
-      "**/*.generated.*",
-      "**/vendor/**",
-      "supabase/functions/**",
-    ],
-  },
+  { ignores: ["dist"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -49,22 +35,20 @@ export default tseslint.config(
   {
     files: ["supabase/functions/**/*.ts"],
     languageOptions: {
-      parser,
-      parserOptions: {
-        ecmaVersion: "latest",
-        sourceType: "module",
-      },
+      ecmaVersion: 2020,
       globals: {
         Deno: "readonly",
-        Response: "readonly",
-        Request: "readonly",
         fetch: "readonly",
+        Request: "readonly",
+        Response: "readonly",
+        Headers: "readonly",
+        console: "readonly",
       },
     },
-    plugins: { "@typescript-eslint": ts },
     rules: {
-      "import/no-unresolved": "off",
+      "no-undef": "off",
       "@typescript-eslint/no-explicit-any": "off",
+      "prefer-const": "warn",
     },
   },
   {

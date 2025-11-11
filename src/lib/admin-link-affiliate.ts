@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabaseSafeClient";
+import { supabase } from "@/integrations/supabase/client";
 
 export async function linkAffiliateToParent(
   affiliateEmail: string,

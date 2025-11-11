@@ -9,7 +9,6 @@ import { useMemo } from "react";
 type Counts = {
   queued?: number;
   running?: number;
-  retrying?: number;
   failed?: number;
   completed?: number;
   completed_24h?: number;
@@ -32,7 +31,7 @@ function timeAgo(date: string | number | Date) {
 
 export function QueueStatus({ data }: { data: QueueMonitorPayload }) {
   const c: Counts = data.counts || {};
-  const total = (c.queued ?? 0) + (c.running ?? 0) + (c.retrying ?? 0) + (c.failed ?? 0) + (c.completed ?? 0);
+  const total = (c.queued ?? 0) + (c.running ?? 0) + (c.failed ?? 0) + (c.completed ?? 0);
   const backlogMin = data.backlogSeconds ? Math.max(0, Math.round((data.backlogSeconds as number) / 60)) : null;
   const stuckCount = data.stuck?.runningStuckCount ?? 0;
   const recent = data.recent ?? [];
@@ -55,9 +54,8 @@ export function QueueStatus({ data }: { data: QueueMonitorPayload }) {
   const bar = {
     q: pct(c.queued ?? 0, total),
     r: pct(c.running ?? 0, total),
-    ry: pct(c.retrying ?? 0, total),
     f: pct(c.failed ?? 0, total),
-    c: pct(c.completed ?? 0, total),
+    d: pct(c.completed ?? 0, total),
   };
 
   return (
@@ -68,7 +66,6 @@ export function QueueStatus({ data }: { data: QueueMonitorPayload }) {
 
         <Badge variant="secondary">queued: {c.queued ?? 0}</Badge>
         <Badge variant="outline">running: {c.running ?? 0}</Badge>
-        <Badge variant="outline">retrying: {c.retrying ?? 0}</Badge>
         <Badge variant="destructive">failed: {c.failed ?? 0}</Badge>
         <Badge variant="default">24h: {c.completed_24h ?? 0}</Badge>
 
@@ -118,12 +115,6 @@ export function QueueStatus({ data }: { data: QueueMonitorPayload }) {
               aria-label={`Running ${c.running ?? 0}`}
             />
             <div
-              className="h-full bg-amber-500/70"
-              style={{ width: `${bar.ry}%` }}
-              title={`Retrying: ${c.retrying ?? 0}`}
-              aria-label={`Retrying ${c.retrying ?? 0}`}
-            />
-            <div
               className="h-full bg-red-500/70"
               style={{ width: `${bar.f}%` }}
               title={`Failed: ${c.failed ?? 0}`}
@@ -131,7 +122,7 @@ export function QueueStatus({ data }: { data: QueueMonitorPayload }) {
             />
             <div
               className="h-full bg-emerald-500/80"
-              style={{ width: `${bar.c}%` }}
+              style={{ width: `${bar.d}%` }}
               title={`Completed: ${c.completed ?? 0}`}
               aria-label={`Completed ${c.completed ?? 0}`}
             />
@@ -146,10 +137,6 @@ export function QueueStatus({ data }: { data: QueueMonitorPayload }) {
             <span className="inline-flex items-center gap-1">
               <span className="inline-block h-2 w-3 rounded bg-blue-500/70" />
               running
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="inline-block h-2 w-3 rounded bg-amber-500/70" />
-              retrying
             </span>
             <span className="inline-flex items-center gap-1">
               <span className="inline-block h-2 w-3 rounded bg-red-500/70" />
@@ -171,7 +158,7 @@ export function QueueStatus({ data }: { data: QueueMonitorPayload }) {
             {recent.slice(0, 5).map((j) => (
               <li key={j.id} className="flex justify-between gap-2">
                 <span className="truncate max-w-[50%]" title={j.type}>
-                  {j.kind ? `${j.kind} · ${j.type}` : j.type}
+                  {j.type}
                 </span>
                 <span className="opacity-80" title="Statut">
                   {j.status}

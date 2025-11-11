@@ -46,69 +46,20 @@ function correctFrenchSpelling(text: string): string {
 }
 
 serve(async (req) => {
-  // 1. Vérification JWT
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader) {
-    return new Response(JSON.stringify({ error: 'Missing authorization' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const requestBody = await req.json().catch(() => ({}));
-  const requestSource =
-    typeof requestBody?.source === 'string' ? requestBody.source : 'manual';
-  const lockOwner = `${requestSource}:${crypto.randomUUID()}`;
-
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
-
   let jobIdForCleanup: string | undefined;
   const jobStartTime = Date.now();
   const MAX_JOB_DURATION_MS = 5 * 60 * 1000; // 5 minutes
-  const LOCK_TTL_SECONDS = Math.ceil(MAX_JOB_DURATION_MS / 1000);
-  let lockAcquired = false;
 
   try {
     console.log('🚀 [Worker] Starting job processing...');
-
-    const { data: lockData, error: lockErr } = await supabase.rpc(
-      'acquire_process_job_worker_mutex',
-      {
-        p_owner: lockOwner,
-        p_ttl_seconds: LOCK_TTL_SECONDS,
-      },
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-
-    if (lockErr) {
-      console.error('❌ [Worker] Failed to acquire mutex:', lockErr);
-      return new Response(
-        JSON.stringify({ error: 'Failed to acquire worker lock' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        },
-      );
-    }
-
-    if (!lockData) {
-      console.warn('⚠️ [Worker] Another run is already in progress');
-      return new Response(
-        JSON.stringify({ error: 'Worker already running' }),
-        {
-          status: 409,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        },
-      );
-    }
-
-    lockAcquired = true;
 
     // SANITY CHECK: Compter les jobs en attente
     const { count: queuedCount } = await supabase
@@ -941,9 +892,14 @@ serve(async (req) => {
       try {
         console.log(`🔄 [Worker] Attempting to mark job ${jobIdForCleanup} as failed...`);
         
+        const supabase = createClient(
+          Deno.env.get('SUPABASE_URL')!,
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        );
+        
         const errorMessage = error.message || 'Unknown error';
         const isTimeout = errorMessage.includes('timeout') || errorMessage.includes('exceeded');
-
+        
         await supabase
           .from('jobs')
           .update({
@@ -991,15 +947,5 @@ serve(async (req) => {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
-  } finally {
-    if (lockAcquired) {
-      try {
-        await supabase.rpc('release_process_job_worker_mutex', {
-          p_owner: lockOwner,
-        });
-      } catch (releaseErr) {
-        console.error('❌ [Worker] Failed to release mutex:', releaseErr);
-      }
-    }
   }
 });

@@ -1,5 +1,3 @@
-import { Dict, Json } from './safe';
-
 /**
  * Chat-related shared types and helpers.
  */
@@ -33,7 +31,10 @@ export interface Message {
   type?: 'text' | 'image' | 'video' | 'carousel' | 'reasoning' | 'bulk-carousel';
   assetUrl?: string;
   assetId?: string;
-  metadata?: (Dict<Json> & { assetUrls?: string[] }) | null;
+  metadata?: {
+    assetUrls?: string[];
+    [key: string]: any;
+  };
   reasoning?: string;
   brandAlignment?: string;
   quickReplies?: string[];
@@ -74,7 +75,7 @@ export interface OrchestratorResponse {
   totalSlides?: number;
   bulkCarouselData?: BulkCarouselData;
   state?: ConversationState | string;
-  context?: Dict<Json> | null;
+  context?: Record<string, any>;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabaseSafeClient';
+import { supabase } from '@/integrations/supabase/client';
 import { isVip } from '@/lib/access';
 
 const ACTIVE_PLANS = new Set(['starter', 'pro', 'studio', 'enterprise']);

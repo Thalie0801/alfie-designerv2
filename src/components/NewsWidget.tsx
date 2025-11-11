@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Bell, X, Newspaper } from 'lucide-react';
-import { supabase } from '@/lib/supabaseSafeClient';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';

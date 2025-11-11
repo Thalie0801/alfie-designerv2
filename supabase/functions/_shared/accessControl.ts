@@ -1,13 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY, env } from "./env.ts";
 
 export async function userHasAccess(authHeader: string | null) {
-  const ENFORCE = (env("AUTH_ENFORCEMENT") ?? "on").toLowerCase() === "on";
+  const ENFORCE = (Deno.env.get("AUTH_ENFORCEMENT") ?? "on").toLowerCase() === "on";
   if (!ENFORCE) return true;
 
   const client = createClient(
-    SUPABASE_URL ?? "",
-    SUPABASE_ANON_KEY ?? "",
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_ANON_KEY") ?? "",
     { global: { headers: { Authorization: authHeader ?? "" } } }
   );
 

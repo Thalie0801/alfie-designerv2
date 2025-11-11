@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useBrandKit } from "@/hooks/useBrandKit";
-import { supabase } from "@/lib/supabaseSafeClient";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -274,13 +274,7 @@ Colors: ${brandKit?.palette?.join(', ') || 'default'}`;
 
         loadQuotaInfo();
       } catch (err: any) {
-        console.error(`Erreur création ${i + 1}/${quantity}:`, err);
-        if (err instanceof Error && err.name === "AbortError") {
-          toast.error("Timeout: la génération a pris trop de temps.");
-        } else {
-          const message = err instanceof Error ? err.message : String(err ?? "");
-          toast.error(message || "Erreur de génération");
-        }
+        toast.error(`Erreur création ${i + 1}/${quantity}: ${err.message}`);
         break;
       }
     }

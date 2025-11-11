@@ -1,13 +1,12 @@
-import { useState, useEffect, useMemo, type MouseEvent } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Download, Trash2, PlayCircle, Image as ImageIcon, AlertCircle } from "lucide-react";
 import { LibraryAsset } from "@/hooks/useLibraryAssets";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
-import { cn } from "@/lib/utils";
 
 interface AssetCardProps {
   asset: LibraryAsset;
@@ -75,25 +74,6 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
   const duration = formatDuration(asset.duration_seconds as any);
   const fileSize = formatFileSize((asset as any).file_size_bytes);
   const engine = (asset.engine || "").toString();
-
-  const downloadDisabled = asset.type === "video" && !asset.output_url;
-
-  const handleDownloadClick = (event: MouseEvent<HTMLAnchorElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (downloadDisabled) {
-      return;
-    }
-
-    onDownload();
-  };
-
-  const downloadClasses = cn(
-    buttonVariants({ variant: "outline", size: "sm" }),
-    "flex-1",
-    downloadDisabled && "pointer-events-none opacity-50"
-  );
 
   return (
     <Card className={`group hover:shadow-lg transition-all ${selected ? "ring-2 ring-primary" : ""}`}>
@@ -210,17 +190,18 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
       </CardContent>
 
       <CardFooter className="p-3 pt-0 gap-2">
-        <a
-          href={asset.output_url || asset.thumbnail_url || "#"}
-          download
-          className={downloadClasses}
-          onClick={handleDownloadClick}
+        <Button
+          size="sm"
+          variant="outline"
+          className="flex-1"
+          onClick={onDownload}
+          disabled={asset.type === "video" && !asset.output_url}
           title={asset.type === "video" && !asset.output_url ? "Vidéo en cours de génération" : "Télécharger"}
-          aria-disabled={downloadDisabled || undefined}
+          aria-disabled={(asset.type === "video" && !asset.output_url) || undefined}
         >
           <Download className="h-4 w-4 mr-2" />
           {asset.type === "video" && !asset.output_url ? "En génération…" : "Télécharger"}
-        </a>
+        </Button>
         <Button
           size="sm"
           variant="ghost"

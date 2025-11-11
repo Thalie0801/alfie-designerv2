@@ -2,32 +2,17 @@ import { edgeHandler } from '../_shared/edgeHandler.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { enrichPromptWithBrandKit } from '../_shared/aiOrchestrator.ts';
 import { uploadWithRichMetadata, type RichMetadata } from '../_shared/cloudinaryUploader.ts';
-import { 
-  SUPABASE_URL, 
-  SUPABASE_ANON_KEY, 
-  SUPABASE_SERVICE_ROLE_KEY,
-  INTERNAL_FN_SECRET,
-  LOVABLE_API_KEY 
-} from '../_shared/env.ts';
 
 export default {
   async fetch(req: Request) {
     return edgeHandler(req, async ({ jwt, input }) => {
-      // ✅ Check internal secret FIRST (before JWT) - uppercase header
-      const internalSecret = req.headers.get("X-Internal-Secret");
-      const isInternalCall = internalSecret && internalSecret === INTERNAL_FN_SECRET;
-      
-      // JWT required ONLY if not internal call
-      if (!isInternalCall && !jwt) {
-        console.error("[alfie-render-image] ❌ Missing authentication");
-        throw new Error('MISSING_AUTH');
-      }
+      if (!jwt) throw new Error('MISSING_AUTH');
 
-        const {
-        provider,
-        prompt,
-        format = '1024x1024',
-        brand_id,
+        const { 
+        provider, 
+        prompt, 
+        format = '1024x1024', 
+        brand_id, 
         cost_woofs = 1,
         // Nouveaux params carrousel (optionnels)
         backgroundOnly = false,
@@ -39,64 +24,36 @@ export default {
         resolution,
         backgroundStyle = 'gradient',
         textContrast = 'dark',
-        globalStyle, // ✅ NOUVEAU: style global pour cohérence
-        jobId
+        globalStyle // ✅ NOUVEAU: style global pour cohérence
       } = input;
 
-      if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY) {
-        console.error("[alfie-render-image] ❌ Missing Supabase credentials");
-        throw new Error('MISSING_ENV');
-      }
-
       const supabaseAdmin = createClient(
-        SUPABASE_URL,
-        SUPABASE_SERVICE_ROLE_KEY
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
       );
 
-      // ✅ Conditional user authentication
-      let userId: string;
-      let supabaseAuth;
+      const supabaseAuth = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_ANON_KEY')!,
+        { global: { headers: { Authorization: `Bearer ${jwt}` } } }
+      );
 
-      if (isInternalCall) {
-        // Internal call: userId MUST be in input
-        if (!input.userId) {
-          console.error("[alfie-render-image] ❌ Missing userId in internal call");
-          throw new Error('MISSING_USER_ID_IN_INTERNAL_CALL');
-        }
-        userId = input.userId;
-        console.log("[alfie-render-image] ✅ Internal call authenticated, userId:", userId);
-      } else {
-        // External call: authenticate via JWT
-        supabaseAuth = createClient(
-          SUPABASE_URL,
-          SUPABASE_ANON_KEY,
-          { global: { headers: { Authorization: `Bearer ${jwt}` } } }
-        );
-        
-        const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
-        if (userError || !user) {
-          console.error("[alfie-render-image] ❌ Invalid JWT token");
-          throw new Error('INVALID_TOKEN');
-        }
-        userId = user.id;
-        console.log("[alfie-render-image] ✅ External call authenticated, userId:", userId);
-      }
+      const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
+      if (userError || !user) throw new Error('INVALID_TOKEN');
 
-      // 1. Vérifier quota (skip for internal calls or use admin)
-      if (!isInternalCall && supabaseAuth) {
-        const { data: checkData, error: checkError } = await supabaseAuth.functions.invoke('alfie-check-quota', {
-          body: { cost_woofs, brand_id },
-        });
+      // 1. Vérifier quota
+      const { data: checkData, error: checkError } = await supabaseAuth.functions.invoke('alfie-check-quota', {
+        body: { cost_woofs, brand_id },
+      });
 
-        if (checkError || !checkData?.ok || !checkData.data?.ok) {
-          console.error('Quota check failed:', checkError, checkData);
-          throw new Error('INSUFFICIENT_QUOTA');
-        }
+      if (checkError || !checkData?.ok || !checkData.data?.ok) {
+        console.error('Quota check failed:', checkError, checkData);
+        throw new Error('INSUFFICIENT_QUOTA');
       }
 
       // 2. Débiter (via RPC)
       const { error: consumeError } = await supabaseAdmin.rpc('consume_woofs', { 
-        user_id_param: userId, 
+        user_id_param: user.id, 
         woofs_amount: cost_woofs 
       });
 
@@ -131,10 +88,8 @@ export default {
         }
 
         // 4. Génération IA
-        if (!LOVABLE_API_KEY) {
-          console.error("[alfie-render-image] ❌ Missing LOVABLE_API_KEY");
-          throw new Error('LOVABLE_API_KEY_MISSING');
-        }
+        const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+        if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY_MISSING');
 
         // System prompt de base (orthographe FR, 1 seule image)
         let systemPrompt = `You are a professional image generator for social media content.
@@ -278,8 +233,7 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
 
         console.log('[Render] AI Payload:', JSON.stringify(aiPayload, null, 2));
 
-        const requestStartedAt = performance.now();
-        const providerResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${LOVABLE_API_KEY}`,
@@ -288,37 +242,15 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
           body: JSON.stringify(aiPayload),
         });
 
-        const durationMs = Math.round(performance.now() - requestStartedAt);
-        const responseBody = await providerResponse.text();
-        const bodyPreview = responseBody.length > 500 ? `${responseBody.slice(0, 500)}…` : responseBody;
-
-        console.log('[Render] Provider response', {
-          status: providerResponse.status,
-          durationMs,
-          brandId: brand_id ?? null,
-          jobId: jobId ?? null,
-          bodyPreview,
-        });
-
-        let data: any = null;
-        if (responseBody) {
-          try {
-            data = JSON.parse(responseBody);
-          } catch (parseError) {
-            console.warn('[Render] Unable to parse provider response as JSON:', parseError);
-          }
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('AI Gateway error:', response.status, errorText);
+          throw new Error(`AI_GATEWAY_ERROR: ${response.status} - ${errorText}`);
         }
 
-        if (!providerResponse.ok) {
-          const errorMessage =
-            (data && (data.error || data.message)) || bodyPreview || 'Provider returned an error';
-          const error = new Error(`AI_GATEWAY_ERROR: ${providerResponse.status} - ${errorMessage}`);
-          (error as Error & { status?: number }).status = providerResponse.status;
-          throw error;
-        }
-
+        const data = await response.json();
         const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
+        
         if (!imageUrl) {
           console.error('No image in response:', JSON.stringify(data));
           throw new Error('NO_IMAGE_GENERATED');
@@ -357,7 +289,7 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
         const { data: generation, error: insertError } = await supabaseAdmin
           .from('media_generations')
           .insert({
-            user_id: userId,
+            user_id: user.id,
             brand_id: brand_id || null,
             type: 'image',
             modality: 'image',
@@ -419,7 +351,7 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
         console.error('[Render] Generation failed, refunding woofs:', genError);
         
         const { error: refundError } = await supabaseAdmin.rpc('refund_woofs', { 
-          user_id_param: userId, 
+          user_id_param: user.id, 
           woofs_amount: cost_woofs 
         });
 
