@@ -2,6 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect, useState } from 'react';
 import { hasRole } from '@/lib/access';
+import { useRoles } from '@/hooks/useRoles';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -15,6 +16,7 @@ export function ProtectedRoute({
   allowPending = false,
 }: ProtectedRouteProps) {
   const { user, isAdmin, isAuthorized, roles, loading, refreshProfile } = useAuth();
+  const { isAdmin: profileIsAdmin, loading: rolesLoading } = useRoles();
   const [checkingAdmin, setCheckingAdmin] = useState(false);
 
   // ============================================================================
@@ -24,7 +26,7 @@ export function ProtectedRoute({
 
   // Flags effectifs pour la navigation (whitelist ou autorisé normalement)
   const effectiveIsAuthorized = isAuthorized || isWhitelisted;
-  const effectiveIsAdmin = isAdmin; // Admin déjà calculé dans useAuth
+  const effectiveIsAdmin = isAdmin || profileIsAdmin;
   const hasAccess = effectiveIsAuthorized || allowPending;
 
   useEffect(() => {
@@ -34,7 +36,9 @@ export function ProtectedRoute({
     }
   }, [requireAdmin, user, effectiveIsAdmin, checkingAdmin, refreshProfile]);
 
-  if (loading || checkingAdmin) {
+  const waitingForAdmin = requireAdmin && (rolesLoading || checkingAdmin);
+
+  if (loading || waitingForAdmin) {
     return (
       <div className="min-h-screen gradient-subtle flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -77,3 +81,5 @@ export function ProtectedRoute({
 
   return <>{children}</>;
 }
+
+export default ProtectedRoute;
