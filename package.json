@@ -9,10 +9,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview",
-    "lint:fix": "eslint . --fix",
-    "lint:js": "eslint . --ext .js,.jsx --ignore-pattern '**/*.{ts,tsx}'",
-    "lint:js:fallback": "eslint . --ext .js,.jsx --no-config-lookup --ignore-pattern 'supabase/functions/**' --rule 'no-redeclare:error' --rule 'no-duplicate-imports:error' --rule 'no-unused-vars:warn' --rule 'no-console:warn' --rule 'eqeqeq:warn'"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -52,7 +49,6 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "class-variance-authority": "^0.7.1",
-    "cloudinary": "^2.8.0",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
@@ -77,6 +73,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.16",
     "@types/node": "^20.12.7",
     "@types/react": "^18.3.5",
@@ -84,7 +81,7 @@
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.32.0",
-    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
     "lovable-tagger": "^1.1.10",
@@ -92,12 +89,7 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.38.0",
-    "vite": "^5.0.0",
-    "@typescript-eslint/parser": "^8.38.0",
-    "@typescript-eslint/eslint-plugin": "^8.38.0",
-    "eslint-plugin-import": "^2.29.1",
-    "eslint-plugin-react": "^7.35.0",
-    "eslint-plugin-jsx-a11y": "^6.9.0"
+    "vite": "^5.0.0"
   },
   "engines": {
     "node": ">=18"

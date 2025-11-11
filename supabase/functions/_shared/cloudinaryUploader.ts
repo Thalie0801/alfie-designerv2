@@ -97,44 +97,15 @@ export async function uploadToCloudinary(
 
 // Encode texte pour URL Cloudinary (robuste, identique à imageCompositor)
 export function encodeCloudinaryText(text: string): string {
-  const input = String(text ?? '');
-
-  // Remove unmatched surrogate pairs to avoid URIError
-  const sanitizeSurrogates = (s: string) =>
-    s
-      .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '') // high without low
-      .replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, ''); // low without high
-
-  const safeDecode = (s: string) => {
-    try { return decodeURIComponent(s); } catch { return s; }
-  };
-
-  const cleaned = sanitizeSurrogates(input).replace(/\r\n/g, '\n');
-
-  // If looks already percent-encoded, decode once then re-encode exactly once
-  const looksEncoded = /%[0-9A-Fa-f]{2}/.test(cleaned);
-  const decodedOnce = looksEncoded ? safeDecode(cleaned) : cleaned;
-
-  // Protect stray % that would break encoding in some runtimes
-  const prepped = decodedOnce.replace(/%(?![0-9A-Fa-f]{2})/g, '%25');
-
-  let encoded: string;
-  try {
-    encoded = encodeURIComponent(prepped);
-  } catch {
-    const fallback = sanitizeSurrogates(prepped.normalize('NFC'));
-    encoded = encodeURIComponent(fallback);
-  }
-
-  // Protect Cloudinary special characters
-  encoded = encoded.replace(/%2C/g, '%252C'); // comma
+  let encoded = encodeURIComponent(text);
+  // Protéger les caractères sensibles Cloudinary
+  encoded = encoded.replace(/%2C/g, '%252C'); // virgule
   encoded = encoded.replace(/%2F/g, '%252F'); // slash
-  encoded = encoded.replace(/%3A/g, '%253A'); // colon
+  encoded = encoded.replace(/%3A/g, '%253A'); // deux-points
   encoded = encoded.replace(/%23/g, '%2523'); // hash
   encoded = encoded.replace(/\(/g, '%28');
   encoded = encoded.replace(/\)/g, '%29');
-  // newline already encoded as %0A by encodeURIComponent
-
+  encoded = encoded.replace(/\n/g, '%0A'); // newline
   return encoded;
 }
 
@@ -188,10 +159,9 @@ export function buildTextOverlayTransform(options: {
     );
   }
 
-  // Subtitle layer (limit to 150 characters)
+  // Subtitle layer
   if (subtitle) {
-    const subtitleTrimmed = subtitle.length > 150 ? subtitle.substring(0, 147) + '...' : subtitle;
-    const encodedSubtitle = encodeCloudinaryText(subtitleTrimmed);
+    const encodedSubtitle = encodeCloudinaryText(subtitle);
     const safeSubtitleFont = (subtitleFont || 'Arial').replace(/\s+/g, '%20');
     const fontStyle = subtitleWeight === 'bold' ? `${safeSubtitleFont}_${subtitleSize}_Bold` : `${safeSubtitleFont}_${subtitleSize}`;
     transformations.push(
@@ -199,27 +169,25 @@ export function buildTextOverlayTransform(options: {
     );
   }
 
-  // Bullets layers (each bullet on its own line, limit to 5)
+  // Bullets layers (each bullet on its own line)
   if (bullets && bullets.length > 0) {
     const safeBulletFont = (subtitleFont || 'Arial').replace(/\s+/g, '%20');
-    bullets.slice(0, 5).forEach((bullet, index) => {
-      const bulletTrimmed = bullet.length > 80 ? bullet.substring(0, 77) + '...' : bullet;
-      const encodedBullet = encodeCloudinaryText(`• ${bulletTrimmed}`);
-      const yPos = 450 + (index * 60);
+    bullets.forEach((bullet, index) => {
+      const encodedBullet = encodeCloudinaryText(`• ${bullet}`);
+      const yPos = 400 + (index * 60);
       transformations.push(
-        `l_text:${safeBulletFont}_28:${encodedBullet},co_rgb:${subtitleColor},e_outline:10:color_black,w_${width - 120},c_fit,g_north_west,x_80,y_${yPos}/fl_layer_apply`
+        `l_text:${safeBulletFont}_36:${encodedBullet},co_rgb:${subtitleColor},e_outline:10:color_black,w_${width - 120},c_fit,g_north_west,x_80,y_${yPos}/fl_layer_apply`
       );
     });
   }
 
-  // CTA layer (bottom center, limit to 50 characters)
+  // CTA layer (bottom center)
   const ctaText = ctaPrimary || cta;
   if (ctaText) {
-    const ctaTrimmed = ctaText.length > 50 ? ctaText.substring(0, 47) + '...' : ctaText;
-    const encodedCta = encodeCloudinaryText(ctaTrimmed);
+    const encodedCta = encodeCloudinaryText(ctaText);
     const safeCtaFont = (titleFont || 'Arial').replace(/\s+/g, '%20');
     transformations.push(
-      `l_text:${safeCtaFont}_44_Bold:${encodedCta},co_rgb:${titleColor},e_outline:16:color_black,w_700,c_fit,g_south,y_80/fl_layer_apply`
+      `l_text:${safeCtaFont}_44_Bold:${encodedCta},co_rgb:${titleColor},e_outline:12:color_black,w_700,c_fit,g_south,y_80/fl_layer_apply`
     );
   }
 

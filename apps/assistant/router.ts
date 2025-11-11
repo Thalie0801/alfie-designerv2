@@ -1,7 +1,7 @@
-import { detectHost, type HostId, type RequestLike } from "./context";
+import { detectHost, type HostId } from "./context";
 
 type ChatContext = {
-  req: RequestLike;
+  req: any;
   brandId: string;
   userId?: string;
   session: Record<string, boolean>;

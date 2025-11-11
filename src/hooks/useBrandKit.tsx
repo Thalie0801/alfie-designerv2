@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { safeString } from '@/lib/safeRender';
 
 export interface BrandKit {
   id?: string;
@@ -56,11 +55,9 @@ export function useBrandKit() {
       // Transform null to undefined for TypeScript compatibility
       const transformedBrands = (brandsData || []).map(brand => ({
         ...brand,
-        name: safeString(brand.name),
         logo_url: brand.logo_url ?? undefined,
         voice: brand.voice ?? undefined,
-        palette: Array.isArray(brand.palette) ? brand.palette : [],
-        canva_connected: Boolean(brand.canva_connected)
+        canva_connected: brand.canva_connected ?? false
       }));
       setBrands(transformedBrands);
 

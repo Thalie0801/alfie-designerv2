@@ -1,8 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
-const INTERNAL_SECRET = Deno.env.get('INTERNAL_FN_SECRET') ?? '';
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -114,24 +112,6 @@ async function handleCreateDeliverable(req: Request, supabase: any) {
     p_woofs: 0,
   });
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-  if (userError || !user) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
-  if (!INTERNAL_SECRET) {
-    return new Response(JSON.stringify({ error: 'Server misconfigured' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
   // Logger l'événement
   const eventKind = format === 'image' ? 'image_ai' : format === 'carousel' ? 'carousel_ai_image' : 'reel_export';
   await supabase.from('usage_event').insert({
@@ -160,11 +140,7 @@ async function handleCreateDeliverable(req: Request, supabase: any) {
           prompt: objective,
           deliverableId: deliverable.id,
           brandId,
-          userId: user.id,
-          orderId: null,
-          requestId: `deliverable:${deliverable.id}`,
         },
-        headers: { 'X-Internal-Secret': INTERNAL_SECRET },
       });
     }
   }

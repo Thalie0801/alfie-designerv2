@@ -1,12 +1,10 @@
 // Gestion du workflow conversationnel Alfie
 
-export type ConversationState =
+export type ConversationState = 
   | 'initial'
   | 'collecting_order_size'
   | 'collecting_image_brief'
   | 'collecting_carousel_brief'
-  | 'awaiting_video_params'
-  | 'awaiting_video_prompt'
   | 'confirming'
   | 'generating'
   | 'completed';
@@ -16,16 +14,10 @@ export interface ConversationContext {
   numCarousels?: number;
   currentImageIndex?: number;
   currentCarouselIndex?: number;
-  imageBriefs?: Array<Record<string, unknown>>;
-  carouselBriefs?: Array<Record<string, unknown>>;
+  imageBriefs?: any[];
+  carouselBriefs?: any[];
   globalStyle?: string;
   campaign?: string;
-  video?: {
-    aspectRatio: string | null;
-    durationSec: number | null;
-    prompt?: string | null;
-    sourceUrl?: string | null;
-  } | null;
 }
 
 export interface BriefQuestion {
@@ -398,9 +390,7 @@ export function buildSummary(context: ConversationContext): string {
     const grouped = new Map<string, { brief: any; indices: number[] }>();
     
     context.carouselBriefs?.forEach((brief, idx) => {
-      const topic = typeof brief.topic === 'string' ? brief.topic : 'n/a';
-      const angle = typeof brief.angle === 'string' ? brief.angle : 'n/a';
-      const key = `${topic.toLowerCase()}|${angle.toLowerCase()}|${brief.numSlides || 5}`;
+      const key = `${(brief.topic || 'n/a').toLowerCase()}|${(brief.angle || 'n/a').toLowerCase()}|${brief.numSlides || 5}`;
       
       if (grouped.has(key)) {
         grouped.get(key)!.indices.push(idx + 1);

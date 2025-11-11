@@ -15,13 +15,16 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.alfie-generate-ai-image]
-verify_jwt = false
+verify_jwt = true
 
 [functions.alfie-plan-carousel]
 verify_jwt = true
 
 [functions.alfie-render-carousel-slide]
 verify_jwt = false
+
+[functions.repair-carousel-overlay]
+verify_jwt = true
 
 [functions.alfie-proofread-fr]
 verify_jwt = true
@@ -179,6 +182,10 @@ verify_jwt = true
 
 [functions.admin-reset-stuck-jobs]
 verify_jwt = true
+
+[functions.alfie-job-worker]
+verify_jwt = false
+schedule = "*/30 * * * * *"
 
 [functions.queue-monitor]
 verify_jwt = true
