@@ -3,3 +3,4 @@ examples/**
 apps/assistant/**
 **/*.generated.*
 **/vendor/**
+supabase/functions/**

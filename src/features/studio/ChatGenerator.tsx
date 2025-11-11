@@ -10,6 +10,13 @@ import { uploadToChatBucket } from "@/lib/chatUploads";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { toast } from "sonner";
+import {
+  V_JOB_QUEUE_ACTIVE_SELECT,
+  inferKindFromType,
+  normalizeStatus,
+  type JobQueueRow,
+  type JobKind,
+} from "@/lib/types/jobQueue";
 
 type GeneratedAsset = {
   url: string;
@@ -25,20 +32,9 @@ type UploadedSource = {
   name: string;
 };
 
-type JobEntry = {
-  id: string;
-  type: string;
-  status: string;
-  order_id: string | null;
-  created_at: string;
-  updated_at: string;
-  error?: string | null;
+type JobEntry = JobQueueRow & {
+  kind: JobKind;
   error_message?: string | null;
-  payload?: unknown;
-  user_id: string;
-  archived_at: string | null;
-  is_archived: boolean;
-  job_version: number | null;
 };
 
 type MediaEntry = {
@@ -192,7 +188,7 @@ export function ChatGenerator() {
 
       let jobsQuery = supabase
         .from("v_job_queue_active")
-        .select("*")
+        .select(V_JOB_QUEUE_ACTIVE_SELECT)
         .eq("user_id", currentUser.id)
         .order("created_at", { ascending: false })
         .limit(50);
@@ -217,7 +213,14 @@ export function ChatGenerator() {
       if (jobsResponse.error) throw jobsResponse.error;
       if (assetsResponse.error) throw assetsResponse.error;
 
-      setJobs((jobsResponse.data as JobEntry[]) ?? []);
+      const jobRows = (jobsResponse.data as JobQueueRow[]) ?? [];
+      const normalizedJobs: JobEntry[] = jobRows.map((row) => ({
+        ...row,
+        status: normalizeStatus(row.status),
+        kind: inferKindFromType(row.type),
+      }));
+
+      setJobs(normalizedJobs);
       setAssets((assetsResponse.data || []) as MediaEntry[]);
     } catch (err) {
       console.error("[Studio] refetchAll error:", err);

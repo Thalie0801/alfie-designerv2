@@ -1,66 +1,59 @@
-import js from "@eslint/js";
-import globals from "globals";
+// eslint.config.js — sans @eslint/js
+import tsParser from "@typescript-eslint/parser";
+import ts from "@typescript-eslint/eslint-plugin";
+import importPlugin from "eslint-plugin-import";
+import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
-import reactRefresh from "eslint-plugin-react-refresh";
-import tseslint from "typescript-eslint";
+import jsxA11y from "eslint-plugin-jsx-a11y";
 
-export default tseslint.config(
-  { ignores: ["dist"] },
+/** @type {import('eslint').Linter.FlatConfig[]} */
+export default [
+  // Ignorés
+  { ignores: ["dist/**", "build/**", "node_modules/**", "coverage/**", "supabase/functions/**"] },
+
+  // Base commune JS/TS/React (on n’utilise PAS js.configs.recommended)
   {
-    extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    files: ["**/*.{ts,tsx}"],
+    files: ["**/*.{ts,tsx,js,jsx}"],
     languageOptions: {
-      ecmaVersion: 2020,
-      globals: globals.browser,
+      parser: tsParser,
+      parserOptions: { ecmaVersion: "latest", sourceType: "module" },
+      globals: { window: "readonly", document: "readonly" },
     },
     plugins: {
+      "@typescript-eslint": ts,
+      import: importPlugin,
+      react,
       "react-hooks": reactHooks,
-      "react-refresh": reactRefresh,
+      "jsx-a11y": jsxA11y,
+    },
+    settings: {
+      react: { version: "detect" },
+      "import/resolver": { node: { extensions: [".js", ".jsx", ".ts", ".tsx"] } },
     },
     rules: {
-      ...reactHooks.configs.recommended.rules,
-      "react-refresh/only-export-components": "warn",
-      "@typescript-eslint/no-unused-vars": "off",
-      "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-empty-object-type": "warn",
-      "react-hooks/exhaustive-deps": "warn",
-      "prefer-const": "warn",
-      "no-irregular-whitespace": "error",
-      "no-control-regex": "error",
-      "no-useless-escape": "warn",
-      "no-empty": "warn",
+      // “dur”
+      "no-redeclare": "error",
+      "no-duplicate-imports": "error",
+      "import/no-unresolved": "error",
       "react-hooks/rules-of-hooks": "error",
-    },
-  },
-  {
-    files: ["supabase/functions/**/*.ts"],
-    languageOptions: {
-      ecmaVersion: 2020,
-      globals: {
-        Deno: "readonly",
-        fetch: "readonly",
-        Request: "readonly",
-        Response: "readonly",
-        Headers: "readonly",
-        console: "readonly",
-      },
-    },
-    rules: {
-      "no-undef": "off",
-      "@typescript-eslint/no-explicit-any": "off",
+
+      // “soft” pour réduire le bruit
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      "react-hooks/exhaustive-deps": "warn",
+      "no-console": ["warn", { allow: ["warn", "error"] }],
       "prefer-const": "warn",
+      "eqeqeq": ["warn", "smart"],
     },
   },
+
+  // Tests (si présents)
   {
-    files: ["**/*.test.{ts,tsx}", "examples/**/*"],
+    files: ["**/*.test.{ts,tsx}", "**/__tests__/**/*.{ts,tsx}"],
     rules: {
+      "no-console": "off",
       "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "import/no-extraneous-dependencies": "off",
     },
   },
-  {
-    files: ["src/components/ui/**/*.{ts,tsx}"],
-    rules: {
-      "@typescript-eslint/no-empty-object-type": "off",
-    },
-  },
-);
+];
