@@ -1,5 +1,3 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { Send, ImagePlus, Loader2, Download } from "lucide-react";
@@ -24,12 +22,6 @@ import { extractCloudNameFromUrl } from "@/lib/cloudinary/utils";
 // =====================
 const VIDEO_KEYWORDS = /\b(vid[ée]o|reel|r[ée]el|tiktok|shorts?|clip)\b/i;
 
-function uid() {
-  return "m_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
-// util léger pour éviter toute dépendance externe
-function clsx(...parts: Array<string | false | null | undefined>) {
-  return parts.filter(Boolean).join(" ");
 function detectIntent(message: string): "video" | "default" {
   if (VIDEO_KEYWORDS.test(message)) return "video";
   return "default";
@@ -789,17 +781,6 @@ export function AlfieChat() {
   // Rendu
   // =====================
   return (
-    <div className="flex h-full w-full flex-col">
-      <div className="flex-1 overflow-y-auto space-y-3 p-4">
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={cn(
-            className={clsx(
-              "max-w-[75%] rounded-2xl px-4 py-3 shadow-sm",
-              m.role === "user"
-                ? "ml-auto bg-primary text-primary-foreground"
-                : "mr-auto bg-muted"
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
       <CreateHeader />
@@ -1156,16 +1137,6 @@ export function AlfieChat() {
             maxRows={5}
             disabled={isLoading}
           />
-          <button
-            onClick={handleSend}
-            disabled={!canSend}
-            className={cn(
-            className={clsx(
-              "rounded-xl px-4 py-2",
-              canSend
-                ? "bg-black text-white hover:opacity-90"
-                : "bg-muted text-muted-foreground cursor-not-allowed"
-            )}
 
           <Button
             onClick={() => void handleSend()}
