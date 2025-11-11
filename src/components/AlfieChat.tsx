@@ -543,12 +543,12 @@ export function AlfieChat() {
 
         interface QueueMonitorResponse {
           counts?: {
-            done_24h?: number;
-            processing?: number;
+            completed_24h?: number;
+            running?: number;
             retrying?: number;
             queued?: number;
-            error?: number;
-            done?: number;
+            failed?: number;
+            completed?: number;
           };
           backlogSeconds?: number;
           stuck?: { runningStuckCount?: number };
@@ -557,7 +557,7 @@ export function AlfieChat() {
         const c = response?.counts || {};
         const oldest = response?.backlogSeconds ?? null;
         const stuck = response?.stuck?.runningStuckCount ?? 0;
-        const done24h = c.done_24h ?? 0;
+        const done24h = c.completed_24h ?? 0;
         const minutes = oldest ? Math.max(0, Math.round((oldest as number) / 60)) : null;
 
         addMessage({
@@ -565,10 +565,10 @@ export function AlfieChat() {
           content: [
             "📊 État de la file de jobs:",
             `• queued: ${c.queued ?? 0}`,
-            `• processing: ${c.processing ?? 0}`,
+            `• running: ${c.running ?? 0}`,
             `• retrying: ${c.retrying ?? 0}`,
-            `• errors: ${c.error ?? 0}`,
-            `• done (24h): ${done24h}`,
+            `• failed: ${c.failed ?? 0}`,
+            `• completed (24h): ${done24h}`,
             `• plus ancien en attente: ${minutes !== null ? minutes + " min" : "n/a"}`,
             `• jobs bloqués (>5min): ${stuck}`,
           ].join("\n"),

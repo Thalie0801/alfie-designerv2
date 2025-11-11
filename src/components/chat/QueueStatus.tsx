@@ -8,11 +8,11 @@ import { useMemo } from "react";
 
 type Counts = {
   queued?: number;
-  processing?: number;
+  running?: number;
   retrying?: number;
-  error?: number;
-  done?: number;
-  done_24h?: number;
+  failed?: number;
+  completed?: number;
+  completed_24h?: number;
 };
 
 function pct(part: number, total: number) {
@@ -32,32 +32,32 @@ function timeAgo(date: string | number | Date) {
 
 export function QueueStatus({ data }: { data: QueueMonitorPayload }) {
   const c: Counts = data.counts || {};
-  const total = (c.queued ?? 0) + (c.processing ?? 0) + (c.retrying ?? 0) + (c.error ?? 0) + (c.done ?? 0);
+  const total = (c.queued ?? 0) + (c.running ?? 0) + (c.retrying ?? 0) + (c.failed ?? 0) + (c.completed ?? 0);
   const backlogMin = data.backlogSeconds ? Math.max(0, Math.round((data.backlogSeconds as number) / 60)) : null;
   const stuckCount = data.stuck?.runningStuckCount ?? 0;
   const recent = data.recent ?? [];
 
   const stats = useMemo(() => {
-    const completed = c.done ?? 0;
-    const failed = c.error ?? 0;
+    const completed = c.completed ?? 0;
+    const failed = c.failed ?? 0;
     const successDen = completed + failed;
     const successRate = successDen > 0 ? completed / successDen : 0;
 
-    const per24h = c.done_24h ?? 0;
+    const per24h = c.completed_24h ?? 0;
     const throughputPerHour = per24h / 24;
 
     return {
       successRate,
       throughputPerHour,
     };
-  }, [c.done, c.error, c.done_24h]);
+  }, [c.completed, c.failed, c.completed_24h]);
 
   const bar = {
     q: pct(c.queued ?? 0, total),
-    p: pct(c.processing ?? 0, total),
-    r: pct(c.retrying ?? 0, total),
-    e: pct(c.error ?? 0, total),
-    d: pct(c.done ?? 0, total),
+    r: pct(c.running ?? 0, total),
+    ry: pct(c.retrying ?? 0, total),
+    f: pct(c.failed ?? 0, total),
+    c: pct(c.completed ?? 0, total),
   };
 
   return (
@@ -67,10 +67,10 @@ export function QueueStatus({ data }: { data: QueueMonitorPayload }) {
         <div className="font-medium">Suivi des jobs</div>
 
         <Badge variant="secondary">queued: {c.queued ?? 0}</Badge>
-        <Badge variant="outline">processing: {c.processing ?? 0}</Badge>
+        <Badge variant="outline">running: {c.running ?? 0}</Badge>
         <Badge variant="outline">retrying: {c.retrying ?? 0}</Badge>
-        <Badge variant="destructive">errors: {c.error ?? 0}</Badge>
-        <Badge variant="default">24h: {c.done_24h ?? 0}</Badge>
+        <Badge variant="destructive">failed: {c.failed ?? 0}</Badge>
+        <Badge variant="default">24h: {c.completed_24h ?? 0}</Badge>
 
         <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground ml-auto">
           <span title="Débit moyen sur 24h">⚡ {stats.throughputPerHour.toFixed(1)}/h</span>
@@ -99,7 +99,7 @@ export function QueueStatus({ data }: { data: QueueMonitorPayload }) {
         <div className="px-3 pb-2">
           {/* Progress (global pour a11y) */}
           <Progress
-            value={Math.min(100, pct(c.done ?? 0, total))}
+            value={Math.min(100, pct(c.completed ?? 0, total))}
             className="h-0 opacity-0 pointer-events-none absolute -z-10"
             aria-label="Progression globale (complétés / total)"
           />
@@ -113,27 +113,27 @@ export function QueueStatus({ data }: { data: QueueMonitorPayload }) {
             />
             <div
               className="h-full bg-blue-500/70"
-              style={{ width: `${bar.p}%` }}
-              title={`Processing: ${c.processing ?? 0}`}
-              aria-label={`Processing ${c.processing ?? 0}`}
+              style={{ width: `${bar.r}%` }}
+              title={`Running: ${c.running ?? 0}`}
+              aria-label={`Running ${c.running ?? 0}`}
             />
             <div
               className="h-full bg-amber-500/70"
-              style={{ width: `${bar.r}%` }}
+              style={{ width: `${bar.ry}%` }}
               title={`Retrying: ${c.retrying ?? 0}`}
               aria-label={`Retrying ${c.retrying ?? 0}`}
             />
             <div
               className="h-full bg-red-500/70"
-              style={{ width: `${bar.e}%` }}
-              title={`Errors: ${c.error ?? 0}`}
-              aria-label={`Errors ${c.error ?? 0}`}
+              style={{ width: `${bar.f}%` }}
+              title={`Failed: ${c.failed ?? 0}`}
+              aria-label={`Failed ${c.failed ?? 0}`}
             />
             <div
               className="h-full bg-emerald-500/80"
-              style={{ width: `${bar.d}%` }}
-              title={`Done: ${c.done ?? 0}`}
-              aria-label={`Done ${c.done ?? 0}`}
+              style={{ width: `${bar.c}%` }}
+              title={`Completed: ${c.completed ?? 0}`}
+              aria-label={`Completed ${c.completed ?? 0}`}
             />
           </div>
 
@@ -145,7 +145,7 @@ export function QueueStatus({ data }: { data: QueueMonitorPayload }) {
             </span>
             <span className="inline-flex items-center gap-1">
               <span className="inline-block h-2 w-3 rounded bg-blue-500/70" />
-              processing
+              running
             </span>
             <span className="inline-flex items-center gap-1">
               <span className="inline-block h-2 w-3 rounded bg-amber-500/70" />
@@ -153,11 +153,11 @@ export function QueueStatus({ data }: { data: QueueMonitorPayload }) {
             </span>
             <span className="inline-flex items-center gap-1">
               <span className="inline-block h-2 w-3 rounded bg-red-500/70" />
-              erreurs
+              failed
             </span>
             <span className="inline-flex items-center gap-1">
               <span className="inline-block h-2 w-3 rounded bg-emerald-500/80" />
-              done
+              completed
             </span>
           </div>
         </div>

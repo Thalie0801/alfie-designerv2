@@ -8,10 +8,10 @@ export type QueueMonitorPayload = {
   now: string;
   counts: {
     queued: number;
-    processing: number;
-    error: number;
-    done?: number;
-    done_24h?: number;
+    running: number;
+    failed: number;
+    completed?: number;
+    completed_24h?: number;
     retrying?: number;
   };
   backlogSeconds: number | null;

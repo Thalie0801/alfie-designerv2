@@ -2,6 +2,8 @@ import js from "@eslint/js";
 import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
+import ts from "@typescript-eslint/eslint-plugin";
+import parser from "@typescript-eslint/parser";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
@@ -46,20 +48,22 @@ export default tseslint.config(
   {
     files: ["supabase/functions/**/*.ts"],
     languageOptions: {
-      ecmaVersion: 2020,
+      parser,
+      parserOptions: {
+        ecmaVersion: "latest",
+        sourceType: "module",
+      },
       globals: {
         Deno: "readonly",
-        fetch: "readonly",
-        Request: "readonly",
         Response: "readonly",
-        Headers: "readonly",
-        console: "readonly",
+        Request: "readonly",
+        fetch: "readonly",
       },
     },
+    plugins: { "@typescript-eslint": ts },
     rules: {
-      "no-undef": "off",
+      "import/no-unresolved": "off",
       "@typescript-eslint/no-explicit-any": "off",
-      "prefer-const": "warn",
     },
   },
   {

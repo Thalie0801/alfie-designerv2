@@ -58,9 +58,9 @@ serve(async (req) => {
     const counts = {
       queued: 0,
       retrying: 0,
-      processing: 0,
-      done: 0,
-      error: 0,
+      running: 0,
+      completed: 0,
+      failed: 0,
     } as Record<string, number>;
     let oldestQueuedAgeSec: number | null = null;
     let runningStuckCount = 0;
@@ -70,12 +70,12 @@ serve(async (req) => {
 
     const normaliseStatus = (status: string) => {
       switch (status) {
-        case "running":
-          return "processing";
-        case "completed":
-          return "done";
-        case "failed":
-          return "error";
+        case "processing":
+          return "running";
+        case "done":
+          return "completed";
+        case "error":
+          return "failed";
         default:
           return status;
       }
@@ -88,7 +88,7 @@ serve(async (req) => {
         const ageSec = Math.floor((now - new Date(j.created_at as string).getTime()) / 1000);
         if (oldestQueuedAgeSec === null || ageSec > oldestQueuedAgeSec) oldestQueuedAgeSec = ageSec;
       }
-      if (status === "processing") {
+      if (status === "running") {
         const ageSec = Math.floor((now - new Date(j.updated_at as string).getTime()) / 1000);
         if (ageSec > STUCK_THRESHOLD_SEC) runningStuckCount += 1;
       }
@@ -100,7 +100,7 @@ serve(async (req) => {
       .from("job_queue")
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId)
-      .eq("status", "done")
+      .eq("status", "completed")
       .gte("updated_at", sinceIso);
 
     const recent = (jobs ?? []).slice(0, 15).map((j) => {
@@ -123,11 +123,11 @@ serve(async (req) => {
       now: nowIso,
       counts: {
         queued: counts.queued,
-        processing: counts.processing,
-        error: counts.error,
-        done: counts.done,
+        running: counts.running,
+        failed: counts.failed,
+        completed: counts.completed,
         retrying: counts.retrying,
-        done_24h: completed24h ?? 0,
+        completed_24h: completed24h ?? 0,
       },
       backlogSeconds: oldestQueuedAgeSec,
       stuck: { runningStuckCount, thresholdSec: STUCK_THRESHOLD_SEC },

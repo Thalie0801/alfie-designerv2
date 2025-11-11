@@ -612,7 +612,7 @@ export function ChatGenerator() {
                   <strong>{queueData.counts.queued}</strong> en attente
                 </span>
                 <span className="text-sm">
-                  <strong>{queueData.counts.processing}</strong> en cours
+                  <strong>{queueData.counts.running}</strong> en cours
                 </span>
                 {queueData.counts.retrying ? (
                   <span className="text-sm text-amber-600">
@@ -620,16 +620,16 @@ export function ChatGenerator() {
                     <strong>{queueData.counts.retrying}</strong> en relance
                   </span>
                 ) : null}
-                {queueData.counts.error > 0 && (
+                {queueData.counts.failed > 0 && (
                   <span className="text-sm text-destructive">
                     <AlertCircle className="inline w-3 h-3 mr-1" />
-                    <strong>{queueData.counts.error}</strong> erreurs
+                    <strong>{queueData.counts.failed}</strong> erreurs
                   </span>
                 )}
-                {queueData.counts.done_24h !== undefined && (
+                {queueData.counts.completed_24h !== undefined && (
                   <span className="text-sm text-muted-foreground">
                     <CheckCircle2 className="inline w-3 h-3 mr-1" />
-                    {queueData.counts.done_24h} générés (24h)
+                    {queueData.counts.completed_24h} générés (24h)
                   </span>
                 )}
               </div>
