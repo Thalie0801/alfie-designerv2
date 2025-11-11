@@ -9,11 +9,7 @@ interface ProtectedRouteProps {
   allowPending?: boolean;
 }
 
-export function ProtectedRoute({
-  children,
-  requireAdmin = false,
-  allowPending = false,
-}: ProtectedRouteProps) {
+export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
   const { user, isAdmin, isAuthorized, roles, loading, refreshProfile } = useAuth();
   const [checkingAdmin, setCheckingAdmin] = useState(false);
 
@@ -25,7 +21,6 @@ export function ProtectedRoute({
   // Flags effectifs pour la navigation (whitelist ou autorisé normalement)
   const effectiveIsAuthorized = isAuthorized || isWhitelisted;
   const effectiveIsAdmin = isAdmin; // Admin déjà calculé dans useAuth
-  const hasAccess = effectiveIsAuthorized || allowPending;
 
   useEffect(() => {
     if (requireAdmin && user && !effectiveIsAdmin && !checkingAdmin) {
@@ -55,24 +50,20 @@ export function ProtectedRoute({
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Vérifier les accès généraux (abonnement/autorisation)
-  if (!hasAccess) {
-    console.debug('[ProtectedRoute] Access denied, redirecting to /onboarding/activate', {
-      email: user?.email,
-      effectiveIsAuthorized,
-      allowPending,
-      isWhitelisted,
-    });
-    return <Navigate to="/onboarding/activate" replace />;
+  // Priorité 2: Admin général → toujours /admin si pas déjà sur une route admin
+  if (effectiveIsAdmin && requireAdmin === false) {
+    // Laisser passer, l'admin peut accéder aux routes normales
   }
 
-  // Note: On ne redirige JAMAIS vers /onboarding/activate ici pour les admins whitelistes
+  // Note: On ne redirige JAMAIS vers /onboarding/activate ici
+  // La redirection onboarding est gérée uniquement dans Auth.tsx après login
+  // Une fois dans l'app, les utilisateurs whitelist (Sandrine/Patricia) 
+  // sont traités comme autorisés grâce à effectiveIsAuthorized
   console.debug('[ProtectedRoute] Access granted', {
     email: user?.email,
     effectiveIsAdmin,
     effectiveIsAuthorized,
-    allowPending,
-    isWhitelisted,
+    isWhitelisted
   });
 
   return <>{children}</>;

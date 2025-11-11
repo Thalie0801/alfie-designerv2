@@ -12,7 +12,6 @@ import { Badge } from '@/components/ui/badge';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { BrandDialog } from '@/components/BrandDialog';
 import { toast } from 'sonner';
-import { safeNumber } from '@/lib/safeRender';
 
 export function BrandSelector() {
   const { 
@@ -55,7 +54,7 @@ export function BrandSelector() {
             <span>Mes marques</span>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="font-mono text-xs">
-                {safeNumber(totalBrands, 0)}/{safeNumber(quotaBrands, 1)}
+                {totalBrands}/{quotaBrands}
               </Badge>
               {totalBrands >= quotaBrands && (
                 <Badge variant="destructive" className="text-xs">
@@ -101,7 +100,7 @@ export function BrandSelector() {
                 className="cursor-pointer text-primary"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Créer une marque gratuite ({safeNumber(quotaBrands, 1) - safeNumber(totalBrands, 0)} restante)
+                Créer une marque gratuite ({quotaBrands - totalBrands} restante)
               </DropdownMenuItem>
             </BrandDialog>
           ) : (

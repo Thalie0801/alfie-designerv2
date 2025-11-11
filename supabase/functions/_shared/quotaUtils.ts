@@ -1,9 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "./env.ts";
 
 const admin = createClient(
-  SUPABASE_URL ?? "",
-  SUPABASE_SERVICE_ROLE_KEY ?? "",
+  Deno.env.get("SUPABASE_URL") ?? "",
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
 

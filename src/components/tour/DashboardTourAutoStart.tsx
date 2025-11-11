@@ -1,20 +1,18 @@
-import { useEffect, useRef } from "react";
-import { useTour } from "./InteractiveTour";
-import { useAuth } from "@/hooks/useAuth";
-import { autoCompletedKey, lsGet } from "@/utils/localStorage";
+import { useEffect, useRef } from 'react';
+import { useTour } from './InteractiveTour';
+import { useAuth } from '@/hooks/useAuth';
+import { autoCompletedKey, lsGet } from '@/utils/localStorage';
 
 interface DashboardTourAutoStartProps {
   targets?: string[];
   maxWaitMs?: number;
-  /** Par défaut true. Si false, ne lance jamais automatiquement (utile pour A/B tests) */
-  enabled?: boolean;
 }
 
 /**
- * Auto-start le tour à la première connexion quand toutes les cibles sont prêtes.
- * À placer à l'intérieur d'un TourProvider.
+ * Auto-starts the tour on first login when DOM targets are ready
+ * This component should be placed inside a TourProvider
  */
-export function DashboardTourAutoStart({
+export function DashboardTourAutoStart({ 
   targets = [
     '[data-tour-id="nav-dashboard"]',
     '[data-tour-id="btn-create"]',
@@ -27,114 +25,70 @@ export function DashboardTourAutoStart({
     '[data-sidebar-id="library"]',
     '[data-sidebar-id="affiliate"]',
   ],
-  maxWaitMs = 8000,
-  enabled = true,
+  maxWaitMs = 8000 
 }: DashboardTourAutoStartProps) {
   const { user } = useAuth();
-  const { start, isRunning } = useTour() as { start: () => void; isRunning?: boolean };
-
+  const { start } = useTour();
   const attemptedRef = useRef(false);
-  const startedRef = useRef(false);
 
   useEffect(() => {
-    // garde : feature désactivée
-    if (!enabled) return;
+    // Only run once per mount
+    if (attemptedRef.current || !user?.email) return;
+    attemptedRef.current = true;
 
-    // garde : 1 seule tentative par mount
-    if (attemptedRef.current) return;
-    if (!user?.email) return;
-
-    // déjà complété pour cet utilisateur ?
+    // Check if tour already auto-completed for this user
     const key = autoCompletedKey(user.email);
-    if (lsGet(key) === "1") {
-      // déjà auto-completé auparavant => ne rien faire
+    if (lsGet(key) === '1') {
+      console.debug('[TourAutoStart] Tour already auto-completed for', user.email);
       return;
     }
 
-    attemptedRef.current = true;
+    console.debug('[TourAutoStart] Waiting for targets:', targets);
 
-    let cancelled = false;
+    let ready = false;
     let timeoutId: number | undefined;
-    let rafId: number | undefined;
 
-    const hasAllTargets = () => targets.every((sel) => !!document.querySelector(sel));
-    const isTabVisible = () => document.visibilityState === "visible";
-
-    const log = (...args: any[]) => console.debug("[TourAutoStart]", ...args);
-
-    const safeStart = () => {
-      if (cancelled || startedRef.current || isRunning) return;
-      startedRef.current = true;
-
-      // petit délai pour laisser le layout se stabiliser
-      const run = () => {
-        if (cancelled) return;
-        log("Starting tour");
-        start();
-      };
-
-      // requestIdleCallback n’existe pas partout
-      if ("requestIdleCallback" in window) {
-        (window as any).requestIdleCallback(() => setTimeout(run, 0), { timeout: 500 });
-      } else {
-        setTimeout(run, 0);
-      }
-    };
+    // Check if all targets exist in DOM
+    const hasAllTargets = () => targets.every(sel => !!document.querySelector(sel));
 
     const tryStart = () => {
-      if (cancelled) return;
-      if (!isTabVisible()) return; // n’auto-démarre pas onglet caché
       if (hasAllTargets()) {
-        cleanup();
-        safeStart();
+        ready = true;
+        console.debug('[TourAutoStart] All targets ready, starting tour');
+        start();
+        mo.disconnect();
+        if (timeoutId) clearTimeout(timeoutId);
       }
     };
 
+    // Watch DOM for target elements
     const mo = new MutationObserver(() => {
-      tryStart();
+      if (!ready) tryStart();
     });
 
-    // Observations larges : on évite attributeFilter trop strict
-    if (document.body) {
-      mo.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-      });
-    }
+    mo.observe(document.body, { 
+      childList: true, 
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-tour-id']
+    });
 
-    // Polling léger (raf) pour les cas où les mutations ne suffisent pas (portals, microtasks)
-    const pump = () => {
-      if (cancelled) return;
-      tryStart();
-      rafId = requestAnimationFrame(pump);
-    };
-    rafId = requestAnimationFrame(pump);
-
-    // essayer immédiatement
-    log("Waiting for targets", targets);
+    // Try immediately in case targets already exist
     tryStart();
 
-    // sécurité : on abandonne après maxWaitMs
+    // Safety timeout - give up after maxWaitMs
     timeoutId = window.setTimeout(() => {
-      if (cancelled || startedRef.current) return;
-      cleanup();
-      log("Timeout reached, targets not found");
+      if (!ready) {
+        console.debug('[TourAutoStart] Timeout reached, targets not found');
+        mo.disconnect();
+      }
     }, maxWaitMs);
 
-    // nettoyage
-    function cleanup() {
-      if (timeoutId) clearTimeout(timeoutId);
-      if (rafId) cancelAnimationFrame(rafId);
-      mo.disconnect();
-    }
-
-    // annulation si user change, unmount, etc.
     return () => {
-      cancelled = true;
-      cleanup();
+      mo.disconnect();
+      if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [user?.email, enabled, targets, maxWaitMs, start, isRunning]);
+  }, [user, start, targets, maxWaitMs]);
 
   return null;
 }

@@ -32,7 +32,6 @@ import CloudinaryTest from "./pages/CloudinaryTest";
 import ActivateAccess from "./pages/onboarding/Activate";
 import { AlfieChat } from "./components/AlfieChat";
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
-import { ChatGenerator } from "@/features/studio";
 
 const queryClient = new QueryClient();
 
@@ -62,16 +61,6 @@ const AppRoutes = () => {
               <ProtectedRoute>
                 <AppLayoutWithSidebar>
                   <AlfieChat />
-                </AppLayoutWithSidebar>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/studio"
-            element={
-              <ProtectedRoute>
-                <AppLayoutWithSidebar>
-                  <ChatGenerator />
                 </AppLayoutWithSidebar>
               </ProtectedRoute>
             }
@@ -211,7 +200,7 @@ const AppRoutes = () => {
           <Route
             path="/onboarding/activate"
             element={
-              <ProtectedRoute allowPending={true}>
+              <ProtectedRoute>
                 <AppLayoutWithSidebar>
                   <ActivateAccess />
                 </AppLayoutWithSidebar>

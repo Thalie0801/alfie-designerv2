@@ -332,22 +332,6 @@ export default function Auth() {
   // Déterminer si le formulaire doit être désactivé
   const formDisabled = loading || verifyingPayment || (mode === 'signup' && !canSignUp);
 
-  // Show loader while checking auth state
-  if (authLoading || (user && !flagsReady)) {
-    return (
-      <div className="min-h-screen gradient-subtle flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="py-12">
-            <div className="text-center space-y-4">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
-              <p className="text-muted-foreground">Vérification de votre session...</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen gradient-subtle flex items-center justify-center p-4">
       <Card className="w-full max-w-md">

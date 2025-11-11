@@ -1,63 +1,44 @@
-import { cn } from "@/lib/utils";
+import { cn } from '@/lib/utils';
 
 interface CharacterCounterProps {
   current: number;
   min?: number;
-  max: number; // > 0 recommandé
+  max: number;
   label?: string;
   className?: string;
 }
 
 export function CharacterCounter({ current, min, max, label, className }: CharacterCounterProps) {
-  // sécurité max > 0
-  const safeMax = Math.max(1, max);
-  const pct = Math.max(0, Math.min(100, (current / safeMax) * 100));
+  const percentage = (current / max) * 100;
+  const isWarning = percentage >= 90 && percentage <= 100;
+  const isError = current > max || (min && current < min);
 
-  const hasMin = typeof min === "number";
-  const underMin = hasMin && current < (min as number);
-  const overMax = current > max;
+  const getColor = () => {
+    if (isError) return 'text-destructive';
+    if (isWarning) return 'text-orange-500';
+    return 'text-success';
+  };
 
-  const isWarning = !overMax && !underMin && pct >= 90; // proche du max
-  const isError = overMax || underMin;
-
-  // NOTE: garde tes tokens actuels; change-les si ta palette diffère
-  const color = isError ? "text-destructive" : isWarning ? "text-orange-500" : "text-success";
-
-  const bg = isError ? "bg-destructive/20" : isWarning ? "bg-orange-500/20" : "bg-success/20";
-
-  const helper = overMax
-    ? `(${current - max} au-delà du max)`
-    : underMin
-      ? `(${(min as number) - current} restant·s min)`
-      : undefined;
+  const getBgColor = () => {
+    if (isError) return 'bg-destructive/20';
+    if (isWarning) return 'bg-orange-500/20';
+    return 'bg-success/20';
+  };
 
   return (
-    <div
-      className={cn("flex items-center gap-2", className)}
-      role="group"
-      aria-label={label ?? "Compteur de caractères"}
-    >
-      {label && <span className="text-xs text-muted-foreground">{label}</span>}
-
-      <div className="flex items-center gap-1" title={helper}>
-        <span
-          className={cn("text-xs font-medium", color)}
-          aria-live="polite"
-          aria-atomic="true"
-          aria-invalid={isError || undefined}
-        >
+    <div className={cn('flex items-center gap-2', className)}>
+      {label && (
+        <span className="text-xs text-muted-foreground">{label}</span>
+      )}
+      <div className="flex items-center gap-1">
+        <span className={cn('text-xs font-medium', getColor())}>
           {current}/{max}
         </span>
-
-        <div
-          className="w-12 h-1.5 rounded-full bg-muted overflow-hidden"
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={max}
-          aria-valuenow={Math.min(current, max)}
-          aria-label="Utilisation des caractères"
-        >
-          <div className={cn("h-full transition-all duration-200", bg)} style={{ width: `${pct}%` }} />
+        <div className="w-12 h-1.5 rounded-full bg-muted overflow-hidden">
+          <div
+            className={cn('h-full transition-all duration-200', getBgColor())}
+            style={{ width: `${Math.min(percentage, 100)}%` }}
+          />
         </div>
       </div>
     </div>

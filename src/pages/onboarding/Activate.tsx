@@ -8,27 +8,13 @@ import { ShieldCheck, CreditCard, LifeBuoy } from 'lucide-react';
 
 export default function ActivateAccess() {
   const navigate = useNavigate();
-  const { profile, isAuthorized, loading } = useAuth();
+  const { profile, isAuthorized } = useAuth();
 
   useEffect(() => {
-    if (!loading && (isAuthorized || profile?.granted_by_admin)) {
+    if (isAuthorized || profile?.granted_by_admin) {
       navigate('/dashboard', { replace: true });
     }
-  }, [loading, isAuthorized, profile?.granted_by_admin, navigate]);
-
-  // Show loader while auth data is being fetched
-  if (loading) {
-    return (
-      <div className="p-6">
-        <div className="max-w-3xl mx-auto flex items-center justify-center min-h-[60vh]">
-          <div className="text-center space-y-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
-            <p className="text-muted-foreground">Chargement de vos informations...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  }, [isAuthorized, profile?.granted_by_admin, navigate]);
 
   const status = profile?.status ?? 'pending';
 

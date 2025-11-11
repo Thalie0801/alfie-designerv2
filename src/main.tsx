@@ -14,10 +14,8 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
     return { error };
   }
 
-  componentDidCatch(error: Error, errorInfo: any) {
+  componentDidCatch(error: Error) {
     console.error('Runtime error:', error);
-    console.error('Component stack:', errorInfo.componentStack);
-    console.error('Error type:', error.name, 'Message:', error.message);
   }
 
   render() {

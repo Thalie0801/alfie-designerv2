@@ -1,24 +1,23 @@
-import { useState, useRef, useEffect, useMemo } from "react";
-import { Sparkles, ImagePlus, Loader2, Download } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { useBrandKit } from "@/hooks/useBrandKit";
-import { cn } from "@/lib/utils";
-import { uploadToChatBucket } from "@/lib/chatUploads";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { VIDEO_ENGINE_CONFIG } from "@/config/videoEngine";
+import { useState, useRef, useEffect } from 'react';
+import { Sparkles, ImagePlus, Loader2, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useBrandKit } from '@/hooks/useBrandKit';
+import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { VIDEO_ENGINE_CONFIG } from '@/config/videoEngine';
 
 type GeneratedAsset = {
-  type: "image" | "video";
+  type: 'image' | 'video';
   url: string;
   prompt: string;
-  format: AspectRatio;
+  format: string;
 };
 
-type AspectRatio = "1:1" | "16:9" | "9:16" | "4:3" | "3:4" | "4:5";
-type ContentType = "image" | "video";
+type AspectRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
+type ContentType = 'image' | 'video';
 
 type UploadedSource = {
   type: ContentType;
@@ -27,418 +26,452 @@ type UploadedSource = {
 };
 
 const MEDIA_URL_KEYS = [
-  "videoUrl",
-  "video_url",
-  "url",
-  "output",
-  "outputUrl",
-  "output_url",
-  "downloadUrl",
-  "download_url",
-  "resultUrl",
-  "result_url",
-  "fileUrl",
-  "file_url",
-  "assetUrl",
-  "asset_url",
+  'videoUrl',
+  'video_url',
+  'url',
+  'output',
+  'outputUrl',
+  'output_url',
+  'downloadUrl',
+  'download_url',
+  'resultUrl',
+  'result_url',
+  'fileUrl',
+  'file_url'
 ] as const;
 
-const STATUS_URL_KEYS = [
-  "statusUrl",
-  "status_url",
-  "pollUrl",
-  "poll_url",
-  "resultUrl",
-  "result_url",
-  "progressUrl",
-  "progress_url",
-  "checkUrl",
-  "check_url",
-] as const;
-
-const ASPECT_TO_TW: Record<AspectRatio, string> = {
-  "1:1": "aspect-square",
-  "16:9": "aspect-video",
-  "9:16": "aspect-[9/16]",
-  "4:3": "aspect-[4/3]",
-  "3:4": "aspect-[3/4]",
-  "4:5": "aspect-[4/5]",
-};
-
-const IMAGE_SIZE_MAP: Record<AspectRatio, string> = {
-  "1:1": "1024x1024",
-  "9:16": "1024x1820",
-  "16:9": "1820x1024",
-  "3:4": "1024x1365",
-  "4:3": "1365x1024",
-  "4:5": "1080x1350",
-};
-
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
 
 const extractMediaUrl = (payload: unknown): string | null => {
   if (!payload) return null;
 
-  if (typeof payload === "string") {
-    const s = payload.trim();
-    return s.startsWith("http") ? s : null;
+  if (typeof payload === 'string') {
+    const trimmed = payload.trim();
+    return trimmed.startsWith('http') ? trimmed : null;
   }
+
   if (Array.isArray(payload)) {
     for (const item of payload) {
-      const found = extractMediaUrl(item);
-      if (found) return found;
+      const extracted = extractMediaUrl(item);
+      if (extracted) return extracted;
     }
     return null;
   }
+
   if (isRecord(payload)) {
     for (const key of MEDIA_URL_KEYS) {
-      const found = extractMediaUrl(payload[key]);
-      if (found) return found;
+      const candidate = payload[key];
+      const extracted = extractMediaUrl(candidate);
+      if (extracted) return extracted;
     }
-    if ("data" in payload) {
-      const found = extractMediaUrl(payload["data"]);
-      if (found) return found;
+
+    if ('data' in payload) {
+      const extracted = extractMediaUrl((payload as Record<string, unknown>).data);
+      if (extracted) return extracted;
     }
-    if ("result" in payload) {
-      const found = extractMediaUrl(payload["result"]);
-      if (found) return found;
+
+    if ('result' in payload) {
+      const extracted = extractMediaUrl((payload as Record<string, unknown>).result);
+      if (extracted) return extracted;
     }
   }
+
   return null;
 };
 
-const extractStatusUrls = (payload: unknown): string[] => {
-  const out: string[] = [];
-  if (!isRecord(payload)) return out;
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  for (const key of STATUS_URL_KEYS) {
-    const v = payload[key];
-    if (typeof v === "string" && v.startsWith("http")) out.push(v);
-  }
-  const list = (payload as any).statusUrls ?? (payload as any).status_urls;
-  if (Array.isArray(list)) {
-    for (const url of list) if (typeof url === "string" && url.startsWith("http")) out.push(url);
-  }
+const pollForVideoUrl = async (candidateUrls: string[], maxAttempts = 12, intervalMs = 5000): Promise<string | null> => {
+  const uniqueUrls = Array.from(new Set(candidateUrls.filter(Boolean)));
 
-  // jobId → endpoints du backend
-  const jobId =
-    (typeof payload.jobId === "string" && payload.jobId) ||
-    (typeof payload.job_id === "string" && payload.job_id) ||
-    (typeof payload.id === "string" && payload.id) ||
-    (typeof payload.taskId === "string" && payload.taskId) ||
-    (typeof payload.task_id === "string" && payload.task_id) ||
-    null;
-
-  if (jobId && VIDEO_ENGINE_CONFIG?.FFMPEG_BACKEND_URL) {
-    const base = VIDEO_ENGINE_CONFIG.FFMPEG_BACKEND_URL.replace(/\/+$/, "");
-    out.push(`${base}/api/jobs/${jobId}`);
-    out.push(`${base}/api/status/${jobId}`);
-  }
-  return Array.from(new Set(out));
-};
-
-const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-async function pollForVideoUrl(
-  candidateUrls: string[],
-  {
-    maxAttempts = 12,
-    intervalMs = 5000,
-    signal,
-  }: { maxAttempts?: number; intervalMs?: number; signal?: AbortSignal } = {},
-): Promise<string | null> {
-  const unique = Array.from(new Set(candidateUrls.filter(Boolean)));
-  for (const url of unique) {
+  for (const url of uniqueUrls) {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      if (signal?.aborted) return null;
       try {
-        const res = await fetch(url, { method: "GET", signal });
-        if (!res.ok) {
+        const response = await fetch(url, { method: 'GET' });
+        if (!response.ok) {
           await delay(intervalMs);
           continue;
         }
-        const text = await res.text();
+
+        const text = await response.text();
         if (!text) {
           await delay(intervalMs);
           continue;
         }
+
         let data: unknown;
         try {
           data = JSON.parse(text);
-        } catch {
+        } catch (error) {
+          console.warn('Impossible de parser la réponse de statut vidéo', error);
           await delay(intervalMs);
           continue;
         }
 
-        const finalUrl = extractMediaUrl(data);
-        if (finalUrl) return finalUrl;
-
-        const statusRaw =
-          (isRecord(data) && typeof data.status === "string" && data.status) ||
-          (isRecord(data) && typeof data.state === "string" && data.state) ||
-          null;
-        const status = statusRaw?.toLowerCase();
-
-        if (status && ["failed", "error", "cancelled", "canceled"].includes(status)) {
-          const msg =
-            (isRecord(data) && typeof data.error === "string" && data.error) || "La génération vidéo a échoué.";
-          throw new Error(msg);
+        const mediaUrl = extractMediaUrl(data);
+        if (mediaUrl) {
+          return mediaUrl;
         }
-      } catch (e) {
-        if ((e as any)?.name === "AbortError") return null;
-        console.warn("[Video poll] error:", e);
+
+        const status =
+          (isRecord(data) && typeof data.status === 'string' && data.status.toLowerCase()) ||
+          (isRecord(data) && typeof data.state === 'string' && data.state.toLowerCase()) ||
+          null;
+
+        if (status && ['failed', 'error', 'cancelled', 'canceled'].includes(status)) {
+          const errorMessage =
+            (isRecord(data) && typeof data.error === 'string' && data.error) ||
+            'La génération vidéo a échoué.';
+          throw new Error(errorMessage);
+        }
+      } catch (error) {
+        console.warn('Erreur lors du suivi de la génération vidéo', error);
       }
+
       await delay(intervalMs);
     }
   }
+
   return null;
-}
+};
 
 interface VideoGenerationParams {
   prompt: string;
   aspectRatio: AspectRatio;
   source?: UploadedSource | null;
-  signal?: AbortSignal;
 }
 
-async function generateVideoWithFfmpeg({ prompt, aspectRatio, source, signal }: VideoGenerationParams) {
-  const trimmedPrompt = (prompt ?? "").trim();
+const generateVideoWithFfmpeg = async ({ prompt, aspectRatio, source }: VideoGenerationParams) => {
+  const trimmedPrompt = typeof prompt === 'string' ? prompt.trim() : '';
+
   const body: Record<string, unknown> = {
-    prompt: trimmedPrompt || "Creative social video",
+    prompt: trimmedPrompt,
     aspectRatio,
-    source: source ? { type: source.type, url: source.url, name: source.name } : null,
+    source: source
+      ? {
+          type: source.type,
+          url: source.url,
+          name: source.name,
+        }
+      : null,
   };
 
   let responseData: unknown = null;
 
   try {
-    const { data, error } = await supabase.functions.invoke("chat-generate-video", { body });
-    if (error) throw new Error(error.message || "Erreur lors de la génération vidéo");
+    const { data, error } = await supabase.functions.invoke('chat-generate-video', {
+      body,
+    });
+
+    if (error) {
+      throw new Error(error.message || 'Erreur lors de la génération vidéo');
+    }
+
     responseData = data;
-  } catch (e: any) {
-    if (/fetch/i.test(e?.message || "")) {
+  } catch (error) {
+    if (error instanceof Error && /fetch/i.test(error.message)) {
       throw new Error("Connexion impossible avec le moteur vidéo. Réessayez dans un instant.");
     }
-    throw e;
+
+    throw error;
   }
 
-  // 1) tentative d’URL directe
-  const direct = extractMediaUrl(responseData);
-  if (direct) return direct;
+  const directUrl = extractMediaUrl(responseData);
+  if (directUrl) {
+    return directUrl;
+  }
 
-  // 2) polling
-  const statusUrls = extractStatusUrls(responseData);
-  const videoUrl = await pollForVideoUrl(statusUrls, { signal });
-  if (videoUrl) return videoUrl;
+  const statusUrls: string[] = [];
+  if (isRecord(responseData)) {
+    const possibleStatusFields = [
+      'statusUrl',
+      'status_url',
+      'pollUrl',
+      'poll_url',
+      'resultUrl',
+      'result_url',
+      'progressUrl',
+      'progress_url',
+    ];
 
-  // 3) pas (encore) prêt
-  throw new Error("La vidéo est en cours de préparation. Réessayez dans quelques instants.");
-}
+    for (const key of possibleStatusFields) {
+      const value = responseData[key];
+      if (typeof value === 'string') {
+        statusUrls.push(value);
+      }
+    }
+
+    const statusUrlList = Array.isArray(responseData.statusUrls)
+      ? responseData.statusUrls
+      : Array.isArray(responseData.status_urls)
+      ? responseData.status_urls
+      : null;
+
+    if (Array.isArray(statusUrlList)) {
+      for (const url of statusUrlList) {
+        if (typeof url === 'string') {
+          statusUrls.push(url);
+        }
+      }
+    }
+
+    const jobId =
+      (typeof responseData.jobId === 'string' && responseData.jobId) ||
+      (typeof responseData.job_id === 'string' && responseData.job_id) ||
+      (typeof responseData.id === 'string' && responseData.id) ||
+      (typeof responseData.taskId === 'string' && responseData.taskId) ||
+      (typeof responseData.task_id === 'string' && responseData.task_id) ||
+      null;
+
+    if (jobId) {
+      statusUrls.push(`${VIDEO_ENGINE_CONFIG.FFMPEG_BACKEND_URL}/api/jobs/${jobId}`);
+      statusUrls.push(`${VIDEO_ENGINE_CONFIG.FFMPEG_BACKEND_URL}/api/status/${jobId}`);
+    }
+  }
+
+  const videoUrl = await pollForVideoUrl(statusUrls);
+  if (videoUrl) {
+    return videoUrl;
+  }
+
+  throw new Error('La vidéo est en cours de préparation. Réessayez dans quelques instants.');
+};
 
 export function ChatGenerator() {
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [contentType, setContentType] = useState<ContentType>("image");
+  const [contentType, setContentType] = useState<ContentType>('image');
   const [uploadedSource, setUploadedSource] = useState<UploadedSource | null>(null);
   const [uploadingSource, setUploadingSource] = useState(false);
   const [generatedAsset, setGeneratedAsset] = useState<GeneratedAsset | null>(null);
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
   const { brandKit } = useBrandKit();
 
-  // Forcer des ratios valides pour la vidéo
   useEffect(() => {
-    if (contentType === "video" && (aspectRatio === "4:3" || aspectRatio === "3:4" || aspectRatio === "4:5")) {
-      setAspectRatio("9:16");
+    if (contentType === 'video' && (aspectRatio === '4:3' || aspectRatio === '3:4')) {
+      setAspectRatio('9:16');
     }
   }, [contentType, aspectRatio]);
 
-  // Reset preview lors du changement de type
   useEffect(() => {
     setGeneratedAsset(null);
   }, [contentType]);
-
-  const canGenerate = useMemo(() => {
-    return !isGenerating && (!!prompt.trim() || !!uploadedSource);
-  }, [isGenerating, prompt, uploadedSource]);
 
   const handleSourceUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const isVideo = file.type.startsWith("video/");
-    const isImage = file.type.startsWith("image/");
+    const isVideo = file.type.startsWith('video/');
+    const isImage = file.type.startsWith('image/');
 
     if (!isVideo && !isImage) {
-      toast.error("Format non supporté. Choisissez une image ou une vidéo.");
+      toast.error('Format non supporté. Choisissez une image ou une vidéo.');
       return;
     }
 
     const maxSize = isVideo ? 200 * 1024 * 1024 : 10 * 1024 * 1024;
     if (file.size > maxSize) {
-      toast.error(isVideo ? "Vidéo trop volumineuse (max 200MB)" : "Image trop volumineuse (max 10MB)");
+      toast.error(
+        isVideo ? 'Vidéo trop volumineuse (max 200MB)' : 'Image trop volumineuse (max 10MB)'
+      );
       return;
     }
 
     setUploadingSource(true);
 
     try {
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
-      if (authError) throw authError;
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        toast.error("Vous devez être connecté");
+        toast.error('Vous devez être connecté');
         return;
       }
 
-      const { signedUrl: uploadedSourceUrl } = await uploadToChatBucket(file, supabase, user.id);
+      const fileName = `${user.id}/${Date.now()}-${file.name}`;
 
-      const src: UploadedSource = {
-        type: isVideo ? ("video" as const) : ("image" as const),
-        url: uploadedSourceUrl,
+      const { error: uploadError } = await supabase.storage
+        .from('chat-uploads')
+        .upload(fileName, file, { contentType: file.type });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat-uploads')
+        .getPublicUrl(fileName);
+
+      setUploadedSource({
+        type: isVideo ? 'video' : 'image',
+        url: publicUrl,
         name: file.name,
-      };
-      setUploadedSource(src);
+      });
 
-      if (isVideo) setContentType("video");
-
-      toast.success(isVideo ? "Vidéo ajoutée ! 🎬" : "Image ajoutée ! 📸");
-    } catch (error: unknown) {
-      console.error("Upload error:", error);
-      let message: string;
-      if (error instanceof Error) {
-        message = error.message;
-      } else {
-        try {
-          message = JSON.stringify(error);
-        } catch {
-          message = String(error);
-        }
+      if (isVideo) {
+        setContentType('video');
       }
-      toast.error(`Erreur lors de l'upload${message ? ` : ${message}` : ""}`);
+
+      toast.success(isVideo ? 'Vidéo ajoutée ! 🎬' : 'Image ajoutée ! 📸');
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error('Erreur lors de l\'upload');
     } finally {
       setUploadingSource(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
   const handleGenerate = async () => {
     if (!prompt.trim() && !uploadedSource) {
-      toast.error("Ajoutez un prompt ou un média");
+      toast.error('Ajoutez un prompt ou un média');
       return;
     }
-    if (contentType === "image" && uploadedSource?.type === "video") {
-      toast.error("Veuillez sélectionner une image pour générer une image.");
+
+    if (contentType === 'image' && uploadedSource?.type === 'video') {
+      toast.error('Veuillez sélectionner une image pour générer une image.');
       return;
     }
 
     setIsGenerating(true);
     setGeneratedAsset(null);
 
-    // abort précédent
-    if (abortRef.current) abortRef.current.abort();
-    abortRef.current = new AbortController();
-
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        toast.error("Vous devez être connecté");
+        toast.error('Vous devez être connecté');
         return;
       }
 
-      if (contentType === "image") {
-        const size = IMAGE_SIZE_MAP[aspectRatio] ?? IMAGE_SIZE_MAP["1:1"];
+      if (contentType === 'image') {
+        // Mapper les aspect ratios vers les formats attendus par alfie-render-image
+        const mapAspectRatio = (ratio: AspectRatio): string => {
+          const mapping: Record<string, string> = {
+            '1:1': '1024x1024',
+            '9:16': '1024x1820',
+            '16:9': '1820x1024',
+            '3:4': '1024x1365',
+            '4:3': '1365x1024'
+          };
+          return mapping[ratio] || '1024x1024';
+        };
 
-        if (uploadedSource?.type === "image") {
-          const { data, error } = await supabase.functions.invoke("alfie-generate-ai-image", {
+        if (uploadedSource?.type === 'image') {
+          const { data, error } = await supabase.functions.invoke('alfie-generate-ai-image', {
             body: {
               templateImageUrl: uploadedSource.url,
               brandKit: brandKit,
-              prompt: prompt || "Transform this image with a creative style",
+              prompt: prompt || 'Transform this image with a creative style',
             },
           });
-          if (error) throw error;
-          if (!data?.imageUrl) throw new Error("Aucune image générée");
 
-          const url = data.imageUrl as string;
-          setGeneratedAsset({ type: "image", url, prompt: prompt || "Image transformation", format: aspectRatio });
+          if (error) throw error;
+
+          if (!data?.imageUrl) {
+            throw new Error('Aucune image générée');
+          }
+
+          setGeneratedAsset({
+            type: 'image',
+            url: data.imageUrl,
+            prompt: prompt || 'Image transformation',
+            format: aspectRatio,
+          });
 
           if (brandKit?.id) {
-            await supabase.from("media_generations").insert({
+            await supabase.from('media_generations').insert({
               user_id: user.id,
               brand_id: brandKit.id,
-              type: "image",
-              prompt: prompt || "Image transformation",
+              type: 'image',
+              prompt: prompt || 'Image transformation',
               input_url: uploadedSource.url,
-              output_url: url,
-              status: "completed",
-              metadata: { aspectRatio, sourceType: "image" },
+              output_url: data.imageUrl,
+              status: 'completed',
+              metadata: {
+                aspectRatio,
+                sourceType: uploadedSource.type,
+              },
             } as any);
           }
 
-          toast.success("Image générée avec succès ! ✨");
+          toast.success('Image générée avec succès ! ✨');
         } else {
-          const { data, error } = await supabase.functions.invoke("alfie-render-image", {
+          const { data, error } = await supabase.functions.invoke('alfie-render-image', {
             body: {
-              provider: "gemini-nano",
+              provider: 'gemini-nano',
               prompt: prompt,
-              format: size,
+              format: mapAspectRatio(aspectRatio),
               brand_id: brandKit?.id,
-              cost_woofs: 1,
+              cost_woofs: 1
             },
           });
+
           if (error) throw error;
 
-          const imageUrl = data?.data?.image_urls?.[0];
-          if (!data?.ok || !imageUrl) throw new Error(data?.error || "Aucune image générée");
+          // alfie-render-image renvoie { ok, data: { image_urls, generation_id } }
+          if (!data?.ok || !data?.data?.image_urls?.[0]) {
+            throw new Error(data?.error || 'Aucune image générée');
+          }
 
-          setGeneratedAsset({ type: "image", url: imageUrl, prompt, format: aspectRatio });
-          toast.success("Image générée avec succès ! ✨");
+          const imageUrl = data.data.image_urls[0];
+
+          setGeneratedAsset({
+            type: 'image',
+            url: imageUrl,
+            prompt: prompt,
+            format: aspectRatio,
+          });
+
+          toast.success('Image générée avec succès ! ✨');
         }
       } else {
         const videoUrl = await generateVideoWithFfmpeg({
-          prompt: prompt || "Creative social video",
+          prompt: prompt || 'Creative social video',
           aspectRatio,
           source: uploadedSource,
-          signal: abortRef.current.signal,
         });
 
-        setGeneratedAsset({ type: "video", url: videoUrl, prompt: prompt || "Vidéo générée", format: aspectRatio });
+        setGeneratedAsset({
+          type: 'video',
+          url: videoUrl,
+          prompt: prompt || 'Vidéo générée',
+          format: aspectRatio,
+        });
 
         if (brandKit?.id) {
-          await supabase.from("media_generations").insert({
+          await supabase.from('media_generations').insert({
             user_id: user.id,
             brand_id: brandKit.id,
-            type: "video",
-            prompt: prompt || "Vidéo générée",
+            type: 'video',
+            prompt: prompt || 'Vidéo générée',
             input_url: uploadedSource?.url ?? null,
             output_url: videoUrl,
-            status: "completed",
+            status: 'completed',
             metadata: {
               aspectRatio,
-              sourceType: uploadedSource ? uploadedSource.type : "prompt",
-              engine: "ffmpeg-backend",
+              sourceType: uploadedSource ? uploadedSource.type : 'prompt',
+              engine: 'ffmpeg-backend',
             },
           } as any);
         }
 
-        toast.success("Vidéo générée avec succès ! 🎬");
+        toast.success('Vidéo générée avec succès ! 🎬');
       }
     } catch (error: any) {
-      console.error("Generation error:", error);
-      const message = error?.message || "Erreur lors de la génération";
-
-      if (/Session expirée|reconnecter/i.test(message)) {
-        toast.error(message, { action: { label: "Se reconnecter", onClick: () => (window.location.href = "/auth") } });
-      } else if (contentType === "video" && /préparation/i.test(message)) {
+      console.error('Generation error:', error);
+      const message = error?.message || 'Erreur lors de la génération';
+      
+      if (message.includes('Session expirée') || message.includes('reconnecter')) {
+        toast.error(message, {
+          action: {
+            label: 'Se reconnecter',
+            onClick: () => {
+              window.location.href = '/auth';
+            }
+          }
+        });
+      } else if (contentType === 'video' && /préparation/i.test(message)) {
         toast.info(message);
-      } else if (message?.includes("AbortError")) {
-        // silencieux : action utilisateur/unmount
       } else {
         toast.error(message);
       }
@@ -447,35 +480,38 @@ export function ChatGenerator() {
     }
   };
 
-  useEffect(() => {
-    return () => {
-      if (abortRef.current) abortRef.current.abort();
-    };
-  }, []);
-
   const handleDownload = () => {
     if (!generatedAsset) return;
+
     (async () => {
       try {
-        const res = await fetch(generatedAsset.url);
-        if (!res.ok) throw new Error("Download failed");
-        const blob = await res.blob();
+        const response = await fetch(generatedAsset.url);
+        if (!response.ok) {
+          throw new Error('Download failed');
+        }
+        const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        const ext = generatedAsset.type === "video" ? "mp4" : "png";
+
+        const link = document.createElement('a');
         link.href = blobUrl;
-        link.download = `alfie-${Date.now()}.${ext}`;
+        link.download = `alfie-${Date.now()}.${generatedAsset.type === 'video' ? 'mp4' : 'png'}`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(blobUrl);
-        toast.success("Téléchargement lancé ! 📥");
-      } catch (e) {
-        console.error("Download error:", e);
-        toast.error("Impossible de télécharger le fichier");
+
+        toast.success('Téléchargement lancé ! 📥');
+      } catch (error) {
+        console.error('Download error:', error);
+        toast.error('Impossible de télécharger le fichier');
       }
     })();
   };
+
+  const promptPlaceholder =
+    contentType === 'video'
+      ? "Décrivez la scène vidéo que vous imaginez, ou ajoutez un média pour l'animer..."
+      : 'Décrivez la scène que vous imaginez, ou uploadez une image pour la transformer...';
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -485,10 +521,12 @@ export function ChatGenerator() {
           <div className="flex items-center justify-center gap-3 mb-4">
             <div className="relative">
               <Sparkles className="h-12 w-12 sm:h-16 sm:w-16 text-primary animate-pulse" />
-              <div className="absolute inset-0 blur-xl bg-primary/20 animate-pulse" />
+              <div className="absolute inset-0 blur-xl bg-primary/20 animate-pulse"></div>
             </div>
           </div>
-          <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold tracking-tight">ALFIE STUDIO</h1>
+          <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold tracking-tight">
+            ALFIE STUDIO
+          </h1>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg">
             Créez des visuels époustouflants en quelques secondes
           </p>
@@ -499,26 +537,39 @@ export function ChatGenerator() {
           {/* Generated Asset Preview */}
           {generatedAsset && (
             <div className="relative rounded-2xl overflow-hidden bg-card border border-border backdrop-blur-sm animate-fade-in">
-              <div className={cn("relative", ASPECT_TO_TW[generatedAsset.format || "4:5"] || ASPECT_TO_TW["4:5"])}>
-                {generatedAsset.type === "image" ? (
+              <div className={cn(
+                "relative",
+                (generatedAsset.format || '4:5') === '1:1' && "aspect-square",
+                (generatedAsset.format || '4:5') === '16:9' && "aspect-video",
+                (generatedAsset.format || '4:5') === '9:16' && "aspect-[9/16]",
+                (generatedAsset.format || '4:5') === '4:3' && "aspect-[4/3]",
+                (generatedAsset.format || '4:5') === '3:4' && "aspect-[3/4]",
+                (generatedAsset.format || '4:5') === '4:5' && "aspect-[4/5]"
+              )}>
+                {generatedAsset.type === 'image' ? (
                   <img
                     src={generatedAsset.url}
                     alt="Création générée"
-                    className="absolute inset-0 w-full h-full object-cover"
+                    className="w-full h-full object-cover"
                   />
                 ) : (
-                  <video src={generatedAsset.url} controls className="absolute inset-0 w-full h-full object-cover" />
+                  <video
+                    src={generatedAsset.url}
+                    controls
+                    className="w-full h-full object-cover"
+                  />
                 )}
-
-                <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 space-y-3">
+                <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent"></div>
+                <div className="absolute bottom-0 left-0 right-0 p-6 space-y-3">
                   <p className="text-xs text-muted-foreground">
-                    Type : {generatedAsset.type === "video" ? "Vidéo" : "Image"} • Format :{" "}
-                    {generatedAsset.format || "4:5"}
+                    Type : {generatedAsset.type === 'video' ? 'Vidéo' : 'Image'} • Format : {generatedAsset.format || '4:5'}
                   </p>
-                  <Button onClick={handleDownload} className="w-full bg-primary hover:bg-primary/90">
+                  <Button
+                    onClick={handleDownload}
+                    className="w-full bg-primary hover:bg-primary/90"
+                  >
                     <Download className="mr-2 h-4 w-4" />
-                    {generatedAsset.type === "video" ? "Télécharger la vidéo" : "Télécharger l'image"}
+                    {generatedAsset.type === 'video' ? 'Télécharger la vidéo' : "Télécharger l'image"}
                   </Button>
                 </div>
               </div>
@@ -531,7 +582,7 @@ export function ChatGenerator() {
             {uploadedSource && (
               <div className="relative rounded-xl overflow-hidden bg-muted/50 border border-border">
                 <div className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4">
-                  {uploadedSource.type === "image" ? (
+                  {uploadedSource.type === 'image' ? (
                     <img
                       src={uploadedSource.url}
                       alt="Média source"
@@ -548,7 +599,7 @@ export function ChatGenerator() {
                   )}
                   <div className="flex-1">
                     <p className="text-xs sm:text-sm text-muted-foreground mb-2">
-                      {uploadedSource.type === "video" ? "Vidéo source ajoutée" : "Image source ajoutée"}
+                      {uploadedSource.type === 'video' ? 'Vidéo source ajoutée' : 'Image source ajoutée'}
                     </p>
                     <Button
                       variant="ghost"
@@ -566,7 +617,7 @@ export function ChatGenerator() {
             {/* Type Selector */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Type de rendu</label>
-              <Select value={contentType} onValueChange={(v) => setContentType(v as ContentType)}>
+              <Select value={contentType} onValueChange={(value) => setContentType(value as ContentType)}>
                 <SelectTrigger className="bg-muted/50 border-border">
                   <SelectValue placeholder="Sélectionnez un type" />
                 </SelectTrigger>
@@ -580,7 +631,7 @@ export function ChatGenerator() {
             {/* Format Selector */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Format du rendu</label>
-              <Select value={aspectRatio} onValueChange={(v) => setAspectRatio(v as AspectRatio)}>
+              <Select value={aspectRatio} onValueChange={(value) => setAspectRatio(value as AspectRatio)}>
                 <SelectTrigger className="bg-muted/50 border-border">
                   <SelectValue />
                 </SelectTrigger>
@@ -590,7 +641,6 @@ export function ChatGenerator() {
                   <SelectItem value="9:16">Portrait (9:16)</SelectItem>
                   <SelectItem value="4:3">Standard (4:3)</SelectItem>
                   <SelectItem value="3:4">Portrait (3:4)</SelectItem>
-                  <SelectItem value="4:5">Feed (4:5)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -600,11 +650,7 @@ export function ChatGenerator() {
               <Textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder={
-                  contentType === "video"
-                    ? "Décrivez la scène vidéo que vous imaginez, ou ajoutez un média pour l'animer..."
-                    : "Décrivez la scène que vous imaginez, ou uploadez une image pour la transformer..."
-                }
+                placeholder={promptPlaceholder}
                 className="min-h-[120px] bg-muted/50 border-border resize-none text-base"
                 disabled={isGenerating}
               />
@@ -632,18 +678,18 @@ export function ChatGenerator() {
                   ) : (
                     <ImagePlus className="h-4 w-4 mr-2" />
                   )}
-                  <span className="hidden sm:inline">{uploadingSource ? "Upload..." : "Ajouter un média"}</span>
-                  <span className="sm:hidden">{uploadingSource ? "Upload..." : "Média"}</span>
+                  <span className="hidden sm:inline">{uploadingSource ? 'Upload...' : 'Ajouter un média'}</span>
+                  <span className="sm:hidden">{uploadingSource ? 'Upload...' : 'Média'}</span>
                 </Button>
               </div>
 
               <Button
                 onClick={handleGenerate}
-                disabled={!canGenerate}
+                disabled={isGenerating || (!prompt.trim() && !uploadedSource)}
                 className={cn(
                   "bg-primary hover:bg-primary/90",
                   "font-semibold px-6 sm:px-8 w-full sm:w-auto text-sm sm:text-base",
-                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  "disabled:opacity-50 disabled:cursor-not-allowed"
                 )}
               >
                 {isGenerating ? (
@@ -654,11 +700,12 @@ export function ChatGenerator() {
                 ) : (
                   <>
                     <Sparkles className="mr-2 h-4 w-4" />
-                    {contentType === "video" ? "Générer la vidéo" : "Générer"}
+                    {contentType === 'video' ? 'Générer la vidéo' : 'Générer'}
                   </>
                 )}
               </Button>
             </div>
+
           </div>
         </div>
       </div>

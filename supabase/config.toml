@@ -2,10 +2,7 @@ project_id = "itsjonazifiiikozengd"
 
 [functions.alfie-job-worker]
 verify_jwt = false
-schedule = "*/2 * * * *"
-
-[functions.trigger-job-worker]
-verify_jwt = true
+schedule = "*/30 * * * * *"
 
 
 [functions.creations-api]
@@ -18,7 +15,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.alfie-generate-ai-image]
-verify_jwt = false
+verify_jwt = true
 
 [functions.alfie-plan-carousel]
 verify_jwt = true
@@ -138,16 +135,13 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.alfie-render-image]
-verify_jwt = false
-
-[functions.alfie-render-carousel-slide]
-verify_jwt = false
+verify_jwt = true
 
 [functions.alfie-score-coherence]
 verify_jwt = true
 
 [functions.alfie-render-video]
-verify_jwt = false
+verify_jwt = true
 
 [functions.alfie-video-upscale]
 verify_jwt = true
@@ -185,6 +179,10 @@ verify_jwt = true
 
 [functions.admin-reset-stuck-jobs]
 verify_jwt = true
+
+[functions.alfie-job-worker]
+verify_jwt = false
+schedule = "*/30 * * * * *"
 
 [functions.queue-monitor]
 verify_jwt = true
