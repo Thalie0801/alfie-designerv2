@@ -59,6 +59,8 @@ CREATE POLICY jq_user_update ON job_queue
   USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
 
+ALTER TABLE job_queue ENABLE ROW LEVEL SECURITY;
+
 -- ÉTAPE 5: Recréer la fonction claim_next_job (SECURITY DEFINER)
 -- ============================================================================
 CREATE OR REPLACE FUNCTION claim_next_job()
@@ -109,6 +111,9 @@ BEGIN
 END;
 $$;
 
+ REVOKE ALL ON FUNCTION claim_next_job() FROM PUBLIC;
+ REVOKE ALL ON FUNCTION claim_next_job() FROM authenticated;
+ GRANT EXECUTE ON FUNCTION claim_next_job() TO service_role;
 GRANT EXECUTE ON FUNCTION claim_next_job() TO service_role;
 GRANT EXECUTE ON FUNCTION claim_next_job() TO authenticated;
 
@@ -137,6 +142,9 @@ BEGIN
 END;
 $$;
 
+ REVOKE ALL ON FUNCTION unlock_stuck_jobs(integer) FROM PUBLIC;
+ REVOKE ALL ON FUNCTION unlock_stuck_jobs(integer) FROM authenticated;
+ GRANT EXECUTE ON FUNCTION unlock_stuck_jobs(integer) TO service_role;
 GRANT EXECUTE ON FUNCTION unlock_stuck_jobs(integer) TO service_role;
 
 -- ÉTAPE 7: Fonction pour marquer les jobs expirés comme failed
@@ -163,6 +171,9 @@ BEGIN
 END;
 $$;
 
+ REVOKE ALL ON FUNCTION fail_expired_jobs(integer) FROM PUBLIC;
+ REVOKE ALL ON FUNCTION fail_expired_jobs(integer) FROM authenticated;
+ GRANT EXECUTE ON FUNCTION fail_expired_jobs(integer) TO service_role;
 GRANT EXECUTE ON FUNCTION fail_expired_jobs(integer) TO service_role;
 
 -- ÉTAPE 8: Ajouter une colonne scheduled_for si absente (pour retry delays)
