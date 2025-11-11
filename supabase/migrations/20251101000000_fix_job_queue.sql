@@ -8,6 +8,8 @@ ALTER TABLE job_queue
   ADD COLUMN IF NOT EXISTS kind text NULL,
   ADD COLUMN IF NOT EXISTS brand_id uuid NULL,
   ADD COLUMN IF NOT EXISTS attempts integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS max_attempts integer NOT NULL DEFAULT 3,
+  ADD COLUMN IF NOT EXISTS idempotency_key text NULL;
   ADD COLUMN IF NOT EXISTS max_attempts integer NOT NULL DEFAULT 3;
 
 -- Backfill kind depuis type (pour compatibilité Studio)
@@ -33,6 +35,14 @@ CREATE INDEX IF NOT EXISTS ix_job_queue_status_created ON job_queue(status, crea
 CREATE INDEX IF NOT EXISTS ix_job_queue_user ON job_queue(user_id);
 CREATE INDEX IF NOT EXISTS ix_job_queue_order ON job_queue(order_id) WHERE order_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ix_job_queue_brand ON job_queue(brand_id) WHERE brand_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ix_job_queue_claimable
+  ON job_queue (created_at, id)
+  WHERE status = 'queued'
+    AND (scheduled_for IS NULL OR scheduled_for <= now())
+    AND attempts < max_attempts;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_job_queue_idempotency
+  ON job_queue (idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
 
 -- ÉTAPE 4: Corriger les politiques RLS
 -- ============================================================================
@@ -75,6 +85,11 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  RETURN QUERY
+  WITH candidate AS (
 SET search_path = public
 AS $$
 DECLARE
@@ -85,6 +100,25 @@ BEGIN
     FROM job_queue jq
     WHERE jq.status = 'queued'
       AND jq.attempts < jq.max_attempts
+      AND (jq.scheduled_for IS NULL OR jq.scheduled_for <= now())
+    ORDER BY jq.created_at ASC, jq.id ASC
+    LIMIT 1
+    FOR UPDATE SKIP LOCKED
+  )
+  UPDATE job_queue j
+     SET status = 'running',
+         attempts = j.attempts + 1,
+         updated_at = now()
+         -- , started_at = now()
+  FROM candidate c
+  WHERE j.id = c.id
+  RETURNING j.id,
+            j.order_id,
+            j.user_id,
+            j.type,
+            j.payload,
+            j.attempts,
+            j.max_attempts;
       AND (jq.scheduled_for IS NULL OR jq.scheduled_for <= NOW())
     ORDER BY jq.created_at ASC
     LIMIT 1
@@ -216,6 +250,13 @@ FROM job_queue
 GROUP BY status;
 
 GRANT SELECT ON job_queue_stats TO authenticated, service_role;
+
+CREATE OR REPLACE VIEW job_queue_queued_count AS
+SELECT COUNT(*)::int AS queued
+FROM job_queue
+WHERE status = 'queued';
+
+GRANT SELECT ON job_queue_queued_count TO authenticated, service_role;
 
 -- ÉTAPE 11: Réinitialiser les jobs bloqués depuis plus de 5 minutes
 -- ============================================================================

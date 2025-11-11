@@ -14,6 +14,16 @@ type ForceProcessJobsResponse = {
   queuedAfter: number;
 };
 
+type WorkerInvocationResponse = {
+  success?: boolean;
+  ok?: boolean;
+  processed?: number;
+  queuedBefore?: number;
+  queuedAfter?: number;
+  error?: string | null;
+  results?: unknown;
+};
+
 export async function createGeneration(brandId: string, payload: unknown) {
   const edgeResponse = await callEdgeFunction<GenerationResponse & { ok: boolean }>(
     'alfie-generate',
@@ -57,55 +67,80 @@ type SupabaseFunctionError = Error & {
 type WorkerError = Error & { status?: number; originalError?: unknown };
 
 export async function forceProcessJobs(): Promise<ForceProcessJobsResponse> {
-  const edgeResponse = await callEdgeFunction<ForceProcessJobsResponse & { ok: boolean }>(
-    'trigger-job-worker',
-    { source: 'studio-force' },
-  );
-  if (edgeResponse) {
-    return {
-      processed: edgeResponse.processed,
-      queuedBefore: edgeResponse.queuedBefore,
-      queuedAfter: edgeResponse.queuedAfter,
-    };
-  }
+  const payload = { trigger: 'studio-force', source: 'studio-force' };
+  const queuedBefore = await fetchQueuedCount();
 
-  const { data, error } = await supabase.functions.invoke('trigger-job-worker', {
-    body: { source: 'studio-force' },
-  });
+  const edgeResponse = await callEdgeFunction<WorkerInvocationResponse>('alfie-job-worker', payload);
 
-  if (error) {
-    const httpError = error as SupabaseFunctionError;
-    const status =
-      typeof httpError.context?.status === 'number'
-        ? httpError.context.status
-        : typeof httpError.status === 'number'
-          ? httpError.status
-          : undefined;
+  let response = edgeResponse ?? undefined;
 
-    const baseMessage = httpError.message ?? String(error);
-    const message =
-      status === 409
-        ? 'Un traitement est déjà en cours.'
-        : `trigger-job-worker: ${baseMessage}`;
+  if (!response) {
+    const { data, error } = await supabase.functions.invoke<WorkerInvocationResponse>('alfie-job-worker', {
+      body: payload,
+    });
 
-    const wrappedError = new Error(message) as WorkerError;
-    if (status !== undefined) {
-      wrappedError.status = status;
+    if (error) {
+      const httpError = error as SupabaseFunctionError;
+      const status =
+        typeof httpError.context?.status === 'number'
+          ? httpError.context.status
+          : typeof httpError.status === 'number'
+              ? httpError.status
+              : undefined;
+
+      const baseMessage = httpError.message ?? String(error);
+      const message =
+        status === 409
+          ? 'Un traitement est déjà en cours.'
+          : `alfie-job-worker: ${baseMessage}`;
+
+      const wrappedError = new Error(message) as WorkerError;
+      if (status !== undefined) {
+        wrappedError.status = status;
+      }
+      wrappedError.originalError = error as unknown;
+
+      throw wrappedError;
     }
-    wrappedError.originalError = error as unknown;
-
-    throw wrappedError;
+    response = data ?? undefined;
   }
 
-  const payload = data as ForceProcessJobsResponse | undefined;
-  if (!payload) {
-    throw new Error('Réponse invalide du backend');
+  if (response && typeof response === 'object') {
+    const { success, ok, error } = response;
+    if (success === false || ok === false) {
+      throw new Error('alfie-job-worker reported a failure');
+    }
+    if (typeof error === 'string' && error.trim().length > 0) {
+      throw new Error(error);
+    }
   }
+
+  const queuedAfter = await fetchQueuedCount();
+
+  const processedFromResponse =
+    response && typeof response === 'object' && typeof response.processed === 'number'
+      ? response.processed
+      : undefined;
+
+  const queuedBeforeFromResponse =
+    response && typeof response === 'object' && typeof response.queuedBefore === 'number'
+      ? response.queuedBefore
+      : undefined;
+
+  const queuedAfterFromResponse =
+    response && typeof response === 'object' && typeof response.queuedAfter === 'number'
+      ? response.queuedAfter
+      : undefined;
 
   return {
-    processed: typeof payload.processed === 'number' ? payload.processed : 0,
-    queuedBefore: typeof payload.queuedBefore === 'number' ? payload.queuedBefore : 0,
-    queuedAfter: typeof payload.queuedAfter === 'number' ? payload.queuedAfter : 0,
+    processed:
+      processedFromResponse ??
+        Math.max(
+          (queuedBeforeFromResponse ?? queuedBefore) - (queuedAfterFromResponse ?? queuedAfter),
+          0,
+        ),
+    queuedBefore: queuedBeforeFromResponse ?? queuedBefore,
+    queuedAfter: queuedAfterFromResponse ?? queuedAfter,
   };
 }
 
@@ -149,4 +184,22 @@ async function callEdgeFunction<T>(
   });
 
   return response;
+}
+
+async function fetchQueuedCount(): Promise<number> {
+  try {
+    const { data, error } = await (supabase as any)
+      .from('job_queue_queued_count')
+      .select('queued')
+      .maybeSingle<{ queued: number }>();
+
+    if (error) {
+      throw error;
+    }
+
+    return typeof data?.queued === 'number' ? data.queued : 0;
+  } catch (error) {
+    console.warn('Failed to fetch job_queue queued count', error);
+    return 0;
+  }
 }

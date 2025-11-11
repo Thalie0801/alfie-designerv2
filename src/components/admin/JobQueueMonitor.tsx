@@ -74,6 +74,30 @@ export function JobQueueMonitor() {
     try {
       setProcessing(true);
       setError(null);
+      const { data, error: fnError } = await supabase.functions.invoke<{
+        success?: boolean;
+        ok?: boolean;
+        processed?: number;
+        error?: string | null;
+      }>('alfie-job-worker', {
+        body: { trigger: 'admin-monitor' },
+      });
+
+      if (fnError) throw fnError;
+
+      const response = data ?? {};
+
+      if (response && typeof response === 'object') {
+        const { success, ok, error: workerError, processed } = response;
+        if (workerError && workerError.trim().length > 0) {
+          throw new Error(workerError);
+        }
+        if (success === false || ok === false) {
+          throw new Error('Worker reported a failure');
+        }
+        if (typeof processed === 'number') {
+          window.alert(`${processed} job(s) traité(s)`);
+        }
       const { data, error: fnError } = await supabase.functions.invoke('trigger-job-worker', {
         body: { force: true },
       });
