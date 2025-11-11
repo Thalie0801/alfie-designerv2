@@ -13,8 +13,6 @@ import { Users, Activity, ArrowLeft, Sparkles, Plus, ExternalLink, Trash2, Edit2
 import { toast } from 'sonner';
 import { NewsManager } from '@/components/NewsManager';
 import { VideoDiagnostic } from '@/components/VideoDiagnostic';
-import { AdminGuard } from '@/components/admin/AdminGuard';
-import { ForceProcessButton } from '@/components/admin/ForceProcessButton';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -274,47 +272,45 @@ export default function Admin() {
   };
 
   return (
-    <AdminGuard>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Admin Panel</h1>
-            <p className="text-muted-foreground">
-              Gérez les utilisateurs, affiliés et paiements
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <ForceProcessButton />
-            <Button
-              onClick={handleResetStuckJobs}
-              variant="outline"
-              className="gap-2 border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950"
-              disabled={resettingJobs}
-            >
-              <Unlock className="h-4 w-4" />
-              {resettingJobs ? 'Déblocage...' : 'Débloquer jobs'}
-            </Button>
-            <Button onClick={() => navigate('/admin/reset-password')} variant="outline" className="gap-2">
-              <UserCheck className="h-4 w-4" />
-              Reset mot de passe
-            </Button>
-            <Button onClick={() => navigate('/admin/ambassadors')} variant="outline" className="gap-2">
-              <Award className="h-4 w-4" />
-              Gérer Ambassadeurs
-            </Button>
-            <Button onClick={() => navigate('/admin/create-customer')} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Créer un client
-            </Button>
-            <Button variant="outline" onClick={() => navigate('/app')} className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Retour Client
-            </Button>
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Admin Panel</h1>
+          <p className="text-muted-foreground">
+            Gérez les utilisateurs, affiliés et paiements
+          </p>
         </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button 
+            onClick={handleResetStuckJobs} 
+            variant="outline" 
+            className="gap-2 border-orange-500 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950"
+            disabled={resettingJobs}
+          >
+            <Unlock className="h-4 w-4" />
+            {resettingJobs ? 'Déblocage...' : 'Débloquer jobs'}
+          </Button>
+          <Button onClick={() => navigate('/admin/reset-password')} variant="outline" className="gap-2">
+            <UserCheck className="h-4 w-4" />
+            Reset mot de passe
+          </Button>
+          <Button onClick={() => navigate('/admin/ambassadors')} variant="outline" className="gap-2">
+            <Award className="h-4 w-4" />
+            Gérer Ambassadeurs
+          </Button>
+          <Button onClick={() => navigate('/admin/create-customer')} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Créer un client
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/app')} className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Retour Client
+          </Button>
+        </div>
+      </div>
 
-        {/* Stats Cards */}
-        <div className="grid md:grid-cols-4 gap-4">
+      {/* Stats Cards */}
+      <div className="grid md:grid-cols-4 gap-4">
         <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Utilisateurs</CardTitle>
@@ -961,7 +957,6 @@ export default function Admin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      </div>
-    </AdminGuard>
+    </div>
   );
 }
