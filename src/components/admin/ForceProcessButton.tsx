@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
-import { useRoles } from '@/hooks/useRoles';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 
 export function ForceProcessButton() {
-  const { isAdmin, loading: rolesLoading } = useRoles();
+  const isAdmin = useIsAdmin();
   const [loading, setLoading] = useState(false);
 
-  if (rolesLoading || !isAdmin) return null;
+  if (isAdmin === null) return null;
+  if (!isAdmin) return null;
 
   const handleForce = async () => {
     try {
