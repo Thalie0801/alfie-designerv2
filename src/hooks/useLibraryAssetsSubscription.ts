@@ -79,7 +79,7 @@ export function useLibraryAssetsSubscription(orderId: string | null) {
 
     const { data, error } = await supabase
       .from('library_assets')
-      .select('id, cloudinary_url, cloudinary_public_id, text_json, slide_index, type, format')
+      .select('id, cloudinary_url, slide_index, type, format')
       .eq('order_id', orderId)
       .order('slide_index', { ascending: true });
 
@@ -92,8 +92,6 @@ export function useLibraryAssetsSubscription(orderId: string | null) {
       const mapped: LibraryAsset[] = data.map(row => ({
         id: row.id,
         url: row.cloudinary_url,
-        publicId: row.cloudinary_public_id ?? undefined,
-        text: row.text_json as any,
         slideIndex: row.slide_index ?? 0,
         type: row.type,
         format: normalizeFormat(row.format ?? undefined)
@@ -136,8 +134,6 @@ export function useLibraryAssetsSubscription(orderId: string | null) {
           const newItem: LibraryAsset = {
             id: newAsset.id,
             url: newAsset.cloudinary_url,
-            publicId: newAsset.cloudinary_public_id ?? undefined,
-            text: newAsset.text_json as any,
             slideIndex: newAsset.slide_index ?? 0,
             type: newAsset.type,
             format: normalizeFormat(newAsset.format ?? undefined)

@@ -211,21 +211,6 @@ Pour TOUTE demande de création, tu DOIS appeler un tool :
 
 ⛔ **INTERDIT :** Répondre en texte seul pour les demandes de création.
 
-🚨 **RÈGLE ABSOLUE - FORMAT OBLIGATOIRE :**
-
-POUR TOUTE GÉNÉRATION (image, carrousel, vidéo) :
-1. **SI format manquant** → Pose EXPLICITEMENT la question avec exemples visuels
-2. **NE JAMAIS call un tool generate_*/create_carousel/generate_video sans aspect_ratio/aspectRatio confirmé**
-3. **EXEMPLES de réponse :** 
-   "Super idée ! 🎨 Quel format tu veux ?
-   📱 1:1 (carré Instagram)
-   📲 4:5 (portrait feed)
-   📺 9:16 (Story/Reel vertical)
-   🖥️ 16:9 (YouTube paysage)"
-
-⛔ **INTERDIT :** Générer avec un format par défaut sans confirmation utilisateur.
-⛔ **INTERDIT :** Appeler un tool de génération si l'aspect_ratio/aspectRatio n'est pas fourni par l'utilisateur.
-
 ${brandContext}
 
 ## 🎯 TON STYLE
@@ -236,13 +221,13 @@ Encouragements : "Trop bien ton idée !", "On va faire un truc canon !"
 ## ⚡ WORKFLOW RAPIDE
 
 **Carrousel :**
-1. Demande infos (réseau, slides, objectif, FORMAT)
+1. Demande infos (réseau, slides, objectif)
 2. Call tool **plan_carousel**
 3. Présente le plan, demande validation
 4. Si "oui" → Call tool **create_carousel** IMMÉDIATEMENT
 
 **Image/Vidéo :**
-1. Demande FORMAT en premier (1:1, 4:5, 9:16, 16:9), puis objectif
+1. Demande ratio, objectif
 2. Call tool **generate_image** ou **generate_video**
 
 **IMPORTANT :** Si l'user dit "oui" après un plan, tu DOIS call create_carousel, PAS répondre en texte !
@@ -456,11 +441,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
             properties: {
               prompt: { type: "string", description: "Carousel theme/objective in English" },
               count: { type: "number", description: "Number of slides (default: 5)" },
-              aspect_ratio: { 
-                type: "string", 
-                description: "Aspect ratio: '1:1' (carré), '4:5' (portrait), '9:16' (Story/Reel), '16:9' (paysage)",
-                enum: ["1:1", "4:5", "9:16", "16:9"]
-              }
+              aspect_ratio: { type: "string", description: "Aspect ratio: '1:1' or '4:5'" }
             },
             required: ["prompt"]
           }
@@ -478,8 +459,8 @@ Example: "Professional product photography, 45° angle, gradient background (${b
               count: { type: "number", description: "Number of slides (default: 5)" },
               aspect_ratio: { 
                 type: "string", 
-                description: "Aspect ratio: '1:1' (Instagram carré), '4:5' (portrait), '9:16' (Story/Reel), '16:9' (paysage)", 
-                enum: ["1:1", "4:5", "9:16", "16:9"]
+                description: "Aspect ratio: '1:1' (Instagram), '4:5' (portrait), '9:16' (Story)", 
+                enum: ["1:1", "4:5", "9:16"]
               }
             },
             required: ["prompt", "count"]
@@ -710,8 +691,8 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                     name: 'plan_carousel', 
                     arguments: JSON.stringify({ 
                       prompt: lastUserMsg, 
-                      count: 5
-                      // aspect_ratio supprimé : le guard forcera Alfie à demander
+                      count: 5, 
+                      aspect_ratio: '4:5' 
                     }) 
                   }
                 }]
@@ -993,31 +974,12 @@ Example: "Professional product photography, 45° angle, gradient background (${b
             }
 
             case 'create_carousel': {
-              // ✅ GUARD RENFORCÉ : Vérifier que aspect_ratio est fourni
-              if (!toolArgs.aspect_ratio) {
-                const userMessage = '⚠️ Je ne peux pas générer sans connaître le format ! Quel format préfères-tu ? 📐\n\n📱 1:1 (carré Instagram)\n📲 4:5 (portrait feed)\n📺 9:16 (Story/Reel vertical)\n🖥️ 16:9 (YouTube paysage)';
-                
-                toolResult = {
-                  error: 'aspect_ratio_required',
-                  message: userMessage,
-                  options: ['1:1', '4:5', '9:16', '16:9']
-                };
-                
-                // Forcer l'AI à répondre avec ce message
-                conversationMessages.push({
-                  role: 'assistant',
-                  content: userMessage
-                });
-                
-                break;
-              }
-              
               const count = toolArgs.count || 5;
               const { data: planResp } = await supabase.functions.invoke('alfie-plan-carousel', {
                 body: {
                   messages,
                   brandId,
-                  aspect_ratio: toolArgs.aspect_ratio ?? '4:5', // Utiliser le format demandé
+                  aspect_ratio: '4:5',
                   slideCount: count,
                   brandKit: brandKit ?? {},
                   prompt: toolArgs.prompt,
@@ -1193,25 +1155,6 @@ Example: "Professional product photography, 45° angle, gradient background (${b
             }
 
             case 'generate_image': {
-              // ✅ GUARD RENFORCÉ : Vérifier que aspect_ratio est fourni
-              if (!toolArgs.aspect_ratio) {
-                const userMessage = '⚠️ Je ne peux pas générer sans connaître le format ! Quel format tu veux ? 📐\n\n📱 1:1 (carré Instagram)\n📲 4:5 (portrait feed)\n📺 9:16 (Story/Reel vertical)\n🖥️ 16:9 (YouTube paysage)';
-                
-                toolResult = {
-                  error: 'aspect_ratio_required',
-                  message: userMessage,
-                  options: ['1:1', '4:5', '9:16', '16:9']
-                };
-                
-                // Forcer l'AI à répondre avec ce message
-                conversationMessages.push({
-                  role: 'assistant',
-                  content: userMessage
-                });
-                
-                break;
-              }
-              
               let optimizedPrompt = toolArgs.prompt;
 
               if (brandKit) {
@@ -1229,7 +1172,7 @@ Example: "Professional product photography, 45° angle, gradient background (${b
                 optimizedPrompt = opt?.optimizedPrompt ?? toolArgs.prompt;
               }
 
-              const aspectRatio = toolArgs.aspect_ratio;
+              const aspectRatio = toolArgs.aspect_ratio ?? '1:1';
               const format =
                 aspectRatio === '9:16'
                   ? '1024x1820'
@@ -1275,29 +1218,10 @@ Example: "Professional product photography, 45° angle, gradient background (${b
             }
 
             case 'generate_video': {
-              // ✅ GUARD RENFORCÉ : Vérifier que aspectRatio est fourni
-              if (!toolArgs.aspectRatio) {
-                const userMessage = '⚠️ Je ne peux pas générer de vidéo sans connaître le format ! Quel format tu veux ? 🎬\n\n🖥️ 16:9 (paysage YouTube)\n📱 9:16 (vertical TikTok/Reel)';
-                
-                toolResult = {
-                  error: 'aspect_ratio_required',
-                  message: userMessage,
-                  options: ['16:9', '9:16']
-                };
-                
-                // Forcer l'AI à répondre avec ce message
-                conversationMessages.push({
-                  role: 'assistant',
-                  content: userMessage
-                });
-                
-                break;
-              }
-              
               const { data: videoData, error: videoError } = await supabase.functions.invoke('generate-video', {
                 body: {
                   prompt: toolArgs.prompt,
-                  aspect_ratio: toolArgs.aspectRatio,
+                  aspect_ratio: toolArgs.aspect_ratio ?? '16:9',
                   brand_id: brandId,
                   imageUrl: toolArgs.imageUrl ?? null,
                 },

@@ -8,12 +8,6 @@
 export interface LibraryAsset {
   id: string;
   url: string;
-  publicId?: string;
-  text?: {
-    title?: string;
-    subtitle?: string;
-    bullets?: string[];
-  };
   slideIndex: number;
   type: string;
   format?: string;

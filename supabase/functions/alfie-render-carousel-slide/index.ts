@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { uploadTextAsRaw } from "../_shared/cloudinaryUploader.ts";
+import { 
+  uploadWithRichMetadata, 
+  uploadTextAsRaw, 
+  buildCloudinaryTextOverlayUrl 
+} from "../_shared/cloudinaryUploader.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -203,8 +207,8 @@ serve(async (req) => {
 
     console.log('[Render Slide] Background generated:', backgroundUrl.substring(0, 100));
 
-    // 3. Upload slide avec métadonnées enrichies via centralized /cloudinary function
-    console.log('[Render Slide] Step 3/4: Uploading slide to Cloudinary via centralized function...');
+    // 3. Upload slide avec métadonnées enrichies
+    console.log('[Render Slide] Step 3/4: Uploading slide to Cloudinary...');
     
     // Récupérer brand kit pour les couleurs
     const { data: brandData } = await supabaseAdmin
@@ -215,49 +219,111 @@ serve(async (req) => {
 
     const palette = brandData?.palette || [];
     const fonts = brandData?.fonts || {};
-    const primaryColor = (palette[0]?.color || palette[0] || 'ffffff').replace('#', '');
-    const secondaryColor = (palette[1]?.color || palette[1] || 'eeeeee').replace('#', '');
+    const primaryColor = (palette[0]?.color || palette[0] || '1E1E1E').replace('#', '');
+    const secondaryColor = (palette[1]?.color || palette[1] || '5A5A5A').replace('#', '');
 
-    // ✅ Phase 4: New naming convention: alfie/{brandId}/{campaignId}/slides/slide_XX
-    const slidePublicId = `slide_${String(slideIndex + 1).padStart(2, '0')}`;
-    const slideFolder = `alfie/${brandId}/${carouselId}/slides`;
-
-    // ✅ Phase 3: Use centralized /cloudinary edge function for upload
-    const { data: uploadData, error: uploadError } = await supabaseAdmin.functions.invoke('cloudinary', {
-      body: {
-        action: 'upload',
-        params: {
-          file: backgroundUrl,
-          folder: slideFolder,
-          public_id: slidePublicId,
-          resource_type: 'image',
-          tags: [brandId, carouselId, 'carousel_slide', campaign, 'alfie'],
-          context: {
-            brand: brandId,
-            carousel: carouselId,
-            campaign: campaign,
-            slide_index: String(slideIndex),
-            render_version: String(renderVersion),
-            text_version: String(textVersion)
-          }
-        }
+    const uploadResult = await uploadWithRichMetadata(
+      backgroundUrl,
+      {
+        brandId,
+        campaign,
+        orderId,
+        assetId: carouselId,
+        type: 'carousel_slide',
+        format: normalizedAspectRatio,
+        language,
+        slideIndex,
+        textPublicId,
+        renderVersion,
+        textVersion,
+        alt: slideContent.alt
       }
+    );
+
+    console.log('[Render Slide] 📦 Uploaded to Cloudinary:', {
+      publicId: uploadResult.publicId,
+      url: uploadResult.secureUrl?.substring(0, 100)
     });
 
-    if (uploadError || !uploadData) {
-      console.error('[Render Slide] ❌ Cloudinary upload error:', uploadError);
-      throw new Error(`Failed to upload to Cloudinary: ${uploadError?.message || 'Unknown error'}`);
+    console.log('[Render Slide] Uploaded to Cloudinary:', {
+      publicId: uploadResult.publicId,
+      url: uploadResult.secureUrl
+    });
+
+    // 4. Construire URL finale avec text overlays robustes
+    console.log('[Render Slide] Step 4/4: Building final URL with text overlays...');
+    
+    const cloudinaryUrl = buildCloudinaryTextOverlayUrl(uploadResult.publicId, {
+      title: slideContent.title,
+      subtitle: slideContent.subtitle || '',
+      titleColor: primaryColor,
+      subtitleColor: secondaryColor,
+      titleSize: 64,
+      subtitleSize: 32,
+      titleFont: fonts.primary || 'Arial',
+      subtitleFont: fonts.secondary || 'Arial',
+      titleWeight: 'bold',
+      subtitleWeight: 'normal',
+      width: 960,
+      lineSpacing: 10
+    });
+
+    console.log('[Render Slide] Final URL generated:', cloudinaryUrl.substring(0, 150));
+
+    // ✅ Store base URL without overlay as fallback
+    const cloudinaryBaseUrl = uploadResult.secureUrl;
+    console.log('[Render Slide] Base URL (fallback):', cloudinaryBaseUrl.substring(0, 100));
+
+    // 5. Garantir que la dérivée existe sur Cloudinary (Strict Transformations)
+    console.log('[Render Slide] Step 5/6: Ensuring derivative exists on Cloudinary...');
+    
+    const { 
+      ensureDerived, 
+      buildTextOverlayTransform 
+    } = await import('../_shared/cloudinaryUploader.ts');
+    
+    const cloudName = Deno.env.get('CLOUDINARY_CLOUD_NAME');
+    const apiKey = Deno.env.get('CLOUDINARY_API_KEY');
+    const apiSecret = Deno.env.get('CLOUDINARY_API_SECRET');
+    
+    let derivedSuccess = false;
+    if (!cloudName || !apiKey || !apiSecret) {
+      console.warn('[Render Slide] Cloudinary credentials missing, skipping eager generation');
+    } else {
+      try {
+        const transformString = buildTextOverlayTransform({
+          title: slideContent.title,
+          subtitle: slideContent.subtitle || '',
+          titleColor: primaryColor,
+          subtitleColor: secondaryColor,
+          titleSize: 64,
+          subtitleSize: 32,
+          titleFont: fonts.primary || 'Arial',
+          subtitleFont: fonts.secondary || 'Arial',
+          titleWeight: 'bold',
+          subtitleWeight: 'normal',
+          width: 960,
+          lineSpacing: 10
+        });
+        
+        const explicitResult = await ensureDerived(
+          cloudName,
+          apiKey,
+          apiSecret,
+          uploadResult.publicId,
+          transformString
+        );
+        
+        console.log('[Render Slide] Derivative generated:', {
+          publicId: explicitResult.public_id,
+          eager: explicitResult.eager?.length || 0
+        });
+        derivedSuccess = true;
+      } catch (eagerError: any) {
+        console.error('[Render Slide] ⚠️ Eager generation failed, fallback to base URL:', eagerError.message);
+        // Continue - we'll use base URL as fallback
+      }
     }
-
-    const uploadResult = {
-      publicId: uploadData.public_id,
-      secureUrl: uploadData.secure_url,
-      width: uploadData.width,
-      height: uploadData.height,
-      format: uploadData.format
-    };
-
-    const cloudinaryPublicId = uploadResult.publicId;
 
     // 6. ✅ Stocker dans library_assets avec idempotence check
     console.log('[Render Slide] Step 6/6: Checking for existing asset and saving to library_assets...');
@@ -292,7 +358,7 @@ serve(async (req) => {
       );
     }
     
-    // ✅ Phase 2: Insert with BASE URL only (no overlays) - SDK regenerates client-side
+    // ✅ Insert with both overlay URL and base URL fallback
     const { error: insertError } = await supabaseAdmin
       .from('library_assets')
       .insert({
@@ -304,8 +370,8 @@ serve(async (req) => {
         slide_index: slideIndex,
         format: normalizedAspectRatio,
         campaign,
-        cloudinary_url: uploadResult.secureUrl, // ✅ Full base URL for display
-        cloudinary_public_id: cloudinaryPublicId, // ✅ Clean publicId for SDK regeneration
+        cloudinary_url: cloudinaryUrl, // ✅ Overlay URL (preferred)
+        cloudinary_public_id: uploadResult.publicId,
         text_json: {
           title: slideContent.title,
           subtitle: slideContent.subtitle || '',
@@ -319,18 +385,10 @@ serve(async (req) => {
           width: uploadResult.width,
           height: uploadResult.height,
           format: uploadResult.format,
-          cloudinary_base_url: uploadResult.secureUrl, // ✅ Same as cloudinary_url (base only)
-          original_public_id: uploadResult.publicId // ✅ Backup reference
+          cloudinary_base_url: cloudinaryBaseUrl, // ✅ Base URL as fallback
+          overlay_generated: derivedSuccess
         }
       });
-    
-    console.log('[Render Slide] ✅ Saved to library_assets:', { 
-      orderId, 
-      slideIndex, 
-      userId, 
-      publicId: uploadResult.publicId,
-      baseUrl: cloudinaryPublicId
-    });
 
     if (insertError) {
       console.error('[Render Slide] ❌ Database insert error:', insertError);
@@ -341,7 +399,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      cloudinary_url: cloudinaryPublicId,
+      cloudinary_url: cloudinaryUrl,
       cloudinary_public_id: uploadResult.publicId,
       text_public_id: textPublicId,
       slide_metadata: {
