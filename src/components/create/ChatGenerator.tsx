@@ -8,6 +8,7 @@ import { useBrandKit } from '@/hooks/useBrandKit';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { VIDEO_ENGINE_CONFIG } from '@/config/videoEngine';
+import { createSignedUrlForStorageKey } from '@/lib/storage';
 
 type GeneratedAsset = {
   type: 'image' | 'video';
@@ -23,6 +24,7 @@ type UploadedSource = {
   type: ContentType;
   url: string;
   name: string;
+  storageKey?: string;
 };
 
 const MEDIA_URL_KEYS = [
@@ -296,14 +298,17 @@ export function ChatGenerator() {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('chat-uploads')
-        .getPublicUrl(fileName);
+      const signedUrl = await createSignedUrlForStorageKey({
+        bucket: 'chat-uploads',
+        storageKey: fileName,
+        userId: user.id,
+      });
 
       setUploadedSource({
         type: isVideo ? 'video' : 'image',
-        url: publicUrl,
+        url: signedUrl,
         name: file.name,
+        storageKey: fileName,
       });
 
       if (isVideo) {

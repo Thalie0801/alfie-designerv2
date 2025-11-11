@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { createSignedUrlForStorageKey } from '@/lib/storage';
 
 interface FileUploaderProps {
   onFileUploaded: (url: string, file: File) => void;
@@ -11,43 +13,54 @@ interface FileUploaderProps {
   maxSizeMB?: number;
 }
 
-export function FileUploader({ 
-  onFileUploaded, 
+export function FileUploader({
+  onFileUploaded,
   acceptedTypes = ['image/jpeg', 'image/png', 'image/webp'],
   maxSizeMB = 10
 }: FileUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<Array<{ file: File; preview: string }>>([]);
+  const { user } = useAuth();
 
   const uploadToStorage = async (file: File): Promise<string> => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `uploads/${fileName}`;
+    if (!user?.id) {
+      throw new Error('Utilisateur non authentifié');
+    }
+
+    const fileExt = file.name.split('.').pop() || 'bin';
+    const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const storageKey = `${user.id}/${uniqueName}.${fileExt}`;
 
     const { error: uploadError } = await supabase.storage
       .from('chat-uploads')
-      .upload(filePath, file, {
+      .upload(storageKey, file, {
         cacheControl: '3600',
-        upsert: false
+        upsert: false,
+        contentType: file.type
       });
 
     if (uploadError) {
       throw uploadError;
     }
 
-    const { data: { publicUrl } } = supabase.storage
-      .from('chat-uploads')
-      .getPublicUrl(filePath);
-
-    return publicUrl;
+    return await createSignedUrlForStorageKey({
+      bucket: 'chat-uploads',
+      storageKey,
+      userId: user.id,
+    });
   };
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
 
     setUploading(true);
-    
+
     try {
+      if (!user?.id) {
+        toast.error('Vous devez être connecté pour uploader un fichier');
+        return;
+      }
+
       for (const file of acceptedFiles) {
         // Check file size
         if (file.size > maxSizeMB * 1024 * 1024) {
@@ -73,7 +86,7 @@ export function FileUploader({
     } finally {
       setUploading(false);
     }
-  }, [maxSizeMB, onFileUploaded]);
+  }, [maxSizeMB, onFileUploaded, user?.id]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

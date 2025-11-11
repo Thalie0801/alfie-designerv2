@@ -32,8 +32,8 @@ import alfieMain from '@/assets/alfie-main.png';
 export function AppSidebar() {
   const { open, isMobile } = useSidebar();
   const location = useLocation();
-  const { user, profile, isAdmin, signOut } = useAuth();
-  const canSeeAdminToggle = user?.email ? ['nathaliestaelens@gmail.com','staelensnathalie@gmail.com'].includes(user.email) : false;
+  const { user, profile, isAdmin, hasAdminOverride, signOut } = useAuth();
+  const canSeeAdminToggle = isAdmin || hasAdminOverride;
 
   // Removed automatic sidebar toggle on route changes to prevent menu disappearing bug
 
