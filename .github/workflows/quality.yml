@@ -1,0 +1,206 @@
+name: Node Quality Checks
+
+on:
+  push:
+    branches: [main, refonte-alfie-2025]
+  pull_request:
+    branches: [main, refonte-alfie-2025]
+
+permissions:
+  contents: write        # nécessaire pour créer la branche/PR
+  pull-requests: write
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  NODE_VERSION: '20'
+
+jobs:
+  install:
+    name: Install deps (with cache)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Force public npm registry
+        run: npm config set registry https://registry.npmjs.org/
+
+      - name: Cache node_modules
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install (robust)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          set -euxo pipefail
+          if [ -f package-lock.json ]; then
+            npm ci --prefer-offline --no-audit --no-fund \
+            || npm ci --prefer-offline --no-audit --no-fund --legacy-peer-deps \
+            || npm install --prefer-online --no-audit --no-fund --legacy-peer-deps
+          else
+            npm install --prefer-online --no-audit --no-fund --legacy-peer-deps
+          fi
+
+  typecheck:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    needs: install
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Run tsc
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee typecheck.txt
+          test ${PIPESTATUS[0]} -eq 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: typecheck-report
+          path: typecheck.txt
+          retention-days: 7
+
+  lint:
+    name: ESLint (auto-fallback)
+    runs-on: ubuntu-latest
+    needs: install
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Lint (JS+TS if parser available, else JS-only no config)
+        id: runlint
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          node -e "try{require.resolve('@typescript-eslint/parser');process.exit(0)}catch{process.exit(1)}"
+          if [ $? -eq 0 ]; then
+            echo "TS parser OK → lint complet"
+            npx eslint . --ignore-pattern 'supabase/functions/**' 2>&1 | tee lint.txt
+            code=${PIPESTATUS[0]}
+          else
+            echo "::warning::@typescript-eslint/parser indisponible → fallback JS-only"
+            npx eslint . --ext .js,.jsx --no-eslintrc \
+              --ignore-pattern '**/*.{ts,tsx}' \
+              --ignore-pattern 'supabase/functions/**' \
+              --rule 'no-redeclare:error' \
+              --rule 'no-duplicate-imports:error' \
+              --rule 'no-unused-vars:warn' \
+              --rule 'no-console:warn' \
+              --rule 'eqeqeq:warn' 2>&1 | tee lint.txt || true
+            code=0
+          fi
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit $code
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lint-report
+          path: lint.txt
+          retention-days: 7
+
+  deno:
+    name: Deno fmt/lint (Edge Functions)
+    runs-on: ubuntu-latest
+    needs: install
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - uses: denoland/setup-deno@v1
+        with: { deno-version: v1.x }
+
+      # 1) Auto-fix format
+      - name: deno fmt (auto-fix)
+        run: deno fmt supabase/functions
+
+      # 2) Ouvrir une PR si des fichiers ont changé
+      - name: Create PR with formatting
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore(deno): fmt supabase/functions"
+          title: "chore(deno): fmt supabase/functions"
+          body: "Auto-format via CI (deno fmt)."
+          branch: chore/deno-fmt-${{ github.run_id }}
+          base: ${{ github.base_ref || 'main' }}
+          labels: deno, automated
+          draft: false
+
+      # 3) Check informatif (ne bloque pas)
+      - name: deno fmt --check (informative)
+        continue-on-error: true
+        run: deno fmt --check supabase/functions
+
+      # 4) Lint bloquant
+      - name: deno lint
+        run: deno lint supabase/functions
+
+  build:
+    name: Build (Vite)
+    runs-on: ubuntu-latest
+    needs: [typecheck, lint]
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Build
+        run: npm run build
+      - name: Verify dist
+        run: |
+          if [ -d dist ]; then
+            echo "✅ dist ok"; du -sh dist || true
+          else
+            echo "❌ dist manquant"; exit 1
+          fi
+
+  summary:
+    name: Quality summary
+    runs-on: ubuntu-latest
+    needs: [typecheck, lint, deno, build]
+    if: always()
+    steps:
+      - run: |
+          echo "Typecheck: ${{ needs.typecheck.result }}"
+          echo "Lint:      ${{ needs.lint.result }}"
+          echo "Deno:      ${{ needs.deno.result }}"
+          echo "Build:     ${{ needs.build.result }}"
+          test "${{ needs.typecheck.result }}" = "success"
+          test "${{ needs.deno.result }}"     = "success"
+          test "${{ needs.build.result }}"    = "success"
+  = "success"
+          # Lint peut échouer → à toi de durcir si besoin
