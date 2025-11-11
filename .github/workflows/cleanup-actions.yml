@@ -1,0 +1,86 @@
+name: Cleanup Actions Runs
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 0" # tous les dimanches 03:00 UTC
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const cutoffDays = 30; // garde 30 jours
+            const cutoff = new Date(Date.now() - cutoffDays*24*3600*1000);
+
+            // 1) Annuler queued/in_progress trop vieux
+            let page = 1;
+            while (true) {
+              const { data } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100, page
+              });
+              if (!data.workflow_runs.length) break;
+              for (const run of data.workflow_runs) {
+                const created = new Date(run.created_at);
+                if ((run.status === "queued" || run.status === "in_progress") && created < cutoff) {
+                  try {
+                    await github.rest.actions.cancelWorkflowRun({
+                      owner: context.repo.owner, repo: context.repo.repo, run_id: run.id
+                    });
+                    core.info(`Canceled run ${run.id}`);
+                  } catch (e) { core.warning(`Cancel failed ${run.id}: ${e.message}`); }
+                }
+              }
+              if (data.workflow_runs.length < 100) break;
+              page++;
+            }
+
+            // 2) Supprimer les runs complétés avant cutoff
+            page = 1;
+            while (true) {
+              const { data } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100, page
+              });
+              if (!data.workflow_runs.length) break;
+              for (const run of data.workflow_runs) {
+                const created = new Date(run.created_at);
+                if (run.status === "completed" && created < cutoff) {
+                  try {
+                    await github.rest.actions.deleteWorkflowRun({
+                      owner: context.repo.owner, repo: context.repo.repo, run_id: run.id
+                    });
+                    core.info(`Deleted run ${run.id}`);
+                  } catch (e) { core.warning(`Delete failed ${run.id}: ${e.message}`); }
+                }
+              }
+              if (data.workflow_runs.length < 100) break;
+              page++;
+            }
+
+            // 3) (Optionnel) Purger tous les artifacts
+            page = 1;
+            while (true) {
+              const { data } = await github.rest.actions.listArtifactsForRepo({
+                owner: context.repo.owner, repo: context.repo.repo, per_page: 100, page
+              });
+              if (!data.artifacts.length) break;
+              for (const a of data.artifacts) {
+                try {
+                  await github.rest.actions.deleteArtifact({
+                    owner: context.repo.owner, repo: context.repo.repo, artifact_id: a.id
+                  });
+                  core.info(`Deleted artifact ${a.id}`);
+                } catch (e) { core.warning(`Artifact delete failed ${a.id}: ${e.message}`); }
+              }
+              if (data.artifacts.length < 100) break;
+              page++;
+            }
