@@ -1,16 +1,16 @@
-export type JobQueueStatus = "queued" | "running" | "completed" | "failed";
+export type JobQueueStatus = 'queued' | 'running' | 'completed' | 'failed';
 export type JobQueueType =
-  | "api_generate_image"
-  | "render_images"
-  | "render_carousels"
-  | "generate_texts"
-  | "generate_video"
-  | "copy"
-  | "vision"
-  | "upload"
-  | "thumb";
+  | 'api_generate_image'
+  | 'render_images'
+  | 'render_carousels'
+  | 'generate_texts'
+  | 'generate_video'
+  | 'copy'
+  | 'vision'
+  | 'upload'
+  | 'thumb';
 
-export type JobKind = "image" | "carousel" | "video" | "text" | "unknown";
+export type JobKind = 'image' | 'carousel' | 'video' | 'text' | 'unknown';
 
 export interface JobQueueRow {
   id: string;
@@ -34,30 +34,23 @@ export interface JobQueueRow {
   job_version: number | null;
 }
 
-/** Déduit un kind lisible depuis type */
 export function inferKindFromType(type: JobQueueType): JobKind {
-  if (type.includes("image") || type === "render_images") return "image";
-  if (type.includes("carousel") || type === "render_carousels") return "carousel";
-  if (type.includes("video") || type === "generate_video") return "video";
-  if (type === "copy" || type === "vision" || type === "generate_texts") return "text";
-  return "unknown";
+  if (type.includes('image') || type === 'render_images') return 'image';
+  if (type.includes('carousel') || type === 'render_carousels') return 'carousel';
+  if (type.includes('video') || type === 'generate_video') return 'video';
+  if (type === 'copy' || type === 'vision' || type === 'generate_texts') return 'text';
+  return 'unknown';
 }
 
-/** Normalise les statuts legacy vers les nouveaux */
 export function normalizeStatus(status: string): JobQueueStatus {
   switch (status) {
-    case "processing":
-      return "running";
-    case "done":
-      return "completed";
-    case "error":
-      return "failed";
-    default:
-      return status as JobQueueStatus;
+    case 'processing': return 'running';
+    case 'done':       return 'completed';
+    case 'error':      return 'failed';
+    default:           return status as JobQueueStatus;
   }
 }
 
-/** Sélection standardisée (⚠️ sans `kind`) */
 export const V_JOB_QUEUE_ACTIVE_SELECT = `
   id,
   user_id,
