@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { uploadToChatBucket } from "@/lib/chatUploads";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { toast } from "sonner";
+import { enqueueJob } from "@/lib/jobs";
 import {
   V_JOB_QUEUE_ACTIVE_SELECT,
   inferKindFromType,
@@ -296,14 +297,12 @@ export function ChatGenerator() {
           throw new Error("Impossible de relancer ce job sans payload");
         }
 
-        const { error: insertError } = await supabase.from("job_queue").insert([{
-          order_id: job.order_id,
+        await enqueueJob({
           type: job.type,
-          status: "queued" as const,
-          payload,
-        }] as any);
-
-        if (insertError) throw insertError;
+          order_id: job.order_id,
+          brand_id: job.brand_id,
+          payload: payload as Record<string, unknown>,
+        });
 
         showToast({
           title: "Job relancé",

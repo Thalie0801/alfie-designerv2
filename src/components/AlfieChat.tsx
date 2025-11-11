@@ -3,9 +3,10 @@ import { toast } from "sonner";
 import { Send, ImagePlus, Loader2, Download } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useBrandKit } from "@/hooks/useBrandKit";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { getAuthHeader } from "@/lib/auth";
 import { uploadToChatBucket } from "@/lib/chatUploads";
+import { enqueueJob } from "@/lib/jobs";
 import { Button } from "@/components/ui/button";
 import TextareaAutosize from "react-textarea-autosize";
 import { CreateHeader } from "@/components/create/CreateHeader";
@@ -14,6 +15,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { useLibraryAssetsSubscription } from "@/hooks/useLibraryAssetsSubscription";
 import { getAspectClass, type ConversationState, type OrchestratorResponse } from "@/types/chat";
+import type { JobQueueType } from "@/lib/types/jobQueue";
 import { slideUrl } from "@/lib/cloudinary/imageUrls";
 import { extractCloudNameFromUrl } from "@/lib/cloudinary/utils";
 
@@ -70,6 +72,12 @@ const backoffMs = (attempt: number) => {
 const ALLOWED_IMG = ["image/png", "image/jpeg", "image/webp"];
 const MAX_IMG_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
+
+const FORCE_TOOL_TO_JOB_TYPE: Record<NonNullable<SendOptions["forceTool"]>, JobQueueType> = {
+  generate_image: "render_images",
+  generate_video: "generate_video",
+  render_carousel: "render_carousels",
+};
 
 type UploadedSource = {
   url: string;
@@ -690,6 +698,48 @@ export function AlfieChat() {
             orderId: payload.orderId ?? null,
             links,
           });
+        }
+
+        if (payload?.orderId) {
+          const forceTool = requestPayload.forceTool ?? options?.forceTool;
+          let jobType: JobQueueType | null = null;
+
+          if (forceTool && FORCE_TOOL_TO_JOB_TYPE[forceTool]) {
+            jobType = FORCE_TOOL_TO_JOB_TYPE[forceTool];
+          } else if (options?.intentOverride === "carousel" || intent === "carousel") {
+            jobType = "render_carousels";
+          } else if (options?.intentOverride === "video" || intent === "video") {
+            jobType = "generate_video";
+          } else if (options?.intentOverride === "image") {
+            jobType = "render_images";
+          } else {
+            jobType = "render_images";
+          }
+
+          if (jobType) {
+            const jobPayload: Record<string, unknown> = {
+              message: trimmed || rawMessage || "",
+            };
+
+            if (requestPayload.prompt) jobPayload.prompt = requestPayload.prompt;
+            if (requestPayload.slides) jobPayload.slides = requestPayload.slides;
+            if (requestPayload.uploadedSourceUrl) jobPayload.uploadedSourceUrl = requestPayload.uploadedSourceUrl;
+            if (requestPayload.uploadedSourceType) jobPayload.uploadedSourceType = requestPayload.uploadedSourceType;
+            if (uploadedSource?.previewUrl) jobPayload.previewUrl = uploadedSource.previewUrl;
+            if (uploadedSource?.url) jobPayload.sourceUrl = uploadedSource.url;
+            if (forceTool) jobPayload.forceTool = forceTool;
+
+            try {
+              await enqueueJob({
+                type: jobType,
+                order_id: payload.orderId,
+                brand_id: activeBrandId ?? null,
+                payload: jobPayload,
+              });
+            } catch (enqueueError) {
+              console.error('[Chat] enqueueJob failed:', enqueueError);
+            }
+          }
         }
 
         if (payload?.bulkCarouselData) {
