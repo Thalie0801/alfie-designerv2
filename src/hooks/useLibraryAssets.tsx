@@ -390,6 +390,24 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
         return;
       }
 
+      const SUPABASE_STORAGE_MARKER = '/storage/v1/object/public/media-generations/';
+      if (outputUrl.includes(SUPABASE_STORAGE_MARKER)) {
+        const [, pathPart] = outputUrl.split(SUPABASE_STORAGE_MARKER);
+        if (pathPart) {
+          const { data: signed, error: signedError } = await supabase.storage
+            .from('media-generations')
+            .createSignedUrl(pathPart, 60 * 60);
+          if (!signedError && signed?.signedUrl) {
+            window.open(signed.signedUrl, '_blank');
+            toast.success('Téléchargement prêt');
+            return;
+          }
+          if (signedError) {
+            console.warn('[Download] Signed URL error:', signedError);
+          }
+        }
+      }
+
       let blob: Blob;
       
       // Si c'est une image base64, la convertir en blob

@@ -13,8 +13,8 @@ export default function PremiumModal({ open, woofsCost, onConfirm, onUseEco, onC
   return (
     <div role="dialog" aria-modal="true" className="ad-modal">
       <div className="ad-card">
-        <h2>Ajouter un plan héro ?</h2>
-        <p>Cette action consomme <strong>{woofsCost} Woof(s)</strong>.</p>
+        <h2>Ajouter un plan héro ?</h2>
+        <p>Cette action consomme <strong>{woofsCost} Woof(s)</strong>.</p>
         <div className="ad-actions">
           <button onClick={onUseEco}>Voir version Éco</button>
           <button onClick={onConfirm}>Confirmer</button>

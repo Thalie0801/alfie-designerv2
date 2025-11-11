@@ -8,6 +8,14 @@
 export interface LibraryAsset {
   id: string;
   url: string;
+  publicId?: string;
+  alt?: string;
+  thumbnailUrl?: string;
+  text?: {
+    title?: string;
+    subtitle?: string;
+    bullets?: string[];
+  };
   slideIndex: number;
   type: string;
   format?: string;
@@ -31,6 +39,8 @@ export interface Message {
   brandAlignment?: string;
   quickReplies?: string[];
   bulkCarouselData?: BulkCarouselData;
+  orderId?: string | null;
+  links?: Array<{ label: string; href: string }>;
   timestamp: Date;
 }
 
@@ -65,6 +75,7 @@ export interface OrchestratorResponse {
   totalSlides?: number;
   bulkCarouselData?: BulkCarouselData;
   state?: ConversationState | string;
+  context?: Record<string, any>;
 }
 
 /**

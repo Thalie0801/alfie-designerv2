@@ -8,10 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { useVideoQuota, calculateWoofsForDuration } from '@/hooks/useVideoQuota';
+import { useVideoQuota } from '@/hooks/useVideoQuota';
 import { Video, Upload, Download, Clock, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { woofsForVideo } from '@/lib/woofs';
 
 const VIDEO_TEMPLATES = [
   { id: 'promo', name: 'Promo rapide', description: 'Texte, fade, CTA' },
@@ -19,12 +20,13 @@ const VIDEO_TEMPLATES = [
   { id: 'ugc', name: 'UGC vertical', description: 'Format Stories' }
 ];
 
-const DURATIONS = [
-  { value: 8, label: '8 secondes', woofs: 1 },
-  { value: 15, label: '15 secondes', woofs: 2 },
-  { value: 30, label: '30 secondes', woofs: 4 },
-  { value: 60, label: '60 secondes', woofs: 8 }
-];
+const DURATION_VALUES = [8, 15, 30, 60] as const;
+
+const DURATIONS = DURATION_VALUES.map((value) => ({
+  value,
+  label: `${value} secondes`,
+  woofs: woofsForVideo(value),
+}));
 
 export default function Videos() {
   const { user } = useAuth();
@@ -38,7 +40,7 @@ export default function Videos() {
   const [loading, setLoading] = useState(false);
   const [loadingVideos, setLoadingVideos] = useState(true);
 
-  const woofsNeeded = calculateWoofsForDuration(duration);
+  const woofsNeeded = woofsForVideo(duration);
   const canGenerate = quota && quota.woofsRemaining >= woofsNeeded;
 
   useEffect(() => {
@@ -216,6 +218,10 @@ export default function Videos() {
                 </p>
               </div>
             </div>
+
+            <span className="text-xs text-muted-foreground">
+              Coût estimé : {woofsNeeded} Woof{woofsNeeded > 1 ? 's' : ''}
+            </span>
 
             <Button
               onClick={handleCreateVideo}

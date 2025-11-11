@@ -1,4 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { 
+  SUPABASE_URL, 
+  SUPABASE_ANON_KEY, 
+  SUPABASE_SERVICE_ROLE_KEY,
+  ADMIN_EMAILS 
+} from "../_shared/env.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,9 +17,17 @@ Deno.serve(async (req) => {
   }
 
   try {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("[admin-reset-stuck-jobs] ❌ Missing Supabase credentials");
+      return new Response(
+        JSON.stringify({ error: 'Server misconfigured' }), 
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY,
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
@@ -27,7 +41,10 @@ Deno.serve(async (req) => {
     }
 
     // Vérifier les droits admin via env
-    const adminEmails = (Deno.env.get('ADMIN_EMAILS') ?? '').split(',').map(e => e.trim().toLowerCase());
+    const adminEmails = (ADMIN_EMAILS ?? '')
+      .split(',')
+      .map(e => e.trim().toLowerCase())
+      .filter(Boolean);
     const userEmail = user.email?.toLowerCase() || '';
     
     if (!adminEmails.includes(userEmail)) {
@@ -41,8 +58,8 @@ Deno.serve(async (req) => {
 
     // Appeler la fonction reset_stuck_jobs avec service role
     const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY,
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 

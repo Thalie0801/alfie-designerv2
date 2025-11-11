@@ -8,7 +8,7 @@ export type SessionState = {
   userId?: string;
   nudges?: Record<string, boolean>;
   lastDeliverableId?: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   createdAt: number;
   updatedAt: number;
 };

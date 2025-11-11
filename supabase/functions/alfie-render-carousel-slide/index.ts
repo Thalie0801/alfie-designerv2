@@ -1,18 +1,27 @@
+// functions/alfie-render-carousel-slide/index.ts
+// v2.5.0 — Slide renderer (idempotent, retries + timeout, env.ts, internal secret)
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { uploadTextAsRaw } from "../_shared/cloudinaryUploader.ts";
 import { 
-  uploadWithRichMetadata, 
-  uploadTextAsRaw, 
-  buildCloudinaryTextOverlayUrl 
-} from "../_shared/cloudinaryUploader.ts";
+  SUPABASE_URL, 
+  SUPABASE_SERVICE_ROLE_KEY, 
+  INTERNAL_FN_SECRET,
+  LOVABLE_API_KEY 
+} from "../_shared/env.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST,OPTIONS",
+  "Access-Control-Max-Age": "86400",
 };
 
+type Lang = "FR" | "EN";
+
 interface SlideRequest {
-  userId: string; // ✅ Required from worker
+  userId?: string;               // ✅ Required or deduced from orderId
   prompt: string;
   globalStyle: string;
   slideContent: {
@@ -23,25 +32,126 @@ interface SlideRequest {
   };
   brandId: string;
   orderId: string;
+  orderItemId?: string | null;
   carouselId: string;
   slideIndex: number;
   totalSlides: number;
-  aspectRatio: string; // Allow any string, we'll normalize it
+  aspectRatio: string;           // "4:5" / "1080x1350" etc.
   textVersion: number;
   renderVersion: number;
   campaign: string;
-  language?: string;
+  language?: Lang | string;
+  requestId?: string | null;
 }
 
-serve(async (req) => {
-  console.log('[alfie-render-carousel-slide] Request received');
+type GenSize = { w: number; h: number };
 
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+const MODEL_IMAGE = "google/gemini-2.5-flash-image-preview";
+
+const AR_MAP: Record<string, GenSize> = {
+  "1:1":  { w: 1024, h: 1024 },
+  "4:5":  { w: 1024, h: 1280 },
+  "9:16": { w: 720,  h: 1280 },
+  "16:9": { w: 1280, h: 720 },
+};
+
+const PIXEL_TO_AR: Record<string, string> = {
+  "1080x1350": "4:5",
+  "1080x1920": "9:16",
+  "1920x1080": "16:9",
+  "1080x1080": "1:1",
+};
+
+// -----------------------------
+// Small helpers
+// -----------------------------
+function json(data: any, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json", ...corsHeaders },
+  });
+}
+
+function normalizeLang(l?: string): Lang {
+  return (l?.toUpperCase() === "EN" ? "EN" : "FR") as Lang;
+}
+
+function normalizeAspectRatio(ar: string | undefined): { ar: string; size: GenSize } {
+  let ratio = (ar || "").trim();
+
+  if (ratio.includes("x")) {
+    const key = ratio.toLowerCase();
+    ratio = PIXEL_TO_AR[key] || "4:5";
+    console.log(`[render-slide] ℹ️ normalized pixel AR "${ar}" -> "${ratio}"`);
+  }
+  if (!AR_MAP[ratio]) {
+    console.warn(`[render-slide] ⚠️ unknown AR "${ar}", fallback to 4:5`);
+    ratio = "4:5";
+  }
+  return { ar: ratio, size: AR_MAP[ratio] };
+}
+
+function buildImagePrompt(globalStyle: string, prompt: string) {
+  // “NO TEXT” blinders + qualité
+  return `${globalStyle}. ${prompt}. 
+Background only. No text, no typography, no letters, no logos, no watermark. 
+Clean, professional, high quality, detailed, natural light, soft shadows.`;
+}
+
+async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, ms = 30000) {
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(input, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+async function fetchWithRetries(url: string, init: RequestInit, maxRetries = 2) {
+  let attempt = 0;
+  while (true) {
+    const res = await fetchWithTimeout(url, init, 30000);
+    if (res.ok) return res;
+
+    const body = await res.text().catch(() => "");
+    const is429 = res.status === 429;
+    const is5xx = res.status >= 500 && res.status <= 599;
+
+    if ((is429 || is5xx) && attempt < maxRetries) {
+      const wait = Math.round(Math.pow(1.8, attempt + 1) * 800); // 1.44s, 2.59s
+      console.warn(`[render-slide] ⏳ retry ${attempt + 1}/${maxRetries} after ${wait}ms (status=${res.status})`);
+      await new Promise((r) => setTimeout(r, wait));
+      attempt++;
+      continue;
+    }
+    // propagate last response (non ok)
+    return new Response(body, { status: res.status, headers: res.headers });
+  }
+}
+
+// -----------------------------
+// Handler
+// -----------------------------
+serve(async (req) => {
+  console.log("[alfie-render-carousel-slide] v2.5.0 — invoked");
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  // ✅ Validate internal secret FIRST
+  const secret = req.headers.get("x-internal-secret");
+  if (!secret || secret !== INTERNAL_FN_SECRET) {
+    console.error("[alfie-render-carousel-slide] ❌ Invalid or missing internal secret");
+    return json({ error: "Forbidden: invalid internal secret" }, 403);
+  }
+
+  // ✅ ENV validation using imported variables
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !LOVABLE_API_KEY) {
+    console.error("[alfie-render-carousel-slide] ❌ Missing critical env vars");
+    return json({ error: "Missing required environment variables" }, 500);
   }
 
   try {
-    const params: SlideRequest = await req.json();
+    const params = (await req.json()) as SlideRequest;
     let {
       userId,
       prompt,
@@ -49,6 +159,7 @@ serve(async (req) => {
       slideContent,
       brandId,
       orderId,
+      orderItemId,
       carouselId,
       slideIndex,
       totalSlides,
@@ -56,375 +167,321 @@ serve(async (req) => {
       textVersion,
       renderVersion,
       campaign,
-      language = 'FR'
+      language = "FR",
+      requestId = null,
     } = params;
 
-    // ✅ Use service role client pour toutes les opérations
+    // —— Supabase admin client (service role)
     const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY,
+      { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    // ✅ Fallback: si userId manquant, tenter de le déduire depuis orderId
-    if (!userId && orderId) {
-      console.log(`[alfie-render-carousel-slide] ⚠️ userId missing, attempting to deduce from orderId: ${orderId}`);
-      
-      const { data: order, error: orderError } = await supabaseAdmin
-        .from('orders')
-        .select('user_id')
-        .eq('id', orderId)
+    // —— Validations d’entrée minimales
+    const missing: string[] = [];
+    if (!prompt) missing.push("prompt");
+    if (!globalStyle) missing.push("globalStyle");
+    if (!slideContent?.title) missing.push("slideContent.title");
+    if (!brandId) missing.push("brandId");
+    if (!orderId) missing.push("orderId");
+    if (!carouselId) missing.push("carouselId");
+
+    if (!Number.isInteger(slideIndex) || slideIndex < 0) {
+      missing.push("slideIndex(non-negative integer)");
+    }
+    if (!Number.isInteger(totalSlides) || totalSlides <= 0) {
+      missing.push("totalSlides(positive integer)");
+    }
+    if (Number.isInteger(slideIndex) && Number.isInteger(totalSlides) && slideIndex >= totalSlides) {
+      missing.push(`slideIndex(${slideIndex}) < totalSlides(${totalSlides})`);
+    }
+
+    if (missing.length) {
+      return json({ error: `Missing/invalid fields: ${missing.join(", ")}` }, 400);
+    }
+
+    // —— userId: déduction depuis orderId si absent
+    if (!userId) {
+      console.log(`[render-slide] ⚠️ Missing userId, deducing from orderId=${orderId}`);
+      const { data: order, error: orderErr } = await supabaseAdmin
+        .from("orders")
+        .select("user_id")
+        .eq("id", orderId)
         .single();
 
-      if (orderError || !order) {
-        console.error('[alfie-render-carousel-slide] ❌ Cannot deduce userId from orderId:', orderError);
-        return new Response(
-          JSON.stringify({ error: 'userId is required and could not be deduced from orderId' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      if (orderErr || !order?.user_id) {
+        console.error("[render-slide] ❌ Cannot deduce userId:", orderErr);
+        return json({ error: "userId is required and could not be deduced from orderId" }, 400);
       }
-
       userId = order.user_id;
-      console.log(`[alfie-render-carousel-slide] ✅ Deduced userId: ${userId}`);
+      console.log(`[render-slide] ✅ Deduced userId=${userId}`);
     }
 
-    // ✅ Validation finale: userId requis
-    if (!userId) {
-      console.error('[alfie-render-carousel-slide] ❌ Missing userId in request and no orderId to deduce from');
-      return new Response(JSON.stringify({ error: 'userId is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    const lang = normalizeLang(language);
+    const { ar: normalizedAR, size } = normalizeAspectRatio(aspectRatio);
 
-    // Normalize aspectRatio (handle pixel formats like "1080x1350")
-    let normalizedAspectRatio = aspectRatio;
-    if (aspectRatio && aspectRatio.includes('x')) {
-      // Convert pixel format to ratio
-      normalizedAspectRatio = aspectRatio === '1080x1350' ? '4:5' :
-                               aspectRatio === '1080x1920' ? '9:16' :
-                               aspectRatio === '1920x1080' ? '16:9' :
-                               aspectRatio === '1080x1080' ? '1:1' : '4:5';
-      console.log(`[alfie-render-carousel-slide] Normalized aspectRatio from ${aspectRatio} to ${normalizedAspectRatio}`);
-    }
-
-    console.log(`[alfie-render-carousel-slide] Processing slide ${slideIndex + 1}/${totalSlides} for user: ${userId}, carousel: ${carouselId}`);
-
-    console.log('[Render Slide] Starting generation:', {
-      slideIndex: slideIndex + 1,
-      totalSlides,
-      carouselId
+    const logCtx = `order=${orderId} car=${carouselId} slide=${slideIndex + 1}/${totalSlides}`;
+    console.log(`[render-slide] ${logCtx} context`, {
+      userId,
+      ar: normalizedAR,
+      size,
+      lang,
     });
 
-    // 1. Upload texte JSON en RAW Cloudinary
-    console.log('[Render Slide] Step 1/4: Uploading text JSON to Cloudinary RAW...');
+    // ------------------------------------------
+    // Normalize textual content + soft limits
+    // ------------------------------------------
+    const MAX_TITLE = 80;
+    const MAX_SUB   = 160;
+    const MAX_BUL   = 4;
+    const MAX_BUL_LEN = 90;
+
+    const normTitle = String(slideContent.title || "").trim().slice(0, MAX_TITLE);
+    const normSubtitle = String(slideContent.subtitle || "").trim().slice(0, MAX_SUB);
+    const normBullets = (Array.isArray(slideContent.bullets) ? slideContent.bullets : [])
+      .map(b => String(b || "").trim())
+      .filter(b => b.length > 0)
+      .slice(0, MAX_BUL)
+      .map(b => b.slice(0, MAX_BUL_LEN));
+
+    if (!normTitle) {
+      return json({ error: "slideContent.title cannot be empty after normalization" }, 400);
+    }
     
+    // Generate alt text if missing
+    const altText = slideContent.alt && String(slideContent.alt).trim()
+      ? String(slideContent.alt).trim()
+      : normTitle || normSubtitle || "Carousel slide image";
+
+    // =========================================
+    // STEP 1/4 — Upload texte JSON (RAW)
+    // =========================================
+    console.log(`[render-slide] ${logCtx} 1/4 Upload text JSON → Cloudinary RAW`);
     const textPublicId = await uploadTextAsRaw(
       {
-        title: slideContent.title,
-        subtitle: slideContent.subtitle || '',
-        bullets: slideContent.bullets || [],
-        alt: slideContent.alt
+        title: normTitle,
+        subtitle: normSubtitle,
+        bullets: normBullets,
+        alt: altText,
       },
       {
         brandId,
         campaign,
         carouselId,
         textVersion,
-        language
+        language: lang,
       }
     );
+    console.log(`[render-slide] ${logCtx}   ↳ text_public_id: ${textPublicId}`);
 
-    console.log('[Render Slide] Text uploaded to Cloudinary:', textPublicId);
+    // =========================================
+    // STEP 2/4 — Générer background (Lovable AI)
+    // =========================================
+    console.log(`[render-slide] ${logCtx} 2/4 Generate background via Lovable AI`);
+    const enrichedPrompt = buildImagePrompt(globalStyle, prompt);
 
-    // 2. ✅ Générer background directement via Lovable AI (pas de JWT requis)
-    console.log('[Render Slide] Step 2/4: Generating background with Lovable AI...');
-    
-    const enrichedPrompt = `${globalStyle}. ${prompt}. Background only, no text, clean and professional. High quality, detailed, vibrant colors.`;
-    
-    const [width, height] = normalizedAspectRatio === '1:1' ? [1024, 1024]
-      : normalizedAspectRatio === '16:9' ? [1280, 720]
-      : normalizedAspectRatio === '9:16' ? [720, 1280]
-      : normalizedAspectRatio === '4:5' ? [1024, 1280]
-      : [1024, 1024];
-
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
-    }
-
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
-        messages: [
-          {
-            role: 'user',
-            content: enrichedPrompt
-          }
-        ],
-        modalities: ['image', 'text']
-      })
-    });
-
-    // ✅ Handle rate limit (429)
-    if (aiResponse.status === 429) {
-      console.error('[Render Slide] ⏱️ Rate limit exceeded');
-      return new Response(
-        JSON.stringify({ error: 'Rate limit exceeded, please try again in a moment' }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // ✅ Handle insufficient credits (402)
-    if (aiResponse.status === 402) {
-      console.error('[Render Slide] 💳 Insufficient credits');
-      return new Response(
-        JSON.stringify({ error: 'Insufficient credits for AI generation' }),
-        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('[Render Slide] ❌ AI error:', aiResponse.status, errorText);
-      throw new Error(`Background generation failed: ${aiResponse.status}`);
-    }
-
-    const aiData = await aiResponse.json();
-    const backgroundUrl = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-    if (!backgroundUrl) {
-      console.error('[Render Slide] ❌ No background URL in AI response. Full response:', JSON.stringify(aiData));
-      return new Response(
-        JSON.stringify({ error: 'No image generated by AI API', details: aiData }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log('[Render Slide] Background generated:', backgroundUrl.substring(0, 100));
-
-    // 3. Upload slide avec métadonnées enrichies
-    console.log('[Render Slide] Step 3/4: Uploading slide to Cloudinary...');
-    
-    // Récupérer brand kit pour les couleurs
-    const { data: brandData } = await supabaseAdmin
-      .from('brands')
-      .select('palette, fonts')
-      .eq('id', brandId)
-      .single();
-
-    const palette = brandData?.palette || [];
-    const fonts = brandData?.fonts || {};
-    const primaryColor = (palette[0]?.color || palette[0] || '1E1E1E').replace('#', '');
-    const secondaryColor = (palette[1]?.color || palette[1] || '5A5A5A').replace('#', '');
-
-    const uploadResult = await uploadWithRichMetadata(
-      backgroundUrl,
+    const aiRes = await fetchWithRetries(
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
       {
-        brandId,
-        campaign,
-        orderId,
-        assetId: carouselId,
-        type: 'carousel_slide',
-        format: normalizedAspectRatio,
-        language,
-        slideIndex,
-        textPublicId,
-        renderVersion,
-        textVersion,
-        alt: slideContent.alt
-      }
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: MODEL_IMAGE,
+          messages: [{ role: "user", content: enrichedPrompt }],
+          modalities: ["image", "text"],
+          // hint de taille — ignoré si non supporté
+          size_hint: { width: size.w, height: size.h },
+        }),
+      },
+      2
     );
 
-    console.log('[Render Slide] 📦 Uploaded to Cloudinary:', {
-      publicId: uploadResult.publicId,
-      url: uploadResult.secureUrl?.substring(0, 100)
-    });
-
-    console.log('[Render Slide] Uploaded to Cloudinary:', {
-      publicId: uploadResult.publicId,
-      url: uploadResult.secureUrl
-    });
-
-    // 4. Construire URL finale avec text overlays robustes (avec bullets et CTA)
-    console.log('[Render Slide] Step 4/4: Building final URL with text overlays...');
-    
-    const cloudinaryUrl = buildCloudinaryTextOverlayUrl(uploadResult.publicId, {
-      title: slideContent.title,
-      subtitle: slideContent.subtitle || '',
-      bullets: slideContent.bullets || [],
-      cta: slideContent.alt, // Using alt as CTA fallback
-      titleColor: primaryColor,
-      subtitleColor: secondaryColor,
-      titleSize: 64,
-      subtitleSize: 32,
-      titleFont: fonts.primary || 'Arial',
-      subtitleFont: fonts.secondary || 'Arial',
-      titleWeight: 'bold',
-      subtitleWeight: 'normal',
-      width: 960,
-      lineSpacing: 10
-    });
-
-    console.log('[Render Slide] Final URL generated:', cloudinaryUrl.substring(0, 150));
-
-    // ✅ Store base URL without overlay as fallback
-    const cloudinaryBaseUrl = uploadResult.secureUrl;
-    console.log('[Render Slide] Base URL (fallback):', cloudinaryBaseUrl.substring(0, 100));
-
-    // 5. Garantir que la dérivée existe sur Cloudinary (Strict Transformations)
-    console.log('[Render Slide] Step 5/6: Ensuring derivative exists on Cloudinary...');
-    
-    const { 
-      ensureDerived, 
-      buildTextOverlayTransform 
-    } = await import('../_shared/cloudinaryUploader.ts');
-    
-    const cloudName = Deno.env.get('CLOUDINARY_CLOUD_NAME');
-    const apiKey = Deno.env.get('CLOUDINARY_API_KEY');
-    const apiSecret = Deno.env.get('CLOUDINARY_API_SECRET');
-    
-    let derivedSuccess = false;
-    if (!cloudName || !apiKey || !apiSecret) {
-      console.warn('[Render Slide] Cloudinary credentials missing, skipping eager generation');
-    } else {
-      try {
-        const transformString = buildTextOverlayTransform({
-          title: slideContent.title,
-          subtitle: slideContent.subtitle || '',
-          bullets: slideContent.bullets || [],
-          cta: slideContent.alt,
-          titleColor: primaryColor,
-          subtitleColor: secondaryColor,
-          titleSize: 64,
-          subtitleSize: 32,
-          titleFont: fonts.primary || 'Arial',
-          subtitleFont: fonts.secondary || 'Arial',
-          titleWeight: 'bold',
-          subtitleWeight: 'normal',
-          width: 960,
-          lineSpacing: 10
-        });
-        
-        const explicitResult = await ensureDerived(
-          cloudName,
-          apiKey,
-          apiSecret,
-          uploadResult.publicId,
-          transformString
-        );
-        
-        console.log('[Render Slide] Derivative generated:', {
-          publicId: explicitResult.public_id,
-          eager: explicitResult.eager?.length || 0
-        });
-        derivedSuccess = true;
-      } catch (eagerError: any) {
-        console.error('[Render Slide] ⚠️ Eager generation failed, fallback to base URL:', eagerError.message);
-        // Continue - we'll use base URL as fallback
-      }
+    if (aiRes.status === 429) {
+      console.error(`[render-slide] ${logCtx} ⏱️ Rate limit (429) after retries`);
+      return json({ error: "Rate limit exceeded, please try again shortly." }, 429);
+    }
+    if (aiRes.status === 402) {
+      console.error(`[render-slide] ${logCtx} 💳 Insufficient credits (402)`);
+      return json({ error: "Insufficient credits for AI generation" }, 402);
+    }
+    if (!aiRes.ok) {
+      const errTxt = await aiRes.text().catch(() => "");
+      console.error(`[render-slide] ${logCtx} ❌ AI error:`, aiRes.status, errTxt.slice(0, 600));
+      return json({ error: `Background generation failed (${aiRes.status})` }, 502);
     }
 
-    // 6. ✅ Stocker dans library_assets avec idempotence check
-    console.log('[Render Slide] Step 6/6: Checking for existing asset and saving to library_assets...');
-    
-    // Check if asset already exists (idempotence)
-    const { data: existingAsset } = await supabaseAdmin
-      .from('library_assets')
-      .select('id, cloudinary_url, cloudinary_public_id')
-      .eq('order_id', orderId)
-      .eq('carousel_id', carouselId)
-      .eq('slide_index', slideIndex)
-      .maybeSingle();
+    const aiData = await aiRes.json().catch(() => ({}));
+    const bgUrl =
+      aiData?.choices?.[0]?.message?.images?.[0]?.image_url?.url ||
+      aiData?.choices?.[0]?.message?.content?.[0]?.image_url?.url ||
+      aiData?.choices?.[0]?.message?.image_url?.url ||
+      aiData?.image_url?.url ||
+      null;
 
-    if (existingAsset) {
-      console.log(`[Render Slide] ♻️ Asset already exists (idempotent): ${existingAsset.id}`);
-      return new Response(
-        JSON.stringify({
-          success: true,
-          idempotent: true,
-          cloudinary_url: existingAsset.cloudinary_url,
-          cloudinary_public_id: existingAsset.cloudinary_public_id,
-          text_public_id: textPublicId,
-          slide_metadata: {
-            title: slideContent.title,
-            subtitle: slideContent.subtitle,
-            slideIndex,
-            renderVersion,
-            textVersion
-          }
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (!bgUrl) {
+      console.error(`[render-slide] ${logCtx} ❌ No background URL in AI response:`, JSON.stringify(aiData).slice(0, 1200));
+      return json({ error: "AI did not return an image URL", details: aiData }, 500);
     }
-    
-    // ✅ Insert with both overlay URL and base URL fallback
-    const { error: insertError } = await supabaseAdmin
-      .from('library_assets')
-      .insert({
-        user_id: userId,
-        brand_id: brandId,
-        order_id: orderId,
-        carousel_id: carouselId,
-        type: 'carousel_slide',
-        slide_index: slideIndex,
-        format: normalizedAspectRatio,
-        campaign,
-        cloudinary_url: cloudinaryUrl, // ✅ Overlay URL (preferred)
-        cloudinary_public_id: uploadResult.publicId,
-        text_json: {
-          title: slideContent.title,
-          subtitle: slideContent.subtitle || '',
-          bullets: slideContent.bullets || [],
-          alt: slideContent.alt,
-          text_public_id: textPublicId,
-          text_version: textVersion,
-          render_version: renderVersion
+    console.log(`[render-slide] ${logCtx}   ↳ background_url: ${String(bgUrl).slice(0, 120)}`);
+
+    // =========================================
+    // STEP 3/4 — Upload image → Cloudinary (edge)
+    // =========================================
+    console.log(`[render-slide] ${logCtx} 3/4 Upload background → Cloudinary`);
+    const slidePublicId = `slide_${String(slideIndex + 1).padStart(2, "0")}`;
+    const slideFolder = `alfie/${brandId}/${carouselId}/slides`;
+
+    const { data: uploadData, error: uploadErr } = await supabaseAdmin.functions.invoke("cloudinary", {
+      body: {
+        action: "upload",
+        params: {
+          file: bgUrl,
+          folder: slideFolder,
+          public_id: slidePublicId,
+          resource_type: "image",
+          overwrite: true, // idempotence sur le même slide_public_id
+          tags: [brandId, carouselId, "carousel_slide", campaign, "alfie"],
+          context: {
+            brand: brandId,
+            carousel: carouselId,
+            campaign: campaign,
+            slide_index: String(slideIndex),
+            render_version: String(renderVersion),
+            text_version: String(textVersion),
+            aspect_ratio: normalizedAR,
+            size_hint: `${size.w}x${size.h}`,
+          },
         },
-        metadata: {
-          width: uploadResult.width,
-          height: uploadResult.height,
-          format: uploadResult.format,
-          cloudinary_base_url: cloudinaryBaseUrl, // ✅ Base URL as fallback
-          overlay_generated: derivedSuccess
-        }
-      });
+      },
+    });
 
-    if (insertError) {
-      console.error('[Render Slide] ❌ Database insert error:', insertError);
-      throw new Error(`Failed to save slide: ${insertError.message}`);
+    if (uploadErr || !uploadData) {
+      console.error(`[render-slide] ${logCtx} ❌ Cloudinary upload error:`, uploadErr);
+      return json({ error: `Failed to upload to Cloudinary: ${uploadErr?.message || "Unknown error"}` }, 502);
     }
-    
-    console.log('[Render Slide] ✅ Saved to library_assets:', { orderId, slideIndex, userId, publicId: uploadResult.publicId });
 
-    return new Response(JSON.stringify({
+    const cloudinarySecureUrl: string = uploadData.secure_url;
+    const cloudinaryPublicId: string = uploadData.public_id;
+    const uploadMeta = {
+      width: uploadData.width,
+      height: uploadData.height,
+      format: uploadData.format,
+    };
+
+    console.log(`[render-slide] ${logCtx}   ↳ uploaded:`, {
+      publicId: cloudinaryPublicId,
+      url: cloudinarySecureUrl?.slice(0, 120),
+      ...uploadMeta,
+    });
+
+    // =========================================
+    // STEP 4/4 — Upsert DB (idempotent)
+    // =========================================
+    console.log(`[render-slide] ${logCtx} 4/4 Save to library_assets (idempotence check)`);
+    const existingQuery = supabaseAdmin
+      .from("library_assets")
+      .select("id, cloudinary_url, cloudinary_public_id")
+      .eq("order_id", orderId)
+      .eq("carousel_id", carouselId)
+      .eq("slide_index", slideIndex);
+
+    if (orderItemId) {
+      existingQuery.eq("order_item_id", orderItemId);
+    } else {
+      existingQuery.is("order_item_id", null);
+    }
+
+    const { data: existing } = await existingQuery.maybeSingle();
+
+    if (existing) {
+      console.log(`[render-slide] ${logCtx} ♻️ Asset already exists: ${existing.id}`);
+      return json({
+        success: true,
+        idempotent: true,
+        cloudinary_url: existing.cloudinary_url,
+        cloudinary_public_id: existing.cloudinary_public_id,
+        text_public_id: textPublicId,
+        slide_metadata: {
+          title: normTitle,
+          subtitle: normSubtitle,
+          bullets: normBullets,
+          alt: altText,
+          slideIndex,
+          renderVersion,
+          textVersion,
+          aspectRatio: normalizedAR,
+        },
+      });
+    }
+
+    const { error: insertErr } = await supabaseAdmin.from("library_assets").insert({
+      user_id: userId,
+      brand_id: brandId,
+      order_id: orderId,
+      order_item_id: orderItemId ?? null,
+      carousel_id: carouselId,
+      type: "carousel_slide",
+      slide_index: slideIndex,
+      format: normalizedAR,
+      campaign,
+      cloudinary_url: cloudinarySecureUrl,       // URL complète pour affichage
+      cloudinary_public_id: cloudinaryPublicId,  // public_id pour transformations ultérieures
+      text_json: {
+        title: normTitle,
+        subtitle: normSubtitle,
+        bullets: normBullets,
+        alt: altText,
+        text_public_id: textPublicId,
+        text_version: textVersion,
+        render_version: renderVersion,
+      },
+      metadata: {
+        ...uploadMeta,
+        cloudinary_base_url: cloudinarySecureUrl,
+        original_public_id: cloudinaryPublicId,
+        totalSlides,
+        aspectRatio: normalizedAR,
+        size_hint: `${size.w}x${size.h}`,
+        orderItemId: orderItemId ?? null,
+        requestId,
+      },
+    });
+
+    if (insertErr) {
+      console.error(`[render-slide] ${logCtx} ❌ DB insert error:`, insertErr);
+      return json({ error: `Failed to save slide: ${insertErr.message}` }, 500);
+    }
+
+    console.log(`[render-slide] ${logCtx} ✅ Slide saved`);
+    return json({
       success: true,
-      cloudinary_url: cloudinaryUrl,
-      cloudinary_public_id: uploadResult.publicId,
+      cloudinary_url: cloudinarySecureUrl,
+      cloudinary_public_id: cloudinaryPublicId,
       text_public_id: textPublicId,
       slide_metadata: {
-        title: slideContent.title,
-        subtitle: slideContent.subtitle,
+        title: normTitle,
+        subtitle: normSubtitle,
+        bullets: normBullets,
+        alt: altText,
         slideIndex,
+        totalSlides,
         renderVersion,
-        textVersion
-      }
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        textVersion,
+        aspectRatio: normalizedAR,
+      },
     });
-
-  } catch (error: any) {
-    console.error('[alfie-render-carousel-slide] Error:', error);
-    return new Response(JSON.stringify({
-      error: error.message,
-      details: error.stack
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+  } catch (err: any) {
+    console.error("[alfie-render-carousel-slide] 💥 Error:", err);
+    return json(
+      {
+        error: err?.message || "Unknown error",
+        details: err?.stack,
+      },
+      500
+    );
   }
 });
