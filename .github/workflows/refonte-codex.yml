@@ -18,6 +18,7 @@ permissions:
 jobs:
   codex:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,14 +33,14 @@ jobs:
 
       - name: Configure npm auth (optional)
         if: ${{ secrets.NPM_TOKEN }}
-        run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
 
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
 
-      # ✅ Install robuste : essaie npm ci, sinon bascule en npm install
+      # Install robuste : on tente npm ci, et on bascule sur npm install si le lockfile n'est pas en phase
       - name: Install dependencies (ci → install fallback)
         shell: bash
         run: |
@@ -57,25 +58,23 @@ jobs:
       - name: Run Codex
         shell: bash
         run: |
+          set -euo pipefail
           bash scripts/codex/run.sh
 
-      # ✅ Guard correctement formé (c'était la source de l'erreur YAML ligne 45)
+      # Guard correctement formé : bloque toute modif dans apps/landing/, www/ ou site/
       - name: Guard: No landing changes
         shell: bash
         run: |
           set -euo pipefail
-          # Etat git (fichiers modifiés, ajoutés, renommés)
           CHANGED="$(git -c core.quotepath=false status --porcelain || true)"
           if [ -z "${CHANGED}" ]; then
             echo "OK: aucune modification détectée."
             exit 0
           fi
-          # Extrait les chemins touchés (gère ?? et renommages Rxxx old -> new)
           FILES="$(echo "${CHANGED}" | awk '
             $1 ~ /^\?\?/ { $1=""; sub(/^ +/,""); print; next }
             $1 ~ /^R/   { match($0, /-> (.*)$/, m); if (m[1]!="") print m[1]; next }
             { $1=""; sub(/^ +/,""); print }')"
-          # Dossiers interdits
           if echo "${FILES}" | grep -E -q '^(apps/landing/|www/|site/)'; then
             echo "::error title=Landing modifiée::Ce patch ne doit pas toucher la landing."
             echo "Fichiers concernés :"
@@ -85,6 +84,7 @@ jobs:
           echo "OK: aucune modification dans apps/landing, www ou site."
 
       - name: Create Pull Request
+        if: ${{ github.event_name != 'pull_request' }}
         uses: peter-evans/create-pull-request@v6
         with:
           commit-message: "Codex: push→pull, autopublish off, premium confirmation flag"
@@ -102,4 +102,5 @@ jobs:
             automated
             codex
           draft: false
+
 
