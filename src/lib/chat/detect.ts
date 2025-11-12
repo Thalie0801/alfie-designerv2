@@ -1,3 +1,6 @@
+// src/lib/chat/detect.ts
+type Ratio = "1:1" | "9:16" | "16:9" | "3:4" | "4:5" | "2:3";
+
 export function detectContentIntent(raw: string) {
   const q = raw.toLowerCase().trim();
 
@@ -13,6 +16,11 @@ export function detectContentIntent(raw: string) {
     (/youtube|shorts?/.test(q) && "youtube") ||
     null;
 
+  // ratio (corrigé: pas de cast multi-ligne)
+  const m = q.match(/\b(1:1|9:16|16:9|3:4|4:5|2:3)\b/);
+  const ratioFromText: Ratio | undefined = m ? (m[1] as Ratio) : undefined;
+
+  const defaultRatioByPlatform: Record<string, Ratio> = {
   const ratioFromText = q.match(/\b(1:1|9:16|16:9|3:4|4:5|2:3)\b/)?[1] as
     | "1:1"
     | "9:16"
@@ -29,6 +37,9 @@ export function detectContentIntent(raw: string) {
     linkedin: "1:1",
     youtube: "16:9",
   };
+
+  const fallback: Ratio = isVideo ? "9:16" : isCarousel ? "4:5" : "1:1";
+  const ratio: Ratio = ratioFromText ?? (platform ? defaultRatioByPlatform[platform] ?? fallback : fallback);
   const ratio = ratioFromText || (platform ? defaultRatioByPlatform[platform] || "1:1" : isVideo ? "9:16" : isCarousel ? "4:5" : "1:1");
 
   const tone =
@@ -38,6 +49,8 @@ export function detectContentIntent(raw: string) {
     null;
 
   const slides = (() => {
+    const sm = q.match(/(\d+)\s*(slides?|pages?)/);
+    if (sm) return Math.min(10, Math.max(3, parseInt(sm[1], 10)));
     const m = q.match(/(\d+)\s*(slides?|pages?)/);
     if (m) return Math.min(10, Math.max(3, parseInt(m[1], 10)));
     if (mode === "carousel") return 5;
