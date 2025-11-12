@@ -86,15 +86,10 @@ export function canUseFeature(
   const roles = new Set(user?.roles ?? []);
   const willBypass = roles.has('admin') || roles.has('vip');
   
-  console.log('[canUseFeature] Check:', {
-    feature,
-    roles: Array.from(roles),
-    plan: user?.plan,
-    hasAdmin: roles.has('admin'),
-    hasVip: roles.has('vip'),
-    willBypass,
-    flags: flags?.[feature]
-  });
+  // ✅ SECURITY: Logs removed to prevent authorization info leakage
+  if (import.meta.env.DEV) {
+    console.debug('[canUseFeature]', { feature, willBypass });
+  }
   
   if (willBypass) {
     return true;

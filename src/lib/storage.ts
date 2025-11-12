@@ -17,6 +17,14 @@ function normalizeStoragePath(bucket: string, storageKey: string): string {
     : storageKey;
 }
 
+/**
+ * ✅ SECURITY: Creates signed URLs for private storage buckets
+ * Validates user ownership before generating URL
+ * @param bucket - Storage bucket name
+ * @param storageKey - Path to file in storage
+ * @param userId - User ID for ownership verification
+ * @param expiresIn - URL expiration in seconds (default: 1 hour)
+ */
 export async function createSignedUrlForStorageKey({
   bucket,
   storageKey,
@@ -43,4 +51,38 @@ export async function createSignedUrlForStorageKey({
   }
 
   return data.signedUrl;
+}
+
+/**
+ * ✅ SECURITY: Helper for media-generations bucket
+ * Generates 1-hour signed URLs for user-owned media
+ */
+export async function getSignedMediaUrl(
+  path: string, 
+  userId: string,
+  expiresIn = 3600
+): Promise<string> {
+  return createSignedUrlForStorageKey({
+    bucket: 'media-generations',
+    storageKey: path,
+    userId,
+    expiresIn
+  });
+}
+
+/**
+ * ✅ SECURITY: Helper for chat-uploads bucket
+ * Generates 1-hour signed URLs for user-owned uploads
+ */
+export async function getSignedChatUploadUrl(
+  path: string,
+  userId: string,
+  expiresIn = 3600
+): Promise<string> {
+  return createSignedUrlForStorageKey({
+    bucket: 'chat-uploads',
+    storageKey: path,
+    userId,
+    expiresIn
+  });
 }
