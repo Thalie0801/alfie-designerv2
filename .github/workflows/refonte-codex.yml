@@ -90,9 +90,6 @@ jobs:
           base: refonte-alfie-2025
           author: "alfie-codex-bot <codex@alfie.local>"
           committer: "alfie-codex-bot <codex@alfie.local>"
-          labels: |
-            automated
-            codex
-          draft: false
+          labels: automated,codex
 
           draft: false
