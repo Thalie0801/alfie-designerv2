@@ -16,6 +16,8 @@ export interface SlideContent {
   kpis?: Array<{ label: string; delta: string }>;
 }
 
+const CONTROL = new RegExp('[\\x00-\\x1F\\x7F\\u00A0\\uFEFF]', 'g');
+
 /**
  * Sanitize text by removing control characters, NBSP, BOM, and other invisible characters
  * that can break Cloudinary overlays
@@ -23,7 +25,7 @@ export interface SlideContent {
 function sanitizeText(text: string): string {
   if (!text) return '';
   return text
-    .replace(/[\u0000-\u001F\u007F\u00A0\uFEFF]/g, '') // Remove control chars, NBSP, BOM
+    .replace(CONTROL, '') // Remove control chars, NBSP, BOM
     .trim();
 }
 

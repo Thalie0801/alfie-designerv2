@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import JSZip from "https://esm.sh/jszip@3.10.1";
+import { encodeOverlayText as encodeCloudinaryText } from "../_shared/cloudinaryText.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,8 +37,10 @@ function derivePublicIdFromUrl(url?: string): string | undefined {
   return derivedId;
 }
 
+const CONTROL = new RegExp('[\\x00-\\x1F\\x7F\\u00A0\\uFEFF]', 'g');
+
 function cleanText(text: string, maxLen = 220): string {
-  let cleaned = text.replace(/[\u0000-\u001F\u007F\u00A0\uFEFF]/g, '');
+  let cleaned = text.replace(CONTROL, '');
   // Remove emojis
   try {
     cleaned = cleaned.replace(/\p{Extended_Pictographic}/gu, '');
@@ -45,10 +48,6 @@ function cleanText(text: string, maxLen = 220): string {
     cleaned = cleaned.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '');
   }
   return cleaned.length > maxLen ? cleaned.slice(0, maxLen).trim() : cleaned.trim();
-}
-
-function encodeCloudinaryText(text: string): string {
-  return encodeURIComponent(text).replace(/%20/g, '%20');
 }
 
 function buildOverlayUrl(slide: any): string | null {
@@ -147,7 +146,26 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('Missing authorization');
 
-    const { carouselId, orderId } = await req.json();
+    const requestUrl = new URL(req.url);
+    const queryCarouselId = requestUrl.searchParams.get('carousel_id') || requestUrl.searchParams.get('carouselId');
+    const queryOrderId = requestUrl.searchParams.get('order_id') || requestUrl.searchParams.get('orderId');
+
+    let bodyCarouselId: string | null = null;
+    let bodyOrderId: string | null = null;
+
+    if (req.method !== 'GET') {
+      try {
+        const parsed = await req.json();
+        bodyCarouselId = parsed?.carouselId ?? null;
+        bodyOrderId = parsed?.orderId ?? null;
+      } catch {
+        // ignore empty body
+      }
+    }
+
+    const carouselId = bodyCarouselId || queryCarouselId;
+    const orderId = bodyOrderId || queryOrderId;
+
     if (!carouselId && !orderId) throw new Error('Missing carouselId or orderId');
 
     const supabase = createClient(
@@ -296,12 +314,17 @@ serve(async (req) => {
       throw uploadError;
     }
 
-    // Obtenir l'URL publique
-    const { data: publicUrlData } = supabase.storage
+    // URL signée (1h)
+    const { data: signedData, error: signedErr } = await supabase.storage
       .from('media-generations')
-      .getPublicUrl(zipFileName);
+      .createSignedUrl(zipFileName, 60 * 60);
 
-    const zipUrl = publicUrlData.publicUrl;
+    if (signedErr || !signedData?.signedUrl) {
+      console.error('[download-zip] Signed URL error:', signedErr);
+      throw signedErr ?? new Error('Failed to create signed URL');
+    }
+
+    const zipUrl = signedData.signedUrl;
     console.log(`[download-zip] ZIP uploaded successfully: ${zipUrl}`);
 
     return new Response(JSON.stringify({ 

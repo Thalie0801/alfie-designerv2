@@ -1,3 +1,5 @@
+import { CONTROL_CHARS_REGEX } from '@/lib/safeRender';
+
 /**
  * Extract Cloudinary cloud name from a full Cloudinary URL
  * @example extractCloudNameFromUrl('https://res.cloudinary.com/dcuvvilto/...') // 'dcuvvilto'
@@ -27,7 +29,7 @@ export function cleanText(s?: string, max = 220): string {
   if (!s) return '';
   
   // 1) Remove control characters, NBSP, BOM
-  let out = s.replace(/[\u0000-\u001F\u007F\u00A0\uFEFF]/g, '');
+  let out = s.replace(CONTROL_CHARS_REGEX, '');
   
   // 2) Remove emojis - try Extended_Pictographic first, fallback to ranges
   try {

@@ -1,119 +1,367 @@
+// functions/alfie-render-carousel-bulk/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { 
+  SUPABASE_URL, 
+  SUPABASE_SERVICE_ROLE_KEY, 
+  INTERNAL_FN_SECRET 
+} from "../_shared/env.ts";
+
+type AspectRatio = "1:1" | "4:5" | "9:16" | "16:9";
+
+type SlideInput = Record<string, unknown>; // ton schema de slide texte (title, subtitle, bullets, etc.)
+
+interface CarouselInput {
+  id?: string;
+  aspectRatio?: AspectRatio;
+  globalStyle?: Record<string, unknown>;
+  slides: SlideInput[];
+}
+
+interface BulkRequestBody {
+  carousels: CarouselInput[];
+  brandId?: string | null;
+  orderId?: string | null;
+  globalStyle?: Record<string, unknown>;
+  textVersion?: "v1" | "v2";
+  /** Limite de slides traitées en parallèle (par défaut 4) */
+  concurrency?: number;
+  /** Nombre de retries par slide (par défaut 2) */
+  retries?: number;
+  /** Propager l’Authorization à la fonction slide (si elle attend un contexte user) */
+  forwardAuth?: boolean;
+}
+
+interface SlideSuccess {
+  ok: true;
+  slideIndex: number;
+  data: any;
+  cloudinaryUrl?: string;
+}
+
+interface SlideFailure {
+  ok: false;
+  slideIndex: number;
+  error: string;
+}
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const supabaseAdmin = createClient(
-  Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
+// Validate env at module level
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  console.error("[carousel-bulk] ❌ Missing SUPABASE credentials");
+}
+
+const supabaseAdmin = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(
+      SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+  : null as any;
+
+/** Utilitaires */
+
+function isArray(v: unknown): v is any[] {
+  return Array.isArray(v);
+}
+
+function isNonEmptyString(v: unknown): v is string {
+  return typeof v === "string" && v.trim().length > 0;
+}
+
+function safeAspect(aspect?: unknown): AspectRatio {
+  const a = String(aspect ?? "4:5");
+  return (["1:1", "4:5", "9:16", "16:9"].includes(a) ? a : "4:5") as AspectRatio;
+}
+
+function normalizeCarousel(input: any, fallbackAspect: AspectRatio): CarouselInput | null {
+  if (!input || typeof input !== "object") return null;
+  const slides = isArray(input.slides) ? input.slides : [];
+  if (slides.length === 0) return null;
+
+  return {
+    id: isNonEmptyString(input.id) ? input.id : crypto.randomUUID(),
+    aspectRatio: safeAspect(input.aspectRatio ?? fallbackAspect),
+    globalStyle: (typeof input.globalStyle === "object" && input.globalStyle) || undefined,
+    slides,
+  };
+}
+
+function clamp(n: number, lo: number, hi: number) {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+/** Concurrence simple (p-limit like) */
+async function runWithConcurrency<T>(items: T[], limit: number, worker: (item: T, idx: number) => Promise<void>) {
+  let i = 0;
+  const running: Promise<void>[] = [];
+  while (i < items.length) {
+    while (running.length < limit && i < items.length) {
+      const p = worker(items[i], i).catch(() => {
+        /* already handled in worker */
+      });
+      running.push(
+        p.finally(() => {
+          const ix = running.indexOf(p);
+          if (ix >= 0) running.splice(ix, 1);
+        }),
+      );
+      i++;
+    }
+    if (running.length) {
+      await Promise.race(running);
+    }
+  }
+  await Promise.allSettled(running);
+}
+
+/** Retry avec backoff (500ms, 900ms, 1300ms, …) */
+async function withRetries<T>(fn: () => Promise<T>, retries: number, label: string): Promise<T> {
+  let attempt = 0;
+  let lastError: unknown = null;
+  while (attempt <= retries) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastError = e;
+      attempt++;
+      if (attempt > retries) break;
+      const delay = 500 + attempt * 400;
+      console.warn(`↻ Retry ${attempt}/${retries} after ${delay}ms for ${label}`, e);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  // CORS preflight
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('Missing authorization header');
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    if (!INTERNAL_FN_SECRET) {
+      console.error("[Carousel Bulk] ❌ Missing INTERNAL_FN_SECRET");
+      return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     
-    if (userError || !user) throw new Error('Unauthorized');
+    if (!supabaseAdmin) {
+      console.error("[Carousel Bulk] ❌ Supabase client not initialized");
+      return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseAdmin.auth.getUser(token);
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const userId = user.id;
-    console.log(`🎨 [Carousel Bulk] Authenticated user: ${userId}`);
+    const startTs = Date.now();
+    console.log(`🎨 [Carousel Bulk] User=${userId}`);
 
-    const { carousels, brandId, orderId, globalStyle, textVersion = 'v1' } = await req.json();
-
-    if (!carousels || !Array.isArray(carousels)) {
-      throw new Error('Carousels array is required');
+    // --- Parse & validate body
+    const body = (await req.json()) as Partial<BulkRequestBody>;
+    if (!body || !isArray(body.carousels) || body.carousels.length === 0) {
+      return new Response(JSON.stringify({ error: "carousels array is required and must be non-empty" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    console.log(`🎨 [Carousel Bulk] Generating ${carousels.length} carousels`);
+    const brandId = isNonEmptyString(body.brandId) ? body.brandId : null;
+    const orderId = isNonEmptyString(body.orderId) ? body.orderId : null;
+    const textVersion = (body.textVersion === "v2" ? "v2" : "v1") as "v1" | "v2";
+    const forwardAuth = Boolean(body.forwardAuth);
 
-    const results = [];
+    const defaultAspect: AspectRatio = "4:5";
+    const normalizedCarousels: CarouselInput[] = [];
+    for (const raw of body.carousels) {
+      const norm = normalizeCarousel(raw, defaultAspect);
+      if (norm) normalizedCarousels.push(norm);
+    }
+    if (normalizedCarousels.length === 0) {
+      return new Response(JSON.stringify({ error: "No valid carousels provided (slides missing)" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    // Process each carousel
-    for (const carousel of carousels) {
-      const carouselId = carousel.id || crypto.randomUUID();
-      const slides = [];
+    // Concurrence & retries
+    const concurrency = clamp(Number(body.concurrency ?? 4), 1, 16);
+    const retries = clamp(Number(body.retries ?? 2), 0, 5);
 
-      console.log(`📚 [Carousel ${carouselId}] Generating ${carousel.slides.length} slides`);
+    console.log(
+      `🧮 [Carousel Bulk] Carousels=${normalizedCarousels.length} | Concurrency=${concurrency} | Retries=${retries}`,
+    );
 
-      // Generate each slide using alfie-render-carousel-slide
-      for (let slideIndex = 0; slideIndex < carousel.slides.length; slideIndex++) {
-        const slide = carousel.slides[slideIndex];
+    // Résultats agrégés
+    const bulkResults: Array<{
+      carouselId: string;
+      aspectRatio: AspectRatio;
+      totalSlides: number;
+      slides: Array<SlideSuccess | SlideFailure>;
+    }> = [];
 
-        console.log(`🔨 [Slide ${slideIndex + 1}/${carousel.slides.length}] Rendering...`);
+    // Traitement carousel par carousel (on pourrait paralléliser ici aussi si besoin)
+    for (const carousel of normalizedCarousels) {
+      const carouselId = carousel.id!;
+      const aspectRatio = carousel.aspectRatio ?? "4:5";
+      const slidesOut: Array<SlideSuccess | SlideFailure> = [];
+      const totalSlides = carousel.slides.length;
 
-        // Call alfie-render-carousel-slide for each slide
-        const { data: slideData, error: slideError } = await supabaseAdmin.functions.invoke(
-          'alfie-render-carousel-slide',
-          {
-            body: {
-              userId,
-              slideContent: slide,
-              globalStyle: globalStyle || carousel.globalStyle || {},
-              brandId,
-              orderId,
-              carouselId,
-              slideIndex,
-              totalSlides: carousel.slides.length,
-              aspectRatio: carousel.aspectRatio || '4:5',
-              textVersion,
-              renderVersion: 'v1',
-              context: 'bulk',
+      console.log(`📚 [Carousel ${carouselId}] ${totalSlides} slides, aspect=${aspectRatio}`);
+
+      // Prépare la liste de jobs (un job = une slide)
+      const jobs = carousel.slides.map((slideContent, slideIndex) => ({
+        slideContent,
+        slideIndex,
+      }));
+
+      // Worker d’exécution pour une slide
+      const worker = async (job: { slideContent: SlideInput; slideIndex: number }, idx: number) => {
+        const label = `carousel=${carouselId} slide=${job.slideIndex + 1}/${totalSlides}`;
+
+        const exec = async () => {
+          const headers: Record<string, string> = forwardAuth && authHeader
+            ? { Authorization: authHeader, "X-Internal-Secret": INTERNAL_FN_SECRET || "" }
+            : { "X-Internal-Secret": INTERNAL_FN_SECRET || "" };
+
+          const { data: slideData, error: slideError } = await supabaseAdmin.functions.invoke(
+            "alfie-render-carousel-slide",
+            {
+              body: {
+                userId,
+                slideContent: job.slideContent,
+                globalStyle: carousel.globalStyle ?? body.globalStyle ?? {},
+                brandId,
+                orderId,
+                orderItemId: null,
+                carouselId,
+                slideIndex: job.slideIndex,
+                totalSlides,
+                aspectRatio,
+                textVersion,
+                renderVersion: "v1",
+                context: "bulk",
+                requestId: null,
+              },
+              headers,
             },
+          );
+
+          if (slideError) {
+            throw new Error(slideError.message || "Slide render failed");
           }
-        );
+          if (!slideData) {
+            throw new Error("Empty slide response");
+          }
 
-        if (slideError) {
-          console.error(`❌ [Slide ${slideIndex + 1}] Error:`, slideError);
-          throw new Error(`Slide ${slideIndex + 1} failed: ${slideError.message}`);
+          // Normalisation d’un champ utile si dispo (facultatif)
+          const cloudinaryUrl =
+            slideData?.cloudinaryUrl ||
+            slideData?.cloudinary_url ||
+            slideData?.data?.cloudinaryUrl ||
+            slideData?.data?.cloudinary_url;
+
+          slidesOut[job.slideIndex] = {
+            ok: true,
+            slideIndex: job.slideIndex,
+            data: slideData,
+            cloudinaryUrl,
+          };
+          console.log(`✅ [${label}] OK`);
+        };
+
+        try {
+          await withRetries(exec, retries, label);
+        } catch (e: any) {
+          const msg = e?.message || String(e);
+          slidesOut[job.slideIndex] = {
+            ok: false,
+            slideIndex: job.slideIndex,
+            error: msg,
+          };
+          console.error(`❌ [${label}] ${msg}`);
         }
+      };
 
-        slides.push(slideData);
-        console.log(`✅ [Slide ${slideIndex + 1}] Generated: ${slideData.cloudinaryUrl}`);
-      }
+      // Lance les slides avec limite de concurrence
+      await runWithConcurrency(jobs, concurrency, worker);
 
-      results.push({
+      // Pousse le résultat pour ce carousel
+      bulkResults.push({
         carouselId,
-        slides,
-        totalSlides: slides.length,
+        aspectRatio,
+        totalSlides,
+        slides: slidesOut,
       });
 
-      console.log(`✅ [Carousel ${carouselId}] Complete with ${slides.length} slides`);
+      const okCount = slidesOut.filter((s) => s.ok).length;
+      console.log(`✅ [Carousel ${carouselId}] ${okCount}/${totalSlides} slides ok`);
     }
 
-    console.log(`✅ [Carousel Bulk] All ${carousels.length} carousels generated successfully`);
+    // Statuts globaux
+    const totalCarousels = bulkResults.length;
+    const totalSlides = bulkResults.reduce((acc, c) => acc + c.totalSlides, 0);
+    const okSlides = bulkResults.reduce((acc, c) => acc + c.slides.filter((s) => s.ok).length, 0);
+    const failedSlides = totalSlides - okSlides;
+
+    const success = failedSlides === 0;
+    const partial_success = !success && okSlides > 0;
+
+    const durationMs = Date.now() - startTs;
+    console.log(
+      `🏁 [Carousel Bulk] Done in ${durationMs}ms | Carousels=${totalCarousels} | Slides OK=${okSlides}/${totalSlides}`,
+    );
 
     return new Response(
       JSON.stringify({
-        success: true,
-        carousels: results,
-        total: carousels.length,
+        success,
+        partial_success,
+        stats: {
+          carousels: totalCarousels,
+          totalSlides,
+          okSlides,
+          failedSlides,
+          durationMs,
+        },
+        carousels: bulkResults,
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
     );
   } catch (error) {
-    console.error('❌ [Carousel Bulk] Error:', error);
+    console.error("❌ [Carousel Bulk] Crash:", error);
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 },
     );
   }
 });

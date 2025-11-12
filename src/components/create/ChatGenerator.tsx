@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { cn } from "@/lib/utils";
+import { uploadToChatBucket } from "@/lib/chatUploads";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { VIDEO_ENGINE_CONFIG } from "@/config/videoEngine";
 
@@ -285,27 +286,19 @@ export function ChatGenerator() {
     try {
       const {
         data: { user },
+        error: authError,
       } = await supabase.auth.getUser();
+      if (authError) throw authError;
       if (!user) {
         toast.error("Vous devez être connecté");
         return;
       }
-      const safeName = file.name.replace(/[^\w.\-]+/g, "_");
-      const fileName = `${user.id}/${Date.now()}-${safeName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("chat-uploads")
-        .upload(fileName, file, { contentType: file.type, upsert: false });
-
-      if (uploadError) throw uploadError;
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("chat-uploads").getPublicUrl(fileName);
+      const { signedUrl: uploadedSourceUrl } = await uploadToChatBucket(file, supabase, user.id);
 
       const src: UploadedSource = {
         type: isVideo ? ("video" as const) : ("image" as const),
-        url: publicUrl,
+        url: uploadedSourceUrl,
         name: file.name,
       };
       setUploadedSource(src);
@@ -313,9 +306,19 @@ export function ChatGenerator() {
       if (isVideo) setContentType("video");
 
       toast.success(isVideo ? "Vidéo ajoutée ! 🎬" : "Image ajoutée ! 📸");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Upload error:", error);
-      toast.error("Erreur lors de l'upload");
+      let message: string;
+      if (error instanceof Error) {
+        message = error.message;
+      } else {
+        try {
+          message = JSON.stringify(error);
+        } catch {
+          message = String(error);
+        }
+      }
+      toast.error(`Erreur lors de l'upload${message ? ` : ${message}` : ""}`);
     } finally {
       setUploadingSource(false);
       if (fileInputRef.current) fileInputRef.current.value = "";

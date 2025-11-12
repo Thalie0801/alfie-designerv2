@@ -1,4 +1,5 @@
 import { cleanText } from './utils';
+import { encodeOverlayText } from './text';
 
 type Aspect = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '4:5';
 
@@ -53,13 +54,13 @@ export function imageToVideoUrl(params: {
 
   const overlays: string[] = [];
   if (title) {
-    overlays.push(`l_text:Arial_70_bold:${enc(cleanText(title, 80))},co_rgb:FFFFFF,g_north,y_200`);
+    overlays.push(`l_text:Arial_70_bold:${encodeOverlayText(cleanText(title, 80))},co_rgb:FFFFFF,g_north,y_200`);
   }
   if (subtitle) {
-    overlays.push(`l_text:Arial_44:${enc(cleanText(subtitle, 100))},co_rgb:E5E7EB,g_center,y_50`);
+    overlays.push(`l_text:Arial_44:${encodeOverlayText(cleanText(subtitle, 100))},co_rgb:E5E7EB,g_center,y_50`);
   }
   if (cta) {
-    overlays.push(`l_text:Arial_56_bold:${enc(cleanText(cta, 50))},co_rgb:FFFFFF,g_south,y_160`);
+    overlays.push(`l_text:Arial_56_bold:${encodeOverlayText(cleanText(cta, 50))},co_rgb:FFFFFF,g_south,y_160`);
   }
 
   const audio = audioPublicId ? `/l_audio:${enc(audioPublicId)}` : '';
@@ -98,9 +99,9 @@ export function spliceVideoUrl(params: {
   const parts: string[] = [`https://res.cloudinary.com/${cloudName}/video/upload/${dim},c_fill,f_mp4`];
 
   const globalOverlays: string[] = [];
-  if (title)    globalOverlays.push(`l_text:Arial_70_bold:${enc(cleanText(title, 80))},co_rgb:FFFFFF,g_north,y_200`);
-  if (subtitle) globalOverlays.push(`l_text:Arial_44:${enc(cleanText(subtitle, 100))},co_rgb:E5E7EB,g_center,y_50`);
-  if (cta)      globalOverlays.push(`l_text:Arial_56_bold:${enc(cleanText(cta, 50))},co_rgb:FFFFFF,g_south,y_160`);
+  if (title)    globalOverlays.push(`l_text:Arial_70_bold:${encodeOverlayText(cleanText(title, 80))},co_rgb:FFFFFF,g_north,y_200`);
+  if (subtitle) globalOverlays.push(`l_text:Arial_44:${encodeOverlayText(cleanText(subtitle, 100))},co_rgb:E5E7EB,g_center,y_50`);
+  if (cta)      globalOverlays.push(`l_text:Arial_56_bold:${encodeOverlayText(cleanText(cta, 50))},co_rgb:FFFFFF,g_south,y_160`);
   if (globalOverlays.length) parts.push('/' + globalOverlays.join('/'));
 
   items.forEach((it) => {

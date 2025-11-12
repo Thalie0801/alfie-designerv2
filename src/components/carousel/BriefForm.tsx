@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, X, Sparkles } from "lucide-react";
 import { CharacterCounter } from "./CharacterCounter";
+import { CONTROL_CHARS_REGEX } from "@/lib/safeRender";
 
 export type AspectRatio = "1:1" | "4:5" | "9:16" | "16:9";
 export type OutputKind = "image" | "carousel" | "video";
@@ -67,7 +68,7 @@ const OUTPUTS: { value: OutputKind; label: string }[] = [
 // petit nettoyage anti-emoji/contrôles pour fiabiliser Cloudinary
 function cleanText(s: string, max = 220) {
   if (!s) return "";
-  let out = s.replace(/[\u0000-\u001F\u007F\u00A0\uFEFF]/g, "");
+  let out = s.replace(CONTROL_CHARS_REGEX, "");
   try {
     out = out.replace(/\p{Extended_Pictographic}/gu, "");
   } catch {

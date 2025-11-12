@@ -1005,42 +1005,63 @@ export type Database = {
       }
       job_queue: {
         Row: {
+          archived_at: string | null
+          attempts: number
           created_at: string
           error: string | null
           id: string
+          idempotency_key: string | null
+          is_archived: boolean
+          job_version: number
+          locked_by: string | null
           max_retries: number
           order_id: string | null
           payload: Json
           result: Json | null
           retry_count: number
+          started_at: string | null
           status: string
           type: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          archived_at?: string | null
+          attempts?: number
           created_at?: string
           error?: string | null
           id?: string
+          idempotency_key?: string | null
+          is_archived?: boolean
+          job_version?: number
+          locked_by?: string | null
           max_retries?: number
           order_id?: string | null
           payload: Json
           result?: Json | null
           retry_count?: number
+          started_at?: string | null
           status?: string
           type: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          archived_at?: string | null
+          attempts?: number
           created_at?: string
           error?: string | null
           id?: string
+          idempotency_key?: string | null
+          is_archived?: boolean
+          job_version?: number
+          locked_by?: string | null
           max_retries?: number
           order_id?: string | null
           payload?: Json
           result?: Json | null
           retry_count?: number
+          started_at?: string | null
           status?: string
           type?: string
           updated_at?: string
@@ -2166,6 +2187,26 @@ export type Database = {
         }
         Relationships: []
       }
+      v_job_queue_active: {
+        Row: {
+          archived_at: string | null
+          created_at: string | null
+          error: string | null
+          id: string | null
+          is_archived: boolean | null
+          job_version: number | null
+          max_retries: number | null
+          order_id: string | null
+          payload: Json | null
+          result: Json | null
+          retry_count: number | null
+          status: string | null
+          type: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
       v_brand_quota_current: {
         Row: {
           brand_id: string | null
@@ -2261,14 +2302,18 @@ export type Database = {
         }[]
       }
       claim_next_job: {
-        Args: never
+        Args: { worker_id: string }
         Returns: {
           id: string
-          order_id: string
+          order_id: string | null
           payload: Json
           type: string
           user_id: string
-        }[]
+          status: string
+          attempts: number | null
+          locked_by: string | null
+          started_at: string | null
+        } | null
       }
       consume_visuals: {
         Args: {

@@ -211,7 +211,7 @@ const AppRoutes = () => {
           <Route
             path="/onboarding/activate"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowPending={true}>
                 <AppLayoutWithSidebar>
                   <ActivateAccess />
                 </AppLayoutWithSidebar>

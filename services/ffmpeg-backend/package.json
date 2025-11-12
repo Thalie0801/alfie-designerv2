@@ -1,0 +1,14 @@
+{
+  "name": "alfie-ffmpeg-backend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "fluent-ffmpeg": "^2.1.2"
+  }
+}
