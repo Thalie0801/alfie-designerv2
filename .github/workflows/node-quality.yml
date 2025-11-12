@@ -1,35 +1,28 @@
 name: Node Quality Checks
-
 on:
   pull_request:
     branches: [ main, refonte-alfie-2025 ]
   workflow_dispatch: {}
-
 concurrency:
   group: qa-${{ github.ref }}
   cancel-in-progress: true
-
 permissions:
   contents: read
-
 jobs:
   qa:
     runs-on: ubuntu-latest
     env:
       NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # pnpm à partir de package.json: "packageManager": "pnpm@x.y.z"
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           run_install: false
 
-      # Node + cache PNPM (nécessite pnpm-lock.yaml)
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -37,18 +30,14 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
-      # .npmrc local pour forcer npmjs (évite GitHub Packages → 403)
-      - name: Use npmjs registry
+      - name: Force npmjs registry
         run: |
-          cat > .npmrc <<'EONPM'
-          registry=https://registry.npmjs.org/
-          @*:registry=https://registry.npmjs.org/
-          strict-ssl=true
-          always-auth=false
-          EONPM
+          printf "registry=https://registry.npmjs.org/\n" > .npmrc
+          printf "@*:registry=https://registry.npmjs.org/\n" >> .npmrc
+          printf "strict-ssl=true\n" >> .npmrc
+          printf "always-auth=false\n" >> .npmrc
 
-      # Install robuste avec retries
-      - name: Install deps (with cache + retry)
+      - name: Install deps
         run: |
           pnpm -v
           pnpm config set registry https://registry.npmjs.org/
@@ -56,30 +45,18 @@ jobs:
           pnpm config set fetch-retry-factor 2
           pnpm config set fetch-timeout 60000
           if [ -f pnpm-lock.yaml ]; then FROZEN="--frozen-lockfile"; else FROZEN=""; fi
-          for i in 1 2 3; do
-            echo "pnpm install (attempt $i)…"
-            pnpm install $FROZEN && DONE=1 && break || true
-            sleep 5
-          done
-          if [ -z "$DONE" ]; then
-            echo "Last attempt without frozen lockfile…"
-            pnpm install
-          fi
+          pnpm install $FROZEN || pnpm install
 
       - name: TypeScript
         run: pnpm typecheck || true
 
-      - name: ESLint (skippable)
+      - name: ESLint
         run: |
           if pnpm lint; then
             echo "Lint OK"
           else
-            echo "⚠️ Lint skipped (plugins/registry)."
+            echo "Lint skipped"
           fi
-
-      - name: Build
-        run: pnpm build
-
 
       - name: Build
         run: pnpm build
