@@ -19,7 +19,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -30,32 +31,26 @@ jobs:
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
 
-      # --- INSTALL ROBUSTE AVEC TIMEOUT & FALLBACK ---
-      - name: Install deps (try npm ci with timeout)
+      # Install robuste : essaye npm ci (avec timeout). Si ça échoue → npm install. Dernier recours → resync lock.
+      - name: Install deps (ci with timeout → install → resync)
         id: install
         shell: bash
         run: |
           set -euo pipefail
           echo "→ Trying npm ci (timeout 240s)…"
-          # lance npm ci avec timeout (kill si pend)
           if timeout 240s npm ci --prefer-online --no-audit --no-fund; then
             echo "ok=ci" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          echo "::warning:: npm ci timed out or failed. Falling back to npm install."
-          # 1er fallback: npm install (garde lock existant)
+          echo "::warning:: npm ci timed out/failed. Falling back to npm install."
           if npm install --prefer-online --no-audit --no-fund --legacy-peer-deps; then
             echo "ok=install" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "::warning:: npm install failed. Resyncing lockfile…"
-          # Dernier recours: regénérer lockfile
           rm -f package-lock.json
           npm install --prefer-online --no-audit --no-fund --legacy-peer-deps
           echo "ok=resynced" >> "$GITHUB_OUTPUT"
-
-      - name: Show install result
-        run: echo "Install strategy: ${{ steps.install.outputs.ok }}"
 
       - name: Run Codex
         shell: bash
@@ -63,7 +58,7 @@ jobs:
           set -euo pipefail
           bash scripts/codex/run.sh
 
-      # Garde-fou landing
+      # Garde-fou : ne pas toucher la landing
       - name: Guard: No landing changes
         shell: bash
         run: |
@@ -100,4 +95,6 @@ jobs:
           labels: |
             automated
             codex
+          draft: false
+
           draft: false
