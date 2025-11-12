@@ -1,8 +1,8 @@
-import { NavLink, useLocation } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { cn } from '@/lib/utils';
+import { NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard, 
+  LayoutDashboard,
   CreditCard,
   TrendingUp,
   Settings,
@@ -10,9 +10,8 @@ import {
   UserCircle,
   Layers,
   FolderOpen,
-  MessageCircle,
-  Sparkles
-} from 'lucide-react';
+  Sparkles,
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -24,17 +23,19 @@ import {
   SidebarMenuItem,
   SidebarFooter,
   useSidebar,
-} from '@/components/ui/sidebar';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import alfieMain from '@/assets/alfie-main.png';
+} from "@/components/ui/sidebar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import alfieMain from "@/assets/alfie-main.png";
 
 export function AppSidebar() {
   const { open, isMobile } = useSidebar();
   const location = useLocation();
   const { user, profile, isAdmin, signOut } = useAuth();
-  const canSeeAdminToggle = user?.email ? ['nathaliestaelens@gmail.com','staelensnathalie@gmail.com'].includes(user.email) : false;
+  const canSeeAdminToggle = user?.email
+    ? ["nathaliestaelens@gmail.com", "staelensnathalie@gmail.com"].includes(user.email)
+    : false;
 
   // Removed automatic sidebar toggle on route changes to prevent menu disappearing bug
 
@@ -46,29 +47,30 @@ export function AppSidebar() {
     badge?: string;
     tourId?: string;
   }> = [
-    { path: '/chat', label: 'Chat Alfie', icon: MessageCircle, tourId: 'chat' },
-    { path: '/studio', label: 'Studio', icon: Sparkles, tourId: 'studio' },
-    { path: '/templates', label: 'Catalogue', icon: Layers, badge: 'Bientôt' },
-    { path: '/library', label: 'Bibliothèque', icon: FolderOpen, tourId: 'library' },
-    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/profile', label: 'Profil', icon: UserCircle },
-    { path: '/billing', label: 'Abonnement', icon: CreditCard },
-    { path: '/affiliate', label: 'Affiliation', icon: TrendingUp, tourId: 'affiliate' },
+    { path: "/studio", label: "Studio", icon: Sparkles, tourId: "studio" },
+    { path: "/templates", label: "Catalogue", icon: Layers, badge: "Bientôt" },
+    { path: "/library", label: "Bibliothèque", icon: FolderOpen, tourId: "library" },
+    { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { path: "/profile", label: "Profil", icon: UserCircle },
+    { path: "/billing", label: "Abonnement", icon: CreditCard },
+    { path: "/affiliate", label: "Affiliation", icon: TrendingUp, tourId: "affiliate" },
   ];
 
   // Navigation principale (sans "Créer")
   const navItems = baseNavItems;
 
   if (isAdmin || canSeeAdminToggle) {
-    navItems.push({ path: '/admin', label: 'Admin', icon: Settings });
+    navItems.push({ path: "/admin", label: "Admin", icon: Settings });
   }
 
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
-    isActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
+    isActive
+      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
 
   const handleSignOut = async () => {
     await signOut();
-    window.location.href = '/';
+    window.location.href = "/";
   };
 
   return (
@@ -94,13 +96,12 @@ export function AppSidebar() {
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.path}>
-                  <SidebarMenuButton asChild isActive={location.pathname === item.path} className="min-h-[44px] touch-target">
-                    <NavLink 
-                      to={item.path} 
-                      end 
-                      className={getNavCls}
-                      data-sidebar-id={item.tourId}
-                    >
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.pathname === item.path}
+                    className="min-h-[44px] touch-target"
+                  >
+                    <NavLink to={item.path} end className={getNavCls} data-sidebar-id={item.tourId}>
                       <item.icon className={cn(open && !isMobile ? "mr-2" : "mx-auto")} size={isMobile ? 22 : 20} />
                       {(open || isMobile) && (
                         <div className="flex items-center gap-2 flex-1">
@@ -129,18 +130,16 @@ export function AppSidebar() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <UserCircle className="h-4 w-4" />
-                <span className="text-xs truncate max-w-[120px]">
-                  {user?.email?.split('@')[0]}
-                </span>
+                <span className="text-xs truncate max-w-[120px]">{user?.email?.split("@")[0]}</span>
               </div>
               <Badge variant="secondary" className="text-xs">
-                {profile?.plan || 'starter'}
+                {profile?.plan || "starter"}
               </Badge>
             </div>
           )}
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleSignOut}
             className="w-full justify-start min-h-[44px] touch-target"
           >
