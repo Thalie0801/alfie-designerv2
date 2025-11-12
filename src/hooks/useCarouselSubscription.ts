@@ -1,8 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { useAuth } from '@/hooks/useAuth';
-import { createSignedUrlForStorageKey } from '@/lib/storage';
 
 export interface CarouselItem {
   id: string;
@@ -10,37 +8,29 @@ export interface CarouselItem {
   index: number;
 }
 
+// Helper pour construire l'URL publique de manière robuste via l'API Supabase
+function makePublicUrlRobust(storageKey: string): string {
+  console.log('[makePublicUrlRobust] Input storageKey:', storageKey);
+  
+  const bucket = 'media-generations';
+  
+  // Normaliser le chemin (retirer le préfixe bucket s'il existe)
+  let path = storageKey;
+  if (path.startsWith(`${bucket}/`)) {
+    path = path.replace(`${bucket}/`, '');
+  }
+  
+  // Utiliser l'API officielle
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  
+  console.log('[makePublicUrlRobust] Generated URL:', data.publicUrl);
+  return data.publicUrl;
+}
+
 export function useCarouselSubscription(jobSetId: string, total: number) {
   const [items, setItems] = useState<CarouselItem[]>([]);
   const [done, setDone] = useState(0);
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const { user } = useAuth();
-  const userId = user?.id ?? null;
-  const STORAGE_BUCKET = 'media-generations';
-
-  const resolveAssetUrl = useCallback(
-    async (storageKey: string | null, meta: { public_url?: string } | null) => {
-      if (meta?.public_url) {
-        return meta.public_url;
-      }
-
-      if (!storageKey || !userId) {
-        return null;
-      }
-
-      try {
-        return await createSignedUrlForStorageKey({
-          bucket: STORAGE_BUCKET,
-          storageKey,
-          userId,
-        });
-      } catch (error) {
-        console.error('[Carousel] Failed to create signed URL:', error);
-        return null;
-      }
-    },
-    [userId]
-  );
 
   // 🔄 RÉINITIALISER quand jobSetId change
   useEffect(() => {
@@ -51,8 +41,8 @@ export function useCarouselSubscription(jobSetId: string, total: number) {
 
   // 1️⃣ Fonction de chargement des assets existants (extractée pour être réutilisable)
   const loadExistingAssets = useCallback(async () => {
-    if (!jobSetId || !userId) return;
-
+    if (!jobSetId) return;
+    
     // Defensive: join job_sets to ensure we only see assets from our brands
     const { data, error } = await supabase
       .from('assets')
@@ -72,37 +62,26 @@ export function useCarouselSubscription(jobSetId: string, total: number) {
     }
 
     if (data && data.length > 0) {
-      const mapped = await Promise.all(
-        data.map(async (row) => {
-          const meta = row.meta as { public_url?: string } | null;
-          const url = await resolveAssetUrl(row.storage_key, meta);
-
-          if (!url) {
-            return null;
-          }
-
-          return {
-            id: row.id,
-            index: row.index_in_set ?? 0,
-            url,
-          } as CarouselItem;
-        })
-      );
-
-      const filtered = mapped.filter((item): item is CarouselItem => Boolean(item));
-      setItems(filtered);
-      setDone(filtered.length);
-    } else {
-      setItems([]);
-      setDone(0);
+      const mapped: CarouselItem[] = data.map(row => {
+        const meta = row.meta as { public_url?: string } | null;
+        // Priorité à meta.public_url, sinon utiliser l'API robuste
+        const url = meta?.public_url || makePublicUrlRobust(row.storage_key);
+        return {
+          id: row.id,
+          index: row.index_in_set ?? 0,
+          url
+        };
+      });
+      setItems(mapped);
+      setDone(mapped.length);
     }
-  }, [jobSetId, resolveAssetUrl, userId]);
+  }, [jobSetId]);
 
   useEffect(() => {
     console.log('[useCarouselSubscription] Hook triggered with jobSetId:', jobSetId);
-
-    if (!jobSetId || !userId) {
-      console.log('[useCarouselSubscription] Missing jobSetId or userId, skipping');
+    
+    if (!jobSetId) {
+      console.log('[useCarouselSubscription] No jobSetId, skipping');
       return;
     }
 
@@ -123,35 +102,27 @@ export function useCarouselSubscription(jobSetId: string, total: number) {
         },
         (payload: any) => {
           console.log('[useCarouselSubscription] New asset received:', payload.new);
+          
+          const newAsset = payload.new;
+          const meta = newAsset.meta as { public_url?: string } | null;
+          const newItem: CarouselItem = {
+            id: newAsset.id,
+            index: newAsset.index_in_set ?? 0,
+            url: meta?.public_url || makePublicUrlRobust(newAsset.storage_key)
+          };
 
-          void (async () => {
-            const newAsset = payload.new;
-            const meta = newAsset.meta as { public_url?: string } | null;
-            const url = await resolveAssetUrl(newAsset.storage_key, meta);
-
-            if (!url) {
-              console.warn('[useCarouselSubscription] Unable to resolve URL for asset', newAsset.id);
-              return;
+          setItems(prev => {
+            // Déduplication
+            if (prev.some(p => p.id === newItem.id)) {
+              console.log('[useCarouselSubscription] Duplicate asset, skipping:', newItem.id);
+              return prev;
             }
-
-            const newItem: CarouselItem = {
-              id: newAsset.id,
-              index: newAsset.index_in_set ?? 0,
-              url,
-            };
-
-            setItems(prev => {
-              if (prev.some(p => p.id === newItem.id)) {
-                console.log('[useCarouselSubscription] Duplicate asset, skipping:', newItem.id);
-                return prev;
-              }
-
-              const next = [...prev, newItem].sort((a, b) => a.index - b.index);
-              setDone(next.length);
-              console.log('[useCarouselSubscription] Asset added, total:', next.length);
-              return next;
-            });
-          })();
+            
+            const next = [...prev, newItem].sort((a, b) => a.index - b.index);
+            setDone(next.length);
+            console.log('[useCarouselSubscription] Asset added, total:', next.length);
+            return next;
+          });
         }
       )
       .subscribe((status) => {
@@ -185,7 +156,7 @@ export function useCarouselSubscription(jobSetId: string, total: number) {
       }
       clearInterval(pollingInterval);
     };
-  }, [jobSetId, loadExistingAssets, done, total, resolveAssetUrl, userId]);
+  }, [jobSetId, loadExistingAssets, done, total]);
 
   return { items, done, total, refresh: loadExistingAssets };
 }

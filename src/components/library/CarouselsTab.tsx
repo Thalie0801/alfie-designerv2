@@ -3,9 +3,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Eye, Download } from 'lucide-react';
+import { Eye, Download, FileArchive, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import { slideUrl } from '@/lib/cloudinary/imageUrls';
+import { extractCloudNameFromUrl } from '@/lib/cloudinary/utils';
+
+function resolveCloudName(slide: CarouselSlide): string | undefined {
+  const fromUrl = extractCloudNameFromUrl(slide.cloudinary_url);
+  const fromMeta = extractCloudNameFromUrl(slide.metadata?.cloudinary_base_url);
+  const fromEnv = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined;
+  return fromUrl || fromMeta || fromEnv;
+}
 
 interface CarouselSlide {
   id: string;
@@ -16,6 +26,12 @@ interface CarouselSlide {
   created_at: string | null;
   format: string | null;
   cloudinary_public_id?: string | null;
+  text_json?: {
+    title?: string;
+    subtitle?: string;
+    bullets?: string[];
+    [k: string]: any;
+  } | null;
   metadata?: {
     cloudinary_base_url?: string;
     [k: string]: any;
@@ -31,6 +47,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
   const { activeBrandId } = useBrandKit();
   const [slides, setSlides] = useState<CarouselSlide[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingZip, setDownloadingZip] = useState<string | null>(null);
 
   useEffect(() => {
     loadSlides();
@@ -46,7 +63,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
 
     let query = supabase
       .from('library_assets')
-      .select('id, cloudinary_url, cloudinary_public_id, metadata, slide_index, carousel_id, order_id, created_at, format')
+      .select('id, cloudinary_url, cloudinary_public_id, metadata, text_json, slide_index, carousel_id, order_id, created_at, format')
       .eq('user_id', user.id)
       .eq('type', 'carousel_slide')
       .order('created_at', { ascending: false })
@@ -73,33 +90,46 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     setLoading(false);
   };
 
-  // Utility functions for robust fallback
-  const buildBaseUrlFromOriginal = (originalUrl: string): string | null => {
+  const handleDownloadZip = async (carouselKey: string, carouselSlides: CarouselSlide[]) => {
+    setDownloadingZip(carouselKey);
+    
     try {
-      const url = new URL(originalUrl);
-      // Remove all transformations after /image/upload/ and keep version path
-      const match = url.pathname.match(/^(\/[^/]+)\/image\/upload(?:\/[^/]+)?(\/v\d+\/.+)$/);
-      if (match) {
-        return `${url.origin}${match[1]}/image/upload${match[2]}`;
+      const carouselId = carouselSlides[0]?.carousel_id;
+      const orderId = carouselSlides[0]?.order_id;
+      
+      if (!carouselId && !orderId) {
+        throw new Error('No carousel or order ID found');
       }
-      // If no version, try without transform part
-      const noTransform = url.pathname.replace(/(\/image\/upload)\/[^/]+(\/.+)/, '$1$2');
-      return `${url.origin}${noTransform}`;
-    } catch {
-      return null;
-    }
-  };
 
-  const buildBaseUrlFromPublicId = (originalUrl: string, publicId?: string | null): string | null => {
-    if (!publicId) return null;
-    try {
-      const url = new URL(originalUrl);
-      const segments = url.pathname.split('/');
-      const cloudName = segments[1];
-      if (!cloudName) return null;
-      return `${url.origin}/${cloudName}/image/upload/${publicId}.png`;
-    } catch {
-      return null;
+      console.log('[CarouselsTab] Downloading ZIP for:', { carouselId, orderId });
+
+      const { data, error } = await supabase.functions.invoke('download-job-set-zip', {
+        body: { 
+          carouselId: carouselId || undefined,
+          orderId: orderId || undefined
+        }
+      });
+
+      if (error) {
+        console.error('[CarouselsTab] ZIP download error:', error);
+        throw error;
+      }
+
+      if (!data?.url) {
+        throw new Error('No ZIP URL returned');
+      }
+
+      // Open ZIP download in new tab
+      window.open(data.url, '_blank');
+      
+      const sizeInMB = (data.size / (1024 * 1024)).toFixed(2);
+      toast.success(`ZIP téléchargé : ${data.filename} (${sizeInMB} MB)`);
+      
+    } catch (err: any) {
+      console.error('[CarouselsTab] ZIP download failed:', err);
+      toast.error(`Échec du téléchargement : ${err.message || 'Erreur inconnue'}`);
+    } finally {
+      setDownloadingZip(null);
     }
   };
 
@@ -142,21 +172,36 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
               <h3 className="font-semibold">Carrousel</h3>
               <Badge variant="secondary">{carouselSlides.length} slides</Badge>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                // Télécharger toutes les slides (ouvrir dans nouvel onglet)
-                carouselSlides.forEach((slide, index) => {
-                  setTimeout(() => {
-                    window.open(slide.cloudinary_url, '_blank');
-                  }, index * 200); // Stagger downloads
-                });
-              }}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Télécharger tout
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleDownloadZip(carouselKey, carouselSlides)}
+                disabled={downloadingZip === carouselKey}
+              >
+                {downloadingZip === carouselKey ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <FileArchive className="h-4 w-4 mr-2" />
+                )}
+                Télécharger en ZIP
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  // Télécharger toutes les slides individuellement (fallback)
+                  carouselSlides.forEach((slide, index) => {
+                    setTimeout(() => {
+                      window.open(slide.cloudinary_url, '_blank');
+                    }, index * 200);
+                  });
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Individual
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
@@ -175,55 +220,37 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                 return (
                   <div key={slide.id} className="relative group">
                     <img
-                      src={slide.cloudinary_url}
-                      alt={`Slide ${(slide.slide_index ?? 0) + 1}`}
-                      className={`w-full rounded-lg ${aspectClass} object-cover border`}
-                      onError={async (e) => {
-                        const img = e.currentTarget;
-                        const alreadyRepaired = img.dataset.repaired === 'true';
-                        const alreadyTried = img.dataset.fallbackTried === 'true';
+                      src={(() => {
+                        const base = slide.cloudinary_url ?? '';
                         
-                        if (alreadyTried) return; // Prevent infinite loop
-
-                        const original = slide.cloudinary_url;
+                        // Need all 3 conditions
+                        if (!slide.cloudinary_public_id || !slide.text_json) return base;
                         
-                        // Try to repair the overlay first (if not already repaired)
-                        if (!alreadyRepaired) {
-                          try {
-                            console.log('[CarouselsTab] Attempting to repair overlay for slide:', slide.id);
-                            img.dataset.repaired = 'true'; // Mark as repaired to prevent loops
-                            
-                            const { data, error } = await supabase.functions.invoke('repair-carousel-overlay', {
-                              body: { slideId: slide.id }
-                            });
-                            
-                            if (!error && data?.cloudinary_url) {
-                              console.log('[CarouselsTab] ✅ Overlay repaired, reloading image');
-                              img.src = data.cloudinary_url;
-                              return; // Success, no need for fallback
-                            }
-                          } catch (repairError) {
-                            console.warn('[CarouselsTab] Repair failed:', repairError);
-                          }
+                        const cloudName = resolveCloudName(slide);
+                        if (!cloudName) {
+                          console.warn('[CarouselsTab] No cloudName found, fallback to base URL');
+                          return base;
                         }
                         
-                        // If repair failed or was already tried, use fallback
-                        const metaBase = slide.metadata?.cloudinary_base_url || null;
-                        const baseFromOriginal = buildBaseUrlFromOriginal(original);
-                        const baseFromPublicId = buildBaseUrlFromPublicId(original, slide.cloudinary_public_id);
-
-                        // Priority order for fallback
-                        const fallback = metaBase || baseFromOriginal || baseFromPublicId;
-                        
-                        console.warn('[CarouselsTab] Using fallback image:', {
-                          metaBase: metaBase?.substring(0, 120),
-                          baseFromOriginal: baseFromOriginal?.substring(0, 120),
-                          baseFromPublicId: baseFromPublicId?.substring(0, 120)
-                        });
-
-                        if (fallback && img.src !== fallback) {
-                          img.dataset.fallbackTried = 'true';
-                          img.src = fallback;
+                        try {
+                          return slideUrl(slide.cloudinary_public_id, {
+                            title: slide.text_json.title,
+                            subtitle: slide.text_json.subtitle,
+                            bulletPoints: slide.text_json.bullets || [],
+                            aspectRatio: (slide.format || '4:5') as '4:5' | '1:1' | '9:16' | '16:9',
+                            cloudName,
+                          });
+                        } catch (e) {
+                          console.warn('[CarouselsTab] Overlay generation failed:', e);
+                          return base;
+                        }
+                      })()}
+                      alt={`Slide ${(slide.slide_index ?? 0) + 1}`}
+                      className={`w-full rounded-lg ${aspectClass} object-cover border`}
+                      onError={(e) => {
+                        console.warn('[CarouselsTab] Overlay image failed, fallback base:', e.currentTarget.src);
+                        if (slide.cloudinary_url?.startsWith('https://')) {
+                          e.currentTarget.src = slide.cloudinary_url;
                         }
                       }}
                     />

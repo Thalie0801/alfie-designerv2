@@ -14,31 +14,18 @@ import { Label } from '@/components/ui/label';
 import { CreditCard } from 'lucide-react';
 import { useStripeCheckout } from '@/hooks/useStripeCheckout';
 import { SYSTEM_CONFIG } from '@/config/systemConfig';
-import { useAuth } from '@/hooks/useAuth';
 
 export function AddPaidBrandDialog() {
   const [open, setOpen] = useState(false);
   const [brandName, setBrandName] = useState('');
   const { createCheckout, loading } = useStripeCheckout();
-  const { user } = useAuth();
 
   const handlePayment = async () => {
-    const normalizedBrandName = brandName.trim();
-    if (!normalizedBrandName) return;
-
-    const metadata = user?.email
-      ? {
-          amount: SYSTEM_CONFIG.PRICING.ADDON_BRAND,
-          currency: 'EUR' as const,
-          description: normalizedBrandName,
-          reference: 'ADDON-BRAND',
-          customerEmail: user.email,
-        }
-      : undefined;
-
+    if (!brandName.trim()) return;
+    
     // Create Stripe checkout with brand name in metadata
-    await createCheckout('starter', 'monthly', normalizedBrandName, metadata);
-
+    await createCheckout('starter', 'monthly', brandName);
+    
     setOpen(false);
     setBrandName('');
   };
@@ -99,8 +86,8 @@ export function AddPaidBrandDialog() {
           <Button variant="outline" onClick={() => setOpen(false)}>
             Annuler
           </Button>
-          <Button
-            onClick={handlePayment}
+          <Button 
+            onClick={handlePayment} 
             disabled={loading || !brandName.trim()}
             className="gap-2"
           >

@@ -17,6 +17,7 @@ export function BulkCarouselGenerator({ brandId }: { brandId: string }) {
   const [campaignName, setCampaignName] = useState('');
   const [textOption, setTextOption] = useState<'alfie' | 'excel'>('alfie');
   const [excelData, setExcelData] = useState('');
+  const [aspectRatio, setAspectRatio] = useState<'1:1' | '9:16' | '16:9' | '4:5'>('1:1');
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<any[]>([]);
@@ -53,7 +54,7 @@ export function BulkCarouselGenerator({ brandId }: { brandId: string }) {
           text_option: textOption,
           excel_data: parsedExcelData,
           global_style: 'Professional, clean, modern design',
-          aspect_ratio: '1:1'
+          aspect_ratio: aspectRatio
         }
       });
 
@@ -131,6 +132,40 @@ export function BulkCarouselGenerator({ brandId }: { brandId: string }) {
               value={theme}
               onChange={(e) => setTheme(e.target.value)}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Aspect Ratio / Format</Label>
+            <RadioGroup 
+              value={aspectRatio} 
+              onValueChange={(v: any) => setAspectRatio(v)}
+              className="flex gap-4 flex-wrap"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="1:1" id="ratio-1-1" />
+                <Label htmlFor="ratio-1-1" className="font-normal cursor-pointer">
+                  1:1 (Carré)
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="9:16" id="ratio-9-16" />
+                <Label htmlFor="ratio-9-16" className="font-normal cursor-pointer">
+                  9:16 (Story/Reel)
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="16:9" id="ratio-16-9" />
+                <Label htmlFor="ratio-16-9" className="font-normal cursor-pointer">
+                  16:9 (Paysage)
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="4:5" id="ratio-4-5" />
+                <Label htmlFor="ratio-4-5" className="font-normal cursor-pointer">
+                  4:5 (Portrait)
+                </Label>
+              </div>
+            </RadioGroup>
           </div>
 
           <div className="space-y-4">

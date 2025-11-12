@@ -62,7 +62,7 @@ serve(async (req) => {
       );
     }
     
-    const { plan, billing_period, affiliate_ref, brand_name, payment_metadata } = validation.data;
+    const { plan, billing_period, affiliate_ref, brand_name } = validation.data;
     
     const billingType = billing_period === 'annual' ? 'annual' : 'monthly';
     const planType = plan as 'starter' | 'pro' | 'studio';
@@ -118,15 +118,6 @@ serve(async (req) => {
         user_id: userId || "",
         affiliate_ref: affiliate_ref || "",
         brand_name: brand_name || "",
-        ...(payment_metadata
-          ? {
-              payment_amount: payment_metadata.amount.toString(),
-              payment_currency: payment_metadata.currency,
-              payment_reference: payment_metadata.reference,
-              payment_description: payment_metadata.description,
-              payment_customer: payment_metadata.customerEmail,
-            }
-          : {}),
       },
     });
 

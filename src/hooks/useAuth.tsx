@@ -12,7 +12,6 @@ interface AuthContextType {
   subscription: any | null;
   roles: string[];
   isAdmin: boolean;
-  hasAdminOverride: boolean;
   isAuthorized: boolean;
   hasActivePlan: boolean;
   subscriptionExpired: boolean;
@@ -32,51 +31,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [subscription, setSubscription] = useState<any | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hasAdminOverride, setHasAdminOverride] = useState(false);
-
-  const fetchAdminOverride = async (email: string | null | undefined) => {
-    const normalizedEmail = (email ?? '').trim().toLowerCase();
-
-    if (!normalizedEmail) {
-      setHasAdminOverride(false);
-      return false;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('admin_users')
-        .select('id')
-        .eq('email', normalizedEmail)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('[Auth] fetchAdminOverride failed:', error);
-        setHasAdminOverride(false);
-        return false;
-      }
-
-      const overrideActive = Boolean(data);
-      setHasAdminOverride(overrideActive);
-      return overrideActive;
-    } catch (overrideError) {
-      console.error('[Auth] Unexpected error while checking admin override:', overrideError);
-      setHasAdminOverride(false);
-      return false;
-    }
-  };
 
   const ensureActiveSubscription = async (currentUser: User | null) => {
     if (!currentUser?.email) {
       console.debug('[Auth] ensureActiveSubscription: no user email');
       return false;
-    }
-
-    const overrideActive = await fetchAdminOverride(currentUser.email);
-
-    if (overrideActive) {
-      console.debug('[Auth] ensureActiveSubscription: admin override grants access');
-      return true;
     }
 
     // Vérifier si l'utilisateur a un rôle VIP ou Admin via la DB
@@ -182,7 +141,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(null);
           setSubscription(null);
           setRoles([]);
-          setHasAdminOverride(false);
         }
       }
     );
@@ -199,7 +157,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setLoading(false);
         setSubscription(null);
-        setHasAdminOverride(false);
       }
     });
 
@@ -229,18 +186,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('user_id', userFromAuth.id);
     
     const userRoles = (rolesData || []).map(r => r.role);
-    const overrideActive = await fetchAdminOverride(userFromAuth.email);
-    const isVipOrAdmin =
-      userRoles.includes('vip') ||
-      userRoles.includes('admin') ||
-      overrideActive;
+    const isVipOrAdmin = userRoles.includes('vip') || userRoles.includes('admin');
 
     if (isVipOrAdmin) {
-      console.debug('[Auth] signIn: bypass subscription check (VIP/Admin)', {
-        email: userFromAuth.email,
+      console.debug('[Auth] signIn: bypass subscription check (VIP/Admin)', { 
+        email: userFromAuth.email, 
         roles: userRoles,
-        isVipOrAdmin,
-        overrideActive
+        isVipOrAdmin
       });
       return { error: null };
     }
@@ -312,14 +264,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const roleAdmin = hasRole(roles, 'admin');
   const roleVip = hasRole(roles, 'vip');
   const computedAdmin = roleAdmin;
-  const adminAccess = computedAdmin || hasAdminOverride;
-
+  
   // 1. Calculer vipBypass en premier (VIP ou Admin)
-  const vipBypass = roleVip || adminAccess;
-
+  const vipBypass = roleVip || roleAdmin;
+  
   // 2. Calculer computedIsAuthorized avec vipBypass
   const computedIsAuthorized = vipBypass || computeIsAuthorized(user, {
-    isAdmin: adminAccess,
+    isAdmin: computedAdmin,
     roles,
     profile,
     subscription,
@@ -330,19 +281,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: user?.email,
     vipBypass,
     roleAdmin,
-    computedAdmin: adminAccess,
-    hasAdminOverride,
+    computedAdmin,
     computedIsAuthorized,
     hasActivePlan: Boolean(
       vipBypass ||
-      adminAccess ||
+      computedAdmin ||
       profile?.granted_by_admin ||
       (subscription?.status ? ['active', 'trial', 'trialing'].includes(String(subscription.status).toLowerCase()) : false)
     )
   });
   const hasActivePlan = Boolean(
     vipBypass ||
-    adminAccess ||
+    computedAdmin ||
     profile?.granted_by_admin ||
     (subscription?.status ? ['active', 'trial', 'trialing'].includes(String(subscription.status).toLowerCase()) : false)
   );
@@ -355,8 +305,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profile,
     subscription,
     roles,
-    isAdmin: adminAccess,
-    hasAdminOverride,
+    isAdmin: computedAdmin,
     isAuthorized: computedIsAuthorized,
     hasActivePlan,
     subscriptionExpired,

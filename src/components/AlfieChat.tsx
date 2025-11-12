@@ -13,6 +13,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { useLibraryAssetsSubscription } from '@/hooks/useLibraryAssetsSubscription';
 import { getAspectClass, type ConversationState, type OrchestratorResponse } from '@/types/chat';
+import { slideUrl } from '@/lib/cloudinary/imageUrls';
+import { extractCloudNameFromUrl } from '@/lib/cloudinary/utils';
 
 const normalizeConversationState = (state?: string | null): ConversationState => {
   switch (state) {
@@ -338,9 +340,23 @@ export function AlfieChat() {
         const headers = await getAuthHeader();
         const { data, error } = await supabase.functions.invoke('queue-monitor', { headers });
         if (error) throw error;
-        const c = (data as any)?.counts || {};
-        const oldest = (data as any)?.backlogSeconds ?? null;
-        const stuck = (data as any)?.stuck?.runningStuckCount ?? 0;
+        
+        interface QueueMonitorResponse {
+          counts?: { 
+            completed_24h?: number; 
+            pending?: number; 
+            running?: number;
+            queued?: number;
+            failed?: number;
+          };
+          backlogSeconds?: number;
+          stuck?: { runningStuckCount?: number };
+        }
+        
+        const response = data as QueueMonitorResponse;
+        const c = response?.counts || {};
+        const oldest = response?.backlogSeconds ?? null;
+        const stuck = response?.stuck?.runningStuckCount ?? 0;
         const completed24h = c.completed_24h ?? 0;
         const minutes = oldest ? Math.max(0, Math.round((oldest as number) / 60)) : null;
 
@@ -672,14 +688,44 @@ export function AlfieChat() {
                         if (!item?.url) return null;
 
                         const aspectClass = getAspectClass(item.format || '4:5');
+                        
+                        const imageUrl = (() => {
+                          if (item.publicId && item.text) {
+                            const cloudName = 
+                              extractCloudNameFromUrl(item.url) ||
+                              (import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined);
+                            
+                            if (!cloudName) return item.url ?? '/placeholder.svg';
+                            
+                            try {
+                              return slideUrl(item.publicId, {
+                                title: item.text.title,
+                                subtitle: item.text.subtitle,
+                                bulletPoints: item.text.bullets,
+                                aspectRatio: (item.format || '4:5') as '4:5' | '1:1' | '9:16' | '16:9',
+                                cloudName,
+                              });
+                            } catch {
+                              return item.url ?? '/placeholder.svg';
+                            }
+                          }
+                          
+                          if (item.url?.startsWith('https://')) return item.url;
+                          return '/placeholder.svg';
+                        })();
 
                         return (
                           <div key={i} className={`relative ${aspectClass} rounded-lg overflow-hidden`}>
                             <img
-                              src={item.url}
+                              src={imageUrl}
                               alt={`Slide ${i + 1}`}
                               className="absolute inset-0 w-full h-full object-cover"
                               loading="lazy"
+                              onError={(e) => {
+                                if (item.url?.startsWith('https://')) {
+                                  e.currentTarget.src = item.url;
+                                }
+                              }}
                             />
                           </div>
                         );
@@ -711,12 +757,43 @@ export function AlfieChat() {
                       </div>
                       
                       {/* Aperçu principal: afficher la première slide avec text overlays */}
-                      {carousel.slides?.[0]?.cloudinary_url && (
+                      {carousel.slides?.[0] && (
                         <div className="mb-3 rounded-lg overflow-hidden border border-border">
                           <img 
-                            src={carousel.slides[0].cloudinary_url} 
+                            src={(() => {
+                              const firstSlide = carousel.slides[0];
+                              if (firstSlide.cloudinary_public_id && firstSlide.text_json) {
+                                const cloudName = 
+                                  extractCloudNameFromUrl(firstSlide.cloudinary_url) ||
+                                  (import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined);
+                                
+                                if (!cloudName) {
+                                  return firstSlide.cloudinary_url || firstSlide.storage_url;
+                                }
+                                
+                                try {
+                                  return slideUrl(firstSlide.cloudinary_public_id, {
+                                    title: firstSlide.text_json.title,
+                                    subtitle: firstSlide.text_json.subtitle,
+                                    bulletPoints: firstSlide.text_json.bullets,
+                                    aspectRatio: firstSlide.format || '4:5',
+                                    cloudName,
+                                    baseUrlForCloudGuess: firstSlide.cloudinary_url,
+                                  });
+                                } catch {
+                                  return firstSlide.cloudinary_url || firstSlide.storage_url;
+                                }
+                              }
+                              return firstSlide.cloudinary_url || firstSlide.storage_url;
+                            })()}
                             alt={`Aperçu carrousel ${carousel.carousel_index}`}
                             className="w-full object-cover"
+                            onError={(e) => {
+                              const firstSlide = carousel.slides[0];
+                              if (firstSlide.cloudinary_url?.startsWith('https://')) {
+                                e.currentTarget.src = firstSlide.cloudinary_url;
+                              }
+                            }}
                           />
                         </div>
                       )}
@@ -725,14 +802,48 @@ export function AlfieChat() {
                       <div className="grid grid-cols-5 gap-2">
                         {carousel.slides?.slice(0, 5).map((slide: any, slideIdx: number) => {
                           const aspectClass = getAspectClass(slide.format || '4:5');
+                          
+                          const thumbUrl = (() => {
+                            if (slide.cloudinary_public_id && slide.text_json) {
+                              const cloudName = 
+                                extractCloudNameFromUrl(slide.cloudinary_url) ||
+                                (import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined);
+                              
+                              if (!cloudName) {
+                                return slide.cloudinary_url || slide.storage_url;
+                              }
+                              
+                              try {
+                                return slideUrl(slide.cloudinary_public_id, {
+                                  title: slide.text_json.title,
+                                  subtitle: slide.text_json.subtitle,
+                                  bulletPoints: slide.text_json.bullets,
+                                  aspectRatio: slide.format || '4:5',
+                                  cloudName,
+                                  baseUrlForCloudGuess: slide.cloudinary_url,
+                                });
+                              } catch {
+                                return slide.cloudinary_url || slide.storage_url;
+                              }
+                            }
+                            return slide.cloudinary_url || slide.storage_url;
+                          })();
 
                           return (
                             <div key={slideIdx} className={`relative ${aspectClass} rounded overflow-hidden border border-border`}>
                               <img
-                                src={slide.cloudinary_url || slide.storage_url}
+                                src={thumbUrl}
                                 alt={`Slide ${slideIdx + 1}`}
                                 className="absolute inset-0 w-full h-full object-cover"
                                 loading="lazy"
+                                onError={(e) => {
+                                  // Fallback to base Cloudinary URL if overlay fails
+                                  if (slide.cloudinary_url && e.currentTarget.src !== slide.cloudinary_url) {
+                                    e.currentTarget.src = slide.cloudinary_url;
+                                  } else if (slide.storage_url && e.currentTarget.src !== slide.storage_url) {
+                                    e.currentTarget.src = slide.storage_url;
+                                  }
+                                }}
                               />
                             </div>
                           );

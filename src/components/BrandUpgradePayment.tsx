@@ -10,7 +10,6 @@ import {
 import { AlertCircle, CreditCard } from 'lucide-react';
 import { useStripeCheckout } from '@/hooks/useStripeCheckout';
 import { SYSTEM_CONFIG } from '@/config/systemConfig';
-import { useAuth } from '@/hooks/useAuth';
 
 interface BrandUpgradePaymentProps {
   open: boolean;
@@ -20,38 +19,22 @@ interface BrandUpgradePaymentProps {
   onPaymentInitiated: () => void;
 }
 
-export function BrandUpgradePayment({
-  open,
+export function BrandUpgradePayment({ 
+  open, 
   onOpenChange,
   currentBrandsCount,
   brandName,
   onPaymentInitiated
 }: BrandUpgradePaymentProps) {
   const { createCheckout, loading } = useStripeCheckout();
-  const { user } = useAuth();
 
   const handlePayment = async () => {
-    const normalizedBrandName = brandName.trim();
-    if (!normalizedBrandName) {
-      return;
-    }
-
     // Save brand name to localStorage for post-payment creation
-    localStorage.setItem('pending_brand_name', normalizedBrandName);
-
-    const metadata = user?.email
-      ? {
-          amount: SYSTEM_CONFIG.PRICING.ADDON_BRAND,
-          currency: 'EUR' as const,
-          description: normalizedBrandName,
-          reference: 'ADDON-BRAND',
-          customerEmail: user.email,
-        }
-      : undefined;
-
+    localStorage.setItem('pending_brand_name', brandName);
+    
     // Create checkout for starter plan (39€/month for additional brand)
-    await createCheckout('starter', 'monthly', normalizedBrandName, metadata);
-
+    await createCheckout('starter', 'monthly');
+    
     // Close dialogs
     onPaymentInitiated();
     onOpenChange(false);

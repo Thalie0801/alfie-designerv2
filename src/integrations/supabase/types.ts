@@ -1005,14 +1005,9 @@ export type Database = {
       }
       job_queue: {
         Row: {
-          attempts: number
-          brand_id: string | null
           created_at: string
           error: string | null
           id: string
-          idempotency_key: string | null
-          kind: string | null
-          max_attempts: number
           max_retries: number
           order_id: string | null
           payload: Json
@@ -1024,14 +1019,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          attempts?: number
-          brand_id?: string | null
           created_at?: string
           error?: string | null
           id?: string
-          idempotency_key?: string | null
-          kind?: string | null
-          max_attempts?: number
           max_retries?: number
           order_id?: string | null
           payload: Json
@@ -1043,14 +1033,9 @@ export type Database = {
           user_id: string
         }
         Update: {
-          attempts?: number
-          brand_id?: string | null
           created_at?: string
           error?: string | null
           id?: string
-          idempotency_key?: string | null
-          kind?: string | null
-          max_attempts?: number
           max_retries?: number
           order_id?: string | null
           payload?: Json

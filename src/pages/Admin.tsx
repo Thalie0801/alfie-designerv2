@@ -9,18 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, Activity, ArrowLeft, Sparkles, Plus, ExternalLink, Trash2, Edit2, Search, RefreshCw, TrendingUp, UserCheck, UserX, Award, Unlock, Shield, UserPlus, UserMinus } from 'lucide-react';
+import { Users, Activity, ArrowLeft, Sparkles, Plus, ExternalLink, Trash2, Edit2, Search, RefreshCw, TrendingUp, UserCheck, UserX, Award, Unlock } from 'lucide-react';
 import { toast } from 'sonner';
 import { NewsManager } from '@/components/NewsManager';
 import { VideoDiagnostic } from '@/components/VideoDiagnostic';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-
-interface AdminUser {
-  id: string;
-  email: string;
-  is_active: boolean;
-  created_at: string | null;
-}
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -37,10 +29,6 @@ export default function Admin() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [designDialogOpen, setDesignDialogOpen] = useState(false);
   const [resettingJobs, setResettingJobs] = useState(false);
-  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
-  const [newAdminEmail, setNewAdminEmail] = useState('');
-  const [addingAdmin, setAddingAdmin] = useState(false);
-  const [updatingAdminId, setUpdatingAdminId] = useState<string | null>(null);
 
   useEffect(() => {
     loadAdminData();
@@ -48,7 +36,7 @@ export default function Admin() {
 
   const loadAdminData = async () => {
     try {
-      const [usersRes, affiliatesRes, conversionsRes, payoutsRes, designsRes, suggestionsRes, adminUsersRes] = await Promise.all([
+      const [usersRes, affiliatesRes, conversionsRes, payoutsRes, designsRes, suggestionsRes] = await Promise.all([
         supabase.from('profiles').select('*').order('created_at', { ascending: false }),
         supabase.from('affiliates').select('*').order('created_at', { ascending: false }),
         supabase
@@ -66,10 +54,6 @@ export default function Admin() {
           .from('contact_requests')
           .select('*')
           .ilike('message', '[SUGGESTION DE FONCTIONNALITÉ]%')
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('admin_users')
-          .select('*')
           .order('created_at', { ascending: false })
       ]);
 
@@ -79,13 +63,6 @@ export default function Admin() {
       setPayouts(payoutsRes.data || []);
       setDesigns(designsRes.data || []);
       setSuggestions(suggestionsRes.data || []);
-      if (adminUsersRes.error) {
-        console.error('Error loading admin users:', adminUsersRes.error);
-        toast.error('Impossible de charger la liste des administrateurs');
-        setAdminUsers([]);
-      } else {
-        setAdminUsers((adminUsersRes.data as AdminUser[]) || []);
-      }
     } catch (error) {
       console.error('Error loading admin data:', error);
       toast.error('Erreur lors du chargement des données');
@@ -195,97 +172,6 @@ export default function Admin() {
     } catch (error: any) {
       console.error('User deletion error:', error);
       toast.error(error.message || 'Erreur lors de la suppression de l\'utilisateur');
-    }
-  };
-
-  const handleAddAdminUser = async () => {
-    const email = newAdminEmail.trim().toLowerCase();
-
-    if (!email) {
-      toast.error('Email administrateur requis');
-      return;
-    }
-
-    setAddingAdmin(true);
-    try {
-      const { error } = await supabase
-        .from('admin_users')
-        .insert({ email, is_active: true });
-
-      if (error) {
-        if ((error as any)?.code === '23505') {
-          toast.error('Cet administrateur existe déjà');
-        } else {
-          throw error;
-        }
-      } else {
-        toast.success('Administrateur ajouté');
-        setNewAdminEmail('');
-        await loadAdminData();
-      }
-    } catch (error) {
-      console.error('Add admin user error:', error);
-      toast.error('Impossible d\'ajouter cet administrateur');
-    } finally {
-      setAddingAdmin(false);
-    }
-  };
-
-  const handleToggleAdminAccess = async (adminUser: AdminUser) => {
-    if (adminUser.is_active) {
-      const activeAdmins = adminUsers.filter(user => user.is_active).length;
-      if (activeAdmins <= 1) {
-        toast.error('Impossible de désactiver le dernier administrateur actif');
-        return;
-      }
-    }
-
-    setUpdatingAdminId(adminUser.id);
-    try {
-      const { error } = await supabase
-        .from('admin_users')
-        .update({ is_active: !adminUser.is_active })
-        .eq('id', adminUser.id);
-
-      if (error) throw error;
-
-      toast.success(!adminUser.is_active ? 'Administrateur activé' : 'Administrateur désactivé');
-      await loadAdminData();
-    } catch (error) {
-      console.error('Toggle admin access error:', error);
-      toast.error('Impossible de mettre à jour cet administrateur');
-    } finally {
-      setUpdatingAdminId(null);
-    }
-  };
-
-  const handleRemoveAdminUser = async (adminUser: AdminUser) => {
-    const activeAdmins = adminUsers.filter(user => user.is_active && user.id !== adminUser.id).length;
-    if (adminUser.is_active && activeAdmins === 0) {
-      toast.error('Impossible de supprimer le dernier administrateur actif');
-      return;
-    }
-
-    if (!confirm(`Supprimer l'accès administrateur de ${adminUser.email} ?`)) {
-      return;
-    }
-
-    setUpdatingAdminId(adminUser.id);
-    try {
-      const { error } = await supabase
-        .from('admin_users')
-        .delete()
-        .eq('id', adminUser.id);
-
-      if (error) throw error;
-
-      toast.success('Administrateur supprimé');
-      await loadAdminData();
-    } catch (error) {
-      console.error('Remove admin user error:', error);
-      toast.error('Impossible de retirer cet administrateur');
-    } finally {
-      setUpdatingAdminId(null);
     }
   };
 
@@ -498,7 +384,6 @@ export default function Admin() {
           </TabsTrigger>
           <TabsTrigger value="news">Actualités</TabsTrigger>
           <TabsTrigger value="diagnostic">Diagnostic</TabsTrigger>
-          <TabsTrigger value="admins">Administrateurs</TabsTrigger>
         </TabsList>
 
         {/* Users Tab */}
@@ -931,102 +816,6 @@ export default function Admin() {
         {/* Diagnostic Tab */}
         <TabsContent value="diagnostic" className="space-y-4">
           <VideoDiagnostic />
-        </TabsContent>
-
-        {/* Admin Users Tab */}
-        <TabsContent value="admins" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <CardTitle>Administrateurs ({adminUsers.length})</CardTitle>
-                  <CardDescription>Gérez les accès privilégiés à la plateforme</CardDescription>
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <Input
-                    type="email"
-                    placeholder="admin@example.com"
-                    value={newAdminEmail}
-                    onChange={(event) => setNewAdminEmail(event.target.value)}
-                    className="sm:w-64"
-                  />
-                  <Button
-                    onClick={handleAddAdminUser}
-                    disabled={addingAdmin || !newAdminEmail.trim()}
-                    className="gap-2"
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    {addingAdmin ? 'Ajout...' : 'Ajouter'}
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <p className="text-center text-muted-foreground py-4">Chargement...</p>
-              ) : adminUsers.length === 0 ? (
-                <div className="text-center py-10">
-                  <Shield className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-                  <p className="font-medium">Aucun administrateur actif</p>
-                  <p className="text-sm text-muted-foreground">
-                    Ajoutez un administrateur pour accéder aux fonctionnalités sensibles.
-                  </p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Statut</TableHead>
-                      <TableHead>Ajouté le</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {adminUsers.map((adminUser) => (
-                      <TableRow key={adminUser.id}>
-                        <TableCell className="font-medium">{adminUser.email}</TableCell>
-                        <TableCell>
-                          <Badge variant={adminUser.is_active ? 'default' : 'secondary'}>
-                            {adminUser.is_active ? 'Actif' : 'Désactivé'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {adminUser.created_at
-                            ? new Date(adminUser.created_at).toLocaleString('fr-FR')
-                            : '—'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleToggleAdminAccess(adminUser)}
-                              disabled={updatingAdminId === adminUser.id}
-                              className="gap-2"
-                            >
-                              <Shield className="h-4 w-4" />
-                              {adminUser.is_active ? 'Désactiver' : 'Activer'}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveAdminUser(adminUser)}
-                              disabled={updatingAdminId === adminUser.id}
-                              className="gap-2 text-destructive"
-                            >
-                              <UserMinus className="h-4 w-4" />
-                              Retirer
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
 

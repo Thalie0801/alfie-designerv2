@@ -1,5 +1,4 @@
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
-import { PaymentMetadataSchema } from './payment-metadata.ts';
 
 // Validation schemas for edge functions
 
@@ -80,7 +79,7 @@ export const deliverableSchema = z.object({
 
 // Payment validation schemas
 export const CheckoutSchema = z.object({
-  plan: z.enum(['starter', 'pro', 'studio', 'enterprise'], {
+  plan: z.enum(['starter', 'pro', 'studio', 'enterprise'], { 
     errorMap: () => ({ message: 'Plan invalide' })
   }),
   billing_period: z.enum(['monthly', 'annual']).default('monthly'),
@@ -92,7 +91,6 @@ export const CheckoutSchema = z.object({
     .regex(/^[a-zA-Z0-9\s\-_'\.]+$/, 'Nom de marque contient des caractères non autorisés')
     .optional()
     .or(z.literal('')),
-  payment_metadata: PaymentMetadataSchema.optional(),
 });
 
 export const VerifyPaymentSchema = z.object({
