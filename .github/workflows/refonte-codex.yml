@@ -3,13 +3,9 @@ name: Refonte Codex (push→pull, disable autopublish)
 on:
   workflow_dispatch: {}
   push:
-    branches:
-      - main
-      - refonte-alfie-2025
+    branches: [ main, refonte-alfie-2025 ]
   pull_request:
-    branches:
-      - main
-      - refonte-alfie-2025
+    branches: [ main, refonte-alfie-2025 ]
 
 permissions:
   contents: write
@@ -18,12 +14,12 @@ permissions:
 jobs:
   codex:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        with: { fetch-depth: 0 }
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -31,29 +27,35 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Configure npm auth (optional)
-        if: ${{ secrets.NPM_TOKEN }}
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
-
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
 
-      # Install robuste : on tente npm ci, et on bascule sur npm install si le lockfile n'est pas en phase
-      - name: Install dependencies (ci → install fallback)
+      # --- INSTALL ROBUSTE AVEC TIMEOUT & FALLBACK ---
+      - name: Install deps (try npm ci with timeout)
+        id: install
         shell: bash
         run: |
           set -euo pipefail
-          echo "→ Trying npm ci…"
-          if npm ci --prefer-online --no-audit --no-fund; then
-            echo "✔ npm ci OK"
-          else
-            echo "::warning:: npm ci failed. Falling back to npm install (lockfile out of sync)."
-            npm cache verify || true
-            npm install --prefer-online --no-audit --no-fund --legacy-peer-deps
-            echo "::notice:: Installed with npm install."
+          echo "→ Trying npm ci (timeout 240s)…"
+          # lance npm ci avec timeout (kill si pend)
+          if timeout 240s npm ci --prefer-online --no-audit --no-fund; then
+            echo "ok=ci" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          echo "::warning:: npm ci timed out or failed. Falling back to npm install."
+          # 1er fallback: npm install (garde lock existant)
+          if npm install --prefer-online --no-audit --no-fund --legacy-peer-deps; then
+            echo "ok=install" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::warning:: npm install failed. Resyncing lockfile…"
+          # Dernier recours: regénérer lockfile
+          rm -f package-lock.json
+          npm install --prefer-online --no-audit --no-fund --legacy-peer-deps
+          echo "ok=resynced" >> "$GITHUB_OUTPUT"
+
+      - name: Show install result
+        run: echo "Install strategy: ${{ steps.install.outputs.ok }}"
 
       - name: Run Codex
         shell: bash
@@ -61,7 +63,7 @@ jobs:
           set -euo pipefail
           bash scripts/codex/run.sh
 
-      # Guard correctement formé : bloque toute modif dans apps/landing/, www/ ou site/
+      # Garde-fou landing
       - name: Guard: No landing changes
         shell: bash
         run: |
@@ -77,7 +79,6 @@ jobs:
             { $1=""; sub(/^ +/,""); print }')"
           if echo "${FILES}" | grep -E -q '^(apps/landing/|www/|site/)'; then
             echo "::error title=Landing modifiée::Ce patch ne doit pas toucher la landing."
-            echo "Fichiers concernés :"
             echo "${FILES}" | grep -E '^(apps/landing/|www/|site/)' | sed 's/^/ - /'
             exit 1
           fi
@@ -87,13 +88,11 @@ jobs:
         if: ${{ github.event_name != 'pull_request' }}
         uses: peter-evans/create-pull-request@v6
         with:
-          commit-message: "Codex: push→pull, autopublish off, premium confirmation flag"
-          title: "Codex: push→pull, autopublish off, premium confirmation flag"
+          commit-message: "Codex: push→pull, autopublish off, lockfile resync if needed"
+          title: "Codex: push→pull, autopublish off, lockfile resync if needed"
           body: |
-            Cette PR est générée par le workflow Codex.
-            - Passage du flux push ➜ pull request
-            - Autopublish désactivé
-            - Ajout du flag de confirmation premium
+            - Fallback npm ci → npm install, avec resync lockfile si nécessaire.
+            - Autopublish désactivé.
           branch: codex/refonte-alfie-2025-${{ github.run_id }}
           base: refonte-alfie-2025
           author: "alfie-codex-bot <codex@alfie.local>"
@@ -102,5 +101,3 @@ jobs:
             automated
             codex
           draft: false
-
-
