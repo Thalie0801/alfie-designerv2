@@ -77,6 +77,18 @@ jobs:
           fi
           echo "OK: no landing changes."
 
+      # NEW: détecte si 'refonte-alfie-2025' existe ; sinon fallback sur 'main'
+      - name: Detect base branch
+        id: base
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --heads origin refonte-alfie-2025 >/dev/null 2>&1; then
+            echo "value=refonte-alfie-2025" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=main" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create Pull Request
         if: ${{ github.event_name != 'pull_request' }}
         uses: peter-evans/create-pull-request@v6
@@ -87,7 +99,7 @@ jobs:
             - Fallback npm ci -> npm install, with lockfile resync if needed.
             - Autopublish disabled.
           branch: codex/refonte-alfie-2025-${{ github.run_id }}
-          base: refonte-alfie-2025
+          base: ${{ steps.base.outputs.value }}
           author: "alfie-codex-bot <codex@alfie.local>"
           committer: "alfie-codex-bot <codex@alfie.local>"
           labels: automated,codex
