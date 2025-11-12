@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,7 +8,6 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-
 import Dashboard from "./pages/Dashboard";
 import Billing from "./pages/Billing";
 import Contact from "./pages/Contact";
@@ -28,12 +28,13 @@ import Templates from "./pages/Templates";
 import Library from "./pages/Library";
 import Videos from "./pages/Videos";
 import CloudinaryTest from "./pages/CloudinaryTest";
-
 import ActivateAccess from "./pages/onboarding/Activate";
-import { AlfieChat } from "./components/AlfieChat"; // si tu gardes /chat
+import { AlfieChat } from "./components/AlfieChat";
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 import { ChatGenerator } from "@/features/studio";
-import { ChatWidget } from "@/components/chat/ChatWidget";
+
+// Lazy load du ChatWidget
+const ChatWidget = lazy(() => import("@/components/chat/ChatWidget"));
 
 const queryClient = new QueryClient();
 
@@ -48,7 +49,6 @@ const AppRoutes = () => {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/legal" element={<Legal />} />
         <Route path="/faq" element={<FAQ />} />
-
         <Route
           path="/brand-kit-questionnaire"
           element={
@@ -59,31 +59,56 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
-
         <Route
-          path="/chat"
+          path="/dashboard"
           element={
             <ProtectedRoute>
               <AppLayoutWithSidebar>
-                <AlfieChat />
+                <Dashboard />
               </AppLayoutWithSidebar>
             </ProtectedRoute>
           }
         />
-
         <Route
-          path="/studio"
+          path="/billing"
           element={
             <ProtectedRoute>
               <AppLayoutWithSidebar>
-                <ChatGenerator />
+                <Billing />
               </AppLayoutWithSidebar>
             </ProtectedRoute>
           }
         />
-
-        <Route path="/app" element={<Navigate to="/studio" replace />} />
-
+        <Route
+          path="/credit-purchase-success"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <CreditPurchaseSuccess />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/affiliate"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <Affiliate />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <Profile />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/templates"
           element={
@@ -117,57 +142,29 @@ const AppRoutes = () => {
         <Route
           path="/cloudinary-test"
           element={
-            <ProtectedRoute requireAdmin>
-              <CloudinaryTest />
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <CloudinaryTest />
+              </AppLayoutWithSidebar>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/dashboard"
+          path="/chat"
           element={
             <ProtectedRoute>
               <AppLayoutWithSidebar>
-                <Dashboard />
+                <AlfieChat />
               </AppLayoutWithSidebar>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/affiliate"
+          path="/studio"
           element={
             <ProtectedRoute>
               <AppLayoutWithSidebar>
-                <Affiliate />
-              </AppLayoutWithSidebar>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <AppLayoutWithSidebar>
-                <Profile />
-              </AppLayoutWithSidebar>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/billing"
-          element={
-            <ProtectedRoute allowPending>
-              <AppLayoutWithSidebar>
-                <Billing />
-              </AppLayoutWithSidebar>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/credit-purchase-success"
-          element={
-            <ProtectedRoute allowPending>
-              <AppLayoutWithSidebar>
-                <CreditPurchaseSuccess />
+                <ChatGenerator />
               </AppLayoutWithSidebar>
             </ProtectedRoute>
           }
@@ -193,7 +190,7 @@ const AppRoutes = () => {
           }
         />
         <Route
-          path="/admin/ambassadors"
+          path="/admin/manage-ambassadors"
           element={
             <ProtectedRoute requireAdmin>
               <AppLayoutWithSidebar>
@@ -228,17 +225,23 @@ const AppRoutes = () => {
   );
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <Toaster />
-    <Sonner />
-    <AuthProvider>
-      <TooltipProvider>
-        <AppRoutes />
-      </TooltipProvider>
-      <ChatWidget />
-    </AuthProvider>
-  </QueryClientProvider>
-);
+// UNE SEULE définition de App
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <AppRoutes />
+          {/* ChatWidget en lazy loading, à l'intérieur de TooltipProvider */}
+          <Suspense fallback={null}>
+            <ChatWidget />
+          </Suspense>
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+}
 
 export default App;
