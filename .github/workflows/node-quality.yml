@@ -17,28 +17,27 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
-      NPM_CONFIG_ALWAYS_AUTH: "false"
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Setup pnpm (use package.json packageManager)
-      # pnpm selon "packageManager" du package.json
+      # pnpm à partir de package.json: "packageManager": "pnpm@x.y.z"
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           run_install: false
 
-      # Node + cache + registry npmjs
       # Node + cache PNPM (nécessite pnpm-lock.yaml)
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
-      # (optionnel) forcer le registry via .npmrc
+      # .npmrc local pour forcer npmjs (évite GitHub Packages → 403)
       - name: Use npmjs registry
         run: |
           cat > .npmrc <<'EONPM'
@@ -48,42 +47,39 @@ jobs:
           always-auth=false
           EONPM
 
-      # Install (avec retry)
-      - name: Install deps
-        run: |
-          pnpm -v
-          pnpm config set registry https://registry.npmjs.org/
-          pnpm install --frozen-lockfile || pnpm install
-
-      - name: TypeScript
-        run: pnpm typecheck || true   # on ne bloque pas la suite
-
-      - name: ESLint (skippable)
-      - name: Confirm registry
-        run: |
-          echo "Using registry:" && npm config get registry
-          cat .npmrc || true
-
-      # Install robuste (retries)
+      # Install robuste avec retries
       - name: Install deps (with cache + retry)
         run: |
+          pnpm -v
           pnpm config set registry https://registry.npmjs.org/
           pnpm config set fetch-retries 5
           pnpm config set fetch-retry-factor 2
           pnpm config set fetch-timeout 60000
-          pnpm install --frozen-lockfile || pnpm install
+          if [ -f pnpm-lock.yaml ]; then FROZEN="--frozen-lockfile"; else FROZEN=""; fi
+          for i in 1 2 3; do
+            echo "pnpm install (attempt $i)…"
+            pnpm install $FROZEN && DONE=1 && break || true
+            sleep 5
+          done
+          if [ -z "$DONE" ]; then
+            echo "Last attempt without frozen lockfile…"
+            pnpm install
+          fi
 
       - name: TypeScript
         run: pnpm typecheck || true
 
-      - name: ESLint (skippable si plugins manquants)
+      - name: ESLint (skippable)
         run: |
           if pnpm lint; then
             echo "Lint OK"
           else
-            echo "⚠️ Lint skipped (registry or dependency issue)"
             echo "⚠️ Lint skipped (plugins/registry)."
           fi
+
+      - name: Build
+        run: pnpm build
+
 
       - name: Build
         run: pnpm build
