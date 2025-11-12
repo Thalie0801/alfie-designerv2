@@ -1,97 +1,369 @@
-name: Refonte Codex (push→pull, disable autopublish)
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { useState } from "react";
+import { MessageCircle, X } from "lucide-react";
+import { AuthProvider } from "@/hooks/useAuth";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import Index from "./pages/Index";
+import Auth from "./pages/Auth";
 
-on:
-  workflow_dispatch: {}
-  push:
-    branches:
-      - main
-      - refonte-alfie-2025
-  pull_request:
-    branches:
-      - main
-      - refonte-alfie-2025
+import Dashboard from "./pages/Dashboard";
+import Billing from "./pages/Billing";
+import Contact from "./pages/Contact";
+import CreditPurchaseSuccess from "./pages/CreditPurchaseSuccess";
+import Admin from "./pages/Admin";
+import AdminCreateCustomerPage from "./pages/admin/CreateCustomer";
+import ManageAmbassadors from "./pages/admin/ManageAmbassadors";
+import ResetUserPassword from "./pages/admin/ResetUserPassword";
+import Affiliate from "./pages/Affiliate";
+import Profile from "./pages/Profile";
+import DevenirPartenaire from "./pages/DevenirPartenaire";
+import Privacy from "./pages/Privacy";
+import Legal from "./pages/Legal";
+import FAQ from "./pages/FAQ";
+import BrandKitQuestionnaire from "./pages/BrandKitQuestionnaire";
+import NotFound from "./pages/NotFound";
+import Templates from "./pages/Templates";
+import Library from "./pages/Library";
+import Videos from "./pages/Videos";
+import CloudinaryTest from "./pages/CloudinaryTest";
 
-permissions:
-  contents: write
-  pull-requests: write
+import ActivateAccess from "./pages/onboarding/Activate";
+import { AlfieChat } from "./components/AlfieChat";
+import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
+import { ChatGenerator } from "@/features/studio";
 
-jobs:
-  codex:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+const queryClient = new QueryClient();
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
+/** --- ChatWidget inline (guidance uniquement, couleurs Alfie) --- */
+function ChatWidget() {
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState("");
+  const [msgs, setMsgs] = useState<{ role: "user" | "assistant"; text: string }[]>([]);
 
-      - name: Configure npm auth (optional)
-        if: ${{ secrets.NPM_TOKEN }}
-        run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+  // Palette Alfie
+  const BRAND = {
+    mint: "#90E3C2",
+    mintDark: "#66C9A6",
+    light: "#F5F5F5",
+    text: "#000000",
+  } as const;
 
-      - name: Force public npm registry
-        run: npm config set registry https://registry.npmjs.org/
-      - name: Install dependencies
-        run: npm ci --prefer-online
-      - name: Run Codex
-        shell: bash
-        run: |
-          bash scripts/codex/run.sh
+  function handleSend() {
+    const text = input.trim();
+    if (!text) return;
+    setMsgs((m) => [...m, { role: "user", text }]);
+    setInput("");
+    const reply =
+      "Top ! Je t’aide à cadrer. Précise : format (image/carrousel/vidéo), ratio (1:1/9:16/16:9), ton (sobre/fun), et CTA.\n" +
+      "Quand c’est bon, va dans **Studio** pour lancer la génération ✨";
+    setTimeout(() => {
+      setMsgs((m) => [...m, { role: "assistant", text: reply }]);
+    }, 200);
+  }
 
-      # GARDE SIMPLE & FIABLE : bloque toute modif dans apps/landing/, www/, site/
-      - name: Guard: No landing changes
-        shell: bash
-        run: |
-          set -euo pipefail
+  return (
+    <>
+      {!open && (
+        <button
+          onClick={() => setOpen(true)}
+          className="fixed bottom-4 right-4 z-50 rounded-full shadow-lg w-12 h-12 grid place-items-center hover:scale-105 transition"
+          style={{ background: `linear-gradient(135deg, ${BRAND.mint}, ${BRAND.mintDark})`, color: "white" }}
+          aria-label="Ouvrir Alfie Chat"
+        >
+          <MessageCircle className="w-6 h-6" />
+        </button>
+      )}
 
-          # Etat git stable (inclut non suivis avec "??")
-          CHANGED="$(git -c core.quotepath=false status --porcelain)"
+      {open && (
+        <div
+          className="fixed bottom-4 right-4 z-50 w-[360px] max-w-[95vw] h-[520px] rounded-2xl shadow-2xl border flex flex-col"
+          style={{ background: BRAND.light, borderColor: "#e5e7eb" }}
+        >
+          <div
+            className="flex items-center justify-between p-3 border-b"
+            style={{ background: `${BRAND.mint}22`, borderColor: "#e5e7eb" }}
+          >
+            <div className="font-medium" style={{ color: BRAND.text }}>
+              Alfie Chat (conseils)
+            </div>
+            <button
+              onClick={() => setOpen(false)}
+              className="p-2 rounded"
+              style={{ color: BRAND.text, background: "transparent" }}
+              aria-label="Fermer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
 
-          # Rien à signaler
-          if [ -z "${CHANGED}" ]; then
-            echo "OK: aucune modification détectée."
-            exit 0
-          fi
+          <div className="flex-1 overflow-auto p-3 space-y-3" style={{ color: "#1f2937" }}>
+            {msgs.length === 0 ? (
+              <p className="text-sm">Une idée en tête ? Je l’affine avec toi. La fabrication, c’est côté Studio ✨</p>
+            ) : (
+              <div className="space-y-2">
+                {msgs.map((m, i) => (
+                  <div key={i} className={m.role === "user" ? "text-right" : "text-left"}>
+                    <span
+                      className={
+                        "inline-block rounded-2xl px-3 py-2 text-sm " +
+                        (m.role === "user" ? "bg-white border" : "bg-[rgba(144,227,194,0.18)] border")
+                      }
+                      style={{ borderColor: "#e5e7eb" }}
+                    >
+                      {m.text}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-          # Extrait les chemins (gère ?? et renommages Rxxx old -> new)
-          FILES="$(echo "${CHANGED}" | awk '
-            $1 ~ /^\?\?/ { $1=""; sub(/^ +/,""); print; next }
-            $1 ~ /^R/   { match($0, /-> (.*)$/, m); if (m[1]!="") print m[1]; next }
-            { $1=""; sub(/^ +/,""); print }')"
+          <div className="p-3 border-t flex gap-2">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              className="flex-1 rounded-md border px-3 py-2 text-sm focus:outline-none"
+              style={{ borderColor: "#e5e7eb", boxShadow: "0 0 0 0 rgba(0,0,0,0)" }}
+              onFocus={(e) => (e.currentTarget.style.boxShadow = `0 0 0 3px ${BRAND.mint}55`)}
+              onBlur={(e) => (e.currentTarget.style.boxShadow = "0 0 0 0 rgba(0,0,0,0)")}
+              placeholder="Pose une question…"
+            />
+            <button
+              onClick={handleSend}
+              className="px-3 py-2 rounded-md text-sm font-medium text-white"
+              style={{ background: `linear-gradient(135deg, ${BRAND.mint}, ${BRAND.mintDark})` }}
+              disabled={!input.trim()}
+            >
+              Envoyer
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
-          # Filtre dossiers interdits (slash requis pour cibler le dossier)
-          if echo "${FILES}" | grep -E -q '^(apps/landing/|www/|site/)'; then
-            echo "::error title=Landing modifiée::Ce patch ne doit pas toucher la landing."
-            echo "Fichiers concernés :"
-            echo "${FILES}" | grep -E '^(apps/landing/|www/|site/)' | sed 's/^/ - /'
-            exit 1
-          fi
+const AppRoutes = () => {
+  const { pathname } = useLocation();
+  // Masquer la bulle sur la landing et la page login
+  const hideChatWidget = pathname === "/" || pathname === "/auth";
 
-          echo "OK: aucune modification dans apps/landing, www ou site."
+  return (
+    <>
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/devenir-partenaire" element={<DevenirPartenaire />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/legal" element={<Legal />} />
+        <Route path="/faq" element={<FAQ />} />
 
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
-        with:
-          commit-message: "Codex: push→pull, autopublish off, premium confirmation flag"
-          title: "Codex: push→pull, autopublish off, premium confirmation flag"
-          body: |
-            Cette PR est générée par le workflow Codex.
-            - Passage du flux push ➜ pull request
-            - Autopublish désactivé
-            - Ajout du flag de confirmation premium
-          branch: codex/refonte-alfie-2025-${{ github.run_id }}
-          base: refonte-alfie-2025
-          author: "alfie-codex-bot <codex@alfie.local>"
-          committer: "alfie-codex-bot <codex@alfie.local>"
-          labels: |
-            automated
-            codex
-          draft: false
+        <Route
+          path="/brand-kit-questionnaire"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <BrandKitQuestionnaire />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Route chat historique (non visible dans le menu) */}
+        <Route
+          path="/chat"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <AlfieChat />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/studio"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <ChatGenerator />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Rediriger /app vers /studio */}
+        <Route path="/app" element={<Navigate to="/studio" replace />} />
+
+        <Route
+          path="/templates"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <Templates />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/library"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <Library />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/videos"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <Videos />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cloudinary-test"
+          element={
+            <ProtectedRoute requireAdmin>
+              <CloudinaryTest />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <Dashboard />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/affiliate"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <Affiliate />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <Profile />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/billing"
+          element={
+            <ProtectedRoute allowPending>
+              <AppLayoutWithSidebar>
+                <Billing />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/credit-purchase-success"
+          element={
+            <ProtectedRoute allowPending>
+              <AppLayoutWithSidebar>
+                <CreditPurchaseSuccess />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute requireAdmin>
+              <AppLayoutWithSidebar>
+              <Admin />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/create-customer"
+          element={
+            <ProtectedRoute requireAdmin>
+              <AppLayoutWithSidebar>
+                <AdminCreateCustomerPage />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/ambassadors"
+          element={
+            <ProtectedRoute requireAdmin>
+              <AppLayoutWithSidebar>
+                <ManageAmbassadors />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/reset-password"
+          element={
+            <ProtectedRoute requireAdmin>
+              <AppLayoutWithSidebar>
+                <ResetUserPassword />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/onboarding/activate"
+          element={
+            <ProtectedRoute allowPending={true}>
+              <AppLayoutWithSidebar>
+                <ActivateAccess />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+
+      {/* Bulle de chat visible uniquement "à l’intérieur" */}
+      {!hideChatWidget && <ChatWidget />}
+    </>
+  );
+};
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <Toaster />
+    <Sonner />
+    <AuthProvider>
+      <TooltipProvider>
+        <AppRoutes />
+      </TooltipProvider>
+    </AuthProvider>
+  </QueryClientProvider>
+);
+
+export default App;
 
