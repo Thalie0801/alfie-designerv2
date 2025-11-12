@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
@@ -30,20 +30,13 @@ import Videos from "./pages/Videos";
 import CloudinaryTest from "./pages/CloudinaryTest";
 
 import ActivateAccess from "./pages/onboarding/Activate";
-import { AlfieChat } from "./components/AlfieChat"; // historique si tu gardes la page /chat
+import { AlfieChat } from "./components/AlfieChat"; // si tu gardes /chat
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 import { ChatGenerator } from "@/features/studio";
-
-// 👉 nouveau widget
-import { ChatWidget } from "@/components/chat/ChatWidget";
 
 const queryClient = new QueryClient();
 
 const AppRoutes = () => {
-  const { pathname } = useLocation();
-  // Pas de bulle sur landing et sur /auth
-  const hideChatWidget = pathname === "/" || pathname === "/auth";
-
   return (
     <>
       <Routes>
@@ -66,7 +59,6 @@ const AppRoutes = () => {
           }
         />
 
-        {/* Route chat historique si besoin */}
         <Route
           path="/chat"
           element={
@@ -89,7 +81,6 @@ const AppRoutes = () => {
           }
         />
 
-        {/* Redirection legacy */}
         <Route path="/app" element={<Navigate to="/studio" replace />} />
 
         <Route
@@ -232,9 +223,6 @@ const AppRoutes = () => {
         />
         <Route path="*" element={<NotFound />} />
       </Routes>
-
-      {/* Bulle d’aide (guidance + concierge) */}
-      {!hideChatWidget && <ChatWidget />}
     </>
   );
 };
