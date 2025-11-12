@@ -42,23 +42,21 @@ jobs:
           set -euo pipefail
           bash scripts/codex/run.sh
 
-      - name: Guard: No landing changes
+      # Bloque toute modif dans apps/landing/, www/ ou site/
+      - name: Guard - no landing changes
         shell: bash
         run: |
           set -euo pipefail
-          CHANGED="$(git -c core.quotepath=false status --porcelain || true)"
-          if [ -z "${CHANGED}" ]; then
+          # liste fichiers modifiés (-m) + non suivis (-o)
+          FILES="$(git ls-files -m -o --exclude-standard || true)"
+          if [ -z "$FILES" ]; then
             echo "OK: aucune modification détectée."
             exit 0
           fi
-          FILES="$(echo "${CHANGED}" | awk '
-            $1 ~ /^\?\?/ { $1=""; sub(/^ +/,""); print; next }
-            $1 ~ /^R/   { match($0, /-> (.*)$/, m); if (m[1]!="") print m[1]; next }
-            { $1=""; sub(/^ +/,""); print }')"
-          if echo "${FILES}" | grep -E -q '^(apps/landing/|www/|site/)'; then
+          if echo "$FILES" | grep -E -q '^(apps/landing/|www/|site/)'; then
             echo "::error title=Landing modifiée::Ce patch ne doit pas toucher la landing."
             echo "Fichiers concernés :"
-            echo "${FILES}" | grep -E '^(apps/landing/|www/|site/)' | sed 's/^/ - /'
+            echo "$FILES" | grep -E '^(apps/landing/|www/|site/)' | sed 's/^/ - /'
             exit 1
           fi
           echo "OK: aucune modification dans apps/landing, www ou site."
@@ -82,4 +80,5 @@ jobs:
             automated
             codex
           draft: false
+
 
