@@ -38,34 +38,36 @@ jobs:
 
       - name: Force public npm registry
         run: npm config set registry https://registry.npmjs.org/
+
       - name: Install dependencies
         run: npm ci --prefer-online
+
       - name: Run Codex
         shell: bash
         run: |
           bash scripts/codex/run.sh
 
       # GARDE SIMPLE & FIABLE : bloque toute modif dans apps/landing/, www/, site/
-      - name: Guard: No landing changes
+      - name: Guard - No landing changes
         shell: bash
         run: |
           set -euo pipefail
-
+          
           # Etat git stable (inclut non suivis avec "??")
           CHANGED="$(git -c core.quotepath=false status --porcelain)"
-
+          
           # Rien à signaler
           if [ -z "${CHANGED}" ]; then
             echo "OK: aucune modification détectée."
             exit 0
           fi
-
+          
           # Extrait les chemins (gère ?? et renommages Rxxx old -> new)
           FILES="$(echo "${CHANGED}" | awk '
-            $1 ~ /^\?\?/ { $1=""; sub(/^ +/,""); print; next }
-            $1 ~ /^R/   { match($0, /-> (.*)$/, m); if (m[1]!="") print m[1]; next }
-            { $1=""; sub(/^ +/,""); print }')"
-
+          $1 ~ /^\?\?/ { $1=""; sub(/^ +/,""); print; next }
+          $1 ~ /^R/ { match($0, /-> (.*)$/, m); if (m[1]!="") print m[1]; next }
+          { $1=""; sub(/^ +/,""); print }')"
+          
           # Filtre dossiers interdits (slash requis pour cibler le dossier)
           if echo "${FILES}" | grep -E -q '^(apps/landing/|www/|site/)'; then
             echo "::error title=Landing modifiée::Ce patch ne doit pas toucher la landing."
@@ -73,7 +75,7 @@ jobs:
             echo "${FILES}" | grep -E '^(apps/landing/|www/|site/)' | sed 's/^/ - /'
             exit 1
           fi
-
+          
           echo "OK: aucune modification dans apps/landing, www ou site."
 
       - name: Create Pull Request
@@ -83,6 +85,7 @@ jobs:
           title: "Codex: push→pull, autopublish off, premium confirmation flag"
           body: |
             Cette PR est générée par le workflow Codex.
+            
             - Passage du flux push ➜ pull request
             - Autopublish désactivé
             - Ajout du flag de confirmation premium
@@ -94,4 +97,3 @@ jobs:
             automated
             codex
           draft: false
-
