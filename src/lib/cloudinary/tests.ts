@@ -7,7 +7,7 @@
 
 import { ping, sign } from './upload';
 import { slideUrl } from './imageUrls';
-import { videoUrl, simpleVideoUrl } from './videoUrls';
+import { simpleVideoUrl } from './videoUrls';
 
 export interface TestResult {
   name: string;

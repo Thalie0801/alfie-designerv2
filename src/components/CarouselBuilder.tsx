@@ -96,8 +96,6 @@ export function CarouselBuilder({ brandId, campaignId, onSlideCreated }: Carouse
         title,
         subtitle,
         bulletPoints: bullets.filter(b => b.trim() !== ''),
-        width: 1080,
-        height: 1920,
         aspectRatio: '9:16',
         cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string || 'dkad5vdyo',
       })

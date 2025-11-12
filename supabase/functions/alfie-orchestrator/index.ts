@@ -42,6 +42,20 @@ serve(async (req) => {
 
     console.log('[ORCH] 📩 Received:', { session_id, brand_id, msg: user_message?.substring(0, 50) });
 
+    // === DETECT VIDEO INTENTION FIRST ===
+    const forceTool = body.forceTool as 'generate_video' | undefined;
+    const VIDEO_RE = /\b(vid[ée]o|reel|r[ée]el|tiktok|shorts?|clip)\b/i;
+    
+    if (forceTool === 'generate_video' || VIDEO_RE.test(user_message || '')) {
+      console.log('[ORCH] 🎬 Video intent detected, asking for format');
+      return json({
+        response: '🎬 Tu veux quel format vidéo ? 9:16 (vertical TikTok/Reel) ou 16:9 (paysage YouTube) ?',
+        quickReplies: ['9:16', '16:9'],
+        conversationId: session_id || null,
+        state: 'awaiting_format'
+      });
+    }
+
     // Auth
     const authHeader = req.headers.get('authorization');
     if (!authHeader) throw new Error('Missing authorization');

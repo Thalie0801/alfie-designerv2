@@ -31,7 +31,7 @@ export function slideUrl(publicId: string, o: SlideUrlOptions): string {
   }
 
   const { w, h } = dims(o.aspectRatio);
-  const base = `w_${w},h_${h},c_fill,r_20,f_png`;
+  const base = `w_${w},h_${h},c_fill,f_png`;
   const overlays: string[] = [];
 
   const title = cleanText(o.title ?? '', 120);
