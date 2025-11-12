@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    const { data, error } = await supabaseAdmin.rpc('reset_stuck_jobs', { timeout_minutes: 5, max_attempts: 3 });
+    const { data, error } = await supabaseAdmin.rpc('reset_stuck_jobs', { age_minutes: 5 });
 
     if (error) {
       console.error('[ADMIN] Error resetting stuck jobs:', error);
@@ -73,19 +73,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    const summary = Array.isArray(data) ? data[0] : data;
-    const resetCount = summary?.reset_count ?? 0;
-    const failedCount = summary?.failed_count ?? 0;
-
-    console.log('[ADMIN] ✅ Reset stuck jobs:', { resetCount, failedCount });
+    console.log('[ADMIN] ✅ Reset stuck jobs:', data);
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        reset_count: resetCount,
-        failed_count: failedCount,
-        message: `${resetCount} job(s) relancé(s), ${failedCount} marqué(s) en échec`
-      }),
+      JSON.stringify({ 
+        success: true, 
+        reset_count: data || 0,
+        message: `${data || 0} job(s) débloqué(s)` 
+      }), 
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

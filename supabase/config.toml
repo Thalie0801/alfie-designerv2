@@ -2,10 +2,7 @@ project_id = "itsjonazifiiikozengd"
 
 [functions.alfie-job-worker]
 verify_jwt = false
-schedule = "*/2 * * * *"
-
-[functions.trigger-job-worker]
-verify_jwt = true
+schedule = "*/10 * * * * *"
 
 
 [functions.creations-api]

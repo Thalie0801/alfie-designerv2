@@ -183,6 +183,7 @@ serve(async (req) => {
     if (!prompt) missing.push("prompt");
     if (!globalStyle) missing.push("globalStyle");
     if (!slideContent?.title) missing.push("slideContent.title");
+    if (!slideContent?.alt) missing.push("slideContent.alt");
     if (!brandId) missing.push("brandId");
     if (!orderId) missing.push("orderId");
     if (!carouselId) missing.push("carouselId");
@@ -248,11 +249,9 @@ serve(async (req) => {
     if (!normTitle) {
       return json({ error: "slideContent.title cannot be empty after normalization" }, 400);
     }
-    
-    // Generate alt text if missing
-    const altText = slideContent.alt && String(slideContent.alt).trim()
-      ? String(slideContent.alt).trim()
-      : normTitle || normSubtitle || "Carousel slide image";
+    if (!slideContent.alt || !String(slideContent.alt).trim()) {
+      return json({ error: "slideContent.alt is required" }, 400);
+    }
 
     // =========================================
     // STEP 1/4 — Upload texte JSON (RAW)
@@ -263,7 +262,7 @@ serve(async (req) => {
         title: normTitle,
         subtitle: normSubtitle,
         bullets: normBullets,
-        alt: altText,
+        alt: slideContent.alt,
       },
       {
         brandId,
@@ -409,7 +408,6 @@ serve(async (req) => {
           title: normTitle,
           subtitle: normSubtitle,
           bullets: normBullets,
-          alt: altText,
           slideIndex,
           renderVersion,
           textVersion,
@@ -434,7 +432,7 @@ serve(async (req) => {
         title: normTitle,
         subtitle: normSubtitle,
         bullets: normBullets,
-        alt: altText,
+        alt: slideContent.alt,
         text_public_id: textPublicId,
         text_version: textVersion,
         render_version: renderVersion,
@@ -466,7 +464,6 @@ serve(async (req) => {
         title: normTitle,
         subtitle: normSubtitle,
         bullets: normBullets,
-        alt: altText,
         slideIndex,
         totalSlides,
         renderVersion,

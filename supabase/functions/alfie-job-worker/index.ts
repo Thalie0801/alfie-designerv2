@@ -4,7 +4,6 @@ import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-
 import { uploadToCloudinary } from "../_shared/cloudinaryUploader.ts";
 import { consumeBrandQuotas } from "../_shared/quota.ts";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, INTERNAL_FN_SECRET } from "../_shared/env.ts";
-import { attachJobIdempotency } from "../_shared/idempotency.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,10 +20,6 @@ type JobRow = {
   max_retries: number | null;
   payload: any;
   error?: string | null;
-  attempts?: number | null;
-  locked_by?: string | null;
-  started_at?: string | null;
-  idempotency_key?: string | null;
 };
 
 const supabaseAdmin = createClient(
@@ -174,24 +169,23 @@ serve(async (req) => {
     console.log("[WORKER] Boot: " + (queued ?? 0) + " jobs queued in job_queue");
 
     // Process a small batch to avoid function timeout
-    const workerId = `worker-${crypto.randomUUID().slice(0, 8)}`;
     const results: Array<{ job_id: string; success: boolean; error?: string; retried?: boolean }> = [];
     const maxJobs = 5;
     let processed = 0;
 
     for (let i = 0; i < maxJobs; i++) {
-      const { data: claimed, error: claimError } = await supabaseAdmin.rpc("claim_next_job", { worker_id: workerId });
+      const { data: claimed, error: claimError } = await supabaseAdmin.rpc("claim_next_job");
       if (claimError) {
         console.error("❌ claim_next_job", claimError);
         break;
       }
-      const job = claimed as JobRow | null;
-      if (!job) {
+      if (!claimed || claimed.length === 0) {
         if ((queued ?? 0) > 0) console.warn("🧪 claim_empty_but_queued_gt0");
         console.log(`ℹ️ No more jobs to process (processed ${processed})`);
         break;
       }
 
+      const job: JobRow = claimed[0];
       console.log("🟢 start_job", { id: job.id, type: job.type, order_id: job.order_id });
 
       try {
@@ -216,15 +210,7 @@ serve(async (req) => {
 
         await supabaseAdmin
           .from("job_queue")
-          .update({
-            status: "completed",
-            result,
-            updated_at: new Date().toISOString(),
-            locked_by: null,
-            started_at: null,
-            attempts: 0,
-            error: null,
-          })
+          .update({ status: "completed", result, updated_at: new Date().toISOString() })
           .eq("id", job.id);
 
         console.log("✅ job_done", { id: job.id, type: job.type });
@@ -271,11 +257,7 @@ serve(async (req) => {
               status: "queued",
               retry_count: retryCount + 1,
               error: message,
-              result: null,
               updated_at: new Date().toISOString(),
-              locked_by: null,
-              started_at: null,
-              attempts: 0,
             })
             .eq("id", job.id);
 
@@ -287,10 +269,7 @@ serve(async (req) => {
             .update({
               status: "failed",
               error: message,
-              result: null,
               updated_at: new Date().toISOString(),
-              locked_by: null,
-              started_at: null,
             })
             .eq("id", job.id);
 
@@ -899,15 +878,22 @@ async function createCascadeJobs(job: JobRow, result: any, sb: SupabaseClient) {
     });
 
     if (cascadeJobs.length) {
-      const keyedJobs = cascadeJobs.map((job) => attachJobIdempotency(job));
-      const { data: inserted, error: insErr } = await sb
+      const { data: existing } = await sb
         .from("job_queue")
-        .upsert(keyedJobs, { onConflict: "idempotency_key", ignoreDuplicates: true })
-        .select("id");
-      if (insErr) console.error("❌ fallback cascade insert", insErr);
-      else if (inserted && inserted.length) {
-        console.log(`✅ fallback cascade created: ${inserted.length}`);
-        await safeReinvoke(sb);
+        .select("id, type, status")
+        .eq("order_id", job.order_id)
+        .in("status", ["queued", "running"]);
+
+      const existingKeys = new Set(existing?.map((j: any) => `${j.type}_${j.status}`) || []);
+      const toInsert = cascadeJobs.filter((j) => !existingKeys.has(`${j.type}_${j.status}`));
+
+      if (toInsert.length) {
+        const { error: insErr } = await sb.from("job_queue").insert(toInsert);
+        if (insErr) console.error("❌ fallback cascade insert", insErr);
+        else {
+          console.log(`✅ fallback cascade created: ${toInsert.length}`);
+          await safeReinvoke(sb);
+        }
       } else {
         console.log("ℹ️ fallback: all jobs already exist");
       }
@@ -964,17 +950,11 @@ async function createCascadeJobs(job: JobRow, result: any, sb: SupabaseClient) {
     const toInsert = toCreate.filter((j) => !existingKeys.has(`${j.type}_${j.status}`));
 
     if (toInsert.length) {
-      const keyedJobs = toInsert.map((job) => attachJobIdempotency(job));
-      const { data: insertedJobs, error: insErr } = await sb
-        .from("job_queue")
-        .upsert(keyedJobs, { onConflict: "idempotency_key", ignoreDuplicates: true })
-        .select("id");
+      const { error: insErr } = await sb.from("job_queue").insert(toInsert);
       if (insErr) console.error("❌ cascade insert", insErr);
-      else if (insertedJobs && insertedJobs.length) {
-        console.log(`✅ cascade created: ${insertedJobs.length}`);
+      else {
+        console.log(`✅ cascade created: ${toInsert.length}`);
         await safeReinvoke(sb);
-      } else {
-        console.log("ℹ️ cascade: jobs already exist");
       }
     } else {
       console.log("ℹ️ cascade: jobs already exist");
@@ -1017,30 +997,26 @@ async function safeReinvoke(sb: SupabaseClient) {
 /**
  * 🔧 SQL attendu côté DB pour claim_next_job:
  *
- * create or replace function claim_next_job(worker_id text)
- * returns job_queue
+ * create or replace function claim_next_job()
+ * returns setof job_queue
  * language plpgsql
  * as $$
- * declare claimed job_queue%rowtype;
+ * declare r job_queue%rowtype;
  * begin
- *   with next_job as (
+ *   update job_queue
+ *   set status = 'running',
+ *       updated_at = now()
+ *   where id in (
  *     select id from job_queue
  *     where status = 'queued'
  *     order by created_at asc
  *     limit 1
  *     for update skip locked
  *   )
- *   update job_queue
- *   set status = 'running',
- *       locked_by = worker_id,
- *       started_at = now(),
- *       attempts = coalesce(attempts, 0) + 1,
- *       updated_at = now()
- *   from next_job
- *   where job_queue.id = next_job.id
- *   returning job_queue.* into claimed;
- *
- *   return claimed;
+ *   returning * into r;
+ *   if found then
+ *     return next r;
+ *   end if;
  * end;
  * $$;
  */
