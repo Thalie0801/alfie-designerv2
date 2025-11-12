@@ -38,9 +38,12 @@ import { ChatGenerator } from "@/features/studio";
 
 const queryClient = new QueryClient();
 
-/** --- ChatWidget inline (guidance uniquement) --- */
+/** --- ChatWidget inline (guidance uniquement, couleurs Alfie) --- */
 function ChatWidget() {
   const [open, setOpen] = useState(false);
+  const [input, setInput] = useState("");
+  const [msgs, setMsgs] = useState<{ role: "user" | "assistant"; text: string }[]>([]);
+
   // Palette Alfie
   const BRAND = {
     mint: "#90E3C2",
@@ -48,6 +51,19 @@ function ChatWidget() {
     light: "#F5F5F5",
     text: "#000000",
   } as const;
+
+  function handleSend() {
+    const text = input.trim();
+    if (!text) return;
+    setMsgs((m) => [...m, { role: "user", text }]);
+    setInput("");
+    const reply =
+      "Top ! Je t’aide à cadrer. Précise : format (image/carrousel/vidéo), ratio (1:1/9:16/16:9), ton (sobre/fun), et CTA.\n" +
+      "Quand c’est bon, va dans **Studio** pour lancer la génération ✨";
+    setTimeout(() => {
+      setMsgs((m) => [...m, { role: "assistant", text: reply }]);
+    }, 200);
+  }
 
   return (
     <>
@@ -85,17 +101,51 @@ function ChatWidget() {
           </div>
 
           <div className="flex-1 overflow-auto p-3 space-y-3" style={{ color: "#1f2937" }}>
-            <p className="text-sm">Une idée en tête ? Je l’affine avec toi. La fabrication, c’est côté Studio ✨</p>
+            {msgs.length === 0 ? (
+              <p className="text-sm">Une idée en tête ? Je l’affine avec toi. La fabrication, c’est côté Studio ✨</p>
+            ) : (
+              <div className="space-y-2">
+                {msgs.map((m, i) => (
+                  <div key={i} className={m.role === "user" ? "text-right" : "text-left"}>
+                    <span
+                      className={
+                        "inline-block rounded-2xl px-3 py-2 text-sm " +
+                        (m.role === "user" ? "bg-white border" : "bg-[rgba(144,227,194,0.18)] border")
+                      }
+                      style={{ borderColor: "#e5e7eb" }}
+                    >
+                      {m.text}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="p-3 border-t">
+          <div className="p-3 border-t flex gap-2">
             <input
-              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              className="flex-1 rounded-md border px-3 py-2 text-sm focus:outline-none"
               style={{ borderColor: "#e5e7eb", boxShadow: "0 0 0 0 rgba(0,0,0,0)" }}
               onFocus={(e) => (e.currentTarget.style.boxShadow = `0 0 0 3px ${BRAND.mint}55`)}
               onBlur={(e) => (e.currentTarget.style.boxShadow = "0 0 0 0 rgba(0,0,0,0)")}
               placeholder="Pose une question…"
             />
+            <button
+              onClick={handleSend}
+              className="px-3 py-2 rounded-md text-sm font-medium text-white"
+              style={{ background: `linear-gradient(135deg, ${BRAND.mint}, ${BRAND.mintDark})` }}
+              disabled={!input.trim()}
+            >
+              Envoyer
+            </button>
           </div>
         </div>
       )}
