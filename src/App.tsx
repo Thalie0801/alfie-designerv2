@@ -41,33 +41,59 @@ const queryClient = new QueryClient();
 /** --- ChatWidget inline (guidance uniquement) --- */
 function ChatWidget() {
   const [open, setOpen] = useState(false);
+  // Palette Alfie
+  const BRAND = {
+    mint: "#90E3C2",
+    mintDark: "#66C9A6",
+    light: "#F5F5F5",
+    text: "#000000",
+  } as const;
+
   return (
     <>
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-4 right-4 z-50 rounded-full shadow-lg bg-black text-white w-12 h-12 grid place-items-center hover:scale-105 transition"
+          className="fixed bottom-4 right-4 z-50 rounded-full shadow-lg w-12 h-12 grid place-items-center hover:scale-105 transition"
+          style={{ background: `linear-gradient(135deg, ${BRAND.mint}, ${BRAND.mintDark})`, color: "white" }}
           aria-label="Ouvrir Alfie Chat"
         >
           <MessageCircle className="w-6 h-6" />
         </button>
       )}
+
       {open && (
-        <div className="fixed bottom-4 right-4 z-50 w-[360px] max-w-[95vw] h-[520px] rounded-2xl shadow-2xl border bg-white flex flex-col">
-          <div className="flex items-center justify-between p-3 border-b">
-            <div className="font-medium">Alfie Chat (conseils)</div>
-            <button onClick={() => setOpen(false)} className="p-2 rounded hover:bg-gray-100" aria-label="Fermer">
+        <div
+          className="fixed bottom-4 right-4 z-50 w-[360px] max-w-[95vw] h-[520px] rounded-2xl shadow-2xl border flex flex-col"
+          style={{ background: BRAND.light, borderColor: "#e5e7eb" }}
+        >
+          <div
+            className="flex items-center justify-between p-3 border-b"
+            style={{ background: `${BRAND.mint}22`, borderColor: "#e5e7eb" }}
+          >
+            <div className="font-medium" style={{ color: BRAND.text }}>
+              Alfie Chat (conseils)
+            </div>
+            <button
+              onClick={() => setOpen(false)}
+              className="p-2 rounded"
+              style={{ color: BRAND.text, background: "transparent" }}
+              aria-label="Fermer"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
-          <div className="flex-1 overflow-auto p-3 space-y-3">
-            <p className="text-sm text-gray-600">
-              Pose-moi une question sur tes visuels, formats, idées… Je ne lance pas la génération — je te guide.
-            </p>
+
+          <div className="flex-1 overflow-auto p-3 space-y-3" style={{ color: "#1f2937" }}>
+            <p className="text-sm">Une idée en tête ? Je l’affine avec toi. La fabrication, c’est côté Studio ✨</p>
           </div>
+
           <div className="p-3 border-t">
             <input
-              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring"
+              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none"
+              style={{ borderColor: "#e5e7eb", boxShadow: "0 0 0 0 rgba(0,0,0,0)" }}
+              onFocus={(e) => (e.currentTarget.style.boxShadow = `0 0 0 3px ${BRAND.mint}55`)}
+              onBlur={(e) => (e.currentTarget.style.boxShadow = "0 0 0 0 rgba(0,0,0,0)")}
               placeholder="Pose une question…"
             />
           </div>
@@ -79,7 +105,7 @@ function ChatWidget() {
 
 const AppRoutes = () => {
   const { pathname } = useLocation();
-  // ❗️On cache la bulle sur la landing et la page de connexion uniquement
+  // Masquer la bulle sur la landing et la page login
   const hideChatWidget = pathname === "/" || pathname === "/auth";
 
   return (
@@ -104,7 +130,7 @@ const AppRoutes = () => {
           }
         />
 
-        {/* Route historique du chat (conservée mais plus dans la sidebar) */}
+        {/* Route chat historique (non visible dans le menu) */}
         <Route
           path="/chat"
           element={
@@ -271,7 +297,7 @@ const AppRoutes = () => {
         <Route path="*" element={<NotFound />} />
       </Routes>
 
-      {/* Bulle de chat visible uniquement "à l'intérieur" */}
+      {/* Bulle de chat visible uniquement "à l’intérieur" */}
       {!hideChatWidget && <ChatWidget />}
     </>
   );
