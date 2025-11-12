@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -33,6 +34,8 @@ import ActivateAccess from "./pages/onboarding/Activate";
 import { AlfieChat } from "./components/AlfieChat"; // si tu gardes /chat
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 import { ChatGenerator } from "@/features/studio";
+
+const ChatWidget = lazy(() => import("@/components/chat/ChatWidget"));
 
 const queryClient = new QueryClient();
 
@@ -227,16 +230,21 @@ const AppRoutes = () => {
   );
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <Toaster />
-    <Sonner />
-    <AuthProvider>
-      <TooltipProvider>
-        <AppRoutes />
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Toaster />
+      <Sonner />
+      <AuthProvider>
+        <TooltipProvider>
+          <AppRoutes />
+        </TooltipProvider>
+        <Suspense fallback={null}>
+          <ChatWidget />
+        </Suspense>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+}
 
 export default App;
