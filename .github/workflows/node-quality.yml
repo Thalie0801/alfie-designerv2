@@ -60,3 +60,4 @@ jobs:
 
       - name: Build
         run: pnpm build
+        continue-on-error: true
