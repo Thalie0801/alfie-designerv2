@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { X, ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
 import { lsGet, lsSet, autoCompletedKey } from "@/utils/localStorage";
+import DOMPurify from "dompurify";
 
 /* ================= Types ================= */
 type Placement = "top" | "bottom" | "left" | "right" | "center";
@@ -50,10 +51,14 @@ export const useTour = () => {
 const isMobileDevice = () =>
   typeof window !== "undefined" && (window.matchMedia?.("(max-width: 767px)")?.matches ?? false);
 
-// markdown light : **bold** + \n\n => <br/><br/>
+// markdown light : **bold** + \n\n => <br/><br/> (sanitized with DOMPurify)
 function renderLiteMarkdown(md: string) {
   const html = md.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\n{2,}/g, "<br/><br/>");
-  return { __html: html };
+  const sanitized = DOMPurify.sanitize(html, { 
+    ALLOWED_TAGS: ['strong', 'br'],
+    ALLOWED_ATTR: []
+  });
+  return { __html: sanitized };
 }
 
 // Attente robuste de cibles (data-tour-id ET data-sidebar-id) + rAF polling

@@ -12,6 +12,18 @@ serve(async (req) => {
   }
 
   try {
+    // Security: This function should only be called by authorized admins
+    // Check for internal secret or admin authorization
+    const authHeader = req.headers.get("authorization");
+    const internalSecret = req.headers.get("x-internal-secret");
+    
+    if (!authHeader && internalSecret !== Deno.env.get("INTERNAL_FN_SECRET")) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized: Admin access required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",

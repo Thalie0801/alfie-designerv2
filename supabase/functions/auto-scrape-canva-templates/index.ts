@@ -57,6 +57,16 @@ serve(async (req) => {
   }
 
   try {
+    // Security: This function should only be called by internal scheduled tasks or admins
+    const internalSecret = req.headers.get("x-internal-secret");
+    
+    if (internalSecret !== Deno.env.get("INTERNAL_FN_SECRET")) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized: Admin or internal access required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     console.log('🤖 Auto-scraping Canva templates...');
 
     const supabase = createClient(
