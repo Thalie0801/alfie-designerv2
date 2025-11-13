@@ -238,13 +238,8 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
           finalPrompt += `\n\nABSOLUTE CRITICAL: Generate a PURE BACKGROUND with NO TEXT, NO TYPOGRAPHY, NO LETTERS, NO VISIBLE WORDS, NO HEX CODES, NO FONT NAMES. Text will be added separately by overlay system.`;
         }
 
-        console.log('[Render] Generating image with carousel context:', {
-          slideIndex,
-          totalSlides,
-          backgroundOnly,
-          hasOverlayText: !!overlayText,
-          hasTemplate: !!templateImageUrl
-        });
+        // Removed detailed carousel logging for security
+        console.log('[Render] Generating carousel image');
 
         // Construire les messages
         const messages: any[] = [

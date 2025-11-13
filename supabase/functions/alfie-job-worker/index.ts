@@ -185,8 +185,9 @@ serve(async (req) => {
         break;
       }
 
-      const job: JobRow = claimed[0];
-      console.log("🟢 start_job", { id: job.id, type: job.type, order_id: job.order_id });
+      // Anonymize job ID for logging
+      const jobIdPrefix = job.id.substring(0, 8);
+      console.log("🟢 start_job", { id: `${jobIdPrefix}...`, type: job.type });
 
       try {
         let result: any;

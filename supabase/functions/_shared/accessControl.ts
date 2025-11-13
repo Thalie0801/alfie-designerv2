@@ -24,8 +24,9 @@ export async function userHasAccess(authHeader: string | null) {
   const isVip = userRoles.includes('vip');
   const isAdmin = userRoles.includes('admin');
   
-  // Log diagnostic pour debug
-  console.log(`[AccessControl] Checking access for: ${user.email} | Roles: ${userRoles.join(',')} | isVip: ${isVip} | isAdmin: ${isAdmin}`);
+  // Anonymize user ID for security (first 8 chars only)
+  const userIdPrefix = user.id.substring(0, 8);
+  console.log(`[AccessControl] Check | UserID: ${userIdPrefix}... | Roles: ${userRoles.join(',')} | isVip: ${isVip} | isAdmin: ${isAdmin}`);
   
   if (isVip || isAdmin) {
     console.log(`[AccessControl] ✅ Access granted via ${isVip ? 'VIP' : 'ADMIN'} role from database`);

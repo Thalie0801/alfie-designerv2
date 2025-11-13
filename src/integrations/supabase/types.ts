@@ -1005,12 +1005,14 @@ export type Database = {
       }
       job_queue: {
         Row: {
-          archived_at: string | null
+          attempts: number
+          brand_id: string | null
           created_at: string
           error: string | null
           id: string
-          is_archived: boolean
-          job_version: number
+          idempotency_key: string | null
+          kind: string | null
+          max_attempts: number
           max_retries: number
           order_id: string | null
           payload: Json
@@ -1022,12 +1024,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          archived_at?: string | null
+          attempts?: number
+          brand_id?: string | null
           created_at?: string
           error?: string | null
           id?: string
-          is_archived?: boolean
-          job_version?: number
+          idempotency_key?: string | null
+          kind?: string | null
+          max_attempts?: number
           max_retries?: number
           order_id?: string | null
           payload: Json
@@ -1039,12 +1043,14 @@ export type Database = {
           user_id: string
         }
         Update: {
-          archived_at?: string | null
+          attempts?: number
+          brand_id?: string | null
           created_at?: string
           error?: string | null
           id?: string
-          is_archived?: boolean
-          job_version?: number
+          idempotency_key?: string | null
+          kind?: string | null
+          max_attempts?: number
           max_retries?: number
           order_id?: string | null
           payload?: Json
@@ -2171,26 +2177,6 @@ export type Database = {
           thumb_url: string | null
           type: string | null
           url: string | null
-          user_id: string | null
-        }
-        Relationships: []
-      }
-      v_job_queue_active: {
-        Row: {
-          archived_at: string | null
-          created_at: string | null
-          error: string | null
-          id: string | null
-          is_archived: boolean | null
-          job_version: number | null
-          max_retries: number | null
-          order_id: string | null
-          payload: Json | null
-          result: Json | null
-          retry_count: number | null
-          status: string | null
-          type: string | null
-          updated_at: string | null
           user_id: string | null
         }
         Relationships: []
