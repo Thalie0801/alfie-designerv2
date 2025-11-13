@@ -1,3 +1,5 @@
+import { HELP } from "./helpMap";
+
 type Ratio = "1:1" | "9:16" | "16:9" | "3:4" | "4:5" | "2:3";
 
 export function detectContentIntent(raw: string) {
@@ -60,6 +62,7 @@ export function detectContentIntent(raw: string) {
 export function detectPlatformHelp(raw: string) {
   const q = raw.toLowerCase();
 
+  const matches = HELP.filter((intent) => intent.match.test(q));
   const intents = [
     { test: /(studio|génération|créer|lancer)/, to: "/studio", label: "Ouvrir Studio" },
     { test: /(template|catalogue|modèles?)/, to: "/templates", label: "Catalogue" },
