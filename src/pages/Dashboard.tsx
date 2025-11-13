@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,12 +20,68 @@ import { TourProvider, HelpLauncher } from '@/components/tour/InteractiveTour';
 import { DashboardTourAutoStart } from '@/components/tour/DashboardTourAutoStart';
 import { BrandPaymentSuccess } from '@/components/BrandPaymentSuccess';
 import { BrandManager } from '@/components/BrandManager';
+import { callEdge } from '@/lib/edgeClient';
+
+interface ImageQuotaSummary {
+  used: number;
+  total: number;
+  plan?: string | null;
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { affiliate } = useAffiliateStatus();
   const { activeBrandId } = useBrandKit();
+  const [imageQuota, setImageQuota] = useState<ImageQuotaSummary | null>(null);
+  const [quotaLoading, setQuotaLoading] = useState(false);
+  const [quotaError, setQuotaError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!activeBrandId) {
+      setImageQuota(null);
+      setQuotaError(null);
+      setQuotaLoading(false);
+      return;
+    }
+
+    setQuotaLoading(true);
+    setQuotaError(null);
+
+    callEdge<{ visuals_used?: number; visuals_quota?: number; plan?: string }>(
+      'get-quota',
+      { brand_id: activeBrandId },
+      { silent: true }
+    )
+      .then((response) => {
+        if (cancelled) return;
+        if (response.ok && response.data) {
+          const { visuals_used = 0, visuals_quota = 0, plan = null } = response.data;
+          setImageQuota({ used: visuals_used, total: visuals_quota, plan });
+        } else if (response.ok) {
+          setImageQuota({ used: 0, total: 0, plan: response.data?.plan ?? null });
+        } else {
+          setImageQuota(null);
+          setQuotaError('Quotas indisponibles');
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setImageQuota(null);
+        setQuotaError('Quotas indisponibles');
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setQuotaLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBrandId]);
 
 
   return (
@@ -96,6 +153,29 @@ export default function Dashboard() {
                 Commencer à créer
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-dashed border-primary/20 bg-muted/20">
+          <CardContent className="flex flex-col gap-2 p-5 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Suivi des quotas visuels</p>
+              <p className="text-lg font-semibold">
+                {quotaLoading
+                  ? 'Images utilisées : chargement…'
+                  : `Images utilisées : ${imageQuota?.used ?? 0} / ${
+                      imageQuota && imageQuota.total > 0 ? imageQuota.total : '∞'
+                    } (${imageQuota?.plan ? `plan ${imageQuota.plan}` : 'plan actuel'})`}
+              </p>
+              {quotaError && !quotaLoading ? (
+                <p className="text-sm text-destructive">{quotaError}</p>
+              ) : null}
+            </div>
+            {imageQuota && imageQuota.total > 0 && !quotaLoading && !quotaError ? (
+              <Badge variant="outline" className="whitespace-nowrap">
+                Restant : {Math.max(0, imageQuota.total - imageQuota.used)}
+              </Badge>
+            ) : null}
           </CardContent>
         </Card>
 

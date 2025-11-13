@@ -16,6 +16,8 @@ import { useLibraryAssetsSubscription } from "@/hooks/useLibraryAssetsSubscripti
 import { getAspectClass, type ConversationState, type OrchestratorResponse } from "@/types/chat";
 import { slideUrl } from "@/lib/cloudinary/imageUrls";
 import { extractCloudNameFromUrl } from "@/lib/cloudinary/utils";
+import type { AlfieIntent } from "@/lib/types/alfie";
+import { GenerationError, triggerGenerationFromChat } from "@/lib/alfie/generation";
 
 // =====================
 // Détection d'intention vidéo
@@ -113,7 +115,65 @@ interface Message {
     slidesPerCarousel: number;
   };
   orderId?: string | null;
+  meta?: Record<string, unknown>;
   timestamp: Date;
+}
+
+const DIRECT_INTENT_KEYWORDS = /(image|carrousel|carousel|visuel)/i;
+const CLEANUP_KEYWORDS = /(fais|fait|faites|fais-moi|fais moi|crée|cree|créer|créez|genere|génère|générer|produis|propose|montre|donne|fais nous)/gi;
+
+function extractSimpleGenerationIntent(message: string, brandId: string | null): AlfieIntent | null {
+  if (!brandId) return null;
+  if (!message || !DIRECT_INTENT_KEYWORDS.test(message)) return null;
+
+  const format: AlfieIntent["format"] = /carrousel|carousel/i.test(message) ? "carousel" : "image";
+
+  let count = 1;
+  const numbers = message.match(/\d+/g);
+  if (numbers) {
+    for (const num of numbers) {
+      const parsed = parseInt(num, 10);
+      if (Number.isNaN(parsed)) continue;
+      const idx = message.indexOf(num);
+      const prev = idx > 0 ? message[idx - 1] : null;
+      const next = message[idx + num.length] ?? null;
+      if (prev === ":" || next === ":") continue;
+      count = Math.min(20, Math.max(1, parsed));
+      break;
+    }
+  }
+
+  const ratioMatch = message.match(/(1:1|4:5|9:16)/);
+  const ratio = ratioMatch ? (ratioMatch[1] as AlfieIntent["ratio"]) : undefined;
+
+  let platform: AlfieIntent["platform"]; // optional assignment
+  if (/tiktok/i.test(message)) {
+    platform = "tiktok";
+  } else if (/instagram/i.test(message)) {
+    platform = "instagram";
+  } else if (/linkedin/i.test(message)) {
+    platform = "linkedin";
+  }
+
+  const cleaned = message
+    .replace(CLEANUP_KEYWORDS, "")
+    .replace(/(carrousel|carousel|image|images|visuels?)/gi, "")
+    .replace(/(1:1|4:5|9:16)/gi, "")
+    .replace(/instagram|linkedin|tik\s*tok/gi, "")
+    .replace(/\b\d+\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const topic = cleaned.length > 0 ? cleaned : message.trim();
+
+  return {
+    brandId,
+    format,
+    count,
+    topic,
+    ratio,
+    platform,
+  };
 }
 
 // =====================
@@ -533,6 +593,65 @@ export function AlfieChat() {
       assetUrl: uploadedSource ? uploadedSource.previewUrl || uploadedSource.url : undefined,
       metadata: uploadedSource ? { name: uploadedSource.name, signedUrl: uploadedSource.url } : undefined,
     });
+
+    const skipDirect = Boolean(options?.forceTool || options?.intentOverride || uploadedSource);
+
+    if (!skipDirect && user?.id) {
+      const directIntent = extractSimpleGenerationIntent(trimmed || rawMessage || "", activeBrandId || null);
+
+      if (directIntent) {
+        try {
+          const { orderId: generatedOrderId } = await triggerGenerationFromChat(user.id, directIntent);
+          setOrderId(generatedOrderId);
+          setConversationState("generating");
+          setExpectedTotal(directIntent.count);
+
+          const confirmation = `Parfait, je lance ${directIntent.count} ${
+            directIntent.format === "image" ? "image(s)" : "carrousel(s)"
+          } pour ta marque. Je te préviens dès que c'est prêt.`;
+
+          addMessage({
+            role: "assistant",
+            content: confirmation,
+            type: "text",
+            orderId: generatedOrderId,
+            meta: { orderId: generatedOrderId, intent: directIntent },
+            links: [
+              { label: "Voir dans Studio", href: `/studio?order=${generatedOrderId}` },
+              { label: "Voir la Bibliothèque", href: `/library?order=${generatedOrderId}` },
+            ],
+          });
+
+          clearUploadedSource();
+          setIsLoading(false);
+          inFlightRef.current = false;
+          return;
+        } catch (error) {
+          if (error instanceof GenerationError && error.code === "quota_exceeded") {
+            const quotaMessage =
+              "Tu as dépassé ton quota d'images pour ce mois. Réduis le nombre de visuels ou upgrade ton plan.";
+            toast.error(quotaMessage);
+            addMessage({
+              role: "assistant",
+              content: `❌ ${quotaMessage}`,
+              type: "text",
+            });
+          } else {
+            const message = error instanceof Error ? error.message : toErrorMessage(error);
+            toast.error(message);
+            addMessage({
+              role: "assistant",
+              content: `❌ ${message}`,
+              type: "text",
+            });
+          }
+
+          setIsLoading(false);
+          inFlightRef.current = false;
+          return;
+        }
+      }
+    }
 
     // Commande /queue (monitoring)
     if (rawMessage.startsWith("/queue")) {

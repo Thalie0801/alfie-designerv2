@@ -1,319 +1,231 @@
-import { useState, useEffect } from "react";
-import { useAuth } from "@/hooks/useAuth";
-import { useBrandKit } from "@/hooks/useBrandKit";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Toggle } from "@/components/ui/toggle";
-import { Clock, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
+import { useBrandKit } from '@/hooks/useBrandKit';
+import { useAlfieIntent } from '@/hooks/useAlfieIntent';
+import type { AlfieFormat } from '@/lib/types/alfie';
+import { GenerationError, triggerGenerationFromChat } from '@/lib/alfie/generation';
+import { BrandSelector } from '@/components/BrandSelector';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 
-interface Artifact {
-  id: string;
-  kind: "image" | "video";
-  uri: string;
-  meta?: any;
-}
+const RATIO_OPTIONS: Array<{ label: string; value: '1:1' | '4:5' | '9:16' }> = [
+  { label: 'Carré 1:1', value: '1:1' },
+  { label: 'Portrait 4:5', value: '4:5' },
+  { label: 'Vertical 9:16', value: '9:16' },
+];
 
-function buildBrandAwarePrompt(prompt: string, brandKit: any): string {
-  if (!brandKit) return prompt;
-  let enriched = prompt;
-  if (brandKit.palette?.length > 0) enriched += `\nCouleurs: ${brandKit.palette.join(", ")}`;
-  if (brandKit.fonts?.primary) enriched += `\nTypo: ${brandKit.fonts.primary}`;
-  if (brandKit.voice) enriched += `\nTon: ${brandKit.voice}`;
-  return enriched;
-}
+const PLATFORM_OPTIONS: Array<{ label: string; value: 'instagram' | 'linkedin' | 'tiktok' }> = [
+  { label: 'Instagram', value: 'instagram' },
+  { label: 'LinkedIn', value: 'linkedin' },
+  { label: 'TikTok', value: 'tiktok' },
+];
 
 export default function Creator() {
   const { user } = useAuth();
-  const { brandKit, brands, activeBrandId, setActiveBrand } = useBrandKit();
-  const [mode, setMode] = useState<"image" | "video">("image");
-  const [prompt, setPrompt] = useState("");
-  const [format, setFormat] = useState("1080x1080");
-  const [duration, setDuration] = useState(10);
-  const [quality, setQuality] = useState<"draft" | "standard" | "premium">("standard");
-  const [quantity, setQuantity] = useState(1);
-  const [batchNight, setBatchNight] = useState(false);
-  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
-  const [decision, setDecision] = useState<any>(null);
-  const [quotaInfo, setQuotaInfo] = useState({ remaining: 0, total: 0 });
-  const [isGenerating, setIsGenerating] = useState(false);
+  const { activeBrandId, brandKit } = useBrandKit();
+  const { intent, setField, resetIntent } = useAlfieIntent({ brandId: activeBrandId ?? '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lastOrderId, setLastOrderId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
-      loadQuotaInfo();
+    if (activeBrandId && intent.brandId !== activeBrandId) {
+      setField('brandId', activeBrandId);
     }
-  }, [user]);
+  }, [activeBrandId, intent.brandId, setField]);
 
-  const loadQuotaInfo = async () => {
-    if (!user) return;
-    const { data: profile } = await supabase.from("profiles").select("quota_videos, woofs_consumed_this_month").eq("id", user.id).single();
-    if (profile) setQuotaInfo({ remaining: (profile.quota_videos || 0) - (profile.woofs_consumed_this_month || 0), total: profile.quota_videos || 0 });
-  };
+  const formattedCount = useMemo(() => Math.max(1, Math.min(20, intent.count || 1)), [intent.count]);
 
-  const handleGenerate = async () => {
-    if (!user || !prompt.trim()) return toast.error("Veuillez saisir un prompt");
-    
-    // ✅ Vérifier active_brand_id AVANT de commencer
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('active_brand_id')
-      .eq('id', user.id)
-      .single();
-    
-    const activeBrandId = profile?.active_brand_id;
-    
-    if (!activeBrandId) {
-      toast.error("Aucune marque active. Veuillez d'abord créer ou sélectionner une marque.");
+  const handleCountChange = (value: string) => {
+    const parsed = parseInt(value, 10);
+    if (Number.isNaN(parsed)) {
+      setField('count', 1);
       return;
     }
-    
-    setIsGenerating(true);
-    setDecision(null);
-
-    // Si carrousel (quantity > 1), générer d'abord le plan
-    let carouselPlan: any = null;
-    if (quantity > 1 && mode === "image") {
-      try {
-        toast.info(`Planification du carrousel de ${quantity} visuels...`);
-        const { data: planRes, error: planError } = await supabase.functions.invoke("alfie-plan-carousel", {
-          body: { 
-            prompt, 
-            brandKit: brandKit || {}, 
-            slideCount: quantity 
-          }
-        });
-        
-        if (planError) throw planError;
-        
-        // ✅ Normaliser la structure de la réponse pour supporter plusieurs formats
-        const normalizedPlan = planRes?.plan ?? planRes;
-        
-        if (!normalizedPlan?.slides || !Array.isArray(normalizedPlan.slides) || normalizedPlan.slides.length === 0) {
-          throw new Error('Plan de carrousel vide ou invalide');
-        }
-        
-        carouselPlan = normalizedPlan;
-        toast.success(`Plan du carrousel généré (${carouselPlan.slides.length} slides) !`);
-        console.log('[Carousel Plan] Generated:', carouselPlan.slides.length, 'slides');
-        
-      } catch (err: any) {
-        console.error('[Carousel Plan] Error:', err);
-        toast.message('Planification indisponible, utilisation d\'un plan de secours.');
-        
-        // ✅ Fallback local : créer un plan minimal pour continuer
-        const fallbackSlides = Array.from({ length: quantity }).map((_, i) => ({
-          type: i === 0 ? 'hero' : i === quantity - 1 ? 'cta' : 'solution',
-          title: `Slide ${i + 1}`,
-          subtitle: 'Contenu à affiner',
-          bullets: [],
-          note: `High quality background, brand colors ${brandKit?.palette?.slice(0, 2)?.join(', ') || 'default'}, no text`
-        }));
-        
-        carouselPlan = { slides: fallbackSlides };
-        console.log('[Carousel Plan] Using fallback plan');
-      }
-    }
-
-    for (let i = 0; i < quantity; i++) {
-      try {
-        // Utiliser le prompt du slide si on a un plan de carrousel
-        const slidePrompt = carouselPlan?.slides?.[i] 
-          ? `${carouselPlan.slides[i].title}. ${carouselPlan.slides[i].subtitle || ''}` 
-          : prompt;
-
-        // ✅ Mapping explicite format → use_case
-        const formatToUseCase: Record<string, string> = {
-          "1080x1080": "post",           // Carré → post classique
-          "1080x1920": "story",          // Portrait 9:16 → story/reel
-            "1080x1350": "post", // Portrait 4:5 (IG/LinkedIn)
-          "1920x1080": "ad_landscape",   // Paysage → pub/bannière
-        };
-        const use_case = formatToUseCase[format] || "post";
-        const { data: providerRes } = await supabase.functions.invoke("alfie-select-provider", {
-          body: { brief: { use_case, style: quality }, modality: mode, format, duration_s: mode === "video" ? duration : 0, quality, budget_woofs: quotaInfo.remaining }
-        });
-        
-        if (providerRes.decision === "KO") {
-          toast.error("Budget insuffisant", { description: providerRes?.suggestions?.join(", ") });
-          break;
-        }
-        
-        setDecision(providerRes);
-        let finalCost = providerRes.cost_woofs;
-
-        if (batchNight) {
-          await supabase.from("batch_requests").insert({ user_id: user.id, modality: mode, payload_json: { prompt: slidePrompt, format, duration, quality }, process_after: new Date(Date.now() + 8 * 3600 * 1000).toISOString() });
-          toast.success(`Planifié slide ${i + 1}/${quantity} pour la nuit`);
-          continue;
-        }
-
-        await supabase.functions.invoke("alfie-consume-woofs", { body: { cost_woofs: finalCost } });
-        
-        let renderUrl = "";
-        if (mode === "image") {
-          toast.info(`Génération slide ${i + 1}/${quantity}...`);
-          
-          // Construire le prompt enrichi pour carrousel
-          const isCarousel = quantity > 1;
-          const slide = carouselPlan?.slides?.[i];
-          
-          let enhancedPrompt = buildBrandAwarePrompt(slidePrompt, brandKit);
-          
-          // Utiliser le prompt visuel du plan généré par l'IA pour carrousel
-          if (isCarousel && slide?.note) {
-            enhancedPrompt = slide.note;
-            // Ajouter contexte technique
-            enhancedPrompt += `\nAspect ratio: ${format}. Professional photography quality, editorial style.`;
-            enhancedPrompt += `\nNO TEXT, NO TYPOGRAPHY, NO LETTERS on the image - text will be added separately.`;
-          } else if (!isCarousel) {
-            // Pour une image unique (non-carrousel), enrichir avec le brand kit
-            enhancedPrompt = `${enhancedPrompt}
-Aspect ratio: ${format}.
-Professional photography quality, editorial style.
-Colors: ${brandKit?.palette?.join(', ') || 'default'}`;
-          }
-          
-          // Construire overlayText à partir du plan
-          let overlayText = '';
-          if (isCarousel && slide) {
-            overlayText = `${slide.title}\n${slide.subtitle || ''}`;
-            if (slide.bullets && slide.bullets.length > 0) {
-              overlayText += `\n${slide.bullets.map((b: string) => `• ${b}`).join('\n')}`;
-            }
-            if (slide.cta) {
-              overlayText += `\n${slide.cta}`;
-            }
-          }
-          
-          const { data: imgRes } = await supabase.functions.invoke("alfie-render-image", { 
-            body: { 
-              provider: providerRes.provider, 
-              prompt: enhancedPrompt,
-              assets: [], 
-              format,
-              resolution: format,
-              brand_id: activeBrandId,
-              cost_woofs: finalCost,
-              // Params carrousel
-              backgroundOnly: false,
-              slideIndex: isCarousel ? i : undefined,
-              totalSlides: isCarousel ? quantity : undefined,
-              overlayText: overlayText || undefined,
-              negativePrompt: "logos de marques tierces, filigranes, artefacts, texte illisible, tuiles, grille, multi-cadres, collage, caricature, bande dessinée, emojis",
-              templateImageUrl: null
-            } 
-          });
-          renderUrl = imgRes?.image_urls?.[0] || "";
-        } else {
-          const { data: vidRes } = await supabase.functions.invoke("alfie-render-video", { body: { provider: providerRes.provider, prompt: buildBrandAwarePrompt(slidePrompt, brandKit), assets: [], params: { duration, resolution: format, style: quality } } });
-          renderUrl = vidRes?.video_url || "";
-        }
-
-        const { data: scoreRes } = await supabase.functions.invoke("alfie-score-coherence", { body: { render_url: renderUrl, brand_spec: brandKit ? JSON.stringify(brandKit) : null } });
-        await supabase.functions.invoke("alfie-update-metrics", { body: { provider: providerRes.provider, use_case, format, reward: scoreRes.score / 100, success: true } });
-
-        // Ajouter à l'affichage local
-        setArtifacts(prev => [...prev, { id: `${Date.now()}-${i}`, kind: mode, uri: renderUrl, meta: { resolution: format, brand_score: scoreRes.score, cost_woofs: finalCost } }]);
-
-        // ✅ Valider que l'image a bien été générée avant de sauvegarder
-        if (!renderUrl || renderUrl.trim() === '') {
-          console.error("❌ Génération échouée : renderUrl vide");
-          toast.error(`Création ${i + 1}/${quantity} échouée : image non générée`);
-          continue; // Passer à la suivante au lieu de break
-        }
-        
-        // Sauvegarder dans la base de données
-        const { error: insertError } = await supabase
-          .from("media_generations")
-          .insert({
-            user_id: user.id,
-            brand_id: activeBrandId,
-            type: mode,
-            prompt: slidePrompt, // ✅ Utiliser le prompt du slide
-            output_url: renderUrl,
-            thumbnail_url: mode === "image" ? renderUrl : null,
-            status: "completed",
-            modality: mode,
-            provider_id: providerRes.provider,
-            engine: providerRes.provider, // ✅ Ajouter engine pour Library
-            brand_score: scoreRes.score,
-            cost_woofs: finalCost,
-            metadata: { 
-              resolution: format, 
-              quality, 
-              use_case,
-              provider: providerRes.provider,
-              isCarousel: quantity > 1, // ✅ Identifier les carrousels
-              slideIndex: quantity > 1 ? i : null,
-              totalSlides: quantity > 1 ? quantity : null
-            },
-            woofs: finalCost,
-            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-          } as any);
-
-        if (insertError) {
-          console.error("❌ Erreur insertion media_generations:", insertError);
-          // ✅ Afficher l'erreur détaillée
-          toast.error(`Sauvegarde échouée : ${insertError.message}`);
-        } else {
-          console.log("✅ Image sauvegardée dans media_generations");
-          toast.success(`Création ${i + 1}/${quantity} sauvegardée dans votre bibliothèque ✅`);
-        }
-
-        // Petit délai entre chaque génération
-        if (i < quantity - 1) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-
-        loadQuotaInfo();
-      } catch (err: any) {
-        toast.error(`Erreur création ${i + 1}/${quantity}: ${err.message}`);
-        break;
-      }
-    }
-
-    setIsGenerating(false);
+    setField('count', Math.max(1, Math.min(20, parsed)));
   };
 
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!user?.id) {
+      toast.error('Vous devez être connecté pour lancer une génération.');
+      return;
+    }
+
+    if (!intent.brandId) {
+      toast.error('Sélectionnez une marque avant de lancer une génération.');
+      return;
+    }
+
+    if (!intent.topic.trim()) {
+      toast.error('Ajoutez un sujet ou une idée pour lancer la génération.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setLastOrderId(null);
+
+    try {
+      const payload = { ...intent, count: formattedCount };
+      const { orderId } = await triggerGenerationFromChat(user.id, payload);
+      setLastOrderId(orderId);
+      toast.success('Génération lancée !', {
+        description: `Commande ${orderId} créée. Tu seras notifié dès que c'est prêt.`,
+      });
+      resetIntent();
+    } catch (error) {
+      if (error instanceof GenerationError && error.code === 'quota_exceeded') {
+        const quotaMessage = "Tu as dépassé ton quota d'images pour ce mois. Réduis le nombre de visuels ou upgrade ton plan.";
+        toast.error(quotaMessage);
+      } else {
+        toast.error(error instanceof Error ? error.message : 'Erreur lors de la génération.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const planName = brandKit?.plan ? brandKit.plan : 'Plan actuel';
+
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-[1800px] mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">Créer</h1>
-          <p className="text-muted-foreground">Générez vos visuels et vidéos en quelques clics</p>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Générateur visuel</h1>
+          <p className="text-muted-foreground">
+            Configure ton brief et déclenche une génération immédiate pour ta marque active.
+          </p>
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <div className="lg:col-span-4 space-y-4">
-            <Card className="p-4">
-              <div className="space-y-4">
-                <div><Label>Mode</Label><Select value={mode} onValueChange={(v: any) => setMode(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="image">Image</SelectItem><SelectItem value="video">Vidéo</SelectItem></SelectContent></Select></div>
-                {brands.length > 0 && <div><Label>Marque</Label><Select value={activeBrandId || ""} onValueChange={setActiveBrand}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{brands.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent></Select></div>}
-                <div><Label>Prompt</Label><Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={4} /></div>
-                <div><Label>Format</Label><Select value={format} onValueChange={setFormat}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1080x1080">Carré</SelectItem><SelectItem value="1080x1920">Portrait</SelectItem><SelectItem value="1920x1080">Paysage</SelectItem>
-                                <SelectItem value="1080x1350">Portrait 4:5</SelectItem>
-</SelectContent></Select></div>
-                {mode === "video" && <div><Label>Durée (s)</Label><Input type="number" value={duration} onChange={(e) => setDuration(parseInt(e.target.value))} min={5} max={30} /></div>}
-                <div><Label>Qualité</Label><Select value={quality} onValueChange={(v: any) => setQuality(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="draft">Draft</SelectItem><SelectItem value="standard">Standard</SelectItem><SelectItem value="premium">Premium</SelectItem></SelectContent></Select></div>
-                <div><Label>Quantité (carrousel)</Label><Select value={quantity.toString()} onValueChange={(v) => setQuantity(parseInt(v))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1">1 visuel</SelectItem><SelectItem value="2">2 visuels</SelectItem><SelectItem value="3">3 visuels</SelectItem><SelectItem value="4">4 visuels</SelectItem><SelectItem value="5">5 visuels</SelectItem><SelectItem value="6">6 visuels</SelectItem><SelectItem value="7">7 visuels</SelectItem><SelectItem value="8">8 visuels</SelectItem><SelectItem value="9">9 visuels</SelectItem><SelectItem value="10">10 visuels</SelectItem></SelectContent></Select></div>
-                <Toggle pressed={batchNight} onPressedChange={setBatchNight}>Batch nuit</Toggle>
-                <Button onClick={handleGenerate} disabled={isGenerating || !prompt.trim()} className="w-full" size="lg">{isGenerating ? <><Clock className="w-4 h-4 mr-2 animate-spin" />Génération...</> : <><Sparkles className="w-4 h-4 mr-2" />Générer</>}</Button>
-              </div>
-            </Card>
-          </div>
-
-          <div className="lg:col-span-4"><Card className="p-4"><h3 className="font-semibold mb-4">Livrables</h3>{artifacts.length === 0 ? <div className="text-center py-12 text-muted-foreground"><Sparkles className="w-12 h-12 mx-auto mb-4 opacity-50" /><p>Vos créations ici</p></div> : <div className="grid grid-cols-2 gap-3">{artifacts.map(a => <div key={a.id} className="relative group">{a.kind === "image" ? <img src={a.uri} className="rounded-lg w-full" /> : <video src={a.uri} controls className="rounded-lg w-full" />}<div className="absolute bottom-2 left-2 flex gap-1">{a.meta?.brand_score && <Badge variant="outline" className="text-xs">{a.meta.brand_score}/100</Badge>}{a.meta?.cost_woofs && <Badge className="text-xs">{a.meta.cost_woofs} woofs</Badge>}</div></div>)}</div>}</Card></div>
-
-          <div className="lg:col-span-4 space-y-4">{decision && <Card className="p-4"><h3 className="font-semibold mb-4">Décision IA</h3><div className="space-y-2 text-sm"><div className="flex justify-between"><span>Provider:</span><span className="font-mono">{decision.provider}</span></div><div className="flex justify-between"><span>Coût:</span><span className="font-semibold">{decision.cost_woofs} woofs</span></div></div></Card>}<Card className="p-4"><h3 className="font-semibold mb-4">Quota</h3><div className="space-y-2"><div className="flex justify-between text-sm"><span>Woofs:</span><span className="font-bold">{quotaInfo.remaining} / {quotaInfo.total}</span></div><Progress value={(quotaInfo.remaining / quotaInfo.total) * 100} /></div></Card></div>
-        </div>
+        <BrandSelector />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Paramètres de génération</CardTitle>
+          <CardDescription>
+            Alfie produira automatiquement {formattedCount} {intent.format === 'image' ? 'image(s)' : 'carrousel(s)'}
+            à partir de ton sujet.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="format">Format</Label>
+                <Select value={intent.format} onValueChange={(value: AlfieFormat) => setField('format', value)}>
+                  <SelectTrigger id="format">
+                    <SelectValue placeholder="Choisir un format" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="image">Image</SelectItem>
+                    <SelectItem value="carousel">Carrousel</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="count">Nombre de visuels</Label>
+                <Input
+                  id="count"
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={formattedCount}
+                  onChange={(event) => handleCountChange(event.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">Entre 1 et 20 visuels par commande.</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="ratio">Ratio</Label>
+                <Select
+                  value={intent.ratio ?? ''}
+                  onValueChange={(value) => setField('ratio', value ? (value as typeof RATIO_OPTIONS[number]['value']) : undefined)}
+                >
+                  <SelectTrigger id="ratio">
+                    <SelectValue placeholder="Optionnel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Par défaut</SelectItem>
+                    {RATIO_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="platform">Plateforme</Label>
+                <Select
+                  value={intent.platform ?? ''}
+                  onValueChange={(value) => setField('platform', value ? (value as typeof PLATFORM_OPTIONS[number]['value']) : undefined)}
+                >
+                  <SelectTrigger id="platform">
+                    <SelectValue placeholder="Optionnel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Toutes plateformes</SelectItem>
+                    {PLATFORM_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="topic">Sujet</Label>
+              <Textarea
+                id="topic"
+                rows={4}
+                placeholder="Décris le sujet, le ton ou les éléments à intégrer"
+                value={intent.topic}
+                onChange={(event) => setField('topic', event.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Indique le thème principal, des angles ou messages clés pour guider Alfie.
+              </p>
+            </div>
+
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Génération en cours…' : 'Lancer la génération'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {lastOrderId && (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col gap-3 p-6 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Commande en file d'attente</p>
+              <p className="text-lg font-semibold">Order #{lastOrderId}</p>
+              <p className="text-sm text-muted-foreground">Plan : <Badge variant="outline">{planName}</Badge></p>
+            </div>
+            <div className="flex gap-3">
+              <Button variant="secondary" asChild>
+                <Link to={`/studio?order=${lastOrderId}`}>Ouvrir dans Studio</Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link to={`/library?order=${lastOrderId}`}>Voir la bibliothèque</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

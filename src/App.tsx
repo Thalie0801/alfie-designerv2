@@ -28,6 +28,7 @@ import Templates from "./pages/Templates";
 import Library from "./pages/Library";
 import Videos from "./pages/Videos";
 import CloudinaryTest from "./pages/CloudinaryTest";
+import Creator from "./pages/Creator";
 
 import ActivateAccess from "./pages/onboarding/Activate";
 import { AlfieChat } from "./components/AlfieChat"; // si tu gardes /chat
@@ -77,6 +78,17 @@ const AppRoutes = () => {
             <ProtectedRoute>
               <AppLayoutWithSidebar>
                 <ChatGenerator />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/creator"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <Creator />
               </AppLayoutWithSidebar>
             </ProtectedRoute>
           }
