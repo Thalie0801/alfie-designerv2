@@ -13,6 +13,12 @@ type CoachMode = "strategy" | "da" | "maker";
 type ChatMessage = { role: "user" | "assistant"; node: ReactNode };
 type AssistantReply = ChatMessage;
 
+type ChatAIResponse = {
+  ok: boolean;
+  data?: { message?: string };
+  error?: string;
+};
+
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -175,6 +181,17 @@ export default function ChatWidget() {
     setMsgs((m) => [...m, { role: "assistant", node }]);
   };
 
+  const buildErrorReply = (message?: string): AssistantReply => ({
+    role: "assistant" as const,
+    node: (
+      <div className="space-y-2 bg-white rounded-lg p-3 border" style={{ borderColor: BRAND.grayBorder }}>
+        <p className="text-sm">
+          {message ?? "Oups, je n'ai pas réussi à traiter ta demande. Réessaie plus tard."}
+        </p>
+      </div>
+    ),
+  });
+
   const buildTemplateReply = (it: ReturnType<typeof detectContentIntent>): AssistantReply => {
   function replyContent(raw: string): AssistantReply {
     const it = detectContentIntent(raw);
@@ -336,7 +353,7 @@ export default function ChatWidget() {
 
     try {
       clearThinking = showThinking();
-      const { data, error } = await supabase.functions.invoke<{ message?: string }>("chat-ai-assistant", {
+      const { data, error } = await supabase.functions.invoke<ChatAIResponse>("chat-ai-assistant", {
         body: {
           message: raw,
           context: {
@@ -349,7 +366,12 @@ export default function ChatWidget() {
       });
 
       if (error) {
-        throw error;
+        console.error("chat-ai-assistant invoke error", error);
+        if (clearThinking) {
+          clearThinking();
+          clearThinking = undefined;
+        }
+        return buildErrorReply(error.message);
       }
 
       if (clearThinking) {
@@ -357,7 +379,12 @@ export default function ChatWidget() {
         clearThinking = undefined;
       }
 
-      const aiResponse = data?.message || "Je peux t'aider à créer ce contenu !";
+      if (!data?.ok) {
+        console.error("chat-ai-assistant response error", data?.error);
+        return buildErrorReply(data?.error);
+      }
+
+      const aiResponse = data.data?.message || "Je peux t'aider à créer ce contenu !";
 
       return {
         role: "assistant" as const,
@@ -387,7 +414,7 @@ export default function ChatWidget() {
         clearThinking();
         clearThinking = undefined;
       }
-      return buildTemplateReply(it);
+      return buildErrorReply();
     }
   }
 
