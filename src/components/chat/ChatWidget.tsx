@@ -37,14 +37,15 @@ export default function ChatWidget() {
         text: "#000000",
         grayBorder: "#e5e7eb",
         ink: "#1f2937",
-      } as const),
-    []
+      }) as const,
+    [],
   );
 
   const disabled =
     (typeof window !== "undefined" &&
       (new URLSearchParams(window.location.search).get("chat") === "off" ||
-        localStorage.getItem("alfie_chat") === "off")) || false;
+        localStorage.getItem("alfie_chat") === "off")) ||
+    false;
   if (disabled) return null;
 
   const coachModes: CoachMode[] = ["strategy", "da", "maker"];
@@ -86,72 +87,17 @@ export default function ChatWidget() {
     const data = JSON.stringify(brief.state);
     try {
       sessionStorage.setItem("alfie_prefill_brief", data);
-    } catch (_error) {
-      /* ignore session storage errors */
+    } catch {
+      // ignore
     }
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams();
-      params.set("mode", brief.state.format || "image");
-      if (brief.state.ratio) params.set("ratio", brief.state.ratio);
-      if (brief.state.slides) params.set("slides", String(brief.state.slides));
-      if (brief.state.topic) params.set("topic", brief.state.topic);
-      if (brief.state.cta) params.set("cta", brief.state.cta);
-      const url = `/studio?${params.toString()}`;
-      window.location.assign(url);
-    }
-  }
-
-
-  const chip = (label: string, onClick: () => void) => (
-    <button
-      key={label}
-      onClick={onClick}
-      className="border rounded-full px-3 py-1 text-xs hover:bg-gray-50"
-      style={{ borderColor: BRAND.grayBorder }}
-    >
-      {label}
-    </button>
-  );
-
-  const navBtn = (href: string, label: string) => (
-    <a
-      key={label}
-      href={href}
-      className="inline-block mr-2 mb-2 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50"
-      style={{ background: "#ffffff", border: `1px solid ${BRAND.grayBorder}`, color: BRAND.ink }}
-    >
-      {label}
-    </a>
-  );
-
-  const primaryBtn = (label: string, onClick: () => void) => (
-    <button
-      onClick={onClick}
-      type="button"
-      className="inline-block mt-1 px-3 py-2 rounded-md text-sm font-medium text-white"
-      style={{ background: `linear-gradient(135deg, ${BRAND.mint}, ${BRAND.mintDark})` }}
-    >
-      {label}
-    </button>
-  );
-
-  function prefillStudio() {
-    const data = JSON.stringify(brief.state);
-    try {
-      sessionStorage.setItem("alfie_prefill_brief", data);
-    } catch (_error) {
-      /* ignore session storage errors */
-    }
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams();
-      params.set("mode", brief.state.format || "image");
-      if (brief.state.ratio) params.set("ratio", brief.state.ratio);
-      if (brief.state.slides) params.set("slides", String(brief.state.slides));
-      if (brief.state.topic) params.set("topic", brief.state.topic);
-      if (brief.state.cta) params.set("cta", brief.state.cta);
-      const url = `/studio?${params.toString()}`;
-      window.location.assign(url);
-    }
+    const params = new URLSearchParams();
+    params.set("mode", brief.state.format || "image");
+    if (brief.state.ratio) params.set("ratio", brief.state.ratio);
+    if (brief.state.slides) params.set("slides", String(brief.state.slides));
+    if (brief.state.topic) params.set("topic", brief.state.topic);
+    if (brief.state.cta) params.set("cta", brief.state.cta);
+    const url = `/studio?${params.toString()}`;
+    window.location.assign(url);
   }
 
   function replyPlatform(raw: string): AssistantReply | null {
@@ -162,9 +108,7 @@ export default function ChatWidget() {
         node: (
           <div className="space-y-2">
             <p className="text-sm">Accès rapide :</p>
-            <div className="pt-1">
-              {plat.matches.map((m) => navBtn(m.to, m.label))}
-            </div>
+            <div className="pt-1">{plat.matches.map((m) => navBtn(m.to, m.label))}</div>
           </div>
         ),
       };
@@ -184,14 +128,11 @@ export default function ChatWidget() {
     role: "assistant" as const,
     node: (
       <div className="space-y-2 bg-white rounded-lg p-3 border" style={{ borderColor: BRAND.grayBorder }}>
-        <p className="text-sm">
-          {message ?? "Oups, je n'ai pas réussi à traiter ta demande. Réessaie plus tard."}
-        </p>
+        <p className="text-sm">{message ?? "Oups, je n'ai pas réussi à traiter ta demande. Réessaie plus tard."}</p>
       </div>
     ),
   });
 
-  const buildTemplateReply = (it: ReturnType<typeof detectContentIntent>): AssistantReply => {
   function replyContent(raw: string): AssistantReply {
     const it = detectContentIntent(raw);
 
@@ -210,19 +151,15 @@ export default function ChatWidget() {
         "Carrousel 5 slides 4:5 Instagram : 3 erreurs en pub Meta pour PME",
         "Visuel 1:1 LinkedIn : annonce webinar IA marketing",
         "Vidéo 9:16 TikTok : astuces Canva pour solopreneurs",
-        "Carrousel 5 slides 4:5 : guide rapide branding e-commerce",
-        "Visuel 4:5 Instagram : lancement offre -30%",
       ];
       return {
         role: "assistant" as const,
         node: (
           <div className="space-y-3">
             <p className="text-sm">
-              Donne-moi un <strong>sujet précis</strong> (cible, thème, but). Voici des idées cliquables :
+              Donne-moi un <strong>sujet précis</strong>. Exemples :
             </p>
-            <div className="flex flex-wrap gap-2">
-              {suggestions.map((s) => chip(s, () => setInput(s)))}
-            </div>
+            <div className="flex flex-wrap gap-2">{suggestions.map((s) => chip(s, () => setInput(s)))}</div>
           </div>
         ),
       };
@@ -230,36 +167,33 @@ export default function ChatWidget() {
 
     const next = () => setSeed((v) => v + 1);
     const header =
-      modeCoach === "strategy"
-        ? (
-          <p>
-            <strong>{it.mode === "carousel" ? "Carrousel" : it.mode === "video" ? "Vidéo" : "Visuel"}</strong>{" "}— ratio{" "}
-            <strong>{it.ratio}</strong>
-            <strong>{it.mode === "carousel" ? "Carrousel" : it.mode === "video" ? "Vidéo" : "Visuel"}</strong>{" "}
-            — ratio <strong>{it.ratio}</strong>
-            {it.platform ? (
-              <>
-                {" "}— <strong>{it.platform}</strong>
-              </>
-            ) : null}
-            {it.tone ? (
-              <>
-                {" "}— ton <strong>{it.tone}</strong>
-              </>
-            ) : null}.
-          </p>
-        )
-        : modeCoach === "da"
-        ? (
-          <p>
-            <strong>Direction créative</strong> pour &quot;{it.topic}&quot;
-          </p>
-        )
-        : (
-          <p>
-            <strong>Prêt à produire</strong> — je te pré-remplis Studio.
-          </p>
-        );
+      modeCoach === "strategy" ? (
+        <p>
+          <strong>{it.mode === "carousel" ? "Carrousel" : it.mode === "video" ? "Vidéo" : "Visuel"}</strong> — ratio{" "}
+          <strong>{it.ratio}</strong>
+          {it.platform ? (
+            <>
+              {" "}
+              — <strong>{it.platform}</strong>
+            </>
+          ) : null}
+          {it.tone ? (
+            <>
+              {" "}
+              — ton <strong>{it.tone}</strong>
+            </>
+          ) : null}
+          .
+        </p>
+      ) : modeCoach === "da" ? (
+        <p>
+          <strong>Direction créative</strong> pour &quot;{it.topic}&quot;
+        </p>
+      ) : (
+        <p>
+          <strong>Prêt à produire</strong> — je te pré-remplis Studio.
+        </p>
+      );
 
     let body: ReactNode = null;
 
@@ -287,7 +221,6 @@ export default function ChatWidget() {
         it.mode === "video"
           ? chooseVideoVariant({ topic: it.topic ?? undefined, cta: it.cta ?? undefined }, seed)
           : chooseImageVariant({ topic: it.topic ?? undefined, cta: it.cta ?? undefined }, seed);
-
       next();
       body = v;
     }
@@ -298,13 +231,11 @@ export default function ChatWidget() {
         <div className="space-y-2">
           {header}
           {body}
-          <div className="pt-1">
-            {primaryBtn("Pré-remplir Studio", prefillStudio)}
-          </div>
+          <div className="pt-1">{primaryBtn("Pré-remplir Studio", prefillStudio)}</div>
         </div>
       ),
     };
-  };
+  }
 
   async function replyContentWithAI(raw: string): Promise<AssistantReply> {
     const it = detectContentIntent(raw);
@@ -320,30 +251,16 @@ export default function ChatWidget() {
     });
 
     if (!it.topic) {
-      const suggestions = [
-        "Carrousel 5 slides 4:5 Instagram : 3 erreurs en pub Meta pour PME",
-        "Visuel 1:1 LinkedIn : annonce webinar IA marketing",
-        "Vidéo 9:16 TikTok : astuces Canva pour solopreneurs",
-      ];
-      return {
-        role: "assistant" as const,
-        node: (
-          <div className="space-y-3">
-            <p className="text-sm">
-              Donne-moi un <strong>sujet précis</strong>. Exemples :
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {suggestions.map((s) => chip(s, () => setInput(s)))}
-            </div>
-          </div>
-        ),
-      };
+      return replyContent(raw);
     }
 
     let clearThinking: (() => void) | undefined;
     const showThinking = () => {
       pushAssistant(
-        <span className="inline-block rounded-2xl px-3 py-2 text-sm bg-white border" style={{ borderColor: BRAND.grayBorder }}>
+        <span
+          className="inline-block rounded-2xl px-3 py-2 text-sm bg-white border"
+          style={{ borderColor: BRAND.grayBorder }}
+        >
           ⏳ Alfie réfléchit...
         </span>,
       );
@@ -364,18 +281,14 @@ export default function ChatWidget() {
         },
       });
 
-      if (error) {
-        console.error("chat-ai-assistant invoke error", error);
-        if (clearThinking) {
-          clearThinking();
-          clearThinking = undefined;
-        }
-        return buildErrorReply(error.message);
-      }
-
       if (clearThinking) {
         clearThinking();
         clearThinking = undefined;
+      }
+
+      if (error) {
+        console.error("chat-ai-assistant invoke error", error);
+        return buildErrorReply(error.message);
       }
 
       if (!data?.ok) {
@@ -409,11 +322,8 @@ export default function ChatWidget() {
       };
     } catch (error) {
       console.error("AI response error:", error);
-      if (clearThinking) {
-        clearThinking();
-        clearThinking = undefined;
-      }
-      return buildErrorReply();
+      if (clearThinking) clearThinking();
+      return replyContent(raw);
     }
   }
 
@@ -458,7 +368,11 @@ export default function ChatWidget() {
         <button
           onClick={() => setOpen(true)}
           className="fixed bottom-6 right-6 rounded-full shadow-lg w-14 h-14 grid place-items-center hover:scale-105 transition"
-          style={{ background: `linear-gradient(135deg, ${BRAND.mint}, ${BRAND.mintDark})`, color: "white", zIndex: 9999 }}
+          style={{
+            background: `linear-gradient(135deg, ${BRAND.mint}, ${BRAND.mintDark})`,
+            color: "white",
+            zIndex: 9999,
+          }}
           aria-label="Ouvrir Alfie Chat"
         >
           <MessageCircle className="w-6 h-6" />
@@ -470,9 +384,19 @@ export default function ChatWidget() {
           className="fixed bottom-6 right-6 w-[360px] max-w-[95vw] h-[520px] rounded-2xl shadow-2xl border flex flex-col"
           style={{ background: BRAND.light, borderColor: BRAND.grayBorder, zIndex: 9999 }}
         >
-          <div className="flex items-center justify-between p-3 border-b" style={{ background: `${BRAND.mint}22`, borderColor: BRAND.grayBorder }}>
-            <div className="font-medium" style={{ color: BRAND.text }}>Alfie Chat (coach &amp; DA)</div>
-            <button onClick={() => setOpen(false)} className="p-2 rounded hover:bg-white/50" style={{ color: BRAND.text }} aria-label="Fermer">
+          <div
+            className="flex items-center justify-between p-3 border-b"
+            style={{ background: `${BRAND.mint}22`, borderColor: BRAND.grayBorder }}
+          >
+            <div className="font-medium" style={{ color: BRAND.text }}>
+              Alfie Chat (coach & DA)
+            </div>
+            <button
+              onClick={() => setOpen(false)}
+              className="p-2 rounded hover:bg-white/50"
+              style={{ color: BRAND.text }}
+              aria-label="Fermer"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -495,7 +419,7 @@ export default function ChatWidget() {
 
           <div className="flex-1 overflow-auto p-3 space-y-2" style={{ color: BRAND.ink }}>
             {msgs.length === 0 ? (
-              <p className="text-sm">Pose-moi une question sur tes visuels, formats, idées… Je ne lance pas la génération — je te guide ✨</p>
+              <p className="text-sm">Pose-moi une question sur tes visuels, formats, idées… Je te guide ✨</p>
             ) : (
               msgs.map((m, i) => (
                 <div key={i} className={m.role === "user" ? "text-right" : "text-left"}>
@@ -510,8 +434,10 @@ export default function ChatWidget() {
               <div className="flex flex-wrap gap-2">
                 {chip("Que peut faire Alfie ?", () => setInput("Que peut faire Alfie ?"))}
                 {chip("Où gérer mon abonnement ?", () => setInput("Où gérer mon abonnement ?"))}
-                {chip("Carrousel 5 slides 4:5 Instagram : 3 idées Reels pour PME", () => setInput("Carrousel 5 slides 4:5 Instagram : 3 idées Reels pour PME"))}
-                {chip("Vidéo 9:16 TikTok : astuces Canva", () => setInput("Vidéo 9:16 TikTok : astuces Canva"))}
+                {chip("Carrousel Instagram", () =>
+                  setInput("Carrousel 5 slides 4:5 Instagram : 3 idées Reels pour PME"),
+                )}
+                {chip("Vidéo TikTok", () => setInput("Vidéo 9:16 TikTok : astuces Canva"))}
               </div>
             </div>
           )}
@@ -531,9 +457,7 @@ export default function ChatWidget() {
               placeholder="Pose une question…"
             />
             <button
-              onClick={() => {
-                void handleSend();
-              }}
+              onClick={() => void handleSend()}
               className="px-3 py-2 rounded-md text-sm font-medium text-white disabled:opacity-50"
               style={{ background: `linear-gradient(135deg, ${BRAND.mint}, ${BRAND.mintDark})` }}
               disabled={!input.trim()}
@@ -544,6 +468,6 @@ export default function ChatWidget() {
         </div>
       )}
     </>,
-    portalTarget
+    portalTarget,
   );
 }
