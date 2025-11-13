@@ -26,6 +26,8 @@ type UploadedSource = {
 };
 
 import type { Database } from "@/integrations/supabase/types";
+import { getAspectClass } from "@/types/chat";
+import type { LibraryAsset as OrderAsset } from "@/types/chat";
 
 type JobEntry = Database['public']['Tables']['job_queue']['Row'];
 
@@ -39,6 +41,17 @@ type MediaEntry = {
   metadata?: Record<string, any> | null;
   created_at: string;
 };
+
+type OrderRow = Database['public']['Tables']['orders']['Row'];
+
+interface OrderSummary {
+  order: OrderRow;
+  assets: OrderAsset[];
+  isProcessing: boolean;
+  expectedTotal: number;
+  completedCount: number;
+  activeJobs: number;
+}
 
 // Exemples de prompts suggérés (Phase 3)
 const PROMPT_EXAMPLES = {
@@ -79,6 +92,9 @@ const IMAGE_SIZE_MAP: Record<AspectRatio, { width: number; height: number }> = {
 };
 
 // const CURRENT_JOB_VERSION = 2; // Temporarily disabled until types regenerate
+
+const isRecord = (value: unknown): value is Record<string, any> =>
+  typeof value === "object" && value !== null;
 
 function extractMediaUrl(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
@@ -128,6 +144,9 @@ export function ChatGenerator() {
   const [assets, setAssets] = useState<MediaEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [orderSummaries, setOrderSummaries] = useState<OrderSummary[]>([]);
+  const [orderSummariesLoading, setOrderSummariesLoading] = useState(false);
+  const [orderSummariesError, setOrderSummariesError] = useState<string | null>(null);
 
   const { toast: showToast } = useToast();
 
@@ -165,6 +184,216 @@ export function ChatGenerator() {
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
   };
 
+  const fetchOrderSummaries = useCallback(
+    async (userId: string, orderIdFilter: string | null) => {
+      if (!activeBrandId) {
+        setOrderSummaries([]);
+        setOrderSummariesError(null);
+        setOrderSummariesLoading(false);
+        return;
+      }
+
+      setOrderSummariesLoading(true);
+      setOrderSummariesError(null);
+
+      try {
+        let ordersQuery = supabase
+          .from("orders")
+          .select("id, status, created_at, campaign_name")
+          .eq("user_id", userId)
+          .eq("brand_id", activeBrandId)
+          .order("created_at", { ascending: false });
+
+        if (orderIdFilter) {
+          ordersQuery = ordersQuery.eq("id", orderIdFilter);
+        } else {
+          ordersQuery = ordersQuery.limit(6);
+        }
+
+        const { data: ordersData, error: ordersError } = await ordersQuery;
+        if (ordersError) throw ordersError;
+
+        const orders = ordersData ?? [];
+        if (orders.length === 0) {
+          setOrderSummaries([]);
+          return;
+        }
+
+        const orderIds = orders.map((order) => order.id);
+        const orderIdSet = new Set(orderIds);
+
+        const [libraryResp, jobsResp, itemsResp, videosResp] = await Promise.all([
+          supabase
+            .from("library_assets")
+            .select(
+              "id, order_id, type, cloudinary_url, cloudinary_public_id, text_json, format, slide_index, metadata",
+            )
+            .eq("user_id", userId)
+            .eq("brand_id", activeBrandId)
+            .in("order_id", orderIds),
+          supabase
+            .from("job_queue")
+            .select("id, order_id, status")
+            .eq("user_id", userId)
+            .in("order_id", orderIds),
+          supabase
+            .from("order_items")
+            .select("id, order_id, type, brief_json")
+            .in("order_id", orderIds),
+          supabase
+            .from("media_generations")
+            .select("id, type, status, output_url, thumbnail_url, metadata, created_at")
+            .eq("user_id", userId)
+            .eq("brand_id", activeBrandId)
+            .in("type", ["video"])
+            .order("created_at", { ascending: false })
+            .limit(50),
+        ]);
+
+        if (libraryResp.error) throw libraryResp.error;
+        if (jobsResp.error) throw jobsResp.error;
+        if (itemsResp.error) throw itemsResp.error;
+        if (videosResp.error) throw videosResp.error;
+
+        const ensurePositiveInt = (value: unknown): number | null => {
+          const parsed = Number(value);
+          if (!Number.isFinite(parsed)) return null;
+          const rounded = Math.round(parsed);
+          return rounded > 0 ? rounded : null;
+        };
+
+        const expectedTotals = new Map<string, number>();
+        const incrementExpected = (id: string, count: number) => {
+          if (!orderIdSet.has(id)) return;
+          const current = expectedTotals.get(id) ?? 0;
+          expectedTotals.set(id, current + count);
+        };
+
+        for (const item of itemsResp.data ?? []) {
+          if (!orderIdSet.has(item.order_id)) continue;
+          const brief: any = item.brief_json ?? {};
+          if (item.type === "carousel") {
+            const slidesLength = Array.isArray(brief?.slides) ? brief.slides.length : null;
+            const candidates = [
+              ensurePositiveInt(brief?.slideCount),
+              ensurePositiveInt(slidesLength),
+              ensurePositiveInt(brief?.briefs?.[0]?.numSlides),
+              ensurePositiveInt(brief?.count),
+              ensurePositiveInt(brief?.numSlides),
+            ];
+            const slideCount = candidates.find((value) => typeof value === "number" && value > 0) ?? 5;
+            incrementExpected(item.order_id, slideCount);
+          } else if (item.type === "image") {
+            const imageCandidates = [
+              ensurePositiveInt(brief?.count),
+              ensurePositiveInt(brief?.quantity),
+              ensurePositiveInt(Array.isArray(brief?.images) ? brief.images.length : null),
+            ];
+            const imageCount = imageCandidates.find((value) => typeof value === "number" && value > 0) ?? 1;
+            incrementExpected(item.order_id, imageCount);
+          } else if (item.type === "video") {
+            const videoCount = ensurePositiveInt(brief?.count) ?? 1;
+            incrementExpected(item.order_id, videoCount);
+          } else {
+            incrementExpected(item.order_id, 1);
+          }
+        }
+
+        const assetsByOrder = new Map<string, OrderAsset[]>();
+        const pushAsset = (id: string, asset: OrderAsset) => {
+          if (!orderIdSet.has(id)) return;
+          const bucket = assetsByOrder.get(id);
+          if (bucket) {
+            bucket.push(asset);
+          } else {
+            assetsByOrder.set(id, [asset]);
+          }
+        };
+
+        for (const asset of libraryResp.data ?? []) {
+          if (!asset.order_id) continue;
+          pushAsset(asset.order_id, {
+            id: asset.id,
+            url: asset.cloudinary_url,
+            publicId: asset.cloudinary_public_id ?? undefined,
+            text: isRecord(asset.text_json) ? (asset.text_json as any) : undefined,
+            slideIndex: asset.slide_index ?? 0,
+            type: asset.type,
+            format: asset.format ?? undefined,
+          });
+        }
+
+        for (const video of videosResp.data ?? []) {
+          if (video.type !== "video") continue;
+          const meta = isRecord(video.metadata) ? video.metadata : {};
+          const linkedOrderId =
+            typeof meta.orderId === "string"
+              ? meta.orderId
+              : typeof meta.order_id === "string"
+                ? meta.order_id
+                : null;
+          if (!linkedOrderId || !orderIdSet.has(linkedOrderId)) continue;
+
+          pushAsset(linkedOrderId, {
+            id: video.id,
+            url: typeof video.output_url === "string" ? video.output_url : "",
+            thumbnailUrl: typeof video.thumbnail_url === "string" ? video.thumbnail_url : undefined,
+            slideIndex: 0,
+            type: "video",
+            format: (meta?.aspectRatio as string | undefined) ?? undefined,
+          });
+        }
+
+        const activeStatuses = new Set(["queued", "running"]);
+        const activeJobsByOrder = new Map<string, number>();
+        for (const job of jobsResp.data ?? []) {
+          if (!job.order_id || !orderIdSet.has(job.order_id)) continue;
+          if (activeStatuses.has(job.status)) {
+            activeJobsByOrder.set(job.order_id, (activeJobsByOrder.get(job.order_id) ?? 0) + 1);
+          }
+        }
+
+        const summaries: OrderSummary[] = orders.map((order) => {
+          const assetsForOrder = assetsByOrder.get(order.id) ?? [];
+          const sortedAssets = [...assetsForOrder].sort((a, b) => {
+            if (a.type === "carousel_slide" && b.type === "carousel_slide") {
+              return (a.slideIndex ?? 0) - (b.slideIndex ?? 0);
+            }
+            if (a.type === "carousel_slide") return -1;
+            if (b.type === "carousel_slide") return 1;
+            return 0;
+          });
+
+          const expectedTotal = expectedTotals.get(order.id) ?? 0;
+          const completedCount = sortedAssets.length;
+          const activeJobs = activeJobsByOrder.get(order.id) ?? 0;
+          const isProcessing =
+            activeJobs > 0 ||
+            (expectedTotal > 0 ? completedCount < expectedTotal : completedCount === 0);
+
+          return {
+            order,
+            assets: sortedAssets,
+            isProcessing,
+            expectedTotal,
+            completedCount,
+            activeJobs,
+          };
+        });
+
+        setOrderSummaries(summaries);
+      } catch (err) {
+        console.error("[Studio] fetchOrderSummaries error:", err);
+        setOrderSummariesError(
+          err instanceof Error ? err.message : "Impossible de charger les commandes récentes",
+        );
+      } finally {
+        setOrderSummariesLoading(false);
+      }
+    },
+    [activeBrandId],
+  );
+
   const refetchAll = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -194,7 +423,6 @@ export function ChatGenerator() {
 
       if (orderId) {
         jobsQuery = jobsQuery.eq("order_id", orderId);
-        assetsQuery = assetsQuery.eq("order_id", orderId);
       }
 
       const [jobsResponse, assetsResponse] = await Promise.all([
@@ -206,7 +434,25 @@ export function ChatGenerator() {
       if (assetsResponse.error) throw assetsResponse.error;
 
       setJobs((jobsResponse.data as JobEntry[]) ?? []);
-      setAssets((assetsResponse.data || []) as MediaEntry[]);
+
+      const rawAssets = (assetsResponse.data || []) as MediaEntry[];
+      const filteredAssets = orderId
+        ? rawAssets.filter((item) => {
+            if (item.order_id === orderId) return true;
+            if (!item.metadata) return false;
+            const meta = isRecord(item.metadata) ? item.metadata : null;
+            if (!meta) return false;
+            const metaOrderId =
+              (meta.orderId as string | undefined) ??
+              (meta.order_id as string | undefined) ??
+              (meta.orderID as string | undefined);
+            return metaOrderId === orderId;
+          })
+        : rawAssets;
+
+      setAssets(filteredAssets);
+
+      await fetchOrderSummaries(currentUser.id, orderId);
     } catch (err) {
       console.error("[Studio] refetchAll error:", err);
       setJobs([]);
@@ -216,7 +462,7 @@ export function ChatGenerator() {
     } finally {
       setLoading(false);
     }
-  }, [orderId]);
+  }, [orderId, fetchOrderSummaries]);
 
   useEffect(() => {
     let mounted = true;
@@ -250,6 +496,13 @@ export function ChatGenerator() {
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "media_generations", filter: `user_id=eq.${currentUser.id}` },
+          () => {
+            if (mounted) void refetchAll();
+          },
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "library_assets", filter: `user_id=eq.${currentUser.id}` },
           () => {
             if (mounted) void refetchAll();
           },
@@ -460,8 +713,46 @@ export function ChatGenerator() {
 
       if (error) throw error;
 
+      const responseRecord = isRecord(data) ? data : null;
+      const isStructuredResponse =
+        responseRecord && ("ok" in responseRecord || "data" in responseRecord);
+
+      if (isStructuredResponse) {
+        if ("ok" in responseRecord && responseRecord.ok === false) {
+          const structuredError =
+            typeof responseRecord.error === "string"
+              ? responseRecord.error
+              : isRecord(responseRecord.data) && typeof responseRecord.data.error === "string"
+                ? responseRecord.data.error
+                : "Erreur de génération";
+          throw new Error(structuredError);
+        }
+
+        const nestedData = isRecord(responseRecord.data)
+          ? (responseRecord.data as Record<string, unknown>)
+          : null;
+        const responseOrderId =
+          (typeof nestedData?.orderId === "string" && nestedData.orderId) ||
+          (typeof responseRecord.orderId === "string" ? responseRecord.orderId : null);
+
+        if (!responseOrderId) {
+          throw new Error("no orderId in response");
+        }
+
+        await refetchAll();
+        if (responseOrderId !== orderId) {
+          navigate(`/studio?order=${responseOrderId}`);
+        }
+
+        showToast({
+          title: "Génération lancée",
+          description: "Ton visuel arrive dans le Studio dans quelques instants.",
+        });
+        return;
+      }
+
       const imageUrl = extractMediaUrl(data);
-      if (!imageUrl) throw new Error("No image URL in response");
+      if (!imageUrl) throw new Error("no orderId in response");
 
       setGeneratedAsset({ url: imageUrl, type: "image" });
       showToast({ title: "Image générée !", description: "Prête à télécharger" });
@@ -476,7 +767,16 @@ export function ChatGenerator() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [prompt, uploadedSource, aspectRatio, activeBrandId, showToast]);
+  }, [
+    prompt,
+    uploadedSource,
+    aspectRatio,
+    activeBrandId,
+    showToast,
+    refetchAll,
+    orderId,
+    navigate,
+  ]);
 
   const handleGenerateVideo = useCallback(async () => {
     try {
@@ -729,6 +1029,157 @@ export function ChatGenerator() {
               </>
             )}
           </Button>
+        </Card>
+
+        <Card className="p-6 mt-6">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold">Générations récentes</h3>
+              <p className="text-xs text-muted-foreground">
+                {activeBrandId
+                  ? "Suivez vos dernières commandes et leur statut."
+                  : "Sélectionnez une marque pour afficher vos générations."}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                void refetchAll();
+              }}
+              disabled={orderSummariesLoading || loading}
+            >
+              {orderSummariesLoading ? (
+                <span className="flex items-center gap-1 text-xs">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  …
+                </span>
+              ) : (
+                "Rafraîchir"
+              )}
+            </Button>
+          </div>
+
+          {orderSummariesError && (
+            <div className="text-xs text-red-600 mb-3">{orderSummariesError}</div>
+          )}
+
+          {orderSummariesLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Chargement des commandes…
+            </div>
+          ) : !activeBrandId ? (
+            <p className="text-sm text-muted-foreground">
+              Sélectionnez une marque pour commencer à générer des visuels.
+            </p>
+          ) : orderSummaries.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Aucune génération récente pour le moment.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {orderSummaries.map((summary) => {
+                const orderShort = summary.order.id.slice(0, 8);
+                const completedLabel = summary.expectedTotal > 0
+                  ? `${summary.completedCount}/${summary.expectedTotal} visuel${summary.expectedTotal > 1 ? "s" : ""}`
+                  : `${summary.completedCount} visuel${summary.completedCount > 1 ? "s" : ""}`;
+
+                return (
+                  <div key={summary.order.id} className="rounded-lg border p-3 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">
+                          {summary.order.campaign_name || `Commande ${orderShort}`}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          #{orderShort} · {formatDate(summary.order.created_at ?? "")}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{completedLabel}</p>
+                      </div>
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full ${
+                          summary.isProcessing
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-emerald-100 text-emerald-800"
+                        }`}
+                      >
+                        {summary.isProcessing ? "En génération…" : "Prêt"}
+                      </span>
+                    </div>
+
+                    {summary.assets.length > 0 && (
+                      <div className="grid gap-2 grid-cols-2 md:grid-cols-3">
+                        {summary.assets.map((asset) => {
+                          const aspectClass =
+                            asset.type === "video"
+                              ? "aspect-video"
+                              : getAspectClass(asset.format ?? "4:5");
+                          const altText =
+                            asset.text?.title ||
+                            (asset.type === "carousel_slide"
+                              ? `Slide ${asset.slideIndex + 1}`
+                              : "Visuel généré");
+
+                          return (
+                            <div
+                              key={asset.id}
+                              className={`relative w-full overflow-hidden rounded-md bg-muted ${aspectClass}`}
+                            >
+                              {asset.type === "video" ? (
+                                asset.url ? (
+                                  <video
+                                    src={asset.url}
+                                    poster={asset.thumbnailUrl ?? undefined}
+                                    className="absolute inset-0 h-full w-full object-cover"
+                                    muted
+                                    loop
+                                    playsInline
+                                  />
+                                ) : (
+                                  <div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground">
+                                    Aperçu indisponible
+                                  </div>
+                                )
+                              ) : asset.url ? (
+                                <img
+                                  src={asset.url}
+                                  alt={altText}
+                                  className="absolute inset-0 h-full w-full object-cover"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground">
+                                  Aperçu indisponible
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <Button asChild variant="link" size="sm" className="px-0">
+                        <a
+                          href={`/library?order=${summary.order.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Voir dans la bibliothèque
+                        </a>
+                      </Button>
+                      {summary.activeJobs > 0 && (
+                        <span>
+                          {summary.activeJobs} job{summary.activeJobs > 1 ? "s" : ""} en cours
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </Card>
 
         <div className="grid gap-6 mt-6 lg:grid-cols-2">

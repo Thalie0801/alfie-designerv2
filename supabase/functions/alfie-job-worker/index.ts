@@ -362,11 +362,11 @@ async function processRenderImage(payload: any) {
   const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
     user_id: userId,
     brand_id: brandId,
-    order_id: orderId,
     type: "image",
     status: "completed",
     output_url: imageUrl,
-    metadata: { prompt, sourceUrl },
+    thumbnail_url: imageUrl,
+    metadata: { prompt, sourceUrl, orderId },
     expires_at: expiresAt,
   });
   if (mediaErr) throw new Error(mediaErr.message);
@@ -377,11 +377,8 @@ async function processRenderImage(payload: any) {
     order_id: orderId,
     type: "image",
     cloudinary_url: imageUrl,
-    src_url: imageUrl,
-    title: typeof prompt === "string" && prompt.trim() ? prompt.trim().slice(0, 80) : "Image",
     tags: ["studio", "auto"],
-    expires_at: expiresAt,
-    metadata: { prompt, sourceUrl },
+    metadata: { prompt, sourceUrl, orderId },
   } as any);
   if (libErr) throw new Error(libErr.message);
 
@@ -785,6 +782,10 @@ async function processGenerateVideo(payload: any) {
 
   if (!videoUrl) throw new Error("Missing video_url from renderer response");
 
+  const thumbnailUrl =
+    getResultValue<string>(renderPayload, ["thumbnail_url", "thumbnailUrl", "preview_url", "previewUrl"]) ??
+    getResultValue<string>(renderResult, ["thumbnail_url", "thumbnailUrl", "preview_url", "previewUrl"]);
+
   const seconds = Number(duration) || 12;
   const woofs = Math.max(1, Math.ceil(seconds / 12));
 
@@ -797,10 +798,10 @@ async function processGenerateVideo(payload: any) {
   const { error: assetErr } = await supabaseAdmin.from("media_generations").insert({
     user_id: userId,
     brand_id: brandId,
-    order_id: orderId,
     type: "video",
     status: "completed",
     output_url: videoUrl,
+    thumbnail_url: thumbnailUrl ?? null,
     metadata: {
       aspectRatio,
       duration: seconds,
@@ -809,6 +810,8 @@ async function processGenerateVideo(payload: any) {
       sourceType,
       generator: "generate-video",
       woofs,
+      orderId,
+      thumbnailUrl: thumbnailUrl ?? undefined,
     },
   });
   if (assetErr) throw new Error(assetErr.message);
