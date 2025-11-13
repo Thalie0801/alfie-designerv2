@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { MessageCircle, X } from "lucide-react";
-import { useBrief } from "@/hooks/useBrief";
+import { useBrief, type Brief } from "@/hooks/useBrief";
 import { detectContentIntent, detectPlatformHelp } from "@/lib/chat/detect";
 import { chooseCarouselOutline, chooseImageVariant, chooseVideoVariant } from "@/lib/chat/coachPresets";
 import { whatCanDoBlocks } from "@/lib/chat/helpMap";
@@ -118,7 +118,7 @@ export default function ChatWidget() {
     const it = detectContentIntent(raw);
 
     brief.merge({
-      platform: it.platform || brief.state.platform,
+      platform: (it.platform || brief.state.platform) as Brief["platform"],
       format: it.mode,
       ratio: it.ratio,
       tone: it.tone || brief.state.tone,
@@ -203,11 +203,11 @@ export default function ChatWidget() {
         </>
       );
     } else if (it.mode === "video") {
-      const v = chooseVideoVariant(it, seed);
+      const v = chooseVideoVariant({ topic: it.topic ?? undefined, cta: it.cta ?? undefined }, seed);
       next();
       body = v;
     } else {
-      const v = chooseImageVariant(it, seed);
+      const v = chooseImageVariant({ topic: it.topic ?? undefined, cta: it.cta ?? undefined }, seed);
       next();
       body = v;
     }

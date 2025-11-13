@@ -25,18 +25,9 @@ type UploadedSource = {
   name: string;
 };
 
-type JobEntry = {
-  id: string;
-  type: string;
-  status: string;
-  order_id: string | null;
-  created_at: string;
-  updated_at: string;
-  error?: string | null;
-  error_message?: string | null;
-  payload?: unknown;
-  user_id: string;
-};
+import type { Database } from "@/integrations/supabase/types";
+
+type JobEntry = Database['public']['Tables']['job_queue']['Row'];
 
 type MediaEntry = {
   id: string;
@@ -791,7 +782,7 @@ export function ChatGenerator() {
             ) : (
               <div className="space-y-3">
                 {jobs.map((job) => {
-                  const jobError = job.error_message || job.error;
+                  const jobError = job.error;
                   const isLegacy = false; // Will be re-enabled after types regenerate
 
                   return (
