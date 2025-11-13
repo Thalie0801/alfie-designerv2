@@ -266,17 +266,12 @@ export default function ChatWidget() {
           </div>
         </>
       );
-    } else if (it.mode === "video") {
-      const v = chooseVideoVariant(it, seed);
-      next();
-      body = v;
     } else {
-      const v = chooseImageVariant(it, seed);
-      const v = chooseVideoVariant({ topic: it.topic ?? undefined, cta: it.cta ?? undefined }, seed);
-      next();
-      body = v;
-    } else {
-      const v = chooseImageVariant({ topic: it.topic ?? undefined, cta: it.cta ?? undefined }, seed);
+      const v =
+        it.mode === "video"
+          ? chooseVideoVariant({ topic: it.topic ?? undefined, cta: it.cta ?? undefined }, seed)
+          : chooseImageVariant({ topic: it.topic ?? undefined, cta: it.cta ?? undefined }, seed);
+
       next();
       body = v;
     }
