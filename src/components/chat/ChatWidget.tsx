@@ -1,6 +1,9 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { MessageCircle, X } from "lucide-react";
+import { useBrief } from "@/hooks/useBrief";
+import { useBrandKit } from "@/hooks/useBrandKit";
+import { supabase } from "@/integrations/supabase/client";
 import { useBrief, type Brief } from "@/hooks/useBrief";
 import { detectContentIntent, detectPlatformHelp } from "@/lib/chat/detect";
 import { chooseCarouselOutline, chooseImageVariant, chooseVideoVariant } from "@/lib/chat/coachPresets";
@@ -18,6 +21,7 @@ export default function ChatWidget() {
   const [seed, setSeed] = useState(0);
 
   const brief = useBrief();
+  const { brandKit } = useBrandKit();
 
   const BRAND = useMemo(
     () =>
@@ -39,6 +43,59 @@ export default function ChatWidget() {
   if (disabled) return null;
 
   const coachModes: CoachMode[] = ["strategy", "da", "maker"];
+
+  const chip = (label: string, onClick: () => void) => (
+    <button
+      key={label}
+      onClick={onClick}
+      className="border rounded-full px-3 py-1 text-xs hover:bg-gray-50"
+      style={{ borderColor: BRAND.grayBorder }}
+    >
+      {label}
+    </button>
+  );
+
+  const navBtn = (href: string, label: string) => (
+    <a
+      key={label}
+      href={href}
+      className="inline-block mr-2 mb-2 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50"
+      style={{ background: "#ffffff", border: `1px solid ${BRAND.grayBorder}`, color: BRAND.ink }}
+    >
+      {label}
+    </a>
+  );
+
+  const primaryBtn = (label: string, onClick: () => void) => (
+    <button
+      onClick={onClick}
+      type="button"
+      className="inline-block mt-1 px-3 py-2 rounded-md text-sm font-medium text-white"
+      style={{ background: `linear-gradient(135deg, ${BRAND.mint}, ${BRAND.mintDark})` }}
+    >
+      {label}
+    </button>
+  );
+
+  function prefillStudio() {
+    const data = JSON.stringify(brief.state);
+    try {
+      sessionStorage.setItem("alfie_prefill_brief", data);
+    } catch (_error) {
+      /* ignore session storage errors */
+    }
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams();
+      params.set("mode", brief.state.format || "image");
+      if (brief.state.ratio) params.set("ratio", brief.state.ratio);
+      if (brief.state.slides) params.set("slides", String(brief.state.slides));
+      if (brief.state.topic) params.set("topic", brief.state.topic);
+      if (brief.state.cta) params.set("cta", brief.state.cta);
+      const url = `/studio?${params.toString()}`;
+      window.location.assign(url);
+    }
+  }
+
 
   const chip = (label: string, onClick: () => void) => (
     <button
@@ -114,6 +171,11 @@ export default function ChatWidget() {
     return null;
   }
 
+  const pushAssistant = (node: ReactNode) => {
+    setMsgs((m) => [...m, { role: "assistant", node }]);
+  };
+
+  const buildTemplateReply = (it: ReturnType<typeof detectContentIntent>): AssistantReply => {
   function replyContent(raw: string): AssistantReply {
     const it = detectContentIntent(raw);
 
@@ -155,6 +217,8 @@ export default function ChatWidget() {
       modeCoach === "strategy"
         ? (
           <p>
+            <strong>{it.mode === "carousel" ? "Carrousel" : it.mode === "video" ? "Vidéo" : "Visuel"}</strong>{" "}— ratio{" "}
+            <strong>{it.ratio}</strong>
             <strong>{it.mode === "carousel" ? "Carrousel" : it.mode === "video" ? "Vidéo" : "Visuel"}</strong>{" "}
             — ratio <strong>{it.ratio}</strong>
             {it.platform ? (
@@ -203,6 +267,11 @@ export default function ChatWidget() {
         </>
       );
     } else if (it.mode === "video") {
+      const v = chooseVideoVariant(it, seed);
+      next();
+      body = v;
+    } else {
+      const v = chooseImageVariant(it, seed);
       const v = chooseVideoVariant({ topic: it.topic ?? undefined, cta: it.cta ?? undefined }, seed);
       next();
       body = v;
@@ -224,6 +293,113 @@ export default function ChatWidget() {
         </div>
       ),
     };
+  };
+
+  async function replyContentWithAI(raw: string): Promise<AssistantReply> {
+    const it = detectContentIntent(raw);
+
+    brief.merge({
+      platform: it.platform || brief.state.platform,
+      format: it.mode,
+      ratio: it.ratio,
+      tone: it.tone || brief.state.tone,
+      slides: it.slides ?? brief.state.slides,
+      topic: it.topic || brief.state.topic,
+      cta: it.cta || brief.state.cta,
+    });
+
+    if (!it.topic) {
+      const suggestions = [
+        "Carrousel 5 slides 4:5 Instagram : 3 erreurs en pub Meta pour PME",
+        "Visuel 1:1 LinkedIn : annonce webinar IA marketing",
+        "Vidéo 9:16 TikTok : astuces Canva pour solopreneurs",
+      ];
+      return {
+        role: "assistant" as const,
+        node: (
+          <div className="space-y-3">
+            <p className="text-sm">
+              Donne-moi un <strong>sujet précis</strong>. Exemples :
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {suggestions.map((s) => chip(s, () => setInput(s)))}
+            </div>
+          </div>
+        ),
+      };
+    }
+
+    let clearThinking: (() => void) | undefined;
+    const showThinking = () => {
+      pushAssistant(
+        <span className="inline-block rounded-2xl px-3 py-2 text-sm bg-white border" style={{ borderColor: BRAND.grayBorder }}>
+          ⏳ Alfie réfléchit...
+        </span>,
+      );
+      return () => setMsgs((prev) => prev.slice(0, -1));
+    };
+
+    try {
+      clearThinking = showThinking();
+      const { data, error } = await supabase.functions.invoke<{ message?: string }>("chat-ai-assistant", {
+        body: {
+          message: raw,
+          context: {
+            contentType: it.mode,
+            platform: it.platform,
+            brief: brief.state,
+            brandKit,
+          },
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (clearThinking) {
+        clearThinking();
+        clearThinking = undefined;
+      }
+
+      const aiResponse = data?.message || "Je peux t'aider à créer ce contenu !";
+
+      return {
+        role: "assistant" as const,
+        node: (
+          <div className="space-y-2 bg-white rounded-lg p-3 border" style={{ borderColor: BRAND.grayBorder }}>
+            <p className="text-sm whitespace-pre-wrap">{aiResponse}</p>
+            <div className="flex gap-2 pt-2 flex-wrap">
+              {primaryBtn("Créer maintenant →", prefillStudio)}
+              <button
+                onClick={() => {
+                  const newPrompt = `${it.mode} ${it.ratio} ${it.platform || ""} : ${it.topic}`.trim();
+                  setInput(newPrompt);
+                }}
+                type="button"
+                className="px-3 py-2 text-sm border rounded-md hover:bg-gray-50"
+                style={{ borderColor: BRAND.grayBorder }}
+              >
+                Affiner
+              </button>
+            </div>
+          </div>
+        ),
+      };
+    } catch (error) {
+      console.error("AI response error:", error);
+      if (clearThinking) {
+        clearThinking();
+        clearThinking = undefined;
+      }
+      return buildTemplateReply(it);
+    }
+  }
+
+  async function makeReply(raw: string): Promise<AssistantReply | null> {
+    const concierge = replyPlatform(raw);
+    if (concierge) return concierge;
+    return await replyContentWithAI(raw);
   }
 
   function makeReply(raw: string): AssistantReply | null {
@@ -249,11 +425,16 @@ export default function ChatWidget() {
     ]);
   }
 
+  const handleSend = async () => {
   function handleSend() {
     const text = input.trim();
     if (!text) return;
     setInput("");
     pushUser(text);
+    const reply = await makeReply(text);
+    if (!reply) return;
+    setMsgs((m) => [...m, reply]);
+  };
     const reply = makeReply(text);
     if (!reply) return;
     setTimeout(() => setMsgs((m) => [...m, reply]), 60);
@@ -333,6 +514,7 @@ export default function ChatWidget() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
+                  void handleSend();
                   handleSend();
                 }
               }}
@@ -341,6 +523,9 @@ export default function ChatWidget() {
               placeholder="Pose une question…"
             />
             <button
+              onClick={() => {
+                void handleSend();
+              }}
               onClick={handleSend}
               className="px-3 py-2 rounded-md text-sm font-medium text-white disabled:opacity-50"
               style={{ background: `linear-gradient(135deg, ${BRAND.mint}, ${BRAND.mintDark})` }}
