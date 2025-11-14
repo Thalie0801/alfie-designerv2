@@ -496,8 +496,7 @@ export default function ChatWidget() {
                 )}
                 {chip(
                   "Vidéo TikTok",
-                  () => void handleCreateVideoFromChat("Vidéo 9:16 TikTok : astuces Canva"),
-                  isGeneratingVideo,
+                  () => setInput("Vidéo 9:16 TikTok : astuces Canva"),
                 )}
               </div>
             </div>
