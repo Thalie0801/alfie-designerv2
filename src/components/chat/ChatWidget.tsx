@@ -378,6 +378,10 @@ export default function ChatWidget() {
       if (!orderId)
         throw new Error("Aucun orderId retourné par la génération vidéo.");
 
+      // 🔍 DEBUG : voir ce qui se passe
+      console.log("[ChatWidget] Video order créé:", orderId);
+      toast.success(`Commande vidéo créée : ${orderId}`);
+
       pushAssistant(
         <div
           className="space-y-2 bg-white rounded-lg p-3 border"
