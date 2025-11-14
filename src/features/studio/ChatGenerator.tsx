@@ -635,6 +635,7 @@ export function ChatGenerator() {
     async () => {
       const promptText = (prompt || "").trim();
 
+
       if (!promptText && !uploadedSource) {
         showToast({
           variant: "destructive",
@@ -763,6 +764,37 @@ export function ChatGenerator() {
             variant: "destructive",
             title: "Erreur de génération",
             description:
+              (error as any)?.message || "Erreur de génération (Edge Function).",
+
+        if (!user) {
+          throw new Error("Tu dois être connecté pour lancer une génération.");
+        }
+
+        const { data, error } = await supabase.functions.invoke("generate-image", {
+          body: {
+            brandId: activeBrandId,
+            userId: user.id,
+            prompt: promptText,
+            format: "instagram_post",
+            ratio: aspectRatio,
+            metadata: {
+              source: "studio-chat",
+              contentType,
+              aspectRatio,
+              uploadedSource: uploadedSource
+                ? { type: uploadedSource.type, url: uploadedSource.url }
+                : undefined,
+              requestedAt: new Date().toISOString(),
+            },
+          },
+        });
+
+        if (error) {
+          console.error("[Studio] generate-image error:", error);
+          showToast({
+            variant: "destructive",
+            title: "Erreur de génération",
+            description:
               (error as any)?.message ?? "Erreur de génération (Edge Function).",
               (error as any)?.message || "Erreur de génération (Edge Function).",
       if (!data?.orderId) {
@@ -836,6 +868,19 @@ export function ChatGenerator() {
           return;
         }
 
+        if (!data?.orderId) {
+          console.error("[Studio] generate-image: no orderId", data);
+          showToast({
+            variant: "destructive",
+            title: "Erreur de génération",
+            description: "Aucun orderId renvoyé par le serveur.",
+          });
+          return;
+        }
+
+        await refetchAll?.();
+        if (data.orderId !== orderId && navigate) {
+          navigate(`/studio?order=${data.orderId}`);
         await refetchAll?.();
         if (data.orderId !== orderId && navigate) {
           navigate(`/studio?order=${data.orderId}`);
@@ -875,6 +920,7 @@ export function ChatGenerator() {
           variant: "success",
           title: "Génération lancée",
           description:
+            data.message || "Ton visuel arrive dans le Studio dans quelques instants.",
             data.message ?? "Ton visuel arrive dans le Studio dans quelques instants.",
             data.message || "Ton visuel arrive dans le Studio dans quelques instants.",
           title: "Erreur de génération",
@@ -1061,9 +1107,21 @@ export function ChatGenerator() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [activeBrandId, aspectRatio, navigate, prompt, uploadedSource, videoDuration]);
+  }, [
+    activeBrandId,
+    aspectRatio,
+    navigate,
+    prompt,
+    uploadedSource,
+    videoDuration,
+    supabase,
+  ]);
 
   const handleGenerate = useCallback(() => {
+    if (contentType === "video") {
+      void handleGenerateVideo();
+    } else {
+      void handleGenerateImage();
     if (contentType === "image") {
       void handleGenerateImage();
     } else {
