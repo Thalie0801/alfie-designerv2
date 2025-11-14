@@ -1,12 +1,16 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import { MessageCircle, X } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useBrief, type Brief } from "@/hooks/useBrief";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { detectContentIntent, detectPlatformHelp } from "@/lib/chat/detect";
 import { chooseCarouselOutline, chooseImageVariant, chooseVideoVariant } from "@/lib/chat/coachPresets";
 import { whatCanDoBlocks } from "@/lib/chat/helpMap";
+import { createMediaOrder } from "@/features/studio/studioApi";
+import type { CreateMediaOrderInput } from "@/features/studio/studioApi";
 
 type CoachMode = "strategy" | "da" | "maker";
 type ChatMessage = { role: "user" | "assistant"; node: ReactNode };
@@ -19,6 +23,7 @@ type ChatAIResponse = {
 };
 
 export default function ChatWidget() {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
@@ -26,7 +31,8 @@ export default function ChatWidget() {
   const [seed, setSeed] = useState(0);
 
   const brief = useBrief();
-  const { brandKit } = useBrandKit();
+  const { brandKit, activeBrandId } = useBrandKit();
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
 
   const BRAND = useMemo(
     () =>
@@ -50,11 +56,13 @@ export default function ChatWidget() {
 
   const coachModes: CoachMode[] = ["strategy", "da", "maker"];
 
-  const chip = (label: string, onClick: () => void) => (
+  const chip = (label: string, onClick: () => void, disabled = false) => (
     <button
       key={label}
       onClick={onClick}
-      className="border rounded-full px-3 py-1 text-xs hover:bg-gray-50"
+      type="button"
+      disabled={disabled}
+      className="border rounded-full px-3 py-1 text-xs hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed"
       style={{ borderColor: BRAND.grayBorder }}
     >
       {label}
@@ -350,6 +358,51 @@ export default function ChatWidget() {
     ]);
   }
 
+  async function handleCreateVideoFromChat(promptOverride?: string) {
+    if (isGeneratingVideo) return;
+    setIsGeneratingVideo(true);
+    try {
+      const brandId = activeBrandId ?? null;
+      const prompt =
+        promptOverride?.trim() || input.trim() || "Vidéo TikTok courte pour ma marque";
+
+      const request: CreateMediaOrderInput = {
+        kind: "video",
+        prompt,
+        brandId,
+        aspectRatio: "9:16",
+        durationSec: 15,
+      };
+
+      const { orderId } = await createMediaOrder(request);
+      if (!orderId)
+        throw new Error("Aucun orderId retourné par la génération vidéo.");
+
+      pushAssistant(
+        <div
+          className="space-y-2 bg-white rounded-lg p-3 border"
+          style={{ borderColor: BRAND.grayBorder }}
+        >
+          <p className="text-sm whitespace-pre-wrap">
+            Parfait, je lance ta vidéo TikTok dans le Studio 🎬{"\n"}
+            Je t’ouvre la page pour suivre la génération.
+          </p>
+        </div>,
+      );
+
+      navigate(`/studio?order=${orderId}`);
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Impossible de lancer la vidéo depuis le chat.",
+      );
+    } finally {
+      setIsGeneratingVideo(false);
+    }
+  }
+
   async function handleSend() {
     const text = input.trim();
     if (!text) return;
@@ -437,7 +490,11 @@ export default function ChatWidget() {
                 {chip("Carrousel Instagram", () =>
                   setInput("Carrousel 5 slides 4:5 Instagram : 3 idées Reels pour PME"),
                 )}
-                {chip("Vidéo TikTok", () => setInput("Vidéo 9:16 TikTok : astuces Canva"))}
+                {chip(
+                  "Vidéo TikTok",
+                  () => void handleCreateVideoFromChat("Vidéo 9:16 TikTok : astuces Canva"),
+                  isGeneratingVideo,
+                )}
               </div>
             </div>
           )}
