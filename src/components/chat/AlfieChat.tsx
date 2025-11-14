@@ -35,8 +35,6 @@ export interface PlannedBrief {
 
 type AlfieChatMode = 'widget' | 'studio';
 
-type AlfieChatMode = 'widget' | 'studio';
-
 type AlfieChatProps = {
   variant?: 'page' | 'widget';
   onClose?: () => void;
@@ -83,12 +81,6 @@ const WIDGET_WELCOME_MESSAGE: Message = {
 const STUDIO_PATH = '/studio';
 
 function detectIntent(prompt: string): AlfieIntent {
-const STUDIO_REDIRECT_MESSAGE =
-  "On va faire ça dans le Studio pour que tu aies les bons réglages de marque, ratios, quotas, etc. Clique sur « Ouvrir le Studio » pour lancer la génération.";
-
-const STUDIO_PATH = '/studio';
-
-function detectIntent(prompt: string): Intent {
   const lower = prompt.toLowerCase();
 
   if (/(carrousel|carousel|slides|diapos?)/.test(lower)) {
@@ -396,7 +388,6 @@ function buildId() {
 }
 
 export function AlfieChat({ variant = 'page', onClose, mode = 'studio', initialBrief }: AlfieChatProps) {
-export function AlfieChat({ variant = 'page', onClose, mode = 'studio' }: AlfieChatProps) {
   const { activeBrandId } = useBrandKit();
   const navigate = useNavigate();
 
@@ -421,6 +412,31 @@ export function AlfieChat({ variant = 'page', onClose, mode = 'studio' }: AlfieC
   const videoPollers = useRef<Map<string, number>>(new Map());
 
   const carouselSubscription = useCarouselSubscription(activeJobSetId, carouselTotal);
+
+  const addMessage = useCallback((message: Omit<Message, 'id'>) => {
+    const id = buildId();
+    setMessages((prev) => [...prev, { ...message, id }]);
+    return id;
+  }, []);
+
+  const addAssistantMessage = useCallback(
+    (content: string, options: Partial<Omit<Message, 'id' | 'role'>> = {}) => {
+      return addMessage({
+        role: 'assistant',
+        type: options.type ?? 'text',
+        content,
+        cta: options.cta,
+        metadata: options.metadata,
+        assetId: options.assetId,
+        assetUrl: options.assetUrl
+      });
+    },
+    [addMessage]
+  );
+
+  const updateMessage = useCallback((id: string, patch: Partial<Message>) => {
+    setMessages((prev) => prev.map((msg) => (msg.id === id ? { ...msg, ...patch } : msg)));
+  }, []);
 
   useEffect(() => {
     setCarouselDone(carouselSubscription.done);
@@ -496,31 +512,6 @@ export function AlfieChat({ variant = 'page', onClose, mode = 'studio' }: AlfieC
       setHasSuggestedStudio(true);
     }
   }, [plannedBrief, mode, hasSuggestedStudio, addAssistantMessage]);
-
-  const addMessage = useCallback((message: Omit<Message, 'id'>) => {
-    const id = buildId();
-    setMessages((prev) => [...prev, { ...message, id }]);
-    return id;
-  }, []);
-
-  const addAssistantMessage = useCallback(
-    (content: string, options: Partial<Omit<Message, 'id' | 'role'>> = {}) => {
-      return addMessage({
-        role: 'assistant',
-        type: options.type ?? 'text',
-        content,
-        cta: options.cta,
-        metadata: options.metadata,
-        assetId: options.assetId,
-        assetUrl: options.assetUrl
-      });
-    },
-    [addMessage]
-  );
-
-  const updateMessage = useCallback((id: string, patch: Partial<Message>) => {
-    setMessages((prev) => prev.map((msg) => (msg.id === id ? { ...msg, ...patch } : msg)));
-  }, []);
 
   const checkAndConsumeQuota = useCallback(
     async (type: 'woofs' | 'visuals', amount: number) => {
@@ -892,29 +883,7 @@ export function AlfieChat({ variant = 'page', onClose, mode = 'studio' }: AlfieC
         addAssistantMessage(assistantMessage);
       }
     },
-    [
-      mode,
-      plannedBrief,
-      addAssistantMessage,
-      setPlannedBrief,
-      setHasSuggestedStudio,
-      setShowStudioCta,
-      hasSuggestedStudio
-    ]
-  const replyAsAssistant = useCallback(
-    async (intent: Intent) => {
-      const needsStudio = intent === 'image' || intent === 'video' || intent === 'carousel';
-
-      addMessage({
-        role: 'assistant',
-        type: 'text',
-        content: needsStudio ? STUDIO_REDIRECT_MESSAGE : "Je suis là pour t'aider à préparer ta prochaine création. Décris-moi ce que tu veux et on le fera ensemble dans le Studio !",
-        cta: needsStudio ? 'open-studio' : undefined
-      });
-
-      setShowStudioCta(mode === 'widget' && needsStudio);
-    },
-    [addMessage, mode]
+    [mode, plannedBrief, addAssistantMessage, hasSuggestedStudio]
   );
 
   const handleSend = useCallback(async () => {
@@ -945,7 +914,7 @@ export function AlfieChat({ variant = 'page', onClose, mode = 'studio' }: AlfieC
         } else if (resolvedIntent === 'video') {
           const woofCost = detectVideoCost(prompt);
           await generateVideo(prompt, aspectRatio, woofCost);
-        } else {
+        } else if (resolvedIntent === 'carousel') {
           const count = studioBrief?.quantity ?? detectCarouselCount(prompt);
           await generateCarousel(prompt, count, aspectRatio);
         }
@@ -955,17 +924,6 @@ export function AlfieChat({ variant = 'page', onClose, mode = 'studio' }: AlfieC
         }
       } else {
         handleWidgetConversation(intent, prompt);
-        if (intent === 'image') {
-          await generateImage(prompt, aspectRatio);
-        } else if (intent === 'video') {
-          const woofCost = detectVideoCost(prompt);
-          await generateVideo(prompt, aspectRatio, woofCost);
-        } else {
-          const count = detectCarouselCount(prompt);
-          await generateCarousel(prompt, count, aspectRatio);
-        }
-      } else {
-        await replyAsAssistant(intent);
       }
     } finally {
       setIsLoading(false);
@@ -975,12 +933,11 @@ export function AlfieChat({ variant = 'page', onClose, mode = 'studio' }: AlfieC
     generateCarousel,
     generateImage,
     generateVideo,
+    handleWidgetConversation,
     input,
     isLoading,
     mode,
-    handleWidgetConversation,
     studioBrief
-    replyAsAssistant
   ]);
 
   const layoutClasses = useMemo(() => {
@@ -1076,7 +1033,6 @@ export function AlfieChat({ variant = 'page', onClose, mode = 'studio' }: AlfieC
             onClick={() => navigate(STUDIO_PATH)}
             type="button"
           >
-            Ouvrir le Studio et préparer ça
             Ouvrir le Studio
           </button>
         </div>
