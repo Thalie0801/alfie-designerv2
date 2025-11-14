@@ -1,6 +1,13 @@
 import { supabase } from '@/lib/supabaseClient';
 import type { AlfieIntent } from '@/lib/types/alfie';
 
+interface GenerateMediaResponse {
+  ok: boolean;
+  error?: string;
+  message?: string;
+  data?: { orderId: string };
+}
+
 export class GenerationError extends Error {
   status: number;
   code?: string;
@@ -14,54 +21,55 @@ export class GenerationError extends Error {
 }
 
 export async function triggerGenerationFromChat(userId: string, intent: AlfieIntent) {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  const { data, error } = await supabase.functions.invoke<GenerateMediaResponse>(
+    'generate-media',
+    {
+      body: { userId, intent },
+    }
+  );
 
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  if (error) {
+    let parsed: GenerateMediaResponse | null = null;
+    try {
+      parsed = JSON.parse(error.message) as GenerateMediaResponse;
+    } catch (parseError) {
+      parsed = null;
+    }
+
+    const status = (error as { status?: number }).status ?? 500;
+    const message = parsed?.message ?? parsed?.error ?? error.message ?? 'Erreur génération';
+    const code = parsed?.error;
+
+    throw new GenerationError(message, status, code);
   }
 
+  if (!data) {
+    throw new GenerationError('Réponse vide du serveur', 500);
+  }
+
+  if (!data.ok) {
+    const message = data.message ?? data.error ?? 'Erreur génération';
+    throw new GenerationError(message, 400, data.error);
+  }
+
+  return data.data as { orderId: string };
   const res = await fetch('/functions/v1/generate-media', {
     method: 'POST',
-    headers,
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId, intent }),
   });
 
-  let body: unknown = null;
+  let json: GenerateMediaResponse;
   try {
-    body = await res.json();
-  } catch (_error) {
-    body = null;
+    json = (await res.json()) as GenerateMediaResponse;
+  } catch (error) {
+    throw new GenerationError('Réponse invalide du serveur', res.status);
   }
 
-  const errorCode = typeof (body as { error?: unknown } | null)?.error === 'string'
-    ? (body as { error: string }).error
-    : undefined;
-
-  if (!res.ok) {
-    let message: string;
-    if (errorCode === 'invalid_body') {
-      message = 'Brief incomplet (marque / sujet / nombre).';
-    } else if (errorCode) {
-      message = `Erreur de génération : ${errorCode}`;
-    } else {
-      message = 'Erreur de génération.';
-    }
-
-    throw new GenerationError(message, res.status, errorCode);
+  if (!res.ok || !json.ok) {
+    const message = json.message ?? json.error ?? 'Erreur génération';
+    throw new GenerationError(message, res.status, json.error);
   }
 
-  const orderId = typeof (body as { orderId?: unknown } | null)?.orderId === 'string'
-    ? (body as { orderId: string }).orderId
-    : null;
-
-  if (!orderId) {
-    const message = 'Erreur de génération (aucun orderId renvoyé).';
-    throw new GenerationError(message, res.status, 'missing_order_id');
-  }
-
-  return { orderId };
+  return json.data as { orderId: string };
 }
