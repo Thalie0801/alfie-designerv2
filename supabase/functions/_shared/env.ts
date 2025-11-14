@@ -39,7 +39,6 @@ export const ADMIN_EMAILS = env('ADMIN_EMAILS');
 export const VIP_EMAILS = env('VIP_EMAILS');
 export const RESEND_API_KEY = env('RESEND_API_KEY');
 export const STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY');
-export const RENDER_BACKEND_URL = env('RENDER_BACKEND_URL', 'VITE_RENDER_BACKEND_URL');
 
 /**
  * Require an environment variable (throws if not found)
