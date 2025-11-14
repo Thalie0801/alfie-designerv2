@@ -20,6 +20,7 @@ interface JobRecord {
   order_id: string | null;
   user_id: string;
   brand_id: string | null;
+  priority?: number | null;
   created_at?: string;
   orders?: {
     id: string;
@@ -314,6 +315,8 @@ async function processJob(job: JobRecord): Promise<JobOutcome> {
   const metadata = extractMetadata(payload);
   const history = extractHistory(payload);
 
+  const startedAt = new Date().toISOString();
+  history.push({ step, status: "processing", at: startedAt });
   const now = new Date().toISOString();
   history.push({ step, status: "processing", at: now });
 
@@ -321,11 +324,13 @@ async function processJob(job: JobRecord): Promise<JobOutcome> {
     ...payload,
     metadata,
     history,
+    lastStartedAt: startedAt,
     lastStartedAt: now,
   };
 
   const { data: claimed, error: claimError } = await supabase
     .from("job_queue")
+    .update({ status: "processing", payload: toJson(processingPayload), started_at: startedAt })
     .update({ status: "processing", payload: toJson(processingPayload) })
     .eq("id", job.id)
     .eq("status", "pending")
@@ -374,6 +379,8 @@ async function processJob(job: JobRecord): Promise<JobOutcome> {
     await markJobStatus(job.id, "completed", {
       result: normaliseResult(result),
       payload: toJson(completedPayload),
+      completed_at: completedAt,
+      progress: 100,
     });
 
     if (step === "upload") {
@@ -401,6 +408,8 @@ async function processJob(job: JobRecord): Promise<JobOutcome> {
     await markJobStatus(job.id, "failed", {
       error: message,
       payload: toJson(failedPayload),
+      completed_at: new Date().toISOString(),
+      progress: 0,
     });
 
     if (job.order_id) {
@@ -424,6 +433,7 @@ async function fetchPendingJobs(): Promise<JobRecord[]> {
       order_id,
       user_id,
       brand_id,
+      priority,
       created_at,
       orders (
         id,
@@ -435,6 +445,7 @@ async function fetchPendingJobs(): Promise<JobRecord[]> {
       )
     `)
     .eq("status", "pending")
+    .order("priority", { ascending: false })
     .order("created_at", { ascending: true })
     .limit(10);
 
