@@ -69,52 +69,16 @@ const PROMPT_EXAMPLES = {
   ],
 };
 
-const MEDIA_URL_KEYS = [
-  "imageUrl",
-  "image_url",
-  "url",
-  "outputUrl",
-  "output_url",
-  "videoUrl",
-  "video_url",
-];
-
 const ASPECT_TO_TW: Record<AspectRatio, string> = {
   "1:1": "aspect-square",
   "9:16": "aspect-[9/16]",
   "16:9": "aspect-video",
 };
 
-const IMAGE_SIZE_MAP: Record<AspectRatio, { width: number; height: number }> = {
-  "1:1": { width: 1024, height: 1024 },
-  "9:16": { width: 1024, height: 1820 },
-  "16:9": { width: 1820, height: 1024 },
-};
-
 // const CURRENT_JOB_VERSION = 2; // Temporarily disabled until types regenerate
 
 const isRecord = (value: unknown): value is Record<string, any> =>
   typeof value === "object" && value !== null;
-
-function extractMediaUrl(payload: unknown): string | null {
-  if (!payload || typeof payload !== "object") return null;
-
-  const obj = payload as Record<string, unknown>;
-  for (const key of MEDIA_URL_KEYS) {
-    const val = obj[key];
-    if (typeof val === "string" && val.trim()) {
-      return val.trim();
-    }
-  }
-
-  for (const v of Object.values(obj)) {
-    if (typeof v === "object" && v !== null) {
-      const nested = extractMediaUrl(v);
-      if (nested) return nested;
-    }
-  }
-  return null;
-}
 
 export function ChatGenerator() {
   const { activeBrandId } = useBrandKit();
@@ -668,10 +632,20 @@ export function ChatGenerator() {
   const videoDuration = 12;
 
   const handleGenerateImage = useCallback(async () => {
-    if (!prompt.trim() && !uploadedSource) {
+    const promptText = (prompt || "").trim();
+    if (!promptText) {
       showToast({
         title: "Prompt requis",
-        description: "Veuillez entrer un prompt ou uploader un média",
+        description: "Ajoute un prompt pour lancer la génération",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!activeBrandId) {
+      showToast({
+        title: "Marque requise",
+        description: "Sélectionne une marque avant de générer un visuel",
         variant: "destructive",
       });
       return;
@@ -681,84 +655,69 @@ export function ChatGenerator() {
     setGeneratedAsset(null);
 
     try {
-      // ✅ Phase A: Get session token for authentication
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      if (!user) throw new Error("Tu dois être connecté pour lancer une génération.");
 
-      const targetFunction = uploadedSource
-        ? "alfie-generate-ai-image"
-        : "alfie-render-image";
-
-      const payload: Record<string, unknown> = {
-        prompt: prompt || "transform this",
-        aspectRatio,
-        brand_id: activeBrandId ?? null, // ✅ Phase A: Pass brand_id
+      const requestBody: Record<string, unknown> = {
+        brandId: activeBrandId,
+        prompt: promptText,
+        format: "image",
+        ratio: aspectRatio,
+        metadata: {
+          source: "studio-chat",
+          contentType,
+          aspectRatio,
+          uploadedSource: uploadedSource
+            ? { type: uploadedSource.type, url: uploadedSource.url }
+            : undefined,
+          requestedAt: new Date().toISOString(),
+        },
       };
 
-      if (uploadedSource) {
-        payload.sourceUrl = uploadedSource.url;
-      } else {
-        const size = IMAGE_SIZE_MAP[aspectRatio];
-        payload.width = size.width;
-        payload.height = size.height;
-      }
-
-      // ✅ Phase A: Include Authorization header if token is available
-      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-
-      const { data, error } = await supabase.functions.invoke(targetFunction, {
-        body: payload,
-        headers,
+      const { data, error } = await supabase.functions.invoke('generate-image', {
+        body: requestBody,
       });
 
-      if (error) throw error;
-
-      const responseRecord = isRecord(data) ? data : null;
-      const isStructuredResponse =
-        responseRecord && ("ok" in responseRecord || "data" in responseRecord);
-
-      if (isStructuredResponse) {
-        if ("ok" in responseRecord && responseRecord.ok === false) {
-          const structuredError =
-            typeof responseRecord.error === "string"
-              ? responseRecord.error
-              : isRecord(responseRecord.data) && typeof responseRecord.data.error === "string"
-                ? responseRecord.data.error
-                : "Erreur de génération";
-          throw new Error(structuredError);
-        }
-
-        const nestedData = isRecord(responseRecord.data)
-          ? (responseRecord.data as Record<string, unknown>)
-          : null;
-        const responseOrderId =
-          (typeof nestedData?.orderId === "string" && nestedData.orderId) ||
-          (typeof responseRecord.orderId === "string" ? responseRecord.orderId : null);
-
-        if (!responseOrderId) {
-          throw new Error("no orderId in response");
-        }
-
-        await refetchAll();
-        if (responseOrderId !== orderId) {
-          navigate(`/studio?order=${responseOrderId}`);
-        }
-
+      if (error) {
+        console.error('[Studio] image generation error:', error);
+        const description = error.message || 'Generation failed';
         showToast({
-          title: "Génération lancée",
-          description: "Ton visuel arrive dans le Studio dans quelques instants.",
+          title: "Erreur de génération",
+          description,
+          variant: "destructive",
         });
         return;
       }
 
-      const imageUrl = extractMediaUrl(data);
-      if (!imageUrl) throw new Error("no orderId in response");
+      const orderIdFromResponse = typeof data?.orderId === 'string' ? data.orderId : null;
+      if (!orderIdFromResponse) {
+        console.error('[Studio] image generation error: no orderId in response', data);
+        showToast({
+          title: "Erreur de génération",
+          description: "Aucun orderId renvoyé par l'API",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      setGeneratedAsset({ url: imageUrl, type: "image" });
-      showToast({ title: "Image générée !", description: "Prête à télécharger" });
+      await refetchAll();
+      if (orderIdFromResponse !== orderId) {
+        navigate(`/studio?order=${orderIdFromResponse}`);
+      }
+
+      showToast({
+        title: "Génération lancée",
+        description: typeof data?.message === 'string'
+          ? data.message
+          : "Ton visuel arrive dans le Studio dans quelques instants.",
+      });
     } catch (err: unknown) {
-      console.error("[Studio] image generation error:", err);
-      const message = err instanceof Error ? err.message : "Une erreur est survenue";
+      console.error('[Studio] image generation error:', err);
+      const message = err instanceof Error ? err.message : 'Une erreur est survenue';
       showToast({
         title: "Erreur de génération",
         description: message,
@@ -769,10 +728,11 @@ export function ChatGenerator() {
     }
   }, [
     prompt,
-    uploadedSource,
-    aspectRatio,
     activeBrandId,
     showToast,
+    aspectRatio,
+    contentType,
+    uploadedSource,
     refetchAll,
     orderId,
     navigate,

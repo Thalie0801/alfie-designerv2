@@ -13,55 +13,72 @@ export class GenerationError extends Error {
   }
 }
 
-export async function triggerGenerationFromChat(userId: string, intent: AlfieIntent) {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const token = session?.access_token;
+type GenerateImageResponse = {
+  orderId?: unknown;
+  jobId?: unknown;
+  status?: unknown;
+  message?: unknown;
+  error?: unknown;
+};
 
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+function normaliseError(message: string, status: number) {
+  if (!message) {
+    return { message: 'Generation failed', code: 'generation_failed' };
   }
 
-  const res = await fetch('/functions/v1/generate-media', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ userId, intent }),
+  try {
+    const parsed = JSON.parse(message) as { error?: string; message?: string };
+    if (parsed && typeof parsed.error === 'string') {
+      return { message: parsed.message ?? parsed.error, code: parsed.error };
+    }
+  } catch (_error) {
+    // ignore JSON parse errors and fall back to raw message
+  }
+
+  return { message, code: message || `generation_failed_${status}` };
+}
+
+export async function triggerGenerationFromChat(userId: string, intent: AlfieIntent) {
+  await supabase.auth.getSession();
+
+  const payload: Record<string, unknown> = {
+    brandId: intent.brandId,
+    prompt: intent.topic,
+    format: intent.format,
+    ratio: intent.ratio,
+    metadata: {
+      count: intent.count,
+      platform: intent.platform,
+      requestedBy: 'alfie-chat',
+      userId,
+      format: intent.format,
+    },
+  };
+
+  const { data, error } = await supabase.functions.invoke('generate-image', {
+    body: payload,
   });
 
-  let body: unknown = null;
-  try {
-    body = await res.json();
-  } catch (_error) {
-    body = null;
+  if (error) {
+    const status = typeof (error as { status?: number }).status === 'number'
+      ? (error as { status?: number }).status ?? 500
+      : 500;
+    const { message, code } = normaliseError(error.message ?? 'Generation failed', status);
+    throw new GenerationError(message, status, code);
   }
 
-  const errorCode = typeof (body as { error?: unknown } | null)?.error === 'string'
-    ? (body as { error: string }).error
-    : undefined;
+  const body = (data ?? {}) as GenerateImageResponse;
 
-  if (!res.ok) {
-    let message: string;
-    if (errorCode === 'invalid_body') {
-      message = 'Brief incomplet (marque / sujet / nombre).';
-    } else if (errorCode) {
-      message = `Erreur de génération : ${errorCode}`;
-    } else {
-      message = 'Erreur de génération.';
-    }
-
-    throw new GenerationError(message, res.status, errorCode);
+  if (typeof body.error === 'string') {
+    throw new GenerationError(body.error, 500, body.error);
   }
 
-  const orderId = typeof (body as { orderId?: unknown } | null)?.orderId === 'string'
-    ? (body as { orderId: string }).orderId
-    : null;
-
+  const orderId = typeof body.orderId === 'string' ? body.orderId : null;
   if (!orderId) {
-    const message = 'Erreur de génération (aucun orderId renvoyé).';
-    throw new GenerationError(message, res.status, 'missing_order_id');
+    throw new GenerationError('Erreur de génération (aucun orderId renvoyé).', 500, 'missing_order_id');
   }
 
-  return { orderId };
+  const jobId = typeof body.jobId === 'string' ? body.jobId : null;
+
+  return { orderId, jobId };
 }
