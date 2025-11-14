@@ -1,6 +1,5 @@
-import { HELP } from "./helpMap";
-
 type Ratio = "1:1" | "9:16" | "16:9" | "3:4" | "4:5" | "2:3";
+type Platform = "instagram" | "tiktok" | "pinterest" | "linkedin" | "youtube";
 
 export function detectContentIntent(raw: string) {
   const q = raw.toLowerCase().trim();
@@ -9,7 +8,7 @@ export function detectContentIntent(raw: string) {
   const isVideo = /(vidéo|video|shorts?|reels?)/.test(q);
   const mode: "carousel" | "video" | "image" = isCarousel ? "carousel" : isVideo ? "video" : "image";
 
-  const platform =
+  const platform: Platform | null =
     (/(instagram|insta)/.test(q) && "instagram") ||
     (/tiktok/.test(q) && "tiktok") ||
     (/pinterest/.test(q) && "pinterest") ||
@@ -62,7 +61,6 @@ export function detectContentIntent(raw: string) {
 export function detectPlatformHelp(raw: string) {
   const q = raw.toLowerCase();
 
-  const matches = HELP.filter((intent) => intent.match.test(q));
   const intents = [
     { test: /(studio|génération|créer|lancer)/, to: "/studio", label: "Ouvrir Studio" },
     { test: /(template|catalogue|modèles?)/, to: "/templates", label: "Catalogue" },
