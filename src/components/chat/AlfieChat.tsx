@@ -22,7 +22,18 @@ export type Message = {
   cta?: 'open-studio';
 };
 
-type Intent = 'image' | 'video' | 'carousel';
+export type AlfieIntent = 'none' | 'image' | 'video' | 'carousel';
+
+export interface PlannedBrief {
+  intent: AlfieIntent;
+  topic?: string;
+  channel?: string;
+  format?: string;
+  tone?: string;
+  quantity?: number;
+}
+
+type AlfieChatMode = 'widget' | 'studio';
 
 type AlfieChatMode = 'widget' | 'studio';
 
@@ -30,6 +41,7 @@ type AlfieChatProps = {
   variant?: 'page' | 'widget';
   onClose?: () => void;
   mode?: AlfieChatMode;
+  initialBrief?: PlannedBrief;
 };
 
 type VideoStatus = {
@@ -52,14 +64,25 @@ const QUICK_PROMPTS = [
   'Carrousel 5 slides — SEO pour PME'
 ];
 
-const WELCOME_MESSAGE: Message = {
-  id: 'welcome',
+const STUDIO_WELCOME_MESSAGE: Message = {
+  id: 'welcome-studio',
   role: 'assistant',
   type: 'text',
   content:
     "👋 Salut ! Je suis Alfie. Je peux générer des **images**, des **vidéos** ou des **carrousels** pour ta marque. Décris-moi ce que tu veux créer."
 };
 
+const WIDGET_WELCOME_MESSAGE: Message = {
+  id: 'welcome-widget',
+  role: 'assistant',
+  type: 'text',
+  content:
+    "👋 Salut ! Je suis Alfie, ton coach créatif. Raconte-moi ton idée et on prépare ensemble un brief aux petits oignons avant de lancer la génération dans le Studio."
+};
+
+const STUDIO_PATH = '/studio';
+
+function detectIntent(prompt: string): AlfieIntent {
 const STUDIO_REDIRECT_MESSAGE =
   "On va faire ça dans le Studio pour que tu aies les bons réglages de marque, ratios, quotas, etc. Clique sur « Ouvrir le Studio » pour lancer la génération.";
 
@@ -76,7 +99,255 @@ function detectIntent(prompt: string): Intent {
     return 'video';
   }
 
-  return 'image';
+  if (/(image|visuel|illustration|mockup|affiche)/.test(lower)) {
+    return 'image';
+  }
+
+  return 'none';
+}
+
+function extractTopic(message: string): string | undefined {
+  const cleaned = message
+    .replace(/(1:1|4:5|9:16|16:9)/gi, '')
+    .replace(/\b(instagram|tik\s?tok|pinterest|linkedin|facebook|youtube|twitter|x|snapchat|newsletter|site web|blog)\b/gi, '')
+    .replace(/\b(image|images|vidéo|vidéos|video|videos|carrousel|carousel|slides?|diapos?|visuels?|contenu|post|publication|pub|campagne)\b/gi, '')
+    .replace(/\b(crée|créer|fais|faire|génère|générer|prépare|préparer|montre|donne-moi|peux-tu|voudrais|j'aimerais)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!cleaned || /je ne sais pas|aucune idée|propose|surprends-moi/i.test(cleaned)) {
+    return undefined;
+  }
+
+  return cleaned;
+}
+
+function extractQuantity(message: string): number | undefined {
+  const lower = message.toLowerCase();
+  const numericMatch = lower.match(/(\d+)\s*(?:images?|visuels?|slides?|diapos?|carrousels?|vidéos?)/i);
+
+  if (numericMatch) {
+    const value = parseInt(numericMatch[1], 10);
+    if (!Number.isNaN(value) && value > 0) {
+      return value;
+    }
+  }
+
+  const words: Record<string, number> = {
+    un: 1,
+    une: 1,
+    deux: 2,
+    trois: 3,
+    quatre: 4,
+    cinq: 5,
+    six: 6,
+    sept: 7,
+    huit: 8,
+    neuf: 9,
+    dix: 10
+  };
+
+  const wordMatch = lower.match(
+    /\b(un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix)\b\s*(?:images?|visuels?|slides?|diapos?|carrousels?|vidéos?)/
+  );
+
+  if (wordMatch) {
+    const value = words[wordMatch[1]];
+    if (value) return value;
+  }
+
+  if (/(quelques|plusieurs|une série)/.test(lower)) {
+    return 3;
+  }
+
+  return undefined;
+}
+
+function extractChannel(message: string): string | undefined {
+  const channels: Record<string, string> = {
+    instagram: 'Instagram',
+    'tik tok': 'TikTok',
+    tiktok: 'TikTok',
+    pinterest: 'Pinterest',
+    linkedin: 'LinkedIn',
+    facebook: 'Facebook',
+    youtube: 'YouTube',
+    newsletter: 'Newsletter',
+    blog: 'Blog',
+    snapchat: 'Snapchat',
+    twitter: 'Twitter',
+    x: 'X'
+  };
+
+  const lower = message.toLowerCase();
+
+  for (const key of Object.keys(channels)) {
+    if (lower.includes(key)) {
+      return channels[key];
+    }
+  }
+
+  return undefined;
+}
+
+function extractFormat(message: string): string | undefined {
+  const ratioMatch = message.match(/(1:1|4:5|9:16|16:9)/);
+  if (ratioMatch) {
+    return ratioMatch[1];
+  }
+
+  if (/(story|reel|short|vertical|portrait)/i.test(message)) {
+    return '9:16';
+  }
+
+  if (/(youtube|horizontal|paysage|wide)/i.test(message)) {
+    return '16:9';
+  }
+
+  if (/(carré|square)/i.test(message)) {
+    return '1:1';
+  }
+
+  return undefined;
+}
+
+function extractTone(message: string): string | undefined {
+  const lower = message.toLowerCase();
+  const toneMap: Record<string, string> = {
+    fun: 'fun',
+    drôle: 'fun',
+    ludique: 'fun',
+    pro: 'professionnel',
+    professionnel: 'professionnel',
+    sérieuse: 'professionnel',
+    sérieux: 'professionnel',
+    luxe: 'luxe',
+    premium: 'luxe',
+    minimaliste: 'minimaliste',
+    dynamique: 'dynamique',
+    énergique: 'dynamique',
+    inspirant: 'inspirant',
+    inspiration: 'inspirant'
+  };
+
+  for (const key of Object.keys(toneMap)) {
+    if (lower.includes(key)) {
+      return toneMap[key];
+    }
+  }
+
+  return undefined;
+}
+
+function userIsOutOfIdeas(message: string): boolean {
+  return /(je ne sais pas|aucune idée|pas d'idée|propose|inspire|surprends-moi|à toi|choisis pour moi)/i.test(message);
+}
+
+function buildSuggestions(intent: AlfieIntent): string[] {
+  if (intent === 'video') {
+    return [
+      'Vidéo 9:16 « 3 astuces pour booster ta visibilité » avec un hook punchy au début',
+      'Vidéo format Reels présentant ton produit en 15 secondes, ton dynamique',
+      'Clip 16:9 « Avant / Après » pour une campagne YouTube courte et impactante'
+    ];
+  }
+
+  if (intent === 'carousel') {
+    return [
+      'Carrousel 5 slides : Les erreurs à éviter pour réussir son lancement',
+      'Carrousel 4 slides : Ton plan d’action en 4 étapes clés',
+      'Carrousel 6 slides : Témoignage client + bénéfices produit'
+    ];
+  }
+
+  return [
+    'Visuel hero 1:1 avec ton produit en scène principale',
+    'Mockup lifestyle montrant ton offre dans un univers réaliste',
+    'Avant / Après pour illustrer l’impact de ta solution'
+  ];
+}
+
+function isBriefReady(brief: PlannedBrief | null): brief is PlannedBrief {
+  if (!brief) return false;
+  if (!brief.intent || brief.intent === 'none') return false;
+  if (!brief.topic) return false;
+  if (!brief.channel && !brief.format) return false;
+  return true;
+}
+
+function getNextQuestion(brief: PlannedBrief): string | null {
+  if (!brief.topic) {
+    return "Dis-moi en quelques mots ce que tu veux mettre en avant dans ce contenu.";
+  }
+
+  if (!brief.channel && !brief.format) {
+    return "C’est pour quel réseau (Instagram, TikTok, Pinterest...)?";
+  }
+
+  if (!brief.format) {
+    return "Tu as un format ou un ratio préféré (1:1, 9:16, 16:9...)?";
+  }
+
+  if (!brief.tone) {
+    return "Quel ton veux-tu donner (fun, pro, luxe...)?";
+  }
+
+  if (!brief.quantity) {
+    if (brief.intent === 'carousel') {
+      return "Tu veux combien de slides pour ce carrousel?";
+    }
+    if (brief.intent === 'image') {
+      return "Tu veux combien de visuels différents?";
+    }
+  }
+
+  return null;
+}
+
+function extractBriefDetails(message: string): Omit<PlannedBrief, 'intent'> {
+  const topic = extractTopic(message);
+  const channel = extractChannel(message);
+  const format = extractFormat(message);
+  const tone = extractTone(message);
+  const quantity = extractQuantity(message);
+
+  return { topic, channel, format, tone, quantity };
+}
+
+function savePlannedBriefToStorage(brief: PlannedBrief) {
+  try {
+    localStorage.setItem('alfie_planned_brief', JSON.stringify(brief));
+  } catch (err) {
+    console.error('Failed to persist planned brief', err);
+  }
+}
+
+function buildPromptFromBrief(brief: PlannedBrief): string {
+  const parts: string[] = [];
+
+  if (brief.topic) {
+    parts.push(brief.topic);
+  }
+
+  if (brief.channel) {
+    parts.push(`pour ${brief.channel}`);
+  }
+
+  if (brief.format) {
+    parts.push(`format ${brief.format}`);
+  }
+
+  if (brief.tone) {
+    parts.push(`ton ${brief.tone}`);
+  }
+
+  if (brief.intent === 'carousel' && brief.quantity) {
+    parts.push(`${brief.quantity} slides`);
+  } else if (brief.intent === 'image' && brief.quantity && brief.quantity > 1) {
+    parts.push(`${brief.quantity} visuels`);
+  }
+
+  return parts.join(' — ');
 }
 
 function detectAspectRatio(prompt: string): string {
@@ -124,15 +395,22 @@ function buildId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+export function AlfieChat({ variant = 'page', onClose, mode = 'studio', initialBrief }: AlfieChatProps) {
 export function AlfieChat({ variant = 'page', onClose, mode = 'studio' }: AlfieChatProps) {
   const { activeBrandId } = useBrandKit();
   const navigate = useNavigate();
 
-  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
+  const [messages, setMessages] = useState<Message[]>(() => [
+    mode === 'widget' ? WIDGET_WELCOME_MESSAGE : STUDIO_WELCOME_MESSAGE
+  ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [showStudioCta, setShowStudioCta] = useState(false);
+  const [plannedBrief, setPlannedBrief] = useState<PlannedBrief | null>(null);
+  const [hasSuggestedStudio, setHasSuggestedStudio] = useState(false);
+  const [studioBrief, setStudioBrief] = useState<PlannedBrief | null>(null);
+  const [hasHydratedInitialBrief, setHasHydratedInitialBrief] = useState(false);
 
   const [activeJobSetId, setActiveJobSetId] = useState<string>('');
   const [carouselTotal, setCarouselTotal] = useState<number>(0);
@@ -183,11 +461,62 @@ export function AlfieChat({ variant = 'page', onClose, mode = 'studio' }: AlfieC
     };
   }, [uploadedImage]);
 
+  useEffect(() => {
+    if (mode !== 'studio') return;
+    if (!initialBrief) return;
+    if (hasHydratedInitialBrief) return;
+
+    const promptFromBrief = buildPromptFromBrief(initialBrief);
+    setInput((prev) => (prev ? prev : promptFromBrief));
+    setStudioBrief(initialBrief);
+    setHasHydratedInitialBrief(true);
+  }, [initialBrief, mode, hasHydratedInitialBrief]);
+
+  useEffect(() => {
+    if (mode !== 'widget') return;
+
+    if (!plannedBrief) {
+      setShowStudioCta(false);
+      setHasSuggestedStudio(false);
+      return;
+    }
+
+    if (!isBriefReady(plannedBrief)) {
+      return;
+    }
+
+    savePlannedBriefToStorage(plannedBrief);
+    setShowStudioCta(true);
+
+    if (!hasSuggestedStudio) {
+      addAssistantMessage(
+        "Super, j’ai tout ce qu’il faut. Je te propose de passer dans le Studio pour lancer la génération. Clique sur le bouton ci-dessous.",
+        { cta: 'open-studio' }
+      );
+      setHasSuggestedStudio(true);
+    }
+  }, [plannedBrief, mode, hasSuggestedStudio, addAssistantMessage]);
+
   const addMessage = useCallback((message: Omit<Message, 'id'>) => {
     const id = buildId();
     setMessages((prev) => [...prev, { ...message, id }]);
     return id;
   }, []);
+
+  const addAssistantMessage = useCallback(
+    (content: string, options: Partial<Omit<Message, 'id' | 'role'>> = {}) => {
+      return addMessage({
+        role: 'assistant',
+        type: options.type ?? 'text',
+        content,
+        cta: options.cta,
+        metadata: options.metadata,
+        assetId: options.assetId,
+        assetUrl: options.assetUrl
+      });
+    },
+    [addMessage]
+  );
 
   const updateMessage = useCallback((id: string, patch: Partial<Message>) => {
     setMessages((prev) => prev.map((msg) => (msg.id === id ? { ...msg, ...patch } : msg)));
@@ -457,6 +786,121 @@ export function AlfieChat({ variant = 'page', onClose, mode = 'studio' }: AlfieC
     [activeBrandId, addMessage, checkAndConsumeQuota, triggerWorker]
   );
 
+  const handleWidgetConversation = useCallback(
+    (intent: AlfieIntent, prompt: string) => {
+      if (mode !== 'widget') return;
+
+      if (plannedBrief?.intent && userIsOutOfIdeas(prompt)) {
+        const suggestions = buildSuggestions(plannedBrief.intent);
+        const ideas = suggestions.map((suggestion, index) => `${index + 1}. ${suggestion}`).join('\n');
+        addAssistantMessage(
+          "Pas de souci, je peux t’inspirer ! Voici quelques idées :\n" +
+            ideas +
+            "\nTu veux que je prépare l’une d’elles dans le Studio ? Dis-moi le numéro ou reformule à ta façon."
+        );
+        return;
+      }
+
+      const details = extractBriefDetails(prompt);
+      const hadBrief = Boolean(plannedBrief);
+
+      if (intent === 'none' && !hadBrief) {
+        addAssistantMessage(
+          "Ravi d’échanger avec toi ! Tu préfères qu’on prépare une image, une vidéo ou un carrousel ?"
+        );
+        return;
+      }
+
+      let updatedBrief: PlannedBrief | null = plannedBrief ?? null;
+      let isNewIntent = false;
+
+      setPlannedBrief((prev) => {
+        if (intent !== 'none') {
+          isNewIntent = !prev || prev.intent !== intent;
+          const next: PlannedBrief = {
+            intent,
+            topic: details.topic ?? prev?.topic ?? extractTopic(prompt),
+            channel: details.channel ?? prev?.channel,
+            format: details.format ?? prev?.format,
+            tone: details.tone ?? prev?.tone,
+            quantity: details.quantity ?? prev?.quantity
+          };
+          updatedBrief = next;
+          return next;
+        }
+
+        if (!prev) {
+          updatedBrief = prev ?? null;
+          return prev;
+        }
+
+        const next: PlannedBrief = {
+          ...prev,
+          topic: details.topic ?? prev.topic,
+          channel: details.channel ?? prev.channel,
+          format: details.format ?? prev.format,
+          tone: details.tone ?? prev.tone,
+          quantity: details.quantity ?? prev.quantity
+        };
+
+        if (
+          next.topic === prev.topic &&
+          next.channel === prev.channel &&
+          next.format === prev.format &&
+          next.tone === prev.tone &&
+          next.quantity === prev.quantity
+        ) {
+          updatedBrief = prev;
+          return prev;
+        }
+
+        updatedBrief = next;
+        return next;
+      });
+
+      if (isNewIntent) {
+        setHasSuggestedStudio(false);
+        setShowStudioCta(false);
+      }
+
+      if (!updatedBrief) {
+        addAssistantMessage(
+          "Je suis là pour t’aider à préparer ton brief. Dis-moi si tu veux qu’on travaille sur une image, une vidéo ou un carrousel."
+        );
+        return;
+      }
+
+      let assistantMessage: string | null = null;
+
+      if (intent !== 'none') {
+        const question = getNextQuestion(updatedBrief);
+        assistantMessage = question
+          ? `Top, on va préparer ça ensemble. ${question}`
+          : "Top, on va préparer ça ensemble. Ajoute les derniers détails si besoin et je m’occupe du reste !";
+      } else {
+        const question = getNextQuestion(updatedBrief);
+        if (question) {
+          assistantMessage = question;
+        } else {
+          assistantMessage = hasSuggestedStudio
+            ? "Parfait, j’ai mis le brief à jour. Tu peux lancer le Studio quand tu veux."
+            : "Super, je note tout. Dis-moi quand tu veux que je finalise et on passera dans le Studio pour générer.";
+        }
+      }
+
+      if (assistantMessage) {
+        addAssistantMessage(assistantMessage);
+      }
+    },
+    [
+      mode,
+      plannedBrief,
+      addAssistantMessage,
+      setPlannedBrief,
+      setHasSuggestedStudio,
+      setShowStudioCta,
+      hasSuggestedStudio
+    ]
   const replyAsAssistant = useCallback(
     async (intent: Intent) => {
       const needsStudio = intent === 'image' || intent === 'video' || intent === 'carousel';
@@ -490,10 +934,27 @@ export function AlfieChat({ variant = 'page', onClose, mode = 'studio' }: AlfieC
     });
 
     const intent = detectIntent(prompt);
-    const aspectRatio = detectAspectRatio(prompt);
 
     try {
       if (mode === 'studio') {
+        const resolvedIntent: AlfieIntent = intent === 'none' ? studioBrief?.intent ?? 'image' : intent;
+        const aspectRatio = studioBrief?.format ?? detectAspectRatio(prompt);
+
+        if (resolvedIntent === 'image') {
+          await generateImage(prompt, aspectRatio);
+        } else if (resolvedIntent === 'video') {
+          const woofCost = detectVideoCost(prompt);
+          await generateVideo(prompt, aspectRatio, woofCost);
+        } else {
+          const count = studioBrief?.quantity ?? detectCarouselCount(prompt);
+          await generateCarousel(prompt, count, aspectRatio);
+        }
+
+        if (studioBrief) {
+          setStudioBrief(null);
+        }
+      } else {
+        handleWidgetConversation(intent, prompt);
         if (intent === 'image') {
           await generateImage(prompt, aspectRatio);
         } else if (intent === 'video') {
@@ -517,6 +978,8 @@ export function AlfieChat({ variant = 'page', onClose, mode = 'studio' }: AlfieC
     input,
     isLoading,
     mode,
+    handleWidgetConversation,
+    studioBrief
     replyAsAssistant
   ]);
 
@@ -613,6 +1076,7 @@ export function AlfieChat({ variant = 'page', onClose, mode = 'studio' }: AlfieC
             onClick={() => navigate(STUDIO_PATH)}
             type="button"
           >
+            Ouvrir le Studio et préparer ça
             Ouvrir le Studio
           </button>
         </div>
