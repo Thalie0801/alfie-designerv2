@@ -631,6 +631,9 @@ export function ChatGenerator() {
 
   const videoDuration = 12;
 
+  const handleGenerateImage = useCallback(
+    async () => {
+      const promptText = (prompt || "").trim();
   const handleGenerateImage = useCallback(async () => {
     const promptText = (prompt || "").trim();
     if (!promptText) {
@@ -654,9 +657,20 @@ export function ChatGenerator() {
       return;
     }
 
-    setIsSubmitting(true);
-    setGeneratedAsset(null);
+      if (!promptText && !uploadedSource) {
+        showToast({
+          variant: "destructive",
+          title: "Prompt requis",
+          description: "Ajoute un prompt ou uploade un média pour lancer la génération.",
+        });
+        return;
+      }
 
+      if (!activeBrandId) {
+        showToast({
+          variant: "destructive",
+          title: "Marque requise",
+          description: "Sélectionne une marque avant de générer un visuel.",
     try {
       const {
         data: { user },
@@ -697,6 +711,49 @@ export function ChatGenerator() {
         return;
       }
 
+      setIsSubmitting(true);
+      setGeneratedAsset(null);
+
+      try {
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError) {
+          throw authError;
+        }
+
+        if (!user) {
+          throw new Error("Tu dois être connecté pour lancer une génération.");
+        }
+
+        const { data, error } = await supabase.functions.invoke("generate-image", {
+          body: {
+            brandId: activeBrandId,
+            userId: user.id,
+            prompt: promptText,
+            format: "instagram_post",
+            ratio: aspectRatio,
+            metadata: {
+              source: "studio-chat",
+              contentType,
+              aspectRatio,
+              uploadedSource: uploadedSource
+                ? { type: uploadedSource.type, url: uploadedSource.url }
+                : undefined,
+              requestedAt: new Date().toISOString(),
+            },
+          },
+        });
+
+        if (error) {
+          console.error("[Studio] generate-image error:", error);
+          showToast({
+            variant: "destructive",
+            title: "Erreur de génération",
+            description:
+              (error as any)?.message || "Erreur de génération (Edge Function).",
       if (!data?.orderId) {
         console.error("[Studio] generate-image: no orderId in data", data);
         showToast({
@@ -748,6 +805,19 @@ export function ChatGenerator() {
           return;
         }
 
+        if (!data?.orderId) {
+          console.error("[Studio] generate-image: no orderId", data);
+          showToast({
+            variant: "destructive",
+            title: "Erreur de génération",
+            description: "Aucun orderId renvoyé par le serveur.",
+          });
+          return;
+        }
+
+        await refetchAll?.();
+        if (data.orderId !== orderId && navigate) {
+          navigate(`/studio?order=${data.orderId}`);
         const orderIdFromResponse = data.orderId;
         await refetchAll();
         if (orderIdFromResponse !== orderId) {
@@ -778,12 +848,44 @@ export function ChatGenerator() {
         console.error('[Studio] image generation error:', error);
         const description = error.message || 'Generation failed';
         showToast({
+          variant: "success",
+          title: "Génération lancée",
+          description:
+            data.message || "Ton visuel arrive dans le Studio dans quelques instants.",
           title: "Erreur de génération",
           description,
           variant: "destructive",
         });
-        return;
+      } catch (err: unknown) {
+        console.error("[Studio] image generation exception:", err);
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Une erreur est survenue lors de la génération.";
+        showToast({
+          variant: "destructive",
+          title: "Erreur de génération",
+          description: message,
+        });
+      } finally {
+        setIsSubmitting(false);
       }
+    },
+    [
+      prompt,
+      activeBrandId,
+      aspectRatio,
+      contentType,
+      uploadedSource,
+      supabase,
+      showToast,
+      refetchAll,
+      orderId,
+      navigate,
+      setIsSubmitting,
+      setGeneratedAsset,
+    ],
+  );
 
       await refetchAll();
       if (data.orderId !== orderId) {
@@ -891,8 +993,9 @@ export function ChatGenerator() {
       const { data, error } = await supabase.functions.invoke("alfie-orchestrator", {
         body: {
           message: promptText,
-          user_message: promptText,
           brandId: activeBrandId,
+          userId: user.id,
+          mode: "video",
           forceTool: "generate_video",
           aspectRatio,
           durationSec,
@@ -904,11 +1007,11 @@ export function ChatGenerator() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error as string);
 
-      const orderId = data?.orderId as string | undefined;
-      if (!orderId) throw new Error("L’orchestrateur n’a pas renvoyé d’orderId.");
+      const newOrderId = data?.orderId as string | undefined;
+      if (!newOrderId) throw new Error("L’orchestrateur n’a pas renvoyé d’orderId.");
 
       toast.success("🚀 Vidéo lancée ! Retrouve-la dans le Studio.");
-      navigate(`/studio?order=${orderId}`);
+      navigate(`/studio?order=${newOrderId}`);
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : String(e);
       console.error("[Studio] generate video error:", e);
@@ -918,6 +1021,13 @@ export function ChatGenerator() {
     }
   }, [activeBrandId, aspectRatio, navigate, prompt, uploadedSource, videoDuration]);
 
+  const handleGenerate = useCallback(() => {
+    if (contentType === "image") {
+      void handleGenerateImage();
+    } else {
+      void handleGenerateVideo();
+    }
+  }, [contentType, handleGenerateImage, handleGenerateVideo]);
   const handleGenerateImage = useCallback(
     async () => {
       const promptText = (prompt || "").trim();
@@ -1328,6 +1438,7 @@ export function ChatGenerator() {
 
           {/* Generate button */}
           <Button
+            onClick={() => void handleGenerate()}
             onClick={() => {
               if (contentType === "video") {
                 void handleGenerateVideo();
