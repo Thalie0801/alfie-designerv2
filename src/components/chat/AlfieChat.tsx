@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Send, ImagePlus, Loader2, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useBrandKit } from '@/hooks/useBrandKit';
@@ -18,13 +19,17 @@ export type Message = {
   assetUrl?: string;
   assetId?: string;
   metadata?: Record<string, unknown>;
+  cta?: 'open-studio';
 };
 
 type Intent = 'image' | 'video' | 'carousel';
 
+type AlfieChatMode = 'widget' | 'studio';
+
 type AlfieChatProps = {
   variant?: 'page' | 'widget';
   onClose?: () => void;
+  mode?: AlfieChatMode;
 };
 
 type VideoStatus = {
@@ -54,6 +59,11 @@ const WELCOME_MESSAGE: Message = {
   content:
     "👋 Salut ! Je suis Alfie. Je peux générer des **images**, des **vidéos** ou des **carrousels** pour ta marque. Décris-moi ce que tu veux créer."
 };
+
+const STUDIO_REDIRECT_MESSAGE =
+  "On va faire ça dans le Studio pour que tu aies les bons réglages de marque, ratios, quotas, etc. Clique sur « Ouvrir le Studio » pour lancer la génération.";
+
+const STUDIO_PATH = '/studio';
 
 function detectIntent(prompt: string): Intent {
   const lower = prompt.toLowerCase();
@@ -114,13 +124,15 @@ function buildId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function AlfieChat({ variant = 'page', onClose }: AlfieChatProps) {
+export function AlfieChat({ variant = 'page', onClose, mode = 'studio' }: AlfieChatProps) {
   const { activeBrandId } = useBrandKit();
+  const navigate = useNavigate();
 
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [showStudioCta, setShowStudioCta] = useState(false);
 
   const [activeJobSetId, setActiveJobSetId] = useState<string>('');
   const [carouselTotal, setCarouselTotal] = useState<number>(0);
@@ -445,6 +457,22 @@ export function AlfieChat({ variant = 'page', onClose }: AlfieChatProps) {
     [activeBrandId, addMessage, checkAndConsumeQuota, triggerWorker]
   );
 
+  const replyAsAssistant = useCallback(
+    async (intent: Intent) => {
+      const needsStudio = intent === 'image' || intent === 'video' || intent === 'carousel';
+
+      addMessage({
+        role: 'assistant',
+        type: 'text',
+        content: needsStudio ? STUDIO_REDIRECT_MESSAGE : "Je suis là pour t'aider à préparer ta prochaine création. Décris-moi ce que tu veux et on le fera ensemble dans le Studio !",
+        cta: needsStudio ? 'open-studio' : undefined
+      });
+
+      setShowStudioCta(mode === 'widget' && needsStudio);
+    },
+    [addMessage, mode]
+  );
+
   const handleSend = useCallback(async () => {
     if (!input.trim() || isLoading) {
       return;
@@ -453,6 +481,7 @@ export function AlfieChat({ variant = 'page', onClose }: AlfieChatProps) {
     const prompt = input.trim();
     setInput('');
     setIsLoading(true);
+    setShowStudioCta(false);
 
     addMessage({
       role: 'user',
@@ -464,19 +493,32 @@ export function AlfieChat({ variant = 'page', onClose }: AlfieChatProps) {
     const aspectRatio = detectAspectRatio(prompt);
 
     try {
-      if (intent === 'image') {
-        await generateImage(prompt, aspectRatio);
-      } else if (intent === 'video') {
-        const woofCost = detectVideoCost(prompt);
-        await generateVideo(prompt, aspectRatio, woofCost);
+      if (mode === 'studio') {
+        if (intent === 'image') {
+          await generateImage(prompt, aspectRatio);
+        } else if (intent === 'video') {
+          const woofCost = detectVideoCost(prompt);
+          await generateVideo(prompt, aspectRatio, woofCost);
+        } else {
+          const count = detectCarouselCount(prompt);
+          await generateCarousel(prompt, count, aspectRatio);
+        }
       } else {
-        const count = detectCarouselCount(prompt);
-        await generateCarousel(prompt, count, aspectRatio);
+        await replyAsAssistant(intent);
       }
     } finally {
       setIsLoading(false);
     }
-  }, [addMessage, generateCarousel, generateImage, generateVideo, input, isLoading]);
+  }, [
+    addMessage,
+    generateCarousel,
+    generateImage,
+    generateVideo,
+    input,
+    isLoading,
+    mode,
+    replyAsAssistant
+  ]);
 
   const layoutClasses = useMemo(() => {
     if (variant === 'widget') {
@@ -563,6 +605,18 @@ export function AlfieChat({ variant = 'page', onClose }: AlfieChatProps) {
           </div>
         </ScrollArea>
       </div>
+
+      {mode === 'widget' && showStudioCta ? (
+        <div className="px-4">
+          <button
+            className="mt-2 w-full rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition hover:opacity-90"
+            onClick={() => navigate(STUDIO_PATH)}
+            type="button"
+          >
+            Ouvrir le Studio
+          </button>
+        </div>
+      ) : null}
 
       {uploadedImage ? (
         <div className="px-4">

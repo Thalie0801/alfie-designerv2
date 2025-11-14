@@ -33,7 +33,7 @@ export default function ChatWidget() {
                   </Button>
                 </div>
                 <div className="h-[480px]">
-                  <AlfieChat variant="widget" onClose={() => setIsOpen(false)} />
+                  <AlfieChat mode="widget" variant="widget" onClose={() => setIsOpen(false)} />
                 </div>
               </div>
             ) : null}
