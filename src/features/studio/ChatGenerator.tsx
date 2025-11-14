@@ -634,6 +634,16 @@ export function ChatGenerator() {
   const handleGenerateImage = useCallback(
     async () => {
       const promptText = (prompt || "").trim();
+
+      if (!promptText && !uploadedSource) {
+        showToast({
+          variant: "destructive",
+          title: "Prompt requis",
+          description: "Ajoute un prompt ou uploade un média pour lancer la génération.",
+        });
+        return;
+      }
+
   const handleGenerateImage = useCallback(async () => {
     const promptText = (prompt || "").trim();
     if (!promptText) {
@@ -753,6 +763,7 @@ export function ChatGenerator() {
             variant: "destructive",
             title: "Erreur de génération",
             description:
+              (error as any)?.message ?? "Erreur de génération (Edge Function).",
               (error as any)?.message || "Erreur de génération (Edge Function).",
       if (!data?.orderId) {
         console.error("[Studio] generate-image: no orderId in data", data);
@@ -815,6 +826,19 @@ export function ChatGenerator() {
           return;
         }
 
+        if (!data?.orderId) {
+          console.error("[Studio] generate-image: no orderId", data);
+          showToast({
+            variant: "destructive",
+            title: "Erreur de génération",
+            description: "Aucun orderId renvoyé par le serveur.",
+          });
+          return;
+        }
+
+        await refetchAll?.();
+        if (data.orderId !== orderId && navigate) {
+          navigate(`/studio?order=${data.orderId}`);
         await refetchAll?.();
         if (data.orderId !== orderId && navigate) {
           navigate(`/studio?order=${data.orderId}`);
@@ -851,6 +875,7 @@ export function ChatGenerator() {
           variant: "success",
           title: "Génération lancée",
           description:
+            data.message ?? "Ton visuel arrive dans le Studio dans quelques instants.",
             data.message || "Ton visuel arrive dans le Studio dans quelques instants.",
           title: "Erreur de génération",
           description,
@@ -869,6 +894,23 @@ export function ChatGenerator() {
         });
       } finally {
         setIsSubmitting(false);
+      }
+    },
+    [
+      prompt,
+      activeBrandId,
+      aspectRatio,
+      contentType,
+      uploadedSource,
+      supabase,
+      showToast,
+      refetchAll,
+      orderId,
+      navigate,
+      setIsSubmitting,
+      setGeneratedAsset,
+    ],
+  );
       }
     },
     [
