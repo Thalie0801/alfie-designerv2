@@ -43,6 +43,7 @@ export async function triggerGenerationFromChat(userId: string, intent: AlfieInt
 
   const payload: Record<string, unknown> = {
     brandId: intent.brandId,
+    userId,
     prompt: intent.topic,
     format: intent.format,
     ratio: intent.ratio,

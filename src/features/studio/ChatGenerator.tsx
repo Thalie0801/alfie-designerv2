@@ -664,6 +664,55 @@ export function ChatGenerator() {
 
       const requestBody: Record<string, unknown> = {
         brandId: activeBrandId,
+        userId: user.id,
+        prompt: promptText,
+        format: "image",
+        ratio: aspectRatio,
+        metadata: {
+          source: "studio-chat",
+          contentType,
+          aspectRatio,
+          uploadedSource: uploadedSource
+            ? { type: uploadedSource.type, url: uploadedSource.url }
+            : undefined,
+          requestedAt: new Date().toISOString(),
+        },
+      };
+
+      try {
+        const { data, error } = await supabase.functions.invoke("generate-image", {
+          body: requestBody,
+        });
+
+        if (error) {
+          console.error("[Studio] generate-image error:", { error, data, requestBody });
+          const description = error.message ?? "Network error";
+          showToast({
+            title: "Erreur de génération",
+            description: `Erreur de génération (Edge Function): ${description}`,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (!data?.orderId) {
+          console.error("[Studio] generate-image: no orderId in data", data);
+          showToast({
+            title: "Erreur de génération",
+            description: "Erreur de génération : aucun orderId renvoyé.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const orderIdFromResponse = data.orderId;
+        await refetchAll();
+        if (orderIdFromResponse !== orderId) {
+          navigate(`/studio?order=${orderIdFromResponse}`);
+        }
+
+      const requestBody: Record<string, unknown> = {
+        brandId: activeBrandId,
         prompt: promptText,
         format: "image",
         ratio: aspectRatio,
@@ -697,11 +746,23 @@ export function ChatGenerator() {
       if (!orderIdFromResponse) {
         console.error('[Studio] image generation error: no orderId in response', data);
         showToast({
+          title: "Génération lancée",
+          description:
+            typeof data?.message === "string"
+              ? data.message
+              : "Ton visuel arrive dans le Studio dans quelques instants.",
+        });
+      } catch (invokeError) {
+        console.error("[Studio] generate-image exception:", invokeError);
+        const message =
+          invokeError instanceof Error ? invokeError.message : "Exception inconnue";
+        showToast({
+          title: "Erreur de génération",
+          description: `Erreur de génération : ${message}`,
           title: "Erreur de génération",
           description: "Aucun orderId renvoyé par l'API",
           variant: "destructive",
         });
-        return;
       }
 
       await refetchAll();
@@ -720,7 +781,7 @@ export function ChatGenerator() {
       const message = err instanceof Error ? err.message : 'Une erreur est survenue';
       showToast({
         title: "Erreur de génération",
-        description: message,
+        description: `Erreur de génération : ${message}`,
         variant: "destructive",
       });
     } finally {
