@@ -918,6 +918,24 @@ export function ChatGenerator() {
     }
   }, [activeBrandId, aspectRatio, navigate, prompt, uploadedSource, videoDuration]);
 
+  const handleGenerateImage = useCallback(
+    async () => {
+      const promptText = (prompt || "").trim();
+
+      if (!promptText) {
+        showToast({
+          variant: "destructive",
+          title: "Prompt requis",
+          description: "Ajoute un prompt pour lancer la génération.",
+        });
+        return;
+      }
+
+      if (!activeBrandId) {
+        showToast({
+          variant: "destructive",
+          title: "Marque requise",
+          description: "Sélectionne une marque avant de générer un visuel.",
   const handleGenerate = useCallback(async () => {
     if (contentType === "video") {
       await handleGenerateVideo();
@@ -968,6 +986,80 @@ export function ChatGenerator() {
         return;
       }
 
+      setIsSubmitting(true);
+      setGeneratedAsset(null);
+
+      try {
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError) {
+          throw authError;
+        }
+        if (!user) {
+          throw new Error("Tu dois être connecté pour lancer une génération.");
+        }
+
+        const { data, error } = await supabase.functions.invoke("generate-image", {
+          body: {
+            brandId: activeBrandId,
+            userId: user.id,
+            prompt: promptText,
+            format: "instagram_post",
+            ratio: aspectRatio,
+            metadata: {
+              source: "studio-chat",
+              contentType,
+              aspectRatio,
+              uploadedSource: uploadedSource
+                ? { type: uploadedSource.type, url: uploadedSource.url }
+                : undefined,
+              requestedAt: new Date().toISOString(),
+            },
+          },
+        });
+
+        if (error) {
+          console.error("[Studio] generate-image error:", error);
+          showToast({
+            variant: "destructive",
+            title: "Erreur de génération",
+            description:
+              (error as any)?.message || "Erreur de génération (Edge Function).",
+          });
+          return;
+        }
+
+        if (!data?.orderId) {
+          console.error("[Studio] generate-image: no orderId", data);
+          showToast({
+            variant: "destructive",
+            title: "Erreur de génération",
+            description: "Aucun orderId renvoyé par le serveur.",
+          });
+          return;
+        }
+
+        await refetchAll?.();
+        if (data.orderId !== orderId && navigate) {
+          navigate(`/studio?order=${data.orderId}`);
+        }
+
+        showToast({
+          variant: "success",
+          title: "Génération lancée",
+          description:
+            data.message ||
+            "Ton visuel arrive dans le Studio dans quelques instants.",
+        });
+      } catch (err: unknown) {
+        console.error("[Studio] image generation exception:", err);
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Une erreur est survenue lors de la génération.";
       const { data, error } = await supabase.functions.invoke("generate-image", {
         body: {
           prompt: promptText,
@@ -997,6 +1089,25 @@ export function ChatGenerator() {
           title: "Erreur de génération",
           description: message,
         });
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [
+      prompt,
+      activeBrandId,
+      aspectRatio,
+      contentType,
+      uploadedSource,
+      supabase,
+      showToast,
+      refetchAll,
+      orderId,
+      navigate,
+      setIsSubmitting,
+      setGeneratedAsset,
+    ],
+  );
         return;
       }
 
@@ -1218,7 +1329,11 @@ export function ChatGenerator() {
           {/* Generate button */}
           <Button
             onClick={() => {
-              void handleGenerate();
+              if (contentType === "video") {
+                void handleGenerateVideo();
+              } else {
+                void handleGenerateImage();
+              }
             }}
             disabled={
               isSubmitting ||
