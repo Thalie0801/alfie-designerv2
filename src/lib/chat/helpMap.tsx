@@ -1,5 +1,3 @@
-import React from "react";
-
 export const HELP = [
   { match: /studio|génération|créer|lancer/i, to: "/studio", label: "Ouvrir Studio", why: "Lancer une génération guidée" },
   { match: /template|catalogue|modèles?/i, to: "/templates", label: "Catalogue", why: "Parcourir les modèles" },

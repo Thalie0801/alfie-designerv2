@@ -29,7 +29,7 @@ const PLATFORM_OPTIONS: Array<{ label: string; value: 'instagram' | 'linkedin' |
 
 export default function Creator() {
   const { user } = useAuth();
-  const { activeBrandId, brandKit } = useBrandKit();
+  const { activeBrandId } = useBrandKit();
   const { intent, setField, resetIntent } = useAlfieIntent({ brandId: activeBrandId ?? '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
@@ -92,7 +92,7 @@ export default function Creator() {
     }
   };
 
-  const planName = brandKit?.plan ? brandKit.plan : 'Plan actuel';
+  const planName = 'Plan actuel';
 
   return (
     <div className="space-y-6">

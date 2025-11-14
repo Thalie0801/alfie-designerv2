@@ -45,7 +45,7 @@ type MediaEntry = {
 type OrderRow = Database['public']['Tables']['orders']['Row'];
 
 interface OrderSummary {
-  order: OrderRow;
+  order: Pick<OrderRow, 'id' | 'status' | 'created_at' | 'campaign_name'>;
   assets: OrderAsset[];
   isProcessing: boolean;
   expectedTotal: number;
@@ -325,7 +325,7 @@ export function ChatGenerator() {
 
         for (const video of videosResp.data ?? []) {
           if (video.type !== "video") continue;
-          const meta = isRecord(video.metadata) ? video.metadata : {};
+          const meta = (isRecord(video.metadata) ? video.metadata : {}) as Record<string, any>;
           const linkedOrderId =
             typeof meta.orderId === "string"
               ? meta.orderId
@@ -340,7 +340,7 @@ export function ChatGenerator() {
             thumbnailUrl: typeof video.thumbnail_url === "string" ? video.thumbnail_url : undefined,
             slideIndex: 0,
             type: "video",
-            format: (meta?.aspectRatio as string | undefined) ?? undefined,
+            format: typeof meta.aspectRatio === "string" ? meta.aspectRatio : undefined,
           });
         }
 
