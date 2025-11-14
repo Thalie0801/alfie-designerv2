@@ -635,6 +635,7 @@ export function ChatGenerator() {
     const promptText = (prompt || "").trim();
     if (!promptText) {
       showToast({
+        variant: "destructive",
         title: "Prompt requis",
         description: "Ajoute un prompt pour lancer la génération",
         variant: "destructive",
@@ -647,6 +648,8 @@ export function ChatGenerator() {
         title: "Marque requise",
         description: "Sélectionne une marque avant de générer un visuel",
         variant: "destructive",
+        title: "Marque requise",
+        description: "Sélectionne une marque avant de générer un visuel",
       });
       return;
     }
@@ -660,6 +663,46 @@ export function ChatGenerator() {
         error: authError,
       } = await supabase.auth.getUser();
       if (authError) throw authError;
+      if (!user) {
+        throw new Error("Tu dois être connecté pour lancer une génération.");
+      }
+
+      const { data, error } = await supabase.functions.invoke("generate-image", {
+        body: {
+          prompt: promptText,
+          format: "image",
+          brandId: activeBrandId,
+          userId: user.id,
+          ratio: aspectRatio,
+          metadata: {
+            source: "studio-chat",
+            contentType,
+            aspectRatio,
+            uploadedSource: uploadedSource
+              ? { type: uploadedSource.type, url: uploadedSource.url }
+              : undefined,
+            requestedAt: new Date().toISOString(),
+          },
+        },
+      });
+
+      if (error) {
+        console.error("[Studio] generate-image error:", { error, data });
+        const message = (error as any)?.message ?? "Erreur de génération (Edge Function).";
+        showToast({
+          variant: "destructive",
+          title: "Erreur de génération",
+          description: message,
+        });
+        return;
+      }
+
+      if (!data?.orderId) {
+        console.error("[Studio] generate-image: no orderId in data", data);
+        showToast({
+          variant: "destructive",
+          title: "Erreur de génération",
+          description: "Aucun orderId renvoyé par le serveur.",
       if (!user) throw new Error("Tu dois être connecté pour lancer une génération.");
 
       const requestBody: Record<string, unknown> = {
@@ -742,6 +785,11 @@ export function ChatGenerator() {
         return;
       }
 
+      await refetchAll();
+      if (data.orderId !== orderId) {
+        navigate(`/studio?order=${data.orderId}`);
+      }
+
       const orderIdFromResponse = typeof data?.orderId === 'string' ? data.orderId : null;
       if (!orderIdFromResponse) {
         console.error('[Studio] image generation error: no orderId in response', data);
@@ -780,7 +828,23 @@ export function ChatGenerator() {
       console.error('[Studio] image generation error:', err);
       const message = err instanceof Error ? err.message : 'Une erreur est survenue';
       showToast({
+        variant: "success",
+        title: "Génération lancée",
+        description:
+          typeof data?.message === "string"
+            ? data.message
+            : "Ton visuel arrive dans le Studio dans quelques instants.",
+      });
+    } catch (invokeError) {
+      console.error("[Studio] generate-image exception:", invokeError);
+      const message =
+        invokeError instanceof Error
+          ? invokeError.message
+          : "Exception inconnue lors de l'appel à la fonction edge.";
+      showToast({
+        variant: "destructive",
         title: "Erreur de génération",
+        description: message,
         description: `Erreur de génération : ${message}`,
         variant: "destructive",
       });
@@ -791,6 +855,9 @@ export function ChatGenerator() {
     prompt,
     activeBrandId,
     showToast,
+    supabase,
+    contentType,
+    aspectRatio,
     aspectRatio,
     contentType,
     uploadedSource,
