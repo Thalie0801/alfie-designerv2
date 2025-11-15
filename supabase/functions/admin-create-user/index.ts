@@ -18,6 +18,63 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error('Configuration Supabase manquante')
+    }
+
+    // Client admin (service role) pour les opérations privilégiées
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
+
+    // Client utilisateur pour récupérer le compte courant via le token
+    const supabase = createClient(supabaseUrl, anonKey || serviceRoleKey, {
+      global: {
+        headers: {
+          Authorization: req.headers.get('Authorization') ?? ''
+        }
+      },
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
+
+    const { email, fullName, plan, sendInvite, password } = await req.json()
+
+    // Vérifier que l'utilisateur actuel est authentifié
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      throw new Error('Non authentifié')
+    }
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      throw new Error('Non authentifié')
+    }
+
+    if (!ADMIN_EMAILS.includes(user.email || '')) {
+      throw new Error('Accès refusé : droits administrateur requis')
+    }
+
+    console.log('Admin verified:', user.email)
+
+    // Créer l'utilisateur
+    const createUserData: any = {
+      email,
+      email_confirm: !sendInvite,
+      user_metadata: {
+        full_name: fullName || '',
+        plan: plan,
+      }
     console.log('[admin-create-user] Request received');
     
     // 1) Auth + droit admin (source de vérité backend)
