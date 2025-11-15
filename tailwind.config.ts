@@ -15,6 +15,23 @@ export default {
     },
     extend: {
       colors: {
+        alfie: {
+          primary: "#F6B36A",
+          primarySoft: "#FFE0B5",
+          pink: "#FF8BC2",
+          pinkSoft: "#FFD5EB",
+          aqua: "#7EE2E0",
+          aquaSoft: "#CFF6F5",
+          lilac: "#C8A9FF",
+          bg: "#FFF7FB",
+          bgSoft: "#FFEFF7",
+          bgDark: "#151325",
+          bgSoftDark: "#1D1930",
+          text: "#2C2340",
+          muted: "#7B6E9A",
+          textDark: "#FDF5FF",
+          mutedDark: "#A7A0CC",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

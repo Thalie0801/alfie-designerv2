@@ -63,10 +63,7 @@ export function AppSidebar() {
     navItems.push({ path: "/admin", label: "Admin", icon: Settings });
   }
 
-  const getNavCls = ({ isActive }: { isActive: boolean }) =>
-    isActive
-      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
+  const getNavCls = (_: { isActive: boolean }) => "w-full";
 
   const handleSignOut = async () => {
     await signOut();
@@ -74,7 +71,7 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar className="z-30">
+    <Sidebar className="z-30 border-r border-border bg-card">
       <SidebarContent>
         {/* Logo */}
         <div className="p-4 flex items-center gap-3">
@@ -107,7 +104,10 @@ export function AppSidebar() {
                         <div className="flex items-center gap-2 flex-1">
                           <span>{item.label}</span>
                           {item.badge && (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] px-1.5 py-0 border-none bg-alfie-pink text-[#2C2340] dark:bg-alfie-pinkSoft dark:text-[#151325]"
+                            >
                               {item.badge}
                             </Badge>
                           )}

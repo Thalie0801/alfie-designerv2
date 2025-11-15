@@ -33,7 +33,7 @@ export function AppLayoutWithSidebar({ children }: AppLayoutWithSidebarProps) {
         onRenew={handleRenew}
       />
       <SidebarProvider defaultOpen={true}>
-          <div className="min-h-screen flex w-full bg-background">
+          <div className="min-h-screen flex w-full bg-background text-foreground">
             <AppSidebar />
             
             <div className="flex-1 flex flex-col min-w-0">
