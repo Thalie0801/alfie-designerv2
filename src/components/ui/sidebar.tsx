@@ -412,12 +412,14 @@ const SidebarMenuItem = React.forwardRef<HTMLLIElement, React.ComponentProps<"li
 SidebarMenuItem.displayName = "SidebarMenuItem";
 
 const sidebarMenuButtonVariants = cva(
+  "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-2xl border border-transparent bg-transparent p-2 text-left text-sm font-medium text-muted-foreground outline-none ring-sidebar-ring transition-[width,height,padding,color,background-color,border-color] hover:bg-muted/80 hover:text-foreground focus-visible:ring-2 active:bg-muted active:text-foreground disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-muted data-[active=true]:text-foreground data-[active=true]:border-alfie-pink/60 group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-2 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
   "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-2xl border border-transparent bg-transparent p-2 text-left text-sm font-medium text-muted-foreground outline-none ring-sidebar-ring transition-[width,height,padding,color,background-color,border-color] hover:bg-alfie-bgSoft hover:text-foreground focus-visible:ring-2 active:bg-alfie-pinkSoft active:text-foreground disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-alfie-pinkSoft data-[active=true]:text-foreground data-[active=true]:border-alfie-pink/60 dark:hover:bg-alfie-bgSoftDark dark:active:bg-alfie-pink dark:data-[active=true]:bg-alfie-pink group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-2 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
   {
     variants: {
       variant: {
         default: "",
         outline:
+          "bg-card shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-muted hover:text-foreground hover:shadow-[0_0_0_1px_hsl(var(--ring))]",
           "bg-card shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-alfie-bgSoft hover:text-foreground hover:shadow-[0_0_0_1px_hsl(var(--ring))]",
       },
       size: {

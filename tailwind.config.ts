@@ -17,6 +17,9 @@ export default {
       colors: {
         alfie: {
           primary: "#F6B36A",
+          pink: "#FF8BC2",
+          aqua: "#7EE2E0",
+          lilac: "#C8A9FF",
           primarySoft: "#FFE0B5",
           pink: "#FF8BC2",
           pinkSoft: "#FFD5EB",

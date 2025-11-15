@@ -8,6 +8,27 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
+    --background: 240 11% 96.5%;
+    --foreground: 220.91 39.29% 10.98%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220.91 39.29% 10.98%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220.91 39.29% 10.98%;
+
+    --primary: 31.29 88.61% 69.02%;
+    --primary-foreground: 220.91 39.29% 10.98%;
+    --primary-glow: 31.29 88.61% 80%;
+
+    --secondary: 331.55 100% 77.25%;
+    --secondary-foreground: 220.91 39.29% 10.98%;
+
+    --muted: 220 14.29% 95.88%;
+    --muted-foreground: 220 8.94% 46.08%;
+
+    --accent: 178.8 63.29% 69.02%;
+    --accent-foreground: 220.91 39.29% 10.98%;
     /* Alfie Design System - Modern, Creative, Professional */
     --background: 330 100% 98.43%;
     --foreground: 258.62 29.29% 19.41%;
@@ -38,6 +59,29 @@ All colors MUST be HSL.
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
+    --border: 240 10.64% 90.78%;
+    --input: 240 10.64% 90.78%;
+    --ring: 220.91 39.29% 10.98%;
+
+    --sidebar-background: 240 33.33% 98.82%;
+    --sidebar-foreground: 220.91 39.29% 10.98%;
+    --sidebar-primary: 31.29 88.61% 69.02%;
+    --sidebar-primary-foreground: 220.91 39.29% 10.98%;
+    --sidebar-accent: 220 14.29% 95.88%;
+    --sidebar-accent-foreground: 220.91 39.29% 10.98%;
+    --sidebar-border: 240 10.64% 90.78%;
+    --sidebar-ring: 220.91 39.29% 10.98%;
+
+    --radius: 0.75rem;
+
+    --gradient-hero: linear-gradient(135deg, hsl(240 11% 96.5%), hsl(0 0% 100%));
+    --gradient-warm: linear-gradient(135deg, hsl(31.29 88.61% 69.02%), hsl(331.55 100% 77.25%));
+    --gradient-subtle: linear-gradient(180deg, hsl(240 11% 96.5%), hsl(0 0% 100%));
+
+    --shadow-soft: 0 4px 16px hsl(220 15% 35% / 0.08);
+    --shadow-medium: 0 8px 30px hsl(220 15% 35% / 0.12);
+    --shadow-strong: 0 20px 60px hsl(220 15% 35% / 0.16);
+    --shadow-glow: 0 0 40px hsl(31.29 88.61% 69.02% / 0.35);
     --border: 328.57 100% 91.76%;
     --input: 328.57 100% 91.76%;
     --ring: 31.29 88.61% 69.02%;
@@ -77,12 +121,19 @@ All colors MUST be HSL.
     --shadow-strong: 0 8px 32px hsl(258.62 29.29% 19.41% / 0.18);
     --shadow-glow: 0 0 40px hsl(331.55 100% 77.25% / 0.35);
 
-    /* Animation */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
   }
 
   .dark {
+    --background: 261.82 84.62% 2.55%;
+    --foreground: 210 20% 98.04%;
+
+    --card: 220.91 39.29% 10.98%;
+    --card-foreground: 210 20% 98.04%;
+
+    --popover: 220.91 39.29% 10.98%;
+    --popover-foreground: 210 20% 98.04%;
     --background: 246.67 32.14% 10.98%;
     --foreground: 288 100% 98.04%;
 
@@ -99,6 +150,8 @@ All colors MUST be HSL.
     --secondary: 331.55 100% 77.25%;
     --secondary-foreground: 246.67 32.14% 10.98%;
 
+    --muted: 220.91 39.29% 10.98%;
+    --muted-foreground: 217.89 10.61% 64.9%;
     --muted: 258.62 29.29% 19.41%;
     --muted-foreground: 249.55 30.14% 71.37%;
 
@@ -108,6 +161,23 @@ All colors MUST be HSL.
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
+    --border: 240 9.3% 16.86%;
+    --input: 240 9.3% 16.86%;
+    --ring: 210 20% 98.04%;
+
+    --sidebar-background: 220.91 39.29% 10.98%;
+    --sidebar-foreground: 210 20% 98.04%;
+    --sidebar-primary: 31.29 88.61% 69.02%;
+    --sidebar-primary-foreground: 246.67 32.14% 10.98%;
+    --sidebar-accent: 220.91 39.29% 10.98%;
+    --sidebar-accent-foreground: 210 20% 98.04%;
+    --sidebar-border: 240 9.3% 16.86%;
+    --sidebar-ring: 210 20% 98.04%;
+
+    --shadow-soft: 0 4px 16px hsl(0 0% 0% / 0.35);
+    --shadow-medium: 0 8px 32px hsl(0 0% 0% / 0.45);
+    --shadow-strong: 0 20px 60px hsl(0 0% 0% / 0.6);
+    --shadow-glow: 0 0 40px hsl(31.29 88.61% 69.02% / 0.45);
     --border: 259.29 26.42% 20.78%;
     --input: 259.29 26.42% 20.78%;
     --ring: 31.29 88.61% 69.02%;

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useVersionRefresh } from '@/hooks/useVersionRefresh';
 import { 
@@ -44,13 +45,13 @@ export function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
-      <header className="sticky top-0 z-20 backdrop-blur bg-white/70 border-b border-slate-100">
+      <header className="sticky top-0 z-20 backdrop-blur bg-card/80 border-b border-border">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-6">
             <Link to="/chat" className="flex items-center gap-1.5 sm:gap-2">
-              <span className="inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
+              <span className="inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-2xl bg-alfie-primary/10 text-alfie-primary shadow-sm">
                 <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
               </span>
               <span className="font-semibold text-sm sm:text-base">Alfie Designer</span>
@@ -76,10 +77,10 @@ export function AppLayout({ children }: AppLayoutProps) {
           <div className="flex items-center gap-1.5 sm:gap-3">
             {/* Admin Quick Switch - Hidden on small mobile */}
             {canSeeAdminToggle && (
-              <div className="hidden sm:flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg bg-slate-100 border border-slate-200">
+              <div className="hidden sm:flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg bg-muted text-foreground border border-border">
                 <Link to="/chat">
-                  <Button 
-                    variant={location.pathname === '/chat' ? 'default' : 'ghost'} 
+                  <Button
+                    variant={location.pathname === '/chat' ? 'default' : 'ghost'}
                     size="sm"
                     className="text-xs sm:text-sm px-2 sm:px-3"
                     aria-label="Basculer vers le mode Client"
@@ -99,7 +100,16 @@ export function AppLayout({ children }: AppLayoutProps) {
                 </Link>
               </div>
             )}
-            <Badge variant="secondary" className="hidden sm:inline-flex text-xs">{profile?.plan || 'starter'}</Badge>
+            <Badge
+              variant="secondary"
+              className={cn(
+                'hidden sm:inline-flex text-xs',
+                (profile?.plan || 'starter').toLowerCase() === 'free' &&
+                  'bg-alfie-aqua/10 text-alfie-aqua border border-alfie-aqua/40'
+              )}
+            >
+              {profile?.plan || 'starter'}
+            </Badge>
             <Button variant="ghost" size="icon" className="hidden sm:flex h-8 w-8 sm:h-10 sm:w-10">
               <UserCircle className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
@@ -116,7 +126,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               </SheetTrigger>
               <SheetContent side="right" className="w-[280px] sm:w-[320px]">
                 <div className="flex flex-col gap-4 mt-6">
-                  <div className="flex items-center gap-2 pb-4 border-b">
+                  <div className="flex items-center gap-2 pb-4 border-b border-border">
                     <UserCircle className="h-5 w-5 text-muted-foreground" />
                     <div className="flex flex-col">
                       <span className="text-sm font-medium">{user?.email}</span>
@@ -139,7 +149,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </nav>
 
                   {canSeeAdminToggle && (
-                    <div className="pt-4 border-t">
+                    <div className="pt-4 border-t border-border">
                       <p className="text-xs text-muted-foreground mb-2 px-2">Mode</p>
                       <div className="flex flex-col gap-2">
                         <Link to="/chat" onClick={() => setMobileMenuOpen(false)}>
@@ -162,7 +172,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     </div>
                   )}
 
-                  <div className="pt-4 border-t mt-auto">
+                  <div className="pt-4 border-t border-border mt-auto">
                     <Button
                       variant="outline"
                       className="w-full justify-start gap-3 text-destructive hover:text-destructive"

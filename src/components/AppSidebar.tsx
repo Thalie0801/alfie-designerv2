@@ -71,6 +71,7 @@ export function AppSidebar() {
   };
 
   return (
+    <Sidebar className="z-30 border-r border-border bg-sidebar text-sidebar-foreground shadow-sm">
     <Sidebar className="z-30 border-r border-border bg-card">
       <SidebarContent>
         {/* Logo */}
@@ -106,6 +107,7 @@ export function AppSidebar() {
                           {item.badge && (
                             <Badge
                               variant="outline"
+                              className="text-[10px] px-1.5 py-0 border-none bg-alfie-pink text-white"
                               className="text-[10px] px-1.5 py-0 border-none bg-alfie-pink text-[#2C2340] dark:bg-alfie-pinkSoft dark:text-[#151325]"
                             >
                               {item.badge}
@@ -132,7 +134,14 @@ export function AppSidebar() {
                 <UserCircle className="h-4 w-4" />
                 <span className="text-xs truncate max-w-[120px]">{user?.email?.split("@")[0]}</span>
               </div>
-              <Badge variant="secondary" className="text-xs">
+              <Badge
+                variant="secondary"
+                className={cn(
+                  "text-xs",
+                  (profile?.plan || "starter").toLowerCase() === "free" &&
+                    "bg-alfie-aqua/10 text-alfie-aqua border border-alfie-aqua/40",
+                )}
+              >
                 {profile?.plan || "starter"}
               </Badge>
             </div>

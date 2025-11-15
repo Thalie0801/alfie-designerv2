@@ -45,8 +45,12 @@ export function ActiveBrandCard() {
     return `${totalBrands}/${quotaBrands} marque(s) utilisées`;
   }, [totalBrands, quotaBrands]);
 
+  const planLabel = safeString(activeBrand?.plan ?? "aucun");
+  const planDisplay = planLabel.toUpperCase();
+  const isFreePlan = planLabel.toLowerCase() === "free";
+
   return (
-    <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+    <Card className="shadow-sm">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -96,8 +100,13 @@ export function ActiveBrandCard() {
                 </div>
 
                 <div className="flex gap-2 flex-wrap">
-                  <Badge variant={activeBrand.plan ? "default" : "secondary"}>
-                    {safeString(activeBrand.plan ?? "aucun").toUpperCase()}
+                  <Badge
+                    variant={isFreePlan ? "outline" : activeBrand.plan ? "secondary" : "outline"}
+                    className={cn(
+                      isFreePlan && "bg-alfie-aqua/10 text-alfie-aqua border border-alfie-aqua/40",
+                    )}
+                  >
+                    {planDisplay}
                   </Badge>
 
                   <Badge variant={activeBrand.canva_connected ? "default" : "secondary"}>
