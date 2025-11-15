@@ -1,14 +1,4 @@
 import { supabase } from "@/lib/supabaseClient";
-import { getAuthHeader } from "@/lib/auth";
-
-export type AspectRatio = "1:1" | "9:16" | "16:9";
-
-interface BaseParams {
-  prompt: string;
-  brandId: string;
-  aspectRatio: AspectRatio;
-  inputMedia?: { type: "image" | "video"; url: string }[];
-}
 
 const IMAGE_SIZE_MAP = {
   "1:1": { width: 1024, height: 1024 },
@@ -140,59 +130,4 @@ export async function createMediaOrder(
   }
 
   throw new Error(`Unsupported media kind: ${input.kind}`);
-}
-
-export async function generateImage(params: BaseParams): Promise<string> {
-  return generateSingle({ ...params, type: "image" });
-}
-
-export async function generateCarousel(
-  params: BaseParams & { slides: number },
-): Promise<string> {
-  return generateSingle({ ...params, type: "carousel", quantity: 1, slides: params.slides });
-  return generateSingle({ ...params, type: "carousel", quantity: params.slides });
-}
-
-export async function generateVideo(
-  params: BaseParams & { durationSeconds: number },
-): Promise<string> {
-  return generateSingle({ ...params, type: "video", duration: params.durationSeconds });
-}
-
-async function generateSingle(body: Record<string, any>): Promise<string> {
-  try {
-    const authHeader = await getAuthHeader();
-    const res = await fetch("/functions/v1/studio-generate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...authHeader,
-      },
-      body: JSON.stringify(body),
-    });
-
-    const data = await res.json().catch(() => null);
-    if (!res.ok || !data?.ok || !data?.resourceId) {
-      console.error("[studioApi] studio-generate invalid response", data);
-      const details =
-        typeof data?.error === "string"
-          ? data.error
-          : typeof data?.details === "string"
-            ? data.details
-            : "Génération impossible";
-      throw new Error(details);
-    const data = await res.json();
-    if (!res.ok || !data?.ok || !data?.resourceId) {
-      console.error("[studio-generate] invalid response", data);
-      throw new Error(data?.error || "Pas de resourceId retourné");
-    }
-
-    return data.resourceId as string;
-  } catch (error) {
-    console.error("[studioApi] studio-generate request failed", error);
-    console.error("[studio-generate] request failed", error);
-    throw error instanceof Error
-      ? error
-      : new Error("Impossible de lancer la génération");
-  }
 }
