@@ -9,7 +9,15 @@ function pickIndex(length: number, seed: number) {
   return Math.abs(Math.trunc(normalised)) % length;
 }
 
-export function chooseCarouselOutline(slides: number, seed = 0) {
+export function chooseCarouselOutline({
+  slides,
+  seed = 0,
+  topic,
+}: {
+  slides: number;
+  seed?: number;
+  topic?: string;
+}) {
   const banks = [
     { title: "Problème → Solution", seq: ["Le problème clé", "Pourquoi ça bloque", "La méthode", "Exemple rapide", "CTA clair"] },
     { title: "5 erreurs à éviter", seq: ["Erreur 1", "Erreur 2", "Erreur 3", "Erreur 4", "Erreur 5 + CTA"] },
@@ -20,12 +28,13 @@ export function chooseCarouselOutline(slides: number, seed = 0) {
 
   const effectiveSlides = Math.max(1, Math.trunc(slides));
   const base = banks[pickIndex(banks.length, seed)];
+  const title = topic?.trim() ? `${base.title} — ${topic.trim()}` : base.title;
   const seq =
     base.seq.length === effectiveSlides
       ? base.seq
       : [...base.seq, ...Array(Math.max(0, effectiveSlides - base.seq.length)).fill("Conseil bonus")].slice(0, effectiveSlides);
 
-  return { title: base.title, slides: seq.map((label, index) => `${index + 1}. ${label}`) };
+  return { title, slides: seq.map((label, index) => `${index + 1}. ${label}`) };
 }
 
 function fallbackCta(cta: IntentDetails["cta"], fallback: string) {

@@ -142,80 +142,43 @@ export default function ChatWidget() {
     });
   };
 
-  const extractIdeaLabels = (message: string): string[] => {
-    const lines = message
-      .split(/\n+/)
+  // Helper to extract interesting lines when parsing AI replies
+  function extractInterestingLines(text: string): string[] {
+    const lines = text
+      .split("\n")
       .map((line) => line.trim())
-      .filter((line) => line.length > 0);
+      .filter(Boolean);
 
     const matches: string[] = [];
-    const allowLine = (line: string) => {
-      const withoutBullet = line.replace(/^[-•*+]\s*/, "");
-      const lower = withoutBullet.toLowerCase();
-      if (/^type\s*:/i.test(withoutBullet)) return false;
-      if (/^plateforme\s*:/i.test(withoutBullet)) return false;
-      if (/^ratio\s*:/i.test(withoutBullet)) return false;
-      if (/^nombre d['’]éléments/i.test(lower)) return false;
-      if (/^cta\s*:/i.test(withoutBullet)) return false;
-      if (/^ton\s*:/i.test(withoutBullet)) return false;
-      if (/^slides?/i.test(lower)) return false;
-      return true;
-    };
+
+    const allowLine = (line: string) =>
+      !/^ok,? sur changement d['’]angle/i.test(line);
 
     for (const line of lines) {
       if (!allowLine(line)) continue;
       const cleaned = line.replace(/^[-•*+]\s*/, "");
-      if (/^(carrousel|carousel|vid[ée]o|image|visuel)/i.test(cleaned)) {
-        matches.push(cleaned);
-      } else if (/^th[eè]me\s*[:–-]/i.test(cleaned)) {
-        matches.push(cleaned);
-      } else if (/^hook\s*[:–-]/i.test(cleaned)) {
-        matches.push(cleaned);
-      } else if (/^id[ée]e?\s*\d*\s*[:–-]/i.test(cleaned)) {
+
+      if (
+        /^(carrousel|carousel|vid[ée]o|video|image|visuel)/i.test(cleaned) ||
+        /^th[eè]me\s*[:–-]/i.test(cleaned) ||
+        /^hook\s*[:–-]/i.test(cleaned) ||
+        /^id[ée]e?\s*\d*\s*[:–-]/i.test(cleaned)
+      ) {
         matches.push(cleaned);
       }
+
       if (matches.length >= 3) break;
     }
 
     if (matches.length === 0) {
-      const fallback = lines.find(
-        (line) => allowLine(line) && !/^ok,? on change d['’]angle/i.test(line),
-      );
+      const fallback = lines.find((line) => allowLine(line));
       if (fallback) {
         matches.push(fallback.replace(/^[-•*+]\s*/, ""));
       }
     }
-  const buildNeedTopicReply = (): AssistantReply => {
-    const suggestions = [
-      "Carrousel 5 slides 4:5 Instagram : 3 erreurs en pub Meta pour PME",
-      "Visuel 1:1 LinkedIn : annonce webinar IA marketing",
-      "Vidéo 9:16 TikTok : astuces Canva pour solopreneurs",
-    ];
-
-    return {
-      role: "assistant" as const,
-      node: (
-        <div className="space-y-3">
-          <p className="text-sm">
-            Donne-moi un <strong>sujet précis</strong>. Exemples :
-          </p>
-          <div className="flex flex-wrap gap-2">{suggestions.map((s) => chip(s, () => setInput(s)))}</div>
-        </div>
-      ),
-    };
-  };
-
-  const buildLocalReply = (intent: ContentIntent, mergedBrief: Brief): AssistantReply => {
-    const format = mergedBrief.format ?? (intent.explicitMode ? intent.mode : "image");
-    const ratio = mergedBrief.ratio ?? intent.ratio;
-    const platform = mergedBrief.platform ?? intent.platform ?? undefined;
-    const tone = mergedBrief.tone ?? intent.tone ?? undefined;
-    const topic = mergedBrief.topic ?? intent.topic ?? "";
-    const cta = mergedBrief.cta ?? intent.cta ?? undefined;
-    const slides = mergedBrief.slides ?? intent.slides ?? 5;
 
     return matches;
-  };
+  }
 
   const buildNeedTopicReply = (): AssistantReply => {
     const suggestions = [
@@ -246,58 +209,36 @@ export default function ChatWidget() {
     const cta = mergedBrief.cta ?? intent.cta ?? undefined;
     const slides = mergedBrief.slides ?? intent.slides ?? 5;
 
-    const next = () => setSeed((v) => v + 1);
-
-    const formatLabel = format === "carousel" ? "Carrousel" : format === "video" ? "Vidéo" : "Visuel";
-
-    const header =
-      modeCoach === "strategy" ? (
-        <p>
-          <strong>{formatLabel}</strong> — ratio <strong>{ratio}</strong>
-          {platform ? (
-            <>
-              {" "}— <strong>{platform}</strong>
-            </>
-          ) : null}
-          {tone ? (
-            <>
-              {" "}— ton <strong>{tone}</strong>
-            </>
-          ) : null}
-          .
+    // Build the assistant card header and body similar to the previous implementation
+    const header = (
+      <div className="space-y-1">
+        <p className="text-sm font-medium">
+          Format : <span className="capitalize">{format}</span>
+          {platform ? ` • ${platform}` : null}
+          {ratio ? ` • ratio ${ratio}` : null}
         </p>
-      ) : modeCoach === "da" ? (
-        <p>
-          <strong>Direction créative</strong> pour &quot;{topic || "ton sujet"}&quot;
-        </p>
-      ) : (
-        <p>
-          <strong>Prêt à produire</strong> — je te pré-remplis Studio.
-        </p>
-      );
+        {topic ? <p className="text-sm">Thème : {topic}</p> : null}
+        {cta ? <p className="text-xs text-muted-foreground">CTA : {cta}</p> : null}
+      </div>
+    );
 
-    let body: ReactNode;
-    const collectedIdeas: string[] = [];
+    let body: ReactNode = null;
 
     if (format === "carousel") {
-      const count = typeof slides === "number" ? slides : 5;
-      const plan = chooseCarouselOutline(count, seed);
-      next();
-      const title = topic ? `Carrousel — ${topic}` : `Carrousel — ${plan.title}`;
-      collectedIdeas.push(title);
+      const plan = chooseCarouselOutline({
+        topic: topic || undefined,
+        slides,
+        seed,
+      });
+      setSeed((value) => value + 1);
       body = (
-        <div className="space-y-2 text-sm">
-          <p>
-            Thème : <em>{topic || "Ton sujet"}</em>
-          </p>
-          <div>
-            <p className="font-medium">Structure suggérée : {plan.title}</p>
-            <ul className="list-disc ml-5">
-              {plan.slides.map((s, i) => (
-                <li key={i}>{s}</li>
-              ))}
-            </ul>
-          </div>
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Structure suggérée : {plan.title}</p>
+          <ul className="list-disc ml-5 text-sm">
+            {plan.slides.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
         </div>
       );
     } else {
@@ -305,22 +246,20 @@ export default function ChatWidget() {
         format === "video"
           ? chooseVideoVariant({ topic: topic || undefined, cta }, seed)
           : chooseImageVariant({ topic: topic || undefined, cta }, seed);
-      next();
-      const ideaLabel = format === "video" ? "Vidéo" : "Visuel";
-      if (topic) {
-        collectedIdeas.push(`${ideaLabel} — ${topic}`);
-      }
-      body = variant;
-    }
 
-    if (collectedIdeas.length > 0) {
-      registerIdeas(collectedIdeas);
+      setSeed((value) => value + 1);
+
       body = variant;
     }
 
     return {
       role: "assistant" as const,
-      node: assistantCard(<div className="space-y-2">{header}{body}</div>),
+      node: assistantCard(
+        <div className="space-y-2">
+          {header}
+          {body}
+        </div>,
+      ),
     };
   };
 
@@ -331,12 +270,14 @@ export default function ChatWidget() {
     } catch {
       // ignore
     }
+
     const params = new URLSearchParams();
     params.set("mode", brief.state.format || "image");
     if (brief.state.ratio) params.set("ratio", brief.state.ratio);
     if (brief.state.slides) params.set("slides", String(brief.state.slides));
     if (brief.state.topic) params.set("topic", brief.state.topic);
     if (brief.state.cta) params.set("cta", brief.state.cta);
+
     const url = `/studio?${params.toString()}`;
     window.location.assign(url);
   }
@@ -396,9 +337,6 @@ export default function ChatWidget() {
         return buildLocalReply(intent, mergedBrief);
       }
 
-      const payload = (await res.json().catch(() => null)) as {
-        data?: { message?: string };
-      } | null;
       const payload = (await res.json().catch(() => null)) as { data?: { message?: string } } | null;
       const aiMessage = typeof payload?.data?.message === "string" ? payload.data.message.trim() : "";
 
@@ -406,7 +344,7 @@ export default function ChatWidget() {
         return buildLocalReply(intent, mergedBrief);
       }
 
-      registerIdeas(extractIdeaLabels(aiMessage));
+      registerIdeas(extractInterestingLines(aiMessage));
 
       const blocks = aiMessage
         .split(/\n{2,}/)
