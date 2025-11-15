@@ -136,6 +136,10 @@ async function claimNextJob(): Promise<JobRow | null> {
 }
 
 async function callInternalFn<TResponse>(fnName: string, body: unknown): Promise<TResponse> {
+  if (!INTERNAL_FN_SECRET) {
+    throw new Error("INTERNAL_FN_SECRET is not configured");
+  }
+  
   const resp = await fetch(`${SUPABASE_URL}/functions/v1/${fnName}`, {
     method: "POST",
     headers: {
