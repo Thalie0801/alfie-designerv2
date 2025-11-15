@@ -17,6 +17,8 @@ export interface MediaGenerationRow {
   thumbnail_url: string | null;
   metadata: Record<string, any> | null;
   type: string | null;
+  public_url?: string | null;
+  storage?: string | null;
 }
 
 export type MediaGenerationUpdateHandler = (row: MediaGenerationRow) => void;
@@ -33,6 +35,7 @@ export function useMediaGenerationsWatcher(
     const fetchInitial = async () => {
       const { data, error } = await supabase
         .from('media_generations')
+        .select('id, status, output_url, render_url, thumbnail_url, metadata, type, public_url, storage')
         .select('id, status, output_url, render_url, thumbnail_url, metadata, type')
         .in('id', resourceIds);
 
@@ -51,6 +54,8 @@ export function useMediaGenerationsWatcher(
           thumbnail_url: row.thumbnail_url ?? null,
           metadata: (row.metadata as Record<string, any> | null) ?? null,
           type: (row.type as string | null) ?? null,
+          public_url: (row as MediaGenerationRow).public_url ?? null,
+          storage: (row as MediaGenerationRow).storage ?? null,
         });
       }
     };
@@ -80,6 +85,8 @@ export function useMediaGenerationsWatcher(
             thumbnail_url: row.thumbnail_url ?? null,
             metadata: (row.metadata as Record<string, any> | null) ?? null,
             type: (row.type as string | null) ?? null,
+            public_url: (row as MediaGenerationRow).public_url ?? null,
+            storage: (row as MediaGenerationRow).storage ?? null,
           });
         },
       )

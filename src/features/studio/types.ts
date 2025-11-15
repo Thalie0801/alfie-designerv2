@@ -19,6 +19,7 @@ export interface GeneratedAsset {
   downloadUrl?: string;
   inLibrary?: boolean;
   meta?: Record<string, any>;
+  storage?: string;
 }
 
 export interface StudioMessage {

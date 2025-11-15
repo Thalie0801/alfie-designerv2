@@ -149,6 +149,7 @@ export async function generateImage(params: BaseParams): Promise<string> {
 export async function generateCarousel(
   params: BaseParams & { slides: number },
 ): Promise<string> {
+  return generateSingle({ ...params, type: "carousel", quantity: 1, slides: params.slides });
   return generateSingle({ ...params, type: "carousel", quantity: params.slides });
 }
 
@@ -170,6 +171,16 @@ async function generateSingle(body: Record<string, any>): Promise<string> {
       body: JSON.stringify(body),
     });
 
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ok || !data?.resourceId) {
+      console.error("[studioApi] studio-generate invalid response", data);
+      const details =
+        typeof data?.error === "string"
+          ? data.error
+          : typeof data?.details === "string"
+            ? data.details
+            : "Génération impossible";
+      throw new Error(details);
     const data = await res.json();
     if (!res.ok || !data?.ok || !data?.resourceId) {
       console.error("[studio-generate] invalid response", data);
@@ -178,6 +189,7 @@ async function generateSingle(body: Record<string, any>): Promise<string> {
 
     return data.resourceId as string;
   } catch (error) {
+    console.error("[studioApi] studio-generate request failed", error);
     console.error("[studio-generate] request failed", error);
     throw error instanceof Error
       ? error

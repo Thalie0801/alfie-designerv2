@@ -11,6 +11,8 @@ export default function StudioV2Page() {
         <div className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">Studio Alfie</h1>
           <p className="text-muted-foreground max-w-2xl">
+            Génère images, carrousels et vidéos avec l'assistant créatif Alfie. Combine plusieurs formats
+            dans une même requête et retrouve-les en un clin d'œil dans ta bibliothèque.
             Génère images, carrousels et vidéos avec une interface inspirée de Meta AI. Combine plusieurs
             formats dans une même requête et retrouve-les en un clin d'œil dans ta bibliothèque Alfie.
           </p>

@@ -27,6 +27,8 @@ interface StudioGenerateRequest {
   aspectRatio: string;
   quantity?: number;
   duration?: number;
+  slides?: number;
+  inputMedia?: { type: "image" | "video"; url: string }[];
 }
 
 serve(async (req) => {
@@ -68,13 +70,32 @@ serve(async (req) => {
     console.log(`[studio-generate] ${body.type} request from user ${user.id}`);
 
     // Route to appropriate generation function based on type
-    let resourceId: string;
-    let resourceType: "media" | "order";
+    let resourceId: string | null = null;
+    let resourceType: "media" | "order" = "media";
+
+    const referenceImage = body.inputMedia?.find((media) => media.type === "image");
+    const referenceVideo = body.inputMedia?.find((media) => media.type === "video");
 
     if (body.type === "image") {
-      // Call alfie-render-image directly
-      const resolution = body.aspectRatio === "1:1" ? "1080x1080" : 
-                        body.aspectRatio === "9:16" ? "1080x1920" : "1080x1350";
+      const resolution =
+        body.aspectRatio === "1:1"
+          ? "1080x1080"
+          : body.aspectRatio === "9:16"
+            ? "1080x1920"
+            : "1080x1350";
+
+      const payload: Record<string, unknown> = {
+        userId: user.id,
+        brand_id: body.brandId,
+        prompt: body.prompt,
+        resolution,
+        provider: "lovable",
+        model: "nano-banana",
+      };
+
+      if (referenceImage) {
+        payload.templateImageUrl = referenceImage.url;
+      }
 
       const response = await fetch(`${SUPABASE_URL}/functions/v1/alfie-render-image`, {
         method: "POST",
@@ -82,83 +103,145 @@ serve(async (req) => {
           "Content-Type": "application/json",
           "X-Internal-Secret": INTERNAL_FN_SECRET,
         },
-        body: JSON.stringify({
-          userId: user.id,
-          brand_id: body.brandId,
-          prompt: body.prompt,
-          resolution,
-        }),
+        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("[studio-generate] alfie-render-image failed:", errorText);
-        
-        if (response.status === 402) {
-          return new Response(
-            JSON.stringify({ error: "Insufficient AI credits" }),
-            {
-              status: 402,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
-        }
-        
-        if (response.status === 429) {
-          return new Response(
-            JSON.stringify({ error: "Rate limit exceeded" }),
-            {
-              status: 429,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
-        }
+      const result = await response.json().catch(() => null);
 
-        throw new Error(`alfie-render-image failed: ${response.status} ${errorText}`);
+      if (!response.ok || !result?.ok) {
+        const details =
+          typeof result?.error === "string"
+            ? result.error
+            : typeof result?.code === "string"
+              ? result.code
+              : "GENERATION_FAILED";
+        console.error("[studio-generate] alfie-render-image failed", {
+          type: body.type,
+          error: details,
+        });
+        throw new Error(details);
       }
 
-      const result = await response.json();
-      resourceId = result.mediaId || result.id;
-      resourceType = "media";
+      const generationId =
+        typeof result.data?.generation_id === "string"
+          ? result.data.generation_id
+          : typeof result.data?.id === "string"
+            ? result.data.id
+            : null;
 
-    } else {
-      // For carousel and video, use generate-media
+      if (!generationId) {
+        console.error("[studio-generate] Missing generation_id in alfie-render-image response", {
+          data: result.data,
+        });
+        throw new Error("GENERATION_ID_MISSING");
+      }
+
+      resourceId = generationId;
+      resourceType = "media";
+    } else if (body.type === "carousel") {
+      const carouselBody = {
+        userId: user.id,
+        intent: {
+          brandId: body.brandId,
+          format: "carousel" as const,
+          count: body.quantity && body.quantity > 0 ? body.quantity : 1,
+          topic: body.prompt,
+          ratio: body.aspectRatio === "4:5" ? "4:5" : body.aspectRatio === "9:16" ? "9:16" : "1:1",
+        },
+      };
+
       const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-media`, {
         method: "POST",
         headers: {
-          Authorization: authHeader,
           "Content-Type": "application/json",
+          Authorization: authHeader,
+        },
+        body: JSON.stringify(carouselBody),
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result?.ok) {
+        const details =
+          typeof result?.message === "string"
+            ? result.message
+            : typeof result?.error === "string"
+              ? result.error
+              : "GENERATION_FAILED";
+        console.error("[studio-generate] generate-media failed", {
+          type: body.type,
+          error: details,
+        });
+        throw new Error(details);
+      }
+
+      const orderId =
+        typeof result.data?.orderId === "string" && result.data.orderId.length > 0
+          ? result.data.orderId
+          : null;
+
+      if (!orderId) {
+        console.error("[studio-generate] Missing orderId from generate-media", {
+          data: result.data,
+        });
+        throw new Error("ORDER_ID_MISSING");
+      }
+
+      resourceId = orderId;
+      resourceType = "order";
+    } else {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/alfie-orchestrator`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authHeader,
         },
         body: JSON.stringify({
-          kind: body.type,
-          prompt: body.prompt,
+          message: body.prompt,
+          user_message: body.prompt,
           brandId: body.brandId,
+          forceTool: "generate_video",
           aspectRatio: body.aspectRatio,
-          quantity: body.quantity,
-          durationSec: body.duration,
+          durationSec: body.duration ?? 12,
+          uploadedSourceUrl: referenceVideo?.url ?? referenceImage?.url ?? null,
+          uploadedSourceType: referenceVideo?.type ?? referenceImage?.type ?? null,
         }),
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("[studio-generate] generate-media failed:", errorText);
-        
-        if (response.status === 402) {
-          return new Response(
-            JSON.stringify({ error: "Insufficient quota or credits" }),
-            {
-              status: 402,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
-        }
+      const result = await response.json().catch(() => null);
 
-        throw new Error(`generate-media failed: ${response.status} ${errorText}`);
+      if (!response.ok || result?.error) {
+        const details =
+          typeof result?.error === "string"
+            ? result.error
+            : typeof result?.message === "string"
+              ? result.message
+              : "GENERATION_FAILED";
+        console.error("[studio-generate] alfie-orchestrator failed", {
+          type: body.type,
+          error: details,
+        });
+        throw new Error(details);
       }
 
-      const result = await response.json();
-      resourceId = result.orderId;
+      const orderId =
+        typeof result?.orderId === "string" && result.orderId.length > 0
+          ? result.orderId
+          : null;
+
+      if (!orderId) {
+        console.error("[studio-generate] Missing orderId from alfie-orchestrator", {
+          data: result,
+        });
+        throw new Error("ORDER_ID_MISSING");
+      }
+
+      resourceId = orderId;
       resourceType = "order";
+    }
+
+    if (!resourceId) {
+      throw new Error("RESOURCE_ID_MISSING");
     }
 
     return new Response(
@@ -172,10 +255,14 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error("[studio-generate] Error:", error);
+    console.error("[studio-generate] generation error", {
+      error,
+    });
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : "Unknown error",
+        ok: false,
+        error: "GENERATION_FAILED",
+        details: error instanceof Error ? error.message : String(error),
       }),
       {
         status: 500,
