@@ -1,7 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { MessageCircle, X } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useBrief, type Brief } from "@/hooks/useBrief";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { detectContentIntent, detectPlatformHelp } from "@/lib/chat/detect";
@@ -12,11 +11,6 @@ type CoachMode = "strategy" | "da" | "maker";
 type ChatMessage = { role: "user" | "assistant"; node: ReactNode };
 type AssistantReply = ChatMessage;
 
-type ChatAIResponse = {
-  ok: boolean;
-  data?: { message?: string };
-  error?: string;
-};
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
@@ -238,93 +232,10 @@ export default function ChatWidget() {
   }
 
   async function replyContentWithAI(raw: string): Promise<AssistantReply> {
-    const it = detectContentIntent(raw);
-
-    brief.merge({
-      platform: it.platform || brief.state.platform,
-      format: it.mode,
-      ratio: it.ratio,
-      tone: it.tone || brief.state.tone,
-      slides: it.slides ?? brief.state.slides,
-      topic: it.topic || brief.state.topic,
-      cta: it.cta || brief.state.cta,
-    });
-
-    if (!it.topic) {
-      return replyContent(raw);
-    }
-
-    let clearThinking: (() => void) | undefined;
-    const showThinking = () => {
-      pushAssistant(
-        <span
-          className="inline-block rounded-2xl px-3 py-2 text-sm bg-white border"
-          style={{ borderColor: BRAND.grayBorder }}
-        >
-          ⏳ Alfie réfléchit...
-        </span>,
-      );
-      return () => setMsgs((prev) => prev.slice(0, -1));
-    };
-
-    try {
-      clearThinking = showThinking();
-      const { data, error } = await supabase.functions.invoke<ChatAIResponse>("chat-ai-assistant", {
-        body: {
-          message: raw,
-          context: {
-            contentType: it.mode,
-            platform: it.platform,
-            brief: brief.state,
-            brandKit,
-          },
-        },
-      });
-
-      if (clearThinking) {
-        clearThinking();
-        clearThinking = undefined;
-      }
-
-      if (error) {
-        console.error("chat-ai-assistant invoke error", error);
-        return buildErrorReply(error.message);
-      }
-
-      if (!data?.ok) {
-        console.error("chat-ai-assistant response error", data?.error);
-        return buildErrorReply(data?.error);
-      }
-
-      const aiResponse = data.data?.message || "Je peux t'aider à créer ce contenu !";
-
-      return {
-        role: "assistant" as const,
-        node: (
-          <div className="space-y-2 bg-white rounded-lg p-3 border" style={{ borderColor: BRAND.grayBorder }}>
-            <p className="text-sm whitespace-pre-wrap">{aiResponse}</p>
-            <div className="flex gap-2 pt-2 flex-wrap">
-              {primaryBtn("Créer maintenant →", prefillStudio)}
-              <button
-                onClick={() => {
-                  const newPrompt = `${it.mode} ${it.ratio} ${it.platform || ""} : ${it.topic}`.trim();
-                  setInput(newPrompt);
-                }}
-                type="button"
-                className="px-3 py-2 text-sm border rounded-md hover:bg-gray-50"
-                style={{ borderColor: BRAND.grayBorder }}
-              >
-                Affiner
-              </button>
-            </div>
-          </div>
-        ),
-      };
-    } catch (error) {
-      console.error("AI response error:", error);
-      if (clearThinking) clearThinking();
-      return replyContent(raw);
-    }
+    // Version sans appel externe à Supabase / OpenAI.
+    // On se contente de parser l'intention (images / carrousels / vidéos)
+    // puis de répondre avec la logique locale existante.
+    return replyContent(raw);
   }
 
   async function makeReply(raw: string): Promise<AssistantReply | null> {
