@@ -734,6 +734,7 @@ export function AlfieChat() {
       
       if (error) {
         console.error('create-job-set error:', error);
+        throw new Error(error.message || JSON.stringify(error) || 'Erreur inconnue lors de la création du job set.');
         // Afficher l'objet d'erreur brut pour le diagnostic
         throw new Error(JSON.stringify(error, null, 2));
       }
@@ -752,6 +753,11 @@ export function AlfieChat() {
 
       // Refund des visuels (à implémenter si nécessaire)
       
+      const errorMessage = error.message || JSON.stringify(error) || 'Erreur inconnue';
+      
+      addMessage({
+        role: 'assistant',
+        content: `❌ Erreur de génération de carrousel : \n\n\`\`\`\n${errorMessage}\n\`\`\``,
       const errorMessage = error.message || JSON.stringify(error, null, 2) || 'Erreur inconnue';
       
       addMessage({
