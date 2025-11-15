@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
@@ -40,6 +41,18 @@ const DEFAULT_ASPECT_RATIO: AspectRatio = '1:1';
 const DEFAULT_CAROUSEL_SLIDES = 5;
 const DEFAULT_VIDEO_DURATION = 15;
 
+const statusLabels: Record<GeneratedAsset['status'], string> = {
+  pending: 'En attente',
+  processing: 'En cours',
+  completed: 'Terminé',
+  failed: 'Échec',
+};
+
+const statusColors: Record<GeneratedAsset['status'], string> = {
+  pending: 'bg-muted text-muted-foreground',
+  processing: 'bg-blue-100 text-blue-800',
+  completed: 'bg-emerald-100 text-emerald-800',
+  failed: 'bg-rose-100 text-rose-800',
 const statusConfig: Record<
   GeneratedAsset['status'],
   { label: string; variant: BadgeProps['variant']; className?: string }
@@ -177,6 +190,8 @@ export function StudioV2({ activeBrandId }: StudioV2Props) {
         failed: 'failed',
       };
       const mappedStatus = statusMap[row.status] ?? 'processing';
+      const preview = row.thumbnail_url ?? row.render_url ?? row.output_url ?? undefined;
+      const download = row.output_url ?? row.render_url ?? undefined;
       const preview =
         row.public_url ?? row.thumbnail_url ?? row.render_url ?? row.output_url ?? undefined;
       const download = row.public_url ?? row.output_url ?? row.render_url ?? undefined;
@@ -437,6 +452,9 @@ export function StudioV2({ activeBrandId }: StudioV2Props) {
           } catch (error) {
             console.error('[StudioV2] generation failed', error);
             updateAsset(asset.id, { status: 'failed' });
+            toast({
+              title: 'Génération impossible',
+              description: "Nous n'avons pas pu générer cet asset.",
             const message =
               error instanceof Error ? error.message : 'Une erreur inconnue est survenue.';
             toast({
@@ -485,6 +503,10 @@ export function StudioV2({ activeBrandId }: StudioV2Props) {
                     'rounded-2xl px-4 py-3 max-w-[85%] text-sm shadow-sm',
                     message.role === 'user'
                       ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground',
+                  )}
+                >
+                  <div className="whitespace-pre-wrap text-left text-sm text-foreground">
                       : 'bg-muted text-foreground',
                   )}
                 >
@@ -608,6 +630,8 @@ export function StudioV2({ activeBrandId }: StudioV2Props) {
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {assets.map((asset) => (
+                <article key={asset.id} className="border rounded-lg overflow-hidden bg-background flex flex-col">
               {assets.map((asset) => {
                 const status = statusConfig[asset.status];
                 return (
@@ -619,6 +643,11 @@ export function StudioV2({ activeBrandId }: StudioV2Props) {
                         onCheckedChange={() => handleToggleSelection(asset.id)}
                         id={`select-${asset.id}`}
                       />
+                      <label htmlFor={`select-${asset.id}`} className="text-sm font-medium capitalize">
+                        {asset.type}
+                      </label>
+                    </div>
+                    <Badge className={cn('capitalize', statusColors[asset.status])}>{statusLabels[asset.status]}</Badge>
                       <Badge variant="outline" className="capitalize">
                         {mediaTypeLabels[asset.type] ?? asset.type}
                       </Badge>
@@ -671,6 +700,8 @@ export function StudioV2({ activeBrandId }: StudioV2Props) {
                       </Button>
                     </div>
                   </div>
+                </article>
+              ))}
                   </article>
                 );
               })}
