@@ -1,97 +1,226 @@
-import React from "react";
-import type { Brief } from "../../hooks/useBrief";
+import type { ReactNode } from "react";
 
-type IntentDetails = Pick<Brief, "cta" | "topic">;
-
-function pickIndex(length: number, seed: number) {
-  if (length <= 0) return 0;
-  const normalised = Number.isFinite(seed) ? seed : 0;
-  return Math.abs(Math.trunc(normalised)) % length;
-}
-
-export function chooseCarouselOutline({
-  slides,
-  seed = 0,
-  topic,
-}: {
-  slides: number;
-  seed?: number;
+export type VariantInput = {
   topic?: string;
-}) {
-  const banks = [
-    { title: "Problème → Solution", seq: ["Le problème clé", "Pourquoi ça bloque", "La méthode", "Exemple rapide", "CTA clair"] },
-    { title: "5 erreurs à éviter", seq: ["Erreur 1", "Erreur 2", "Erreur 3", "Erreur 4", "Erreur 5 + CTA"] },
-    { title: "Checklist pratique", seq: ["Étape 1", "Étape 2", "Étape 3", "Étape 4", "Résumé + CTA"] },
-    { title: "Mythes vs Réalité", seq: ["Mythe 1 → Réalité", "Mythe 2 → Réalité", "Mythe 3 → Réalité", "Conseil final", "CTA"] },
-    { title: "Avant / Après", seq: ["Avant (constat)", "Après (objectif)", "Étapes", "Résultat attendu", "CTA"] },
-  ] as const;
+  cta?: string;
+  niche?: string;
+};
 
-  const effectiveSlides = Math.max(1, Math.trunc(slides));
-  const base = banks[pickIndex(banks.length, seed)];
-  const title = topic?.trim() ? `${base.title} — ${topic.trim()}` : base.title;
-  const seq =
-    base.seq.length === effectiveSlides
-      ? base.seq
-      : [...base.seq, ...Array(Math.max(0, effectiveSlides - base.seq.length)).fill("Conseil bonus")].slice(0, effectiveSlides);
+export type CarouselOutline = {
+  title: string;
+  slides: string[];
+};
 
-  return { title, slides: seq.map((label, index) => `${index + 1}. ${label}`) };
+// ———————————————————————————————————————
+// Helpers
+// ———————————————————————————————————————
+
+function pickBySeed<T>(items: T[], seed: number): T {
+  if (items.length === 0) {
+    throw new Error("pickBySeed: empty list");
+  }
+  const index = Math.abs(seed) % items.length;
+  return items[index];
 }
 
-function fallbackCta(cta: IntentDetails["cta"], fallback: string) {
-  const trimmed = cta?.trim();
-  return trimmed && trimmed.length > 0 ? trimmed : fallback;
+function normalizeTopic(raw?: string): string {
+  const topic = (raw ?? "").trim();
+  return topic || "ton sujet";
 }
 
-export function chooseVideoVariant(intent: IntentDetails, seed = 0): React.ReactElement {
-  const variants: React.ReactElement[] = [
-    (
-      <div className="text-sm">
-        <p className="font-medium">Plan :</p>
-        <ul className="list-disc ml-5">
-          <li>Hook (3–5s) : bénéfice</li>
-          <li>3 points clés (preuves, tips)</li>
-          <li>CTA : {fallbackCta(intent.cta, "En savoir plus")}</li>
-        </ul>
-      </div>
-    ),
-    (
-      <div className="text-sm">
-        <p className="font-medium">Script flash pour &quot;{intent.topic ?? "ton sujet"}&quot;</p>
-        <ul className="list-disc ml-5">
-          <li>Intro : &quot;Tu galères avec… ?&quot;</li>
-          <li>Astuce 1 / 2 / 3 (visuelles)</li>
-          <li>Conclusion : bénéfice + CTA</li>
-        </ul>
-      </div>
-    ),
+function labelForNiche(niche?: string): string {
+  if (!niche) return "ton audience";
+  const n = niche.toLowerCase();
+
+  if (n.includes("coach")) return "tes clients en coaching";
+  if (n.includes("e-com") || n.includes("ecom") || n.includes("boutique")) {
+    return "tes clients e-commerce";
+  }
+  if (n.includes("vdi") || n.includes("mlm")) {
+    return "tes filleuls / ton réseau VDI";
+  }
+  if (n.includes("bon plan") || n.includes("bons plans")) {
+    return "ton audience bons plans";
+  }
+
+  return "ton audience";
+}
+
+// ———————————————————————————————————————
+//  CARROUSELS : structures variées
+// ———————————————————————————————————————
+
+type CarouselBuilder = (params: { topic: string; nicheLabel: string; slides: number }) => CarouselOutline;
+
+const CAROUSEL_STRUCTURES: CarouselBuilder[] = [
+  // 1. Problème → Solution
+  ({ topic, nicheLabel }) => ({
+    title: "Problème → Solution",
+    slides: [
+      `Intro : le problème que rencontre ${nicheLabel}`,
+      `Pourquoi "${topic}" est un vrai blocage`,
+      "Ce qui se passe si on ne change rien",
+      `La méthode / solution que tu proposes`,
+      "CTA : passe à l’action (comment travailler avec toi)",
+    ],
+  }),
+
+  // 2. 5 erreurs
+  ({ topic }) => ({
+    title: "5 erreurs à éviter",
+    slides: [
+      `Hook : tu fais sûrement ces erreurs avec "${topic}"`,
+      "Erreur 1",
+      "Erreur 2",
+      "Erreur 3 + 4 (en mode rapide)",
+      "Erreur 5 + CTA pour corriger tout ça",
+    ],
+  }),
+
+  // 3. Mythes vs réalité
+  ({ topic }) => ({
+    title: "Mythes vs réalité",
+    slides: [
+      `Intro : 3 idées fausses sur "${topic}"`,
+      "Mythe 1 → Réalité 1",
+      "Mythe 2 → Réalité 2",
+      "Mythe 3 → Réalité 3",
+      "Conclusion + CTA : passer à la bonne approche",
+    ],
+  }),
+
+  // 4. Checklist
+  ({ topic }) => ({
+    title: "Checklist prête à l’emploi",
+    slides: [
+      `Intro : la checklist pour réussir "${topic}"`,
+      "Étape 1",
+      "Étape 2",
+      "Étape 3",
+      "Dernière étape + CTA : garde le post / passe à l’action",
+    ],
+  }),
+
+  // 5. Avant / Après
+  ({ topic, nicheLabel }) => ({
+    title: "Avant / Après",
+    slides: [
+      `Intro : à quoi ressemble "${topic}" AVANT / APRÈS`,
+      `Slide AVANT : situation actuelle de ${nicheLabel}`,
+      "Slide APRÈS : ce que tu veux pour eux",
+      "Comment tu les accompagnes dans cette transformation",
+      "CTA : passe du AVANT au APRÈS avec toi",
+    ],
+  }),
+];
+
+export function chooseCarouselOutline(slides: number, seed: number): CarouselOutline {
+  // Pour l’instant, Alfie ne reçoit pas encore le topic spécifique ici,
+  // donc on génère des structures génériques autour de "ton sujet".
+  const topic = normalizeTopic(undefined);
+  const nicheLabel = "ton audience";
+
+  const builder = pickBySeed(CAROUSEL_STRUCTURES, seed);
+  const base = builder({ topic, nicheLabel, slides });
+
+  if (slides > base.slides.length) {
+    const extraCount = slides - base.slides.length;
+    const extras: string[] = [];
+    for (let i = 0; i < extraCount; i++) {
+      extras.push(`Slide bonus : exemple concret / mini étude de cas #${i + 1}`);
+    }
+    return {
+      title: base.title,
+      slides: [...base.slides.slice(0, slides - extras.length), ...extras],
+    };
+  }
+
+  return {
+    title: base.title,
+    slides: base.slides.slice(0, slides),
+  };
+}
+
+// ———————————————————————————————————————
+//  IMAGES : variantes DA
+// ———————————————————————————————————————
+
+export function chooseImageVariant(input: VariantInput, seed: number): ReactNode {
+  const topic = normalizeTopic(input.topic);
+  const nicheLabel = labelForNiche(input.niche);
+  const cta = input.cta ?? "Découvre le détail dans la légende.";
+
+  const variants: ReactNode[] = [
+    // Hook simple
+    <div className="text-sm space-y-1">
+      <p>
+        <strong>Visuel hook :</strong> gros titre avec "{topic}" en avant-plan.
+      </p>
+      <p>Fond simple, couleurs Alfie, focus sur la promesse.</p>
+      <p>
+        Cible : <em>{nicheLabel}</em>. CTA dans la légende : {cta}
+      </p>
+    </div>,
+
+    // Liste / bullet points
+    <div className="text-sm space-y-1">
+      <p>
+        <strong>Visuel liste :</strong> 3 à 5 bullet points clés sur "{topic}".
+      </p>
+      <p>Icônes minimalistes, beaucoup d’espace blanc, super lisible.</p>
+      <p>CTA discret dans un bandeau en bas.</p>
+    </div>,
+
+    // Avant / Après
+    <div className="text-sm space-y-1">
+      <p>
+        <strong>Visuel avant / après :</strong> à gauche la situation actuelle, à droite le résultat souhaité sur "
+        {topic}".
+      </p>
+      <p>Idéal pour montrer la transformation que tu proposes.</p>
+    </div>,
   ];
 
-  return variants[pickIndex(variants.length, seed)];
+  return pickBySeed(variants, seed);
 }
 
-export function chooseImageVariant(intent: IntentDetails, seed = 0): React.ReactElement {
-  const variants: React.ReactElement[] = [
-    (
-      <div className="text-sm">
-        <p className="font-medium">Suggestion :</p>
-        <ul className="list-disc ml-5">
-          <li>Titre court avec bénéfice</li>
-          <li>Sous-titre preuve (chiffre, résultat)</li>
-          <li>Badge ou CTA : {fallbackCta(intent.cta, "Découvrir")}</li>
-        </ul>
-      </div>
-    ),
-    (
-      <div className="text-sm">
-        <p className="font-medium">Concept express pour &quot;{intent.topic ?? "ton sujet"}&quot;</p>
-        <ul className="list-disc ml-5">
-          <li>Zone titre dominante</li>
-          <li>Contraste fort (fond clair + typo sombre)</li>
-          <li>Élément de preuve (⭐, %)</li>
-        </ul>
-      </div>
-    ),
+// ———————————————————————————————————————
+//  VIDÉOS : idées de script rapides
+// ———————————————————————————————————————
+
+export function chooseVideoVariant(input: VariantInput, seed: number): ReactNode {
+  const topic = normalizeTopic(input.topic);
+  const nicheLabel = labelForNiche(input.niche);
+  const cta = input.cta ?? "Abonne-toi / lien en bio pour aller plus loin.";
+
+  const variants: ReactNode[] = [
+    // Script 1 : face cam
+    <div className="text-sm space-y-1">
+      <p>
+        <strong>Script 1 (face cam) :</strong> "Tu galères avec {topic} ? Laisse-moi te montrer 3 choses que{" "}
+        {nicheLabel} oublient tout le temps..."
+      </p>
+      <p>Plan rapide : hook, 3 points, CTA final : {cta}</p>
+    </div>,
+
+    // Script 2 : B-roll + texte
+    <div className="text-sm space-y-1">
+      <p>
+        <strong>Script 2 (B-roll + texte) :</strong> séquences de ton quotidien + texte à l’écran avec 3 tips rapides
+        sur "{topic}".
+      </p>
+      <p>Idéal pour Reels / TikTok silencieux.</p>
+    </div>,
+
+    // Script 3 : Avant / Après
+    <div className="text-sm space-y-1">
+      <p>
+        <strong>Script 3 (avant / après) :</strong> "Voici à quoi ressemble {topic} AVANT / APRÈS quand on applique la
+        bonne méthode..."
+      </p>
+      <p>Montre concrètement le résultat et termine par : {cta}</p>
+    </div>,
   ];
 
-  return variants[pickIndex(variants.length, seed)];
+  return pickBySeed(variants, seed);
 }
