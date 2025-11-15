@@ -1,12 +1,16 @@
 type Ratio = "1:1" | "9:16" | "16:9" | "3:4" | "4:5" | "2:3";
 type Platform = "instagram" | "tiktok" | "pinterest" | "linkedin" | "youtube";
+type Mode = "carousel" | "video" | "image";
+type Niche = "ecommerce" | "infopreneur" | "services" | "mlm" | "creator";
 
 export function detectContentIntent(raw: string) {
   const q = raw.toLowerCase().trim();
 
   const isCarousel = /(carrousel|carousel|slides?)/.test(q);
   const isVideo = /(vidéo|video|shorts?|reels?)/.test(q);
-  const mode: "carousel" | "video" | "image" = isCarousel ? "carousel" : isVideo ? "video" : "image";
+  const isImage = /(image|visuel|post|miniature|vignette)/.test(q);
+  const explicitMode = isCarousel || isVideo || isImage;
+  const mode: Mode = isCarousel ? "carousel" : isVideo ? "video" : "image";
 
   const platform: Platform | null =
     (/(instagram|insta)/.test(q) && "instagram") ||
@@ -55,7 +59,16 @@ export function detectContentIntent(raw: string) {
   const topicWords = topicRaw.split(" ").filter(Boolean);
   const needTopic = topicWords.length < 2;
 
-  return { mode, platform, ratio, tone, slides, cta, topic: needTopic ? null : topicRaw, needTopic };
+  const niche: Niche | undefined = (() => {
+    if (/(e-?commerce|boutique|eshop|boutique en ligne|produits|stock|commande|panier)/.test(q)) return "ecommerce";
+    if (/(infopreneur|formation|programme|cours en ligne|webinar|masterclass|coaching en ligne)/.test(q)) return "infopreneur";
+    if (/(coach|consultant|consultante|accompagnement|prestataire|freelance service|audit)/.test(q)) return "services";
+    if (/(vdi|mlm|vente directe|vente a domicile|kit de démarrage|duplicable|mon équipe)/.test(q)) return "mlm";
+    if (/(créateur de contenu|influenceur|bons? plans?|communauté|storytime|sélection produit)/.test(q)) return "creator";
+    return undefined;
+  })();
+
+  return { mode, explicitMode, platform, ratio, tone, slides, cta, topic: needTopic ? null : topicRaw, needTopic, niche };
 }
 
 export function detectPlatformHelp(raw: string) {

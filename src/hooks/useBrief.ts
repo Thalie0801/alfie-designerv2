@@ -12,6 +12,7 @@ export type Brief = {
   slides?: number;
   hooks?: string[];
   brand?: { colors?: string[]; fonts?: string[]; voice?: string };
+  niche?: "ecommerce" | "infopreneur" | "services" | "mlm" | "creator" | string;
 };
 
 const KEY = "alfie_prefill_brief";
@@ -83,6 +84,7 @@ export function useBrief() {
     if (state.topic && state.topic.trim().length >= 8) s += 30;
     if (state.cta && state.cta.trim()) s += 10;
     if (state.tone) s += 10;
+    if (state.niche) s += 5;
     if (state.format === "carousel") {
       if (typeof state.slides === "number" && state.slides > 0) s += 10;
     } else if (state.format) {
