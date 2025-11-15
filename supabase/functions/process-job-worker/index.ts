@@ -1,22 +1,13 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
-const SUPABASE_URL_RAW = Deno.env.get("SUPABASE_URL");
-const SUPABASE_SERVICE_ROLE_KEY_RAW = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const INTERNAL_FN_SECRET_RAW = Deno.env.get("INTERNAL_FN_SECRET");
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const INTERNAL_FN_SECRET = Deno.env.get("INTERNAL_FN_SECRET");
 
-if (!SUPABASE_URL_RAW || !SUPABASE_SERVICE_ROLE_KEY_RAW) {
-  throw new Error("Missing required environment variables: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !INTERNAL_FN_SECRET) {
+  throw new Error("Missing required environment variables for process-job-worker");
 }
-
-if (!INTERNAL_FN_SECRET_RAW) {
-  throw new Error("Missing required environment variable: INTERNAL_FN_SECRET");
-}
-
-// Type-safe constants after validation
-const SUPABASE_URL: string = SUPABASE_URL_RAW;
-const SUPABASE_SERVICE_ROLE_KEY: string = SUPABASE_SERVICE_ROLE_KEY_RAW;
-const INTERNAL_FN_SECRET: string = INTERNAL_FN_SECRET_RAW;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
