@@ -5,8 +5,12 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const INTERNAL_FN_SECRET = Deno.env.get("INTERNAL_FN_SECRET");
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !INTERNAL_FN_SECRET) {
-  throw new Error("Missing required environment variables for process-job-worker");
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error("Missing required environment variables: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+}
+
+if (!INTERNAL_FN_SECRET) {
+  throw new Error("Missing required environment variable: INTERNAL_FN_SECRET");
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
