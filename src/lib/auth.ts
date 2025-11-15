@@ -13,16 +13,19 @@ export async function getAuthHeader() {
     }
 
     const userToken = session?.access_token ?? null;
-    const anonToken =
-      import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
-      import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const anonToken = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-    if (!anonToken || !userToken) {
+    if (!anonToken) {
+      throw new Error('Configuration Supabase manquante (VITE_SUPABASE_ANON_KEY).');
+    }
+
+    if (!userToken) {
       throw new Error('Authentification requise. Veuillez vous reconnecter.');
     }
 
     const headers: Record<string, string> = {
-      Authorization: `Bearer ${userToken}`
+      Authorization: `Bearer ${userToken}`,
+      apikey: anonToken,
     };
 
     return headers;
