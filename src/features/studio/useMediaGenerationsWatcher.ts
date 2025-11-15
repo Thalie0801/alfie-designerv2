@@ -35,7 +35,6 @@ export function useMediaGenerationsWatcher(
     const fetchInitial = async () => {
       const { data, error } = await supabase
         .from('media_generations')
-        .select('id, status, output_url, render_url, thumbnail_url, metadata, type')
         .select('id, status, output_url, render_url, thumbnail_url, metadata, type, public_url, storage')
         .in('id', resourceIds);
 
