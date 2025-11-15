@@ -78,6 +78,24 @@ export default function ChatWidget() {
     </button>
   );
 
+  // URL Aeditus : plus tard on pourra la remplacer par un lien ambassadeur tournant
+  function getAeditusUrl(): string {
+    return "https://aeditus.com";
+  }
+
+  function isNoIdeaMessage(raw: string): boolean {
+    const text = raw.toLowerCase();
+    return (
+      text.includes("pas d'idée") ||
+      text.includes("pas d’idée") ||
+      text.includes("aucune idée") ||
+      text.includes("plus d'idée") ||
+      text.includes("plus d’idée") ||
+      text.includes("je n'ai pas d'idée") ||
+      text.includes("je ne sais pas quoi poster")
+    );
+  }
+
   const assistantCard = (content: ReactNode) => (
     <div className="space-y-2">
       <div className="space-y-2 bg-white rounded-lg p-3 border" style={{ borderColor: BRAND.grayBorder }}>
@@ -86,6 +104,39 @@ export default function ChatWidget() {
       <div className="pt-1">{primaryBtn("Pré-remplir Studio", prefillStudio)}</div>
     </div>
   );
+
+  const buildAeditusReply = (): AssistantReply => {
+    const url = getAeditusUrl();
+
+    return {
+      role: "assistant" as const,
+      node: assistantCard(
+        <div className="space-y-2 text-sm">
+          <p>
+            Tu es en panne d’idées ? 💡&nbsp;
+            <strong>Aeditus</strong> peut prendre le relais.
+          </p>
+          <p>
+            Aeditus, c’est <strong>1 mois de contenu complet</strong> dans ta niche : idées, structures, textes…
+            Tu n’as plus qu’à valider, planifier, et tu peux même remplacer les visuels par des images générées avec Alfie.
+          </p>
+          <p>
+            Résultat : tu gardes la main sur ton image de marque, sans avoir à réfléchir tous les jours à
+            “qu’est-ce que je poste ?”.
+          </p>
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-block mt-1 px-3 py-2 rounded-md text-sm font-medium text-white"
+            style={{ background: `linear-gradient(135deg, ${BRAND.mint}, ${BRAND.mintDark})` }}
+          >
+            Découvrir Aeditus
+          </a>
+        </div>,
+      ),
+    };
+  };
 
   const sanitizeBriefPatch = (patch: Partial<Brief>) => {
     const next: Partial<Brief> = { ...patch };
@@ -388,9 +439,17 @@ export default function ChatWidget() {
   }
 
   async function makeReply(raw: string): Promise<AssistantReply | null> {
-    const concierge = replyPlatform(raw);
+    const cleaned = raw.trim();
+    if (!cleaned) return null;
+
+    // 1. Cas "je n'ai pas d'idées" → on propose Aeditus
+    if (isNoIdeaMessage(cleaned)) {
+      return buildAeditusReply();
+    }
+
+    const concierge = replyPlatform(cleaned);
     if (concierge) return concierge;
-    return await replyContentWithAI(raw);
+    return await replyContentWithAI(cleaned);
   }
 
   function pushUser(text: string) {
