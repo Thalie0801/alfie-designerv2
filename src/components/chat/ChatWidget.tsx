@@ -1,12 +1,23 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { MessageCircle, X } from "lucide-react";
+import { Loader2, MessageCircle, Paperclip, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useBrief, type Brief } from "@/hooks/useBrief";
 import { useBrandKit } from "@/hooks/useBrandKit";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { detectContentIntent, detectPlatformHelp } from "@/lib/chat/detect";
 import { chooseCarouselOutline, chooseImageVariant, chooseVideoVariant } from "@/lib/chat/coachPresets";
 import { whatCanDoBlocks } from "@/lib/chat/helpMap";
+import { uploadToChatBucket } from "@/lib/chatUploads";
+import { parseBatchRequest } from "@/features/studio/batchUtils";
+import {
+  generateCarousel,
+  generateImage,
+  generateVideo,
+  type AspectRatio,
+} from "@/features/studio/studioApi";
+import type { InputMedia } from "@/features/studio/types";
 
 type CoachMode = "strategy" | "da" | "maker";
 type ChatMessage = { role: "user" | "assistant"; node: ReactNode };
@@ -18,6 +29,26 @@ type ChatAIResponse = {
   error?: string;
 };
 
+const uploadAccept = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/jpg",
+  "video/mp4",
+  "video/quicktime",
+].join(",");
+
+const DEFAULT_CHAT_ASPECT_RATIO: AspectRatio = "1:1";
+const DEFAULT_CHAT_VIDEO_RATIO: AspectRatio = "9:16";
+const DEFAULT_CHAT_CAROUSEL_SLIDES = 5;
+const DEFAULT_CHAT_VIDEO_DURATION = 15;
+
+const mediaTypeFromMime = (type: string): "image" | "video" | null => {
+  if (type.startsWith("image/")) return "image";
+  if (type.startsWith("video/")) return "video";
+  return null;
+};
+
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -27,6 +58,12 @@ export default function ChatWidget() {
 
   const brief = useBrief();
   const { brandKit } = useBrandKit();
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  const [inputMedias, setInputMedias] = useState<InputMedia[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const BRAND = useMemo(
     () =>
@@ -85,6 +122,62 @@ export default function ChatWidget() {
     </button>
   );
 
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files?.length) return;
+    if (!user?.id) {
+      toast({
+        title: 'Connexion requise',
+        description: 'Connecte-toi pour ajouter un média de référence.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const medias: InputMedia[] = [];
+      for (const file of Array.from(files)) {
+        const type = mediaTypeFromMime(file.type);
+        if (!type) {
+          toast({
+            title: 'Format non supporté',
+            description: `${file.name} n'est pas un format image/vidéo supporté.`,
+            variant: 'destructive',
+          });
+          continue;
+        }
+        const { signedUrl } = await uploadToChatBucket(file, supabase, user.id);
+        medias.push({
+          id: `${Date.now()}_${file.name}`,
+          type,
+          url: signedUrl,
+          name: file.name,
+          size: file.size,
+        });
+      }
+      if (medias.length) {
+        setInputMedias((prev) => [...prev, ...medias]);
+      }
+    } catch (error) {
+      console.error('chat-widget upload error', error);
+      toast({
+        title: "Échec de l'upload",
+        description: 'Impossible de téléverser ce média.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const removeInputMedia = (id: string) => {
+    setInputMedias((prev) => prev.filter((media) => media.id !== id));
+  };
+
   function prefillStudio() {
     const data = JSON.stringify(brief.state);
     try {
@@ -98,7 +191,7 @@ export default function ChatWidget() {
     if (brief.state.slides) params.set("slides", String(brief.state.slides));
     if (brief.state.topic) params.set("topic", brief.state.topic);
     if (brief.state.cta) params.set("cta", brief.state.cta);
-    const url = `/studio?${params.toString()}`;
+    const url = `/studio-v2?${params.toString()}`;
     window.location.assign(url);
   }
 
@@ -134,6 +227,103 @@ export default function ChatWidget() {
       </div>
     ),
   });
+
+  const triggerStudioGeneration = async (
+    prompt: string,
+    medias: InputMedia[],
+  ): Promise<boolean> => {
+    const lower = prompt.toLowerCase();
+    const hasQuantity = /(\d+)/.test(lower);
+    const hasMediaKeyword = /(carrousel|carousel|image|visuel|vidéo|video)/.test(lower);
+    const wantsGeneration = /(génère|genere|produis|crée|create)/.test(lower) || (hasQuantity && hasMediaKeyword);
+    if (!wantsGeneration && medias.length === 0) return false;
+
+    const brandId = brandKit?.id;
+    if (!brandId) {
+      pushAssistant(
+        <div className="space-y-2 bg-white rounded-lg p-3 border" style={{ borderColor: BRAND.grayBorder }}>
+          <p className="text-sm">
+            Choisis une marque active avant de lancer une génération. Ouvre le Studio Alfie pour sélectionner ton brand kit.
+          </p>
+          <a
+            href="/studio-v2"
+            className="inline-flex items-center gap-2 text-sm font-medium text-emerald-600"
+          >
+            Accéder au Studio Alfie →
+          </a>
+        </div>,
+      );
+      return true;
+    }
+
+    const items = parseBatchRequest(prompt);
+    const summary = items
+      .map((item) => {
+        if (item.type === 'carousel') return `${item.count} carrousel(s)`;
+        if (item.type === 'video') return `${item.count} vidéo(s)`;
+        return `${item.count} image(s)`;
+      })
+      .join(', ');
+    const mediaPayload = medias.map((media) => ({ type: media.type, url: media.url }));
+
+    try {
+      await Promise.all(
+        items.flatMap((item) =>
+          Array.from({ length: item.count }).map(() => {
+            if (item.type === 'carousel') {
+              return generateCarousel({
+                prompt,
+                brandId,
+                aspectRatio: DEFAULT_CHAT_ASPECT_RATIO,
+                slides: DEFAULT_CHAT_CAROUSEL_SLIDES,
+                inputMedia: mediaPayload,
+              });
+            }
+            if (item.type === 'video') {
+              return generateVideo({
+                prompt,
+                brandId,
+                aspectRatio: DEFAULT_CHAT_VIDEO_RATIO,
+                durationSeconds: DEFAULT_CHAT_VIDEO_DURATION,
+                inputMedia: mediaPayload,
+              });
+            }
+            return generateImage({
+              prompt,
+              brandId,
+              aspectRatio: DEFAULT_CHAT_ASPECT_RATIO,
+              inputMedia: mediaPayload,
+            });
+          }),
+        ),
+      );
+
+      pushAssistant(
+        <div className="space-y-2 bg-white rounded-lg p-3 border" style={{ borderColor: BRAND.grayBorder }}>
+          <p className="text-sm">
+            C'est parti ! Je lance {summary}. Tu peux suivre l'avancement et récupérer les assets dans le Studio Alfie.
+          </p>
+          <a
+            href="/studio-v2"
+            className="inline-flex items-center gap-2 text-sm font-medium text-emerald-600"
+          >
+            Ouvrir le Studio Alfie →
+          </a>
+        </div>,
+      );
+    } catch (error) {
+      console.error('chat-widget generation error', error);
+      pushAssistant(
+        <div className="space-y-2 bg-white rounded-lg p-3 border" style={{ borderColor: BRAND.grayBorder }}>
+          <p className="text-sm">
+            Oups, la génération n'a pas démarré correctement. Réessaie dans quelques instants.
+          </p>
+        </div>,
+      );
+    }
+
+    return true;
+  };
 
   function replyContent(raw: string): AssistantReply {
     const it = detectContentIntent(raw);
@@ -335,18 +525,32 @@ export default function ChatWidget() {
     return await replyContentWithAI(raw);
   }
 
-  function pushUser(text: string) {
+  function pushUser(text: string, medias: InputMedia[] = []) {
     setMsgs((m) => [
       ...m,
       {
         role: "user",
         node: (
-          <span
-            className="inline-block rounded-2xl px-3 py-2 text-sm bg-white border"
+          <div
+            className="inline-block rounded-2xl px-3 py-2 text-sm bg-white border text-left"
             style={{ borderColor: BRAND.grayBorder }}
           >
-            {text}
-          </span>
+            {text && <span className="block whitespace-pre-wrap">{text}</span>}
+            {medias.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {medias.map((media) => (
+                  <span
+                    key={media.id}
+                    className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                    style={{ borderColor: BRAND.grayBorder }}
+                  >
+                    <Paperclip className="h-3.5 w-3.5" />
+                    <span>{media.name ?? media.type.toUpperCase()}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         ),
       },
     ]);
@@ -356,8 +560,12 @@ export default function ChatWidget() {
   async function handleSend() {
     const text = input.trim();
     if (!text) return;
+    const mediasToSend = inputMedias;
     setInput("");
-    pushUser(text);
+    setInputMedias([]);
+    pushUser(text, mediasToSend);
+    const handledByStudio = await triggerStudioGeneration(text, mediasToSend);
+    if (handledByStudio) return;
     const reply = await makeReply(text);
     if (reply) setMsgs((m) => [...m, reply]);
   }
@@ -448,7 +656,56 @@ export default function ChatWidget() {
             </div>
           )}
 
+          {inputMedias.length > 0 && (
+            <div className="px-3 pb-2">
+              <div className="flex flex-wrap gap-2">
+                {inputMedias.map((media) => (
+                  <span
+                    key={media.id}
+                    className="inline-flex items-center gap-1 rounded-md border bg-white px-2 py-1 text-xs"
+                    style={{ borderColor: BRAND.grayBorder }}
+                  >
+                    <Paperclip className="h-3.5 w-3.5" />
+                    <span>{media.name ?? media.type.toUpperCase()}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeInputMedia(media.id)}
+                      className="ml-1 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="p-3 border-t flex gap-2" style={{ borderColor: BRAND.grayBorder }}>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3 py-2 rounded-md border text-sm"
+              style={{ borderColor: BRAND.grayBorder, background: "white" }}
+              disabled={isUploading}
+            >
+              {isUploading ? (
+                <span className="inline-flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Upload…
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-2">
+                  <Paperclip className="h-4 w-4" /> Média
+                </span>
+              )}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={uploadAccept}
+              multiple
+              className="hidden"
+              onChange={handleFileChange}
+            />
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}

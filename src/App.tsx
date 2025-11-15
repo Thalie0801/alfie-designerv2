@@ -29,6 +29,7 @@ import Library from "./pages/Library";
 import Videos from "./pages/Videos";
 import CloudinaryTest from "./pages/CloudinaryTest";
 import Creator from "./pages/Creator";
+import StudioV2Page from "./pages/StudioV2";
 
 import ActivateAccess from "./pages/onboarding/Activate";
 import { AlfieChat } from "./components/AlfieChat"; // si tu gardes /chat
@@ -84,6 +85,17 @@ const AppRoutes = () => {
         />
 
         <Route
+          path="/studio-v2"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <StudioV2Page />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/creator"
           element={
             <ProtectedRoute>
@@ -94,7 +106,7 @@ const AppRoutes = () => {
           }
         />
 
-        <Route path="/app" element={<Navigate to="/studio" replace />} />
+        <Route path="/app" element={<Navigate to="/studio-v2" replace />} />
 
         <Route
           path="/templates"
