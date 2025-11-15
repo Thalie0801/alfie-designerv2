@@ -1,20 +1,12 @@
-import { ReactNode, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { useVersionRefresh } from '@/hooks/useVersionRefresh';
-import { 
-  Sparkles, 
-  LayoutDashboard, 
-  CreditCard, 
-  Settings, 
-  LogOut,
-  UserCircle,
-  Menu
-} from 'lucide-react';
+import { ReactNode, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useVersionRefresh } from "@/hooks/useVersionRefresh";
+import { Sparkles, LayoutDashboard, CreditCard, Settings, LogOut, UserCircle, Menu } from "lucide-react";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -31,17 +23,17 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/');
+    navigate("/");
   };
 
   const navItems = [
-    { path: '/chat', label: 'Chat Alfie', icon: Sparkles },
-    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/billing', label: 'Abonnement', icon: CreditCard },
+    { path: "/chat", label: "Chat Alfie", icon: Sparkles },
+    { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { path: "/billing", label: "Abonnement", icon: CreditCard },
   ];
 
   if (canSeeAdminToggle) {
-    navItems.push({ path: '/admin', label: 'Admin', icon: Settings });
+    navItems.push({ path: "/admin", label: "Admin", icon: Settings });
   }
 
   return (
@@ -61,11 +53,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             <nav className="hidden md:flex items-center gap-1">
               {navItems.map((item) => (
                 <Link key={item.path} to={item.path}>
-                  <Button
-                    variant={location.pathname === item.path ? 'default' : 'ghost'}
-                    size="sm"
-                    className="gap-2"
-                  >
+                  <Button variant={location.pathname === item.path ? "default" : "ghost"} size="sm" className="gap-2">
                     <item.icon className="h-4 w-4" />
                     {item.label}
                   </Button>
@@ -80,7 +68,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               <div className="hidden sm:flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg bg-muted text-foreground border border-border">
                 <Link to="/chat">
                   <Button
-                    variant={location.pathname === '/chat' ? 'default' : 'ghost'}
+                    variant={location.pathname === "/chat" ? "default" : "ghost"}
                     size="sm"
                     className="text-xs sm:text-sm px-2 sm:px-3"
                     aria-label="Basculer vers le mode Client"
@@ -89,8 +77,8 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </Button>
                 </Link>
                 <Link to="/admin">
-                  <Button 
-                    variant={location.pathname === '/admin' ? 'default' : 'ghost'} 
+                  <Button
+                    variant={location.pathname === "/admin" ? "default" : "ghost"}
                     size="sm"
                     className="text-xs sm:text-sm px-2 sm:px-3"
                     aria-label="Basculer vers le mode Admin"
@@ -100,20 +88,29 @@ export function AppLayout({ children }: AppLayoutProps) {
                 </Link>
               </div>
             )}
+
+            {/* Badge plan */}
             <Badge
               variant="secondary"
               className={cn(
-                'hidden sm:inline-flex text-xs',
-                (profile?.plan || 'starter').toLowerCase() === 'free' &&
-                  'bg-alfie-aqua/10 text-alfie-aqua border border-alfie-aqua/40'
+                "hidden sm:inline-flex text-xs",
+                (profile?.plan || "starter").toLowerCase() === "free" &&
+                  "bg-alfie-aqua/10 text-alfie-aqua border border-alfie-aqua/40",
               )}
             >
-              {profile?.plan || 'starter'}
+              {profile?.plan || "starter"}
             </Badge>
+
+            {/* Icônes user + déconnexion desktop */}
             <Button variant="ghost" size="icon" className="hidden sm:flex h-8 w-8 sm:h-10 sm:w-10">
               <UserCircle className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleSignOut} className="hidden sm:flex h-8 w-8 sm:h-10 sm:w-10">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleSignOut}
+              className="hidden sm:flex h-8 w-8 sm:h-10 sm:w-10"
+            >
               <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
 
@@ -130,7 +127,9 @@ export function AppLayout({ children }: AppLayoutProps) {
                     <UserCircle className="h-5 w-5 text-muted-foreground" />
                     <div className="flex flex-col">
                       <span className="text-sm font-medium">{user?.email}</span>
-                      <Badge variant="secondary" className="w-fit text-xs mt-1">{profile?.plan || 'starter'}</Badge>
+                      <Badge variant="secondary" className="w-fit text-xs mt-1">
+                        {profile?.plan || "starter"}
+                      </Badge>
                     </div>
                   </div>
 
@@ -138,7 +137,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     {navItems.map((item) => (
                       <Link key={item.path} to={item.path} onClick={() => setMobileMenuOpen(false)}>
                         <Button
-                          variant={location.pathname === item.path ? 'default' : 'ghost'}
+                          variant={location.pathname === item.path ? "default" : "ghost"}
                           className="w-full justify-start gap-3"
                         >
                           <item.icon className="h-5 w-5" />
@@ -153,16 +152,16 @@ export function AppLayout({ children }: AppLayoutProps) {
                       <p className="text-xs text-muted-foreground mb-2 px-2">Mode</p>
                       <div className="flex flex-col gap-2">
                         <Link to="/chat" onClick={() => setMobileMenuOpen(false)}>
-                          <Button 
-                            variant={location.pathname === '/chat' ? 'default' : 'outline'} 
+                          <Button
+                            variant={location.pathname === "/chat" ? "default" : "outline"}
                             className="w-full justify-start"
                           >
                             👤 Client
                           </Button>
                         </Link>
                         <Link to="/admin" onClick={() => setMobileMenuOpen(false)}>
-                          <Button 
-                            variant={location.pathname === '/admin' ? 'default' : 'outline'} 
+                          <Button
+                            variant={location.pathname === "/admin" ? "default" : "outline"}
                             className="w-full justify-start"
                           >
                             ⚙️ Admin
@@ -193,16 +192,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       </header>
 
       {/* Main content */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-        {children}
-      </main>
-      
-      {/* Version badge */}
-      <div className="fixed bottom-2 right-2 z-10">
-        <Badge variant="outline" className="text-[10px] opacity-50 hover:opacity-100 transition-opacity">
-          v{appVersion.slice(-8)}
-        </Badge>
-      </div>
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">{children}</main>
     </div>
   );
 }
