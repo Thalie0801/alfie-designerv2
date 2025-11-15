@@ -225,6 +225,11 @@ export default function ChatWidget() {
     let body: ReactNode = null;
 
     if (format === "carousel") {
+      const count = typeof slides === "number" ? slides : 5;
+      const plan = chooseCarouselOutline(count, seed, mergedBrief.niche || brandKit?.niche);
+      next();
+      const title = topic ? `Carrousel — ${topic}` : `Carrousel — ${plan.title}`;
+      collectedIdeas.push(title);
       const plan = chooseCarouselOutline({
         topic: topic || undefined,
         slides,
@@ -244,6 +249,21 @@ export default function ChatWidget() {
     } else {
       const variant =
         format === "video"
+          ? chooseVideoVariant(
+              { topic: topic || undefined, cta, niche: mergedBrief.niche || brandKit?.niche },
+              seed,
+            )
+          : chooseImageVariant(
+              { topic: topic || undefined, cta, niche: mergedBrief.niche || brandKit?.niche },
+              seed,
+            );
+      next();
+      const ideaLabel = format === "video" ? "Vidéo" : "Visuel";
+      if (topic) {
+        collectedIdeas.push(`${ideaLabel} — ${topic}`);
+      }
+      body = variant;
+    }
           ? chooseVideoVariant({ topic: topic || undefined, cta }, seed)
           : chooseImageVariant({ topic: topic || undefined, cta }, seed);
 
