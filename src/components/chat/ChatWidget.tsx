@@ -11,6 +11,7 @@ type CoachMode = "strategy" | "da" | "maker";
 type ChatMessage = { role: "user" | "assistant"; node: ReactNode };
 type AssistantReply = ChatMessage;
 
+type ContentIntent = ReturnType<typeof detectContentIntent>;
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
@@ -61,7 +62,11 @@ export default function ChatWidget() {
       key={label}
       href={href}
       className="inline-block mr-2 mb-2 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50"
-      style={{ background: "#ffffff", border: `1px solid ${BRAND.grayBorder}`, color: BRAND.ink }}
+      style={{
+        background: "#ffffff",
+        border: `1px solid ${BRAND.grayBorder}`,
+        color: BRAND.ink,
+      }}
     >
       {label}
     </a>
@@ -78,7 +83,8 @@ export default function ChatWidget() {
     </button>
   );
 
-  // URL Aeditus : plus tard on pourra la remplacer par un lien ambassadeur tournant
+  // --------- AEDITUS ---------
+
   function getAeditusUrl(): string {
     return "https://aeditus.com";
   }
@@ -113,23 +119,24 @@ export default function ChatWidget() {
       node: assistantCard(
         <div className="space-y-2 text-sm">
           <p>
-            Tu es en panne d’idées ? 💡&nbsp;
-            <strong>Aeditus</strong> peut prendre le relais.
+            Tu es en panne d’idées ? 💡 <strong>Aeditus</strong> peut prendre le relais.
           </p>
           <p>
-            Aeditus, c’est <strong>1 mois de contenu complet</strong> dans ta niche : idées, structures, textes…
-            Tu n’as plus qu’à valider, planifier, et tu peux même remplacer les visuels par des images générées avec Alfie.
+            Aeditus, c’est <strong>1 mois de contenu complet</strong> dans ta niche : idées, structures, textes… Tu n’as
+            plus qu’à valider, planifier, et tu peux même remplacer les visuels par des images générées avec Alfie.
           </p>
           <p>
-            Résultat : tu gardes la main sur ton image de marque, sans avoir à réfléchir tous les jours à
-            “qu’est-ce que je poste ?”.
+            Résultat : tu gardes la main sur ton image de marque, sans avoir à réfléchir tous les jours à “qu’est-ce que
+            je poste ?”.
           </p>
           <a
             href={url}
             target="_blank"
             rel="noreferrer"
             className="inline-block mt-1 px-3 py-2 rounded-md text-sm font-medium text-white"
-            style={{ background: `linear-gradient(135deg, ${BRAND.mint}, ${BRAND.mintDark})` }}
+            style={{
+              background: `linear-gradient(135deg, ${BRAND.mint}, ${BRAND.mintDark})`,
+            }}
           >
             Découvrir Aeditus
           </a>
@@ -137,6 +144,8 @@ export default function ChatWidget() {
       ),
     };
   };
+
+  // --------- BRIEF / INTENT ---------
 
   const sanitizeBriefPatch = (patch: Partial<Brief>) => {
     const next: Partial<Brief> = { ...patch };
@@ -155,11 +164,10 @@ export default function ChatWidget() {
     return next;
   };
 
-  type ContentIntent = ReturnType<typeof detectContentIntent>;
-
   const applyIntent = (raw: string) => {
     const intent = detectContentIntent(raw);
-    const desiredFormat = (intent.explicitMode ? intent.mode : brief.state.format ?? intent.mode) as Brief["format"];
+    const desiredFormat = (intent.explicitMode ? intent.mode : (brief.state.format ?? intent.mode)) as Brief["format"];
+
     const patch: Partial<Brief> = {
       platform: (intent.platform || brief.state.platform) as Brief["platform"],
       format: desiredFormat,
@@ -168,7 +176,6 @@ export default function ChatWidget() {
       slides: intent.slides ?? brief.state.slides,
       topic: intent.topic ?? brief.state.topic,
       cta: intent.cta ?? brief.state.cta,
-      niche: intent.niche ?? brief.state.niche,
     };
 
     const sanitised = sanitizeBriefPatch(patch);
@@ -193,7 +200,6 @@ export default function ChatWidget() {
     });
   };
 
-  // Helper to extract interesting lines when parsing AI replies
   function extractInterestingLines(text: string): string[] {
     const lines = text
       .split("\n")
@@ -202,8 +208,7 @@ export default function ChatWidget() {
 
     const matches: string[] = [];
 
-    const allowLine = (line: string) =>
-      !/^ok,? sur changement d['’]angle/i.test(line);
+    const allowLine = (line: string) => !/^ok,? sur changement d['’]angle/i.test(line);
 
     for (const line of lines) {
       if (!allowLine(line)) continue;
@@ -260,67 +265,75 @@ export default function ChatWidget() {
     const cta = mergedBrief.cta ?? intent.cta ?? undefined;
     const slides = mergedBrief.slides ?? intent.slides ?? 5;
 
-    // Build the assistant card header and body similar to the previous implementation
-    const header = (
-      <div className="space-y-1">
-        <p className="text-sm font-medium">
-          Format : <span className="capitalize">{format}</span>
-          {platform ? ` • ${platform}` : null}
-          {ratio ? ` • ratio ${ratio}` : null}
-        </p>
-        {topic ? <p className="text-sm">Thème : {topic}</p> : null}
-        {cta ? <p className="text-xs text-muted-foreground">CTA : {cta}</p> : null}
-      </div>
-    );
+    const formatLabel = format === "carousel" ? "Carrousel" : format === "video" ? "Vidéo" : "Visuel";
 
-    let body: ReactNode = null;
+    const header =
+      modeCoach === "strategy" ? (
+        <p className="text-sm">
+          <strong>{formatLabel}</strong> — ratio <strong>{ratio}</strong>
+          {platform ? (
+            <>
+              {" "}
+              — <strong>{platform}</strong>
+            </>
+          ) : null}
+          {tone ? (
+            <>
+              {" "}
+              — ton <strong>{tone}</strong>
+            </>
+          ) : null}
+          .
+        </p>
+      ) : modeCoach === "da" ? (
+        <p className="text-sm">
+          <strong>Direction créative</strong> pour « {topic || "ton sujet"} »
+        </p>
+      ) : (
+        <p className="text-sm">
+          <strong>Prêt à produire</strong> — je te pré-remplis Studio.
+        </p>
+      );
+
+    let body: ReactNode;
+    const collectedIdeas: string[] = [];
 
     if (format === "carousel") {
       const count = typeof slides === "number" ? slides : 5;
-      const plan = chooseCarouselOutline(count, seed, mergedBrief.niche || brandKit?.niche);
-      next();
+      const plan = chooseCarouselOutline(count, seed);
+      setSeed((v) => v + 1);
       const title = topic ? `Carrousel — ${topic}` : `Carrousel — ${plan.title}`;
       collectedIdeas.push(title);
-      const plan = chooseCarouselOutline({
-        topic: topic || undefined,
-        slides,
-        seed,
-      });
-      setSeed((value) => value + 1);
       body = (
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Structure suggérée : {plan.title}</p>
-          <ul className="list-disc ml-5 text-sm">
-            {plan.slides.map((s, i) => (
-              <li key={i}>{s}</li>
-            ))}
-          </ul>
+        <div className="space-y-2 text-sm">
+          <p>
+            Thème : <em>{topic || "Ton sujet"}</em>
+          </p>
+          <div>
+            <p className="font-medium">Structure suggérée : {plan.title}</p>
+            <ul className="list-disc ml-5">
+              {plan.slides.map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ul>
+          </div>
         </div>
       );
     } else {
       const variant =
         format === "video"
-          ? chooseVideoVariant(
-              { topic: topic || undefined, cta, niche: mergedBrief.niche || brandKit?.niche },
-              seed,
-            )
-          : chooseImageVariant(
-              { topic: topic || undefined, cta, niche: mergedBrief.niche || brandKit?.niche },
-              seed,
-            );
-      next();
+          ? chooseVideoVariant({ topic: topic || undefined, cta }, seed)
+          : chooseImageVariant({ topic: topic || undefined, cta }, seed);
+      setSeed((v) => v + 1);
       const ideaLabel = format === "video" ? "Vidéo" : "Visuel";
       if (topic) {
         collectedIdeas.push(`${ideaLabel} — ${topic}`);
       }
       body = variant;
     }
-          ? chooseVideoVariant({ topic: topic || undefined, cta }, seed)
-          : chooseImageVariant({ topic: topic || undefined, cta }, seed);
 
-      setSeed((value) => value + 1);
-
-      body = variant;
+    if (collectedIdeas.length > 0) {
+      registerIdeas(collectedIdeas);
     }
 
     return {
@@ -333,6 +346,8 @@ export default function ChatWidget() {
       ),
     };
   };
+
+  // --------- PREFILL STUDIO ---------
 
   function prefillStudio() {
     const data = JSON.stringify(brief.state);
@@ -352,6 +367,8 @@ export default function ChatWidget() {
     const url = `/studio?${params.toString()}`;
     window.location.assign(url);
   }
+
+  // --------- ROUTAGE PLATEFORME ---------
 
   function replyPlatform(raw: string): AssistantReply | null {
     const plat = detectPlatformHelp(raw);
@@ -373,6 +390,8 @@ export default function ChatWidget() {
     return null;
   }
 
+  // --------- LOGIQUE AI PRINCIPALE ---------
+
   async function replyContentWithAI(raw: string): Promise<AssistantReply> {
     const { intent, mergedBrief } = applyIntent(raw);
 
@@ -388,9 +407,6 @@ export default function ChatWidget() {
     if (mergedBrief.format) contextPayload.contentType = mergedBrief.format;
     if (mergedBrief.platform) contextPayload.platform = mergedBrief.platform;
     if (brandKit) contextPayload.brandKit = brandKit;
-    if (mergedBrief.niche || brandKit?.niche) {
-      contextPayload.niche = mergedBrief.niche || brandKit?.niche;
-    }
 
     try {
       const res = await fetch("/functions/v1/chat-ai-assistant", {
@@ -442,15 +458,17 @@ export default function ChatWidget() {
     const cleaned = raw.trim();
     if (!cleaned) return null;
 
-    // 1. Cas "je n'ai pas d'idées" → on propose Aeditus
     if (isNoIdeaMessage(cleaned)) {
       return buildAeditusReply();
     }
 
     const concierge = replyPlatform(cleaned);
     if (concierge) return concierge;
+
     return await replyContentWithAI(cleaned);
   }
+
+  // --------- UI / ENVOI ---------
 
   function pushUser(text: string) {
     setMsgs((m) => [
@@ -501,11 +519,18 @@ export default function ChatWidget() {
       {open && (
         <div
           className="fixed bottom-6 right-6 w-[360px] max-w-[95vw] h-[520px] rounded-2xl shadow-2xl border flex flex-col"
-          style={{ background: BRAND.light, borderColor: BRAND.grayBorder, zIndex: 9999 }}
+          style={{
+            background: BRAND.light,
+            borderColor: BRAND.grayBorder,
+            zIndex: 9999,
+          }}
         >
           <div
             className="flex items-center justify-between p-3 border-b"
-            style={{ background: `${BRAND.mint}22`, borderColor: BRAND.grayBorder }}
+            style={{
+              background: `${BRAND.mint}22`,
+              borderColor: BRAND.grayBorder,
+            }}
           >
             <div className="font-medium" style={{ color: BRAND.text }}>
               Alfie Chat (coach & DA)
@@ -578,7 +603,9 @@ export default function ChatWidget() {
             <button
               onClick={() => void handleSend()}
               className="px-3 py-2 rounded-md text-sm font-medium text-white disabled:opacity-50"
-              style={{ background: `linear-gradient(135deg, ${BRAND.mint}, ${BRAND.mintDark})` }}
+              style={{
+                background: `linear-gradient(135deg, ${BRAND.mint}, ${BRAND.mintDark})`,
+              }}
               disabled={!input.trim()}
             >
               Envoyer
