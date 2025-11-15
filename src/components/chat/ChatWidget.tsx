@@ -18,6 +18,7 @@ export default function ChatWidget() {
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [modeCoach, setModeCoach] = useState<CoachMode>("strategy");
   const [seed, setSeed] = useState(0);
+  const [previousIdeas, setPreviousIdeas] = useState<string[]>([]);
 
   const brief = useBrief();
   const { brandKit } = useBrandKit();
@@ -127,6 +128,95 @@ export default function ChatWidget() {
     return { intent, mergedBrief };
   };
 
+  const registerIdeas = (ideas: string[]) => {
+    setPreviousIdeas((prev) => {
+      const next = [...prev];
+      const seen = new Set(prev);
+      for (const idea of ideas) {
+        const normalised = idea.trim().replace(/\s+/g, " ");
+        if (!normalised || seen.has(normalised)) continue;
+        seen.add(normalised);
+        next.push(normalised);
+      }
+      return next;
+    });
+  };
+
+  const extractIdeaLabels = (message: string): string[] => {
+    const lines = message
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    const matches: string[] = [];
+    const allowLine = (line: string) => {
+      const withoutBullet = line.replace(/^[-•*+]\s*/, "");
+      const lower = withoutBullet.toLowerCase();
+      if (/^type\s*:/i.test(withoutBullet)) return false;
+      if (/^plateforme\s*:/i.test(withoutBullet)) return false;
+      if (/^ratio\s*:/i.test(withoutBullet)) return false;
+      if (/^nombre d['’]éléments/i.test(lower)) return false;
+      if (/^cta\s*:/i.test(withoutBullet)) return false;
+      if (/^ton\s*:/i.test(withoutBullet)) return false;
+      if (/^slides?/i.test(lower)) return false;
+      return true;
+    };
+
+    for (const line of lines) {
+      if (!allowLine(line)) continue;
+      const cleaned = line.replace(/^[-•*+]\s*/, "");
+      if (/^(carrousel|carousel|vid[ée]o|image|visuel)/i.test(cleaned)) {
+        matches.push(cleaned);
+      } else if (/^th[eè]me\s*[:–-]/i.test(cleaned)) {
+        matches.push(cleaned);
+      } else if (/^hook\s*[:–-]/i.test(cleaned)) {
+        matches.push(cleaned);
+      } else if (/^id[ée]e?\s*\d*\s*[:–-]/i.test(cleaned)) {
+        matches.push(cleaned);
+      }
+      if (matches.length >= 3) break;
+    }
+
+    if (matches.length === 0) {
+      const fallback = lines.find(
+        (line) => allowLine(line) && !/^ok,? on change d['’]angle/i.test(line),
+      );
+      if (fallback) {
+        matches.push(fallback.replace(/^[-•*+]\s*/, ""));
+      }
+    }
+  const buildNeedTopicReply = (): AssistantReply => {
+    const suggestions = [
+      "Carrousel 5 slides 4:5 Instagram : 3 erreurs en pub Meta pour PME",
+      "Visuel 1:1 LinkedIn : annonce webinar IA marketing",
+      "Vidéo 9:16 TikTok : astuces Canva pour solopreneurs",
+    ];
+
+    return {
+      role: "assistant" as const,
+      node: (
+        <div className="space-y-3">
+          <p className="text-sm">
+            Donne-moi un <strong>sujet précis</strong>. Exemples :
+          </p>
+          <div className="flex flex-wrap gap-2">{suggestions.map((s) => chip(s, () => setInput(s)))}</div>
+        </div>
+      ),
+    };
+  };
+
+  const buildLocalReply = (intent: ContentIntent, mergedBrief: Brief): AssistantReply => {
+    const format = mergedBrief.format ?? (intent.explicitMode ? intent.mode : "image");
+    const ratio = mergedBrief.ratio ?? intent.ratio;
+    const platform = mergedBrief.platform ?? intent.platform ?? undefined;
+    const tone = mergedBrief.tone ?? intent.tone ?? undefined;
+    const topic = mergedBrief.topic ?? intent.topic ?? "";
+    const cta = mergedBrief.cta ?? intent.cta ?? undefined;
+    const slides = mergedBrief.slides ?? intent.slides ?? 5;
+
+    return matches;
+  };
+
   const buildNeedTopicReply = (): AssistantReply => {
     const suggestions = [
       "Carrousel 5 slides 4:5 Instagram : 3 erreurs en pub Meta pour PME",
@@ -187,11 +277,14 @@ export default function ChatWidget() {
       );
 
     let body: ReactNode;
+    const collectedIdeas: string[] = [];
 
     if (format === "carousel") {
       const count = typeof slides === "number" ? slides : 5;
       const plan = chooseCarouselOutline(count, seed);
       next();
+      const title = topic ? `Carrousel — ${topic}` : `Carrousel — ${plan.title}`;
+      collectedIdeas.push(title);
       body = (
         <div className="space-y-2 text-sm">
           <p>
@@ -213,6 +306,15 @@ export default function ChatWidget() {
           ? chooseVideoVariant({ topic: topic || undefined, cta }, seed)
           : chooseImageVariant({ topic: topic || undefined, cta }, seed);
       next();
+      const ideaLabel = format === "video" ? "Vidéo" : "Visuel";
+      if (topic) {
+        collectedIdeas.push(`${ideaLabel} — ${topic}`);
+      }
+      body = variant;
+    }
+
+    if (collectedIdeas.length > 0) {
+      registerIdeas(collectedIdeas);
       body = variant;
     }
 
@@ -285,6 +387,7 @@ export default function ChatWidget() {
         body: JSON.stringify({
           message: raw,
           context: contextPayload,
+          previousIdeas,
         }),
       });
 
@@ -293,12 +396,17 @@ export default function ChatWidget() {
         return buildLocalReply(intent, mergedBrief);
       }
 
+      const payload = (await res.json().catch(() => null)) as {
+        data?: { message?: string };
+      } | null;
       const payload = (await res.json().catch(() => null)) as { data?: { message?: string } } | null;
       const aiMessage = typeof payload?.data?.message === "string" ? payload.data.message.trim() : "";
 
       if (!aiMessage) {
         return buildLocalReply(intent, mergedBrief);
       }
+
+      registerIdeas(extractIdeaLabels(aiMessage));
 
       const blocks = aiMessage
         .split(/\n{2,}/)

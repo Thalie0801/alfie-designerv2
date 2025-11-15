@@ -16,6 +16,7 @@ type ChatAIRequest = {
     niche?: string;
     mode?: "strategy" | "da" | "maker";
   };
+  previousIdeas?: unknown;
 };
 
 serve(async (req) => {
@@ -42,7 +43,7 @@ serve(async (req) => {
       });
     }
 
-    const { message, context } = body ?? {};
+    const { message, context, previousIdeas } = body ?? {};
 
     if (!message || typeof message !== "string" || message.trim().length === 0) {
       console.warn("chat-ai-assistant: missing message", body);
@@ -84,6 +85,11 @@ Approche :
    • Vidéo courte → propose un hook 3 secondes, un déroulé simple en 3-5 étapes, le type de plans et un CTA oral + texte.
 3. Quand le brief est prêt, termine ton message par un mini-récap clair (Type, Plateforme, Ratio, Nombre d'éléments, Sujet + ton + CTA) suivi de "Clique sur Pré-remplir Studio pour envoyer ce brief dans le Studio Alfie.".
 
+Mémoire de session :
+- Reste cohérent tout au long de la conversation.
+- Réutilise la niche, l'offre, la cible et le ton déjà définis, sauf si l'utilisateur les change.
+- Ne repose pas une question déjà traitée (ex : "quelle est ta niche ?") si l'information figure dans l'historique. Si tu as un doute, vérifie une fois : "On reste sur ta boutique e-commerce de [X], c'est bien ça ?".
+
 Contexte Niche :
 - L'utilisateur peut préciser sa niche (ex : e-commerce, coaching, MLM…). Adapte toujours exemples, accroches et CTA à cette niche.
 - Si aucune niche n'est fournie, pose une question courte pour la connaître avant de détailler un plan complet.
@@ -119,6 +125,11 @@ Instructions par niche :
    • Carrousels favoris : "5 bons plans", "3 produits favoris", "Les coulisses de…".
    • CTA : "Enregistre ce post", "Partage à un(e) ami(e)", "Lien en story / bio".
 
+Gestion des idées déjà proposées :
+- Tu reçois parfois un champ previousIdeas (liste d'idées, titres, hooks déjà fournis dans la session).
+- Ne repropose jamais une idée présente dans previousIdeas.
+- Si l'utilisateur indique "j'ai déjà fait ça", "je l'ai déjà utilisé" ou similaire, répond d'abord "Ok, on change d'angle 👌" puis propose 2 à 3 nouvelles idées vraiment différentes (nouvel angle, hook ou format).
+
 Style de langage : tutoiement, ton chaleureux, concret, sans jargon. Préfère les listes et bullets.
 
 À ne pas faire :
@@ -126,6 +137,18 @@ Style de langage : tutoiement, ton chaleureux, concret, sans jargon. Préfère l
 - Ne promets pas de résultats garantis.
 - Ne lance jamais la génération de médias (le rendu visuel se fait dans le Studio, pas dans le chat).
 - Ne mentionne pas les modèles utilisés.
+
+Si l'utilisateur manque d'idées :
+- Détecte les phrases du type "je n'ai plus d'idées", "je sèche", "je ne sais plus quoi publier", "j'ai zéro inspi" ou ton équivalent.
+- Rassure-le en une phrase courte.
+- Propose Aeditus, la plateforme sœur d'Alfie Designer, avec 3 à 5 points :
+  • Aeditus te fournit un mois de contenu complet chaque mois dans ta niche.
+  • Tu obtiens un planning de contenus + les textes, sans avoir à y penser.
+  • Toute la partie "idées + rédaction" est prise en charge par Aeditus.
+  • Tu peux ensuite ajouter ou remplacer les visuels avec Alfie Designer pour rester on-brand.
+  • C'est idéal si tu veux publier tous les jours sans y passer ta vie.
+- Donne le lien : https://aeditus.com
+- Termine par une invitation à créer ensemble une idée simple maintenant (image, carrousel ou vidéo) pour l'aider à passer à l'action.
 
 Réponds uniquement en français.`;
 
@@ -163,6 +186,21 @@ Réponds uniquement en français.`;
         contextDetails.push(`• ${label} : ${String(value)}`);
       }
     }
+
+    const brandVoice = brand?.voice;
+    if (typeof brandVoice === "string" && brandVoice.trim()) {
+      contextDetails.push(`• Voix de marque : ${brandVoice.trim()}`);
+    }
+
+    const ideasArray = Array.isArray(previousIdeas)
+      ? (previousIdeas as unknown[])
+          .map((value) => (typeof value === "string" ? value : String(value)))
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0)
+      : [];
+
+    if (ideasArray.length > 0) {
+      contextDetails.push(`• Idées déjà proposées : ${ideasArray.join(" | ")}`);
 
     const brandVoice = brand?.voice;
     if (typeof brandVoice === "string" && brandVoice.trim()) {
