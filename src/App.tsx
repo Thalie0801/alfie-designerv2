@@ -34,6 +34,7 @@ import ActivateAccess from "./pages/onboarding/Activate";
 import { AlfieChat } from "./components/AlfieChat"; // si tu gardes /chat
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 import { ChatGenerator } from "@/features/studio";
+import { ChatWidget } from "@/components/chat/ChatWidget";
 import ChatWidget from "./components/chat/ChatWidget";
 
 const queryClient = new QueryClient();
@@ -249,6 +250,7 @@ const App = () => (
         <AppRoutes />
         <ChatWidget />
       </TooltipProvider>
+      <ChatWidget />
     </AuthProvider>
   </QueryClientProvider>
 );
