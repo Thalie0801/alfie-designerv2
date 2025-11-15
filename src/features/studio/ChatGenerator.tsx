@@ -28,8 +28,6 @@ type UploadedSource = {
 import type { Database } from "@/integrations/supabase/types";
 import { getAspectClass } from "@/types/chat";
 import type { LibraryAsset as OrderAsset } from "@/types/chat";
-import { createMediaOrder } from "./studioApi";
-import type { CreateMediaOrderInput } from "./studioApi";
 
 type JobEntry = Database['public']['Tables']['job_queue']['Row'];
 
@@ -85,6 +83,12 @@ const ASPECT_TO_TW: Record<AspectRatio, string> = {
   "1:1": "aspect-square",
   "9:16": "aspect-[9/16]",
   "16:9": "aspect-video",
+};
+
+const IMAGE_SIZE_MAP: Record<AspectRatio, { width: number; height: number }> = {
+  "1:1": { width: 1024, height: 1024 },
+  "9:16": { width: 1024, height: 1820 },
+  "16:9": { width: 1820, height: 1024 },
 };
 
 // const CURRENT_JOB_VERSION = 2; // Temporarily disabled until types regenerate
@@ -677,17 +681,64 @@ export function ChatGenerator() {
     setGeneratedAsset(null);
 
     try {
-      const request: CreateMediaOrderInput = {
-        kind: "image",
-        prompt,
-        brandId: activeBrandId ?? null,
+      // ✅ Phase A: Get session token for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const targetFunction = uploadedSource
+        ? "alfie-generate-ai-image"
+        : "alfie-render-image";
+
+      const payload: Record<string, unknown> = {
+        prompt: prompt || "transform this",
         aspectRatio,
-        sourceUrl: uploadedSource?.url ?? null,
+        brand_id: activeBrandId ?? null, // ✅ Phase A: Pass brand_id
       };
 
-      const { data, orderId: responseOrderId } = await createMediaOrder(request);
+      if (uploadedSource) {
+        payload.sourceUrl = uploadedSource.url;
+      } else {
+        const size = IMAGE_SIZE_MAP[aspectRatio];
+        payload.width = size.width;
+        payload.height = size.height;
+      }
 
-      if (responseOrderId) {
+      // ✅ Phase A: Include Authorization header if token is available
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+
+      const { data, error } = await supabase.functions.invoke(targetFunction, {
+        body: payload,
+        headers,
+      });
+
+      if (error) throw error;
+
+      const responseRecord = isRecord(data) ? data : null;
+      const isStructuredResponse =
+        responseRecord && ("ok" in responseRecord || "data" in responseRecord);
+
+      if (isStructuredResponse) {
+        if ("ok" in responseRecord && responseRecord.ok === false) {
+          const structuredError =
+            typeof responseRecord.error === "string"
+              ? responseRecord.error
+              : isRecord(responseRecord.data) && typeof responseRecord.data.error === "string"
+                ? responseRecord.data.error
+                : "Erreur de génération";
+          throw new Error(structuredError);
+        }
+
+        const nestedData = isRecord(responseRecord.data)
+          ? (responseRecord.data as Record<string, unknown>)
+          : null;
+        const responseOrderId =
+          (typeof nestedData?.orderId === "string" && nestedData.orderId) ||
+          (typeof responseRecord.orderId === "string" ? responseRecord.orderId : null);
+
+        if (!responseOrderId) {
+          throw new Error("no orderId in response");
+        }
+
         await refetchAll();
         if (responseOrderId !== orderId) {
           navigate(`/studio?order=${responseOrderId}`);
@@ -749,17 +800,23 @@ export function ChatGenerator() {
       const sourceUrl = uploadedSource?.url ?? null;
       const sourceType = uploadedSource?.type ?? null;
 
-      const request: CreateMediaOrderInput = {
-        kind: "video",
-        prompt: promptText,
-        brandId: activeBrandId,
-        aspectRatio,
-        durationSec,
-        sourceUrl,
-        sourceType,
-      };
+      const { data, error } = await supabase.functions.invoke("alfie-orchestrator", {
+        body: {
+          message: promptText,
+          user_message: promptText,
+          brandId: activeBrandId,
+          forceTool: "generate_video",
+          aspectRatio,
+          durationSec,
+          uploadedSourceUrl: sourceUrl,
+          uploadedSourceType: sourceType,
+        },
+      });
 
-      const { orderId } = await createMediaOrder(request);
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error as string);
+
+      const orderId = data?.orderId as string | undefined;
       if (!orderId) throw new Error("L’orchestrateur n’a pas renvoyé d’orderId.");
 
       toast.success("🚀 Vidéo lancée ! Retrouve-la dans le Studio.");
