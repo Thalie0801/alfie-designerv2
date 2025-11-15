@@ -139,7 +139,7 @@ export function ChatGenerator() {
   const [jobs, setJobs] = useState<JobEntry[]>([]);
   const [assets, setAssets] = useState<MediaEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  const [jobsError, setJobsError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [orderSummaries, setOrderSummaries] = useState<OrderSummary[]>([]);
   const [orderSummariesLoading, setOrderSummariesLoading] = useState(false);
   const [orderSummariesError, setOrderSummariesError] = useState<string | null>(null);
@@ -392,7 +392,7 @@ export function ChatGenerator() {
 
   const refetchAll = useCallback(async () => {
     setLoading(true);
-    setJobsError(null);
+    setError(null);
 
     try {
       const {
@@ -450,16 +450,11 @@ export function ChatGenerator() {
 
       await fetchOrderSummaries(currentUser.id, orderId);
     } catch (err) {
-      console.error("Erreur chargement jobs", err);
+      console.error("[Studio] refetchAll error:", err);
       setJobs([]);
       setAssets([]);
-      const message =
-        err instanceof Error
-          ? err.message
-          : typeof err === "string"
-            ? err
-            : "Erreur inconnue pendant le rafraîchissement";
-      setJobsError(message);
+      const message = err instanceof Error ? err.message : "Erreur inconnue pendant le rafraîchissement";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -480,7 +475,7 @@ export function ChatGenerator() {
       if (!mounted) return;
       if (authError) {
         console.error("[Studio] auth error after refetch:", authError);
-        setJobsError((prev) => prev ?? authError.message);
+        setError((prev) => prev ?? authError.message);
         return;
       }
       if (!currentUser) return;
@@ -1167,7 +1162,7 @@ export function ChatGenerator() {
                 </Button>
               </div>
             </div>
-            {jobsError && <div className="text-xs text-red-600 mt-2">{jobsError}</div>}
+            {error && <div className="text-xs text-red-600 mt-2">{error}</div>}
 
             {loading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">

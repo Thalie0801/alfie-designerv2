@@ -730,15 +730,6 @@ export function AlfieChat() {
         if (conversationId) {
           requestPayload.conversationId = conversationId;
         }
-      });
-      
-      if (error) {
-        console.error('create-job-set error:', error);
-        throw new Error(error.message || JSON.stringify(error) || 'Erreur inconnue lors de la création du job set.');
-        // Afficher l'objet d'erreur brut pour le diagnostic
-        throw new Error(JSON.stringify(error, null, 2));
-      }
-      
 
         // intention vidéo
         if (options?.forceTool) {
@@ -751,78 +742,6 @@ export function AlfieChat() {
           requestPayload.prompt = promptOverride;
         }
 
-      // Refund des visuels (à implémenter si nécessaire)
-      
-      const errorMessage = error.message || JSON.stringify(error) || 'Erreur inconnue';
-      
-      addMessage({
-        role: 'assistant',
-        content: `❌ Erreur de génération de carrousel : \n\n\`\`\`\n${errorMessage}\n\`\`\``,
-      const errorMessage = error.message || JSON.stringify(error, null, 2) || 'Erreur inconnue';
-      
-      addMessage({
-        role: 'assistant',
-        content: `❌ Erreur de génération de carrousel : \n\n\`\`\`json\n${errorMessage}\n\`\`\``,
-        type: 'text'
-      });;
-      toast.error('Échec de la création du carrousel');
-    }
-  };
-  
-  const subscribeToCarousel = (jobSetId: string, total: number) => {
-    // Nettoyer l'ancien canal si présent
-    if (carouselChannelRef.current) {
-      supabase.removeChannel(carouselChannelRef.current);
-    }
-    
-    const channel = supabase
-      .channel(`carousel-${jobSetId}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'jobs',
-        filter: `job_set_id=eq.${jobSetId}`
-      }, () => {
-        // Recompter les jobs terminés
-        updateCarouselProgress(jobSetId, total);
-      })
-      .subscribe();
-    
-    carouselChannelRef.current = channel;
-    
-    // Polling de secours toutes les 10s
-    const pollInterval = setInterval(async () => {
-      await updateCarouselProgress(jobSetId, total);
-      
-      // Arrêter le polling si terminé
-      if (carouselProgress.done >= total) {
-        clearInterval(pollInterval);
-      }
-    }, 10000);
-  };
-  
-  const updateCarouselProgress = async (jobSetId: string, total: number) => {
-    try {
-      const { data: jobs } = await supabase
-        .from('jobs')
-        .select('status')
-        .eq('job_set_id', jobSetId);
-      
-      if (!jobs) return;
-      
-      const done = jobs.filter(j => j.status === 'completed').length;
-      setCarouselProgress({ done, total });
-      
-      // Mettre à jour le message de progression
-      setMessages(prev => prev.map(m => {
-        if (m.type === 'carousel' && m.metadata?.jobSetId === jobSetId) {
-          return {
-            ...m,
-            content: done >= total 
-              ? `✅ Carrousel terminé (${done}/${total}) !`
-              : `⏳ Génération en cours (${done}/${total})...`,
-            metadata: { ...m.metadata, done }
-          };
         if (options?.slides && options.slides.length > 0) {
           requestPayload.slides = options.slides;
         }
