@@ -1,13 +1,4 @@
-import { ReactNode, useEffect, useState } from 'react';
-import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { AppSidebar } from '@/components/AppSidebar';
-import { ThemeToggle } from '@/components/ThemeToggle';
-import { useAuth } from '@/hooks/useAuth';
-import { SubscriptionExpiredModal } from './SubscriptionExpiredModal';
-import { useNavigate } from 'react-router-dom';
-
-interface AppLayoutWithSidebarProps {
-  children: ReactNode;
+@@ -11,51 +11,51 @@ interface AppLayoutWithSidebarProps {
 }
 
 export function AppLayoutWithSidebar({ children }: AppLayoutWithSidebarProps) {
@@ -33,6 +24,7 @@ export function AppLayoutWithSidebar({ children }: AppLayoutWithSidebarProps) {
         onRenew={handleRenew}
       />
       <SidebarProvider defaultOpen={true}>
+          <div className="min-h-screen flex w-full bg-background">
           <div className="min-h-screen flex w-full bg-background text-foreground">
             <AppSidebar />
             
@@ -59,6 +51,3 @@ export function AppLayoutWithSidebar({ children }: AppLayoutWithSidebarProps) {
             </div>
           </div>
         </SidebarProvider>
-    </>
-  );
-}
