@@ -1,3 +1,20 @@
+import { ReactNode, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { useVersionRefresh } from '@/hooks/useVersionRefresh';
+import { 
+  Sparkles, 
+  LayoutDashboard, 
+  CreditCard, 
+  Settings, 
+  LogOut,
+  UserCircle,
+  Menu
+} from 'lucide-react';
 import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -68,6 +85,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               <div className="hidden sm:flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg bg-muted text-foreground border border-border">
                 <Link to="/chat">
                   <Button
+                    variant={location.pathname === '/chat' ? 'default' : 'ghost'}
                     variant={location.pathname === "/chat" ? "default" : "ghost"}
                     size="sm"
                     className="text-xs sm:text-sm px-2 sm:px-3"
@@ -88,6 +106,16 @@ export function AppLayout({ children }: AppLayoutProps) {
                 </Link>
               </div>
             )}
+            <Badge
+              variant="secondary"
+              className={cn(
+                'hidden sm:inline-flex text-xs',
+                (profile?.plan || 'starter').toLowerCase() === 'free' &&
+                  'bg-alfie-aqua/10 text-alfie-aqua border border-alfie-aqua/40'
+              )}
+            >
+              {profile?.plan || 'starter'}
+            </Badge>
 
             {/* Badge plan */}
             <Badge

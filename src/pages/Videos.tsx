@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { AppLayoutWithSidebar } from '@/components/AppLayoutWithSidebar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -122,87 +121,55 @@ export default function Videos() {
   };
 
   return (
-    <AppLayoutWithSidebar>
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Génération de Vidéos</h1>
-            <p className="text-muted-foreground">Créez des vidéos courtes à partir de vos visuels</p>
-          </div>
-          {!quotaLoading && quota && (
-            <Card className="p-4">
-              <div className="text-sm text-muted-foreground">Woofs restants</div>
-              <div className="text-2xl font-bold">{quota.woofsRemaining} / {quota.woofsTotal}</div>
-            </Card>
-          )}
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Génération de Vidéos</h1>
+          <p className="text-muted-foreground">Créez des vidéos courtes à partir de vos visuels</p>
         </div>
-
-        {!quotaLoading && quota && quota.woofsRemaining < woofsNeeded && (
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Vous n'avez pas assez de Woofs pour créer une vidéo de {duration}s (besoin de {woofsNeeded} Woofs).
-              Veuillez acheter un pack de Woofs ou choisir une durée plus courte.
-            </AlertDescription>
-          </Alert>
+        {!quotaLoading && quota && (
+          <Card className="p-4">
+            <div className="text-sm text-muted-foreground">Woofs restants</div>
+            <div className="text-2xl font-bold">{quota.woofsRemaining} / {quota.woofsTotal}</div>
+          </Card>
         )}
+      </div>
 
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Nouvelle vidéo</h2>
-          
-          <div className="space-y-4">
+      {!quotaLoading && quota && quota.woofsRemaining < woofsNeeded && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Vous n'avez pas assez de Woofs pour créer une vidéo de {duration}s (besoin de {woofsNeeded} Woofs).
+            Veuillez acheter un pack de Woofs ou choisir une durée plus courte.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <Card className="p-6">
+        <h2 className="text-xl font-semibold mb-4">Nouvelle vidéo</h2>
+
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="title">Titre de la vidéo</Label>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Ma nouvelle vidéo"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <Label htmlFor="title">Titre de la vidéo</Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ma nouvelle vidéo"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Durée</Label>
-                <Select value={duration.toString()} onValueChange={(v) => setDuration(parseInt(v))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DURATIONS.map(d => (
-                      <SelectItem key={d.value} value={d.value.toString()}>
-                        {d.label} ({d.woofs} Woof{d.woofs > 1 ? 's' : ''})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label>Format</Label>
-                <Select value={ratio} onValueChange={setRatio}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="16:9">16:9 (Paysage)</SelectItem>
-                    <SelectItem value="9:16">9:16 (Portrait)</SelectItem>
-                    <SelectItem value="1:1">1:1 (Carré)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div>
-              <Label>Template</Label>
-              <Select value={template} onValueChange={setTemplate}>
+              <Label>Durée</Label>
+              <Select value={duration.toString()} onValueChange={(v) => setDuration(parseInt(v))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {VIDEO_TEMPLATES.map(t => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.name} - {t.description}
+                  {DURATIONS.map((d) => (
+                    <SelectItem key={d.value} value={d.value.toString()}>
+                      {d.label} ({d.woofs} Woof{d.woofs > 1 ? 's' : ''})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -210,78 +177,104 @@ export default function Videos() {
             </div>
 
             <div>
-              <Label>Images (placeholder - à implémenter)</Label>
-              <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  Sélectionnez 3-6 images depuis votre bibliothèque
-                </p>
-              </div>
+              <Label>Format</Label>
+              <Select value={ratio} onValueChange={setRatio}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="16:9">16:9 (Paysage)</SelectItem>
+                  <SelectItem value="9:16">9:16 (Portrait)</SelectItem>
+                  <SelectItem value="1:1">1:1 (Carré)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-
-            <span className="text-xs text-muted-foreground">
-              Coût estimé : {woofsNeeded} Woof{woofsNeeded > 1 ? 's' : ''}
-            </span>
-
-            <Button
-              onClick={handleCreateVideo}
-              disabled={loading || !canGenerate}
-              className="w-full"
-            >
-              <Video className="mr-2 h-4 w-4" />
-              {loading ? 'Génération en cours...' : `Générer (${woofsNeeded} Woof${woofsNeeded > 1 ? 's' : ''})`}
-            </Button>
           </div>
-        </Card>
 
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Historique des vidéos</h2>
-          
-          {loadingVideos ? (
-            <div className="text-center py-8">Chargement...</div>
-          ) : videos.length === 0 ? (
-            <Card className="p-8 text-center">
-              <Video className="mx-auto h-12 w-12 text-muted-foreground mb-2" />
-              <p className="text-muted-foreground">Aucune vidéo générée pour le moment</p>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {videos.map((video) => (
-                <Card key={video.id} className="p-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-semibold">{video.title}</h3>
-                        {getStatusBadge(video.status)}
-                      </div>
-                      <div className="flex gap-4 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          {video.duration}s
-                        </span>
-                        <span>{video.ratio}</span>
-                        <span>{video.woofs_cost} Woof{video.woofs_cost > 1 ? 's' : ''}</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Créée le {new Date(video.created_at).toLocaleDateString('fr-FR')}
-                      </div>
-                    </div>
-                    
-                    {video.status === 'completed' && video.video_url && (
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={video.video_url} download>
-                          <Download className="h-4 w-4 mr-2" />
-                          Télécharger
-                        </a>
-                      </Button>
-                    )}
-                  </div>
-                </Card>
-              ))}
+          <div>
+            <Label>Template</Label>
+            <Select value={template} onValueChange={setTemplate}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {VIDEO_TEMPLATES.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name} - {t.description}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label>Images (placeholder - à implémenter)</Label>
+            <div className="border-2 border-dashed rounded-lg p-8 text-center">
+              <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">
+                Sélectionnez 3-6 images depuis votre bibliothèque
+              </p>
             </div>
-          )}
+          </div>
+
+          <span className="text-xs text-muted-foreground">
+            Coût estimé : {woofsNeeded} Woof{woofsNeeded > 1 ? 's' : ''}
+          </span>
+
+          <Button onClick={handleCreateVideo} disabled={loading || !canGenerate} className="w-full">
+            <Video className="mr-2 h-4 w-4" />
+            {loading ? 'Génération en cours...' : `Générer (${woofsNeeded} Woof${woofsNeeded > 1 ? 's' : ''})`}
+          </Button>
         </div>
+      </Card>
+
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Historique des vidéos</h2>
+
+        {loadingVideos ? (
+          <div className="text-center py-8">Chargement...</div>
+        ) : videos.length === 0 ? (
+          <Card className="p-8 text-center">
+            <Video className="mx-auto h-12 w-12 text-muted-foreground mb-2" />
+            <p className="text-muted-foreground">Aucune vidéo générée pour le moment</p>
+          </Card>
+        ) : (
+          <div className="grid gap-4">
+            {videos.map((video) => (
+              <Card key={video.id} className="p-4">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <h3 className="font-semibold">{video.title}</h3>
+                      {getStatusBadge(video.status)}
+                    </div>
+                    <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        {video.duration}s
+                      </span>
+                      <span>{video.ratio}</span>
+                      <span>{video.woofs_cost} Woof{video.woofs_cost > 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Créée le {new Date(video.created_at).toLocaleDateString('fr-FR')}
+                    </div>
+                  </div>
+
+                  {video.status === 'completed' && video.video_url && (
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={video.video_url} download>
+                        <Download className="h-4 w-4 mr-2" />
+                        Télécharger
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
-    </AppLayoutWithSidebar>
+    </div>
   );
 }

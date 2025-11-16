@@ -61,6 +61,18 @@ export function AppLayoutWithSidebar({ children }: AppLayoutWithSidebarProps) {
     <>
       <SubscriptionExpiredModal open={showExpiredModal} onRenew={handleRenew} />
       <SidebarProvider defaultOpen={true}>
+          <div className="min-h-screen flex w-full bg-background text-foreground">
+            <AppSidebar />
+            
+            <div className="flex-1 flex flex-col min-w-0">
+              {/* Header avec trigger pour mobile */}
+              <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b bg-card/70 backdrop-blur px-3 sm:px-4 py-2 lg:hidden">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <SidebarTrigger className="touch-target" />
+                  <h1 className="font-semibold text-sm sm:text-base truncate">Alfie Designer</h1>
+                </div>
+                <ThemeToggle className="touch-target" />
+              </header>
         <div className="min-h-screen flex w-full bg-background text-foreground">
           <AppSidebar />
 
@@ -93,6 +105,7 @@ export function AppLayoutWithSidebar({ children }: AppLayoutWithSidebarProps) {
   );
 }
 
+export default AppLayoutWithSidebar;
 // 🔁 On fournit aussi un export par défaut pour être sûr
 export default AppLayoutWithSidebar;
 
