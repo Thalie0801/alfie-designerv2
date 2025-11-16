@@ -31,7 +31,7 @@ const SubscriptionExpiredModal = ({ open, onRenew }: SubscriptionExpiredModalPro
           <button
             type="button"
             onClick={onRenew}
-            className="inline-flex items-center justify-center rounded-md bg-alfie-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-alfie-pink transition-colors"
+            className="inline-flex items-center justify-center rounded-md bg-alfie-mint px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-alfie-pink transition-colors"
           >
             Renouveler
           </button>

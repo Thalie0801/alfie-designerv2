@@ -43,7 +43,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-6">
             <Link to="/chat" className="flex items-center gap-1.5 sm:gap-2">
-              <span className="inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-2xl bg-alfie-primary/10 text-alfie-primary shadow-sm">
+              <span className="inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-2xl bg-alfie-mint/15 text-alfie-mint shadow-sm">
                 <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
               </span>
               <span className="font-semibold text-sm sm:text-base">Alfie Designer</span>
@@ -91,21 +91,9 @@ export function AppLayout({ children }: AppLayoutProps) {
             <Badge
               variant="secondary"
               className={cn(
-                'hidden sm:inline-flex text-xs',
-                (profile?.plan || 'starter').toLowerCase() === 'free' &&
-                  'bg-alfie-aqua/10 text-alfie-aqua border border-alfie-aqua/40'
-              )}
-            >
-              {profile?.plan || 'starter'}
-            </Badge>
-
-            {/* Badge plan */}
-            <Badge
-              variant="secondary"
-              className={cn(
                 "hidden sm:inline-flex text-xs",
                 (profile?.plan || "starter").toLowerCase() === "free" &&
-                  "bg-alfie-aqua/10 text-alfie-aqua border border-alfie-aqua/40",
+                  "bg-alfie-mintSoft text-slate-900 border border-alfie-mint/50",
               )}
             >
               {profile?.plan || "starter"}
