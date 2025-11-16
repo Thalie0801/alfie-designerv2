@@ -18,6 +18,10 @@ export function HeroTextSection() {
 
         <div className="space-y-4">
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl md:text-6xl">
+            Crée des designs{" "}
+            <span className="bg-gradient-to-r from-alfie-mint via-alfie-lilac to-alfie-pink bg-clip-text text-transparent">
+              professionnels
+            </span>{" "}
             Crée des designs
             <span className="bg-gradient-to-r from-alfie-mint via-alfie-lilac to-alfie-pink bg-clip-text text-transparent">
               professionnels

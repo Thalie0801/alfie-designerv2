@@ -1,3 +1,12 @@
+import { LandingHeader } from "@/components/LandingHeader";
+import { HeroTextSection } from "@/components/landing/HeroTextSection";
+import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
+import { FeaturesSection } from "@/components/landing/FeaturesSection";
+import { PricingSection } from "@/components/landing/PricingSection";
+import { FinalCTA } from "@/components/landing/FinalCTA";
+import { LandingFooter } from "@/components/landing/LandingFooter";
+
+const alfieHeroVideo = "/videos/hero-background.mp4";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +50,7 @@ export default function AlfieLanding() {
 
   const getPriceLabel = () => (isAnnual ? " / an" : " / mois");
 
+export default function AlfieLanding() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <LandingHeader />
@@ -242,6 +252,15 @@ export default function AlfieLanding() {
         </div>
       </section>
 
+      <HeroTextSection />
+      <HowItWorksSection />
+      <FeaturesSection />
+      <PricingSection />
+      <FinalCTA />
+      <LandingFooter />
+    </div>
+  );
+}
       {/* Features Grid */}
       <section className="py-24 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
