@@ -103,7 +103,7 @@ export function ActiveBrandCard() {
                   <Badge
                     variant={isFreePlan ? "outline" : activeBrand.plan ? "secondary" : "outline"}
                     className={cn(
-                      isFreePlan && "bg-alfie-aqua/10 text-alfie-aqua border border-alfie-aqua/40",
+                      isFreePlan && "bg-alfie-mintSoft text-slate-900 border border-alfie-mint/50",
                     )}
                   >
                     {planDisplay}
