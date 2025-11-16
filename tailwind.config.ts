@@ -16,16 +16,13 @@ export default {
     extend: {
       colors: {
         alfie: {
-          primary: "#F6B36A",
+          primary: "#90E3C2",
           pink: "#FF8BC2",
           aqua: "#7EE2E0",
           lilac: "#C8A9FF",
           primarySoft: "#FFE0B5",
-          pink: "#FF8BC2",
           pinkSoft: "#FFD5EB",
-          aqua: "#7EE2E0",
           aquaSoft: "#CFF6F5",
-          lilac: "#C8A9FF",
           bg: "#FFF7FB",
           bgSoft: "#FFEFF7",
           bgDark: "#151325",

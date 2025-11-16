@@ -10,13 +10,14 @@ import {
   BarChart3,
   Layers,
   Share2,
-  ChevronRight,
   ArrowRight,
   Zap,
   Globe,
   Shield,
 } from "lucide-react";
 import { useStripeCheckout } from "@/hooks/useStripeCheckout";
+
+const alfieHeroVideo = "/videos/hero-background.mp4";
 
 export default function AlfieLanding() {
   const [isAnnual, setIsAnnual] = useState(false);
@@ -58,76 +59,70 @@ export default function AlfieLanding() {
         </div>
       </header>
 
-      {/* Hero Section with Video Background */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Video Background */}
-        <div className="absolute inset-0 z-0">
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover"
-          >
-            <source src="/videos/hero-background.mp4" type="video/mp4" />
-          </video>
-          <div className="absolute inset-0 bg-gradient-to-b from-background/95 via-background/80 to-background/95" />
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5" />
-        </div>
+      {/* Hero Section 1: immersive video */}
+      <section className="relative min-h-screen w-full overflow-hidden">
+        <video
+          src={alfieHeroVideo}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background/90 to-transparent" />
+      </section>
 
-        {/* Hero Content */}
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-32 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card/50 backdrop-blur-md border border-border/50 mb-8 animate-fade-in">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium">Agent IA de Création Visuelle</span>
+      {/* Hero Section 2: text + CTA */}
+      <section className="bg-gradient-to-b from-background to-alfie-primary/10 py-16 sm:py-24">
+        <div className="mx-auto flex max-w-5xl flex-col items-center gap-8 px-4 text-center">
+          <Badge
+            variant="secondary"
+            className="bg-alfie-primary/10 text-alfie-primary border border-alfie-primary/30"
+          >
+            Agent IA de Création Visuelle
+          </Badge>
+
+          <div className="space-y-4">
+            <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight text-slate-900">
+              Crée des designs{" "}
+              <span className="bg-gradient-to-r from-alfie-primary via-alfie-aqua to-alfie-pink bg-clip-text text-transparent">
+                professionnels
+              </span>{" "}
+              en quelques secondes
+            </h1>
+            <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto">
+              Alfie génère tes visuels Instagram, carrousels et reels directement dans Canva.
+              Pas de design, juste tes idées.
+            </p>
           </div>
 
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold leading-tight tracking-tight mb-6 animate-fade-in">
-            Crée des designs{" "}
-            <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-              professionnels
-            </span>
-            <br />
-            en quelques secondes
-          </h1>
-
-          <p className="text-xl sm:text-2xl text-muted-foreground max-w-3xl mx-auto mb-12 animate-fade-in leading-relaxed">
-            Alfie génère tes visuels Instagram, carrousels et reels directement dans Canva.
-            Pas de design, juste tes idées.
-          </p>
-
-          <div className="flex flex-wrap gap-4 justify-center items-center animate-fade-in">
-            <Button 
-              size="lg" 
-              className="h-14 px-8 text-lg shadow-xl hover:shadow-2xl hover:scale-105 transition-all"
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <Button
+              className="h-11 rounded-full px-6 bg-alfie-primary text-slate-900 hover:bg-alfie-aqua"
               onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
             >
-              Commencer maintenant
-              <Sparkles className="ml-2 h-5 w-5" />
+              Commencer maintenant ✨
             </Button>
-            <Button 
-              size="lg" 
+            <Button
               variant="outline"
-              className="h-14 px-8 text-lg backdrop-blur-md bg-card/50 hover:bg-card/80 transition-all"
+              className="h-11 rounded-full px-6 border-slate-200 bg-white/80 hover:bg-slate-50"
               onClick={() => (window.location.href = "/demo")}
             >
-              Voir la démo
-              <ChevronRight className="ml-2 h-5 w-5" />
+              Voir la démo →
             </Button>
           </div>
 
-          {/* Feature Pills */}
-          <div className="flex flex-wrap gap-3 justify-center mt-16">
+          <div className="flex flex-wrap gap-3 justify-center mt-10">
             {[
               { icon: Zap, label: "IA ultra-rapide" },
               { icon: Palette, label: "Design personnalisé" },
               { icon: Globe, label: "Intégration Canva" },
             ].map((feature, idx) => (
-              <div 
+              <div
                 key={idx}
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-card/30 backdrop-blur-md border border-border/30 text-sm"
+                className="flex items-center gap-2 px-4 py-2 rounded-full border border-border/30 bg-white/80 text-sm"
               >
-                <feature.icon className="h-4 w-4 text-primary" />
+                <feature.icon className="h-4 w-4 text-alfie-primary" />
                 <span>{feature.label}</span>
               </div>
             ))}
