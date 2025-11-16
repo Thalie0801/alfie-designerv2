@@ -20,6 +20,8 @@ export default {
           mintSoft: "#E3FBF9",
           pink: "#FF8BC2",
           lilac: "#E0C9FF",
+          pink: "#FF8BC2",
+          lilac: "#E0C9FF",
           primary: "#90E3C2",
           pink: "#FF8BC2",
           aqua: "#7EE2E0",

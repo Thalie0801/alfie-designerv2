@@ -57,6 +57,22 @@ export default function AlfieLanding() {
           <span className="text-xs md:text-sm">Fais défiler pour découvrir Alfie</span>
           <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/60 text-base animate-bounce">
             ↓
+
+      {/* SECTION 1 : vidéo immersive */}
+      <section className="relative h-screen overflow-hidden">
+        <video
+          src={alfieHeroVideo}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/35" />
+        <div className="pointer-events-none absolute bottom-10 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 text-white/80">
+          <span className="text-xs md:text-sm">Fais défiler pour découvrir Alfie</span>
+          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/60 text-base animate-bounce">
+            ↓
       {/* Navbar */}
       <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
