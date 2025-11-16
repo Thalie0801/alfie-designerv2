@@ -38,7 +38,6 @@ export function AppSidebar() {
     ? ["nathaliestaelens@gmail.com", "staelensnathalie@gmail.com"].includes(user.email)
     : false;
 
-  // Construire la liste des items de navigation selon les droits
   const baseNavItems: Array<{
     path: string;
     label: string;
@@ -55,9 +54,7 @@ export function AppSidebar() {
     { path: "/affiliate", label: "Affiliation", icon: TrendingUp, tourId: "affiliate" },
   ];
 
-  // Navigation principale (sans "Créer")
   const navItems = [...baseNavItems];
-
   if (isAdmin || canSeeAdminToggle) {
     navItems.push({ path: "/admin", label: "Admin", icon: Settings });
   }
