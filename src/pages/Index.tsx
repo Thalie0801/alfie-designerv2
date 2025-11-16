@@ -1,20 +1,7 @@
-import { LandingHeader } from "@/components/LandingHeader";
-import { HeroTextSection } from "@/components/landing/HeroTextSection";
-import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
-import { FeaturesSection } from "@/components/landing/FeaturesSection";
-import { PricingSection } from "@/components/landing/PricingSection";
-import { FinalCTA } from "@/components/landing/FinalCTA";
-import { LandingFooter } from "@/components/landing/LandingFooter";
-
-const alfieHeroVideo = "/videos/hero-background.mp4";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { LandingHeader } from "@/components/LandingHeader";
-import { HeroTextSection } from "@/components/landing/HeroTextSection";
-import { PriceCard } from "@/components/landing/PriceCard";
-import { Sparkles, Palette, Film, BarChart3, Layers, Share2, Zap, Globe, Shield } from "lucide-react";
 import {
   Check,
   Sparkles,
@@ -23,14 +10,13 @@ import {
   BarChart3,
   Layers,
   Share2,
+  ChevronRight,
   ArrowRight,
   Zap,
   Globe,
   Shield,
 } from "lucide-react";
 import { useStripeCheckout } from "@/hooks/useStripeCheckout";
-
-const alfieHeroVideo = "/videos/hero-background.mp4";
 
 export default function AlfieLanding() {
   const [isAnnual, setIsAnnual] = useState(false);
@@ -50,58 +36,8 @@ export default function AlfieLanding() {
 
   const getPriceLabel = () => (isAnnual ? " / an" : " / mois");
 
-export default function AlfieLanding() {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <LandingHeader />
-
-      {/* SECTION 1 : vidéo immersive */}
-      <section className="relative h-screen overflow-hidden">
-        <video
-          src={alfieHeroVideo}
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/35" />
-        <div className="pointer-events-none absolute bottom-10 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 text-white/80">
-          <span className="text-xs md:text-sm">Fais défiler pour découvrir Alfie</span>
-          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/60 text-base animate-bounce">
-            ↓
-
-      {/* SECTION 1 : vidéo immersive */}
-      <section className="relative h-screen overflow-hidden">
-        <video
-          src={alfieHeroVideo}
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/35" />
-        <div className="pointer-events-none absolute bottom-10 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 text-white/80">
-          <span className="text-xs md:text-sm">Fais défiler pour découvrir Alfie</span>
-          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/60 text-base animate-bounce">
-            ↓
-
-      {/* SECTION 1 : vidéo immersive */}
-      <section className="relative h-screen overflow-hidden">
-        <video
-          src={alfieHeroVideo}
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/35" />
-        <div className="pointer-events-none absolute bottom-10 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 text-white/80">
-          <span className="text-xs md:text-sm">Fais défiler pour découvrir Alfie</span>
-          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/60 text-base animate-bounce">
-            ↓
       {/* Navbar */}
       <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
@@ -122,70 +58,76 @@ export default function AlfieLanding() {
         </div>
       </header>
 
-      {/* Hero Section 1: immersive video */}
-      <section className="relative min-h-screen w-full overflow-hidden">
-        <video
-          src={alfieHeroVideo}
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background/90 to-transparent" />
-      </section>
-
-      {/* Hero Section 2: text + CTA */}
-      <section className="bg-gradient-to-b from-background to-alfie-primary/10 py-16 sm:py-24">
-        <div className="mx-auto flex max-w-5xl flex-col items-center gap-8 px-4 text-center">
-          <Badge
-            variant="secondary"
-            className="bg-alfie-primary/10 text-alfie-primary border border-alfie-primary/30"
+      {/* Hero Section with Video Background */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        {/* Video Background */}
+        <div className="absolute inset-0 z-0">
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
           >
-            Agent IA de Création Visuelle
-          </Badge>
+            <source src="/videos/hero-background.mp4" type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-gradient-to-b from-background/95 via-background/80 to-background/95" />
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5" />
+        </div>
 
-          <div className="space-y-4">
-            <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight text-slate-900">
-              Crée des designs{" "}
-              <span className="bg-gradient-to-r from-alfie-primary via-alfie-aqua to-alfie-pink bg-clip-text text-transparent">
-                professionnels
-              </span>{" "}
-              en quelques secondes
-            </h1>
-            <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto">
-              Alfie génère tes visuels Instagram, carrousels et reels directement dans Canva.
-              Pas de design, juste tes idées.
-            </p>
+        {/* Hero Content */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-32 text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card/50 backdrop-blur-md border border-border/50 mb-8 animate-fade-in">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium">Agent IA de Création Visuelle</span>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            <Button
-              className="h-11 rounded-full px-6 bg-alfie-primary text-slate-900 hover:bg-alfie-aqua"
+          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold leading-tight tracking-tight mb-6 animate-fade-in">
+            Crée des designs{" "}
+            <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+              professionnels
+            </span>
+            <br />
+            en quelques secondes
+          </h1>
+
+          <p className="text-xl sm:text-2xl text-muted-foreground max-w-3xl mx-auto mb-12 animate-fade-in leading-relaxed">
+            Alfie génère tes visuels Instagram, carrousels et reels directement dans Canva.
+            Pas de design, juste tes idées.
+          </p>
+
+          <div className="flex flex-wrap gap-4 justify-center items-center animate-fade-in">
+            <Button 
+              size="lg" 
+              className="h-14 px-8 text-lg shadow-xl hover:shadow-2xl hover:scale-105 transition-all"
               onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
             >
-              Commencer maintenant ✨
+              Commencer maintenant
+              <Sparkles className="ml-2 h-5 w-5" />
             </Button>
-            <Button
+            <Button 
+              size="lg" 
               variant="outline"
-              className="h-11 rounded-full px-6 border-slate-200 bg-white/80 hover:bg-slate-50"
+              className="h-14 px-8 text-lg backdrop-blur-md bg-card/50 hover:bg-card/80 transition-all"
               onClick={() => (window.location.href = "/demo")}
             >
-              Voir la démo →
+              Voir la démo
+              <ChevronRight className="ml-2 h-5 w-5" />
             </Button>
           </div>
 
-          <div className="flex flex-wrap gap-3 justify-center mt-10">
+          {/* Feature Pills */}
+          <div className="flex flex-wrap gap-3 justify-center mt-16">
             {[
               { icon: Zap, label: "IA ultra-rapide" },
               { icon: Palette, label: "Design personnalisé" },
               { icon: Globe, label: "Intégration Canva" },
             ].map((feature, idx) => (
-              <div
+              <div 
                 key={idx}
-                className="flex items-center gap-2 px-4 py-2 rounded-full border border-border/30 bg-white/80 text-sm"
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-card/30 backdrop-blur-md border border-border/30 text-sm"
               >
-                <feature.icon className="h-4 w-4 text-alfie-primary" />
+                <feature.icon className="h-4 w-4 text-primary" />
                 <span>{feature.label}</span>
               </div>
             ))}
@@ -193,13 +135,11 @@ export default function AlfieLanding() {
         </div>
       </section>
 
-      <HeroTextSection />
-
       {/* How it Works */}
       <section className="py-24 px-4 sm:px-6 bg-muted/30">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <Badge className="mb-4 border border-alfie-mint/40 bg-alfie-mintSoft text-slate-700" variant="secondary">
+            <Badge className="mb-4" variant="secondary">
               Simple et rapide
             </Badge>
             <h2 className="text-4xl sm:text-5xl font-bold mb-4">
@@ -237,7 +177,7 @@ export default function AlfieLanding() {
                     <div className="text-5xl font-bold text-muted-foreground/20">
                       {item.step}
                     </div>
-                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-alfie-mint via-alfie-lilac to-alfie-pink flex items-center justify-center shadow-lg">
+                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-primary via-secondary to-accent flex items-center justify-center shadow-lg">
                       <item.icon className="h-6 w-6 text-white" />
                     </div>
                   </div>
@@ -252,20 +192,11 @@ export default function AlfieLanding() {
         </div>
       </section>
 
-      <HeroTextSection />
-      <HowItWorksSection />
-      <FeaturesSection />
-      <PricingSection />
-      <FinalCTA />
-      <LandingFooter />
-    </div>
-  );
-}
       {/* Features Grid */}
       <section className="py-24 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <Badge className="mb-4 border border-alfie-mint/40 bg-alfie-mintSoft text-slate-700" variant="secondary">
+            <Badge className="mb-4" variant="secondary">
               Fonctionnalités
             </Badge>
             <h2 className="text-4xl sm:text-5xl font-bold mb-4">
@@ -309,9 +240,9 @@ export default function AlfieLanding() {
                 description: "Télécharge en ZIP ou pousse direct dans Canva",
               },
             ].map((feature, idx) => (
-              <Card key={idx} className="border-border/50 bg-card/50 backdrop-blur-sm hover:border-alfie-mint/60 hover:shadow-lg transition-all group">
+              <Card key={idx} className="border-border/50 bg-card/50 backdrop-blur-sm hover:border-primary/50 hover:shadow-lg transition-all group">
                 <CardHeader>
-                  <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-alfie-mint/20 via-alfie-lilac/20 to-alfie-pink/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                     <feature.icon className="h-6 w-6 text-primary" />
                   </div>
                   <CardTitle className="text-xl">{feature.title}</CardTitle>
@@ -327,7 +258,7 @@ export default function AlfieLanding() {
       <section id="pricing" className="py-24 px-4 sm:px-6 bg-muted/30">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <Badge className="mb-4 border border-alfie-mint/40 bg-alfie-mintSoft text-slate-700" variant="secondary">
+            <Badge className="mb-4" variant="secondary">
               Tarifs
             </Badge>
             <h2 className="text-4xl sm:text-5xl font-bold mb-4">
@@ -341,7 +272,7 @@ export default function AlfieLanding() {
               <button
                 onClick={() => setIsAnnual(false)}
                 className={`px-6 py-2 rounded-full transition-all ${
-                  !isAnnual ? "bg-alfie-mint text-slate-900 shadow-md" : "text-muted-foreground hover:text-foreground"
+                  !isAnnual ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 Mensuel
@@ -349,7 +280,7 @@ export default function AlfieLanding() {
               <button
                 onClick={() => setIsAnnual(true)}
                 className={`px-6 py-2 rounded-full transition-all ${
-                  isAnnual ? "bg-alfie-mint text-slate-900 shadow-md" : "text-muted-foreground hover:text-foreground"
+                  isAnnual ? "bg-primary text-white shadow-md" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 Annuel
@@ -425,7 +356,7 @@ export default function AlfieLanding() {
       {/* CTA Final */}
       <section className="py-24 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="p-12 rounded-3xl bg-gradient-to-br from-alfie-mint/15 via-alfie-lilac/15 to-alfie-pink/20 border border-border/50 backdrop-blur-sm">
+          <div className="p-12 rounded-3xl bg-gradient-to-br from-primary/10 via-secondary/10 to-accent/10 border border-border/50 backdrop-blur-sm">
             <h2 className="text-4xl sm:text-5xl font-bold mb-6">
               Prêt à créer du contenu qui cartonne ?
             </h2>
@@ -450,7 +381,7 @@ export default function AlfieLanding() {
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-alfie-mint via-alfie-lilac to-alfie-pink flex items-center justify-center">
+                <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary via-secondary to-accent flex items-center justify-center">
                   <Sparkles className="h-4 w-4 text-white" />
                 </div>
                 <span className="font-bold">Alfie Designer</span>
@@ -495,69 +426,6 @@ export default function AlfieLanding() {
   );
 }
 
-function HeroTextSection() {
-  const featurePills = [
-    { icon: Zap, label: "IA ultra-rapide" },
-    { icon: Palette, label: "Design personnalisé" },
-    { icon: Globe, label: "Intégration Canva" },
-  ];
-
-  return (
-    <section className="relative bg-gradient-to-b from-white to-slate-50">
-      <div className="mx-auto flex max-w-5xl flex-col items-center gap-8 px-4 pt-20 pb-24 text-center">
-        <Badge
-          variant="secondary"
-          className="border border-alfie-mint/40 bg-alfie-mintSoft text-slate-700"
-        >
-          Agent IA de Création Visuelle
-        </Badge>
-
-        <div className="space-y-4">
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl md:text-6xl">
-            Crée des designs{" "}
-            <span className="bg-gradient-to-r from-alfie-mint via-alfie-lilac to-alfie-pink bg-clip-text text-transparent">
-              professionnels
-            </span>{" "}
-            en quelques secondes
-          </h1>
-          <p className="mx-auto max-w-2xl text-base text-slate-600 sm:text-lg">
-            Alfie génère tes visuels Instagram, carrousels et reels directement dans Canva.
-            Pas de design, juste tes idées.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-center gap-4">
-          <Button
-            className="h-11 rounded-full bg-alfie-mint px-6 text-slate-900 hover:bg-alfie-pink"
-            onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
-          >
-            Commencer maintenant ✨
-          </Button>
-          <Button
-            variant="outline"
-            className="h-11 rounded-full border-slate-200 bg-white/80 px-6 text-slate-900 hover:bg-slate-100"
-            onClick={() => (window.location.href = "/demo")}
-          >
-            Voir la démo →
-          </Button>
-        </div>
-
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          {featurePills.map((feature) => (
-            <div
-              key={feature.label}
-              className="flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm"
-            >
-              <feature.icon className="h-4 w-4 text-alfie-mint" />
-              <span>{feature.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 interface PriceCardProps {
   title: string;
   monthlyPrice: number;
@@ -586,10 +454,10 @@ function PriceCard({
   checkoutLoading,
 }: PriceCardProps) {
   return (
-    <Card className={`relative border-border/50 bg-card/50 backdrop-blur-sm hover:shadow-2xl transition-all ${popular ? 'border-alfie-mint shadow-xl scale-105' : ''}`}>
+    <Card className={`relative border-border/50 bg-card/50 backdrop-blur-sm hover:shadow-2xl transition-all ${popular ? 'border-primary shadow-xl scale-105' : ''}`}>
       {popular && (
         <div className="absolute -top-4 left-0 right-0 flex justify-center">
-          <Badge className="bg-alfie-mint text-slate-900 shadow-lg">
+          <Badge className="bg-primary text-white shadow-lg">
             Le plus populaire
           </Badge>
         </div>

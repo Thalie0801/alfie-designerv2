@@ -136,7 +136,7 @@ export function AppSidebar() {
                 className={cn(
                   "text-xs",
                   (profile?.plan || "starter").toLowerCase() === "free" &&
-                    "bg-alfie-mintSoft text-slate-900 border border-alfie-mint/50",
+                    "bg-alfie-aqua/10 text-alfie-aqua border border-alfie-aqua/40",
                 )}
               >
                 {profile?.plan || "starter"}
