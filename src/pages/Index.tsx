@@ -3,6 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LandingHeader } from "@/components/LandingHeader";
+import { HeroTextSection } from "@/components/landing/HeroTextSection";
+import { PriceCard } from "@/components/landing/PriceCard";
+import { Sparkles, Palette, Film, BarChart3, Layers, Share2, Zap, Globe, Shield } from "lucide-react";
 import {
   Check,
   Sparkles,
@@ -41,6 +44,22 @@ export default function AlfieLanding() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <LandingHeader />
+
+      {/* SECTION 1 : vidéo immersive */}
+      <section className="relative h-screen overflow-hidden">
+        <video
+          src={alfieHeroVideo}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/35" />
+        <div className="pointer-events-none absolute bottom-10 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 text-white/80">
+          <span className="text-xs md:text-sm">Fais défiler pour découvrir Alfie</span>
+          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/60 text-base animate-bounce">
+            ↓
 
       {/* SECTION 1 : vidéo immersive */}
       <section className="relative h-screen overflow-hidden">
