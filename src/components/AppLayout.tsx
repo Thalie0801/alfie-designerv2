@@ -1,20 +1,3 @@
-import { ReactNode, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { useVersionRefresh } from '@/hooks/useVersionRefresh';
-import { 
-  Sparkles, 
-  LayoutDashboard, 
-  CreditCard, 
-  Settings, 
-  LogOut,
-  UserCircle,
-  Menu
-} from 'lucide-react';
 import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -34,7 +17,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const navigate = useNavigate();
   const { user, profile, isAdmin, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const appVersion = useVersionRefresh();
+  useVersionRefresh();
 
   const canSeeAdminToggle = isAdmin;
 
@@ -85,7 +68,6 @@ export function AppLayout({ children }: AppLayoutProps) {
               <div className="hidden sm:flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg bg-muted text-foreground border border-border">
                 <Link to="/chat">
                   <Button
-                    variant={location.pathname === '/chat' ? 'default' : 'ghost'}
                     variant={location.pathname === "/chat" ? "default" : "ghost"}
                     size="sm"
                     className="text-xs sm:text-sm px-2 sm:px-3"

@@ -67,7 +67,6 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar className="z-30 border-r border-border bg-sidebar text-sidebar-foreground shadow-sm">
     <Sidebar className="z-30 border-r border-border bg-card">
       <SidebarContent>
         {/* Logo */}
@@ -103,7 +102,6 @@ export function AppSidebar() {
                           {item.badge && (
                             <Badge
                               variant="outline"
-                              className="text-[10px] px-1.5 py-0 border-none bg-alfie-pink text-white"
                               className={cn(
                                 "text-[10px] px-1.5 py-0 border-none bg-alfie-pink text-[#2C2340]",
                                 "dark:bg-alfie-pink dark:text-[#151325]",

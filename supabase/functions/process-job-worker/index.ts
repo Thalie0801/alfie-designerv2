@@ -136,7 +136,7 @@ async function callInternalFn<TResponse>(fnName: string, body: unknown): Promise
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Internal-Secret": INTERNAL_FN_SECRET,
+      "X-Internal-Secret": INTERNAL_FN_SECRET || "",
     },
     body: JSON.stringify(body),
   });
