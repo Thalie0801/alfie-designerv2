@@ -4,8 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       project_ref:
-        description: "Override Supabase project ref (defaults to SUPABASE_PROJECT_REF secret)"
-        description: "Override Supabase project ref (defaults to itsjonazifiiikozengd)"
+        description: "Override Supabase project ref (leave empty to use SUPABASE_PROJECT_REF secret)"
         required: false
         type: string
 
@@ -14,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,24 +31,32 @@ jobs:
           PROJECT_REF_INPUT: ${{ github.event.inputs.project_ref }}
         run: |
           set -euo pipefail
-          PROJECT_REF_INPUT: ${{ github.event.inputs.project_ref }}
-        run: |
-          set -euo pipefail
-          PROJECT_REF="${PROJECT_REF_INPUT:-itsjonazifiiikozengd}"
+
           if [[ -z "${SUPABASE_ACCESS_TOKEN:-}" ]]; then
             echo "SUPABASE_ACCESS_TOKEN secret is required" >&2
             exit 1
           fi
-          if [[ -z "${SUPABASE_PROJECT_REF:-}" ]]; then
-            echo "SUPABASE_PROJECT_REF secret is required" >&2
+
+          # Si un project_ref est passé manuellement, on l'utilise,
+          # sinon on prend le secret SUPABASE_PROJECT_REF
+          PROJECT_REF="${PROJECT_REF_INPUT:-$SUPABASE_PROJECT_REF}"
+
+          if [[ -z "${PROJECT_REF:-}" ]]; then
+            echo "No project ref provided and SUPABASE_PROJECT_REF is empty" >&2
             exit 1
           fi
-          PROJECT_REF="${PROJECT_REF_INPUT:-$SUPABASE_PROJECT_REF}"
+
+          echo "Deploying functions to $PROJECT_REF"
+
+          # Liste tous les dossiers de fonctions (sauf _shared)
           mapfile -t FUNCTIONS < <(find functions -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
+
           for function_name in "${FUNCTIONS[@]}"; do
             if [[ "$function_name" == "_shared" ]]; then
               continue
             fi
             echo "Deploying $function_name to $PROJECT_REF"
             supabase functions deploy "$function_name" --project-ref "$PROJECT_REF"
+          done
+CT_REF"
           done
