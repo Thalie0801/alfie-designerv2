@@ -7,8 +7,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Image, Video, Download, Sparkles, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { useBrandKit } from '@/hooks/useBrandKit';
-import { useAlfieCredits } from '@/hooks/useAlfieCredits';
+import { useBrandQuota } from '@/hooks/useBrandQuota';
 
 export function ContentGenerator() {
   const [prompt, setPrompt] = useState('');
@@ -17,8 +18,9 @@ export function ContentGenerator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<string | null>(null);
   
+  const { user } = useAuth();
   const { brandKit } = useBrandKit();
-  const { decrementCredits, hasCredits } = useAlfieCredits();
+  const { quota, loading: quotaLoading, refresh: refreshQuota } = useBrandQuota();
 
   const downloadContent = async (url: string, filename: string) => {
     try {
@@ -42,15 +44,19 @@ export function ContentGenerator() {
   };
 
   const handleGenerate = async () => {
+    if (!user) {
+      toast.error('Connecte-toi pour générer du contenu');
+      return;
+    }
+
     if (!prompt.trim()) {
       toast.error('Décris ce que tu veux créer !');
       return;
     }
 
-    const creditCost = contentType === 'image' ? 1 : 3;
-    
-    if (!hasCredits(creditCost)) {
-      toast.error(`Il te faut ${creditCost} crédits pour générer ${contentType === 'image' ? 'une image' : 'une vidéo'}`);
+    // Check quota
+    if (!quota.canGenerateImage && contentType === 'image') {
+      toast.error(`Quota mensuel atteint (${quota.imagesUsed}/${quota.quotaImages}). Upgrade ton plan pour continuer !`);
       return;
     }
 
@@ -62,21 +68,39 @@ export function ContentGenerator() {
         body: {
           type: contentType,
           prompt: prompt,
-          brandKit: brandKit,
+          brandKit: brandKit ? {
+            id: brandKit.id,
+            name: brandKit.name,
+            palette: brandKit.palette,
+            logo_url: brandKit.logo_url
+          } : undefined,
           aspectRatio: aspectRatio
         },
       });
 
       if (error) throw error;
 
+      if (data?.error) {
+        if (data.code === 'quota_exceeded') {
+          toast.error(data.error);
+          await refreshQuota();
+          return;
+        }
+        
+        if (data.status === 'not_implemented' || data.status === 'coming_soon') {
+          toast.info(data.error);
+          return;
+        }
+        
+        throw new Error(data.error);
+      }
+
       if (data.contentUrl) {
         setGeneratedContent(data.contentUrl);
-        await decrementCredits(creditCost, contentType === 'image' ? 'image_generation' : 'video_generation');
+        await refreshQuota();
         toast.success(`${contentType === 'image' ? 'Image' : 'Vidéo'} générée avec succès ! ✨`);
-      } else if (data.status === 'coming_soon') {
-        toast.info(data.error);
       } else {
-        throw new Error(data.error || 'Erreur de génération');
+        throw new Error('Aucun contenu généré');
       }
     } catch (error: any) {
       console.error('Generation error:', error);
@@ -95,6 +119,16 @@ export function ContentGenerator() {
         </CardTitle>
         <CardDescription>
           Crée des visuels et vidéos pour tes réseaux sociaux avec l'IA
+          {quota.brandId && (
+            <div className="mt-2 text-sm font-medium text-primary">
+              📊 Quota: {quota.imagesRemaining}/{quota.quotaImages} images restantes ce mois
+            </div>
+          )}
+          {!quota.brandId && !quotaLoading && (
+            <div className="mt-2 text-sm text-muted-foreground">
+              ℹ️ Sélectionne une marque pour voir tes quotas
+            </div>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-6 space-y-4">
@@ -102,141 +136,107 @@ export function ContentGenerator() {
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="image" className="gap-2">
               <Image className="h-4 w-4" />
-              Image (1 crédit)
+              Image
             </TabsTrigger>
             <TabsTrigger value="video" className="gap-2">
               <Video className="h-4 w-4" />
-              Vidéo VEO3 (3 crédits)
+              Vidéo
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="image" className="space-y-4">
+          <TabsContent value="image" className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Que veux-tu créer ?</label>
+              <Textarea
+                placeholder="Ex: Une image Instagram avec un coucher de soleil sur la plage, ambiance relaxante..."
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                rows={4}
+                className="resize-none"
+              />
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium">Format</label>
-              <Select value={aspectRatio} onValueChange={(v: any) => setAspectRatio(v)}>
+              <Select value={aspectRatio} onValueChange={(v) => setAspectRatio(v as any)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1:1">Carré 1:1 (Instagram Post)</SelectItem>
-                  <SelectItem value="9:16">Vertical 9:16 (Stories, Reels)</SelectItem>
-                  <SelectItem value="16:9">Horizontal 16:9 (YouTube)</SelectItem>
+                  <SelectItem value="1:1">Carré (1:1) - Instagram Post</SelectItem>
+                  <SelectItem value="9:16">Vertical (9:16) - Story / Reels</SelectItem>
+                  <SelectItem value="16:9">Horizontal (16:9) - YouTube</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Décris ton visuel</label>
-              <Textarea
-                placeholder="Ex: Une affiche moderne pour promouvoir mon nouveau produit, style minimaliste, couleurs vives..."
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                rows={4}
-              />
-            </div>
+            {brandKit && (
+              <div className="p-3 bg-accent/50 rounded-lg border border-accent">
+                <p className="text-sm text-muted-foreground">
+                  ✨ Utilise le Brand Kit <strong>{brandKit.name}</strong>
+                </p>
+              </div>
+            )}
 
             <Button 
               onClick={handleGenerate} 
-              disabled={isGenerating || !prompt.trim()}
-              className="w-full gap-2"
+              disabled={isGenerating || !prompt.trim() || (!quota.canGenerateImage && contentType === 'image') || quotaLoading}
+              className="w-full"
             >
               {isGenerating ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Génération en cours...
+                </>
+              ) : quotaLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Chargement...
+                </>
+              ) : !quota.canGenerateImage && contentType === 'image' ? (
+                <>
+                  ⚠️ Quota atteint ({quota.imagesUsed}/{quota.quotaImages})
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-4 w-4" />
+                  <Sparkles className="mr-2 h-4 w-4" />
                   Générer l'image
                 </>
               )}
             </Button>
+
+            {generatedContent && (
+              <div className="space-y-3 border rounded-lg p-4 bg-card">
+                <img 
+                  src={generatedContent} 
+                  alt="Contenu généré"
+                  className="w-full rounded-lg shadow-md"
+                />
+                <Button 
+                  onClick={() => downloadContent(generatedContent, `alfie-image-${Date.now()}.png`)}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Télécharger l'image
+                </Button>
+              </div>
+            )}
           </TabsContent>
 
-          <TabsContent value="video" className="space-y-4">
-            <div className="bg-muted/50 p-4 rounded-lg border">
-              <p className="text-sm text-muted-foreground">
-                🎥 <strong>Génération vidéo VEO3</strong> sera bientôt disponible ! 
-                Cette fonctionnalité permettra de créer des vidéos de 5-8 secondes optimisées pour les réseaux sociaux.
-              </p>
+          <TabsContent value="video" className="space-y-4 mt-4">
+            <div className="p-6 text-center space-y-4 bg-accent/20 rounded-lg border-2 border-dashed border-accent">
+              <Video className="h-12 w-12 mx-auto text-muted-foreground" />
+              <div className="space-y-2">
+                <h3 className="font-semibold text-lg">Génération vidéo bientôt disponible</h3>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                  La génération de vidéos sera ajoutée très prochainement ! 
+                  En attendant, utilise l'onglet <strong>Studio</strong> pour créer des vidéos à partir d'images.
+                </p>
+              </div>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Format vidéo</label>
-              <Select value={aspectRatio} onValueChange={(v: any) => setAspectRatio(v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="9:16">Vertical 9:16 (TikTok, Reels, Stories)</SelectItem>
-                  <SelectItem value="16:9">Horizontal 16:9 (YouTube)</SelectItem>
-                  <SelectItem value="1:1">Carré 1:1 (Feed)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Décris ta vidéo</label>
-              <Textarea
-                placeholder="Ex: Une animation de produit qui tourne sur fond coloré, transition fluide, ambiance dynamique..."
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                rows={4}
-              />
-            </div>
-
-            <Button 
-              onClick={handleGenerate} 
-              disabled={true}
-              className="w-full gap-2"
-            >
-              <Video className="h-4 w-4" />
-              Bientôt disponible
-            </Button>
           </TabsContent>
         </Tabs>
-
-        {/* Résultat généré */}
-        {generatedContent && (
-          <div className="space-y-3 pt-4 border-t">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Contenu généré</h3>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  const filename = `alfie-${contentType}-${Date.now()}.${contentType === 'image' ? 'png' : 'mp4'}`;
-                  downloadContent(generatedContent, filename);
-                }}
-                className="gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Télécharger
-              </Button>
-            </div>
-            
-            {contentType === 'image' ? (
-              <img 
-                src={generatedContent} 
-                alt="Contenu généré"
-                className="w-full rounded-lg border shadow-md"
-              />
-            ) : (
-              <video 
-                src={generatedContent}
-                controls
-                className="w-full rounded-lg border shadow-md"
-              />
-            )}
-          </div>
-        )}
-
-        {brandKit && (
-          <div className="text-xs text-muted-foreground bg-muted/30 p-3 rounded">
-            ✨ Ton Brand Kit sera appliqué automatiquement
-          </div>
-        )}
       </CardContent>
     </Card>
   );
