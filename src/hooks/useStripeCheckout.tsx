@@ -28,8 +28,10 @@ export function useStripeCheckout() {
       if (error) throw error;
 
       if (data?.url) {
-        // Open checkout in new tab
-        window.open(data.url, '_blank');
+        // Open checkout in new tab if the browser environment exists
+        if (typeof window !== 'undefined') {
+          window.open(data.url, '_blank');
+        }
       }
     } catch (error: any) {
       console.error('Checkout error:', error);

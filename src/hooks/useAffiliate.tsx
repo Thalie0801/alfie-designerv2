@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -15,8 +15,15 @@ export function useAffiliate() {
   const [affiliateRef, setAffiliateRef] = useState<string | null>(null);
   const [affiliateName, setAffiliateName] = useState<string | null>(null);
   const { toast } = useToast();
+  const hasBrowserAPIs = useMemo(
+    () => typeof window !== 'undefined' && typeof localStorage !== 'undefined',
+    [],
+  );
 
   useEffect(() => {
+    if (!hasBrowserAPIs) {
+      return;
+    }
     // Check URL for ref parameter
     const urlParams = new URLSearchParams(window.location.search);
     const refParam = urlParams.get('ref');
@@ -39,6 +46,7 @@ export function useAffiliate() {
       
       // Clean URL after a small delay to ensure tracking happens
       setTimeout(() => {
+        if (!hasBrowserAPIs) return;
         urlParams.delete('ref');
         const newUrl = `${window.location.pathname}${urlParams.toString() ? '?' + urlParams.toString() : ''}`;
         window.history.replaceState({}, '', newUrl);
@@ -64,7 +72,7 @@ export function useAffiliate() {
         }
       }
     }
-  }, []);
+  }, [hasBrowserAPIs]);
 
   const loadAffiliateInfo = async (ref: string) => {
     try {
@@ -81,13 +89,15 @@ export function useAffiliate() {
       setAffiliateName(name);
 
       // Show simple toast only once per ref
-      const toastShown = localStorage.getItem(AFFILIATE_TOAST_SHOWN);
+      const toastShown = hasBrowserAPIs ? localStorage.getItem(AFFILIATE_TOAST_SHOWN) : null;
       if (toastShown !== ref) {
         toast({
           description: `Vous êtes invité·e par ${name}`,
           duration: 5000,
         });
-        localStorage.setItem(AFFILIATE_TOAST_SHOWN, ref);
+        if (hasBrowserAPIs) {
+          localStorage.setItem(AFFILIATE_TOAST_SHOWN, ref);
+        }
       }
     } catch (error) {
       console.error('Error loading affiliate info:', error);
@@ -95,13 +105,14 @@ export function useAffiliate() {
   };
 
   const getAffiliateRef = () => {
+    if (!hasBrowserAPIs) return null;
     const stored = localStorage.getItem(AFFILIATE_STORAGE_KEY);
     if (!stored) return null;
-    
+
     try {
       const data: AffiliateData = JSON.parse(stored);
       const daysSinceStored = (Date.now() - data.timestamp) / (1000 * 60 * 60 * 24);
-      
+
       if (daysSinceStored < AFFILIATE_EXPIRY_DAYS) {
         return data.ref;
       }
@@ -114,6 +125,7 @@ export function useAffiliate() {
 
   const trackAffiliateClick = async (ref: string) => {
     try {
+      if (!hasBrowserAPIs) return;
       const url = new URL(window.location.href);
       const utm_source = url.searchParams.get('utm_source') || undefined;
       const utm_medium = url.searchParams.get('utm_medium') || undefined;
