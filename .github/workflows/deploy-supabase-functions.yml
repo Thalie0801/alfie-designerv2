@@ -48,6 +48,11 @@ jobs:
 
           echo "Deploying functions to $PROJECT_REF"
 
+          if [[ ! -d "functions" ]]; then
+            echo "No functions directory found" >&2
+            exit 1
+          fi
+
           # Liste tous les dossiers de fonctions (sauf _shared)
           mapfile -t FUNCTIONS < <(find functions -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
 
