@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import logoWhite from "@/assets/alfie-logo-white.svg";
+import logo from "@/assets/alfie-main.png";
+
 import logo from "@/assets/alfie-logo-black.svg";
 export function LandingHeader() {
   const [scrolled, setScrolled] = useState(false);
