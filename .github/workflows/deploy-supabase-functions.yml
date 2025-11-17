@@ -41,4 +41,21 @@ jobs:
           # sinon on prend le secret SUPABASE_PROJECT_REF
           PROJECT_REF="${PROJECT_REF_INPUT:-$SUPABASE_PROJECT_REF}"
 
-          if [[ -z "${PROJECT_REF:_]()]()
+          if [[ -z "${PROJECT_REF:-}" ]]; then
+            echo "No project ref provided and SUPABASE_PROJECT_REF is empty" >&2
+            exit 1
+          fi
+
+          echo "Deploying functions to $PROJECT_REF"
+
+          # Liste tous les dossiers de fonctions (sauf _shared)
+          mapfile -t FUNCTIONS < <(find functions -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
+
+          for function_name in "${FUNCTIONS[@]}"; do
+            if [[ "$function_name" == "_shared" ]]; then
+              continue
+            fi
+            echo "Deploying $function_name to $PROJECT_REF"
+            supabase functions deploy "$function_name" --project-ref "$PROJECT_REF"
+          done
+
