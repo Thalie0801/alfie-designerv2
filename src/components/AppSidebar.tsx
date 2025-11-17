@@ -11,6 +11,7 @@ import {
   Layers,
   FolderOpen,
   Sparkles,
+  Link2,
 } from "lucide-react";
 import {
   Sidebar,
@@ -50,6 +51,7 @@ export function AppSidebar() {
     { path: "/library", label: "Bibliothèque", icon: FolderOpen, tourId: "library" },
     { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { path: "/profile", label: "Profil", icon: UserCircle },
+    { path: "/integrations", label: "Intégrations", icon: Link2 },
     { path: "/billing", label: "Abonnement", icon: CreditCard },
     { path: "/affiliate", label: "Affiliation", icon: TrendingUp, tourId: "affiliate" },
   ];

@@ -32,7 +32,7 @@ verify_jwt = true
 [functions.generate-content]
 verify_jwt = true
 
-[functions.canva-oauth]
+[functions.canva-auth-start]
 verify_jwt = true
 
 [functions.generate-alfie-variant]

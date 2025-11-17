@@ -18,6 +18,7 @@ import ManageAmbassadors from "./pages/admin/ManageAmbassadors";
 import ResetUserPassword from "./pages/admin/ResetUserPassword";
 import Affiliate from "./pages/Affiliate";
 import Profile from "./pages/Profile";
+import Integrations from "./pages/Integrations";
 import DevenirPartenaire from "./pages/DevenirPartenaire";
 import Privacy from "./pages/Privacy";
 import Legal from "./pages/Legal";
@@ -161,6 +162,16 @@ const AppRoutes = () => {
             <ProtectedRoute>
               <AppLayoutWithSidebar>
                 <Profile />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/integrations"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <Integrations />
               </AppLayoutWithSidebar>
             </ProtectedRoute>
           }

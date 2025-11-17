@@ -39,7 +39,7 @@
 - auto-scrape-canva-templates
 - backfill-carousel-public-ids
 - cancel-job-set
-- canva-oauth
+- canva-auth-start
 - chat-ai-assistant
 - chat-create-carousel
 - chat-generate-video
