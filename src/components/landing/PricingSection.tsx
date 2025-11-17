@@ -62,14 +62,14 @@ export function PricingSection() {
   const { createCheckout, loading: checkoutLoading } = useStripeCheckout();
 
   return (
-    <section id="pricing" className="bg-muted/30 px-4 py-24 sm:px-6">
-      <div className="mx-auto max-w-7xl">
+    <section id="pricing" className="bg-muted/30 px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-24">
+      <div className="mx-auto max-w-6xl">
         <div className="mb-16 text-center">
           <Badge className="mb-4 border border-alfie-mint/40 bg-alfie-mintSoft text-slate-700" variant="secondary">
             Tarifs
           </Badge>
-          <h2 className="mb-4 text-4xl font-bold sm:text-5xl">Choisis ton plan</h2>
-          <p className="mx-auto mb-8 max-w-2xl text-xl text-muted-foreground">
+          <h2 className="mb-4 text-3xl font-bold leading-tight text-slate-900 sm:text-4xl md:text-5xl">Choisis ton plan</h2>
+          <p className="mx-auto mb-8 max-w-2xl text-xl text-muted-foreground text-center">
             Tous les plans incluent l'intégration Canva et le support
           </p>
 
