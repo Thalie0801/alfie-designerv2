@@ -5,6 +5,7 @@ import { FeaturesSection } from "@/components/landing/FeaturesSection";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { FinalCTA } from "@/components/landing/FinalCTA";
 import { LandingFooter } from "@/components/landing/LandingFooter";
+import { ProspectBubble } from "@/components/ProspectBubble";
 
 const alfieHeroVideo = "/videos/hero-background.mp4";
 
@@ -38,6 +39,7 @@ export default function AlfieLanding() {
       <PricingSection />
       <FinalCTA />
       <LandingFooter />
+      <ProspectBubble />
     </div>
   );
 }

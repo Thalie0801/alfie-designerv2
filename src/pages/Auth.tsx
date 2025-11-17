@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { hasRole } from '@/lib/access';
+import { ProspectBubble } from '@/components/ProspectBubble';
 
 const authSchema = z.object({
   email: z.string().email({ message: "Email invalide" }),
@@ -335,152 +336,158 @@ export default function Auth() {
   // Show loader while checking auth state
   if (authLoading || (user && !flagsReady)) {
     return (
-      <div className="min-h-screen gradient-subtle flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="py-12">
-            <div className="text-center space-y-4">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
-              <p className="text-muted-foreground">Vérification de votre session...</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <>
+        <div className="min-h-screen gradient-subtle flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardContent className="py-12">
+              <div className="text-center space-y-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
+                <p className="text-muted-foreground">Vérification de votre session...</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <ProspectBubble />
+      </>
     );
   }
 
   return (
-    <div className="min-h-screen gradient-subtle flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
-              <Sparkles className="h-6 w-6" />
-            </span>
-          </div>
-          <CardTitle className="text-2xl">
-            {mode === 'login' ? 'Connexion' : 'Créer un compte'}
-          </CardTitle>
-          <CardDescription>
-            {mode === 'login' 
-              ? 'Connectez-vous pour accéder à Alfie Designer'
-              : 'Commencez à créer vos visuels avec Alfie'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {verifyingPayment && (
-            <Alert className="mb-4 border-green-500/50 bg-green-50 dark:bg-green-900/20">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-700 dark:text-green-300">
-                Vérification de votre paiement en cours...
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          <form onSubmit={handleSubmit} className="space-y-4 mt-6">
-            {mode === 'signup' && (
+    <>
+      <div className="min-h-screen gradient-subtle flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
+                <Sparkles className="h-6 w-6" />
+              </span>
+            </div>
+            <CardTitle className="text-2xl">
+              {mode === 'login' ? 'Connexion' : 'Créer un compte'}
+            </CardTitle>
+            <CardDescription>
+              {mode === 'login'
+                ? 'Connectez-vous pour accéder à Alfie Designer'
+                : 'Commencez à créer vos visuels avec Alfie'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {verifyingPayment && (
+              <Alert className="mb-4 border-green-500/50 bg-green-50 dark:bg-green-900/20">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-700 dark:text-green-300">
+                  Vérification de votre paiement en cours...
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4 mt-6">
+              {mode === 'signup' && (
+                <div>
+                  <Input
+                    placeholder="Nom complet"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required={mode === 'signup'}
+                    disabled={formDisabled}
+                  />
+                </div>
+              )}
               <div>
                 <Input
-                  placeholder="Nom complet"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required={mode === 'signup'}
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
                   disabled={formDisabled}
                 />
               </div>
-            )}
-            <div>
-              <Input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
+              <div>
+                <Input
+                  type="password"
+                  placeholder="Mot de passe"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={formDisabled}
+                />
+                {mode === 'login' && (
+                  <button
+                    type="button"
+                    onClick={() => toast.info('Fonctionnalité bientôt disponible')}
+                    className="text-xs text-primary hover:underline mt-1 block text-right"
+                  >
+                    Mot de passe oublié ?
+                  </button>
+                )}
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
                 disabled={formDisabled}
-              />
-            </div>
-            <div>
-              <Input
-                type="password"
-                placeholder="Mot de passe"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={formDisabled}
-              />
-              {mode === 'login' && (
-                <button
-                  type="button"
-                  onClick={() => toast.info('Fonctionnalité bientôt disponible')}
-                  className="text-xs text-primary hover:underline mt-1 block text-right"
-                >
-                  Mot de passe oublié ?
-                </button>
+              >
+                {loading || verifyingPayment ? 'Chargement...' : mode === 'login' ? 'Se connecter' : 'Créer mon compte'}
+              </Button>
+            </form>
+
+            <div className="mt-4 text-center text-sm">
+              {mode === 'login' ? (
+                <p>
+                  Pas encore de compte ?{' '}
+                  <button
+                    type="button"
+                    onClick={() => handleModeChange('signup')}
+                    className={`text-primary font-medium ${
+                      canSignUp ? 'hover:underline' : 'cursor-not-allowed opacity-60'
+                    }`}
+                    aria-disabled={!canSignUp}
+                  >
+                    S'inscrire
+                  </button>
+                </p>
+              ) : (
+                <p>
+                  Déjà un compte ?{' '}
+                  <button
+                    type="button"
+                    onClick={() => handleModeChange('login')}
+                    className="text-primary hover:underline font-medium"
+                  >
+                    Se connecter
+                  </button>
+                </p>
               )}
             </div>
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={formDisabled}
-            >
-              {loading || verifyingPayment ? 'Chargement...' : mode === 'login' ? 'Se connecter' : 'Créer mon compte'}
-            </Button>
-          </form>
 
-          <div className="mt-4 text-center text-sm">
-            {mode === 'login' ? (
-              <p>
-                Pas encore de compte ?{' '}
-                <button
-                  type="button"
-                  onClick={() => handleModeChange('signup')}
-                  className={`text-primary font-medium ${
-                    canSignUp ? 'hover:underline' : 'cursor-not-allowed opacity-60'
-                  }`}
-                  aria-disabled={!canSignUp}
-                >
-                  S'inscrire
-                </button>
-              </p>
-            ) : (
-              <p>
-                Déjà un compte ?{' '}
-                <button
-                  type="button"
-                  onClick={() => handleModeChange('login')}
-                  className="text-primary hover:underline font-medium"
-                >
-                  Se connecter
-                </button>
-              </p>
+            {!canSignUp && (
+              <div className="mt-3 text-center text-xs text-slate-500">
+                <p>
+                  L'inscription est réservée aux clients ayant validé un paiement.{' '}
+                  <button
+                    type="button"
+                    onClick={() => redirectToPricing()}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    Voir les offres
+                  </button>
+                </p>
+              </div>
             )}
-          </div>
 
-          {!canSignUp && (
-            <div className="mt-3 text-center text-xs text-slate-500">
-              <p>
-                L'inscription est réservée aux clients ayant validé un paiement.{' '}
-                <button
-                  type="button"
-                  onClick={() => redirectToPricing()}
-                  className="font-medium text-primary hover:underline"
-                >
-                  Voir les offres
-                </button>
-              </p>
+            <div className="mt-6 text-center">
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/')}
+                className="text-sm"
+              >
+                ← Retour à l'accueil
+              </Button>
             </div>
-          )}
-
-          <div className="mt-6 text-center">
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/')}
-              className="text-sm"
-            >
-              ← Retour à l'accueil
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          </CardContent>
+        </Card>
+      </div>
+      <ProspectBubble />
+    </>
   );
 }

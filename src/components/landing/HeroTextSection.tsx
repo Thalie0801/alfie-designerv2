@@ -57,6 +57,14 @@ export function HeroTextSection() {
         <div className="space-y-4">
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl md:text-6xl">
             Crée des designs{" "}
+            <span className="relative inline-flex items-center">
+              <span className="bg-gradient-to-r from-alfie-mint via-alfie-lilac to-alfie-pink bg-clip-text text-transparent">
+                {typedText || "\u00A0"}
+              </span>
+              <span
+                className="ml-1 inline-block h-8 w-[2px] animate-pulse rounded bg-alfie-mint align-middle"
+                aria-hidden="true"
+              />
             <span className="bg-gradient-to-r from-alfie-mint via-alfie-lilac to-alfie-pink bg-clip-text text-transparent">
               professionnels
             </span>{" "}
@@ -68,10 +76,7 @@ export function HeroTextSection() {
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-4">
-          <Button
-            className="h-11 rounded-full bg-alfie-mint px-6 text-slate-900 hover:bg-alfie-pink"
-            onClick={scrollToPricing}
-          >
+          <Button className="h-11 rounded-full bg-alfie-mint px-6 text-slate-900 hover:bg-alfie-pink" onClick={scrollToPricing}>
             Commencer maintenant ✨
           </Button>
           <Button

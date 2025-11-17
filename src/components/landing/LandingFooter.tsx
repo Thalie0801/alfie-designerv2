@@ -5,6 +5,13 @@ import { Sparkles } from "lucide-react";
 export function LandingFooter() {
   return (
     <footer className="bg-muted/30 px-4 py-12 sm:px-6">
+      <div className="mx-auto max-w-7xl space-y-10">
+        <div className="rounded-3xl bg-gradient-to-b from-slate-900 via-slate-900 to-black p-8 text-center shadow-lg">
+          <img src={logoWhite} alt="Alfie Designer" className="mx-auto h-11 w-auto" />
+          <p className="mt-4 text-sm text-white/80">L'agent IA qui transforme tes idées en designs professionnels</p>
+        </div>
+
+        <div className="grid gap-8 md:grid-cols-4">
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 grid gap-8 md:grid-cols-4">
           <div>

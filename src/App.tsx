@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
@@ -37,6 +37,7 @@ import { ChatGenerator } from "@/features/studio";
 import ChatWidget from "./components/chat/ChatWidget";
 
 const queryClient = new QueryClient();
+const PUBLIC_ROUTES_WITH_PROSPECT_BUBBLE = new Set(["/", "/auth"]);
 
 const AppRoutes = () => {
   return (
@@ -240,17 +241,22 @@ const AppRoutes = () => {
   );
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <Toaster />
-    <Sonner />
-    <AuthProvider>
-      <TooltipProvider>
-        <AppRoutes />
-        <ChatWidget />
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  const location = useLocation();
+  const shouldShowChatWidget = !PUBLIC_ROUTES_WITH_PROSPECT_BUBBLE.has(location.pathname);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Toaster />
+      <Sonner />
+      <AuthProvider>
+        <TooltipProvider>
+          <AppRoutes />
+          {shouldShowChatWidget && <ChatWidget />}
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
