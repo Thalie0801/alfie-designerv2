@@ -1,0 +1,19 @@
+<svg width="640" height="200" viewBox="0 0 640 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title id="title">Alfie Designer Logo (Light)</title>
+  <defs>
+    <filter id="glow" x="-20%" y="-50%" width="140%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feFlood flood-color="#FFFFFF" flood-opacity="0.75" />
+      <feComposite in2="blur" operator="in" />
+      <feMerge>
+        <feMergeNode />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#glow)">
+    <text x="40" y="120" fill="#FFFFFF" font-family="'Inter','Poppins','SF Pro Display',sans-serif" font-size="88" font-weight="600" letter-spacing="0.02em">
+      Alfie <tspan font-weight="500">Designer</tspan>
+    </text>
+  </g>
+</svg>

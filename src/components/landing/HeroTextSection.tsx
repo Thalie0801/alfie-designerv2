@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Globe, Palette, Zap } from "lucide-react";
@@ -9,6 +10,51 @@ const featurePills = [
 ];
 
 export function HeroTextSection() {
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const [typedText, setTypedText] = useState("");
+  const typingStarted = useRef(false);
+  const typewriterText = "designs professionnels";
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !sectionRef.current) {
+      setIsVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.3 }
+    );
+
+    observer.observe(sectionRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !isVisible || typingStarted.current) {
+      return;
+    }
+
+    typingStarted.current = true;
+    let index = 0;
+    const interval = window.setInterval(() => {
+      index += 1;
+      setTypedText(typewriterText.slice(0, index));
+
+      if (index >= typewriterText.length) {
+        window.clearInterval(interval);
+      }
+    }, 60);
+
+    return () => window.clearInterval(interval);
+  }, [isVisible, typewriterText]);
+
   const scrollToPricing = () => {
     if (typeof document === "undefined") return;
     document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
@@ -20,6 +66,12 @@ export function HeroTextSection() {
   };
 
   return (
+    <section ref={sectionRef} className="relative bg-gradient-to-b from-white to-slate-50">
+      <div
+        className={`mx-auto flex max-w-5xl flex-col items-center gap-8 px-4 pt-20 pb-24 text-center transition-all duration-700 ease-out ${
+          isVisible ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
+        }`}
+      >
     <section className="relative bg-gradient-to-b from-white to-slate-50">
       <div className="mx-auto flex max-w-5xl flex-col items-center gap-8 px-4 pt-20 pb-24 text-center">
         <Badge variant="secondary" className="border border-alfie-mint/40 bg-alfie-mintSoft text-slate-700">
@@ -29,12 +81,18 @@ export function HeroTextSection() {
         <div className="space-y-4">
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl md:text-6xl">
             Crée des designs{" "}
+            <span className="relative inline-flex items-center">
+              <span className="bg-gradient-to-r from-alfie-mint via-alfie-lilac to-alfie-pink bg-clip-text text-transparent">
+                {typedText || "\u00A0"}
+              </span>
+              <span className="ml-1 inline-block h-8 w-[2px] animate-pulse rounded bg-alfie-mint align-middle" aria-hidden="true" />
             <span className="bg-gradient-to-r from-alfie-mint via-alfie-lilac to-alfie-pink bg-clip-text text-transparent">
               professionnels
             </span>{" "}
             en quelques secondes
           </h1>
           <p className="mx-auto max-w-2xl text-base text-slate-600 sm:text-lg">
+            Alfie génère tes visuels pour tous tes réseaux, carrousels et reels directement dans Canva. Pas de design, juste tes idées.
             Alfie génère tes visuels Instagram, carrousels et reels directement dans Canva. Pas de design, juste tes idées.
           </p>
         </div>
