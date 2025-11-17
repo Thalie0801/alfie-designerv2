@@ -44,4 +44,4 @@ jobs:
       # Step neutre pour garantir un job vert
       - name: Done
         run: echo "Refonte-codex: OK (no PR creation, no build)."
-tion, no build)."
+
