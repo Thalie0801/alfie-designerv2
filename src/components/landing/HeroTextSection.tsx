@@ -17,11 +17,22 @@ export function HeroTextSection() {
   const typewriterText = "designs professionnels";
 
   useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      typeof window.IntersectionObserver === "undefined" ||
+      !sectionRef.current
+    ) {
     if (typeof window === "undefined" || !sectionRef.current) {
       setIsVisible(true);
       return;
     }
 
+    let observer: IntersectionObserver | null = new window.IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setIsVisible(true);
+          observer?.disconnect();
+          observer = null;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting) {
@@ -33,6 +44,7 @@ export function HeroTextSection() {
     );
 
     observer.observe(sectionRef.current);
+    return () => observer?.disconnect();
     return () => observer.disconnect();
   }, []);
 
