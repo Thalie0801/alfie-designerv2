@@ -1,0 +1,99 @@
+# Supabase Edge Functions Inventory
+
+## Directory listing (`supabase/functions`)
+- _shared
+- admin-create-user
+- admin-delete-user
+- admin-grant-access
+- admin-link-affiliate
+- admin-purge-affiliates
+- admin-reset-stuck-jobs
+- admin-reset-user-password
+- alfie-add-text-overlay
+- alfie-chat
+- alfie-check-quota
+- alfie-classify-intent
+- alfie-consume-visuals
+- alfie-consume-woofs
+- alfie-estimate-cost
+- alfie-excel-export
+- alfie-excel-import
+- alfie-generate
+- alfie-generate-ai-image
+- alfie-generate-carousel-bulk
+- alfie-generate-video-slideshow
+- alfie-job-worker
+- alfie-optimize-prompt
+- alfie-orchestrator
+- alfie-plan-carousel
+- alfie-proofread-fr
+- alfie-refund-woofs
+- alfie-render-carousel-slide
+- alfie-render-image
+- alfie-render-video
+- alfie-score-coherence
+- alfie-select-provider
+- alfie-update-metrics
+- alfie-video-extend
+- alfie-video-upscale
+- auto-scrape-canva-templates
+- backfill-carousel-public-ids
+- cancel-job-set
+- canva-oauth
+- chat-ai-assistant
+- chat-create-carousel
+- chat-generate-video
+- check-subscription
+- cleanup-inactive-users
+- cleanup-processing-videos
+- cleanup-stuck-jobs
+- cloudinary
+- cloudinary-asset
+- create-checkout
+- create-job-set
+- create-missing-studio-accounts
+- create-studio-accounts
+- create-video
+- creations-api
+- customer-portal
+- download-job-set-zip
+- export-canva
+- fix-user-quotas
+- generate-ai-image
+- generate-alfie-variant
+- generate-content
+- generate-media
+- generate-sora-montage
+- generate-video
+- get-affiliate-public
+- get-credits
+- get-quota
+- improve-image
+- process-batch-queue
+- process-job-worker
+- purchase-credit-pack
+- purge-expired-assets
+- queue-monitor
+- reset-monthly-quotas
+- scrape-canva
+- send-confirmation-email
+- studio-generate
+- track-affiliate-click
+- track-job-status
+- verify-credit-purchase
+- verify-payment
+- verify-video-generation
+- video-webhook
+
+## Content generation functions
+These are the Edge Functions involved in generating assets (images, videos, carousels, or mixed media):
+- **alfie-generate** — orchestrates Alfie content generation across media types.
+- **alfie-generate-ai-image** — dedicated image generation pipeline.
+- **alfie-render-image** — handles rendering of generated imagery (backgrounds, overlays, etc.).
+- **generate-ai-image** — shared AI image generation entrypoint.
+- **generate-media** — unified handler for Alfie assets (image + video).
+- **alfie-plan-carousel** / **alfie-render-carousel-slide** / **alfie-generate-carousel-bulk** — full carousel generation workflow.
+- **chat-create-carousel** — conversational entrypoint for carousel creation.
+- **create-video**, **generate-video**, **chat-generate-video**, **alfie-render-video**, **alfie-video-upscale**, **alfie-video-extend**, **alfie-generate-video-slideshow**, **generate-sora-montage** — functions for producing and refining videos.
+- **studio-generate** — studio-specific creation helper.
+- **improve-image** / **alfie-add-text-overlay** — post-processing helpers for generated assets.
