@@ -1,3 +1,7 @@
+Corriger le workflow une bonne fois pour toutes
+
+Remplace TOUT le fichier .github/workflows/deploy-supabase-functions.yml par ce contenu (copie–colle tel quel, sans rien ajouter après done) :
+
 name: Deploy Supabase Edge Functions
 
 on:
@@ -57,4 +61,18 @@ jobs:
             fi
             echo "Deploying $function_name to $PROJECT_REF"
             supabase functions deploy "$function_name" --project-ref "$PROJECT_REF"
+          done
+
+
+Points importants :
+
+Il n’y a qu’une seule ligne description:.
+
+Il n’y a qu’un seul bloc run: |.
+
+Le fichier doit se terminer sur done + retour à la ligne, rien après.
+
+Ensuite
+
+Enregistre/commit le fichier.ref "$PROJECT_REF"
           done
