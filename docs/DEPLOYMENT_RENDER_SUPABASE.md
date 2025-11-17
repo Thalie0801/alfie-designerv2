@@ -29,7 +29,6 @@ Les variables suivantes doivent être définies (déjà en place par défaut) :
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
-- `VITE_SUPABASE_PROJECT_ID`
 
 Si vous changez de projet Supabase, pensez à mettre à jour ces valeurs.
 

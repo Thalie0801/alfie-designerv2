@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       project_ref:
+        description: "Override Supabase project ref (defaults to SUPABASE_PROJECT_REF secret)"
         description: "Override Supabase project ref (defaults to itsjonazifiiikozengd)"
         required: false
         type: string
@@ -26,6 +27,10 @@ jobs:
         working-directory: supabase
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          PROJECT_REF_INPUT: ${{ github.event.inputs.project_ref }}
+        run: |
+          set -euo pipefail
           PROJECT_REF_INPUT: ${{ github.event.inputs.project_ref }}
         run: |
           set -euo pipefail
@@ -34,6 +39,11 @@ jobs:
             echo "SUPABASE_ACCESS_TOKEN secret is required" >&2
             exit 1
           fi
+          if [[ -z "${SUPABASE_PROJECT_REF:-}" ]]; then
+            echo "SUPABASE_PROJECT_REF secret is required" >&2
+            exit 1
+          fi
+          PROJECT_REF="${PROJECT_REF_INPUT:-$SUPABASE_PROJECT_REF}"
           mapfile -t FUNCTIONS < <(find functions -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
           for function_name in "${FUNCTIONS[@]}"; do
             if [[ "$function_name" == "_shared" ]]; then

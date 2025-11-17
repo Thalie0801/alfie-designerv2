@@ -65,12 +65,13 @@ const ASPECT_TO_TW: Record<AspectRatio, string> = {
   "4:5": "aspect-[4/5]",
 };
 
-const IMAGE_SIZE_MAP: Record<AspectRatio, string> = {
-  "1:1": "1024x1024",
-  "9:16": "1024x1820",
-  "16:9": "1820x1024",
-  "3:4": "1024x1365",
-  "4:3": "1365x1024",
+const DEFAULT_RESOLUTION = "1080x1350";
+const RATIO_TO_RESOLUTION: Record<AspectRatio, string> = {
+  "1:1": "1080x1080",
+  "9:16": "1080x1920",
+  "16:9": "1920x1080",
+  "3:4": "1080x1920",
+  "4:3": "1080x1350",
   "4:5": "1080x1350",
 };
 
@@ -352,53 +353,61 @@ export function ChatGenerator() {
       }
 
       if (contentType === "image") {
-        const size = IMAGE_SIZE_MAP[aspectRatio] ?? IMAGE_SIZE_MAP["1:1"];
+        const resolution = RATIO_TO_RESOLUTION[aspectRatio] ?? DEFAULT_RESOLUTION;
+        const trimmedPrompt = prompt.trim();
+        const generationPrompt = trimmedPrompt || (uploadedSource ? "Image transformation" : "Creative marketing visual");
 
-        if (uploadedSource?.type === "image") {
-          const { data, error } = await supabase.functions.invoke("alfie-generate-ai-image", {
-            body: {
-              templateImageUrl: uploadedSource.url,
-              brandKit: brandKit,
-              prompt: prompt || "Transform this image with a creative style",
-            },
-          });
-          if (error) throw error;
-          if (!data?.imageUrl) throw new Error("Aucune image générée");
+        try {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          const headers = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined;
 
-          const url = data.imageUrl as string;
-          setGeneratedAsset({ type: "image", url, prompt: prompt || "Image transformation", format: aspectRatio });
+          const body: Record<string, unknown> = {
+            type: "image",
+            ratio: aspectRatio,
+            resolution,
+            prompt: generationPrompt,
+            brandId: brandKit?.id ?? null,
+            brandKit: brandKit ?? null,
+            userId: user.id,
+          };
 
-          if (brandKit?.id) {
-            await supabase.from("media_generations").insert({
-              user_id: user.id,
-              brand_id: brandKit.id,
-              type: "image",
-              prompt: prompt || "Image transformation",
-              input_url: uploadedSource.url,
-              output_url: url,
-              status: "completed",
-              metadata: { aspectRatio, sourceType: "image" },
-            } as any);
+          if (uploadedSource) {
+            body.sourceType = uploadedSource.type;
+            body.uploadedSourceUrl = uploadedSource.url;
+            if (uploadedSource.type === "image") {
+              body.templateImageUrl = uploadedSource.url;
+            }
           }
 
-          toast.success("Image générée avec succès ! ✨");
-        } else {
-          const { data, error } = await supabase.functions.invoke("alfie-render-image", {
-            body: {
-              provider: "gemini-nano",
-              prompt: prompt,
-              format: size,
-              brand_id: brandKit?.id,
-              cost_woofs: 1,
-            },
+          const { data, error } = await supabase.functions.invoke("alfie-generate-ai-image", {
+            body,
+            headers,
           });
-          if (error) throw error;
 
-          const imageUrl = data?.data?.image_urls?.[0];
-          if (!data?.ok || !imageUrl) throw new Error(data?.error || "Aucune image générée");
+          if (error) {
+            console.error("Erreur Edge générateur simple", error);
+            toast.error(error.message ?? "Erreur de génération d'image");
+            return;
+          }
 
-          setGeneratedAsset({ type: "image", url: imageUrl, prompt, format: aspectRatio });
+          const imageUrl =
+            (data && typeof (data as any).imageUrl === "string" && (data as any).imageUrl) || extractMediaUrl(data);
+
+          if (!imageUrl) {
+            console.error("Réponse inattendue de la fonction alfie-generate-ai-image", data);
+            toast.error("Aucune image générée");
+            return;
+          }
+
+          setGeneratedAsset({ type: "image", url: imageUrl, prompt: generationPrompt, format: aspectRatio });
           toast.success("Image générée avec succès ! ✨");
+        } catch (err) {
+          console.error("Erreur réseau Edge générateur simple", err);
+          toast.error(
+            err instanceof Error ? err.message : "Erreur réseau lors de l'appel à la function",
+          );
         }
       } else {
         const videoUrl = await generateVideoWithFfmpeg({

@@ -9,7 +9,7 @@ SELECT cron.schedule(
   $$
   SELECT
     net.http_post(
-        url:='https://itsjonazifiiikozengd.supabase.co/functions/v1/purge-expired-assets',
+        url:='https://onxqgtuiagiuomlstcmt.supabase.co/functions/v1/purge-expired-assets',
         headers:='{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0c2pvbmF6aWZpaWlrb3plbmdkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2MzE3MzcsImV4cCI6MjA3NTIwNzczN30.s5aKKp_MrX8Tks2m7YUmDcp0bcSzo7s2Od2cyjU0n48"}'::jsonb,
         body:=concat('{"time": "', now(), '"}')::jsonb
     ) as request_id;
@@ -23,7 +23,7 @@ SELECT cron.schedule(
   $$
   SELECT
     net.http_post(
-        url:='https://itsjonazifiiikozengd.supabase.co/functions/v1/reset-monthly-quotas',
+        url:='https://onxqgtuiagiuomlstcmt.supabase.co/functions/v1/reset-monthly-quotas',
         headers:='{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0c2pvbmF6aWZpaWlrb3plbmdkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2MzE3MzcsImV4cCI6MjA3NTIwNzczN30.s5aKKp_MrX8Tks2m7YUmDcp0bcSzo7s2Od2cyjU0n48"}'::jsonb,
         body:=concat('{"time": "', now(), '"}')::jsonb
     ) as request_id;
