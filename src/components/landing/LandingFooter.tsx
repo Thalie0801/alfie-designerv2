@@ -1,5 +1,30 @@
 import logoBlack from "@/assets/alfie-logo-black.svg";
 import logoWhite from "@/assets/alfie-logo-white.svg";
+
+const footerLinks = [
+  {
+    title: "Produit",
+    items: [
+      { label: "Démo", href: "/demo" },
+      { label: "Tarifs", href: "#pricing" },
+      { label: "Dashboard", href: "/dashboard" },
+    ],
+  },
+  {
+    title: "Ressources",
+    items: [
+      { label: "FAQ", href: "/faq" },
+      { label: "Support", href: "/contact" },
+    ],
+  },
+  {
+    title: "Légal",
+    items: [
+      { label: "Mentions légales", href: "/legal" },
+      { label: "Confidentialité", href: "/privacy" },
+    ],
+  },
+];
 import { Sparkles } from "lucide-react";
 
 export function LandingFooter() {
@@ -14,6 +39,20 @@ export function LandingFooter() {
         </div>
 
         <div className="grid gap-8 md:grid-cols-3">
+          {footerLinks.map((column) => (
+            <div key={column.title}>
+              <h4 className="mb-4 font-semibold">{column.title}</h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                {column.items.map((item) => (
+                  <li key={item.label}>
+                    <a href={item.href} className="transition-colors hover:text-foreground">
+                      {item.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 grid gap-8 md:grid-cols-4">
           <div>
