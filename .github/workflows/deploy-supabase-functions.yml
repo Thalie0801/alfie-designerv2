@@ -59,8 +59,6 @@ jobs:
             supabase functions deploy "$function_name" --project-ref "$PROJECT_REF"
           done
 
-
 Ensuite
 
-Enregistre/commit le fichier.ref "$PROJECT_REF"
-          done
+Enregistre/commit le fichier.ref "$PROJECT_RE
