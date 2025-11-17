@@ -12,8 +12,6 @@ export function LandingFooter() {
         </div>
 
         <div className="grid gap-8 md:grid-cols-4">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-8 grid gap-8 md:grid-cols-4">
           <div>
             <div className="mb-4 flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-alfie-mint via-alfie-lilac to-alfie-pink">

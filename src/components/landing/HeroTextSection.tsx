@@ -9,9 +9,24 @@ const featurePills = [
   { icon: Globe, label: "Intégration Canva" },
 ];
 
+const heroAdjectives = ["viraux", "professionnels", "impactants"];
+
 export function HeroTextSection() {
   const sectionRef = useRef<HTMLElement | null>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [phraseIndex, setPhraseIndex] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const interval = window.setInterval(() => {
+      setPhraseIndex((prev) => (prev + 1) % heroAdjectives.length);
+    }, 2500);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const typedText = heroAdjectives[phraseIndex];
 
   useEffect(() => {
     if (typeof window === "undefined" || !sectionRef.current) {
@@ -65,6 +80,7 @@ export function HeroTextSection() {
                 className="ml-1 inline-block h-8 w-[2px] animate-pulse rounded bg-alfie-mint align-middle"
                 aria-hidden="true"
               />
+            </span>{" "}
             <span className="bg-gradient-to-r from-alfie-mint via-alfie-lilac to-alfie-pink bg-clip-text text-transparent">
               professionnels
             </span>{" "}
