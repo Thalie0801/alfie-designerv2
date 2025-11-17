@@ -139,9 +139,6 @@ verify_jwt = true
 [functions.alfie-render-image]
 verify_jwt = false
 
-[functions.alfie-render-carousel-slide]
-verify_jwt = false
-
 [functions.alfie-score-coherence]
 verify_jwt = true
 
