@@ -1,10 +1,8 @@
 project_id = "onxqgtuiagiuomlstcmt"
-project_ref = "onxqgtuiagiuomlstcmt"
 
 
 [functions.alfie-job-worker]
 verify_jwt = false
-schedule = "*/10 * * * * *"
 
 
 [functions.creations-api]
@@ -174,7 +172,6 @@ verify_jwt = true
 
 [functions.cleanup-stuck-jobs]
 verify_jwt = false
-schedule = "*/5 * * * *"
 
 [functions.cancel-job-set]
 verify_jwt = true
