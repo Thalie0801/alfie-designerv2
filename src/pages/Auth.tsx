@@ -29,6 +29,7 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [verifyingPayment, setVerifyingPayment] = useState(false);
   const [canSignUp, setCanSignUp] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const warnedAboutSignupRedirect = useRef(false);
   const isMountedRef = useRef(true);
 
@@ -121,98 +122,54 @@ export default function Auth() {
     return navigate('/onboarding/activate');
   }, [effectiveIsAdmin, effectiveIsAuthorized, isAuthorized, isWhitelisted, navigate, user?.email, flagsReady]);
 
-  // Vérification du paiement (useCallback stable)
-  const verifyPayment = useCallback(async (sessionId: string) => {
-    if (!isMountedRef.current) return;
-    
-    setVerifyingPayment(true);
-    console.debug('[Auth] Starting payment verification', { sessionId });
-
-    try {
-      const { data, error } = await supabase.functions.invoke('verify-payment', {
-        body: { session_id: sessionId },
-      });
-
-      if (error) {
-        console.error('[Auth] Payment verification error:', error);
-        throw error;
-      }
-
-      if (!isMountedRef.current) return;
-
-      // Gestion des codes d'erreur structurés si disponibles
-      const errorCode = data?.code;
-      const plan = data?.plan;
-      const customerEmail = data?.email;
-
-      if (errorCode) {
-        // Gérer les codes d'erreur structurés
-        switch (errorCode) {
-          case 'PAYMENT_NOT_COMPLETED':
-            toast.error('Le paiement n\'a pas été complété');
-            break;
-          case 'INVALID_PLAN':
-            toast.error('Plan invalide dans la session de paiement');
-            break;
-          case 'SESSION_NOT_FOUND':
-            toast.error('Session de paiement introuvable');
-            break;
-          default:
-            toast.error(data?.message || 'Erreur lors de la vérification du paiement');
-        }
-        setCanSignUp(false);
-        setMode('login');
-        return;
-      }
-
-      console.debug('[Auth] Payment verified successfully', { plan, email: customerEmail });
-      toast.success(`Paiement confirmé ! Plan ${plan || ''} activé.`);
-
-      setCanSignUp(true);
-
-      // Si pas connecté, basculer en mode inscription avec email pré-rempli
-      if (!user) {
-        console.debug('[Auth] User not logged in, switching to signup mode');
-        setMode('signup');
-        if (customerEmail) {
-          setEmail(customerEmail);
-        }
-      } else {
-        // Si déjà connecté, naviguer selon les rôles
-        console.debug('[Auth] User already logged in, navigating');
-        navigateAfterAuth();
-      }
-
-      // Nettoyer l'URL après succès
-      stripPaymentParams();
-    } catch (error: any) {
-      if (!isMountedRef.current) return;
-      
-      console.error('[Auth] Payment verification failed:', error);
-      
-      // Gestion d'erreur robuste (ne pas se baser uniquement sur message.includes)
-      const errorMsg = error?.message || 'Erreur inconnue';
-      toast.error(`Erreur lors de la vérification du paiement: ${errorMsg}`);
-      
-      setCanSignUp(false);
-      setMode('login');
-    } finally {
-      if (isMountedRef.current) {
-        setVerifyingPayment(false);
-      }
-    }
-  }, [user, navigateAfterAuth, stripPaymentParams]);
-
   // Check for payment success (vérifie une seule fois au montage ou changement de sessionId)
   useEffect(() => {
-    if (hasPaymentSession && sessionId) {
-      console.debug('[Auth] Payment session detected, verifying...');
-      verifyPayment(sessionId);
-    } else {
-      setCanSignUp(false);
-      setMode('login');
+    if (!hasPaymentSession || !sessionId || verifyingPayment) {
+      if (!hasPaymentSession) {
+        setCanSignUp(false);
+        setMode('login');
+      }
+      return;
     }
-  }, [hasPaymentSession, sessionId, verifyPayment]);
+
+    if (!isMountedRef.current) return;
+
+    console.debug('[Auth] Payment session detected, verifying...');
+    setPaymentError(null);
+    setVerifyingPayment(true);
+
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('verify-payment', {
+          body: { session_id: sessionId },
+        });
+
+        if (error || !data?.success) {
+          throw error || new Error(data?.message || 'Erreur pendant la vérification du paiement');
+        }
+
+        if (!isMountedRef.current) {
+          return;
+        }
+
+        setCanSignUp(true);
+        toast.success(`✅ Abonnement ${data?.plan || ''} activé !`);
+        stripPaymentParams();
+
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 2000);
+      } catch (error) {
+        console.error('[Auth] Payment verification failed:', error);
+        setPaymentError('Le paiement a été validé, mais la création du compte a échoué. Contacte le support.');
+        toast.error('Erreur pendant la vérification du paiement.');
+        setCanSignUp(false);
+        setMode('login');
+        stripPaymentParams();
+        setVerifyingPayment(false);
+      }
+    })();
+  }, [hasPaymentSession, sessionId, verifyingPayment, navigate, stripPaymentParams]);
 
   // Redirect if already logged in - ATTENDRE que les flags soient prêts
   useEffect(() => {
@@ -376,8 +333,14 @@ export default function Auth() {
               <Alert className="mb-4 border-green-500/50 bg-green-50 dark:bg-green-900/20">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-green-700 dark:text-green-300">
-                  Vérification de votre paiement en cours...
+                  🎉 Paiement validé ! Création de ton compte en cours, ça prend quelques secondes…
                 </AlertDescription>
+              </Alert>
+            )}
+
+            {paymentError && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertDescription>{paymentError}</AlertDescription>
               </Alert>
             )}
 
