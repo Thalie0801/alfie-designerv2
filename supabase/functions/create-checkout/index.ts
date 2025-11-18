@@ -17,6 +17,15 @@ const PRICE_IDS = {
   }
 };
 
+const jsonResponse = (payload: unknown, status = 200) =>
+  new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json",
+    },
+  });
+
 // Plan configuration (quotas are applied in verify-payment after successful payment)
 
 Deno.serve(async (req) => {
@@ -37,13 +46,7 @@ Deno.serve(async (req) => {
     // Validate input with Zod
     const validation = validateInput(CheckoutSchema, body);
     if (!validation.success) {
-      return new Response(
-        JSON.stringify({ error: validation.error }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        }
-      );
+      return jsonResponse({ error: validation.error }, 400);
     }
     
     const { plan, billing_period, affiliate_ref, brand_name, email } = validation.data;
@@ -113,15 +116,9 @@ Deno.serve(async (req) => {
       },
     });
 
-    return new Response(JSON.stringify({ url: session.url }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    return jsonResponse({ url: session.url });
   } catch (error: any) {
     console.error("Error in create-checkout:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    return jsonResponse({ error: error.message }, 500);
   }
 });

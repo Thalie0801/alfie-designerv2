@@ -1,5 +1,7 @@
 import cloudinary from 'npm:cloudinary';
 
+import { corsHeaders } from "../_shared/cors.ts";
+
 cloudinary.v2.config({
   cloud_name: Deno.env.get('CLOUDINARY_CLOUD_NAME'),
   api_key: Deno.env.get('CLOUDINARY_API_KEY'),
@@ -10,10 +12,14 @@ type Json = Record<string, unknown>;
 const j = (d: Json, s = 200) =>
   new Response(JSON.stringify(d), {
     status: s,
-    headers: { 'content-type': 'application/json' },
+    headers: { "Content-Type": "application/json", ...corsHeaders },
   });
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   try {
     const { action, params } = (await req.json().catch(() => ({
       action: 'ping',
