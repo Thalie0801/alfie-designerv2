@@ -140,10 +140,23 @@ serve(async (req) => {
     }
 
     const plan = session.metadata?.plan;
-    const userId = session.metadata?.user_id;
-    const customerEmail = session.customer_details?.email;
+    let userId = session.metadata?.user_id;
+    const customerEmail = session.customer_details?.email || session.metadata?.email;
     const affiliateRef = session.metadata?.affiliate_ref;
     const brandName = session.metadata?.brand_name;
+    
+    if (!customerEmail) {
+      return new Response(
+        JSON.stringify({ 
+          code: 'MISSING_EMAIL',
+          message: 'Email client introuvable' 
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
+    }
 
     // Handle brand purchase (additional brand for existing user)
     if (brandName && userId) {
@@ -276,22 +289,60 @@ serve(async (req) => {
 
     console.log(`✅ Payment session stored for ${customerEmail}, plan: ${plan}`);
 
-    // If user is already logged in (rare case), update their profile
+    // Check if user exists
     let targetUserId = userId;
-    if (targetUserId) {
-      await supabaseClient
-        .from("profiles")
-        .update({
-          plan,
-          quota_brands: planConfig.quota_brands,
-          stripe_customer_id: session.customer as string,
-          stripe_subscription_id: session.subscription as string,
-          status: 'active',
-        })
-        .eq("id", targetUserId);
-
-      console.log(`✅ Updated profile for existing user ${targetUserId}`);
+    if (!targetUserId) {
+      // Try to find existing user by email
+      const { data: existingUsers } = await supabaseClient.auth.admin.listUsers();
+      const existingUser = existingUsers?.users?.find(u => u.email === customerEmail);
+      
+      if (existingUser) {
+        targetUserId = existingUser.id;
+        console.log(`✅ Found existing user: ${targetUserId}`);
+      } else {
+        // Create new user account
+        const tempPassword = Math.random().toString(36).slice(-12) + 'Aa1!';
+        const { data: newUser, error: createError } = await supabaseClient.auth.admin.createUser({
+          email: customerEmail,
+          password: tempPassword,
+          email_confirm: true,
+        });
+        
+        if (createError) {
+          console.error('Error creating user:', createError);
+          return new Response(
+            JSON.stringify({ 
+              code: 'USER_CREATION_ERROR',
+              message: 'Erreur lors de la création du compte',
+              details: createError.message 
+            }),
+            {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 500,
+            }
+          );
+        }
+        
+        targetUserId = newUser.user.id;
+        console.log(`✅ Created new user: ${targetUserId}`);
+      }
     }
+    
+    // Update or create profile
+    await supabaseClient
+      .from("profiles")
+      .upsert({
+        id: targetUserId,
+        email: customerEmail,
+        plan,
+        quota_brands: planConfig.quota_brands,
+        stripe_customer_id: session.customer as string,
+        stripe_subscription_id: session.subscription as string,
+        status: 'active',
+      })
+      .eq("id", targetUserId);
+
+    console.log(`✅ Updated profile for user ${targetUserId}`)
 
     // Handle affiliate conversion if affiliate_ref exists
     if (affiliateRef && targetUserId) {

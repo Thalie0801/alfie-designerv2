@@ -62,7 +62,7 @@ serve(async (req) => {
       );
     }
     
-    const { plan, billing_period, affiliate_ref, brand_name } = validation.data;
+    const { plan, billing_period, affiliate_ref, brand_name, email } = validation.data;
     
     const billingType = billing_period === 'annual' ? 'annual' : 'monthly';
     const planType = plan as 'starter' | 'pro' | 'studio';
@@ -73,7 +73,7 @@ serve(async (req) => {
 
     const priceId = PRICE_IDS[billingType][planType];
     
-    // Check if user is authenticated
+    // Check if user is authenticated (optional)
     const authHeader = req.headers.get("Authorization");
     let userEmail: string | undefined;
     let userId: string | undefined;
@@ -83,6 +83,13 @@ serve(async (req) => {
       const { data } = await supabaseClient.auth.getUser(token);
       userEmail = data.user?.email;
       userId = data.user?.id;
+    } else {
+      // Guest checkout: use email from request body
+      userEmail = email;
+    }
+    
+    if (!userEmail) {
+      throw new Error("Email is required for checkout");
     }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
@@ -111,11 +118,12 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
-      success_url: `${origin}/?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${origin}/auth?payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/?payment=canceled`,
       metadata: {
         plan,
         user_id: userId || "",
+        email: userEmail,
         affiliate_ref: affiliate_ref || "",
         brand_name: brand_name || "",
       },
