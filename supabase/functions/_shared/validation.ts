@@ -91,6 +91,7 @@ export const CheckoutSchema = z.object({
     .regex(/^[a-zA-Z0-9\s\-_'\.]+$/, 'Nom de marque contient des caractères non autorisés')
     .optional()
     .or(z.literal('')),
+  email: z.string().email('Email invalide').optional(),
 });
 
 export const VerifyPaymentSchema = z.object({

@@ -1,8 +1,10 @@
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { PriceCard } from "@/components/landing/PriceCard";
+import { PriceCard, type BillingPlan } from "@/components/landing/PriceCard";
 import { useStripeCheckout } from "@/hooks/useStripeCheckout";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 const plans = [
   {
@@ -59,7 +61,17 @@ const getPriceLabel = (isAnnual: boolean) => (isAnnual ? " / an" : " / mois");
 
 export function PricingSection() {
   const [isAnnual, setIsAnnual] = useState(false);
+  const [guestEmail, setGuestEmail] = useState("");
   const { createCheckout, loading: checkoutLoading } = useStripeCheckout();
+  const { user } = useAuth();
+  
+  const handleCheckout = async (plan: BillingPlan) => {
+    if (!user && !guestEmail) {
+      toast.error("Veuillez entrer votre email pour continuer");
+      return;
+    }
+    await createCheckout(plan, isAnnual ? "annual" : "monthly", undefined, guestEmail || undefined);
+  };
 
   return (
     <section id="pricing" className="bg-muted/30 px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-24">
@@ -107,8 +119,11 @@ export function PricingSection() {
               features={plan.features}
               plan={plan.plan}
               popular={plan.popular}
-              createCheckout={createCheckout}
+              onCheckout={handleCheckout}
               checkoutLoading={checkoutLoading}
+              isAuthenticated={!!user}
+              guestEmail={guestEmail}
+              onEmailChange={setGuestEmail}
             />
           ))}
         </div>
