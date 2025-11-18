@@ -9,20 +9,11 @@ const featurePills = [
   { icon: Globe, label: "Intégration Canva" },
 ];
 
-const rotatingKeywords = ["professionnels", "impactants", "brandés"];
 const heroAdjectives = ["viraux", "professionnels", "impactants"];
 
 export function HeroTextSection() {
   const sectionRef = useRef<HTMLElement | null>(null);
   const [isVisible, setIsVisible] = useState(false);
-  const [keywordIndex, setKeywordIndex] = useState(0);
-
-  useEffect(() => {
-    if (rotatingKeywords.length <= 1) return undefined;
-
-    const interval = window.setInterval(() => {
-      setKeywordIndex((prev) => (prev + 1) % rotatingKeywords.length);
-    }, 2400);
   const [phraseIndex, setPhraseIndex] = useState(0);
 
   useEffect(() => {
@@ -35,7 +26,6 @@ export function HeroTextSection() {
     return () => window.clearInterval(interval);
   }, []);
 
-  const typedText = rotatingKeywords[keywordIndex];
   const typedText = heroAdjectives[phraseIndex];
 
   useEffect(() => {
@@ -83,8 +73,6 @@ export function HeroTextSection() {
           <h1 className="text-center text-3xl font-extrabold tracking-tight text-slate-900 leading-tight sm:text-5xl md:text-6xl">
             Crée des designs{" "}
             <span className="relative inline-flex items-center">
-              <span className="bg-gradient-to-r from-alfie-mint via-alfie-lilac to-alfie-pink bg-clip-text text-transparent">
-                {typedText}
               <span className="bg-gradient-to-r from-[#7fdce2] via-[#c99df8] to-[#ff9fd4] bg-clip-text text-transparent">
                 {typedText || "\u00A0"}
               </span>
