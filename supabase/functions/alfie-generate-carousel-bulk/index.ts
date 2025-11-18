@@ -1,5 +1,4 @@
 // functions/alfie-render-carousel-bulk/index.ts
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { 
   SUPABASE_URL, 
@@ -7,6 +6,7 @@ import {
   INTERNAL_FN_SECRET 
 } from "../_shared/env.ts";
 
+import { corsHeaders } from "../_shared/cors.ts";
 type AspectRatio = "1:1" | "4:5" | "9:16" | "16:9";
 
 type SlideInput = Record<string, unknown>; // ton schema de slide texte (title, subtitle, bullets, etc.)
@@ -44,11 +44,6 @@ interface SlideFailure {
   slideIndex: number;
   error: string;
 }
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
 
 // Validate env at module level
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -138,10 +133,10 @@ async function withRetries<T>(fn: () => Promise<T>, retries: number, label: stri
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {

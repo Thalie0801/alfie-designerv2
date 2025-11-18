@@ -1,7 +1,6 @@
 // functions/alfie-render-carousel-slide/index.ts
 // v2.5.0 — Slide renderer (idempotent, retries + timeout, env.ts, internal secret)
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { uploadTextAsRaw } from "../_shared/cloudinaryUploader.ts";
 import { 
@@ -11,13 +10,7 @@ import {
   LOVABLE_API_KEY 
 } from "../_shared/env.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST,OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
-
+import { corsHeaders } from "../_shared/cors.ts";
 type Lang = "FR" | "EN";
 
 interface SlideRequest {
@@ -133,9 +126,9 @@ async function fetchWithRetries(url: string, init: RequestInit, maxRetries = 2) 
 // -----------------------------
 // Handler
 // -----------------------------
-serve(async (req) => {
+Deno.serve(async (req) => {
   console.log("[alfie-render-carousel-slide] v2.5.0 — invoked");
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   // ✅ Validate internal secret FIRST
   const secret = req.headers.get("x-internal-secret");

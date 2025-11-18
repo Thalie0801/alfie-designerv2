@@ -1,5 +1,4 @@
 // --- imports ---
-import { serve } from "https://deno.land/std/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { userHasAccess } from "../_shared/access.ts";
@@ -38,9 +37,9 @@ const AI_CONFIG = {
   endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions",
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {

@@ -1,13 +1,8 @@
 // functions/alfie-generate/index.ts
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { userHasAccess } from "../_shared/accessControl.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
+import { corsHeaders } from "../_shared/cors.ts";
 type GenType = "hero" | "carousel" | "insight" | "reel";
 
 interface GenerateRequest {
@@ -249,10 +244,10 @@ async function callLovable(systemPrompt: string, userPrompt: string, key: string
   return res;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {

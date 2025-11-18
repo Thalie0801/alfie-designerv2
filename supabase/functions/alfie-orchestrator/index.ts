@@ -1,5 +1,4 @@
 // functions/alfie-orchestrator/index.ts
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY, INTERNAL_FN_SECRET } from "../_shared/env.ts";
 import {
@@ -12,17 +11,11 @@ import {
   detectTopicIntent,
 } from "../_shared/conversationFlow.ts";
 
+import { corsHeaders } from "../_shared/cors.ts";
 // ---- Supabase (service role pour la persistance session/ordres/jobs)
 const sb = createClient(SUPABASE_URL ?? "", SUPABASE_SERVICE_ROLE_KEY ?? "");
 
 // ---- CORS / helpers
-const corsHeaders = {
-  "access-control-allow-origin": "*",
-  "access-control-allow-headers": "authorization, x-client-info, apikey, content-type",
-  "access-control-allow-methods": "POST, OPTIONS",
-  "access-control-max-age": "86400",
-};
-
 const json = (data: any, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
@@ -70,9 +63,9 @@ function assertBriefsValid(ctx: any) {
   }
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {

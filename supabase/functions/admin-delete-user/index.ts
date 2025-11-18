@@ -1,14 +1,13 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import {
   supabaseAdmin,
   supabaseUserFromReq,
   getAuthUserId,
   assertIsAdmin,
-  corsHeaders,
   json,
 } from "../_shared/utils/admin.ts";
 
-serve(async (req) => {
+import { corsHeaders } from "../_shared/cors.ts";
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {

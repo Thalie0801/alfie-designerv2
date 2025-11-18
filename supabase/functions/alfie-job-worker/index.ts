@@ -1,15 +1,10 @@
 // supabase/functions/alfie-job-worker/index.ts
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { uploadToCloudinary } from "../_shared/cloudinaryUploader.ts";
 import { consumeBrandQuotas } from "../_shared/quota.ts";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, INTERNAL_FN_SECRET } from "../_shared/env.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
+import { corsHeaders } from "../_shared/cors.ts";
 type JobRow = {
   id: string;
   user_id: string;
@@ -146,10 +141,10 @@ function deepGet(obj: any, key: string): any {
 }
 
 // ---------- HTTP Entrypoint ----------
-serve(async (req) => {
+Deno.serve(async (req) => {
   console.log("[alfie-job-worker] 🚀 Invoked at", new Date().toISOString());
   
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
     console.log("🚀 [Worker] Starting job processing...");

@@ -1,11 +1,6 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { v2 as cloudinary } from 'npm:cloudinary@2.8.0';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
+import { corsHeaders } from "../_shared/cors.ts";
 // Initialize Cloudinary
 cloudinary.config({
   cloud_name: Deno.env.get('CLOUDINARY_CLOUD_NAME'),
@@ -13,9 +8,9 @@ cloudinary.config({
   api_secret: Deno.env.get('CLOUDINARY_API_SECRET'),
 });
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {

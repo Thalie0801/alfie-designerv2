@@ -1,3 +1,5 @@
+import { corsHeaders } from "./cors.ts";
+
 /**
  * Universal Edge Function Handler
  * Ensures all edge functions return 200 OK with { ok, data, error } payload
@@ -8,15 +10,8 @@ export async function edgeHandler(
   req: Request,
   logic: (ctx: { jwt: string | null; input: any; req: Request }) => Promise<any>
 ): Promise<Response> {
-  const origin = req.headers.get('origin') || '*';
-  const cors = {
-    'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Methods': 'POST,OPTIONS,GET',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization,x-client-info,apikey',
-  };
-
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: cors });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -35,17 +30,17 @@ export async function edgeHandler(
     
     return new Response(
       JSON.stringify({ ok: true, data: result }),
-      { status: 200, headers: { 'Content-Type': 'application/json', ...cors } }
+      { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   } catch (e: any) {
     console.error('[edgeHandler] Error:', e.message, e.stack);
     return new Response(
-      JSON.stringify({ 
-        ok: false, 
+      JSON.stringify({
+        ok: false,
         error: e?.message || 'unexpected_error',
         code: e?.code || 'INTERNAL_ERROR'
       }),
-      { status: 200, headers: { 'Content-Type': 'application/json', ...cors } }
+      { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   }
 }

@@ -1,19 +1,12 @@
 // functions/alfie-plan-carousel/index.ts
 // v2.1.0 — Planificateur de carrousel robuste (rétro-compat, validations, structured output)
 
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { LOVABLE_API_KEY } from "../_shared/env.ts";
 
+import { corsHeaders } from "../_shared/cors.ts";
 // ---------------------------
 // CORS
 // ---------------------------
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST,OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
-
 // ---------------------------
 // Types
 // ---------------------------
@@ -396,11 +389,11 @@ function responseSchema(slideCount: number) {
 // ---------------------------
 // Handler
 // ---------------------------
-serve(async (req) => {
+Deno.serve(async (req) => {
   console.log("[alfie-plan-carousel] v2.1.0 invoked");
 
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {

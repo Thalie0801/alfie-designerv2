@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { withIdempotency } from "../_shared/idempotency.ts";
 import { userHasAccess } from "../_shared/accessControl.ts";
@@ -6,6 +5,7 @@ import { resolveBrandKit } from "../_shared/brandResolver.ts";
 import { generateMasterSeed } from "../_shared/seedGenerator.ts";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
 
+import { corsHeaders } from "../_shared/cors.ts";
 function correctFrenchSpelling(text: string): string {
   const corrections: Record<string, string> = {
     'developper': 'développer',
@@ -66,16 +66,11 @@ function correctFrenchSpelling(text: string): string {
   return corrected;
 }
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-idempotency-key',
-};
-
-serve(async (req) => {
+Deno.serve(async (req) => {
   console.log('[create-job-set] v1.0.1 - Function invoked');
   
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
