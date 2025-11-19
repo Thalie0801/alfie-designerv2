@@ -41,11 +41,6 @@ const jsonResponse = (req: Request, payload: unknown, status = 200) =>
     status,
     headers: {
       ...getCorsHeaders(req),
-const jsonResponse = (payload: unknown, status = 200) =>
-  new Response(JSON.stringify(payload), {
-    status,
-    headers: {
-      ...corsHeaders,
       "Content-Type": "application/json",
     },
   });
@@ -63,7 +58,8 @@ Deno.serve(async (req) => {
 
   const supabaseClient = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+    { auth: { persistSession: false } }
   );
 
   try {
@@ -73,7 +69,6 @@ Deno.serve(async (req) => {
     const validation = validateInput(CheckoutSchema, body);
     if (!validation.success) {
       return jsonResponse(req, { error: validation.error }, 400);
-      return jsonResponse({ error: validation.error }, 400);
     }
     
     const { plan, billing_period, affiliate_ref, brand_name, email } = validation.data;
@@ -147,9 +142,5 @@ Deno.serve(async (req) => {
   } catch (error: any) {
     console.error("Error in create-checkout:", error);
     return jsonResponse(req, { error: error.message }, 500);
-    return jsonResponse({ url: session.url });
-  } catch (error: any) {
-    console.error("Error in create-checkout:", error);
-    return jsonResponse({ error: error.message }, 500);
   }
 });
