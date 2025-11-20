@@ -1,7 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/config/env";
 
 // DEBUG TEMPORAIRE
 console.log("[Alfie] SUPABASE_URL =", SUPABASE_URL);
