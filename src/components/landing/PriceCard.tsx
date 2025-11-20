@@ -23,8 +23,6 @@ export interface PriceCardProps {
   isAuthenticated: boolean;
   guestEmail: string;
   onEmailChange: (email: string) => void;
-  promoCode: string;
-  onPromoCodeChange: (code: string) => void;
 }
 
 export function PriceCard({
@@ -42,8 +40,6 @@ export function PriceCard({
   isAuthenticated,
   guestEmail,
   onEmailChange,
-  promoCode,
-  onPromoCodeChange,
 }: PriceCardProps) {
   return (
     <Card
@@ -85,15 +81,6 @@ export function PriceCard({
             placeholder="votre@email.com"
             value={guestEmail}
             onChange={(e) => onEmailChange(e.target.value)}
-            className="w-full"
-          />
-        )}
-        {plan === 'pro' && (
-          <Input
-            type="text"
-            placeholder="Code promo (ex: PROMO40PRO)"
-            value={promoCode}
-            onChange={(e) => onPromoCodeChange(e.target.value.toUpperCase())}
             className="w-full"
           />
         )}
