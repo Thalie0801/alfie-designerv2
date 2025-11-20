@@ -64,18 +64,27 @@ Deno.serve(async (req) => {
 
     const priceId = PRICE_IDS[billingType][planType];
     
-    // Check if user is authenticated (optional)
+    // Try to authenticate user (optional for guest checkout)
     const authHeader = req.headers.get("Authorization");
     let userEmail: string | undefined;
     let userId: string | undefined;
     
-    if (authHeader) {
-      const token = authHeader.replace("Bearer ", "");
-      const { data } = await supabaseClient.auth.getUser(token);
-      userEmail = data.user?.email;
-      userId = data.user?.id;
-    } else {
-      // Guest checkout: use email from request body
+    // Only try to authenticate if we have a valid Bearer token (not the anon key)
+    if (authHeader && authHeader.startsWith("Bearer eyJ")) {
+      try {
+        const token = authHeader.replace("Bearer ", "");
+        const { data, error } = await supabaseClient.auth.getUser(token);
+        if (!error && data.user) {
+          userEmail = data.user.email;
+          userId = data.user.id;
+        }
+      } catch (authError) {
+        console.log("Auth check failed, proceeding as guest:", authError);
+      }
+    }
+    
+    // Use email from request body if not authenticated
+    if (!userEmail) {
       userEmail = email;
     }
     
