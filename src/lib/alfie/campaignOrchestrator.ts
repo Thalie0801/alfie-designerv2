@@ -3,9 +3,7 @@
  * Handles campaign creation from Chat Alfie
  */
 
-import { getAuthHeader } from '@/lib/auth';
-import { SUPABASE_URL } from '@/config/env';
-import type { CampaignPlan, CreateCampaignResponse } from '@/types/campaign';
+import { supabase } from "@/integrations/supabase/client";
 import { getAuthHeader } from "@/lib/auth";
 import { SUPABASE_URL } from "@/config/env";
 import type { CampaignPlan, CreateCampaignResponse } from "@/types/campaign";
@@ -34,7 +32,7 @@ export function detectCampaignIntent(message: string): boolean {
  */
 export function extractCampaignPlan(
   message: string,
-  brandKit?: unknown
+  brandKit?: any
 ): CampaignPlan | null {
   // Pattern: "X carrousels et Y images pour [sujet]"
   const pattern =
@@ -106,24 +104,17 @@ function normalizeAssetType(type: string): "image" | "carousel" | "video" {
  */
 export async function createCampaignFromPlan(
   plan: CampaignPlan,
-  brandKit?: unknown
+  brandKit?: any
 ): Promise<CreateCampaignResponse> {
   const authHeader = await getAuthHeader();
-  const headers = {
-    'Content-Type': 'application/json',
-    ...authHeader,
-  };
 
   const response = await fetch(
     `${SUPABASE_URL}/functions/v1/chat-create-campaign`,
     {
-      method: 'POST',
-      headers,
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: authHeader.Authorization,
-        apikey: authHeader.apikey,
+        Authorization: authHeader,
       },
       body: JSON.stringify({
         campaign_name: plan.campaign_name,
