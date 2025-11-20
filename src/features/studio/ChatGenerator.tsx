@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Upload, Wand2, Download, X, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -147,8 +147,39 @@ export function ChatGenerator() {
   const [orderSummaries, setOrderSummaries] = useState<OrderSummary[]>([]);
   const [orderSummariesLoading, setOrderSummariesLoading] = useState(false);
   const [orderSummariesError, setOrderSummariesError] = useState<string | null>(null);
+  const prefillAppliedRef = useRef(false);
 
   const { toast: showToast } = useToast();
+
+  useEffect(() => {
+    if (prefillAppliedRef.current) return;
+
+    const state = location.state as
+      | { prefillPrompt?: string | null; prefillBrief?: Record<string, any> }
+      | null;
+    const params = new URLSearchParams(location.search);
+
+    const promptFromParams =
+      state?.prefillPrompt || params.get("prefill") || params.get("topic");
+    if (promptFromParams) {
+      setPrompt(promptFromParams);
+    }
+
+    const format = (state?.prefillBrief?.format as string | null) || params.get("mode");
+    if (format === "video") {
+      setContentType("video");
+    } else if (format === "image" || format === "carousel") {
+      setContentType("image");
+    }
+
+    const ratio =
+      (state?.prefillBrief?.ratio as string | null) || params.get("ratio") || undefined;
+    if (ratio === "1:1" || ratio === "9:16" || ratio === "16:9") {
+      setAspectRatio(ratio);
+    }
+
+    prefillAppliedRef.current = true;
+  }, [location.search, location.state]);
 
   const jobBadgeVariant = (status: string): "default" | "secondary" | "outline" | "destructive" => {
     switch (status) {

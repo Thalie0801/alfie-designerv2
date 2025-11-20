@@ -6,6 +6,7 @@ export interface CampaignAssetPlan {
   topic: string;
   slides?: number;
   brandKit?: unknown;
+  config?: Record<string, any>;
 }
 
 export interface CampaignPlan {

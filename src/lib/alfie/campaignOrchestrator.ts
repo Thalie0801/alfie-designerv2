@@ -5,7 +5,27 @@
 
 import { getAuthHeader } from "@/lib/auth";
 import { SUPABASE_URL } from "@/config/env";
-import type { CampaignPlan, CreateCampaignResponse } from "@/types/campaign";
+import type {
+  CampaignAssetPlan,
+  CampaignPlan,
+  CreateCampaignResponse,
+} from "@/types/campaign";
+
+interface GenerateAssetsResponse {
+  ok: boolean;
+  message?: string;
+  order_id?: string;
+}
+
+export type CampaignTaskPayload = {
+  type: "image" | "carousel" | "video";
+  prompt: string;
+  ratio: "1:1" | "9:16" | "16:9" | "4:5";
+  slide_count?: number | null;
+  brand_kit_id?: string;
+  style?: string;
+  variant?: string;
+};
 
 /**
  * Detect if a user message is asking to create a campaign
@@ -138,6 +158,81 @@ export async function createCampaignFromPlan(
 
   if (!result.ok) {
     throw new Error(result.message || "Failed to create campaign");
+  }
+
+  return result;
+}
+
+const normalizeTaskToAsset = (task: CampaignTaskPayload): CampaignAssetPlan => ({
+  type: task.type,
+  count: 1,
+  topic: task.prompt,
+  slides: task.slide_count ?? undefined,
+  brandKit: task.brand_kit_id,
+  config: {
+    prompt: task.prompt,
+    ratio: task.ratio,
+    slide_count: task.slide_count,
+    brand_kit_id: task.brand_kit_id,
+    style: task.style,
+    variant: task.variant,
+  },
+});
+
+export function tasksToAssetsPayload(
+  tasks: CampaignTaskPayload[]
+): CampaignAssetPlan[] {
+  // TODO: déduire les crédits en fonction du nombre de tasks
+  // TODO: enregistrer un variant A/B pour certains assets (ex: marquer les tasks avec "variant": "A" | "B")
+  return tasks.map(normalizeTaskToAsset);
+}
+
+const resolveBrandKitId = (taskBrandKitId: string | undefined, brandKit?: any) => {
+  if (taskBrandKitId && taskBrandKitId !== "CURRENT_USER_BRAND_KIT") return taskBrandKitId;
+  if (brandKit?.id) return brandKit.id as string;
+  return taskBrandKitId;
+};
+
+export async function createCampaignFromTasks(
+  campaignName: string,
+  tasks: CampaignTaskPayload[],
+  brandKit?: any
+): Promise<GenerateAssetsResponse> {
+  const normalizedTasks = tasks.map((task) => ({
+    ...task,
+    brand_kit_id: resolveBrandKitId(task.brand_kit_id, brandKit),
+  }));
+
+  const authHeader = await getAuthHeader();
+
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-assets`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeader,
+    },
+    body: JSON.stringify({
+      campaign_name: campaignName,
+      tasks: normalizedTasks,
+      brandKit,
+    }),
+  });
+
+  if (!response.ok) {
+    let errorMessage = "Failed to launch asset generation";
+    try {
+      const error = await response.json();
+      errorMessage = error.message || errorMessage;
+    } catch {
+      // ignore
+    }
+    throw new Error(errorMessage);
+  }
+
+  const result = (await response.json()) as GenerateAssetsResponse;
+
+  if (!result.ok) {
+    throw new Error(result.message || "Asset generation failed");
   }
 
   return result;

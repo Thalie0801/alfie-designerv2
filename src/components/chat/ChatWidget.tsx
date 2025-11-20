@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { MessageCircle, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useBrief, type Brief } from "@/hooks/useBrief";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { detectContentIntent, detectPlatformHelp } from "@/lib/chat/detect";
@@ -23,6 +24,7 @@ export default function ChatWidget() {
 
   const brief = useBrief();
   const { brandKit } = useBrandKit();
+  const navigate = useNavigate();
 
   const BRAND = useMemo(
     () =>
@@ -365,7 +367,12 @@ export default function ChatWidget() {
     if (brief.state.cta) params.set("cta", brief.state.cta);
 
     const url = `/studio?${params.toString()}`;
-    window.location.assign(url);
+    navigate(url, {
+      state: {
+        prefillPrompt: brief.state.topic,
+        prefillBrief: brief.state,
+      },
+    });
   }
 
   // --------- ROUTAGE PLATEFORME ---------

@@ -18,6 +18,8 @@ import { slideUrl } from "@/lib/cloudinary/imageUrls";
 import { extractCloudNameFromUrl } from "@/lib/cloudinary/utils";
 import type { AlfieIntent } from "@/lib/types/alfie";
 import { GenerationError, triggerGenerationFromChat } from "@/lib/alfie/generation";
+import { CampaignActionCard } from "@/components/chat/CampaignActionCard";
+import type { CampaignTaskPayload } from "@/lib/alfie/campaignOrchestrator";
 
 // =====================
 // Détection d'intention vidéo
@@ -203,6 +205,39 @@ export function AlfieChat() {
   const [conversationState, setConversationState] = useState<ConversationState>("idle");
   const [expectedTotal, setExpectedTotal] = useState<number | null>(null);
   const [lastContext, setLastContext] = useState<any | null>(null);
+  const parseCampaignJson = useCallback(
+    (
+      message: Message,
+    ): { campaignName: string; tasks: CampaignTaskPayload[]; rawPayload: any } | null => {
+      if (message.role !== "assistant") return null;
+      const raw = message.content?.trim();
+
+      if (!raw || !raw.startsWith("{") || !raw.includes("\"tasks\"")) return null;
+
+      try {
+        const parsed = JSON.parse(raw) as {
+          campaign_name?: unknown;
+          tasks?: unknown;
+        };
+
+        if (
+          typeof parsed.campaign_name === "string" &&
+          Array.isArray(parsed.tasks)
+        ) {
+          return {
+            campaignName: parsed.campaign_name,
+            tasks: parsed.tasks as CampaignTaskPayload[],
+            rawPayload: parsed,
+          };
+        }
+      } catch (error) {
+        console.warn("[Chat] Failed to parse campaign JSON", error);
+      }
+
+      return null;
+    },
+    [],
+  );
 
   // Subscription aux assets de l'order
   const { assets: orderAssets, total: orderTotal } = useLibraryAssetsSubscription(orderId);
@@ -919,7 +954,23 @@ export function AlfieChat() {
               {/* Message texte */}
               {(!message.type || message.type === "text") && (
                 <div className="space-y-2">
-                  <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+                  {(() => {
+                    const campaignPayload = parseCampaignJson(message);
+                    if (campaignPayload) {
+                      return (
+                        <CampaignActionCard
+                          campaignName={campaignPayload.campaignName}
+                          tasks={campaignPayload.tasks}
+                          brandKit={brandKit}
+                          rawPayload={campaignPayload.rawPayload}
+                        />
+                      );
+                    }
+
+                    return (
+                      <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+                    );
+                  })()}
 
                   {/* Reasoning */}
                   {message.reasoning && (
