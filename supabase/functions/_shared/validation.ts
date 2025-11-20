@@ -96,6 +96,11 @@ export const CheckoutSchema = z.object({
     .optional()
     .or(z.literal('')),
   email: z.string().email('Email invalide').optional(),
+  coupon_code: z.string()
+    .trim()
+    .max(50, 'Code promo trop long')
+    .optional()
+    .or(z.literal('')),
 });
 
 export const VerifyPaymentSchema = z.object({

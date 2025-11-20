@@ -11,7 +11,8 @@ export function useStripeCheckout() {
     plan: 'starter' | 'pro' | 'studio' | 'enterprise',
     billingPeriod: 'monthly' | 'annual' = 'monthly',
     brandName?: string,
-    guestEmail?: string
+    guestEmail?: string,
+    couponCode?: string
   ) => {
     setLoading(true);
     try {
@@ -23,7 +24,8 @@ export function useStripeCheckout() {
           billing_period: billingPeriod,
           affiliate_ref: affiliateRef,
           brand_name: brandName,
-          email: guestEmail
+          email: guestEmail,
+          coupon_code: couponCode
         },
       });
 
