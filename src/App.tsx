@@ -30,6 +30,7 @@ import Library from "./pages/Library";
 import Videos from "./pages/Videos";
 import CloudinaryTest from "./pages/CloudinaryTest";
 import Creator from "./pages/Creator";
+import Campaigns from "./pages/Campaigns";
 
 import ActivateAccess from "./pages/onboarding/Activate";
 import { AlfieChat } from "./components/AlfieChat"; // si tu gardes /chat
@@ -114,6 +115,16 @@ const AppRoutes = () => {
             <ProtectedRoute>
               <AppLayoutWithSidebar>
                 <Library />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/campaigns"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <Campaigns />
               </AppLayoutWithSidebar>
             </ProtectedRoute>
           }

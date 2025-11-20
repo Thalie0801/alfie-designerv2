@@ -1,8 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/config/env";
 
-import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/config/env";
-
 // DEBUG TEMPORAIRE
 console.log("[Alfie] SUPABASE_URL =", SUPABASE_URL);
 console.log("[Alfie] SUPABASE_ANON_KEY prefix =", SUPABASE_ANON_KEY?.slice(0, 12));
