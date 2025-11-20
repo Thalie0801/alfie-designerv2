@@ -38,12 +38,6 @@ Deno.serve(async (req) => {
 
   console.log("[create-checkout] function invoked");
 
-  const supabaseClient = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-    { auth: { persistSession: false } }
-  );
-
   try {
     const body = await req.json();
     
@@ -64,31 +58,8 @@ Deno.serve(async (req) => {
 
     const priceId = PRICE_IDS[billingType][planType];
     
-    // Try to authenticate user (optional for guest checkout)
-    const authHeader = req.headers.get("Authorization");
-    let userEmail: string | undefined;
-    let userId: string | undefined;
-    
-    // Only try to authenticate if we have a valid Bearer token (not the anon key)
-    if (authHeader && authHeader.startsWith("Bearer eyJ")) {
-      try {
-        const token = authHeader.replace("Bearer ", "");
-        const { data, error } = await supabaseClient.auth.getUser(token);
-        if (!error && data.user) {
-          userEmail = data.user.email;
-          userId = data.user.id;
-        }
-      } catch (authError) {
-        console.log("Auth check failed, proceeding as guest:", authError);
-      }
-    }
-    
-    // Use email from request body if not authenticated
-    if (!userEmail) {
-      userEmail = email;
-    }
-    
-    if (!userEmail) {
+    // Email is required (provided by frontend for both auth and guest users)
+    if (!email) {
       throw new Error("Email is required for checkout");
     }
 
@@ -98,8 +69,8 @@ Deno.serve(async (req) => {
 
     // Check if customer exists
     let customerId;
-    if (userEmail) {
-      const customers = await stripe.customers.list({ email: userEmail, limit: 1 });
+    if (email) {
+      const customers = await stripe.customers.list({ email: email, limit: 1 });
       if (customers.data.length > 0) {
         customerId = customers.data[0].id;
       }
@@ -109,7 +80,7 @@ Deno.serve(async (req) => {
     
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      customer_email: customerId ? undefined : userEmail,
+      customer_email: customerId ? undefined : email,
       payment_method_types: ['card'],
       line_items: [
         {
@@ -122,8 +93,8 @@ Deno.serve(async (req) => {
       cancel_url: `${origin}/?payment=canceled`,
       metadata: {
         plan,
-        user_id: userId || "",
-        email: userEmail,
+        user_id: "",  // Will be set in verify-payment
+        email: email,
         affiliate_ref: affiliate_ref || "",
         brand_name: brand_name || "",
       },
