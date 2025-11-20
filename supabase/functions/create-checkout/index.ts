@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: validation.error }, 400);
     }
     
-    const { plan, billing_period, affiliate_ref, brand_name, email, coupon_code } = validation.data;
+    const { plan, billing_period, affiliate_ref, brand_name, email } = validation.data;
     
     const billingType = billing_period === 'annual' ? 'annual' : 'monthly';
     const planType = plan as 'starter' | 'pro' | 'studio';
@@ -78,8 +78,7 @@ Deno.serve(async (req) => {
 
     const origin = req.headers.get("origin") || "http://localhost:8080";
     
-    // Build session options
-    const sessionOptions: any = {
+    const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : email,
       payment_method_types: ['card'],
@@ -99,16 +98,7 @@ Deno.serve(async (req) => {
         affiliate_ref: affiliate_ref || "",
         brand_name: brand_name || "",
       },
-    };
-
-    // Add coupon if provided
-    if (coupon_code && coupon_code.trim() !== '') {
-      sessionOptions.discounts = [{
-        coupon: coupon_code.trim().toUpperCase(),
-      }];
-    }
-    
-    const session = await stripe.checkout.sessions.create(sessionOptions);
+    });
 
     return jsonResponse({ url: session.url });
   } catch (error: any) {
