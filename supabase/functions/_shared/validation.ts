@@ -83,7 +83,11 @@ export const CheckoutSchema = z.object({
     errorMap: () => ({ message: 'Plan invalide' })
   }),
   billing_period: z.enum(['monthly', 'annual']).default('monthly'),
-  affiliate_ref: z.string().uuid('Référence affilié invalide').optional().or(z.literal('')),
+  affiliate_ref: z.union([
+    z.string().uuid('Référence affilié invalide'),
+    z.literal(''),
+    z.null()
+  ]).optional(),
   brand_name: z.string()
     .trim()
     .min(1, 'Nom de marque requis')
