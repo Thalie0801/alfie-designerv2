@@ -2,25 +2,9 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { CheckoutSchema, validateInput } from "../_shared/validation.ts";
 
-import { corsHeaders } from "../_shared/cors.ts";
-
-const ALLOWED_ORIGINS = [
-  "https://alfie-designer.com",
-  "https://alfie-designer.lovable.app",
-  "http://localhost:5173",
-  "http://localhost:8080",
-];
-
-const getCorsHeaders = (req: Request) => {
-  const origin = req.headers.get("origin");
-  const allowedOrigin =
-    origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-
-  return {
-    ...corsHeaders,
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Credentials": "true",
-  };
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 const PRICE_IDS = {
@@ -36,11 +20,11 @@ const PRICE_IDS = {
   }
 };
 
-const jsonResponse = (req: Request, payload: unknown, status = 200) =>
+const jsonResponse = (payload: unknown, status = 200) =>
   new Response(JSON.stringify(payload), {
     status,
     headers: {
-      ...getCorsHeaders(req),
+      ...corsHeaders,
       "Content-Type": "application/json",
     },
   });
@@ -48,10 +32,8 @@ const jsonResponse = (req: Request, payload: unknown, status = 200) =>
 // Plan configuration (quotas are applied in verify-payment after successful payment)
 
 Deno.serve(async (req) => {
-  const requestCorsHeaders = getCorsHeaders(req);
-
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: requestCorsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   console.log("[create-checkout] function invoked");
@@ -68,7 +50,7 @@ Deno.serve(async (req) => {
     // Validate input with Zod
     const validation = validateInput(CheckoutSchema, body);
     if (!validation.success) {
-      return jsonResponse(req, { error: validation.error }, 400);
+      return jsonResponse({ error: validation.error }, 400);
     }
     
     const { plan, billing_period, affiliate_ref, brand_name, email } = validation.data;
@@ -138,9 +120,9 @@ Deno.serve(async (req) => {
       },
     });
 
-    return jsonResponse(req, { url: session.url });
+    return jsonResponse({ url: session.url });
   } catch (error: any) {
     console.error("Error in create-checkout:", error);
-    return jsonResponse(req, { error: error.message }, 500);
+    return jsonResponse({ error: error.message }, 500);
   }
 });

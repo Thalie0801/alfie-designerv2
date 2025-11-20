@@ -12,20 +12,20 @@ export default function AlfieLanding() {
     <div className="min-h-screen bg-background text-foreground">
       <LandingHeader />
 
-      {/* SECTION 1 : Hero avec gradient (fallback temporaire) */}
-      <section className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-alfie-mint via-alfie-lilac to-alfie-pink">
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40" />
-        <div className="relative z-10 px-4 text-center">
-          <h1 className="mb-6 text-5xl font-extrabold tracking-tight text-white drop-shadow-lg sm:text-6xl md:text-7xl">
-            Alfie Designer
-          </h1>
-          <p className="mx-auto max-w-2xl text-xl text-white/90 drop-shadow-md sm:text-2xl">
-            L'agent IA qui transforme tes idées en designs professionnels
-          </p>
-        </div>
-        <div className="pointer-events-none absolute bottom-10 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 text-white/90">
-          <span className="text-xs drop-shadow md:text-sm">Fais défiler pour découvrir</span>
-          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/70 text-base animate-bounce drop-shadow">
+      {/* SECTION 1 : vidéo immersive */}
+      <section className="relative h-screen overflow-hidden">
+        <video
+          src="/videos/hero-background.mp4"
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/35" />
+        <div className="pointer-events-none absolute bottom-10 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 text-white/80">
+          <span className="text-xs md:text-sm">Fais défiler pour découvrir Alfie</span>
+          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/60 text-base animate-bounce">
             ↓
           </div>
         </div>
