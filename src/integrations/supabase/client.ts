@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/config/env";
 
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/config/env";
 

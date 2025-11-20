@@ -3,6 +3,9 @@
  * Handles campaign creation from Chat Alfie
  */
 
+import { getAuthHeader } from '@/lib/auth';
+import { SUPABASE_URL } from '@/config/env';
+import type { CampaignPlan, CreateCampaignResponse } from '@/types/campaign';
 import { getAuthHeader } from "@/lib/auth";
 import { SUPABASE_URL } from "@/config/env";
 import type { CampaignPlan, CreateCampaignResponse } from "@/types/campaign";
@@ -106,10 +109,16 @@ export async function createCampaignFromPlan(
   brandKit?: unknown
 ): Promise<CreateCampaignResponse> {
   const authHeader = await getAuthHeader();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...authHeader,
+  };
 
   const response = await fetch(
     `${SUPABASE_URL}/functions/v1/chat-create-campaign`,
     {
+      method: 'POST',
+      headers,
       method: "POST",
       headers: {
         "Content-Type": "application/json",
