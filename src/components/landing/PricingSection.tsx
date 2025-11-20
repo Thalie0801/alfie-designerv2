@@ -62,6 +62,7 @@ const getPriceLabel = (isAnnual: boolean) => (isAnnual ? " / an" : " / mois");
 export function PricingSection() {
   const [isAnnual, setIsAnnual] = useState(false);
   const [guestEmail, setGuestEmail] = useState("");
+  const [promoCode, setPromoCode] = useState("");
   const { createCheckout, loading: checkoutLoading } = useStripeCheckout();
   const { user } = useAuth();
   
@@ -70,7 +71,7 @@ export function PricingSection() {
       toast.error("Veuillez entrer votre email pour continuer");
       return;
     }
-    await createCheckout(plan, isAnnual ? "annual" : "monthly", undefined, guestEmail || undefined);
+    await createCheckout(plan, isAnnual ? "annual" : "monthly", undefined, guestEmail || undefined, promoCode || undefined);
   };
 
   return (
@@ -124,6 +125,8 @@ export function PricingSection() {
               isAuthenticated={!!user}
               guestEmail={guestEmail}
               onEmailChange={setGuestEmail}
+              promoCode={promoCode}
+              onPromoCodeChange={setPromoCode}
             />
           ))}
         </div>
