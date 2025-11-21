@@ -335,36 +335,74 @@ Deno.serve(async (req) => {
 
     const nonNullBrandSnapshot = brandSnapshot ?? {};
 
-    // 7) Créer les jobs avec le contenu structuré DÈS LA CRÉATION + guards null-safety
-    console.log(`[CreateCarousel] Creating jobs with slideContent from plan...`);
-    const jobs = Array.from({ length: count }, (_, i) => {
+    // 7) Créer UN job unique dans job_queue avec toutes les slides
+    console.log(`[CreateCarousel] Creating job in job_queue with slideContent from plan...`);
+    
+    // Préparer les slides avec leur contenu structuré
+    const slides = Array.from({ length: count }, (_, i) => {
       const slide = carouselPlan.slides[i] || {};
       return {
-        job_set_id: set.id,
-        index_in_set: i,
-        status: "queued",
-        prompt,
+        index: i,
         slide_template: slide.type || (i === 0 ? "hero" : i === count-1 ? "cta" : "body"),
-        brand_snapshot: nonNullBrandSnapshot,
-        metadata: {
-          role: i === 0 ? "key_visual" : "variant",
-          slideContent: {
-            type: slide.type || (i === 0 ? "hero" : i === count-1 ? "cta" : "body"),
-            title: slide.title ?? `Slide ${i + 1}`,
-            subtitle: slide.subtitle ?? "",
-            punchline: slide.punchline ?? "",
-            bullets: Array.isArray(slide.bullets) ? slide.bullets : [],
-            cta_primary: slide.cta_primary ?? slide.cta ?? "",
-            cta_secondary: slide.cta_secondary ?? "",
-            badge: slide.badge ?? "",
-            kpis: Array.isArray(slide.kpis) ? slide.kpis : [],
-            note: slide.note ?? ""
-          },
+        role: i === 0 ? "key_visual" : "variant",
+        slideContent: {
+          type: slide.type || (i === 0 ? "hero" : i === count-1 ? "cta" : "body"),
+          title: slide.title ?? `Slide ${i + 1}`,
+          subtitle: slide.subtitle ?? "",
+          punchline: slide.punchline ?? "",
+          bullets: Array.isArray(slide.bullets) ? slide.bullets : [],
+          cta_primary: slide.cta_primary ?? slide.cta ?? "",
+          cta_secondary: slide.cta_secondary ?? "",
+          badge: slide.badge ?? "",
+          kpis: Array.isArray(slide.kpis) ? slide.kpis : [],
+          note: slide.note ?? ""
         },
       };
     });
 
-    const { error: jobsErr } = await adminClient.from("jobs").insert(jobs);
+    const { error: jobsErr } = await adminClient.from("job_queue").insert({
+      user_id: user.id,
+      brand_id: brandId,
+      type: "render_carousels",
+      status: "queued",
+      payload: {
+        jobSetId: set.id,
+        userId: user.id,
+        brandId: brandId,
+        prompt,
+        count,
+        aspectRatio: aspectRatio || "4:5",
+        brand_snapshot: nonNullBrandSnapshot,
+        slides,
+        carouselPlan
+      }
+    });
+
+    if (jobsErr) {
+      console.error("[CreateCarousel] Job creation failed:", jobsErr);
+      await adminClient.rpc("refund_brand_quotas", {
+        p_brand_id: brandId,
+        p_visuals_count: count,
+      });
+      throw new Error(`Job creation failed: ${jobsErr.message}`);
+    }
+
+    console.log(`[CreateCarousel] Job created for set ${set.id} with structured content`);
+
+    // Déclencher le worker immédiatement
+    try {
+      console.log(`[CreateCarousel] Triggering alfie-job-worker...`);
+      const { error: workerError } = await adminClient.functions.invoke("alfie-job-worker", {
+        body: { trigger: "chat-create-carousel" }
+      });
+      if (workerError) {
+        console.error("[CreateCarousel] Worker trigger failed:", workerError);
+      } else {
+        console.log("[CreateCarousel] Worker triggered successfully");
+      }
+    } catch (workerErr) {
+      console.error("[CreateCarousel] Worker invocation error:", workerErr);
+    }
 
     if (jobsErr) {
       console.error("[CreateCarousel] Jobs creation failed:", jobsErr);
