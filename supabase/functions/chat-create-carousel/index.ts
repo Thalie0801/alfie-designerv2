@@ -384,7 +384,7 @@ Deno.serve(async (req) => {
         p_brand_id: brandId,
         p_visuals_count: count,
       });
-      throw new Error(`Job creation failed: ${jobsErr.message}`);
+      throw new Error(`Job creation failed: ${String(jobsErr)}`);
     }
 
     console.log(`[CreateCarousel] Job created for set ${set.id} with structured content`);
@@ -403,17 +403,6 @@ Deno.serve(async (req) => {
     } catch (workerErr) {
       console.error("[CreateCarousel] Worker invocation error:", workerErr);
     }
-
-    if (jobsErr) {
-      console.error("[CreateCarousel] Jobs creation failed:", jobsErr);
-      await adminClient.rpc("refund_brand_quotas", {
-        p_brand_id: brandId,
-        p_visuals_count: count,
-      });
-      throw new Error(`Jobs creation failed: ${jobsErr.message}`);
-    }
-
-    console.log(`[CreateCarousel] ${count} jobs created for set ${set.id} with structured content`)
 
     // 6) Marquer l'idempotency comme appliquée
     await adminClient
