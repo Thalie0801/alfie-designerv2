@@ -6,6 +6,7 @@ import { useBrandKit } from "@/hooks/useBrandKit";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthHeader } from "@/lib/auth";
 import { uploadToChatBucket } from "@/lib/chatUploads";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import TextareaAutosize from "react-textarea-autosize";
 import { CreateHeader } from "@/components/create/CreateHeader";
@@ -178,12 +179,28 @@ function extractSimpleGenerationIntent(message: string, brandId: string | null):
   };
 }
 
+const PERSONA_MESSAGES: Record<"coach" | "da" | "director", string> = {
+  coach:
+    "Tu discutes maintenant avec le Coach Stratégie. Je t’aide à clarifier ton offre, ton audience et l’objectif de tes contenus.",
+  da:
+    "Tu discutes maintenant avec le Directeur Artistique. Je t’aide à définir ton style visuel, tes couleurs et tes compositions.",
+  director:
+    "Tu discutes maintenant avec le Directeur de Studio. Je t’aide à organiser la production : formats, volumes et utilisation de tes quotas.",
+};
+
+const PERSONA_HINTS: Record<"coach" | "da" | "director", string> = {
+  coach: "Pose-lui des questions sur ta niche, ton audience, tes offres ou ta stratégie de contenu.",
+  da: "Parlez style visuel, palettes de couleurs, moodboard ou ambiance pour vos créations.",
+  director: "Précise les formats, les volumes et la cadence de production que tu veux lancer dans le Studio.",
+};
+
 // =====================
 // COMPOSANT PRINCIPAL
 // =====================
 export function AlfieChat() {
   const { user } = useAuth();
   const { activeBrandId, brandKit } = useBrandKit();
+  const navigate = useNavigate();
 
   // États
   const [messages, setMessages] = useState<Message[]>([
@@ -205,6 +222,8 @@ export function AlfieChat() {
   const [conversationState, setConversationState] = useState<ConversationState>("idle");
   const [expectedTotal, setExpectedTotal] = useState<number | null>(null);
   const [lastContext, setLastContext] = useState<any | null>(null);
+  const [persona, setPersona] = useState<"coach" | "da" | "director">("coach");
+  const [sendingToStudio, setSendingToStudio] = useState(false);
   const parseCampaignJson = useCallback(
     (
       message: Message,
@@ -342,6 +361,15 @@ export function AlfieChat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const handlePersonaChange = useCallback(
+    (nextPersona: "coach" | "da" | "director") => {
+      if (nextPersona === persona) return;
+      setPersona(nextPersona);
+      addMessage({ role: "assistant", content: PERSONA_MESSAGES[nextPersona], type: "text" });
+    },
+    [addMessage, persona],
+  );
 
   // System message during generation
   useEffect(() => {
@@ -925,6 +953,62 @@ export function AlfieChat() {
     [handleSend, isLoading, lastContext, orderId, planCarouselSlides],
   );
 
+  const handleSendToStudio = useCallback(async () => {
+    if (sendingToStudio) return;
+
+    if (!activeBrandId) {
+      toast.error("Sélectionne d'abord une marque pour continuer.");
+      return;
+    }
+
+    if (!user?.id) {
+      toast.error("Connecte-toi pour envoyer un brief au Studio.");
+      return;
+    }
+
+    const lastUserMessage = [...messages].filter((m) => m.role === "user").pop();
+    if (!lastUserMessage) {
+      toast.error("Écris d’abord ce que tu veux que le Studio génère.");
+      return;
+    }
+
+    const baseIntent = extractSimpleGenerationIntent(lastUserMessage.content, activeBrandId);
+    const intent: AlfieIntent =
+      baseIntent ?? {
+        brandId: activeBrandId,
+        format: "image",
+        count: 1,
+        topic: lastUserMessage.content.trim() || "Brief Studio",
+      };
+
+    setSendingToStudio(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-media", {
+        body: { userId: user.id, intent },
+      });
+
+      const payload = (data as any) ?? {};
+      const orderIdFromPayload = payload?.data?.orderId;
+
+      if (error || !payload?.ok || !orderIdFromPayload) {
+        console.error("[Chat] Send to Studio error:", error || payload?.error);
+        toast.error("Impossible d'envoyer le brief au Studio. Réessaie dans un instant.");
+        return;
+      }
+
+      navigate(`/studio?orderId=${orderIdFromPayload}`, {
+        state: { prefillPrompt: intent.topic, prefillBrief: intent },
+      });
+      toast.success("Brief envoyé au Studio !");
+    } catch (err) {
+      console.error("[Chat] Send to Studio exception:", err);
+      toast.error("Une erreur est survenue pendant l'envoi au Studio.");
+    } finally {
+      setSendingToStudio(false);
+    }
+  }, [activeBrandId, messages, navigate, sendingToStudio, user?.id]);
+
   // =====================
   // Rendu
   // =====================
@@ -936,8 +1020,44 @@ export function AlfieChat() {
       {/* Quota Bar */}
       {activeBrandId && <QuotaBar activeBrandId={activeBrandId} />}
 
+      <div className="px-4 pb-2 flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { key: "coach", label: "Coach Stratégie" },
+            { key: "da", label: "Directeur Artistique" },
+            { key: "director", label: "Directeur de Studio" },
+          ].map((personaItem) => (
+            <Button
+              key={personaItem.key}
+              variant={persona === personaItem.key ? "default" : "outline"}
+              size="sm"
+              className={`rounded-full ${persona === personaItem.key ? "shadow-md" : "bg-muted"}`}
+              onClick={() => handlePersonaChange(personaItem.key as "coach" | "da" | "director")}
+            >
+              {personaItem.label}
+            </Button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-muted-foreground">
+            Tu discutes avec : <span className="font-semibold text-foreground">{PERSONA_MESSAGES[persona].split(".")[0]}</span>
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void handleSendToStudio()}
+            disabled={sendingToStudio || isLoading}
+            className="gap-2"
+          >
+            {sendingToStudio ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Envoyer au Studio
+          </Button>
+        </div>
+      </div>
+
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         {messages.map((message) => (
           <div key={message.id} className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
             {message.role === "assistant" && (
@@ -1312,6 +1432,8 @@ export function AlfieChat() {
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
+
+        <p className="mt-2 text-xs text-muted-foreground">{PERSONA_HINTS[persona]}</p>
       </div>
     </div>
   );

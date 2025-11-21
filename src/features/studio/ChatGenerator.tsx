@@ -123,7 +123,7 @@ export function ChatGenerator() {
   const orderId =
     useMemo(() => {
       const params = new URLSearchParams(location.search);
-      return params.get("order");
+      return params.get("orderId") || params.get("order");
     }, [location.search]) || null;
   const orderLabel = useMemo(
     () => (orderId ? `Commande ${orderId}` : "Toutes les commandes"),
@@ -180,6 +180,46 @@ export function ChatGenerator() {
 
     prefillAppliedRef.current = true;
   }, [location.search, location.state]);
+
+  useEffect(() => {
+    if (!orderId) return;
+
+    const fetchOrderPrefill = async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("brief_json")
+        .eq("id", orderId)
+        .maybeSingle();
+
+      if (error || !data) {
+        toast.error("Impossible de charger la commande Studio.");
+        return;
+      }
+
+      const rawBrief = data.brief_json as Record<string, any>;
+      const intent = (rawBrief as any)?.intent || (rawBrief as any)?.plan?.intent || null;
+
+      if (!intent) return;
+
+      if (typeof intent.topic === "string") {
+        setPrompt(intent.topic);
+      }
+
+      if (intent.format === "video") {
+        setContentType("video");
+      } else if (intent.format === "image" || intent.format === "carousel") {
+        setContentType("image");
+      }
+
+      if (intent.ratio === "9:16" || intent.ratio === "16:9" || intent.ratio === "1:1") {
+        setAspectRatio(intent.ratio);
+      } else if (intent.ratio === "4:5") {
+        setAspectRatio("1:1");
+      }
+    };
+
+    fetchOrderPrefill();
+  }, [orderId]);
 
   const jobBadgeVariant = (status: string): "default" | "secondary" | "outline" | "destructive" => {
     switch (status) {

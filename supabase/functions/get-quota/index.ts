@@ -1,5 +1,6 @@
 import { edgeHandler } from '../_shared/edgeHandler.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
+import { ADMIN_EMAILS } from '../_shared/env.ts';
 
 export default {
   async fetch(req: Request) {
@@ -21,6 +22,11 @@ export default {
 
       const { brand_id } = input;
 
+      const adminEmails = (ADMIN_EMAILS ?? '')
+        .split(',')
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean);
+
       // 1. Lire le profil utilisateur pour les quotas de base
       const { data: profile, error: profileError } = await supabaseRls
         .from('profiles')
@@ -32,6 +38,14 @@ export default {
         console.error('Profile error:', profileError);
         throw new Error('PROFILE_NOT_FOUND');
       }
+
+      const userEmail = user.email?.toLowerCase() ?? '';
+      const { data: roles } = await supabaseRls
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      const isAdmin = adminEmails.includes(userEmail) || !!roles?.some((r) => r.role === 'admin');
 
       // 2. ✅ FIX: Calculer la période actuelle YYYYMM
       const now = new Date();
@@ -93,6 +107,16 @@ export default {
         }
       }
 
+      if (isAdmin) {
+        const unlimited = 1_000_000_000;
+        finalQuotas = {
+          ...finalQuotas,
+          woofs_quota: unlimited,
+          visuals_quota: unlimited,
+          videos_quota: unlimited,
+        };
+      }
+
       const woofs_remaining = Math.max(0, finalQuotas.woofs_quota - finalQuotas.woofs_used);
       const visuals_remaining = Math.max(0, finalQuotas.visuals_quota - finalQuotas.visuals_used);
       const videos_remaining = Math.max(0, finalQuotas.videos_quota - finalQuotas.videos_used);
@@ -112,6 +136,7 @@ export default {
         videos_remaining,
         plan: profile.plan || 'starter',
         reset_date: resetDate,
+        is_admin: isAdmin,
       };
     });
   }

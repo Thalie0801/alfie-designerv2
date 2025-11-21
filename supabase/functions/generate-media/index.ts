@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";
+import { ADMIN_EMAILS } from "../_shared/env.ts";
 const IntentSchema = z.object({
   brandId: z.string().uuid(),
   format: z.enum(["image", "carousel"]),
@@ -68,6 +69,20 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false },
   });
 
+  const adminEmails = (ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+
+  const { data: authUser } = await supabase.auth.admin.getUserById(userId);
+  const userEmail = authUser?.user?.email?.toLowerCase() ?? "";
+  const { data: roleRows } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId);
+
+  const isAdmin = adminEmails.includes(userEmail) || !!roleRows?.some((r) => r.role === "admin");
+
   const { data: brand, error: brandError } = await supabase
     .from("brands")
     .select("id, quota_images, images_used")
@@ -87,7 +102,7 @@ Deno.serve(async (req: Request) => {
   const limit = typeof brand.quota_images === "number" ? brand.quota_images : 0;
   const used = typeof brand.images_used === "number" ? brand.images_used : 0;
 
-  if (limit > 0 && used + imagesToConsume > limit * 1.1) {
+  if (!isAdmin && limit > 0 && used + imagesToConsume > limit * 1.1) {
     return respond(403, {
       ok: false,
       error: "quota_exceeded",
