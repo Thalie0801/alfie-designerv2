@@ -32,6 +32,21 @@ export default {
         .select('role')
         .eq('user_id', user.id);
 
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('plan, granted_by_admin')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error('[alfie-check-quota] profile lookup failed', profileError);
+      }
+
+      const isAdmin =
+        adminEmails.includes((user.email || '').toLowerCase()) ||
+        !!roleRows?.some((r) => r.role === 'admin') ||
+        profile?.plan === 'admin' ||
+        !!profile?.granted_by_admin;
       const isAdmin = adminEmails.includes((user.email || '').toLowerCase()) || !!roleRows?.some((r) => r.role === 'admin');
 
       if (isAdmin) {

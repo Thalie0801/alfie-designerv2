@@ -30,7 +30,7 @@ export default {
       // 1. Lire le profil utilisateur pour les quotas de base
       const { data: profile, error: profileError } = await supabaseRls
         .from('profiles')
-        .select('quota_videos, quota_visuals_per_month, plan, generations_reset_date')
+        .select('quota_videos, quota_visuals_per_month, plan, generations_reset_date, granted_by_admin')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -45,6 +45,11 @@ export default {
         .select('role')
         .eq('user_id', user.id);
 
+      const isAdmin =
+        adminEmails.includes(userEmail) ||
+        !!roles?.some((r) => r.role === 'admin') ||
+        profile.plan === 'admin' ||
+        !!profile.granted_by_admin;
       const isAdmin = adminEmails.includes(userEmail) || !!roles?.some((r) => r.role === 'admin');
 
       // 2. ✅ FIX: Calculer la période actuelle YYYYMM
