@@ -23,12 +23,27 @@ export default function VideoBuilder({
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
+    
+    // Validation du fichier
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    if (f.size > maxSize) {
+      alert('❌ Fichier trop volumineux (max 100MB)');
+      return;
+    }
+    
+    const validTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+    if (!validTypes.includes(f.type)) {
+      alert('❌ Format non supporté. Utilisez MP4, WebM ou MOV.');
+      return;
+    }
+    
     setUploading(true);
     try {
       const r = await uploadAsset(f, { folder: 'alfie/demo/videos' });
       setPublicId(r.public_id);
     } catch (err) {
       console.error('Upload failed:', err);
+      alert('❌ Erreur lors de l\'upload. Veuillez réessayer.');
     } finally {
       setUploading(false);
     }
@@ -127,9 +142,15 @@ export default function VideoBuilder({
       )}
 
       {!cloudName && (
-        <p className="text-sm text-destructive">
-          ⚠️ Cloud name manquant. Configurez VITE_CLOUDINARY_CLOUD_NAME.
-        </p>
+        <div className="p-4 border border-destructive/50 rounded-lg bg-destructive/10">
+          <p className="text-sm text-destructive font-medium">
+            ⚠️ Configuration manquante
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            La variable d'environnement VITE_CLOUDINARY_CLOUD_NAME n'est pas configurée.
+            Contactez l'administrateur.
+          </p>
+        </div>
       )}
     </div>
   );

@@ -56,8 +56,12 @@ export function ContentGenerator() {
 
     // Check quota
     if (!quota.canGenerateImage && contentType === 'image') {
-      toast.error(`Quota mensuel atteint (${quota.imagesUsed}/${quota.quotaImages}). Upgrade ton plan pour continuer !`);
+      toast.error(`🚨 Quota mensuel atteint (${quota.imagesUsed}/${quota.quotaImages}). Upgrade ton plan pour continuer !`);
       return;
+    }
+
+    if (!brandKit) {
+      toast.warning('⚠️ Aucune marque sélectionnée. Le contenu sera généré sans Brand Kit.');
     }
 
     setIsGenerating(true);
@@ -82,13 +86,13 @@ export function ContentGenerator() {
 
       if (data?.error) {
         if (data.code === 'quota_exceeded') {
-          toast.error(data.error);
+          toast.error(`🚨 ${data.error}`);
           await refreshQuota();
           return;
         }
         
         if (data.status === 'not_implemented' || data.status === 'coming_soon') {
-          toast.info(data.error);
+          toast.info(`🚧 ${data.error}`);
           return;
         }
         
@@ -104,7 +108,14 @@ export function ContentGenerator() {
       }
     } catch (error: any) {
       console.error('Generation error:', error);
-      toast.error(error.message || 'Erreur lors de la génération');
+      const userFriendlyMessage = error.message?.includes('quota')
+        ? '🚨 Quota insuffisant. Veuillez upgrader votre plan.'
+        : error.message?.includes('auth')
+        ? '🔒 Erreur d\'authentification. Veuillez vous reconnecter.'
+        : error.message?.includes('network')
+        ? '🌐 Erreur réseau. Vérifiez votre connexion.'
+        : `❌ ${error.message || 'Erreur lors de la génération'}`;
+      toast.error(userFriendlyMessage);
     } finally {
       setIsGenerating(false);
     }

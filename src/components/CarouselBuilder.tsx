@@ -42,12 +42,25 @@ export function CarouselBuilder({ brandId, campaignId, onSlideCreated }: Carouse
 
   const handleUpload = async () => {
     if (!backgroundFile) {
-      toast.error('Please select a background image');
+      toast.error('🖼️ Veuillez sélectionner une image de fond');
+      return;
+    }
+
+    // Validation du fichier
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (backgroundFile.size > maxSize) {
+      toast.error('❌ Image trop volumineuse (max 10MB)');
+      return;
+    }
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(backgroundFile.type)) {
+      toast.error('❌ Format non supporté. Utilisez JPG, PNG ou WebP.');
       return;
     }
 
     if (!brandId || !campaignId) {
-      toast.error('Brand ID and Campaign ID are required');
+      toast.error('⚠️ Brand ID et Campaign ID requis');
       return;
     }
 
@@ -65,7 +78,7 @@ export function CarouselBuilder({ brandId, campaignId, onSlideCreated }: Carouse
       });
 
       setBackgroundPublicId(result.public_id);
-      toast.success('Background uploaded successfully!');
+      toast.success('✅ Image de fond uploadée avec succès !');
       
       if (onSlideCreated) {
         const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string || 'dkad5vdyo';
@@ -79,7 +92,12 @@ export function CarouselBuilder({ brandId, campaignId, onSlideCreated }: Carouse
       }
     } catch (error: any) {
       console.error('Upload error:', error);
-      toast.error(`Upload failed: ${error.message}`);
+      const userMessage = error.message?.includes('network')
+        ? '🌐 Erreur réseau. Vérifiez votre connexion.'
+        : error.message?.includes('quota')
+        ? '🚨 Quota d\'upload atteint.'
+        : `❌ Erreur d'upload: ${error.message}`;
+      toast.error(userMessage);
     } finally {
       setUploading(false);
     }

@@ -24,7 +24,17 @@ export function BulkCarouselGenerator({ brandId }: { brandId: string }) {
 
   const handleGenerate = async () => {
     if (!theme || !campaignName) {
-      toast.error('Please fill in all required fields');
+      toast.error('Veuillez remplir tous les champs requis');
+      return;
+    }
+
+    if (numCarousels > 20) {
+      toast.error('Maximum 20 carrousels par génération');
+      return;
+    }
+
+    if (numSlides > 10) {
+      toast.error('Maximum 10 slides par carrousel');
       return;
     }
 
@@ -37,6 +47,11 @@ export function BulkCarouselGenerator({ brandId }: { brandId: string }) {
       if (textOption === 'excel' && excelData) {
         try {
           parsedExcelData = JSON.parse(excelData);
+          if (!Array.isArray(parsedExcelData)) {
+            toast.error('Les données Excel doivent être un tableau JSON');
+            setIsGenerating(false);
+            return;
+          }
         } catch (e) {
           toast.error('Invalid Excel data format. Expected JSON array.');
           setIsGenerating(false);
@@ -44,6 +59,8 @@ export function BulkCarouselGenerator({ brandId }: { brandId: string }) {
         }
       }
 
+      console.log(`🎨 Génération de ${numCarousels} carrousels avec ${numSlides} slides chacun...`);
+      
       const { data, error } = await supabase.functions.invoke('alfie-generate-carousel-bulk', {
         body: {
           num_carousels: numCarousels,
@@ -73,7 +90,12 @@ export function BulkCarouselGenerator({ brandId }: { brandId: string }) {
       }
     } catch (error: any) {
       console.error('Bulk generation error:', error);
-      toast.error('Failed to generate carousels: ' + error.message);
+      const userMessage = error.message?.includes('quota') 
+        ? 'Quota insuffisant. Veuillez upgrader votre plan.'
+        : error.message?.includes('auth')
+        ? 'Erreur d\'authentification. Veuillez vous reconnecter.'
+        : 'Erreur lors de la génération. Veuillez réessayer.';
+      toast.error(userMessage);
     } finally {
       setIsGenerating(false);
     }
