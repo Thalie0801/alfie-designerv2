@@ -86,44 +86,7 @@ export default {
 
       const isAdminUser = ADMIN_USER_IDS.includes(userId);
 
-      // 1. Vérifier quota (skip for internal calls or admin)
-      if (!isInternalCall && supabaseAuth && !isAdminUser) {
-        try {
-          const { data: checkData, error: checkError } = await supabaseAuth.functions.invoke("alfie-check-quota", {
-            body: { cost_woofs, brand_id },
-          });
-
-          if (checkError) {
-            // ⚠️ On log mais on ne bloque pas la génération si la fonction de quota bug
-            console.error("[alfie-render-image] Quota check failed with error:", checkError);
-          } else if (!checkData?.ok || !checkData.data?.ok) {
-            console.error("[alfie-render-image] Quota check indicates insufficient quota:", checkData);
-            throw new Error("INSUFFICIENT_QUOTA");
-          }
-        } catch (quotaError) {
-          // ⚠️ Safety net : en cas d’exception, on n’empêche pas la génération
-          console.error("[alfie-render-image] Exception while calling alfie-check-quota:", quotaError);
-          // Si tu veux être ultra stricte pour les non-admins, tu peux remettre :
-          // throw new Error('INSUFFICIENT_QUOTA');
-        }
-      } else {
-        console.log("[alfie-render-image] ⏭️ Skipping quota check (internal call or admin user)", {
-          isInternalCall,
-          userId,
-          isAdminUser,
-        });
-      }
-
-      // 2. Débiter (via RPC)
-      const { error: consumeError } = await supabaseAdmin.rpc("consume_woofs", {
-        user_id_param: userId,
-        woofs_amount: cost_woofs,
-      });
-
-      if (consumeError) {
-        console.error("Failed to consume woofs:", consumeError);
-        throw new Error("DEBIT_FAILED");
-      }
+      console.log("[alfie-render-image] Quota system temporarily disabled");
 
       try {
         // 3. Récupérer le Brand Kit si nécessaire (avant de construire les prompts)
@@ -402,18 +365,8 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
           meta: { provider: provider || "gemini_image", format, cost: cost_woofs },
         };
       } catch (genError: any) {
-        // 5. REMBOURSEMENT en cas d'échec
-        console.error("[Render] Generation failed, refunding woofs:", genError);
-
-        const { error: refundError } = await supabaseAdmin.rpc("refund_woofs", {
-          user_id_param: userId,
-          woofs_amount: cost_woofs,
-        });
-
-        if (refundError) {
-          console.error("Failed to refund woofs:", refundError);
-        }
-
+        console.error("[Render] Generation failed:", genError);
+        console.log("[alfie-render-image] Quota system temporarily disabled");
         throw genError;
       }
     });
