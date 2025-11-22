@@ -157,13 +157,6 @@ Deno.serve(async (req) => {
       serviceKey: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
     });
 
-    // Quick probe
-    const { count: queued } = await supabaseAdmin
-      .from("job_queue")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "queued");
-    console.log("[WORKER] Boot: " + (queued ?? 0) + " jobs queued in job_queue");
-
     // Process a small batch to avoid function timeout
     const results: Array<{ job_id: string; success: boolean; error?: string; retried?: boolean }> = [];
     const maxJobs = 5;
@@ -184,7 +177,6 @@ Deno.serve(async (req) => {
       }
 
       if (!job) {
-        if ((queued ?? 0) > 0) console.warn("🧪 claim_empty_but_queued_gt0");
         console.log(`ℹ️ No more jobs to process (processed ${processed})`);
         console.log("[job-worker] no job claimed");
         break;
@@ -278,6 +270,18 @@ Deno.serve(async (req) => {
           await createCascadeJobs(job, result, supabaseAdmin);
         }
       } catch (e) {
+        console.error("❌ job_failed", { jobId: job.id, error: e });
+        await supabaseAdmin
+          .from("job_queue")
+          .update({
+            status: "failed",
+            error: e instanceof Error ? e.message : String(e),
+            updated_at: new Date().toISOString(),
+            finished_at: new Date().toISOString(),
+          })
+          .eq("id", job.id);
+
+        results.push({ job_id: job.id, success: false, retried: false, error: e instanceof Error ? e.message : String(e) });
         const message = e instanceof Error ? e.message : "Unknown error";
         console.error("🔴 job_failed", { id: job.id, message });
 
@@ -423,6 +427,7 @@ async function processRenderImage(payload: any) {
 }
 
 async function processRenderImages(payload: any) {
+  console.log("[processRenderImages] start", { orderId: payload?.orderId, brandId: payload?.brandId });
   console.log("🖼️ [processRenderImages] payload.in", payload);
 
   if (
@@ -537,6 +542,8 @@ Format: ${aspectRatio} aspect ratio optimized.`;
         getResultValue<string>(imageResult, ["imageUrl", "url", "outputUrl", "output_url"]);
       if (!imageUrl) throw new Error("No image URL returned");
 
+      console.log("[processRenderImages] engine responded", { imageUrl, orderId: payload.orderId, brandId: img.brandId ?? payload.brandId });
+
       // 2) upload cloudinary from URL
       console.log("[job-worker] uploaded image engine result, pushing to Cloudinary", { imageUrl });
       const cloud = await uploadFromUrlToCloudinary(imageUrl, {
@@ -610,6 +617,7 @@ Format: ${aspectRatio} aspect ratio optimized.`;
           console.error("❌ library_asset insert failed", libErr);
           throw new Error(`Failed to save to library: ${libErr.message}`);
         }
+        console.log("[job-worker] inserted asset", assetRows?.id);
         console.log(`[job-worker] inserted asset ${assetRows?.id} into library_assets`);
       } else {
         console.log("ℹ️ library_asset already exists", existing.id);
