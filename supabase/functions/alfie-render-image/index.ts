@@ -116,6 +116,11 @@ export default {
             isAdmin = true;
           }
 
+          const quotaOk = checkError
+            ? true
+            : checkData?.data?.ok ?? checkData?.ok ?? true;
+
+          if (!isAdmin && quotaOk === false) {
           if (!isAdmin && (!checkData?.ok || !checkData.data?.ok)) {
             console.error("[alfie-render-image] Quota check indicates insufficient quota:", checkData);
             throw new Error("INSUFFICIENT_QUOTA");
