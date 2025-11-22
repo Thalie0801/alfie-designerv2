@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const counts = { queued: 0, running: 0, completed: 0, failed: 0 } as Record<string, number>;
+    const counts = { queued: 0, processing: 0, running: 0, completed: 0, failed: 0 } as Record<string, number>;
     let oldestQueuedAgeSec: number | null = null;
     let runningStuckCount = 0;
     const STUCK_THRESHOLD_SEC = 5 * 60; // 5 minutes
@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
         const ageSec = Math.floor((now - new Date(j.created_at as string).getTime()) / 1000);
         if (oldestQueuedAgeSec === null || ageSec > oldestQueuedAgeSec) oldestQueuedAgeSec = ageSec;
       }
-      if (j.status === "running") {
+      if (j.status === "running" || j.status === "processing") {
         const ageSec = Math.floor((now - new Date(j.updated_at as string).getTime()) / 1000);
         if (ageSec > STUCK_THRESHOLD_SEC) runningStuckCount += 1;
       }
@@ -108,6 +108,9 @@ Deno.serve(async (req) => {
     };
 
     // Auto-kick the worker when we detect a backlog with nothing running
+    const activeWorkers = (counts.running ?? 0) + (counts.processing ?? 0);
+
+    if (counts.queued > 0 && activeWorkers === 0) {
     if (counts.queued > 0 && counts.running === 0) {
       console.warn("[queue-monitor] Detected queued jobs with no worker running – triggering worker");
 

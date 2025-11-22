@@ -191,6 +191,13 @@ Deno.serve(async (req) => {
       }
 
       const startedAt = new Date().toISOString();
+      const { data: claimed, error: markError } = await supabaseAdmin
+        .from("job_queue")
+        .update({ status: "processing", started_at: startedAt, updated_at: startedAt })
+        .eq("id", job.id)
+        .eq("status", "queued")
+        .select("id, status")
+        .maybeSingle();
       const { error: markError } = await supabaseAdmin
         .from("job_queue")
         .update({ status: "processing", started_at: startedAt, updated_at: startedAt })
@@ -198,6 +205,11 @@ Deno.serve(async (req) => {
 
       if (markError) {
         console.error("❌ failed to mark job as processing", { jobId: job.id, markError });
+        continue;
+      }
+
+      if (!claimed) {
+        console.warn("⚠️ job already claimed or status changed", { jobId: job.id });
         continue;
       }
 
