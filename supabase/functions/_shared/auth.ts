@@ -16,6 +16,7 @@ export type AdminCheckOptions = {
   plan?: string | null;
   grantedByAdmin?: boolean | null;
   logContext?: string;
+  isAdminFlag?: boolean | null;
 };
 
 export function isAdminUser(
@@ -23,6 +24,13 @@ export function isAdminUser(
   roles: RoleRow[] | null = null,
   options: AdminCheckOptions = {},
 ): boolean {
+  if (options.isAdminFlag) {
+    if (options.logContext) {
+      console.log(`[${options.logContext}] admin bypass applied for ${email || "unknown-email"} (explicit flag)`);
+    }
+    return true;
+  }
+
   const adminEmails = parseAdminEmails();
   const normalizedEmail = (email || "").trim().toLowerCase();
   const normalizedRoles = options.roles ?? roles ?? null;

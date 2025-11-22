@@ -598,6 +598,7 @@ Format: ${aspectRatio} aspect ratio optimized.`;
   try {
     await consumeBrandQuotas(payload.brandId, results.length, 0, 0, {
       userEmail: resolvedUserEmail,
+      isAdminFlag: payload.isAdmin === true,
       logContext: "quota",
     });
     console.log("📊 quota_consume", results.length);
@@ -776,6 +777,7 @@ async function processRenderCarousels(payload: any) {
     try {
       await consumeBrandQuotas(carousel.brandId, slidesOut.length, 0, 0, {
         userEmail: payload?.userEmail ?? null,
+        isAdminFlag: payload?.isAdmin === true,
         logContext: "quota",
       });
       console.log("📊 quota_consume", slidesOut.length);

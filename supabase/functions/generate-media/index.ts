@@ -191,6 +191,7 @@ Deno.serve(async (req: Request) => {
     payload: {
       userId,
       userEmail,
+      isAdmin,
       brandId: intent.brandId,
       orderId: order.id,
       format: intent.format,

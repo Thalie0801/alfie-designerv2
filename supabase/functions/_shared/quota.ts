@@ -18,6 +18,7 @@ export async function consumeBrandQuotas(
   options: QuotaOptions = {},
 ) {
   const isAdmin = isAdminUser(options.userEmail, options.roles ?? null, {
+    isAdminFlag: options.isAdminFlag,
     grantedByAdmin: options.grantedByAdmin,
     plan: options.plan,
     roles: options.roles,
