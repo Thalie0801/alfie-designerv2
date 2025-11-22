@@ -2,6 +2,7 @@ import { edgeHandler } from "../_shared/edgeHandler.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { enrichPromptWithBrandKit } from "../_shared/aiOrchestrator.ts";
 import { uploadWithRichMetadata, type RichMetadata } from "../_shared/cloudinaryUploader.ts";
+import { getUserRoles, isAdminUser } from "../_shared/auth.ts";
 import {
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
@@ -49,14 +50,10 @@ export default {
 
       const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-      // ✅ Liste des admins (bypass quotas)
-      const ADMIN_USER_IDS = [
-        "1b2d270c-3081-43b0-8923-3ad9fe5dbe8c", // ton user admin
-      ];
-
       // ✅ Conditional user authentication
       let userId: string;
       let supabaseAuth: any;
+      let userEmail: string | null = null;
 
       if (isInternalCall) {
         // Internal call: userId MUST be in input
@@ -66,6 +63,9 @@ export default {
         }
         userId = input.userId;
         console.log("[alfie-render-image] ✅ Internal call authenticated, userId:", userId);
+
+        const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
+        userEmail = authUser?.user?.email?.toLowerCase() ?? null;
       } else {
         // External call: authenticate via JWT
         supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -81,13 +81,25 @@ export default {
           throw new Error("INVALID_TOKEN");
         }
         userId = user.id;
+        userEmail = user.email?.toLowerCase() ?? null;
         console.log("[alfie-render-image] ✅ External call authenticated, userId:", userId);
       }
 
-      const isAdminUser = ADMIN_USER_IDS.includes(userId);
+      const roleRows = await getUserRoles(supabaseAdmin, userId);
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("plan, granted_by_admin")
+        .eq("id", userId)
+        .maybeSingle();
+
+      const isAdmin = isAdminUser(userEmail, roleRows, {
+        plan: profile?.plan ?? undefined,
+        grantedByAdmin: profile?.granted_by_admin ?? undefined,
+        logContext: "quota",
+      });
 
       // 1. Vérifier quota (skip for internal calls or admin)
-      if (!isInternalCall && supabaseAuth && !isAdminUser) {
+      if (!isInternalCall && supabaseAuth && !isAdmin) {
         try {
           const { data: checkData, error: checkError } = await supabaseAuth.functions.invoke("alfie-check-quota", {
             body: { cost_woofs, brand_id },
@@ -110,19 +122,23 @@ export default {
         console.log("[alfie-render-image] ⏭️ Skipping quota check (internal call or admin user)", {
           isInternalCall,
           userId,
-          isAdminUser,
+          isAdminUser: isAdmin,
         });
       }
 
       // 2. Débiter (via RPC)
-      const { error: consumeError } = await supabaseAdmin.rpc("consume_woofs", {
-        user_id_param: userId,
-        woofs_amount: cost_woofs,
-      });
+      if (!isAdmin) {
+        const { error: consumeError } = await supabaseAdmin.rpc("consume_woofs", {
+          user_id_param: userId,
+          woofs_amount: cost_woofs,
+        });
 
-      if (consumeError) {
-        console.error("Failed to consume woofs:", consumeError);
-        throw new Error("DEBIT_FAILED");
+        if (consumeError) {
+          console.error("Failed to consume woofs:", consumeError);
+          throw new Error("DEBIT_FAILED");
+        }
+      } else {
+        console.log(`[quota] admin bypass applied for ${userEmail ?? "unknown-email"}`);
       }
 
       try {

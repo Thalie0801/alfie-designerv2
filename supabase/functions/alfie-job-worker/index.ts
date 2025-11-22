@@ -182,6 +182,8 @@ Deno.serve(async (req) => {
 
       const job = claimed[0];
 
+      console.log(`[job-worker] claimed job ${job.id} type=${job.type}`);
+
       // Anonymize job ID for logging
       const jobIdPrefix = job.id.substring(0, 8);
       console.log("🟢 start_job", { id: `${jobIdPrefix}...`, type: job.type });
@@ -399,6 +401,17 @@ async function processRenderImages(payload: any) {
     throw new Error("Invalid render_images payload: missing userId or orderId");
   }
 
+  const payloadEmail = typeof payload?.userEmail === "string" ? payload.userEmail.toLowerCase() : null;
+  let resolvedUserEmail = payloadEmail;
+
+  if (!resolvedUserEmail) {
+    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(payload.userId);
+    if (authError) {
+      console.error("[job-worker] failed to resolve user email", authError);
+    }
+    resolvedUserEmail = authUser?.user?.email?.toLowerCase() ?? null;
+  }
+
   const results: Array<{ url: string; aspectRatio: string; resolution: string }> = [];
   let imagesToRender: Array<{
     prompt: string;
@@ -528,35 +541,41 @@ Format: ${aspectRatio} aspect ratio optimized.`;
 
       if (!existing) {
         console.log("💾 inserting library_asset", { userId: payload.userId, orderId: payload.orderId, publicId: cloud.publicId });
-        const { error: libErr } = await supabaseAdmin.from("library_assets").insert({
-          user_id: payload.userId,
-          brand_id: img.brandId ?? payload.brandId ?? null,
-          order_id: payload.orderId,
-          order_item_id: payload.orderItemId ?? null,
-          type: "image",
-          cloudinary_url: cloud.secureUrl,
-          cloudinary_public_id: cloud.publicId,
-          format: aspectRatio,
-          tags: ["ai-generated", "alfie", `order:${payload.orderId}`],
-          metadata: {
-            orderId: payload.orderId,
-            orderItemId: payload.orderItemId ?? null,
-            aspectRatio,
-            resolution: img.resolution,
-            source: "alfie-job-worker",
+        const { data: assetRows, error: libErr } = await supabaseAdmin
+          .from("library_assets")
+          .insert({
+            user_id: payload.userId,
+            brand_id: img.brandId ?? payload.brandId ?? null,
+            order_id: payload.orderId,
+            order_item_id: payload.orderItemId ?? null,
+            type: "image",
+            cloudinary_url: cloud.secureUrl,
             cloudinary_public_id: cloud.publicId,
-            width: cloud.width,
-            height: cloud.height,
-          },
-        });
+            format: aspectRatio,
+            tags: ["ai-generated", "alfie", `order:${payload.orderId}`],
+            metadata: {
+              orderId: payload.orderId,
+              orderItemId: payload.orderItemId ?? null,
+              aspectRatio,
+              resolution: img.resolution,
+              source: "alfie-job-worker",
+              cloudinary_public_id: cloud.publicId,
+              width: cloud.width,
+              height: cloud.height,
+            },
+          })
+          .select("id")
+          .single();
         if (libErr) {
           console.error("❌ library_asset insert failed", libErr);
           throw new Error(`Failed to save to library: ${libErr.message}`);
         }
+        console.log(`[job-worker] inserted asset ${assetRows?.id} into library_assets`);
       } else {
         console.log("ℹ️ library_asset already exists", existing.id);
       }
 
+      console.log(`[job-worker] uploaded image to Cloudinary ${cloud.publicId}`);
       results.push({ url: cloud.secureUrl, aspectRatio, resolution: img.resolution });
     } catch (e) {
       console.error("❌ image_failed", e);
@@ -573,7 +592,10 @@ Format: ${aspectRatio} aspect ratio optimized.`;
 
   // Quotas (best-effort)
   try {
-    await consumeBrandQuotas(payload.brandId, results.length);
+    await consumeBrandQuotas(payload.brandId, results.length, 0, 0, {
+      userEmail: resolvedUserEmail,
+      logContext: "quota",
+    });
     console.log("📊 quota_consume", results.length);
   } catch (qErr) {
     console.warn("⚠️ quota_consume_failed", qErr);
@@ -748,7 +770,10 @@ async function processRenderCarousels(payload: any) {
     }
 
     try {
-      await consumeBrandQuotas(carousel.brandId, slidesOut.length);
+      await consumeBrandQuotas(carousel.brandId, slidesOut.length, 0, 0, {
+        userEmail: payload?.userEmail ?? null,
+        logContext: "quota",
+      });
       console.log("📊 quota_consume", slidesOut.length);
     } catch (qErr) {
       console.warn("⚠️ quota_consume_failed", qErr);

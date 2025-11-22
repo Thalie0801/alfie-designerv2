@@ -1,6 +1,6 @@
 import { edgeHandler } from '../_shared/edgeHandler.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
-import { ADMIN_EMAILS } from '../_shared/env.ts';
+import { isAdminUser } from '../_shared/auth.ts';
 
 export default {
   async fetch(req: Request) {
@@ -22,11 +22,6 @@ export default {
 
       const { brand_id } = input;
 
-      const adminEmails = (ADMIN_EMAILS ?? '')
-        .split(',')
-        .map((e) => e.trim().toLowerCase())
-        .filter(Boolean);
-
       // 1. Lire le profil utilisateur pour les quotas de base
       const { data: profile, error: profileError } = await supabaseRls
         .from('profiles')
@@ -45,11 +40,11 @@ export default {
         .select('role')
         .eq('user_id', user.id);
 
-      const isAdmin =
-        adminEmails.includes(userEmail) ||
-        !!roles?.some((r) => r.role === 'admin') ||
-        profile.plan === 'admin' ||
-        !!profile.granted_by_admin;
+      const isAdmin = isAdminUser(userEmail, roles, {
+        plan: profile.plan,
+        grantedByAdmin: profile.granted_by_admin,
+        logContext: 'quota',
+      });
 
       // 2. ✅ FIX: Calculer la période actuelle YYYYMM
       const now = new Date();

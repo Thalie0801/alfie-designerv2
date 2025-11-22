@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";
-import { ADMIN_EMAILS } from "../_shared/env.ts";
+import { isAdminUser, getUserRoles } from "../_shared/auth.ts";
 const IntentSchema = z.object({
   brandId: z.string().uuid(),
   format: z.enum(["image", "carousel"]),
@@ -57,6 +57,13 @@ Deno.serve(async (req: Request) => {
 
   const { userId, intent } = parsed.data;
 
+  console.log("[generate-media] received intent", {
+    userId,
+    brandId: intent.brandId,
+    format: intent.format,
+    count: intent.count,
+  });
+
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -69,17 +76,9 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false },
   });
 
-  const adminEmails = (ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-
   const { data: authUser } = await supabase.auth.admin.getUserById(userId);
   const userEmail = authUser?.user?.email?.toLowerCase() ?? "";
-  const { data: roleRows } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
+  const roleRows = await getUserRoles(supabase, userId);
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -87,11 +86,15 @@ Deno.serve(async (req: Request) => {
     .eq("id", userId)
     .maybeSingle();
 
-  const isAdmin =
-    adminEmails.includes(userEmail) ||
-    !!roleRows?.some((r) => r.role === "admin") ||
-    profile?.plan === "admin" ||
-    !!profile?.granted_by_admin;
+  const isAdmin = isAdminUser(userEmail, roleRows, {
+    plan: profile?.plan,
+    grantedByAdmin: profile?.granted_by_admin,
+    logContext: "quota",
+  });
+
+  if (isAdmin) {
+    console.log(`[quota] admin bypass applied for ${userEmail || "unknown-email"}`);
+  }
 
   const { data: brand, error: brandError } = await supabase
     .from("brands")
@@ -154,6 +157,7 @@ Deno.serve(async (req: Request) => {
     status: "queued",
     payload: {
       userId,
+      userEmail,
       brandId: intent.brandId,
       orderId: order.id,
       format: intent.format,
@@ -169,13 +173,24 @@ Deno.serve(async (req: Request) => {
     },
   };
 
-  const { error: jobError } = await supabase.from("job_queue").insert(jobPayload);
+  const { data: jobRows, error: jobError } = await supabase
+    .from("job_queue")
+    .insert(jobPayload)
+    .select("id")
+    .single();
 
   if (jobError) {
     console.error("[generate-media] Job queue insert error", jobError);
     await supabase.from("orders").update({ status: "failed" }).eq("id", order.id);
     return respond(500, { ok: false, error: "job_enqueue_failed" });
   }
+
+  console.log("[generate-media] created order", { orderId: order.id });
+  console.log("[generate-media] enqueued job", {
+    jobId: jobRows?.id,
+    type: jobType,
+    brandId: intent.brandId,
+  });
 
   return respond(200, { ok: true, data: { orderId: order.id } });
 });

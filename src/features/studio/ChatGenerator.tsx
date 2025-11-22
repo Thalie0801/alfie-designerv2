@@ -85,12 +85,6 @@ const ASPECT_TO_TW: Record<AspectRatio, string> = {
   "16:9": "aspect-video",
 };
 
-const IMAGE_SIZE_MAP: Record<AspectRatio, { width: number; height: number }> = {
-  "1:1": { width: 1024, height: 1024 },
-  "9:16": { width: 1024, height: 1820 },
-  "16:9": { width: 1820, height: 1024 },
-};
-
 // const CURRENT_JOB_VERSION = 2; // Temporarily disabled until types regenerate
 
 const isRecord = (value: unknown): value is Record<string, any> =>
@@ -748,37 +742,44 @@ export function ChatGenerator() {
       return;
     }
 
+    if (!activeBrandId) {
+      showToast({
+        title: "Marque requise",
+        description: "Sélectionne une marque avant de lancer une génération",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     setGeneratedAsset(null);
 
     try {
-      // ✅ Phase A: Get session token for authentication
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      const [{ data: sessionData }, { data: userData, error: authError }] = await Promise.all([
+        supabase.auth.getSession(),
+        supabase.auth.getUser(),
+      ]);
 
-      const targetFunction = uploadedSource
-        ? "alfie-generate-ai-image"
-        : "alfie-render-image";
-
-      const payload: Record<string, unknown> = {
-        prompt: prompt || "transform this",
-        aspectRatio,
-        brand_id: activeBrandId ?? null, // ✅ Phase A: Pass brand_id
-      };
-
-      if (uploadedSource) {
-        payload.sourceUrl = uploadedSource.url;
-      } else {
-        const size = IMAGE_SIZE_MAP[aspectRatio];
-        payload.width = size.width;
-        payload.height = size.height;
+      if (authError || !userData.user) {
+        throw authError || new Error("Utilisateur non authentifié");
       }
 
-      // ✅ Phase A: Include Authorization header if token is available
-      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+      const ratioPayload = ["1:1", "4:5", "9:16"].includes(aspectRatio) ? aspectRatio : undefined;
+      const headers = sessionData.session?.access_token
+        ? { Authorization: `Bearer ${sessionData.session.access_token}` }
+        : undefined;
 
-      const { data, error } = await supabase.functions.invoke(targetFunction, {
-        body: payload,
+      const { data, error } = await supabase.functions.invoke("generate-media", {
+        body: {
+          userId: userData.user.id,
+          intent: {
+            brandId: activeBrandId,
+            format: "image",
+            count: 1,
+            topic: prompt || "Image request",
+            ...(ratioPayload ? { ratio: ratioPayload } : {}),
+          },
+        },
         headers,
       });
 

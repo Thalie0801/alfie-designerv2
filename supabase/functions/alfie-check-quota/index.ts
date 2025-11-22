@@ -1,6 +1,6 @@
 import { edgeHandler } from '../_shared/edgeHandler.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
-import { ADMIN_EMAILS } from '../_shared/env.ts';
+import { isAdminUser } from '../_shared/auth.ts';
 
 export default {
   async fetch(req: Request) {
@@ -22,11 +22,6 @@ export default {
         throw new Error('INVALID_TOKEN');
       }
 
-      const adminEmails = (ADMIN_EMAILS ?? '')
-        .split(',')
-        .map((e) => e.trim().toLowerCase())
-        .filter(Boolean);
-
       const { data: roleRows } = await supabase
         .from('user_roles')
         .select('role')
@@ -42,11 +37,11 @@ export default {
         console.error('[alfie-check-quota] profile lookup failed', profileError);
       }
 
-      const isAdmin =
-        adminEmails.includes((user.email || '').toLowerCase()) ||
-        !!roleRows?.some((r) => r.role === 'admin') ||
-        profile?.plan === 'admin' ||
-        !!profile?.granted_by_admin;
+      const isAdmin = isAdminUser(user.email, roleRows, {
+        plan: profile?.plan,
+        grantedByAdmin: profile?.granted_by_admin,
+        logContext: 'quota',
+      });
 
       if (isAdmin) {
         const unlimited = 1_000_000_000;

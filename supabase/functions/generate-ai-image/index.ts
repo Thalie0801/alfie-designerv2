@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
     }
 
     try {
-      await consumeBrandQuotas(brandId);
+      await consumeBrandQuotas(brandId, 1, 0, 0, { userEmail: user.email ?? undefined, logContext: "quota" });
     } catch (quotaError) {
       return new Response(
         JSON.stringify({ error: quotaError instanceof Error ? quotaError.message : 'Quota exhausted' }),

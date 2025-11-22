@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "./env.ts";
+import { isAdminUser, type AdminCheckOptions } from "./auth.ts";
 
 const admin = createClient(
   SUPABASE_URL ?? "",
@@ -7,12 +8,27 @@ const admin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
+type QuotaOptions = AdminCheckOptions & { userEmail?: string | null };
+
 export async function consumeBrandQuotas(
-  brandId: string, 
+  brandId: string,
   imageCount: number = 1,  // ✅ Nombre d'images générées (1 par défaut, N pour carrousels)
-  addVideos = 0, 
-  addWoofs = 0
+  addVideos = 0,
+  addWoofs = 0,
+  options: QuotaOptions = {},
 ) {
+  const isAdmin = isAdminUser(options.userEmail, options.roles ?? null, {
+    grantedByAdmin: options.grantedByAdmin,
+    plan: options.plan,
+    roles: options.roles,
+    logContext: options.logContext ?? "quota",
+  });
+
+  if (isAdmin) {
+    console.log(`[quota] admin bypass applied for ${options.userEmail ?? "unknown-email"}`);
+    return true;
+  }
+
   // Calculer la période actuelle YYYYMM (ex: 202510 pour octobre 2025)
   const now = new Date();
   const period = parseInt(
