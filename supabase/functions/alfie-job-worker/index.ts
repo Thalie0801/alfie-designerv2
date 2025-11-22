@@ -182,22 +182,10 @@ Deno.serve(async (req) => {
         break;
       }
 
-      const startedAt = new Date().toISOString();
-      const { data: claimRow, error: markError } = await supabaseAdmin
-      const { data: claimed, error: markError } = await supabaseAdmin
-        .from("job_queue")
-        .update({ status: "processing", started_at: startedAt, updated_at: startedAt })
-        .eq("id", job.id)
-        .eq("status", "queued")
-        .select("id")
-        .maybeSingle();
-
-      if (markError || !claimRow) {
-        .select("id, status")
-        .maybeSingle();
+      const now = new Date().toISOString();
       const { error: markError } = await supabaseAdmin
         .from("job_queue")
-        .update({ status: "processing", started_at: startedAt, updated_at: startedAt })
+        .update({ status: "processing", started_at: now, updated_at: now })
         .eq("id", job.id);
 
       if (markError) {
@@ -205,15 +193,8 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      if (!claimed) {
-        console.warn("⚠️ job already claimed or status changed", { jobId: job.id });
-        continue;
-      }
-
-      console.log(`[job-worker] claimed job ${job.id} type=${job.type}`);
-
-      // Anonymize job ID for logging
       const jobIdPrefix = job.id.substring(0, 8);
+      console.log(`[job-worker] claimed job ${job.id} type=${job.type}`);
       console.log("🟢 start_job", { id: `${jobIdPrefix}...`, type: job.type });
 
       try {
@@ -233,7 +214,9 @@ Deno.serve(async (req) => {
             result = await processGenerateVideo(job.payload);
             break;
           default:
-            throw new Error(`Unknown job type: ${job.type}`);
+            console.warn("⚠️ unknown job type", job.type);
+            result = null;
+            break;
         }
 
         const finishedAt = new Date().toISOString();
@@ -244,8 +227,6 @@ Deno.serve(async (req) => {
             result,
             updated_at: finishedAt,
             finished_at: finishedAt,
-            updated_at: new Date().toISOString(),
-            finished_at: new Date().toISOString(),
           })
           .eq("id", job.id);
 
@@ -267,7 +248,6 @@ Deno.serve(async (req) => {
         console.log("✅ job_done", { id: job.id, type: job.type });
         results.push({ job_id: job.id, success: true });
 
-        // Check for remaining jobs and reinvoke if needed
         const { data: remainingJobs } = await supabaseAdmin
           .from("job_queue")
           .select("id")
@@ -278,7 +258,7 @@ Deno.serve(async (req) => {
           console.log("[alfie-job-worker] 🔁 Remaining jobs detected, reinvoking...");
           try {
             const { error: invokeError } = await supabaseAdmin.functions.invoke("alfie-job-worker", {
-              body: { trigger: "self-reinvoke" }
+              body: { trigger: "self-reinvoke" },
             });
             if (invokeError) {
               console.error("[alfie-job-worker] ⚠️ Reinvoke failed:", invokeError);
@@ -288,12 +268,12 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Cascade for text → generate children jobs
         if (job.type === "generate_texts") {
           await createCascadeJobs(job, result, supabaseAdmin);
         }
       } catch (e) {
         console.error("❌ job_failed", { jobId: job.id, error: e });
+
         await supabaseAdmin
           .from("job_queue")
           .update({
@@ -304,8 +284,8 @@ Deno.serve(async (req) => {
           })
           .eq("id", job.id);
 
-        results.push({ job_id: job.id, success: false, retried: false, error: e instanceof Error ? e.message : String(e) });
         const message = e instanceof Error ? e.message : "Unknown error";
+        results.push({ job_id: job.id, success: false, retried: false, error: message });
         console.error("🔴 job_failed", { id: job.id, message });
 
         const retryCount = job.retry_count ?? 0;
@@ -325,18 +305,7 @@ Deno.serve(async (req) => {
 
           console.log(`🔄 requeued ${job.id} (${retryCount + 1}/${maxRetries})`);
           results.push({ job_id: job.id, success: false, retried: true, error: message });
-        } else {
-          await supabaseAdmin
-            .from("job_queue")
-            .update({
-              status: "failed",
-              error: message,
-              updated_at: new Date().toISOString(),
-              finished_at: new Date().toISOString(),
-            })
-            .eq("id", job.id);
-
-        results.push({ job_id: job.id, success: false, retried: false, error: e instanceof Error ? e.message : String(e) });
+        }
       }
 
       processed++;
