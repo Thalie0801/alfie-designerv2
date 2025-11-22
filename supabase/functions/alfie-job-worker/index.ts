@@ -183,11 +183,16 @@ Deno.serve(async (req) => {
       }
 
       const startedAt = new Date().toISOString();
+      const { data: claimRow, error: markError } = await supabaseAdmin
       const { data: claimed, error: markError } = await supabaseAdmin
         .from("job_queue")
         .update({ status: "processing", started_at: startedAt, updated_at: startedAt })
         .eq("id", job.id)
         .eq("status", "queued")
+        .select("id")
+        .maybeSingle();
+
+      if (markError || !claimRow) {
         .select("id, status")
         .maybeSingle();
       const { error: markError } = await supabaseAdmin
@@ -231,15 +236,33 @@ Deno.serve(async (req) => {
             throw new Error(`Unknown job type: ${job.type}`);
         }
 
-        await supabaseAdmin
+        const finishedAt = new Date().toISOString();
+        const { error: completeError } = await supabaseAdmin
           .from("job_queue")
           .update({
             status: "completed",
             result,
+            updated_at: finishedAt,
+            finished_at: finishedAt,
             updated_at: new Date().toISOString(),
             finished_at: new Date().toISOString(),
           })
           .eq("id", job.id);
+
+        if (completeError) {
+          console.error("❌ failed to mark job completed", { jobId: job.id, error: completeError });
+          await supabaseAdmin
+            .from("job_queue")
+            .update({
+              status: "failed",
+              error: `complete update failed: ${completeError.message}`,
+              updated_at: finishedAt,
+              finished_at: finishedAt,
+            })
+            .eq("id", job.id);
+          results.push({ job_id: job.id, success: false, error: completeError.message });
+          continue;
+        }
 
         console.log("✅ job_done", { id: job.id, type: job.type });
         results.push({ job_id: job.id, success: true });
@@ -313,9 +336,7 @@ Deno.serve(async (req) => {
             })
             .eq("id", job.id);
 
-          console.log(`❌ permanently_failed ${job.id}`);
-          results.push({ job_id: job.id, success: false, retried: false, error: message });
-        }
+        results.push({ job_id: job.id, success: false, retried: false, error: e instanceof Error ? e.message : String(e) });
       }
 
       processed++;
