@@ -110,7 +110,13 @@ export default {
           if (checkError) {
             // ⚠️ On log mais on ne bloque pas la génération si la fonction de quota bug
             console.error("[alfie-render-image] Quota check failed with error:", checkError);
-          } else if (!checkData?.ok || !checkData.data?.ok) {
+          }
+
+          if (checkData?.data?.is_admin || checkData?.is_admin) {
+            isAdmin = true;
+          }
+
+          if (!isAdmin && (!checkData?.ok || !checkData.data?.ok)) {
             console.error("[alfie-render-image] Quota check indicates insufficient quota:", checkData);
             throw new Error("INSUFFICIENT_QUOTA");
           }
