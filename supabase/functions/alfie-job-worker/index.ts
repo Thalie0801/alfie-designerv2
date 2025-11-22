@@ -163,11 +163,11 @@ Deno.serve(async (req) => {
     let processed = 0;
 
     for (let i = 0; i < maxJobs; i++) {
+      // On prend simplement le premier job en file, sans supposer qu'il existe une colonne "created_at"
       const { data: job, error: fetchError } = await supabaseAdmin
         .from("job_queue")
         .select("*")
         .eq("status", "queued")
-        .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle();
 
