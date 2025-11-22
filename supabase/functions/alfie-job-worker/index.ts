@@ -417,7 +417,7 @@ async function processRenderImage(payload: any) {
 }
 
 async function processRenderImages(payload: any) {
-  console.log("[processRenderImages] start", { orderId: payload?.orderId, brandId: payload?.brandId });
+  console.log("[processRenderImages] start", { orderId: payload.orderId, brandId: payload.brandId });
   console.log("🖼️ [processRenderImages] payload.in", payload);
 
   if (
@@ -504,6 +504,10 @@ Format: ${aspectRatio} aspect ratio optimized.`;
     const aspectRatio = img.aspectRatio || "4:5";
     try {
       // 1) generate
+      console.log("[processRenderImages] calling image engine", {
+        orderId: payload.orderId,
+        brandId: payload.brandId,
+      });
       console.log(
         `[job-worker] calling image engine for order=${payload.orderId} brand=${img.brandId ?? payload.brandId} ratio=${aspectRatio}`,
       );
@@ -532,6 +536,7 @@ Format: ${aspectRatio} aspect ratio optimized.`;
         getResultValue<string>(imageResult, ["imageUrl", "url", "outputUrl", "output_url"]);
       if (!imageUrl) throw new Error("No image URL returned");
 
+      console.log("[processRenderImages] engine returned imageUrl", imageUrl);
       console.log("[processRenderImages] engine responded", { imageUrl, orderId: payload.orderId, brandId: img.brandId ?? payload.brandId });
 
       // 2) upload cloudinary from URL
@@ -548,6 +553,7 @@ Format: ${aspectRatio} aspect ratio optimized.`;
           type: "image",
         },
       });
+      console.log("[job-worker] uploaded image to Cloudinary publicId=" + cloud.publicId);
 
       // 3) persist media_generations (best-effort)
       await supabaseAdmin.from("media_generations").insert({
