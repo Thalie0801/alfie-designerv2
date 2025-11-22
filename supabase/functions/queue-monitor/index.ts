@@ -85,7 +85,18 @@ Deno.serve(async (req) => {
       updated_at: j.updated_at,
     }));
 
-    const payload = {
+    type QueueMonitorPayload = {
+      ok: boolean;
+      now: string;
+      counts: typeof counts & { completed_24h: number };
+      backlogSeconds: number | null;
+      stuck: { runningStuckCount: number; thresholdSec: number };
+      recent: typeof recent;
+      scope: "user";
+      workerKick?: { attempted: boolean; triggerPayload?: Record<string, unknown>; error?: string };
+    };
+
+    const payload: QueueMonitorPayload = {
       ok: true,
       now: nowIso,
       counts: { ...counts, completed_24h: completed24h ?? 0 },
@@ -94,6 +105,25 @@ Deno.serve(async (req) => {
       recent,
       scope: "user",
     };
+
+    // Auto-kick the worker when we detect a backlog with nothing running
+    if (counts.queued > 0 && counts.running === 0) {
+      console.warn("[queue-monitor] Detected queued jobs with no worker running – triggering worker");
+
+      const triggerPayload = {
+        reason: "queue-monitor-auto-kick",
+        oldestQueuedAgeSec: oldestQueuedAgeSec ?? null,
+        queued: counts.queued,
+      };
+
+      try {
+        await supabase.functions.invoke("alfie-job-worker", { body: triggerPayload });
+        payload.workerKick = { attempted: true, triggerPayload };
+      } catch (kickError) {
+        console.error("[queue-monitor] Failed to trigger alfie-job-worker", kickError);
+        payload.workerKick = { attempted: true, error: (kickError as Error).message };
+      }
+    }
 
     console.log("[queue-monitor] Done", payload.counts);
 
