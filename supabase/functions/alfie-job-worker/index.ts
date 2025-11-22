@@ -10,7 +10,7 @@ type JobRow = {
   user_id: string;
   order_id: string;
   type: "generate_texts" | "render_images" | "render_carousels" | "generate_video";
-  status: "queued" | "running" | "completed" | "failed";
+  status: "queued" | "processing" | "running" | "completed" | "failed";
   retry_count: number | null;
   max_retries: number | null;
   payload: any;
@@ -140,53 +140,6 @@ function deepGet(obj: any, key: string): any {
   return null;
 }
 
-async function claimJob(): Promise<JobRow | null> {
-  const { data: claimed, error: claimError } = await supabaseAdmin.rpc("claim_next_job");
-  if (claimError) {
-    console.error("❌ claim_next_job", claimError);
-  }
-
-  if (claimed && claimed.length > 0) {
-    return claimed[0] as JobRow;
-  }
-
-  // Fallback path: direct claim to avoid stalled queues when RPC is missing or returns nothing
-  console.warn("⚠️ claim_next_job returned no rows, attempting direct claim fallback");
-  const { data: queuedJob, error: fetchError } = await supabaseAdmin
-    .from("job_queue")
-    .select("*")
-    .eq("status", "queued")
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (fetchError) {
-    console.error("❌ fallback claim select failed", fetchError);
-    return null;
-  }
-
-  if (!queuedJob) {
-    console.log("ℹ️ fallback claim found no queued job");
-    return null;
-  }
-
-  const { data: lockedJob, error: lockError } = await supabaseAdmin
-    .from("job_queue")
-    .update({ status: "running", updated_at: new Date().toISOString() })
-    .eq("id", queuedJob.id)
-    .eq("status", "queued")
-    .select("*")
-    .single();
-
-  if (lockError) {
-    console.error("❌ fallback claim update failed", lockError);
-    return null;
-  }
-
-  console.log("✅ fallback_claim", { id: lockedJob.id, type: lockedJob.type });
-  return lockedJob as JobRow;
-}
-
 // ---------- HTTP Entrypoint ----------
 Deno.serve(async (req) => {
   console.log("[alfie-job-worker] 🚀 Invoked at", new Date().toISOString());
@@ -217,12 +170,35 @@ Deno.serve(async (req) => {
     let processed = 0;
 
     for (let i = 0; i < maxJobs; i++) {
-      const job = await claimJob();
+      const { data: job, error: fetchError } = await supabaseAdmin
+        .from("job_queue")
+        .select("*")
+        .eq("status", "queued")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error("❌ job_queue select failed", fetchError);
+        break;
+      }
+
       if (!job) {
         if ((queued ?? 0) > 0) console.warn("🧪 claim_empty_but_queued_gt0");
         console.log(`ℹ️ No more jobs to process (processed ${processed})`);
         console.log("[job-worker] no job claimed");
         break;
+      }
+
+      const startedAt = new Date().toISOString();
+      const { error: markError } = await supabaseAdmin
+        .from("job_queue")
+        .update({ status: "processing", started_at: startedAt, updated_at: startedAt })
+        .eq("id", job.id);
+
+      if (markError) {
+        console.error("❌ failed to mark job as processing", { jobId: job.id, markError });
+        continue;
       }
 
       console.log(`[job-worker] claimed job ${job.id} type=${job.type}`);
@@ -253,11 +229,15 @@ Deno.serve(async (req) => {
 
         await supabaseAdmin
           .from("job_queue")
-          .update({ status: "completed", result, updated_at: new Date().toISOString() })
+          .update({
+            status: "completed",
+            result,
+            updated_at: new Date().toISOString(),
+            finished_at: new Date().toISOString(),
+          })
           .eq("id", job.id);
 
         console.log("✅ job_done", { id: job.id, type: job.type });
-        processed++;
         results.push({ job_id: job.id, success: true });
 
         // Check for remaining jobs and reinvoke if needed
@@ -313,6 +293,7 @@ Deno.serve(async (req) => {
               status: "failed",
               error: message,
               updated_at: new Date().toISOString(),
+              finished_at: new Date().toISOString(),
             })
             .eq("id", job.id);
 
@@ -320,6 +301,8 @@ Deno.serve(async (req) => {
           results.push({ job_id: job.id, success: false, retried: false, error: message });
         }
       }
+
+      processed++;
     }
 
     return ok({ success: true, processed, results });
@@ -966,7 +949,7 @@ async function createCascadeJobs(job: JobRow, result: any, sb: SupabaseClient) {
         .from("job_queue")
         .select("id, type, status")
         .eq("order_id", job.order_id)
-        .in("status", ["queued", "running"]);
+        .in("status", ["queued", "processing", "running"]);
 
       const existingKeys = new Set(existing?.map((j: any) => `${j.type}_${j.status}`) || []);
       const toInsert = cascadeJobs.filter((j) => !existingKeys.has(`${j.type}_${j.status}`));
@@ -1028,7 +1011,7 @@ async function createCascadeJobs(job: JobRow, result: any, sb: SupabaseClient) {
       .from("job_queue")
       .select("id, type, status")
       .eq("order_id", job.order_id)
-      .in("status", ["queued", "running"]);
+      .in("status", ["queued", "processing", "running"]);
 
     const existingKeys = new Set(existing?.map((j: any) => `${j.type}_${j.status}`) || []);
     const toInsert = toCreate.filter((j) => !existingKeys.has(`${j.type}_${j.status}`));
@@ -1078,29 +1061,3 @@ async function safeReinvoke(sb: SupabaseClient) {
   }
 }
 
-/**
- * 🔧 SQL attendu côté DB pour claim_next_job:
- *
- * create or replace function claim_next_job()
- * returns setof job_queue
- * language plpgsql
- * as $$
- * declare r job_queue%rowtype;
- * begin
- *   update job_queue
- *   set status = 'running',
- *       updated_at = now()
- *   where id in (
- *     select id from job_queue
- *     where status = 'queued'
- *     order by created_at asc
- *     limit 1
- *     for update skip locked
- *   )
- *   returning * into r;
- *   if found then
- *     return next r;
- *   end if;
- * end;
- * $$;
- */

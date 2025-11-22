@@ -1,14 +1,15 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 import { corsHeaders } from "../_shared/cors.ts";
+import { INTERNAL_FN_SECRET, SUPABASE_ANON_KEY, SUPABASE_URL } from "../_shared/env.ts";
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const supabaseUrl = SUPABASE_URL ?? "";
+    const supabaseAnonKey = SUPABASE_ANON_KEY ?? "";
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -116,6 +117,25 @@ Deno.serve(async (req) => {
         queued: counts.queued,
       };
 
+      if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        payload.workerKick = { attempted: true, error: "missing_supabase_config" };
+      } else {
+        try {
+          await fetch(`${SUPABASE_URL}/functions/v1/alfie-job-worker`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+              ...(INTERNAL_FN_SECRET ? { "X-Internal-Secret": INTERNAL_FN_SECRET } : {}),
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(triggerPayload),
+          });
+
+          payload.workerKick = { attempted: true, triggerPayload };
+        } catch (kickError) {
+          console.error("[queue-monitor] Failed to trigger alfie-job-worker", kickError);
+          payload.workerKick = { attempted: true, error: (kickError as Error).message };
+        }
       try {
         await supabase.functions.invoke("alfie-job-worker", { body: triggerPayload });
         payload.workerKick = { attempted: true, triggerPayload };
