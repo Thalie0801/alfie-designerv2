@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
             result = await processGenerateTexts(job.payload);
             break;
           case "render_images":
-            // 🔁 on passe aussi les métadonnées du job pour gérer les payloads legacy
+            // ✅ on passe aussi user_id / order_id pour réparer les payloads legacy
             result = await processRenderImages(job.payload, {
               user_id: job.user_id,
               order_id: job.order_id,
@@ -450,6 +450,7 @@ async function processRenderImages(
     !payload.images &&
     !payload.brief
   ) {
+    // on injecte userId / orderId provenant du job si manquants
     return processRenderImage({
       ...payload,
       userId: payload.userId ?? jobUserId,
@@ -457,27 +458,31 @@ async function processRenderImages(
     });
   }
 
-  // ✅ Normalisation des payloads : on force userId/orderId/brandId
-  let userId: string | null = payload?.userId ?? jobUserId ?? null;
-  let orderId: string | null = payload?.orderId ?? jobOrderId ?? null;
-  let brandId: string | null = payload?.brandId ?? null;
+  // ✅ Normalisation : on force userId / orderId à partir du job si absents
+  if (!payload.userId && jobUserId) {
+    payload.userId = jobUserId;
+  }
+  if (!payload.orderId && jobOrderId) {
+    payload.orderId = jobOrderId;
+  }
 
-  // Si on a un orderId mais pas de brandId, on va le chercher dans orders
-  if (!brandId && orderId) {
+  // On reconstruit aussi brandId à partir de l’ordre si possible
+  if (!payload.brandId && payload.orderId) {
     const { data: orderRow, error: orderErr } = await supabaseAdmin
       .from("orders")
       .select("brand_id")
-      .eq("id", orderId)
+      .eq("id", payload.orderId)
       .maybeSingle();
 
     if (orderErr) {
       console.error("[processRenderImages] order lookup failed", orderErr);
     }
-
-    brandId = (orderRow?.brand_id as string | undefined) ?? null;
+    if (orderRow?.brand_id) {
+      payload.brandId = orderRow.brand_id as string;
+    }
   }
 
-  if (!userId || !orderId) {
+  if (!payload?.userId || !payload?.orderId) {
     console.error("[processRenderImages] legacy payload without userId/orderId", {
       jobUserId,
       jobOrderId,
@@ -486,12 +491,9 @@ async function processRenderImages(
     throw new Error("legacy payload without userId/orderId");
   }
 
-  // On met à jour le payload pour la suite de la fonction
-  payload.userId = userId;
-  payload.orderId = orderId;
-  if (brandId) {
-    payload.brandId = brandId;
-  }
+  const userId = payload.userId as string;
+  const orderId = payload.orderId as string;
+  const brandId = (payload.brandId as string | undefined) ?? null;
 
   const payloadEmail =
     typeof payload?.userEmail === "string" ? payload.userEmail.toLowerCase() : null;
@@ -715,7 +717,7 @@ Format: ${aspectRatio} aspect ratio optimized.`;
 
   // Quotas (best-effort)
   try {
-    await consumeBrandQuotas(payload.brandId, results.length, 0, 0, {
+    await consumeBrandQuotas(brandId, results.length, 0, 0, {
       userEmail: resolvedUserEmail,
       isAdminFlag: payload.isAdmin === true,
       logContext: "quota",
