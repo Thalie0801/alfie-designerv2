@@ -1,14 +1,10 @@
-import { env } from "@/config/env";
+import { SUPABASE_URL } from "@/config/env";
 import { getAuthHeader } from "@/lib/auth";
 
 export async function triggerAssetImageGeneration(assetId: string) {
-  if (!env.VITE_SUPABASE_URL) {
-    throw new Error("Configuration Supabase manquante (VITE_SUPABASE_URL).");
-  }
-
   const headers = await getAuthHeader();
 
-  const response = await fetch(`${env.VITE_SUPABASE_URL}/functions/v1/campaign-generate-image`, {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/campaign-generate-image`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -26,13 +22,9 @@ export async function triggerAssetImageGeneration(assetId: string) {
 }
 
 export async function requestCampaignArchive(campaignId: string) {
-  if (!env.VITE_SUPABASE_URL) {
-    throw new Error("Configuration Supabase manquante (VITE_SUPABASE_URL).");
-  }
-
   const headers = await getAuthHeader();
 
-  const response = await fetch(`${env.VITE_SUPABASE_URL}/functions/v1/archive-campaign`, {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/archive-campaign`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

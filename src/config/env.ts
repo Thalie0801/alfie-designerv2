@@ -1,21 +1,35 @@
-// src/config/env.ts
+// Centralized environment configuration for Alfie Designer
+// Ensures we consistently read Supabase settings and log them once at startup
 
-// ✅ Fallbacks vers le projet Supabase onx
-const FALLBACK_SUPABASE_URL = 'https://onxqgtuiagiuomlstcmt.supabase.co';
-const FALLBACK_SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ueHFndHVpYWdpdW9tbHN0Y210Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2MzE3MzcsImV4cCI6MjA3NTIwNzczN30.EdzpwyX-2BnwKRqIA9_hwFp1oCkMT4AElPn6dN1Dvy8';
+// Support both Vite runtime (import.meta.env) and Node/Deno (process.env)
+// to avoid reference errors when this module is imported in scripts or tests.
+// In Node ESM, import.meta exists but does not include "env", so we guard for it
+// before falling back to process.env.
+const runtimeEnv =
+  typeof import.meta !== "undefined" && (import.meta as ImportMeta & { env?: unknown }).env
+    ? (import.meta as ImportMeta).env
+    : process.env;
 
-const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL || FALLBACK_SUPABASE_URL;
-const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY || FALLBACK_SUPABASE_ANON_KEY;
+const supabaseUrl =
+  (runtimeEnv as Record<string, string | undefined>).VITE_SUPABASE_URL ||
+  (runtimeEnv as Record<string, string | undefined>).PUBLIC_SUPABASE_URL;
+const supabaseAnonKey =
+  (runtimeEnv as Record<string, string | undefined>).VITE_SUPABASE_ANON_KEY ||
+  (runtimeEnv as Record<string, string | undefined>).PUBLIC_SUPABASE_ANON_KEY;
 
-// ❌ IMPORTANT : plus aucun throw ici, on ne fait que log si problème
-if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
-  console.warn('[env] Using fallback Supabase config (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY not set).');
+if (!supabaseUrl) {
+  throw new Error("VITE_SUPABASE_URL n'est pas configuré");
 }
 
-export const env = {
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY,
-};
+if (!supabaseAnonKey) {
+  throw new Error("VITE_SUPABASE_ANON_KEY n'est pas configuré");
+}
+
+console.log("[Alfie] SUPABASE_URL =", supabaseUrl);
+console.log(
+  "[Alfie] SUPABASE_ANON_KEY prefix =",
+  supabaseAnonKey ? supabaseAnonKey.slice(0, 10) : "(manquante)"
+);
+
+export const SUPABASE_URL = supabaseUrl;
+export const SUPABASE_ANON_KEY = supabaseAnonKey;
