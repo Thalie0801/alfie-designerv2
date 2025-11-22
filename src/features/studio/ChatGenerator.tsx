@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { uploadToChatBucket } from "@/lib/chatUploads";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useBrandKit } from "@/hooks/useBrandKit";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
 type GeneratedAsset = {
@@ -111,17 +112,21 @@ function extractMediaUrl(payload: unknown): string | null {
 }
 
 export function ChatGenerator() {
+  const { user } = useAuth();
+  const { activeBrandId, activeBrand, brands, loading: isLoadingBrands } = useBrandKit();
   const { activeBrandId, brands } = useBrandKit();
   const resolvedBrandId = useMemo(() => {
     const defaultBrand = brands?.find(
       (brand) => (brand as Record<string, unknown>)?.is_default || (brand as Record<string, unknown>)?.isDefault,
     );
 
+    if (activeBrand?.id) return activeBrand.id;
     if (defaultBrand?.id) return defaultBrand.id;
     if (activeBrandId) return activeBrandId;
     if (brands?.[0]?.id) return brands[0].id;
 
     return null;
+  }, [activeBrand?.id, activeBrandId, brands]);
   }, [activeBrandId, brands]);
   const location = useLocation();
   const navigate = useNavigate();
@@ -155,6 +160,23 @@ export function ChatGenerator() {
   const prefillAppliedRef = useRef(false);
 
   const { toast: showToast } = useToast();
+  const lastLoggedBrandIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (isLoadingBrands) return;
+
+    if (resolvedBrandId && user?.email) {
+      if (lastLoggedBrandIdRef.current !== resolvedBrandId) {
+        console.info(`[Studio] resolved active brand ${resolvedBrandId} for user ${user.email}`);
+        lastLoggedBrandIdRef.current = resolvedBrandId;
+      }
+      return;
+    }
+
+    if ((brands?.length ?? 0) === 0) {
+      console.error("[Studio] no brand found for current user, prompting setup");
+    }
+  }, [brands?.length, isLoadingBrands, resolvedBrandId, user?.email]);
 
   useEffect(() => {
     if (prefillAppliedRef.current) return;
@@ -754,6 +776,15 @@ export function ChatGenerator() {
     }
 
     if (!resolvedBrandId) {
+      if (!isLoadingBrands) {
+        console.error("[Studio] no brand found for current user, prompting setup");
+        showToast({
+          title: "Marque requise",
+          description:
+            "Aucune marque n’est configurée pour ce compte. Merci de créer une marque dans vos paramètres avant de générer des visuels.",
+          variant: "destructive",
+        });
+      }
       console.error("[Studio] no brand found for current user, prompting setup");
       showToast({
         title: "Marque requise",
@@ -861,6 +892,7 @@ export function ChatGenerator() {
     refetchAll,
     orderId,
     navigate,
+    isLoadingBrands,
   ]);
 
   const handleGenerateVideo = useCallback(async () => {
@@ -875,6 +907,9 @@ export function ChatGenerator() {
       if (authError) throw authError;
       if (!user) throw new Error("Tu dois être connecté pour lancer une génération.");
       if (!resolvedBrandId) {
+        if (!isLoadingBrands) {
+          console.error("[Studio] no brand found for current user, prompting setup");
+        }
         console.error("[Studio] no brand found for current user, prompting setup");
         throw new Error(
           "Aucune marque n’est configurée pour ce compte. Merci de créer une marque dans vos paramètres avant de générer des visuels.",
@@ -918,6 +953,15 @@ export function ChatGenerator() {
     } finally {
       setIsSubmitting(false);
     }
+  }, [
+    aspectRatio,
+    navigate,
+    prompt,
+    resolvedBrandId,
+    uploadedSource,
+    videoDuration,
+    isLoadingBrands,
+  ]);
   }, [aspectRatio, navigate, prompt, resolvedBrandId, uploadedSource, videoDuration]);
 
   const handleGenerate = useCallback(() => {
@@ -1159,6 +1203,7 @@ export function ChatGenerator() {
               <Loader2 className="h-4 w-4 animate-spin" />
               Chargement des commandes…
             </div>
+          ) : !resolvedBrandId && !isLoadingBrands ? (
           ) : !resolvedBrandId ? (
             <p className="text-sm text-muted-foreground">
               Aucune marque n’est configurée pour ce compte. Merci de créer une marque dans vos paramètres avant de générer des visuels.
