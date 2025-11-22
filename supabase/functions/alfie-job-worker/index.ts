@@ -1,6 +1,6 @@
 // supabase/functions/alfie-job-worker/index.ts
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { uploadToCloudinary } from "../_shared/cloudinaryUploader.ts";
+import { uploadFromUrlToCloudinary } from "../_shared/cloudinaryUploader.ts";
 import { consumeBrandQuotas } from "../_shared/quota.ts";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, INTERNAL_FN_SECRET } from "../_shared/env.ts";
 
@@ -484,17 +484,18 @@ Format: ${aspectRatio} aspect ratio optimized.`;
         getResultValue<string>(imageResult, ["imageUrl", "url", "outputUrl", "output_url"]);
       if (!imageUrl) throw new Error("No image URL returned");
 
-      // 2) upload cloudinary
-      console.log("📤 upload cloudinary");
-      const cloud = await uploadToCloudinary(imageUrl, {
-        folder: `brands/${img.brandId}/images`,
-        publicId: `order_${payload.orderId}_img_${results.length + 1}`,
-        tags: ["ai-generated", "worker", `order-${payload.orderId}`],
+      // 2) upload cloudinary from URL
+      console.log("📤 upload cloudinary from URL:", imageUrl);
+      const cloud = await uploadFromUrlToCloudinary(imageUrl, {
+        folder: `alfie/${img.brandId ?? payload.brandId}/orders/${payload.orderId}`,
+        publicId: `image_${results.length + 1}`,
+        tags: ["ai-generated", "alfie", `brand:${img.brandId ?? payload.brandId}`, `order:${payload.orderId}`, `type:image`, `ratio:${aspectRatio}`],
         context: {
           order_id: String(payload.orderId),
           order_item_id: String(payload.orderItemId ?? ""),
-          brand_id: String(img.brandId ?? ""),
+          brand_id: String(img.brandId ?? payload.brandId ?? ""),
           aspect_ratio: aspectRatio,
+          type: "image",
         },
       });
 
@@ -522,28 +523,38 @@ Format: ${aspectRatio} aspect ratio optimized.`;
         .from("library_assets")
         .select("id")
         .eq("order_id", payload.orderId)
-        .eq("order_item_id", payload.orderItemId ?? null)
-        .eq("cloudinary_url", cloud.secureUrl)
+        .eq("cloudinary_public_id", cloud.publicId)
         .maybeSingle();
 
       if (!existing) {
-        await supabaseAdmin.from("library_assets").insert({
+        console.log("💾 inserting library_asset", { userId: payload.userId, orderId: payload.orderId, publicId: cloud.publicId });
+        const { error: libErr } = await supabaseAdmin.from("library_assets").insert({
           user_id: payload.userId,
-          brand_id: img.brandId ?? null,
+          brand_id: img.brandId ?? payload.brandId ?? null,
           order_id: payload.orderId,
           order_item_id: payload.orderItemId ?? null,
           type: "image",
           cloudinary_url: cloud.secureUrl,
+          cloudinary_public_id: cloud.publicId,
           format: aspectRatio,
+          tags: ["ai-generated", "alfie", `order:${payload.orderId}`],
           metadata: {
             orderId: payload.orderId,
             orderItemId: payload.orderItemId ?? null,
             aspectRatio,
             resolution: img.resolution,
-            source: "worker",
+            source: "alfie-job-worker",
             cloudinary_public_id: cloud.publicId,
+            width: cloud.width,
+            height: cloud.height,
           },
         });
+        if (libErr) {
+          console.error("❌ library_asset insert failed", libErr);
+          throw new Error(`Failed to save to library: ${libErr.message}`);
+        }
+      } else {
+        console.log("ℹ️ library_asset already exists", existing.id);
       }
 
       results.push({ url: cloud.secureUrl, aspectRatio, resolution: img.resolution });
