@@ -92,7 +92,6 @@ Deno.serve(async (req: Request) => {
     !!roleRows?.some((r) => r.role === "admin") ||
     profile?.plan === "admin" ||
     !!profile?.granted_by_admin;
-  const isAdmin = adminEmails.includes(userEmail) || !!roleRows?.some((r) => r.role === "admin");
 
   const { data: brand, error: brandError } = await supabase
     .from("brands")
@@ -153,7 +152,21 @@ Deno.serve(async (req: Request) => {
     order_id: order.id,
     type: jobType,
     status: "queued",
-    payload: { intent, orderId: order.id },
+    payload: {
+      userId,
+      brandId: intent.brandId,
+      orderId: order.id,
+      format: intent.format,
+      brief: {
+        briefs: [{
+          content: intent.topic,
+          format: `${intent.ratio || "4:5"} ${intent.format}`,
+          objective: `Generate ${intent.count} ${intent.format}(s)`,
+          style: "professional",
+          numSlides: intent.format === "carousel" ? intent.count : 1,
+        }]
+      }
+    },
   };
 
   const { error: jobError } = await supabase.from("job_queue").insert(jobPayload);

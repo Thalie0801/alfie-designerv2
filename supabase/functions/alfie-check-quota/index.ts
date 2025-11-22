@@ -47,7 +47,6 @@ export default {
         !!roleRows?.some((r) => r.role === 'admin') ||
         profile?.plan === 'admin' ||
         !!profile?.granted_by_admin;
-      const isAdmin = adminEmails.includes((user.email || '').toLowerCase()) || !!roleRows?.some((r) => r.role === 'admin');
 
       if (isAdmin) {
         const unlimited = 1_000_000_000;
