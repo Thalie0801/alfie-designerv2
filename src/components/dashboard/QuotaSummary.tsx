@@ -163,6 +163,8 @@ export function QuotaSummary({ activeBrandId }: QuotaSummaryProps) {
     );
   }
 
+  const hasUnlimitedQuotas = data.is_admin || rows.some((row) => isUnlimited(row.quota, data.is_admin));
+
   return (
     <Card className="bg-muted/30 border-primary/10 shadow-strong">
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -171,7 +173,10 @@ export function QuotaSummary({ activeBrandId }: QuotaSummaryProps) {
           Quotas
           {data.is_admin ? <Badge className="ml-2" variant="secondary">Admin</Badge> : null}
         </CardTitle>
-        {data.plan ? <Badge variant="outline">Plan {data.plan}</Badge> : null}
+        <div className="flex items-center gap-2">
+          {hasUnlimitedQuotas ? <Badge variant="secondary">Illimité</Badge> : null}
+          {data.plan ? <Badge variant="outline">Plan {data.plan}</Badge> : null}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {rows.map(({ label, used, quota, icon: Icon, testId }) => {

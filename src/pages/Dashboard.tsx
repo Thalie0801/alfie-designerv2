@@ -10,7 +10,6 @@ import { AccessGuard } from '@/components/AccessGuard';
 import { AlertBanner } from '@/components/dashboard/AlertBanner';
 import { ActiveBrandCard } from '@/components/dashboard/ActiveBrandCard';
 import { QuickActions } from '@/components/dashboard/QuickActions';
-import { ActivityCard } from '@/components/dashboard/ActivityCard';
 import { RecentCreations } from '@/components/dashboard/RecentCreations';
 import { ProfileProgress } from '@/components/dashboard/ProfileProgress';
 import { useAffiliateStatus } from '@/hooks/useAffiliateStatus';
@@ -107,12 +106,9 @@ export default function Dashboard() {
           <QuickActions />
         </div>
 
-        {/* Main Grid - Active Brand + Activity */}
-        <div className="grid lg:grid-cols-2 gap-6">
+        {/* Active Brand */}
+        <div className="grid lg:grid-cols-1 gap-6">
           <ActiveBrandCard />
-          <div data-tour-id="quotas">
-            <ActivityCard activeBrandId={activeBrandId} />
-          </div>
         </div>
 
         {/* Recent Creations */}
