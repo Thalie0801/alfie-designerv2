@@ -143,6 +143,7 @@ function deepGet(obj: any, key: string): any {
 // ---------- HTTP Entrypoint ----------
 Deno.serve(async (req) => {
   console.log("[alfie-job-worker] 🚀 Invoked at", new Date().toISOString());
+  console.log("[job-worker] start");
   
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -177,6 +178,7 @@ Deno.serve(async (req) => {
       if (!claimed || claimed.length === 0) {
         if ((queued ?? 0) > 0) console.warn("🧪 claim_empty_but_queued_gt0");
         console.log(`ℹ️ No more jobs to process (processed ${processed})`);
+        console.log("[job-worker] no job claimed");
         break;
       }
 

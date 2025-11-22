@@ -222,6 +222,15 @@ Deno.serve(async (req: Request) => {
     `[generate-media] enqueued job ${jobRows?.id} type=${jobType} brand=${intent.brandId} for order=${order.id}`,
   );
 
+  try {
+    console.log("[generate-media] invoking alfie-job-worker after enqueue");
+    await supabase.functions.invoke("alfie-job-worker", {
+      body: { trigger: "image_enqueue", orderId: order.id, jobId: jobRows?.id ?? null },
+    });
+  } catch (invokeError) {
+    console.error("[generate-media] failed to invoke alfie-job-worker", invokeError);
+  }
+
   return respond(200, {
     ok: true,
     data: {

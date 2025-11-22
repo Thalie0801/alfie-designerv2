@@ -108,6 +108,7 @@ export default {
 
       if (isAdmin) {
         const unlimited = 1_000_000_000;
+        console.log(`[quota] admin bypass applied for ${userEmail}`);
         finalQuotas = {
           ...finalQuotas,
           woofs_quota: unlimited,
