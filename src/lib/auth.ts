@@ -1,7 +1,12 @@
 import { supabase } from '@/integrations/supabase/client';
-import { SUPABASE_ANON_KEY } from '@/config/env';
+import { env } from '@/config/env';
 
 export async function getAuthHeader() {
+  if (!supabase || !env.VITE_SUPABASE_ANON_KEY) {
+    console.error('[Auth] Configuration Supabase manquante');
+    throw new Error('Configuration Supabase manquante (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).');
+  }
+
   try {
     const {
       data: { session },
@@ -14,7 +19,7 @@ export async function getAuthHeader() {
     }
 
     const userToken = session?.access_token ?? null;
-    const anonToken = SUPABASE_ANON_KEY;
+    const anonToken = env.VITE_SUPABASE_ANON_KEY;
 
     if (!anonToken) {
       throw new Error('Configuration Supabase manquante (VITE_SUPABASE_ANON_KEY).');

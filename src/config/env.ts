@@ -1,35 +1,17 @@
-// Centralized environment configuration for Alfie Designer
-// Ensures we consistently read Supabase settings and log them once at startup
+// src/config/env.ts
 
-// Support both Vite runtime (import.meta.env) and Node/Deno (process.env)
-// to avoid reference errors when this module is imported in scripts or tests.
-// In Node ESM, import.meta exists but does not include "env", so we guard for it
-// before falling back to process.env.
-const runtimeEnv =
-  typeof import.meta !== "undefined" && (import.meta as ImportMeta & { env?: unknown }).env
-    ? (import.meta as ImportMeta).env
-    : process.env;
+const VITE_SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const VITE_SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const supabaseUrl =
-  (runtimeEnv as Record<string, string | undefined>).VITE_SUPABASE_URL ||
-  (runtimeEnv as Record<string, string | undefined>).PUBLIC_SUPABASE_URL;
-const supabaseAnonKey =
-  (runtimeEnv as Record<string, string | undefined>).VITE_SUPABASE_ANON_KEY ||
-  (runtimeEnv as Record<string, string | undefined>).PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl) {
-  throw new Error("VITE_SUPABASE_URL n'est pas configuré");
+if (!VITE_SUPABASE_URL || !VITE_SUPABASE_ANON_KEY) {
+  // On LOG l'erreur au lieu de faire crasher toute l'app
+  console.error('[Env] Variables Supabase manquantes', {
+    hasUrl: !!VITE_SUPABASE_URL,
+    hasAnonKey: !!VITE_SUPABASE_ANON_KEY,
+  });
 }
 
-if (!supabaseAnonKey) {
-  throw new Error("VITE_SUPABASE_ANON_KEY n'est pas configuré");
-}
-
-console.log("[Alfie] SUPABASE_URL =", supabaseUrl);
-console.log(
-  "[Alfie] SUPABASE_ANON_KEY prefix =",
-  supabaseAnonKey ? supabaseAnonKey.slice(0, 10) : "(manquante)"
-);
-
-export const SUPABASE_URL = supabaseUrl;
-export const SUPABASE_ANON_KEY = supabaseAnonKey;
+export const env = {
+  VITE_SUPABASE_URL,
+  VITE_SUPABASE_ANON_KEY,
+};
