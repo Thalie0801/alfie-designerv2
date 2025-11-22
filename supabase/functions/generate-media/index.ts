@@ -28,6 +28,10 @@ function respond(status: number, payload: Json) {
   });
 }
 
+function userEmailFromAuth(authData: { user?: { email?: string | null } } | null | undefined) {
+  return authData?.user?.email?.toLowerCase() ?? null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -43,6 +47,39 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     console.error("[generate-media] Invalid JSON", error);
     return respond(400, { ok: false, error: "invalid_json" });
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error("[generate-media] Missing Supabase credentials");
+    return respond(500, { ok: false, error: "server_misconfigured" });
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { persistSession: false },
+  });
+
+  const userIdForLogging = z.string().uuid().safeParse((body as any)?.userId).success
+    ? ((body as Record<string, unknown>)?.userId as string)
+    : null;
+  const brandIdFromPayload = (body as Record<string, any>)?.intent?.brandId;
+
+  let userEmail = "";
+  let authUserResponse = null as Awaited<ReturnType<typeof supabase.auth.admin.getUserById>> | null;
+
+  if (userIdForLogging) {
+    const authResponse = await supabase.auth.admin.getUserById(userIdForLogging);
+    authUserResponse = authResponse;
+    userEmail = userEmailFromAuth(authResponse.data) ?? "";
+  }
+
+  if (!brandIdFromPayload) {
+    console.error(
+      `[generate-media] missing brandId in payload for user ${userEmail || userIdForLogging || "unknown-user"}`,
+    );
+    return respond(400, { ok: false, error: "missing_brand_id" });
   }
 
   const parsed = BodySchema.safeParse(body);
@@ -64,20 +101,8 @@ Deno.serve(async (req: Request) => {
     count: intent.count,
   });
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    console.error("[generate-media] Missing Supabase credentials");
-    return respond(500, { ok: false, error: "server_misconfigured" });
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: { persistSession: false },
-  });
-
-  const { data: authUser } = await supabase.auth.admin.getUserById(userId);
-  const userEmail = authUser?.user?.email?.toLowerCase() ?? "";
+  const { data: authUserData } = authUserResponse ?? (await supabase.auth.admin.getUserById(userId));
+  userEmail = userEmailFromAuth(authUserData) ?? userEmail;
   const roleRows = await getUserRoles(supabase, userId);
 
   const { data: profile } = await supabase

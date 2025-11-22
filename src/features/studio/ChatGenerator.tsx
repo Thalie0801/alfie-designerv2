@@ -111,7 +111,18 @@ function extractMediaUrl(payload: unknown): string | null {
 }
 
 export function ChatGenerator() {
-  const { activeBrandId } = useBrandKit();
+  const { activeBrandId, brands } = useBrandKit();
+  const resolvedBrandId = useMemo(() => {
+    const defaultBrand = brands?.find(
+      (brand) => (brand as Record<string, unknown>)?.is_default || (brand as Record<string, unknown>)?.isDefault,
+    );
+
+    if (defaultBrand?.id) return defaultBrand.id;
+    if (activeBrandId) return activeBrandId;
+    if (brands?.[0]?.id) return brands[0].id;
+
+    return null;
+  }, [activeBrandId, brands]);
   const location = useLocation();
   const navigate = useNavigate();
   const orderId =
@@ -251,7 +262,7 @@ export function ChatGenerator() {
 
   const fetchOrderSummaries = useCallback(
     async (userId: string, orderIdFilter: string | null) => {
-      if (!activeBrandId) {
+      if (!resolvedBrandId) {
         setOrderSummaries([]);
         setOrderSummariesError(null);
         setOrderSummariesLoading(false);
@@ -266,7 +277,7 @@ export function ChatGenerator() {
           .from("orders")
           .select("id, status, created_at, campaign_name")
           .eq("user_id", userId)
-          .eq("brand_id", activeBrandId)
+          .eq("brand_id", resolvedBrandId)
           .order("created_at", { ascending: false });
 
         if (orderIdFilter) {
@@ -294,7 +305,7 @@ export function ChatGenerator() {
               "id, order_id, type, cloudinary_url, cloudinary_public_id, text_json, format, slide_index, metadata",
             )
             .eq("user_id", userId)
-            .eq("brand_id", activeBrandId)
+            .eq("brand_id", resolvedBrandId)
             .in("order_id", orderIds),
           supabase
             .from("job_queue")
@@ -309,7 +320,7 @@ export function ChatGenerator() {
             .from("media_generations")
             .select("id, type, status, output_url, thumbnail_url, metadata, created_at")
             .eq("user_id", userId)
-            .eq("brand_id", activeBrandId)
+            .eq("brand_id", resolvedBrandId)
             .in("type", ["video"])
             .order("created_at", { ascending: false })
             .limit(50),
@@ -456,7 +467,7 @@ export function ChatGenerator() {
         setOrderSummariesLoading(false);
       }
     },
-    [activeBrandId],
+    [resolvedBrandId],
   );
 
   const refetchAll = useCallback(async () => {
@@ -742,10 +753,12 @@ export function ChatGenerator() {
       return;
     }
 
-    if (!activeBrandId) {
+    if (!resolvedBrandId) {
+      console.error("[Studio] no brand found for current user, prompting setup");
       showToast({
         title: "Marque requise",
-        description: "Sélectionne une marque avant de lancer une génération",
+        description:
+          "Aucune marque n’est configurée pour ce compte. Merci de créer une marque dans vos paramètres avant de générer des visuels.",
         variant: "destructive",
       });
       return;
@@ -773,7 +786,7 @@ export function ChatGenerator() {
         body: {
           userId: userData.user.id,
           intent: {
-            brandId: activeBrandId,
+            brandId: resolvedBrandId,
             format: "image",
             count: 1,
             topic: prompt || "Image request",
@@ -843,7 +856,7 @@ export function ChatGenerator() {
     prompt,
     uploadedSource,
     aspectRatio,
-    activeBrandId,
+    resolvedBrandId,
     showToast,
     refetchAll,
     orderId,
@@ -861,7 +874,12 @@ export function ChatGenerator() {
       } = await supabase.auth.getUser();
       if (authError) throw authError;
       if (!user) throw new Error("Tu dois être connecté pour lancer une génération.");
-      if (!activeBrandId) throw new Error("Sélectionne une marque.");
+      if (!resolvedBrandId) {
+        console.error("[Studio] no brand found for current user, prompting setup");
+        throw new Error(
+          "Aucune marque n’est configurée pour ce compte. Merci de créer une marque dans vos paramètres avant de générer des visuels.",
+        );
+      }
 
       const promptText = (prompt || "").trim();
       if (!promptText) throw new Error("Ajoute un prompt (1–2 phrases suffisent).");
@@ -876,7 +894,7 @@ export function ChatGenerator() {
         body: {
           message: promptText,
           user_message: promptText,
-          brandId: activeBrandId,
+          brandId: resolvedBrandId,
           forceTool: "generate_video",
           aspectRatio,
           durationSec,
@@ -900,7 +918,7 @@ export function ChatGenerator() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [activeBrandId, aspectRatio, navigate, prompt, uploadedSource, videoDuration]);
+  }, [aspectRatio, navigate, prompt, resolvedBrandId, uploadedSource, videoDuration]);
 
   const handleGenerate = useCallback(() => {
     if (contentType === "image") {
@@ -1108,9 +1126,9 @@ export function ChatGenerator() {
             <div>
               <h3 className="text-lg font-semibold">Générations récentes</h3>
               <p className="text-xs text-muted-foreground">
-                {activeBrandId
+                {resolvedBrandId
                   ? "Suivez vos dernières commandes et leur statut."
-                  : "Sélectionnez une marque pour afficher vos générations."}
+                  : "Configurez une marque pour afficher vos générations."}
               </p>
             </div>
             <Button
@@ -1141,9 +1159,9 @@ export function ChatGenerator() {
               <Loader2 className="h-4 w-4 animate-spin" />
               Chargement des commandes…
             </div>
-          ) : !activeBrandId ? (
+          ) : !resolvedBrandId ? (
             <p className="text-sm text-muted-foreground">
-              Sélectionnez une marque pour commencer à générer des visuels.
+              Aucune marque n’est configurée pour ce compte. Merci de créer une marque dans vos paramètres avant de générer des visuels.
             </p>
           ) : orderSummaries.length === 0 ? (
             <p className="text-sm text-muted-foreground">
