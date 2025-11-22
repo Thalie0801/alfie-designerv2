@@ -101,6 +101,12 @@ Deno.serve(async (req: Request) => {
     count: intent.count,
   });
 
+  if (intent.format === "image" || intent.format === "carousel") {
+    console.log(
+      `[generate-media] start image generation for user=${userEmail || userId} brand=${intent.brandId}`,
+    );
+  }
+
   const { data: authUserData } = authUserResponse ?? (await supabase.auth.admin.getUserById(userId));
   userEmail = userEmailFromAuth(authUserData) ?? userEmail;
   const roleRows = await getUserRoles(supabase, userId);
@@ -174,6 +180,8 @@ Deno.serve(async (req: Request) => {
     return respond(500, { ok: false, error: "order_creation_failed" });
   }
 
+  console.log(`[generate-media] created order ${order.id}`);
+
   const jobType = intent.format === "carousel" ? "render_carousels" : "render_images";
   const jobPayload = {
     user_id: userId,
@@ -210,14 +218,22 @@ Deno.serve(async (req: Request) => {
     return respond(500, { ok: false, error: "job_enqueue_failed" });
   }
 
-  console.log("[generate-media] created order", { orderId: order.id });
-  console.log("[generate-media] enqueued job", {
-    jobId: jobRows?.id,
-    type: jobType,
-    brandId: intent.brandId,
-  });
+  console.log(
+    `[generate-media] enqueued job ${jobRows?.id} type=${jobType} brand=${intent.brandId} for order=${order.id}`,
+  );
 
-  return respond(200, { ok: true, data: { orderId: order.id } });
+  return respond(200, {
+    ok: true,
+    data: {
+      orderId: order.id,
+      jobId: jobRows?.id ?? null,
+      summary: {
+        format: intent.format,
+        count: intent.count,
+        status: "queued",
+      },
+    },
+  });
 });
 
 function buildCampaignName(intent: Intent): string {

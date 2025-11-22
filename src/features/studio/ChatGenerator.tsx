@@ -114,7 +114,6 @@ function extractMediaUrl(payload: unknown): string | null {
 export function ChatGenerator() {
   const { user } = useAuth();
   const { activeBrandId, activeBrand, brands, loading: isLoadingBrands } = useBrandKit();
-  const { activeBrandId, brands } = useBrandKit();
   const resolvedBrandId = useMemo(() => {
     const defaultBrand = brands?.find(
       (brand) => (brand as Record<string, unknown>)?.is_default || (brand as Record<string, unknown>)?.isDefault,
@@ -127,7 +126,6 @@ export function ChatGenerator() {
 
     return null;
   }, [activeBrand?.id, activeBrandId, brands]);
-  }, [activeBrandId, brands]);
   const location = useLocation();
   const navigate = useNavigate();
   const orderId =
@@ -158,6 +156,7 @@ export function ChatGenerator() {
   const [orderSummariesLoading, setOrderSummariesLoading] = useState(false);
   const [orderSummariesError, setOrderSummariesError] = useState<string | null>(null);
   const prefillAppliedRef = useRef(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { toast: showToast } = useToast();
   const lastLoggedBrandIdRef = useRef<string | null>(null);
@@ -616,6 +615,29 @@ export function ChatGenerator() {
     };
   }, [refetchAll]);
 
+  useEffect(() => {
+    const shouldPoll = isSubmitting || orderSummaries.some((summary) => summary.isProcessing);
+
+    if (shouldPoll && !pollingRef.current) {
+      console.info("[Studio] enabling polling fallback for orders/assets");
+      pollingRef.current = setInterval(() => {
+        void refetchAll();
+      }, 6000);
+    }
+
+    if (!shouldPoll && pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [isSubmitting, orderSummaries, refetchAll]);
+
   const requeueJob = useCallback(
     async (job: JobEntry) => {
       try {
@@ -785,13 +807,6 @@ export function ChatGenerator() {
           variant: "destructive",
         });
       }
-      console.error("[Studio] no brand found for current user, prompting setup");
-      showToast({
-        title: "Marque requise",
-        description:
-          "Aucune marque n’est configurée pour ce compte. Merci de créer une marque dans vos paramètres avant de générer des visuels.",
-        variant: "destructive",
-      });
       return;
     }
 
@@ -962,7 +977,6 @@ export function ChatGenerator() {
     videoDuration,
     isLoadingBrands,
   ]);
-  }, [aspectRatio, navigate, prompt, resolvedBrandId, uploadedSource, videoDuration]);
 
   const handleGenerate = useCallback(() => {
     if (contentType === "image") {
@@ -1204,7 +1218,6 @@ export function ChatGenerator() {
               Chargement des commandes…
             </div>
           ) : !resolvedBrandId && !isLoadingBrands ? (
-          ) : !resolvedBrandId ? (
             <p className="text-sm text-muted-foreground">
               Aucune marque n’est configurée pour ce compte. Merci de créer une marque dans vos paramètres avant de générer des visuels.
             </p>

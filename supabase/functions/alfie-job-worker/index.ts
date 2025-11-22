@@ -471,7 +471,9 @@ Format: ${aspectRatio} aspect ratio optimized.`;
     const aspectRatio = img.aspectRatio || "4:5";
     try {
       // 1) generate
-      console.log("🎨 generate", { aspectRatio, resolution: img.resolution });
+      console.log(
+        `[job-worker] calling image engine for order=${payload.orderId} brand=${img.brandId ?? payload.brandId} ratio=${aspectRatio}`,
+      );
       const imageResult = await callFn<any>("alfie-generate-ai-image", {
         prompt: img.prompt,
         resolution: img.resolution,
@@ -498,7 +500,7 @@ Format: ${aspectRatio} aspect ratio optimized.`;
       if (!imageUrl) throw new Error("No image URL returned");
 
       // 2) upload cloudinary from URL
-      console.log("📤 upload cloudinary from URL:", imageUrl);
+      console.log("[job-worker] uploaded image engine result, pushing to Cloudinary", { imageUrl });
       const cloud = await uploadFromUrlToCloudinary(imageUrl, {
         folder: `alfie/${img.brandId ?? payload.brandId}/orders/${payload.orderId}`,
         publicId: `image_${results.length + 1}`,
@@ -575,7 +577,7 @@ Format: ${aspectRatio} aspect ratio optimized.`;
         console.log("ℹ️ library_asset already exists", existing.id);
       }
 
-      console.log(`[job-worker] uploaded image to Cloudinary ${cloud.publicId}`);
+      console.log(`[job-worker] uploaded image to Cloudinary publicId=${cloud.publicId}`);
       results.push({ url: cloud.secureUrl, aspectRatio, resolution: img.resolution });
     } catch (e) {
       console.error("❌ image_failed", e);
