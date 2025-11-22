@@ -140,6 +140,53 @@ function deepGet(obj: any, key: string): any {
   return null;
 }
 
+async function claimJob(): Promise<JobRow | null> {
+  const { data: claimed, error: claimError } = await supabaseAdmin.rpc("claim_next_job");
+  if (claimError) {
+    console.error("❌ claim_next_job", claimError);
+  }
+
+  if (claimed && claimed.length > 0) {
+    return claimed[0] as JobRow;
+  }
+
+  // Fallback path: direct claim to avoid stalled queues when RPC is missing or returns nothing
+  console.warn("⚠️ claim_next_job returned no rows, attempting direct claim fallback");
+  const { data: queuedJob, error: fetchError } = await supabaseAdmin
+    .from("job_queue")
+    .select("*")
+    .eq("status", "queued")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (fetchError) {
+    console.error("❌ fallback claim select failed", fetchError);
+    return null;
+  }
+
+  if (!queuedJob) {
+    console.log("ℹ️ fallback claim found no queued job");
+    return null;
+  }
+
+  const { data: lockedJob, error: lockError } = await supabaseAdmin
+    .from("job_queue")
+    .update({ status: "running", updated_at: new Date().toISOString() })
+    .eq("id", queuedJob.id)
+    .eq("status", "queued")
+    .select("*")
+    .single();
+
+  if (lockError) {
+    console.error("❌ fallback claim update failed", lockError);
+    return null;
+  }
+
+  console.log("✅ fallback_claim", { id: lockedJob.id, type: lockedJob.type });
+  return lockedJob as JobRow;
+}
+
 // ---------- HTTP Entrypoint ----------
 Deno.serve(async (req) => {
   console.log("[alfie-job-worker] 🚀 Invoked at", new Date().toISOString());
@@ -170,19 +217,13 @@ Deno.serve(async (req) => {
     let processed = 0;
 
     for (let i = 0; i < maxJobs; i++) {
-      const { data: claimed, error: claimError } = await supabaseAdmin.rpc("claim_next_job");
-      if (claimError) {
-        console.error("❌ claim_next_job", claimError);
-        break;
-      }
-      if (!claimed || claimed.length === 0) {
+      const job = await claimJob();
+      if (!job) {
         if ((queued ?? 0) > 0) console.warn("🧪 claim_empty_but_queued_gt0");
         console.log(`ℹ️ No more jobs to process (processed ${processed})`);
         console.log("[job-worker] no job claimed");
         break;
       }
-
-      const job = claimed[0];
 
       console.log(`[job-worker] claimed job ${job.id} type=${job.type}`);
 
