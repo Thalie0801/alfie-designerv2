@@ -212,54 +212,16 @@ Deno.serve(async (req) => {
           case "generate_texts":
             result = await processGenerateTexts(job.payload);
             break;
-          case "render_images": {
-            const safePayload = {
-              ...(job.payload ?? {}),
-              // on force les infos minimales depuis la ligne job_queue
-              userId: job.user_id,
-              orderId: job.order_id,
-            };
-
-            // si pas de brandId dans le payload, on le récupère via l’order
-            if (!safePayload.brandId && safePayload.orderId) {
-              const { data: orderRow, error: orderErr } = await supabaseAdmin
-                .from("orders")
-                .select("brand_id")
-                .eq("id", safePayload.orderId)
-                .maybeSingle();
-
-              if (orderErr) {
-                console.error("[job-worker] failed to resolve brandId from order", orderErr);
-              }
-              safePayload.brandId = safePayload.brandId ?? orderRow?.brand_id ?? null;
-            }
-
-            result = await processRenderImages(safePayload);
+          case "render_images":
+            // 🔁 on passe aussi les métadonnées du job pour gérer les payloads legacy
+            result = await processRenderImages(job.payload, {
+              user_id: job.user_id,
+              order_id: job.order_id,
+            });
             break;
-          }
-          case "render_carousels": {
-            const safePayload = {
-              ...(job.payload ?? {}),
-              userId: job.user_id,
-              orderId: job.order_id,
-            };
-
-            if (!safePayload.brandId && safePayload.orderId) {
-              const { data: orderRow, error: orderErr } = await supabaseAdmin
-                .from("orders")
-                .select("brand_id")
-                .eq("id", safePayload.orderId)
-                .maybeSingle();
-
-              if (orderErr) {
-                console.error("[job-worker] failed to resolve brandId from order", orderErr);
-              }
-              safePayload.brandId = safePayload.brandId ?? orderRow?.brand_id ?? null;
-            }
-
-            result = await processRenderCarousels(safePayload);
+          case "render_carousels":
+            result = await processRenderCarousels(job.payload);
             break;
-          }
           case "generate_video":
             result = await processGenerateVideo(job.payload);
             break;
@@ -466,21 +428,21 @@ async function processRenderImage(payload: any) {
   return { imageUrl };
 }
 
-async function processRenderImages(payload: any) {
-  console.log("[processRenderImages] start", { orderId: payload.orderId, brandId: payload.brandId });
+
+async function processRenderImages(
+  payload: any,
+  jobMeta?: { user_id?: string | null; order_id?: string | null },
+) {
+  const jobUserId = jobMeta?.user_id ?? null;
+  const jobOrderId = jobMeta?.order_id ?? null;
+
+  console.log("[processRenderImages] start", {
+    orderId: payload?.orderId ?? jobOrderId,
+    brandId: payload?.brandId,
+  });
   console.log("🖼️ [processRenderImages] payload.in", payload);
 
-  // fallbacks supplémentaires
-  const userId = payload.userId ?? payload.user_id;
-  const orderId = payload.orderId ?? payload.order_id;
-
-  if (!userId || !orderId) {
-    throw new Error("Invalid render_images payload: missing userId or orderId");
-  }
-
-  payload.userId = userId;
-  payload.orderId = orderId;
-
+  // ✅ Cas 1 : ancien format "direct" (prompt simple sans brief/images)
   if (
     payload &&
     typeof payload.prompt === "string" &&
@@ -488,14 +450,57 @@ async function processRenderImages(payload: any) {
     !payload.images &&
     !payload.brief
   ) {
-    return processRenderImage(payload);
+    return processRenderImage({
+      ...payload,
+      userId: payload.userId ?? jobUserId,
+      orderId: payload.orderId ?? jobOrderId,
+    });
   }
 
-  const payloadEmail = typeof payload?.userEmail === "string" ? payload.userEmail.toLowerCase() : null;
+  // ✅ Normalisation des payloads : on force userId/orderId/brandId
+  let userId: string | null = payload?.userId ?? jobUserId ?? null;
+  let orderId: string | null = payload?.orderId ?? jobOrderId ?? null;
+  let brandId: string | null = payload?.brandId ?? null;
+
+  // Si on a un orderId mais pas de brandId, on va le chercher dans orders
+  if (!brandId && orderId) {
+    const { data: orderRow, error: orderErr } = await supabaseAdmin
+      .from("orders")
+      .select("brand_id")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    if (orderErr) {
+      console.error("[processRenderImages] order lookup failed", orderErr);
+    }
+
+    brandId = (orderRow?.brand_id as string | undefined) ?? null;
+  }
+
+  if (!userId || !orderId) {
+    console.error("[processRenderImages] legacy payload without userId/orderId", {
+      jobUserId,
+      jobOrderId,
+      rawPayload: payload,
+    });
+    throw new Error("legacy payload without userId/orderId");
+  }
+
+  // On met à jour le payload pour la suite de la fonction
+  payload.userId = userId;
+  payload.orderId = orderId;
+  if (brandId) {
+    payload.brandId = brandId;
+  }
+
+  const payloadEmail =
+    typeof payload?.userEmail === "string" ? payload.userEmail.toLowerCase() : null;
   let resolvedUserEmail = payloadEmail;
 
   if (!resolvedUserEmail) {
-    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(payload.userId);
+    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(
+      userId,
+    );
     if (authError) {
       console.error("[job-worker] failed to resolve user email", authError);
     }
@@ -516,12 +521,12 @@ async function processRenderImages(payload: any) {
     imagesToRender = payload.images;
   } else if (payload.brief) {
     const { briefs } = payload.brief;
-    const brandId = payload.brandId;
+    const brandIdLocal = payload.brandId;
 
     const { data: brand } = await supabaseAdmin
       .from("brands")
       .select("name, palette, voice, niche")
-      .eq("id", brandId)
+      .eq("id", brandIdLocal)
       .single();
 
     const AR_MAP: Record<string, { w: number; h: number }> = {
@@ -547,7 +552,7 @@ Format: ${aspectRatio} aspect ratio optimized.`;
         prompt,
         resolution: `${w}x${h}`,
         aspectRatio: aspectRatio as any,
-        brandId,
+        brandId: brandIdLocal,
         briefIndex: i,
       };
     });
@@ -562,20 +567,21 @@ Format: ${aspectRatio} aspect ratio optimized.`;
     try {
       // 1) generate
       console.log("[processRenderImages] calling image engine", {
-        orderId: payload.orderId,
+        orderId,
         brandId: payload.brandId,
       });
       console.log(
-        `[job-worker] calling image engine for order=${payload.orderId} brand=${img.brandId ?? payload.brandId} ratio=${aspectRatio}`,
+        `[job-worker] calling image engine for order=${orderId} brand=${img.brandId ?? payload.brandId} ratio=${aspectRatio}`,
       );
+
       const imageResult = await callFn<any>("alfie-generate-ai-image", {
         prompt: img.prompt,
         resolution: img.resolution,
         backgroundOnly: false,
         brandKit: await loadBrandMini(img.brandId ?? payload.brandId),
-        userId: payload.userId,
+        userId,
         brandId: img.brandId ?? payload.brandId ?? null,
-        orderId: payload.orderId,
+        orderId,
         orderItemId: payload.orderItemId ?? null,
         requestId: payload.requestId ?? null,
         templateImageUrl: img.templateImageUrl ?? payload.sourceUrl ?? null,
@@ -594,16 +600,29 @@ Format: ${aspectRatio} aspect ratio optimized.`;
       if (!imageUrl) throw new Error("No image URL returned");
 
       console.log("[processRenderImages] engine returned imageUrl", imageUrl);
-      console.log("[processRenderImages] engine responded", { imageUrl, orderId: payload.orderId, brandId: img.brandId ?? payload.brandId });
+      console.log("[processRenderImages] engine responded", {
+        imageUrl,
+        orderId,
+        brandId: img.brandId ?? payload.brandId,
+      });
 
       // 2) upload cloudinary from URL
-      console.log("[job-worker] uploaded image engine result, pushing to Cloudinary", { imageUrl });
+      console.log("[job-worker] uploaded image engine result, pushing to Cloudinary", {
+        imageUrl,
+      });
       const cloud = await uploadFromUrlToCloudinary(imageUrl, {
-        folder: `alfie/${img.brandId ?? payload.brandId}/orders/${payload.orderId}`,
+        folder: `alfie/${img.brandId ?? payload.brandId}/orders/${orderId}`,
         publicId: `image_${results.length + 1}`,
-        tags: ["ai-generated", "alfie", `brand:${img.brandId ?? payload.brandId}`, `order:${payload.orderId}`, `type:image`, `ratio:${aspectRatio}`],
+        tags: [
+          "ai-generated",
+          "alfie",
+          `brand:${img.brandId ?? payload.brandId}`,
+          `order:${orderId}`,
+          `type:image`,
+          `ratio:${aspectRatio}`,
+        ],
         context: {
-          order_id: String(payload.orderId),
+          order_id: String(orderId),
           order_item_id: String(payload.orderItemId ?? ""),
           brand_id: String(img.brandId ?? payload.brandId ?? ""),
           aspect_ratio: aspectRatio,
@@ -614,7 +633,7 @@ Format: ${aspectRatio} aspect ratio optimized.`;
 
       // 3) persist media_generations (best-effort)
       await supabaseAdmin.from("media_generations").insert({
-        user_id: payload.userId,
+        user_id: userId,
         brand_id: img.brandId ?? null,
         type: "image",
         status: "completed",
@@ -622,7 +641,7 @@ Format: ${aspectRatio} aspect ratio optimized.`;
         thumbnail_url: cloud.secureUrl,
         prompt: img.prompt,
         metadata: {
-          orderId: payload.orderId,
+          orderId,
           orderItemId: payload.orderItemId ?? null,
           aspectRatio,
           resolution: img.resolution,
@@ -635,26 +654,30 @@ Format: ${aspectRatio} aspect ratio optimized.`;
       const { data: existing } = await supabaseAdmin
         .from("library_assets")
         .select("id")
-        .eq("order_id", payload.orderId)
+        .eq("order_id", orderId)
         .eq("cloudinary_public_id", cloud.publicId)
         .maybeSingle();
 
       if (!existing) {
-        console.log("💾 inserting library_asset", { userId: payload.userId, orderId: payload.orderId, publicId: cloud.publicId });
+        console.log("💾 inserting library_asset", {
+          userId,
+          orderId,
+          publicId: cloud.publicId,
+        });
         const { data: assetRows, error: libErr } = await supabaseAdmin
           .from("library_assets")
           .insert({
-            user_id: payload.userId,
+            user_id: userId,
             brand_id: img.brandId ?? payload.brandId ?? null,
-            order_id: payload.orderId,
+            order_id: orderId,
             order_item_id: payload.orderItemId ?? null,
             type: "image",
             cloudinary_url: cloud.secureUrl,
             cloudinary_public_id: cloud.publicId,
             format: aspectRatio,
-            tags: ["ai-generated", "alfie", `order:${payload.orderId}`],
+            tags: ["ai-generated", "alfie", `order:${orderId}`],
             metadata: {
-              orderId: payload.orderId,
+              orderId,
               orderItemId: payload.orderItemId ?? null,
               aspectRatio,
               resolution: img.resolution,
@@ -670,7 +693,6 @@ Format: ${aspectRatio} aspect ratio optimized.`;
           console.error("❌ library_asset insert failed", libErr);
           throw new Error(`Failed to save to library: ${libErr.message}`);
         }
-        console.log("[job-worker] inserted asset", assetRows?.id);
         console.log(`[job-worker] inserted asset ${assetRows?.id} into library_assets`);
       } else {
         console.log("ℹ️ library_asset already exists", existing.id);
@@ -704,189 +726,6 @@ Format: ${aspectRatio} aspect ratio optimized.`;
   }
 
   return { images: results };
-}
-
-async function processRenderCarousels(payload: any) {
-  console.log("📚 [processRenderCarousels] START", {
-    hasSlides: !!payload?.slides,
-    slidesCount: Array.isArray(payload?.slides) ? payload.slides.length : 0,
-    hasBrief: !!payload?.brief,
-    briefCount: payload?.brief?.briefs?.length || 0,
-    userId: payload?.userId,
-    brandId: payload?.brandId,
-    orderId: payload?.orderId
-  });
-
-  // ✅ Phase B: Removed alfie-render-carousel call (function doesn't exist)
-  // Always convert payload.slides to carousel object and use slide-by-slide rendering
-
-  let carouselsToRender: any[] = [];
-
-  // ✅ Phase B: Handle payload.slides by converting to carousel format
-  if (Array.isArray(payload?.slides) && payload.slides.length > 0) {
-    const { userId, brandId, orderId } = payload || {};
-    if (!userId || !brandId || !orderId) {
-      throw new Error("Invalid render_carousels payload: missing userId, brandId, or orderId");
-    }
-
-    // Convert slides array to carousel object for slide-by-slide processing
-    carouselsToRender = [{
-      id: crypto.randomUUID(),
-      aspectRatio: payload.aspectRatio || "9:16",
-      textVersion: 1,
-      slides: payload.slides,
-      prompts: payload.slides.map((_: any, i: number) => `Slide ${i + 1}`),
-      style: "minimalist",
-      brandId,
-    }];
-  } else if (payload.carousels) {
-    carouselsToRender = payload.carousels;
-  } else if (payload.brief) {
-    const { briefs } = payload.brief;
-    const brandId = payload.brandId;
-    const brandMini = await loadBrandMini(brandId, true);
-
-    const planPromises = (briefs || [payload.brief]).map(async (brief: any) => {
-      const slideCount =
-        typeof brief?.numSlides === "number" ? brief.numSlides : parseInt(String(brief?.numSlides ?? "5")) || 5;
-
-      const planResult = await callFn<any>("alfie-plan-carousel", {
-        prompt: brief?.topic ?? "Carousel",
-        slideCount,
-        brandKit: brandMini,
-      });
-
-      const planPayload = unwrapResult<any>(planResult);
-      const planError = extractError(planResult) ?? extractError(planPayload);
-      if (planError) throw new Error(planError);
-
-      const planObject =
-        (planPayload && typeof planPayload === "object"
-          ? (planPayload as Record<string, any>)
-          : null) ??
-        (typeof planResult === "object" && planResult !== null
-          ? (planResult as Record<string, any>)
-          : null);
-
-      if (!planObject) throw new Error("Plan returned invalid payload");
-
-      const slides = Array.isArray(planObject.slides) ? planObject.slides : [];
-      if (slides.length === 0) throw new Error("Plan returned no slides");
-
-      const prompts = Array.isArray(planObject.prompts) ? planObject.prompts : [];
-      const style =
-        typeof planObject.style === "string"
-          ? planObject.style
-          : typeof (planObject as any).meta?.style === "string"
-            ? (planObject as any).meta.style
-            : "minimalist";
-
-      return {
-        id: crypto.randomUUID(),
-        aspectRatio: payload.aspectRatio || "9:16",
-        textVersion: 1,
-        slides,
-        prompts,
-        style,
-        brandId,
-      };
-    });
-
-    carouselsToRender = await Promise.all(planPromises);
-  } else {
-    throw new Error("Invalid payload: missing carousels or brief");
-  }
-
-  const results: any[] = [];
-
-  for (const carousel of carouselsToRender) {
-    console.log("🎠 rendering_carousel", { slides: carousel.slides?.length, id: carousel.id });
-
-    if (!Array.isArray(carousel.slides) || carousel.slides.length === 0) {
-      throw new Error("Carousel has no slides");
-    }
-
-    const slidesOut: Array<{ index: number; url: string; publicId?: string; text: any }> = [];
-
-    for (let i = 0; i < carousel.slides.length; i++) {
-      const slide = carousel.slides[i];
-      const slidePrompt = carousel.prompts?.[i] || `Slide ${i + 1}`;
-
-      let attempt = 0;
-      const maxRetry = 2;
-
-      while (true) {
-        try {
-          const slideResult = await callFn<any>("alfie-render-carousel-slide", {
-            userId: payload.userId,
-            prompt: slidePrompt,
-            globalStyle: carousel.style || "minimalist",
-            slideContent: slide,
-            brandId: carousel.brandId,
-            orderId: payload.orderId,
-            orderItemId: payload.orderItemId ?? null,
-            carouselId: carousel.id,
-            slideIndex: i,
-            totalSlides: carousel.slides.length,
-            aspectRatio: carousel.aspectRatio || "9:16",
-            textVersion: carousel.textVersion || 1,
-            renderVersion: 1,
-            campaign: "carousel_generation",
-            language: "FR",
-            requestId: payload.requestId ?? null,
-          });
-
-          const slidePayload = unwrapResult<any>(slideResult);
-          const slideError = extractError(slideResult) ?? extractError(slidePayload);
-          if (slideError) throw new Error(slideError);
-
-          const cloudinaryUrl =
-            (typeof slidePayload === "string"
-              ? slidePayload
-              : getResultValue<string>(slidePayload, ["cloudinary_url", "url"])) ??
-            getResultValue<string>(slideResult, ["cloudinary_url", "url"]);
-          const cloudinaryPublicId =
-            getResultValue<string>(slidePayload, ["cloudinary_public_id"]) ??
-            getResultValue<string>(slideResult, ["cloudinary_public_id"]);
-
-          if (!cloudinaryUrl) throw new Error("Slide renderer did not return cloudinary_url");
-
-          slidesOut.push({
-            index: i,
-            url: cloudinaryUrl,
-            publicId: cloudinaryPublicId ?? undefined,
-            text: slide,
-          });
-          break;
-        } catch (e) {
-          attempt++;
-          if (isHttp429(e) && attempt <= maxRetry) {
-            const backoff = Math.round(Math.pow(1.6, attempt) * 1200);
-            console.warn(`⏳ rate_limited retry=${attempt}/${maxRetry} wait=${backoff}ms`);
-            await sleep(backoff);
-            continue;
-          }
-          throw e;
-        }
-      }
-    }
-
-    try {
-      await consumeBrandQuotas(carousel.brandId, slidesOut.length, 0, 0, {
-        userEmail: payload?.userEmail ?? null,
-        isAdminFlag: payload?.isAdmin === true,
-        logContext: "quota",
-      });
-      console.log("📊 quota_consume", slidesOut.length);
-    } catch (qErr) {
-      console.warn("⚠️ quota_consume_failed", qErr);
-    }
-
-    results.push({ carouselId: carousel.id, slides: slidesOut, totalSlides: slidesOut.length });
-    console.log("✅ carousel_done", { id: carousel.id, slides: slidesOut.length });
-  }
-
-  return { carousels: results };
 }
 
 async function processGenerateVideo(payload: any) {
