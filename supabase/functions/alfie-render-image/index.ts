@@ -121,13 +121,8 @@ export default {
             : checkData?.data?.ok ?? checkData?.ok ?? true;
 
           if (!isAdmin && quotaOk === false) {
-          if (!isAdmin && (!checkData?.ok || !checkData.data?.ok)) {
             console.error("[alfie-render-image] Quota check indicates insufficient quota:", checkData);
             throw new Error("INSUFFICIENT_QUOTA");
-          }
-
-          if (checkData?.data?.is_admin || checkData?.is_admin) {
-            isAdmin = true;
           }
         } catch (quotaError) {
           // ⚠️ Safety net : en cas d’exception, on n’empêche pas la génération
