@@ -1,440 +1,319 @@
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { VerifyPaymentSchema, validateInput } from "../_shared/validation.ts";
 
-import { corsHeaders } from "../_shared/cors.ts";
+import { requireEnv } from "../_shared/env.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*", // TODO: restrict to frontend domain
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 const PLAN_CONFIG = {
-  starter: { 
-    quota_brands: 1, 
-    quota_images: 150, 
+  starter: {
+    quota_brands: 1,
+    quota_images: 150,
     quota_videos: 15,
-    quota_woofs: 15
+    quota_woofs: 15,
   },
-  pro: { 
-    quota_brands: 1, 
-    quota_images: 450, 
+  pro: {
+    quota_brands: 1,
+    quota_images: 450,
     quota_videos: 45,
-    quota_woofs: 45
+    quota_woofs: 45,
   },
-  studio: { 
-    quota_brands: 1, 
-    quota_images: 1000, 
+  studio: {
+    quota_brands: 1,
+    quota_images: 1000,
     quota_videos: 100,
-    quota_woofs: 100
+    quota_woofs: 100,
   },
-  enterprise: { 
-    quota_brands: 999, 
-    quota_images: 9999, 
+  enterprise: {
+    quota_brands: 999,
+    quota_images: 9999,
     quota_videos: 9999,
-    quota_woofs: 9999
+    quota_woofs: 9999,
   },
 };
+
+const jsonResponse = (payload: unknown, status = 200) =>
+  new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+let supabaseClient: ReturnType<typeof createClient> | null = null;
+
+function getSupabaseClient() {
+  if (!supabaseClient) {
+    supabaseClient = createClient(
+      requireEnv("SUPABASE_URL", "VITE_SUPABASE_URL"),
+      requireEnv("SUPABASE_SERVICE_ROLE_KEY", "SERVICE_ROLE_KEY", "VITE_SUPABASE_SERVICE_ROLE_KEY"),
+      { auth: { persistSession: false, autoRefreshToken: false } },
+    );
+  }
+
+  return supabaseClient;
+}
+
+async function ensureUserExists(email: string) {
+  const supabase = getSupabaseClient();
+  const { data: existingUser } = await supabase.auth.admin.getUserByEmail(email);
+  if (existingUser?.user) {
+    return existingUser.user.id;
+  }
+
+  const tempPassword = crypto.randomUUID();
+  const { data: created, error } = await supabase.auth.admin.createUser({
+    email,
+    password: tempPassword,
+    email_confirm: true,
+  });
+
+  if (error) {
+    throw new Error(`User creation failed: ${error.message}`);
+  }
+
+  return created.user.id;
+}
+
+async function upsertProfile(
+  userId: string,
+  email: string,
+  plan: keyof typeof PLAN_CONFIG,
+  stripeCustomerId?: string,
+  stripeSubscriptionId?: string,
+) {
+  const planConfig = PLAN_CONFIG[plan];
+
+  const supabase = getSupabaseClient();
+
+  await supabase
+    .from("profiles")
+    .upsert({
+      id: userId,
+      email,
+      plan,
+      quota_brands: planConfig.quota_brands,
+      quota_images: planConfig.quota_images,
+      quota_videos: planConfig.quota_videos,
+      quota_woofs: planConfig.quota_woofs,
+      stripe_customer_id: stripeCustomerId,
+      stripe_subscription_id: stripeSubscriptionId,
+      status: "active",
+    })
+    .eq("id", userId);
+}
+
+async function insertPaymentSession(sessionId: string, email: string, plan: string, amount?: number) {
+  const supabase = getSupabaseClient();
+
+  const { error } = await supabase
+    .from("payment_sessions")
+    .upsert(
+      {
+        session_id: sessionId,
+        email,
+        plan,
+        verified: true,
+        amount: amount ?? 0,
+      },
+      { onConflict: "session_id", ignoreDuplicates: false },
+    );
+
+  if (error && error.code !== "23505") {
+    throw new Error(`Failed to record payment session: ${error.message}`);
+  }
+}
+
+async function handleAffiliateConversion(affiliateRef: string | undefined | null, userId: string, plan: string, amount: number) {
+  if (!affiliateRef) return;
+
+  console.log("[verify-payment] Processing affiliate conversion", { affiliateRef, userId, plan });
+
+  const supabase = getSupabaseClient();
+
+  const { data: affiliate, error: affiliateError } = await supabase
+    .from("affiliates")
+    .select("id")
+    .eq("id", affiliateRef)
+    .single();
+
+  if (!affiliate || affiliateError) {
+    console.log("[verify-payment] Affiliate not found", { affiliateError });
+    return;
+  }
+
+  const { data: conversion, error: conversionError } = await supabase
+    .from("affiliate_conversions")
+    .insert({
+      affiliate_id: affiliate.id,
+      user_id: userId,
+      plan,
+      amount,
+      status: "paid",
+    })
+    .select()
+    .single();
+
+  if (conversionError) {
+    console.error("[verify-payment] Error creating conversion", conversionError);
+    return;
+  }
+
+  await supabase.rpc("calculate_mlm_commissions", {
+    conversion_id_param: conversion.id,
+    direct_affiliate_id: affiliate.id,
+    conversion_amount: amount,
+  });
+
+  await supabase.rpc("update_affiliate_status", { affiliate_id_param: affiliate.id });
+}
+
+async function createBrandIfNeeded(userId: string, brandName?: string | null, subscriptionId?: string | null) {
+  if (!brandName) return;
+
+  const starter = PLAN_CONFIG.starter;
+
+  const supabase = getSupabaseClient();
+
+  const { error } = await supabase.from("brands").insert({
+    user_id: userId,
+    name: brandName,
+    plan: "starter",
+    is_addon: true,
+    quota_images: starter.quota_images,
+    quota_videos: starter.quota_videos,
+    quota_woofs: starter.quota_woofs,
+    stripe_subscription_id: subscriptionId ?? undefined,
+  });
+
+  if (error) {
+    console.error("[verify-payment] Error creating brand", error);
+  }
+}
+
+async function processCheckoutSession(session: Stripe.Checkout.Session) {
+  const email = (session.customer_details?.email || session.metadata?.email) as string | undefined;
+  const plan = session.metadata?.plan as keyof typeof PLAN_CONFIG | undefined;
+  const billingPeriod = session.metadata?.billing_period;
+  const affiliateRef = session.metadata?.affiliate_ref as string | undefined;
+  const brandName = session.metadata?.brand_name as string | undefined;
+
+  console.log("[verify-payment] checkout.session.completed", { email, plan, billingPeriod });
+
+  if (!email) {
+    throw new Error("Missing customer email on checkout session");
+  }
+
+  if (!plan || !PLAN_CONFIG[plan]) {
+    throw new Error(`Invalid plan on checkout session: ${plan}`);
+  }
+
+  await insertPaymentSession(
+    session.id,
+    email,
+    plan,
+    session.amount_total ? session.amount_total / 100 : 0,
+  );
+
+  const userId = await ensureUserExists(email);
+
+  await upsertProfile(userId, email, plan, session.customer as string, session.subscription as string);
+
+  await createBrandIfNeeded(userId, brandName, session.subscription as string | undefined);
+
+  await handleAffiliateConversion(
+    affiliateRef,
+    userId,
+    plan,
+    session.amount_total ? session.amount_total / 100 : 0,
+  );
+
+  const supabase = getSupabaseClient();
+
+  await supabase.functions.invoke("send-confirmation-email", {
+    body: {
+      email,
+      plan,
+      session_id: session.id,
+      billing_period: billingPeriod,
+    },
+  });
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const supabaseClient = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-  );
+  if (req.method !== "POST") {
+    return jsonResponse({ ok: false, error: "Method not allowed" }, 405);
+  }
+
+  const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY");
+  const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+
+  if (!stripeSecret) {
+    console.error("[verify-payment] STRIPE_SECRET_KEY missing");
+    return jsonResponse({ ok: false, error: "STRIPE_SECRET_KEY missing" }, 500);
+  }
+
+  if (!webhookSecret) {
+    console.error("[verify-payment] STRIPE_WEBHOOK_SECRET missing");
+    return jsonResponse({ ok: false, error: "STRIPE_WEBHOOK_SECRET missing" }, 500);
+  }
+
+  const stripe = new Stripe(stripeSecret, { apiVersion: "2024-11-20" });
+
+  const signature = req.headers.get("stripe-signature");
+  const body = await req.text();
+
+  if (!signature) {
+    console.error("[verify-payment] Missing stripe-signature header");
+    return jsonResponse({ ok: false, error: "Missing stripe-signature header" }, 400);
+  }
+
+  let event: Stripe.Event;
 
   try {
-    const body = await req.json();
-    
-    // Validate input with Zod
-    const validation = validateInput(VerifyPaymentSchema, body);
-    if (!validation.success) {
-      return new Response(
-        JSON.stringify({ 
-          code: 'VALIDATION_ERROR',
-          message: validation.error 
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        }
-      );
-    }
-    
-    const { session_id } = validation.data;
-    
-    // Check if payment session already processed (prevent replay attacks)
-    const { data: existingSession, error: checkError } = await supabaseClient
-      .from('payment_sessions')
-      .select('id, verified')
-      .eq('session_id', session_id)
-      .maybeSingle();
-    
-    if (checkError) {
-      console.error('Error checking existing session:', checkError);
-    }
-    
-    if (existingSession?.verified) {
-      console.warn(`⚠️ Payment replay attempt detected for session: ${session_id}`);
-      return new Response(
-        JSON.stringify({ 
-          code: 'SESSION_ALREADY_USED',
-          message: 'Ce paiement a déjà été traité' 
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        }
-      );
-    }
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+  } catch (err: any) {
+    console.error("[verify-payment] Signature verification failed", err);
+    return jsonResponse({ ok: false, error: "Invalid webhook signature" }, 400);
+  }
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2025-08-27.basil",
-    });
-
-    // Get checkout session details
-    let session;
-    try {
-      session = await stripe.checkout.sessions.retrieve(session_id);
-    } catch (stripeError) {
-      console.error('Stripe error retrieving session:', stripeError);
-      return new Response(
-        JSON.stringify({ 
-          code: 'SESSION_NOT_FOUND',
-          message: 'Session de paiement introuvable' 
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 404,
-        }
-      );
-    }
-    
-    if (session.payment_status !== "paid") {
-      return new Response(
-        JSON.stringify({ 
-          code: 'PAYMENT_NOT_COMPLETED',
-          message: 'Le paiement n\'a pas été complété' 
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        }
-      );
-    }
-
-    const plan = session.metadata?.plan;
-    let userId = session.metadata?.user_id;
-    const customerEmail = session.customer_details?.email || session.metadata?.email;
-    const affiliateRef = session.metadata?.affiliate_ref;
-    const brandName = session.metadata?.brand_name;
-    
-    if (!customerEmail) {
-      return new Response(
-        JSON.stringify({ 
-          code: 'MISSING_EMAIL',
-          message: 'Email client introuvable' 
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        }
-      );
-    }
-
-    // Handle brand purchase (additional brand for existing user)
-    if (brandName && userId) {
-      console.log(`🎨 Processing brand purchase for user ${userId}, brand: ${brandName}`);
-      
-      // Get starter plan config
-      const starterConfig = PLAN_CONFIG.starter;
-      
-      // Create the new brand
-      const { data: newBrand, error: brandError } = await supabaseClient
-        .from('brands')
-        .insert({
-          user_id: userId,
-          name: brandName,
-          plan: 'starter',
-          is_addon: true,
-          quota_images: starterConfig.quota_images,
-          quota_videos: starterConfig.quota_videos,
-          quota_woofs: starterConfig.quota_woofs,
-          stripe_subscription_id: session.subscription as string,
-        })
-        .select()
-        .single();
-
-      if (brandError) {
-        console.error('Error creating brand:', brandError);
-        return new Response(
-          JSON.stringify({ 
-            code: 'BRAND_CREATION_ERROR',
-            message: 'Erreur lors de la création de la marque',
-            details: brandError.message 
-          }),
-          {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 500,
-          }
-        );
+  try {
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        await processCheckoutSession(session);
+        break;
       }
-
-      console.log(`✅ Brand created: ${newBrand.id} - ${brandName}`);
-
-      // Send confirmation email
-      try {
-        await supabaseClient.functions.invoke('send-confirmation-email', {
-          body: {
-            email: customerEmail,
-            plan: 'starter',
-            brand_name: brandName,
-          },
+      case "invoice.paid": {
+        const invoice = event.data.object as Stripe.Invoice;
+        console.log("[verify-payment] invoice.paid", {
+          email: invoice.customer_email,
+          subscription: invoice.subscription,
         });
-      } catch (emailError) {
-        console.error('Email sending error:', emailError);
+        break;
       }
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          brand_id: newBrand.id,
-          brand_name: brandName,
-          plan: 'starter',
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        }
-      );
-    }
-
-    if (!plan || !PLAN_CONFIG[plan as keyof typeof PLAN_CONFIG]) {
-      return new Response(
-        JSON.stringify({ 
-          code: 'INVALID_PLAN',
-          message: 'Plan invalide dans la session de paiement',
-          plan 
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        }
-      );
-    }
-
-    const planConfig = PLAN_CONFIG[plan as keyof typeof PLAN_CONFIG];
-
-    // Store payment session for signup verification
-    // Using upsert with onConflict to prevent race conditions
-    const { error: insertError } = await supabaseClient
-      .from('payment_sessions')
-      .upsert(
-        {
-          session_id,
-          email: customerEmail,
-          plan,
-          verified: true,
-          amount: session.amount_total ? session.amount_total / 100 : 0,
-        },
-        { 
-          onConflict: 'session_id',
-          ignoreDuplicates: false 
-        }
-      );
-
-    if (insertError) {
-      console.error('Error storing payment session:', insertError);
-      // If it's a duplicate key error, treat as replay attempt
-      if (insertError.code === '23505') {
-        return new Response(
-          JSON.stringify({ 
-            code: 'SESSION_ALREADY_USED',
-            message: 'Ce paiement a déjà été traité' 
-          }),
-          {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 400,
-          }
-        );
-      }
-      return new Response(
-        JSON.stringify({ 
-          code: 'STORAGE_ERROR',
-          message: 'Erreur lors de l\'enregistrement de la session de paiement',
-          details: insertError.message 
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 500,
-        }
-      );
-    }
-
-    console.log(`✅ Payment session stored for ${customerEmail}, plan: ${plan}`);
-
-    // Check if user exists
-    let targetUserId = userId;
-    if (!targetUserId) {
-      // Try to find existing user by email
-      const { data: existingUsers } = await supabaseClient.auth.admin.listUsers();
-      const existingUser = existingUsers?.users?.find(u => u.email === customerEmail);
-      
-      if (existingUser) {
-        targetUserId = existingUser.id;
-        console.log(`✅ Found existing user: ${targetUserId}`);
-      } else {
-        // Create new user account
-        const tempPassword = Math.random().toString(36).slice(-12) + 'Aa1!';
-        const { data: newUser, error: createError } = await supabaseClient.auth.admin.createUser({
-          email: customerEmail,
-          password: tempPassword,
-          email_confirm: true,
+      case "customer.subscription.updated": {
+        const subscription = event.data.object as Stripe.Subscription;
+        console.log("[verify-payment] customer.subscription.updated", {
+          subscription: subscription.id,
+          status: subscription.status,
         });
-        
-        if (createError) {
-          console.error('Error creating user:', createError);
-          return new Response(
-            JSON.stringify({ 
-              code: 'USER_CREATION_ERROR',
-              message: 'Erreur lors de la création du compte',
-              details: createError.message 
-            }),
-            {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-              status: 500,
-            }
-          );
-        }
-        
-        targetUserId = newUser.user.id;
-        console.log(`✅ Created new user: ${targetUserId}`);
+        break;
       }
-    }
-    
-    // Update or create profile
-    await supabaseClient
-      .from("profiles")
-      .upsert({
-        id: targetUserId,
-        email: customerEmail,
-        plan,
-        quota_brands: planConfig.quota_brands,
-        stripe_customer_id: session.customer as string,
-        stripe_subscription_id: session.subscription as string,
-        status: 'active',
-      })
-      .eq("id", targetUserId);
-
-    console.log(`✅ Updated profile for user ${targetUserId}`)
-
-    // Handle affiliate conversion if affiliate_ref exists
-    if (affiliateRef && targetUserId) {
-      console.log("Processing affiliate conversion for ref:", affiliateRef);
-      
-      // Find the affiliate by their code (using id as the code)
-      const { data: affiliate, error: affiliateError } = await supabaseClient
-        .from("affiliates")
-        .select("id")
-        .eq("id", affiliateRef)
-        .single();
-
-      if (affiliate && !affiliateError) {
-        console.log("Found affiliate:", affiliate.id);
-        
-        // Get the amount from session
-        const amount = session.amount_total ? session.amount_total / 100 : 0;
-        
-        // Create the conversion
-        const { data: conversion, error: conversionError } = await supabaseClient
-          .from("affiliate_conversions")
-          .insert({
-            affiliate_id: affiliate.id,
-            user_id: targetUserId,
-            plan,
-            amount,
-            status: "paid",
-          })
-          .select()
-          .single();
-
-        if (conversion && !conversionError) {
-          console.log("Conversion created:", conversion.id);
-          
-          // Calculate MLM commissions (3 levels)
-          const { error: commissionError } = await supabaseClient.rpc(
-            "calculate_mlm_commissions",
-            {
-              conversion_id_param: conversion.id,
-              direct_affiliate_id: affiliate.id,
-              conversion_amount: amount,
-            }
-          );
-
-          if (commissionError) {
-            console.error("Error calculating commissions:", commissionError);
-          } else {
-            console.log("Commissions calculated successfully");
-          }
-
-          // Update affiliate status based on their performance
-          const { error: statusError } = await supabaseClient.rpc(
-            "update_affiliate_status",
-            {
-              affiliate_id_param: affiliate.id,
-            }
-          );
-
-          if (statusError) {
-            console.error("Error updating affiliate status:", statusError);
-          } else {
-            console.log("Affiliate status updated successfully");
-          }
-        } else {
-          console.error("Error creating conversion:", conversionError);
-        }
-      } else {
-        console.log("Affiliate not found or error:", affiliateError);
+      default: {
+        console.log("[verify-payment] Unhandled event", { type: event.type });
       }
     }
 
-    // Send confirmation email
-    await supabaseClient.functions.invoke("send-confirmation-email", {
-      body: {
-        email: customerEmail,
-        plan,
-        session_id,
-      },
-    });
-
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        plan, 
-        email: customerEmail,
-        code: 'SUCCESS'
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      }
-    );
+    return jsonResponse({ ok: true });
   } catch (error: any) {
-    console.error("Error in verify-payment:", error);
-    
-    // Si c'est déjà une réponse structurée, la retourner telle quelle
-    if (error instanceof Response) {
-      return error;
-    }
-    
-    // Sinon, retourner une erreur générique structurée
-    return new Response(
-      JSON.stringify({ 
-        code: 'UNKNOWN_ERROR',
-        message: error.message || 'Une erreur inconnue s\'est produite' 
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      }
-    );
+    console.error("[verify-payment] Error processing event", error);
+    return jsonResponse({ ok: false, error: error.message ?? "Unknown error" }, 500);
   }
 });

@@ -8,7 +8,7 @@ export function useStripeCheckout() {
   const { getAffiliateRef } = useAffiliate();
 
   const createCheckout = async (
-    plan: 'starter' | 'pro' | 'studio' | 'enterprise',
+    plan: 'starter' | 'pro' | 'studio',
     billingPeriod: 'monthly' | 'annual' = 'monthly',
     brandName?: string,
     guestEmail?: string
@@ -37,7 +37,13 @@ export function useStripeCheckout() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(error.message || 'Erreur lors de la création du paiement');
+      }
+
+      if (data?.error) {
+        throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
+      }
 
       if (data?.url) {
         // Open checkout in new tab if the browser environment exists

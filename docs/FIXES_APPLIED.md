@@ -198,6 +198,15 @@ const createCheckout = async (
 
 **Stripe** :
 - ✅ Vérification de `STRIPE_SECRET_KEY` avec logs
+
+---
+
+## 🔐 Rappels secrets Stripe (2025-02-13)
+
+Pour que les fonctions Edge Stripe (`create-checkout`, `customer-portal`, `verify-payment`) fonctionnent correctement, définir les secrets suivants dans Supabase → Project Settings → Edge Functions → Secrets :
+
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
 - ✅ Email toujours fourni (guest ou utilisateur authentifié)
 - ✅ CORS headers présents (déjà en place)
 
