@@ -183,21 +183,16 @@ Deno.serve(async (req) => {
       }
 
       const startedAt = new Date().toISOString();
-      const { data: claimed, error: markError } = await supabaseAdmin
+      const { data: claimed, error: claimError } = await supabaseAdmin
         .from("job_queue")
         .update({ status: "processing", started_at: startedAt, updated_at: startedAt })
         .eq("id", job.id)
         .eq("status", "queued")
         .select("id")
         .maybeSingle();
-      const now = new Date().toISOString();
-      const { error: markError } = await supabaseAdmin
-        .from("job_queue")
-        .update({ status: "processing", started_at: now, updated_at: now })
-        .eq("id", job.id);
 
-      if (markError) {
-        console.error("❌ failed to mark job as processing", { jobId: job.id, markError });
+      if (claimError) {
+        console.error("❌ failed to mark job as processing", { jobId: job.id, claimError });
         continue;
       }
 
@@ -220,7 +215,11 @@ Deno.serve(async (req) => {
             });
             break;
           case "render_carousels":
-            result = await processRenderCarousels(job.payload);
+            // Utiliser processRenderImages pour les carrousels également
+            result = await processRenderImages(job.payload, {
+              user_id: job.user_id,
+              order_id: job.order_id,
+            });
             break;
           case "generate_video":
             result = await processGenerateVideo(job.payload);
@@ -716,15 +715,17 @@ Format: ${aspectRatio} aspect ratio optimized.`;
   console.log(`✅ [processRenderImages] done=${results.length}`);
 
   // Quotas (best-effort)
-  try {
-    await consumeBrandQuotas(brandId, results.length, 0, 0, {
-      userEmail: resolvedUserEmail,
-      isAdminFlag: payload.isAdmin === true,
-      logContext: "quota",
-    });
-    console.log("📊 quota_consume", results.length);
-  } catch (qErr) {
-    console.warn("⚠️ quota_consume_failed", qErr);
+  if (brandId) {
+    try {
+      await consumeBrandQuotas(brandId, results.length, 0, 0, {
+        userEmail: resolvedUserEmail,
+        isAdminFlag: payload.isAdmin === true,
+        logContext: "quota",
+      });
+      console.log("📊 quota_consume", results.length);
+    } catch (quotaErr) {
+      console.warn("[processRenderImages] quota consumption failed (non-fatal)", quotaErr);
+    }
   }
 
   return { images: results };

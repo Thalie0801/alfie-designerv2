@@ -111,7 +111,6 @@ Deno.serve(async (req) => {
     const activeWorkers = (counts.running ?? 0) + (counts.processing ?? 0);
 
     if (counts.queued > 0 && activeWorkers === 0) {
-    if (counts.queued > 0 && counts.running === 0) {
       console.warn("[queue-monitor] Detected queued jobs with no worker running – triggering worker");
 
       const triggerPayload = {
@@ -124,27 +123,12 @@ Deno.serve(async (req) => {
         payload.workerKick = { attempted: true, error: "missing_supabase_config" };
       } else {
         try {
-          await fetch(`${SUPABASE_URL}/functions/v1/alfie-job-worker`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-              ...(INTERNAL_FN_SECRET ? { "X-Internal-Secret": INTERNAL_FN_SECRET } : {}),
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(triggerPayload),
-          });
-
+          await supabase.functions.invoke("alfie-job-worker", { body: triggerPayload });
           payload.workerKick = { attempted: true, triggerPayload };
         } catch (kickError) {
           console.error("[queue-monitor] Failed to trigger alfie-job-worker", kickError);
           payload.workerKick = { attempted: true, error: (kickError as Error).message };
         }
-      try {
-        await supabase.functions.invoke("alfie-job-worker", { body: triggerPayload });
-        payload.workerKick = { attempted: true, triggerPayload };
-      } catch (kickError) {
-        console.error("[queue-monitor] Failed to trigger alfie-job-worker", kickError);
-        payload.workerKick = { attempted: true, error: (kickError as Error).message };
       }
     }
 
