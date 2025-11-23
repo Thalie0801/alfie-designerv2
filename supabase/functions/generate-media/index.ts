@@ -3,21 +3,19 @@ import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";
 import { isAdminUser, getUserRoles } from "../_shared/auth.ts";
-const IntentSchema = z.object({
-  brandId: z.string().uuid(),
-  format: z.enum(["image", "carousel"]),
-  count: z.number().int().min(1).max(20),
-  topic: z.string().min(3),
-  ratio: z.enum(["1:1", "4:5", "9:16"]).optional(),
-  platform: z.enum(["instagram", "linkedin", "tiktok"]).optional(),
-});
 
 const BodySchema = z.object({
   userId: z.string().uuid(),
-  intent: IntentSchema,
+  brandId: z.string().uuid(),
+  kind: z.enum(["image", "carousel"]),
+  count: z.number().int().min(1).max(20),
+  ratio: z.string().optional(),
+  brief: z.string().optional(),
+  topic: z.string().optional(),
+  platform: z.string().optional(),
 });
 
-type Intent = z.infer<typeof IntentSchema>;
+type Intent = z.infer<typeof BodySchema>;
 
 type Json = Record<string, unknown>;
 
@@ -64,7 +62,7 @@ Deno.serve(async (req: Request) => {
   const userIdForLogging = z.string().uuid().safeParse((body as any)?.userId).success
     ? ((body as Record<string, unknown>)?.userId as string)
     : null;
-  const brandIdFromPayload = (body as Record<string, any>)?.intent?.brandId;
+  const brandIdFromPayload = (body as Record<string, any>)?.brandId;
 
   let userEmail = "";
   let authUserResponse = null as Awaited<ReturnType<typeof supabase.auth.admin.getUserById>> | null;
@@ -93,19 +91,18 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const { userId, intent } = parsed.data;
+  const { userId, brandId, kind, ratio, brief, topic, platform, count } = parsed.data;
 
   console.log("[generate-media] received intent", {
     userId,
-    brandId: intent.brandId,
-    format: intent.format,
-    count: intent.count,
+    brandId,
+    kind,
+    count,
+    ratio,
   });
 
-  if (intent.format === "image" || intent.format === "carousel") {
-    console.log(
-      `[generate-media] start image generation for user=${userEmail || userId} brand=${intent.brandId}`,
-    );
+  if (kind === "image" || kind === "carousel") {
+    console.log(`[generate-media] start image generation for user=${userEmail || userId} brand=${brandId}`);
   }
 
   const authData = authUserResponse ?? (await supabase.auth.admin.getUserById(userId));
@@ -132,7 +129,7 @@ Deno.serve(async (req: Request) => {
   const { data: brand, error: brandError } = await supabase
     .from("brands")
     .select("id, quota_images, images_used")
-    .eq("id", intent.brandId)
+    .eq("id", brandId)
     .single();
 
   if (brandError) {
@@ -144,7 +141,7 @@ Deno.serve(async (req: Request) => {
     return respond(404, { ok: false, error: "brand_not_found" });
   }
 
-  const imagesToConsume = intent.format === "carousel" ? intent.count : intent.count;
+  const imagesToConsume = kind === "carousel" ? count : count;
   const limit = typeof brand.quota_images === "number" ? brand.quota_images : 0;
   const used = typeof brand.images_used === "number" ? brand.images_used : 0;
 
@@ -157,17 +154,31 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const campaignName = buildCampaignName(intent);
+  if (!isAdmin) {
+    console.log("[quota] Consuming", { brandId, cost_woofs: 0, images: imagesToConsume });
+  }
+
+  const intentContract = {
+    kind,
+    ratio: ratio || "4:5",
+    count,
+    brief: brief ?? topic ?? "",
+    topic,
+    platform,
+  };
+
+  const campaignName = buildCampaignName(intentContract);
 
   const orderPayload: Record<string, unknown> = {
     user_id: userId,
-    brand_id: intent.brandId,
+    brand_id: brandId,
     campaign_name: campaignName,
     status: "queued",
-    brief_json: { intent },
+    brief_json: intentContract,
     metadata: {
       source: "generate-media",
-      format: intent.format,
+      format: kind,
+      intent_json: intentContract,
     },
   };
 
@@ -184,7 +195,7 @@ Deno.serve(async (req: Request) => {
 
   console.log(`[generate-media] created order ${order.id}`);
 
-  const jobType = intent.format === "carousel" ? "render_carousels" : "render_images";
+  const jobType = kind === "carousel" ? "render_carousels" : "render_images";
   const jobPayload = {
     user_id: userId,
     order_id: order.id,
@@ -194,18 +205,14 @@ Deno.serve(async (req: Request) => {
       userId,
       userEmail,
       isAdmin,
-      brandId: intent.brandId,
+      brandId,
       orderId: order.id,
-      format: intent.format,
-      brief: {
-        briefs: [{
-          content: intent.topic,
-          format: `${intent.ratio || "4:5"} ${intent.format}`,
-          objective: `Generate ${intent.count} ${intent.format}(s)`,
-          style: "professional",
-          numSlides: intent.format === "carousel" ? intent.count : 1,
-        }]
-      }
+      kind,
+      count,
+      ratio: ratio || "4:5",
+      brief: brief ?? topic ?? "",
+      topic,
+      platform,
     },
   };
 
@@ -222,8 +229,10 @@ Deno.serve(async (req: Request) => {
   }
 
   console.log(
-    `[generate-media] enqueued job ${jobRows?.id} type=${jobType} brand=${intent.brandId} for order=${order.id}`,
+    `[generate-media] enqueued job ${jobRows?.id} type=${jobType} brand=${brandId} for order=${order.id}`,
   );
+
+  console.log("[generate-media] New order + job", { userId, brandId, kind, count, ratio: ratio || "4:5" });
 
   try {
     console.log("[generate-media] invoking alfie-job-worker after enqueue");
@@ -239,17 +248,13 @@ Deno.serve(async (req: Request) => {
     data: {
       orderId: order.id,
       jobId: jobRows?.id ?? null,
-      summary: {
-        format: intent.format,
-        count: intent.count,
-        status: "queued",
-      },
+      summary: { format: kind, count, status: "queued" },
     },
   });
 });
 
 function buildCampaignName(intent: Intent): string {
-  const base = intent.topic.trim();
+  const base = (intent.topic ?? intent.brief ?? "").trim();
   if (base.length >= 3) {
     return base.slice(0, 120);
   }
