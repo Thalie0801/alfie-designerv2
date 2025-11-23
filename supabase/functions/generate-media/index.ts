@@ -72,7 +72,8 @@ Deno.serve(async (req: Request) => {
   if (userIdForLogging) {
     const authResponse = await supabase.auth.admin.getUserById(userIdForLogging);
     authUserResponse = authResponse;
-    userEmail = userEmailFromAuth(authResponse.data) ?? "";
+    const userFromAuth = authResponse.data?.user ?? null;
+    userEmail = userFromAuth?.email ?? "";
   }
 
   if (!brandIdFromPayload) {
@@ -107,8 +108,9 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  const { data: authUserData } = authUserResponse ?? (await supabase.auth.admin.getUserById(userId));
-  userEmail = userEmailFromAuth(authUserData) ?? userEmail;
+  const authData = authUserResponse ?? (await supabase.auth.admin.getUserById(userId));
+  const userFromAuth = authData.data?.user ?? null;
+  userEmail = userFromAuth?.email ?? userEmail;
   const roleRows = await getUserRoles(supabase, userId);
 
   const { data: profile } = await supabase

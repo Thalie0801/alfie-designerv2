@@ -539,6 +539,7 @@ export type Database = {
           id: string
           images_used: number | null
           is_addon: boolean | null
+          is_default: boolean | null
           logo_url: string | null
           name: string
           niche: string | null
@@ -565,6 +566,7 @@ export type Database = {
           id?: string
           images_used?: number | null
           is_addon?: boolean | null
+          is_default?: boolean | null
           logo_url?: string | null
           name: string
           niche?: string | null
@@ -591,6 +593,7 @@ export type Database = {
           id?: string
           images_used?: number | null
           is_addon?: boolean | null
+          is_default?: boolean | null
           logo_url?: string | null
           name?: string
           niche?: string | null
