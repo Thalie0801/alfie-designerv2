@@ -60,10 +60,19 @@ Deno.serve(async (req) => {
     
     // Email is required (provided by frontend for both auth and guest users)
     if (!email) {
+      console.error("[create-checkout] ❌ Email is missing");
       throw new Error("Email is required for checkout");
     }
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeKey) {
+      console.error("[create-checkout] ❌ STRIPE_SECRET_KEY is not configured");
+      throw new Error("Stripe configuration error");
+    }
+
+    console.log("[create-checkout] ✅ Initializing Stripe with key:", stripeKey.substring(0, 10) + "...");
+    
+    const stripe = new Stripe(stripeKey, {
       apiVersion: "2025-08-27.basil",
     });
 

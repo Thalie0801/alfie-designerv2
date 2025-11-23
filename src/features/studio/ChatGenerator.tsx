@@ -115,14 +115,17 @@ export function ChatGenerator() {
   const { user } = useAuth();
   const { activeBrandId, activeBrand, brands, loading: isLoadingBrands } = useBrandKit();
   const resolvedBrandId = useMemo(() => {
-    const defaultBrand = brands?.find(
-      (brand) => (brand as Record<string, unknown>)?.is_default || (brand as Record<string, unknown>)?.isDefault,
-    );
-
+    // Priorité : marque active > première marque par date de création
     if (activeBrand?.id) return activeBrand.id;
-    if (defaultBrand?.id) return defaultBrand.id;
     if (activeBrandId) return activeBrandId;
-    if (brands?.[0]?.id) return brands[0].id;
+    
+    // Utiliser la première marque créée comme fallback
+    if (brands && brands.length > 0) {
+      const sortedBrands = [...brands].sort((a, b) => 
+        new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+      );
+      return sortedBrands[0].id;
+    }
 
     return null;
   }, [activeBrand?.id, activeBrandId, brands]);

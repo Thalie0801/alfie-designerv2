@@ -17,13 +17,23 @@ export function useStripeCheckout() {
     try {
       const affiliateRef = getAffiliateRef();
 
+      // Récupérer l'email de l'utilisateur authentifié ou utiliser l'email guest
+      const { data: { user } } = await supabase.auth.getUser();
+      const email = user?.email || guestEmail;
+
+      if (!email) {
+        throw new Error("Email requis pour le checkout");
+      }
+
+      console.log("[useStripeCheckout] Creating checkout with email:", email);
+
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
           plan,
           billing_period: billingPeriod,
           affiliate_ref: affiliateRef,
           brand_name: brandName,
-          email: guestEmail
+          email: email
         },
       });
 
