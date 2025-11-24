@@ -584,8 +584,8 @@ async function processRenderImages(
     imagesToRender = Array.from({ length: imagesCount }).map((_, index) => ({
       prompt: `${basePrompt}. ${resolvedKind === "carousel" ? `Carousel slide ${index + 1}.` : ""} Format ${ratioToUse}.`,
       resolution: `${w}x${h}`,
-      aspectRatio: (ratioToUse as any) ?? "4:5",
-      brandId,
+      aspectRatio: (ratioToUse as "1:1" | "4:5" | "9:16" | "16:9") ?? "4:5",
+      brandId: brandId ?? undefined,
       slideIndex: resolvedKind === "carousel" ? index : undefined,
     }));
   } else if (payload.brief) {

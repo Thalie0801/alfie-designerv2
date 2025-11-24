@@ -8,7 +8,7 @@ export function useStripeCheckout() {
   const { getAffiliateRef } = useAffiliate();
 
   const createCheckout = async (
-    plan: 'starter' | 'pro' | 'studio',
+    plan: 'starter' | 'pro' | 'studio' | 'enterprise',
     billingPeriod: 'monthly' | 'annual' = 'monthly',
     brandName?: string,
     guestEmail?: string
