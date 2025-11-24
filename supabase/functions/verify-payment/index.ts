@@ -2,6 +2,7 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 import { requireEnv } from "../_shared/env.ts";
+import type { Database } from "../_shared/database.types.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*", // TODO: restrict to frontend domain
@@ -42,11 +43,11 @@ const jsonResponse = (payload: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
-let supabaseClient: ReturnType<typeof createClient> | null = null;
+let supabaseClient: ReturnType<typeof createClient<Database>> | null = null;
 
 function getSupabaseClient() {
   if (!supabaseClient) {
-    supabaseClient = createClient(
+    supabaseClient = createClient<Database>(
       requireEnv("SUPABASE_URL", "VITE_SUPABASE_URL"),
       requireEnv("SUPABASE_SERVICE_ROLE_KEY", "SERVICE_ROLE_KEY", "VITE_SUPABASE_SERVICE_ROLE_KEY"),
       { auth: { persistSession: false, autoRefreshToken: false } },
@@ -58,23 +59,33 @@ function getSupabaseClient() {
 
 async function ensureUserExists(email: string) {
   const supabase = getSupabaseClient();
-  const { data: existingUser } = await supabase.auth.admin.getUserByEmail(email);
-  if (existingUser?.user) {
-    return existingUser.user.id;
+  
+  // Liste tous les users et filtre par email
+  const { data: listData, error: listUsersError } = await supabase.auth.admin.listUsers();
+  
+  if (listUsersError) {
+    console.error("[verify-payment] Error listing users:", listUsersError);
+  }
+  
+  const existingUser = listData?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+  
+  if (existingUser) {
+    return existingUser.id;
   }
 
+  // Créer l'utilisateur s'il n'existe pas
   const tempPassword = crypto.randomUUID();
-  const { data: created, error } = await supabase.auth.admin.createUser({
+  const { data: createData, error: createUserError } = await supabase.auth.admin.createUser({
     email,
     password: tempPassword,
     email_confirm: true,
   });
 
-  if (error) {
-    throw new Error(`User creation failed: ${error.message}`);
+  if (createUserError || !createData?.user) {
+    throw new Error(`User creation failed: ${createUserError?.message || 'Unknown error'}`);
   }
 
-  return created.user.id;
+  return createData.user.id;
 }
 
 async function upsertProfile(
@@ -88,7 +99,7 @@ async function upsertProfile(
 
   const supabase = getSupabaseClient();
 
-  await supabase
+  const { error } = await supabase
     .from("profiles")
     .upsert({
       id: userId,
@@ -101,8 +112,12 @@ async function upsertProfile(
       stripe_customer_id: stripeCustomerId,
       stripe_subscription_id: stripeSubscriptionId,
       status: "active",
-    })
+    } as any)
     .eq("id", userId);
+  
+  if (error) {
+    throw new Error(`Profile upsert failed: ${error.message}`);
+  }
 }
 
 async function insertPaymentSession(sessionId: string, email: string, plan: string, amount?: number) {
@@ -117,7 +132,7 @@ async function insertPaymentSession(sessionId: string, email: string, plan: stri
         plan,
         verified: true,
         amount: amount ?? 0,
-      },
+      } as any,
       { onConflict: "session_id", ignoreDuplicates: false },
     );
 
@@ -133,26 +148,28 @@ async function handleAffiliateConversion(affiliateRef: string | undefined | null
 
   const supabase = getSupabaseClient();
 
-  const { data: affiliate, error: affiliateError } = await supabase
+  const { data: affiliateData, error: affiliateError } = await supabase
     .from("affiliates")
     .select("id")
     .eq("id", affiliateRef)
     .single();
 
-  if (!affiliate || affiliateError) {
+  if (!affiliateData || affiliateError) {
     console.log("[verify-payment] Affiliate not found", { affiliateError });
     return;
   }
 
-  const { data: conversion, error: conversionError } = await supabase
+  const affiliateId = (affiliateData as any).id as string;
+
+  const { data: conversionData, error: conversionError } = await supabase
     .from("affiliate_conversions")
     .insert({
-      affiliate_id: affiliate.id,
+      affiliate_id: affiliateId,
       user_id: userId,
       plan,
       amount,
       status: "paid",
-    })
+    } as any)
     .select()
     .single();
 
@@ -161,13 +178,19 @@ async function handleAffiliateConversion(affiliateRef: string | undefined | null
     return;
   }
 
-  await supabase.rpc("calculate_mlm_commissions", {
-    conversion_id_param: conversion.id,
-    direct_affiliate_id: affiliate.id,
-    conversion_amount: amount,
-  });
+  if (conversionData) {
+    const conversionId = (conversionData as any).id as string;
+    
+    await supabase.rpc("calculate_mlm_commissions", {
+      conversion_id_param: conversionId,
+      direct_affiliate_id: affiliateId,
+      conversion_amount: amount,
+    } as any);
 
-  await supabase.rpc("update_affiliate_status", { affiliate_id_param: affiliate.id });
+    await supabase.rpc("update_affiliate_status", { 
+      affiliate_id_param: affiliateId
+    } as any);
+  }
 }
 
 async function createBrandIfNeeded(userId: string, brandName?: string | null, subscriptionId?: string | null) {
@@ -186,7 +209,7 @@ async function createBrandIfNeeded(userId: string, brandName?: string | null, su
     quota_videos: starter.quota_videos,
     quota_woofs: starter.quota_woofs,
     stripe_subscription_id: subscriptionId ?? undefined,
-  });
+  } as any);
 
   if (error) {
     console.error("[verify-payment] Error creating brand", error);

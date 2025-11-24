@@ -12,11 +12,13 @@ const PRICE_IDS = {
     starter: "price_1SGDCEQvcbGhgt8SB4SyubJd",    // 39€/mois
     pro: "price_1SGDDFQvcbGhgt8Sxc5AD69b",        // 99€/mois
     studio: "price_1SGDLmQvcbGhgt8SKWpBTjCg",     // 199€/mois
+    enterprise: "price_ENTERPRISE_MONTHLY",       // À créer dans Stripe Dashboard
   },
   annual: {
     starter: "price_1SGDPHQvcbGhgt8SUJSVCBmg",    // 374.40€/an (-20%)
     pro: "price_1SGDPWQvcbGhgt8SZglD8b5d",        // 950.40€/an (-20%)
     studio: "price_1SGDPkQvcbGhgt8SttOl1idn",     // 1910.40€/an (-20%)
+    enterprise: "price_ENTERPRISE_ANNUAL",        // À créer dans Stripe Dashboard
   }
 };
 
