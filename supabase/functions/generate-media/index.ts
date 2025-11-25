@@ -4,13 +4,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
-import { corsHeaders } from "../_shared/cors.ts";
-import { SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL, validateEnv } from "../_shared/env.ts";
-
-const envValidation = validateEnv();
-if (!envValidation.valid) {
-  console.error("[generate-media] ❌ Missing env vars", envValidation);
-}
+// CORS local (plus de dépendance à ../_shared/cors)
+const corsHeaders: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 interface GenerateMediaPayload {
   userId?: string;
@@ -58,10 +57,14 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    // 🔐 Récup des env Supabase directement (sans _shared/env)
+    const supabaseUrl = Deno.env.get("ALFIE_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("ALFIE_SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    if (!supabaseUrl || !serviceRoleKey) {
       console.error("[generate-media] ❌ Supabase env missing", {
-        hasUrl: !!SUPABASE_URL,
-        hasServiceKey: !!SUPABASE_SERVICE_ROLE_KEY,
+        hasUrl: !!supabaseUrl,
+        hasServiceKey: !!serviceRoleKey,
       });
       return new Response(JSON.stringify({ ok: false, error: "SUPABASE_ENV_MISSING" }), {
         status: 500,
@@ -69,7 +72,7 @@ serve(async (req: Request): Promise<Response> => {
       });
     }
 
-    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
     const rawBody = (await req.json()) as GenerateMediaPayload;
     console.log("[generate-media] Incoming body", rawBody);
@@ -82,7 +85,6 @@ serve(async (req: Request): Promise<Response> => {
     let userId = rawBody.userId ?? rawBody.user_id ?? rawBody.intent?.userId ?? rawBody.intent?.user_id;
 
     if (!userId && jwt) {
-      // On récupère le user depuis le token (cas normal depuis Alfie / supabase-js)
       const { data, error: authError } = await supabaseAdmin.auth.getUser(jwt);
       if (authError) {
         console.error("[generate-media] auth.getUser error", authError);
