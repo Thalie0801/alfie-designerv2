@@ -1,23 +1,24 @@
 // src/config/env.ts
 
-const env = (typeof import.meta !== "undefined" ? import.meta.env : {}) as any;
+// Sécurise l’accès à import.meta.env même côté sandbox Lovable
+const rawEnv = typeof import.meta !== "undefined" ? (import.meta as any).env || {} : ({} as any);
 
-// URL du projet Supabase
-const SUPABASE_URL = env.VITE_SUPABASE_URL || env.PUBLIC_SUPABASE_URL || "https://onxqgtuiagiuomlstcmt.supabase.co";
+// On laisse bien ces noms-là : SUPABASE_URL / SUPABASE_ANON_KEY
+export const SUPABASE_URL =
+  rawEnv.VITE_SUPABASE_URL ||
+  rawEnv.PUBLIC_SUPABASE_URL ||
+  // fallback : ton nouveau projet Supabase
+  "https://onxqgtuiagiuomlstcmt.supabase.co";
 
-// Clé "publique" (publishable / anon)
-const SUPABASE_ANON_KEY =
-  env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_ANON_KEY || env.PUBLIC_SUPABASE_ANON_KEY || "";
+export const SUPABASE_ANON_KEY =
+  rawEnv.VITE_SUPABASE_PUBLISHABLE_KEY || rawEnv.VITE_SUPABASE_ANON_KEY || rawEnv.PUBLIC_SUPABASE_ANON_KEY || "";
 
-// ⚠️ On LOGUE mais on ne jette plus d’erreur fatale
+// ❌ On ne jette plus d’erreur fatale, sinon pas de preview
 if (!SUPABASE_ANON_KEY) {
   console.warn(
-    "[Alfie] SUPABASE_ANON_KEY manquante dans import.meta.env – la preview va s'afficher mais Supabase ne pourra pas faire grand-chose.",
+    "[Alfie] SUPABASE_ANON_KEY absente dans import.meta.env – Supabase ne marchera pas, mais la preview reste accessible.",
   );
 }
 
 console.log("[Alfie] SUPABASE_URL =", SUPABASE_URL);
 console.log("[Alfie] SUPABASE_ANON_KEY prefix =", SUPABASE_ANON_KEY ? SUPABASE_ANON_KEY.slice(0, 10) : "(manquante)");
-
-export const APP_SUPABASE_URL = SUPABASE_URL;
-export const APP_SUPABASE_ANON_KEY = SUPABASE_ANON_KEY;
