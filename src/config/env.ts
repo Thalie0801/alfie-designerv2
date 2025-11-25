@@ -10,10 +10,14 @@ const runtimeEnv =
     ? (import.meta as ImportMeta).env
     : process.env;
 
+// CRITICAL FIX: Use PUBLISHABLE_KEY which contains the real JWT token
+// The ANON_KEY in .env is a publishable token prefix, not the JWT
 const supabaseUrl =
   (runtimeEnv as Record<string, string | undefined>).VITE_SUPABASE_URL ||
   (runtimeEnv as Record<string, string | undefined>).PUBLIC_SUPABASE_URL;
+
 const supabaseAnonKey =
+  (runtimeEnv as Record<string, string | undefined>).VITE_SUPABASE_PUBLISHABLE_KEY ||
   (runtimeEnv as Record<string, string | undefined>).VITE_SUPABASE_ANON_KEY ||
   (runtimeEnv as Record<string, string | undefined>).PUBLIC_SUPABASE_ANON_KEY;
 
