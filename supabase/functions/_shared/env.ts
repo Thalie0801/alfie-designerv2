@@ -1,6 +1,6 @@
 /**
  * Environment Variable Helper with Lovable VITE_ Compatibility
- * 
+ *
  * Resolves environment variables with fallback support for Lovable's VITE_ prefix.
  * This allows Edge Functions to work seamlessly whether vars are prefixed or not.
  */
@@ -18,28 +18,38 @@ export function env(...keys: string[]): string | undefined {
   return undefined;
 }
 
-// ✅ Public variables (accept VITE_* prefix for Lovable compatibility)
-export const SUPABASE_URL = env('SUPABASE_URL', 'VITE_SUPABASE_URL');
-export const SUPABASE_ANON_KEY = env('SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY');
+// ✅ Public variables
+// On donne la priorité à ALFIE_* (nos propres secrets),
+// puis aux vieux noms si jamais ils existent encore,
+// puis on finit sur un fallback URL (non secret) vers le NOUVEAU projet.
+export const SUPABASE_URL =
+  env("ALFIE_SUPABASE_URL", "SUPABASE_URL", "VITE_SUPABASE_URL") || "https://onxqgtuiagiuomlstcmt.supabase.co";
 
-// ✅ Private secrets (no VITE_ prefix - these must stay secret)
-export const SUPABASE_SERVICE_ROLE_KEY = env('SUPABASE_SERVICE_ROLE_KEY', 'SERVICE_ROLE_KEY', 'VITE_SUPABASE_SERVICE_ROLE_KEY');
-export const INTERNAL_FN_SECRET = env('INTERNAL_FN_SECRET', 'INTERNAL_SECRET');
+export const SUPABASE_ANON_KEY = env("ALFIE_SUPABASE_ANON_KEY", "SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY");
+
+// ✅ Private secrets (pas de VITE_ ici pour éviter les fuites côté client)
+export const SUPABASE_SERVICE_ROLE_KEY = env(
+  "ALFIE_SUPABASE_SERVICE_ROLE_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "SERVICE_ROLE_KEY",
+);
+
+export const INTERNAL_FN_SECRET = env("INTERNAL_FN_SECRET", "INTERNAL_SECRET");
 
 // ✅ API Keys and other secrets
-export const LOVABLE_API_KEY = env('LOVABLE_API_KEY');
-export const CLOUDINARY_CLOUD_NAME = env('CLOUDINARY_CLOUD_NAME');
-export const CLOUDINARY_API_KEY = env('CLOUDINARY_API_KEY');
-export const CLOUDINARY_API_SECRET = env('CLOUDINARY_API_SECRET');
-export const REPLICATE_API_TOKEN = env('REPLICATE_API_TOKEN');
-export const REPLICATE_API_KEY = env('REPLICATE_API_KEY', 'REPLICATE_API_TOKEN');
-export const FFMPEG_BACKEND_URL = env('FFMPEG_BACKEND_URL');
-export const FFMPEG_BACKEND_API_KEY = env('FFMPEG_BACKEND_API_KEY');
-export const ALFIE_ADMIN_EMAILS = env('ALFIE_ADMIN_EMAILS');
-export const ADMIN_EMAILS = env('ADMIN_EMAILS');
-export const VIP_EMAILS = env('VIP_EMAILS');
-export const RESEND_API_KEY = env('RESEND_API_KEY');
-export const STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY');
+export const LOVABLE_API_KEY = env("LOVABLE_API_KEY");
+export const CLOUDINARY_CLOUD_NAME = env("CLOUDINARY_CLOUD_NAME");
+export const CLOUDINARY_API_KEY = env("CLOUDINARY_API_KEY");
+export const CLOUDINARY_API_SECRET = env("CLOUDINARY_API_SECRET");
+export const REPLICATE_API_TOKEN = env("REPLICATE_API_TOKEN");
+export const REPLICATE_API_KEY = env("REPLICATE_API_KEY", "REPLICATE_API_TOKEN");
+export const FFMPEG_BACKEND_URL = env("FFMPEG_BACKEND_URL");
+export const FFMPEG_BACKEND_API_KEY = env("FFMPEG_BACKEND_API_KEY");
+export const ALFIE_ADMIN_EMAILS = env("ALFIE_ADMIN_EMAILS");
+export const ADMIN_EMAILS = env("ADMIN_EMAILS");
+export const VIP_EMAILS = env("VIP_EMAILS");
+export const RESEND_API_KEY = env("RESEND_API_KEY");
+export const STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY");
 
 /**
  * Require an environment variable (throws if not found)
@@ -50,7 +60,7 @@ export const STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY');
 export function requireEnv(...keys: string[]): string {
   const value = env(...keys);
   if (!value) {
-    throw new Error(`Missing required environment variable: ${keys.join(' or ')}`);
+    throw new Error(`Missing required environment variable: ${keys.join(" or ")}`);
   }
   return value;
 }
@@ -61,17 +71,15 @@ export function requireEnv(...keys: string[]): string {
  */
 export function validateEnv(): { valid: boolean; missing: string[] } {
   const required = [
-    ['SUPABASE_URL', SUPABASE_URL],
-    ['SUPABASE_ANON_KEY', SUPABASE_ANON_KEY],
-    ['SUPABASE_SERVICE_ROLE_KEY', SUPABASE_SERVICE_ROLE_KEY],
+    ["SUPABASE_URL", SUPABASE_URL],
+    ["SUPABASE_ANON_KEY", SUPABASE_ANON_KEY],
+    ["SUPABASE_SERVICE_ROLE_KEY", SUPABASE_SERVICE_ROLE_KEY],
   ];
-  
-  const missing = required
-    .filter(([, value]) => !value)
-    .map(([name]) => name as string);
-  
+
+  const missing = required.filter(([, value]) => !value).map(([name]) => name as string);
+
   return {
     valid: missing.length === 0,
-    missing
+    missing,
   };
 }
