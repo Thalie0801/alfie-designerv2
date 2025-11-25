@@ -1,14 +1,21 @@
 // supabase/functions/generate-media/index.ts
-// Crée un job dans la table jobs pour que le worker s'en occupe.
+// Crée un job dans la table "jobs" que le worker traitera ensuite.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2?target=deno";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2?target=deno";
+
+import { SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL, validateEnv } from "../_shared/env.ts";
 
 const corsHeaders: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*", // TODO : restreindre ton domaine en prod
+  "Access-Control-Allow-Origin": "*", // TODO: restreindre en prod
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const envValidation = validateEnv();
+if (!envValidation.valid) {
+  console.error("[generate-media] ❌ Missing env vars", envValidation);
+}
 
 serve(async (req: Request): Promise<Response> => {
   // Préflight
@@ -24,8 +31,8 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseUrl = SUPABASE_URL;
+    const serviceKey = SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceKey) {
       console.error("[generate-media] ❌ Missing Supabase env", {
@@ -44,12 +51,14 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
 
     const rawBody = await req.json();
     console.log("[generate-media] Incoming body", rawBody);
 
-    // 🔹 Normalisation des champs (on gère camelCase ET snake_case)
+    // 🔹 Normalisation des champs (camelCase + snake_case)
     const userId: string | undefined = rawBody.userId ?? rawBody.user_id;
     const brandId: string | undefined = rawBody.brandId ?? rawBody.brand_id;
 
@@ -62,7 +71,7 @@ serve(async (req: Request): Promise<Response> => {
     const prompt: string = rawBody.prompt ?? rawBody.brief ?? rawBody.description ?? rawBody.intent?.brief ?? "";
 
     if (!userId || !brandId) {
-      console.error("[generate-media] Missing userId or brandId", {
+      console.error("[generate-media] ❌ Missing userId or brandId", {
         userId,
         brandId,
       });
@@ -79,7 +88,7 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     if (!prompt) {
-      console.warn("[generate-media] Empty prompt", { userId, brandId });
+      console.warn("[generate-media] ⚠️ Empty prompt", { userId, brandId });
     }
 
     console.log("[generate-media] Normalized intent", {
@@ -90,24 +99,28 @@ serve(async (req: Request): Promise<Response> => {
       ratio,
     });
 
-    // 🔹 Création du job dans la table jobs
+    // 🔹 Métadonnées supplémentaires (pour le worker/logs)
     const metadata = {
       user_id: userId,
       brand_id: brandId,
-      type: kind, // "image" ou "carousel"
+      type: kind,
       count,
       ratio,
       prompt,
-      // Tu peux ajouter d'autres champs si nécessaire
+      // tu peux rajouter d'autres champs
     };
 
+    // 🔹 Création du job dans la table "jobs"
     const { data: job, error: insertError } = await supabaseAdmin
       .from("jobs")
       .insert({
+        user_id: userId,
+        brand_id: brandId,
+        type: kind, // "image", "video", "carousel", etc.
         status: "queued",
         prompt,
         metadata,
-        // job_set_id, index_in_set, etc. peuvent rester null si tu n'en as pas besoin
+        // job_set_id, index_in_set... → laissent les defaults
       })
       .select("*")
       .single();
