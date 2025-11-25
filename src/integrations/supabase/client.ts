@@ -1,12 +1,19 @@
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../../config/env";
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+// On met des valeurs de secours si jamais les env ne sont pas définies.
+// Ça évite les erreurs de typage et les crashs de preview.
+// Si les vraies VITE_SUPABASE_* sont bien set (ce qui est ton cas),
+// ce sont elles qui seront utilisées.
+const url = SUPABASE_URL || "https://onxqgtuiagiuomlstcmt.supabase.co";
+const key = SUPABASE_ANON_KEY || "public-anon-key-placeholder";
+
+if (!SUPABASE_ANON_KEY) {
   console.warn(
-    "[Alfie] SUPABASE_ANON_KEY absente – le client Supabase ne sera pas initialisé (mais la preview reste accessible).",
+    "[Alfie] SUPABASE_ANON_KEY absente dans import.meta.env – les appels Supabase peuvent échouer, mais la preview reste accessible.",
   );
 }
 
-export const supabase = SUPABASE_URL && SUPABASE_ANON_KEY ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+export const supabase = createClient(url, key);
 
 export default supabase;
