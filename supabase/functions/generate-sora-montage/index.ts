@@ -1,10 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 
 import { corsHeaders } from "../_shared/cors.ts";
+import { SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL, validateEnv } from "../_shared/env.ts";
 /**
  * Génère un montage de plusieurs clips Sora via Kie AI
  * Utilisé pour créer des vidéos de 20-30s à partir de plusieurs clips de 10s
  */
+const envValidation = validateEnv();
+if (!envValidation.valid) {
+  console.error("Missing required environment variables", { missing: envValidation.missing });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response("ok", { headers: corsHeaders });
@@ -20,10 +26,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const kieApiKey = Deno.env.get('KIE_AI_API_KEY')!;
-    
+    const supabaseUrl = SUPABASE_URL!;
+    const supabaseKey = SUPABASE_SERVICE_ROLE_KEY!;
+    const kieApiKey = Deno.env.get('KIE_AI_API_KEY')!; // tu peux le laisser en Deno.env si tu veux
+
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     console.log(`Generating ${clipCount}-clip montage for job ${jobId}`);
@@ -180,8 +186,8 @@ Deno.serve(async (req) => {
   } catch (error: any) {
     console.error('Montage generation error:', error);
     
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = SUPABASE_URL!;
+    const supabaseKey = SUPABASE_SERVICE_ROLE_KEY!;
     const supabase = createClient(supabaseUrl, supabaseKey);
     
     const { jobId } = await req.json();

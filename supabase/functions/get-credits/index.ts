@@ -1,6 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 import { corsHeaders } from "../_shared/cors.ts";
+import { SUPABASE_ANON_KEY, SUPABASE_URL, validateEnv } from "../_shared/env.ts";
+
+const envValidation = validateEnv();
+if (!envValidation.valid) {
+  console.error("Missing required environment variables", { missing: envValidation.missing });
+}
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response("ok", { headers: corsHeaders });
@@ -15,12 +21,18 @@ Deno.serve(async (req) => {
       );
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    );
+    const token = authHeader.replace('Bearer ', '');
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+    });
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
     if (authError || !user) {
       return new Response(
         JSON.stringify({ error: 'Invalid authentication' }),
@@ -29,7 +41,7 @@ Deno.serve(async (req) => {
     }
 
     // Appeler la nouvelle fonction get-quota unifiée
-    const quotaResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/get-quota`, {
+    const quotaResponse = await fetch(`${SUPABASE_URL}/functions/v1/get-quota`, {
       method: 'POST',
       headers: {
         'Authorization': authHeader,

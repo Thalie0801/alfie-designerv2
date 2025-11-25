@@ -18,38 +18,43 @@ export function env(...keys: string[]): string | undefined {
   return undefined;
 }
 
-// ✅ Public variables
-// On donne la priorité à ALFIE_* (nos propres secrets),
-// puis aux vieux noms si jamais ils existent encore,
-// puis on finit sur un fallback URL (non secret) vers le NOUVEAU projet.
+// ✅ Public variables (RLS client)
+// Priorité aux secrets ALFIE_* (non gérés par Lovable),
+// puis aux anciens noms si jamais ils existent encore,
+// puis fallback sur l'URL publique du NOUVEAU projet Supabase.
 export const SUPABASE_URL =
-  env("ALFIE_SUPABASE_URL", "SUPABASE_URL", "VITE_SUPABASE_URL") || "https://onxqgtuiagiuomlstcmt.supabase.co";
+  env('ALFIE_SUPABASE_URL', 'SUPABASE_URL', 'VITE_SUPABASE_URL') ||
+  'https://onxqgtuiagiuomlstcmt.supabase.co';
 
-export const SUPABASE_ANON_KEY = env("ALFIE_SUPABASE_ANON_KEY", "SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY");
-
-// ✅ Private secrets (pas de VITE_ ici pour éviter les fuites côté client)
-export const SUPABASE_SERVICE_ROLE_KEY = env(
-  "ALFIE_SUPABASE_SERVICE_ROLE_KEY",
-  "SUPABASE_SERVICE_ROLE_KEY",
-  "SERVICE_ROLE_KEY",
+export const SUPABASE_ANON_KEY = env(
+  'ALFIE_SUPABASE_ANON_KEY',
+  'SUPABASE_ANON_KEY',
+  'VITE_SUPABASE_ANON_KEY'
 );
 
-export const INTERNAL_FN_SECRET = env("INTERNAL_FN_SECRET", "INTERNAL_SECRET");
+// ✅ Private secrets (service role, pas de VITE_ pour éviter les fuites)
+export const SUPABASE_SERVICE_ROLE_KEY = env(
+  'ALFIE_SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'SERVICE_ROLE_KEY'
+);
+
+export const INTERNAL_FN_SECRET = env('INTERNAL_FN_SECRET', 'INTERNAL_SECRET');
 
 // ✅ API Keys and other secrets
-export const LOVABLE_API_KEY = env("LOVABLE_API_KEY");
-export const CLOUDINARY_CLOUD_NAME = env("CLOUDINARY_CLOUD_NAME");
-export const CLOUDINARY_API_KEY = env("CLOUDINARY_API_KEY");
-export const CLOUDINARY_API_SECRET = env("CLOUDINARY_API_SECRET");
-export const REPLICATE_API_TOKEN = env("REPLICATE_API_TOKEN");
-export const REPLICATE_API_KEY = env("REPLICATE_API_KEY", "REPLICATE_API_TOKEN");
-export const FFMPEG_BACKEND_URL = env("FFMPEG_BACKEND_URL");
-export const FFMPEG_BACKEND_API_KEY = env("FFMPEG_BACKEND_API_KEY");
-export const ALFIE_ADMIN_EMAILS = env("ALFIE_ADMIN_EMAILS");
-export const ADMIN_EMAILS = env("ADMIN_EMAILS");
-export const VIP_EMAILS = env("VIP_EMAILS");
-export const RESEND_API_KEY = env("RESEND_API_KEY");
-export const STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY");
+export const LOVABLE_API_KEY = env('LOVABLE_API_KEY');
+export const CLOUDINARY_CLOUD_NAME = env('CLOUDINARY_CLOUD_NAME');
+export const CLOUDINARY_API_KEY = env('CLOUDINARY_API_KEY');
+export const CLOUDINARY_API_SECRET = env('CLOUDINARY_API_SECRET');
+export const REPLICATE_API_TOKEN = env('REPLICATE_API_TOKEN');
+export const REPLICATE_API_KEY = env('REPLICATE_API_KEY', 'REPLICATE_API_TOKEN');
+export const FFMPEG_BACKEND_URL = env('FFMPEG_BACKEND_URL');
+export const FFMPEG_BACKEND_API_KEY = env('FFMPEG_BACKEND_API_KEY');
+export const ALFIE_ADMIN_EMAILS = env('ALFIE_ADMIN_EMAILS');
+export const ADMIN_EMAILS = env('ADMIN_EMAILS');
+export const VIP_EMAILS = env('VIP_EMAILS');
+export const RESEND_API_KEY = env('RESEND_API_KEY');
+export const STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY');
 
 /**
  * Require an environment variable (throws if not found)
@@ -60,7 +65,7 @@ export const STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY");
 export function requireEnv(...keys: string[]): string {
   const value = env(...keys);
   if (!value) {
-    throw new Error(`Missing required environment variable: ${keys.join(" or ")}`);
+    throw new Error(`Missing required environment variable: ${keys.join(' or ')}`);
   }
   return value;
 }
@@ -70,13 +75,15 @@ export function requireEnv(...keys: string[]): string {
  * @returns Object with validation results
  */
 export function validateEnv(): { valid: boolean; missing: string[] } {
-  const required = [
-    ["SUPABASE_URL", SUPABASE_URL],
-    ["SUPABASE_ANON_KEY", SUPABASE_ANON_KEY],
-    ["SUPABASE_SERVICE_ROLE_KEY", SUPABASE_SERVICE_ROLE_KEY],
+  const required: Array<[string, string | undefined]> = [
+    ['SUPABASE_URL', SUPABASE_URL],
+    ['SUPABASE_ANON_KEY', SUPABASE_ANON_KEY],
+    ['SUPABASE_SERVICE_ROLE_KEY', SUPABASE_SERVICE_ROLE_KEY],
   ];
 
-  const missing = required.filter(([, value]) => !value).map(([name]) => name as string);
+  const missing = required
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
 
   return {
     valid: missing.length === 0,

@@ -1,9 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeaders } from '../_shared/cors.ts';
+import { SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL, validateEnv } from '../_shared/env.ts';
+
+const envValidation = validateEnv();
+if (!envValidation.valid) {
+  console.error('Missing required environment variables', { missing: envValidation.missing });
+}
+
 /**
  * Phase 7: Backfill legacy carousel slides with proper public_id structure
- * 
+ *
  * This function updates existing carousel slides to use the new naming convention:
  * alfie/{brandId}/{campaignId}/slides/slide_XX
  * 
@@ -17,10 +24,8 @@ Deno.serve(async (req) => {
   try {
     const { limit = 100, dryRun = true } = await req.json().catch(() => ({}));
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    // ✅ client admin vers le NOUVEAU projet
+    const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
     console.log('[backfill] Starting backfill process...', { limit, dryRun });
 

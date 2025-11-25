@@ -1,6 +1,12 @@
 import { edgeHandler } from '../_shared/edgeHandler.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { woofsForVideo } from '../_shared/woofs.ts';
+import { SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL, validateEnv } from '../_shared/env.ts';
+
+const envValidation = validateEnv();
+if (!envValidation.valid) {
+  console.error('Missing required environment variables', { missing: envValidation.missing });
+}
 
 interface SelectProviderRequest {
   brief: {
@@ -18,19 +24,17 @@ interface SelectProviderRequest {
 export default {
   async fetch(req: Request) {
     return edgeHandler(req, async ({ input }) => {
-      const { 
-        brief, 
-        modality, 
-        format, 
-        duration_s = 10, 
-        quality = 'standard', 
-        budget_woofs 
+      const {
+        brief,
+        modality,
+        format,
+        duration_s = 10,
+        quality = 'standard',
+        budget_woofs,
       } = input as SelectProviderRequest;
 
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-      );
+      // ✅ client admin : pas de JWT ici, fonction interne
+      const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
       // 1. Fetch enabled providers matching modality and format
       const { data: providers, error } = await supabase

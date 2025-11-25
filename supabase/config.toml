@@ -50,9 +50,6 @@ verify_jwt = false
 [functions.scrape-canva]
 verify_jwt = true
 
-[functions.auto-scrape-canva-templates]
-verify_jwt = false
-
 [functions.purchase-credit-pack]
 verify_jwt = true
 

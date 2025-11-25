@@ -1,22 +1,26 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { INTERNAL_FN_SECRET } from "../_shared/env.ts";
+import { INTERNAL_FN_SECRET, SUPABASE_ANON_KEY, SUPABASE_URL, validateEnv } from "../_shared/env.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";
+const envValidation = validateEnv();
+if (!envValidation.valid) {
+  console.error("Missing required environment variables", { missing: envValidation.missing });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    );
+    const authHeader = req.headers.get("Authorization") || "";
+
+    // ✅ Client RLS avec JWT (API côté user / intégration)
+    const supabaseClient = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+    });
 
     const url = new URL(req.url);
     const path = url.pathname;

@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { uploadToCloudinary } from "../_shared/cloudinaryUploader.ts";
 
+import { SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL, LOVABLE_API_KEY, validateEnv } from "../_shared/env.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 interface GenerateContentRequest {
   type: 'image' | 'video';
@@ -13,6 +14,11 @@ interface GenerateContentRequest {
   };
   duration?: number;
   aspectRatio?: '16:9' | '9:16' | '1:1';
+}
+
+const envValidation = validateEnv();
+if (!envValidation.valid) {
+  console.error("Missing required environment variables", { missing: envValidation.missing });
 }
 
 Deno.serve(async (req) => {
@@ -32,15 +38,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const supabaseUrl = SUPABASE_URL;
+    const supabaseKey = SUPABASE_SERVICE_ROLE_KEY;
+    const lovableApiKey = LOVABLE_API_KEY;
     
     if (!supabaseUrl || !supabaseKey) {
       throw new Error("Supabase credentials not configured");
     }
     
-    if (!LOVABLE_API_KEY) {
+    if (!lovableApiKey) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
@@ -96,7 +102,7 @@ Deno.serve(async (req) => {
       const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+          "Authorization": `Bearer ${lovableApiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({

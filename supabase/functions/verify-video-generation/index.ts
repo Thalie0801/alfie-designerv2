@@ -1,6 +1,17 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 
 import { corsHeaders } from "../_shared/cors.ts";
+import {
+  SUPABASE_SERVICE_ROLE_KEY,
+  SUPABASE_URL,
+  REPLICATE_API_TOKEN,
+  validateEnv,
+} from "../_shared/env.ts";
+
+const envValidation = validateEnv();
+if (!envValidation.valid) {
+  console.error("Missing required environment variables", { missing: envValidation.missing });
+}
 /**
  * Vérifie qu'une vidéo Replicate est prête et valide
  * Utilisé après la génération pour s'assurer que le fichier est accessible
@@ -20,10 +31,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const replicateToken = Deno.env.get('REPLICATE_API_TOKEN')!;
-    
+    if (!REPLICATE_API_TOKEN) {
+      throw new Error('REPLICATE_API_TOKEN is not configured');
+    }
+
+    const supabaseUrl = SUPABASE_URL!;
+    const supabaseKey = SUPABASE_SERVICE_ROLE_KEY!;
+    const replicateToken = REPLICATE_API_TOKEN!;
+
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     console.log(`Verifying video for job ${jobId}, prediction ${predictionId}`);
@@ -153,6 +168,23 @@ Deno.serve(async (req) => {
 
   } catch (error: any) {
     console.error('Video verification error:', error);
+
+    try {
+      const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+      const { jobId } = await req.json().catch(() => ({ jobId: null }));
+      if (jobId) {
+        await supabase
+          .from('jobs')
+          .update({
+            status: 'failed',
+            error: error.message,
+          })
+          .eq('id', jobId);
+      }
+    } catch (e) {
+      console.error('Failed to update job status after error:', e);
+    }
+
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

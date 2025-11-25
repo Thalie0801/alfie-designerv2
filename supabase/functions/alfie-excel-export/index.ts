@@ -1,17 +1,21 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import * as XLSX from "https://esm.sh/xlsx@0.18.5";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import * as XLSX from 'https://esm.sh/xlsx@0.18.5';
 
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeaders } from '../_shared/cors.ts';
+import { SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL, validateEnv } from '../_shared/env.ts';
+
+const envValidation = validateEnv();
+if (!envValidation.valid) {
+  console.error('Missing required environment variables', { missing: envValidation.missing });
+}
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    // ✅ Client admin (service role, pas de JWT)
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
     // Get authenticated user
     const authHeader = req.headers.get('Authorization');
@@ -37,9 +41,9 @@ Deno.serve(async (req) => {
       .eq('user_id', user.id);
 
     if (brandId) query = query.eq('brand_id', brandId);
-    if (campaign) query = query.eq('campaign', campaign);
     if (startDate) query = query.gte('created_at', startDate);
     if (endDate) query = query.lte('created_at', endDate);
+    if (campaign) query = query.eq('campaign', campaign);
 
     const { data: assets, error: assetsError } = await query;
 

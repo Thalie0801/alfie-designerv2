@@ -36,7 +36,6 @@
 - alfie-update-metrics
 - alfie-video-extend
 - alfie-video-upscale
-- auto-scrape-canva-templates
 - backfill-carousel-public-ids
 - cancel-job-set
 - canva-auth-start

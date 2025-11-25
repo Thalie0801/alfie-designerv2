@@ -1,6 +1,12 @@
 import { edgeHandler } from '../_shared/edgeHandler.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { isAdminUser } from '../_shared/auth.ts';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, validateEnv } from '../_shared/env.ts';
+
+const envValidation = validateEnv();
+if (!envValidation.valid) {
+  console.error('Missing required environment variables', { missing: envValidation.missing });
+}
 
 export default {
   async fetch(req: Request) {
@@ -10,8 +16,8 @@ export default {
       }
 
       const supabaseRls = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_ANON_KEY')!,
+        SUPABASE_URL!,
+        SUPABASE_ANON_KEY!,
         { global: { headers: { Authorization: `Bearer ${jwt}` } } }
       );
 
@@ -43,7 +49,6 @@ export default {
       const isAdmin = isAdminUser(userEmail, roles, {
         plan: profile.plan,
         grantedByAdmin: profile.granted_by_admin,
-        logContext: 'quota',
       });
 
       // 2. ✅ FIX: Calculer la période actuelle YYYYMM

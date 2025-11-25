@@ -1,6 +1,12 @@
 import { edgeHandler } from '../_shared/edgeHandler.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { isAdminUser } from '../_shared/auth.ts';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, validateEnv } from '../_shared/env.ts';
+
+const envValidation = validateEnv();
+if (!envValidation.valid) {
+  console.error('Missing required environment variables', { missing: envValidation.missing });
+}
 
 export default {
   async fetch(req: Request) {
@@ -10,12 +16,10 @@ export default {
       const { cost_woofs, brand_id } = input;
       if (!cost_woofs) throw new Error('MISSING_COST');
 
-      // Appel INTERNE via Supabase client (pas fetch HTTP)
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_ANON_KEY')!,
-        { global: { headers: { Authorization: `Bearer ${jwt}` } } }
-      );
+      // ✅ Appel INTERNE via Supabase client (RLS + JWT)
+      const supabase = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+        global: { headers: { Authorization: `Bearer ${jwt}` } },
+      });
 
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
@@ -39,9 +43,10 @@ export default {
 
       const isAdmin = isAdminUser(user.email, roleRows, {
         plan: profile?.plan,
-        grantedByAdmin: profile?.granted_by_admin,
-        logContext: 'quota',
+        granted_by_admin: profile?.granted_by_admin,
       });
+
+      // 👉 À partir d’ici tu gardes ton code existant (calcul des quotas, etc.)
 
       if (isAdmin) {
         const unlimited = 1_000_000_000;
