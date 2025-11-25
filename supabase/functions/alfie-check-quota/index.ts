@@ -43,7 +43,7 @@ export default {
 
       const isAdmin = isAdminUser(user.email, roleRows, {
         plan: profile?.plan,
-        granted_by_admin: profile?.granted_by_admin,
+        grantedByAdmin: profile?.granted_by_admin ?? false,
       });
 
       // 👉 À partir d’ici tu gardes ton code existant (calcul des quotas, etc.)
