@@ -1,24 +1,47 @@
 // supabase/functions/generate-media/index.ts
-// Crée un job dans la table "jobs" que le worker traitera ensuite.
+// Crée un job dans la table "jobs" que le worker traitera.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2?target=deno";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
+import { corsHeaders } from "../_shared/cors.ts";
 import { SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL, validateEnv } from "../_shared/env.ts";
-
-const corsHeaders: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*", // TODO: restreindre en prod
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
 
 const envValidation = validateEnv();
 if (!envValidation.valid) {
   console.error("[generate-media] ❌ Missing env vars", envValidation);
 }
 
+interface GenerateMediaPayload {
+  userId?: string;
+  user_id?: string;
+  brandId?: string;
+  brand_id?: string;
+
+  kind?: string;
+  type?: string;
+  format?: string;
+
+  count?: number;
+  slides?: number;
+
+  ratio?: string;
+  aspect_ratio?: string;
+
+  prompt?: string;
+  brief?: string;
+  description?: string;
+
+  intent?: {
+    kind?: string;
+    count?: number;
+    ratio?: string;
+    brief?: string;
+  };
+}
+
 serve(async (req: Request): Promise<Response> => {
-  // Préflight
+  // Préflight CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -31,64 +54,47 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const supabaseUrl = SUPABASE_URL;
-    const serviceKey = SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !serviceKey) {
-      console.error("[generate-media] ❌ Missing Supabase env", {
-        hasUrl: !!supabaseUrl,
-        hasServiceKey: !!serviceKey,
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("[generate-media] ❌ Supabase env missing", {
+        hasUrl: !!SUPABASE_URL,
+        hasServiceKey: !!SUPABASE_SERVICE_ROLE_KEY,
       });
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          error: "SUPABASE_ENV_MISSING",
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
+      return new Response(JSON.stringify({ ok: false, error: "SUPABASE_ENV_MISSING" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const rawBody = await req.json();
+    const rawBody = (await req.json()) as GenerateMediaPayload;
     console.log("[generate-media] Incoming body", rawBody);
 
-    // 🔹 Normalisation des champs (camelCase + snake_case)
-    const userId: string | undefined = rawBody.userId ?? rawBody.user_id;
-    const brandId: string | undefined = rawBody.brandId ?? rawBody.brand_id;
+    // 🔹 Normalisation
+    const userId = rawBody.userId ?? rawBody.user_id;
+    const brandId = rawBody.brandId ?? rawBody.brand_id;
 
-    const kind: string = rawBody.kind ?? rawBody.format ?? rawBody.type ?? rawBody.intent?.kind ?? "image";
+    const kind = rawBody.kind ?? rawBody.format ?? rawBody.type ?? rawBody.intent?.kind ?? "image";
 
-    const count: number = rawBody.count ?? rawBody.slides ?? rawBody.intent?.count ?? 1;
+    const count = rawBody.count ?? rawBody.slides ?? rawBody.intent?.count ?? 1;
 
-    const ratio: string = rawBody.ratio ?? rawBody.aspect_ratio ?? rawBody.intent?.ratio ?? "1:1";
+    const ratio = rawBody.ratio ?? rawBody.aspect_ratio ?? rawBody.intent?.ratio ?? "1:1";
 
-    const prompt: string = rawBody.prompt ?? rawBody.brief ?? rawBody.description ?? rawBody.intent?.brief ?? "";
+    const prompt = rawBody.prompt ?? rawBody.brief ?? rawBody.description ?? rawBody.intent?.brief ?? "";
 
     if (!userId || !brandId) {
-      console.error("[generate-media] ❌ Missing userId or brandId", {
+      console.error("[generate-media] Missing userId or brandId", {
         userId,
         brandId,
       });
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          error: "MISSING_USER_OR_BRAND",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
+      return new Response(JSON.stringify({ ok: false, error: "MISSING_USER_OR_BRAND" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (!prompt) {
-      console.warn("[generate-media] ⚠️ Empty prompt", { userId, brandId });
+      console.warn("[generate-media] Empty prompt", { userId, brandId });
     }
 
     console.log("[generate-media] Normalized intent", {
@@ -99,44 +105,31 @@ serve(async (req: Request): Promise<Response> => {
       ratio,
     });
 
-    // 🔹 Métadonnées supplémentaires (pour le worker/logs)
+    // 🔹 Création du job dans la table jobs
     const metadata = {
       user_id: userId,
       brand_id: brandId,
       type: kind,
       count,
       ratio,
-      prompt,
-      // tu peux rajouter d'autres champs
     };
 
-    // 🔹 Création du job dans la table "jobs"
     const { data: job, error: insertError } = await supabaseAdmin
       .from("jobs")
       .insert({
-        user_id: userId,
-        brand_id: brandId,
-        type: kind, // "image", "video", "carousel", etc.
         status: "queued",
         prompt,
         metadata,
-        // job_set_id, index_in_set... → laissent les defaults
       })
       .select("*")
       .single();
 
     if (insertError || !job) {
-      console.error("[generate-media] ❌ Error inserting job", insertError);
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          error: "JOB_INSERT_FAILED",
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
+      console.error("[generate-media] ❌ JOB_INSERT_FAILED", insertError);
+      return new Response(JSON.stringify({ ok: false, error: "JOB_INSERT_FAILED" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     console.log("[generate-media] ✅ Job created", {
@@ -147,16 +140,10 @@ serve(async (req: Request): Promise<Response> => {
       count,
     });
 
-    return new Response(
-      JSON.stringify({
-        ok: true,
-        jobId: job.id,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+    return new Response(JSON.stringify({ ok: true, jobId: job.id }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (err: any) {
     console.error("[generate-media] ❌ Uncaught error", err);
     return new Response(
