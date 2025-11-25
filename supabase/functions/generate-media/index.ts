@@ -126,10 +126,19 @@ serve(async (req: Request): Promise<Response> => {
 
     if (insertError || !job) {
       console.error("[generate-media] ❌ JOB_INSERT_FAILED", insertError);
-      return new Response(JSON.stringify({ ok: false, error: "JOB_INSERT_FAILED" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: "JOB_INSERT_FAILED",
+          code: insertError?.code,
+          message: insertError?.message,
+          details: insertError?.details,
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     console.log("[generate-media] ✅ Job created", {
