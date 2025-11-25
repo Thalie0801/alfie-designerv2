@@ -47,10 +47,13 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ ok: false, error: "METHOD_NOT_ALLOWED" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ ok: false, error: "METHOD_NOT_ALLOWED" }),
+      {
+        status: 405,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 
   try {
@@ -59,10 +62,13 @@ serve(async (req: Request): Promise<Response> => {
         hasUrl: !!SUPABASE_URL,
         hasServiceKey: !!SUPABASE_SERVICE_ROLE_KEY,
       });
-      return new Response(JSON.stringify({ ok: false, error: "SUPABASE_ENV_MISSING" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ ok: false, error: "SUPABASE_ENV_MISSING" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -74,97 +80,6 @@ serve(async (req: Request): Promise<Response> => {
     const userId = rawBody.userId ?? rawBody.user_id;
     const brandId = rawBody.brandId ?? rawBody.brand_id;
 
-    const kind = rawBody.kind ?? rawBody.format ?? rawBody.type ?? rawBody.intent?.kind ?? "image";
-
-    const count = rawBody.count ?? rawBody.slides ?? rawBody.intent?.count ?? 1;
-
-    const ratio = rawBody.ratio ?? rawBody.aspect_ratio ?? rawBody.intent?.ratio ?? "1:1";
-
-    const prompt = rawBody.prompt ?? rawBody.brief ?? rawBody.description ?? rawBody.intent?.brief ?? "";
-
-    if (!userId || !brandId) {
-      console.error("[generate-media] Missing userId or brandId", {
-        userId,
-        brandId,
-      });
-      return new Response(JSON.stringify({ ok: false, error: "MISSING_USER_OR_BRAND" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (!prompt) {
-      console.warn("[generate-media] Empty prompt", { userId, brandId });
-    }
-
-    console.log("[generate-media] Normalized intent", {
-      userId,
-      brandId,
-      kind,
-      count,
-      ratio,
-    });
-
-    // 🔹 Création du job dans la table jobs
-    const metadata = {
-      user_id: userId,
-      brand_id: brandId,
-      type: kind,
-      count,
-      ratio,
-    };
-
-    const { data: job, error: insertError } = await supabaseAdmin
-      .from("jobs")
-      .insert({
-        status: "queued",
-        prompt,
-        metadata,
-      })
-      .select("*")
-      .single();
-
-    if (insertError || !job) {
-      console.error("[generate-media] ❌ JOB_INSERT_FAILED", insertError);
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          error: "JOB_INSERT_FAILED",
-          code: insertError?.code,
-          message: insertError?.message,
-          details: insertError?.details,
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    console.log("[generate-media] ✅ Job created", {
-      jobId: job.id,
-      userId,
-      brandId,
-      kind,
-      count,
-    });
-
-    return new Response(JSON.stringify({ ok: true, jobId: job.id }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (err: any) {
-    console.error("[generate-media] ❌ Uncaught error", err);
-    return new Response(
-      JSON.stringify({
-        ok: false,
-        error: "INTERNAL_ERROR",
-        message: err?.message ?? String(err),
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
-  }
-});
+    const kind =
+      rawBody.kind ??
+      rawBody.fo
