@@ -24,3 +24,7 @@ tsconfig.tsbuildinfo
 *.njsproj
 *.sln
 *.sw?
+
+# On ne veut plus de fichiers .env dans le repo
+.env
+.env.*
