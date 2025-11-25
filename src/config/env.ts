@@ -12,7 +12,7 @@ export const SUPABASE_ANON_KEY =
   env.VITE_SUPABASE_PUBLISHABLE_KEY ||
   env.PUBLIC_SUPABASE_ANON_KEY ||
   // ⬇️ Mets ICI la clé "anon public" copiée depuis Supabase
-  "SB_PUBLISHABLE_TON_ANON_KEY_ICI";
+  "sb_publishable_Mt85r7sZTewTZb__-tCB4w_p2e8lOUl";
 
 // ✅ Ne jette plus d'erreur bloquante si Lovable n’injecte pas les VITE_*
 if (!env.VITE_SUPABASE_ANON_KEY && !env.VITE_SUPABASE_PUBLISHABLE_KEY) {
