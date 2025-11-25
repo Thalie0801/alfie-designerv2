@@ -1,34 +1,17 @@
-// src/config/env.ts
-// Config Supabase pour le FRONT (React / Vite)
+// Petit helper pour lire import.meta.env en douceur
+const env = (typeof import.meta !== "undefined" ? import.meta.env : {}) as any;
 
-type RuntimeEnv = {
-  VITE_SUPABASE_URL?: string;
-  VITE_SUPABASE_ANON_KEY?: string;
-  VITE_SUPABASE_PUBLISHABLE_KEY?: string;
-  PUBLIC_SUPABASE_URL?: string;
-  PUBLIC_SUPABASE_ANON_KEY?: string;
-} & Record<string, string>;
-
-// On récupère ce qu'on peut : import.meta.env en Vite, sinon un fallback global
-const rawEnv: RuntimeEnv =
-  typeof import.meta !== "undefined" && (import.meta as any).env
-    ? ((import.meta as any).env as RuntimeEnv)
-    : (((globalThis as any).ENV ?? {}) as RuntimeEnv);
-
-// ✅ URL Supabase : env → fallback nouveau projet
 export const SUPABASE_URL =
-  rawEnv.VITE_SUPABASE_URL || rawEnv.PUBLIC_SUPABASE_URL || "https://onxqgtuiagiuomlstcmt.supabase.co"; // <- ton NOUVEAU projet
+  env.VITE_SUPABASE_URL || env.PUBLIC_SUPABASE_URL || "https://onxqgtuiagiuomlstcmt.supabase.co";
 
-// ✅ Clé anonyme (publishable) : plusieurs noms possibles → fallback hardcodé
 export const SUPABASE_ANON_KEY =
-  rawEnv.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  rawEnv.VITE_SUPABASE_ANON_KEY ||
-  rawEnv.PUBLIC_SUPABASE_ANON_KEY ||
-  "sb-pub-REMPLACE_MOI"; // <--- METS ICI TA CLÉ sb-pub-... du nouveau projet
+  env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_ANON_KEY || env.PUBLIC_SUPABASE_ANON_KEY || "";
 
-// On log, mais on NE JETTE PLUS D'ERREUR
-if (!rawEnv.VITE_SUPABASE_ANON_KEY && !rawEnv.VITE_SUPABASE_PUBLISHABLE_KEY) {
-  console.warn("[Alfie] SUPABASE_ANON_KEY absente dans import.meta.env – utilisation du fallback codé en dur.");
+// On ne jette plus d'erreur, on log juste
+if (!env.VITE_SUPABASE_ANON_KEY) {
+  console.log(
+    "[Alfie] SUPABASE_ANON_KEY absente dans import.meta.env – Supabase risque de ne pas marcher, mais la preview reste accessible.",
+  );
 }
 
 console.log("[Alfie] SUPABASE_URL =", SUPABASE_URL);
