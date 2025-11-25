@@ -17,10 +17,10 @@ Deno.serve(async (req) => {
     const { url, category } = await req.json();
 
     if (!url || !url.includes("canva.com")) {
-      return new Response(
-        JSON.stringify({ error: "Valid Canva URL required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Valid Canva URL required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     console.log("Scraping Canva URL:", url);
@@ -36,34 +36,34 @@ Deno.serve(async (req) => {
     });
 
     if (!response.ok) {
-      return new Response(
-        JSON.stringify({ error: "Failed to fetch Canva URL" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: `Failed to fetch Canva page: ${response.status}` }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const html = await response.text();
 
-    // 👉 garde ici tout ton parsing actuel (titleMatch, ogImageMatch, descriptionMatch...)
+    // Extraction des métadonnées
     const titleMatch =
-      html.match(/<meta property=\"og:title\" content=\"([^\"]+)\"/i) ||
-      html.match(/<meta name=\"twitter:title\" content=\"([^\"]+)\"/i) ||
-      html.match(/<title>([^<]+)<\\/title>/i);
+      html.match(/<meta property="og:title" content="([^"]+)"/i) ||
+      html.match(/<meta name="twitter:title" content="([^"]+)"/i) ||
+      html.match(/<title>([^<]+)<\/title>/i);
 
-    const ogImageMatch = html.match(/<meta property=\"og:image(?::secure_url)?\" content=\"([^\"]+)\"/i);
-    const twitterImageMatch = html.match(/<meta name=\"twitter:image(?::src)?\" content=\"([^\"]+)\"/i);
-    const imageLinkMatch = html.match(/<link rel=\"image_src\" href=\"([^\"]+)\"/i);
+    const ogImageMatch = html.match(/<meta property="og:image" content="([^"]+)"/i);
+    const twitterImageMatch = html.match(/<meta name="twitter:image" content="([^"]+)"/i);
+    const imageLinkMatch = html.match(/<link rel="image_src" href="([^"]+)"/i);
 
     const descriptionMatch =
-      html.match(/<meta property=\"og:description\" content=\"([^\"]+)\"/i) ||
-      html.match(/<meta name=\"description\" content=\"([^\"]+)\"/i) ||
-      html.match(/<meta name=\"twitter:description\" content=\"([^\"]+)\"/i);
+      html.match(/<meta property="og:description" content="([^"]+)"/i) ||
+      html.match(/<meta name="description" content="([^"]+)"/i) ||
+      html.match(/<meta name="twitter:description" content="([^"]+)"/i);
 
     let title = titleMatch ? titleMatch[1] : "Untitled Design";
     let imageUrl = (ogImageMatch?.[1] || twitterImageMatch?.[1] || imageLinkMatch?.[1] || "").trim();
     let description = (descriptionMatch?.[1] || "").trim();
 
-    // Normalize protocol-relative and root-relative URLs
+    // Normaliser l’URL de l’image
     if (imageUrl.startsWith("//")) {
       imageUrl = "https:" + imageUrl;
     }
@@ -72,14 +72,14 @@ Deno.serve(async (req) => {
     }
 
     if (!imageUrl) {
-      return new Response(
-        JSON.stringify({ error: "Could not extract design preview" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Could not extract design preview" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // ✅ Save to NEW Supabase project
-    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    // Supabase admin (service role)
+    const supabase = createClient(SUPABASE_URL ?? "", SUPABASE_SERVICE_ROLE_KEY ?? "");
 
     const { data, error } = await supabase
       .from("canva_designs")
@@ -94,35 +94,32 @@ Deno.serve(async (req) => {
       .single();
 
     if (error) {
-      // If duplicate URL, return existing design
-      if (error.code === "23505") {
-        const { data: existing } = await supabase
-          .from("canva_designs")
-          .select()
-          .eq("canva_url", url)
-          .single();
+      // Duplicate URL: renvoyer le design existant
+      if ((error as any).code === "23505") {
+        const { data: existing } = await supabase.from("canva_designs").select().eq("canva_url", url).single();
 
-        return new Response(
-          JSON.stringify({ success: true, data: existing }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ success: true, data: existing }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
-      return new Response(
-        JSON.stringify({ error: error.message }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      console.error("scrape-canva error:", error);
+      return new Response(JSON.stringify({ error: (error as any).message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    return new Response(
-      JSON.stringify({ success: true, data }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ success: true, data }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (e: any) {
-    console.error("[scrape-canva] Error:", e);
-    return new Response(
-      JSON.stringify({ error: e?.message || "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    console.error("scrape-canva failure:", e);
+    return new Response(JSON.stringify({ error: e?.message || "Unknown error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
