@@ -86,6 +86,25 @@ serve(async (req: Request): Promise<Response> => {
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
+    // 🔍 Verify connection and schema
+    console.log("[generate-media] 🔍 Testing database connection...");
+    const { data: testData, error: testError } = await supabaseAdmin
+      .from("job_queue")
+      .select("id")
+      .limit(1);
+    
+    if (testError) {
+      console.error("[generate-media] ❌ Database connection test failed:", {
+        error: testError,
+        message: testError.message,
+        code: testError.code,
+        details: testError.details,
+        hint: testError.hint
+      });
+    } else {
+      console.log("[generate-media] ✅ Database connection OK, job_queue accessible");
+    }
+
     const rawBody = (await req.json()) as GenerateMediaPayload;
     console.log("[generate-media] Incoming body", rawBody);
 
@@ -187,8 +206,21 @@ serve(async (req: Request): Promise<Response> => {
       .single();
 
     if (insertError || !job) {
-      console.error("[generate-media] ❌ JOB_INSERT_FAILED", insertError);
-      return new Response(JSON.stringify({ ok: false, error: "JOB_INSERT_FAILED" }), {
+      console.error("[generate-media] ❌ JOB_INSERT_FAILED", {
+        error: insertError,
+        message: insertError?.message,
+        code: insertError?.code,
+        details: insertError?.details,
+        hint: insertError?.hint,
+        payload_sent: payload
+      });
+      return new Response(JSON.stringify({ 
+        ok: false, 
+        error: "JOB_INSERT_FAILED",
+        message: insertError?.message || "Failed to create job",
+        code: insertError?.code,
+        details: insertError?.details
+      }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
