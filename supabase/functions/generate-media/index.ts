@@ -145,7 +145,7 @@ serve(async (req: Request): Promise<Response> => {
         status: "queued",
         payload,
       })
-      .select("*")
+      .select("id, user_id, type, status, created_at")
       .single();
 
     if (insertError || !job) {
