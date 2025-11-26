@@ -282,7 +282,15 @@ const App = () => {
     );
   }
 
-  if (isHealthy === false) {
+  // Liste des routes publiques qui n'ont PAS besoin de Supabase
+  const PUBLIC_ROUTES_NO_SUPABASE = new Set([
+    "/", "/auth", "/contact", "/privacy", "/legal", "/faq", "/devenir-partenaire"
+  ]);
+
+  // Ne bloquer QUE si Supabase est down ET la route nécessite Supabase
+  const shouldBlock = isHealthy === false && !PUBLIC_ROUTES_NO_SUPABASE.has(location.pathname);
+
+  if (shouldBlock) {
     return <MaintenanceScreen onRetry={retry} />;
   }
 
