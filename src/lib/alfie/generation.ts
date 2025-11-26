@@ -5,7 +5,9 @@ interface GenerateMediaResponse {
   ok: boolean;
   error?: string;
   message?: string;
-  data?: { orderId: string };
+  data?: { orderId: string; jobId?: string };
+  orderId?: string;
+  jobId?: string;
 }
 
 export class GenerationError extends Error {
@@ -52,5 +54,11 @@ export async function triggerGenerationFromChat(userId: string, intent: AlfieInt
     throw new GenerationError(message, 400, data.error);
   }
 
-  return data.data as { orderId: string };
+  // Support à la fois l'ancien format (data.data.orderId) et le nouveau (data.orderId)
+  const orderId = data.orderId ?? data.data?.orderId;
+  if (!orderId) {
+    throw new GenerationError('Pas d\'orderId dans la réponse', 500);
+  }
+
+  return { orderId };
 }
