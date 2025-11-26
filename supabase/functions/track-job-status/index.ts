@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 import { corsHeaders } from "../_shared/cors.ts";
-import { SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL, validateEnv } from "../_shared/env.ts";
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, validateEnv } from "../_shared/env.ts";
 
 const envValidation = validateEnv();
 if (!envValidation.valid) {
@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
             if (!activeJobId) return;
 
             const { data, error } = await supabase
-              .from("jobs")
+              .from("job_queue")
               .select("*")
               .eq("id", activeJobId)
               .maybeSingle();

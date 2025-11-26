@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import JSZip from "https://esm.sh/jszip@3.10.1";
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
 
 const ALLOWED_ORIGINS = [
   "https://alfie-designer.com",
@@ -46,31 +47,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-    if (!supabaseUrl || !serviceKey) {
-      throw new Error("Missing Supabase configuration");
-    }
-
     const { campaign_id: campaignId } = await req.json();
     const authHeader = req.headers.get("Authorization");
 
-    if (!campaignId) {
-      return new Response(JSON.stringify({ ok: false, message: "campaign_id is required" }), {
+    if (!campaignId || !authHeader) {
+      return new Response(JSON.stringify({ ok: false, message: "Missing parameters" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (!authHeader) {
-      return new Response(JSON.stringify({ ok: false, message: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabase = createClient(supabaseUrl, serviceKey);
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
     const token = authHeader.replace("Bearer ", "");
 
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);

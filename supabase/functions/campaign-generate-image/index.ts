@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
 
 const ALLOWED_ORIGINS = [
   "https://alfie-designer.com",
@@ -62,14 +63,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const imageApiKey = Deno.env.get("NANO_BANANA_KEY") || Deno.env.get("IMAGE_API_KEY");
-
-    if (!supabaseUrl || !serviceKey) {
-      throw new Error("Missing Supabase configuration");
-    }
-
+    
     if (!imageApiKey) {
       throw new Error("Missing image API key (NANO_BANANA_KEY or IMAGE_API_KEY)");
     }
@@ -82,7 +77,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabase = createClient(supabaseUrl, serviceKey);
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
     const { data: asset, error: assetError } = await supabase
       .from("assets")
