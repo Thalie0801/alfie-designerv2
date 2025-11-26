@@ -3,6 +3,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { uploadTextAsRaw } from "../_shared/cloudinaryUploader.ts";
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, LOVABLE_API_KEY } from "../_shared/env.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";
 type Lang = "FR" | "EN";
@@ -123,15 +124,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   // Early ENV checks
-  const missingEnv = [
-    ["SUPABASE_URL", Deno.env.get("SUPABASE_URL")],
-    ["SUPABASE_SERVICE_ROLE_KEY", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")],
-    ["LOVABLE_API_KEY", Deno.env.get("LOVABLE_API_KEY")],
-  ]
-    .filter(([, v]) => !v)
-    .map(([k]) => k);
-  if (missingEnv.length) {
-    return json({ error: `Missing env vars: ${missingEnv.join(", ")}` }, 500);
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !LOVABLE_API_KEY) {
+    return json({ error: `Missing env vars` }, 500);
   }
 
   try {
@@ -155,8 +149,8 @@ Deno.serve(async (req) => {
 
     // —— Supabase admin client (service role)
     const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY,
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
 

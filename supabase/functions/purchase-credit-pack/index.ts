@@ -3,6 +3,8 @@ import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 import { corsHeaders } from "../_shared/cors.ts";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../_shared/env.ts";
+
 Deno.serve(async (req) => {
   console.log("purchase-credit-pack: request received", req.method);
   
@@ -11,8 +13,8 @@ Deno.serve(async (req) => {
   }
 
   const supabaseClient = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    SUPABASE_URL!,
+    SUPABASE_ANON_KEY!
   );
 
   try {
