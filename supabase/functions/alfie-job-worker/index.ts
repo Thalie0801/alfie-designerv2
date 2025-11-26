@@ -18,10 +18,15 @@ type JobRow = {
 };
 
 const supabaseAdmin = createClient(
-  SUPABASE_URL ?? "",
+  SUPABASE_URL ?? "https://onxqgtuiagiuomlstcmt.supabase.co",
   SUPABASE_SERVICE_ROLE_KEY ?? "",
   { auth: { autoRefreshToken: false, persistSession: false } },
 );
+
+console.log("[alfie-job-worker] 🔧 Supabase client initialized", {
+  url: SUPABASE_URL ?? "https://onxqgtuiagiuomlstcmt.supabase.co",
+  hasKey: !!SUPABASE_SERVICE_ROLE_KEY
+});
 
 // ---------- Utils ----------
 const ok = (data: any, status = 200) =>
@@ -171,11 +176,18 @@ Deno.serve(async (req) => {
   try {
     console.log("🚀 [Worker] Starting job processing...");
 
-    // Basic env sanity
-    console.log("🧪 env", {
-      supabaseUrl: !!Deno.env.get("SUPABASE_URL"),
-      anonKey: !!Deno.env.get("SUPABASE_ANON_KEY"),
-      serviceKey: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+    // Diagnostic détaillé de la configuration
+    console.log("🧪 [Worker] Environment check", {
+      SUPABASE_URL: SUPABASE_URL,
+      hasAnonKey: !!SUPABASE_ANON_KEY,
+      hasServiceKey: !!SUPABASE_SERVICE_ROLE_KEY,
+      hasInternalSecret: !!INTERNAL_FN_SECRET,
+      envVars: {
+        ALFIE_SUPABASE_URL: !!Deno.env.get("ALFIE_SUPABASE_URL"),
+        SUPABASE_URL: !!Deno.env.get("SUPABASE_URL"),
+        ALFIE_SERVICE_KEY: !!Deno.env.get("ALFIE_SUPABASE_SERVICE_ROLE_KEY"),
+        SERVICE_KEY: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+      }
     });
 
     // Process a small batch to avoid function timeout
