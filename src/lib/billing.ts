@@ -58,17 +58,7 @@ export async function hasActiveSubscriptionByEmail(
       return true;
     }
 
-    // Check Stripe subscription via edge function for additional validation
-    if (userId || profile.id) {
-      try {
-        const { data: subscriptionData } = await supabase.functions.invoke('check-subscription');
-        if (subscriptionData?.subscribed) {
-          return true;
-        }
-      } catch (err) {
-        console.warn('[billing] Unable to check subscription via edge function:', err);
-      }
-    }
+    // Pas d'appel Edge Function redondant - vérifié via profiles uniquement
   } catch (error) {
     console.error('[billing] Unexpected error while checking subscription:', error);
   }

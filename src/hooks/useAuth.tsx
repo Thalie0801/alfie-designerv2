@@ -2,8 +2,10 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { isAuthorized as computeIsAuthorized } from '@/utils/authz-helpers';
-import { hasRole } from '@/lib/access';
+import { hasRole, getUserRoles } from '@/lib/access';
 import { hasActiveSubscriptionByEmail } from '@/lib/billing';
+import { withRetry } from '@/lib/supabaseRetry';
+import { saveAuthToCache, loadAuthFromCache } from '@/lib/authCache';
 
 interface AuthContextType {
   user: User | null;
@@ -32,23 +34,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const ensureActiveSubscription = async (currentUser: User | null) => {
+  const ensureActiveSubscription = async (currentUser: User | null, cachedRoles?: string[]) => {
     if (!currentUser?.email) {
       console.debug('[Auth] ensureActiveSubscription: no user email');
       return false;
     }
 
-    // Vérifier si l'utilisateur a un rôle VIP ou Admin via la DB
-    const { data: rolesData } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', currentUser.id);
-    
-    const userRoles = (rolesData || []).map(r => r.role);
+    // Utiliser les rôles passés en paramètre ou le cache getUserRoles
+    const userRoles = cachedRoles ?? await getUserRoles(currentUser.id);
     const isVipOrAdmin = userRoles.includes('vip') || userRoles.includes('admin');
 
     if (isVipOrAdmin) {
-      console.debug('[Auth] ensureActiveSubscription: user has VIP/Admin role from database', { roles: userRoles });
+      console.debug('[Auth] ensureActiveSubscription: user has VIP/Admin role', { roles: userRoles });
       return true;
     }
 
@@ -56,11 +53,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userId: currentUser.id,
     });
 
-    if (!hasSubscription) {
-      console.debug('[Auth] ensureActiveSubscription: no active subscription for', currentUser.email);
-    } else {
-      console.debug('[Auth] ensureActiveSubscription: user has active subscription');
-    }
+    console.debug('[Auth] ensureActiveSubscription:', { 
+      email: currentUser.email, 
+      hasSubscription 
+    });
 
     return hasSubscription;
   };
@@ -73,55 +69,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshProfile = async () => {
     if (!session?.user) return;
 
-    const allowed = await ensureActiveSubscription(session.user);
-    if (!allowed) {
-      console.debug('[Auth] refreshProfile: access not allowed, clearing profile');
-      // NE PAS déconnecter - laisser l'app gérer l'accès
-      setProfile(null);
-      setSubscription(null);
-      setRoles([]);
-      return;
-    }
-
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .single();
-
-    if (profileData) {
-      const ensuredProfile = await ensureStudioPlanForTestAccount(profileData);
-      setProfile(ensuredProfile);
-      
-      // Définir les cookies pour stabiliser les redirects
-      const plan = ensuredProfile.plan ?? 'none';
-      const grantedByAdmin = ensuredProfile.granted_by_admin ?? false;
-      document.cookie = `plan=${plan}; Max-Age=${60*60*12}; Path=/; SameSite=Lax`;
-      document.cookie = `granted_by_admin=${grantedByAdmin}; Max-Age=${60*60*12}; Path=/; SameSite=Lax`;
-      console.debug('[Auth] refreshProfile: cookies set', { plan, grantedByAdmin });
-    }
-
-    const { data: rolesData } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', session.user.id);
-
-    if (rolesData) setRoles(rolesData.map(r => r.role));
-
-    // Récupérer l'état d'abonnement via la fonction edge
     try {
-      const { data, error } = await supabase.functions.invoke('check-subscription');
-      if (!error && data) {
-        const isExpired = data.current_period_end ? new Date(data.current_period_end) < new Date() : false;
-        setSubscription({
-          status: isExpired ? 'expired' : (data.subscribed ? 'active' : 'none'),
-          current_period_end: data.current_period_end ?? null,
-        } as any);
-      } else {
+      // 1. Récupérer les rôles UNE SEULE FOIS via cache
+      const userRoles = await withRetry(
+        () => getUserRoles(session.user.id),
+        { maxRetries: 3, timeoutMs: 5000 }
+      );
+      setRoles(userRoles);
+
+      // 2. Vérifier l'accès en passant les rôles
+      const allowed = await ensureActiveSubscription(session.user, userRoles);
+      if (!allowed) {
+        console.debug('[Auth] refreshProfile: access not allowed, clearing profile');
+        setProfile(null);
         setSubscription(null);
+        return;
       }
-    } catch {
-      setSubscription(null);
+
+      // 3. Récupérer le profil avec retry
+      const profileResponse = await withRetry(
+        async () => await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single(),
+        { maxRetries: 3, timeoutMs: 5000 }
+      );
+      const profileData = profileResponse.data;
+
+      if (profileData) {
+        const ensuredProfile = await ensureStudioPlanForTestAccount(profileData);
+        setProfile(ensuredProfile);
+        
+        const plan = ensuredProfile.plan ?? 'none';
+        const grantedByAdmin = ensuredProfile.granted_by_admin ?? false;
+        document.cookie = `plan=${plan}; Max-Age=${60*60*12}; Path=/; SameSite=Lax`;
+        document.cookie = `granted_by_admin=${grantedByAdmin}; Max-Age=${60*60*12}; Path=/; SameSite=Lax`;
+        
+        // Sauvegarder dans le cache local pour mode dégradé
+        saveAuthToCache({
+          userId: session.user.id,
+          email: session.user.email ?? '',
+          roles: userRoles,
+          plan,
+          hasActivePlan: true,
+        });
+      }
+
+      // 4. Déterminer l'état de souscription depuis le profil (pas d'Edge Function)
+      const isExpired = profileData?.status === 'expired';
+      setSubscription({
+        status: isExpired ? 'expired' : (profileData?.plan ? 'active' : 'none'),
+        current_period_end: null,
+      } as any);
+
+    } catch (error) {
+      console.error('[Auth] refreshProfile failed:', error);
+      
+      // Mode dégradé : charger depuis le cache
+      const cached = loadAuthFromCache(session.user.id);
+      if (cached) {
+        console.warn('[Auth] Using cached auth data (degraded mode)');
+        setRoles(cached.roles);
+        setProfile({ plan: cached.plan });
+      }
     }
   };
 
@@ -164,51 +175,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) {
-      return { error };
-    }
+    try {
+      const { data, error } = await withRetry(
+        () => supabase.auth.signInWithPassword({ email, password }),
+        { maxRetries: 3, timeoutMs: 5000 }
+      );
+      
+      if (error) return { error };
 
-    const userFromAuth = data.user ?? null;
+      const userFromAuth = data.user ?? null;
+      if (!userFromAuth?.email) {
+        await supabase.auth.signOut();
+        return { error: new Error('NO_ACTIVE_SUBSCRIPTION') };
+      }
 
-    if (!userFromAuth?.email) {
-      await supabase.auth.signOut();
-      return { error: new Error('NO_ACTIVE_SUBSCRIPTION') };
-    }
+      // Récupérer les rôles UNE SEULE FOIS via cache
+      const userRoles = await getUserRoles(userFromAuth.id);
+      const isVipOrAdmin = userRoles.includes('vip') || userRoles.includes('admin');
 
-    // Vérifier si l'utilisateur a un rôle VIP ou Admin via la DB
-    const { data: rolesData } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userFromAuth.id);
-    
-    const userRoles = (rolesData || []).map(r => r.role);
-    const isVipOrAdmin = userRoles.includes('vip') || userRoles.includes('admin');
+      if (isVipOrAdmin) {
+        console.debug('[Auth] signIn: VIP/Admin access', { roles: userRoles });
+        return { error: null };
+      }
 
-    if (isVipOrAdmin) {
-      console.debug('[Auth] signIn: bypass subscription check (VIP/Admin)', { 
-        email: userFromAuth.email, 
-        roles: userRoles,
-        isVipOrAdmin
+      const hasSubscription = await hasActiveSubscriptionByEmail(userFromAuth.email, {
+        userId: userFromAuth.id,
       });
+
+      if (!hasSubscription) {
+        console.debug('[Auth] signIn: no active subscription, signing out');
+        await supabase.auth.signOut();
+        return { error: new Error('NO_ACTIVE_SUBSCRIPTION') };
+      }
+
+      console.debug('[Auth] signIn: success');
       return { error: null };
+    } catch (error) {
+      console.error('[Auth] signIn failed:', error);
+      return { error: error as Error };
     }
-
-    const hasSubscription = await hasActiveSubscriptionByEmail(userFromAuth.email, {
-      userId: userFromAuth.id,
-    });
-
-    if (!hasSubscription) {
-      console.debug('[Auth] signIn: no active subscription, signing out');
-      await supabase.auth.signOut();
-      return { error: new Error('NO_ACTIVE_SUBSCRIPTION') };
-    }
-
-    console.debug('[Auth] signIn: user has active subscription');
-    return { error: null };
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
