@@ -3,6 +3,7 @@ import { Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 export type BillingPlan = "starter" | "pro" | "studio" | "enterprise";
 export type BillingPeriod = "monthly" | "annual";
@@ -17,8 +18,11 @@ export interface PriceCardProps {
   features: string[];
   plan: BillingPlan;
   popular?: boolean;
-  onCheckout: (plan: BillingPlan) => void;
+  onCheckout: (plan: BillingPlan) => Promise<void>;
   checkoutLoading: boolean;
+  isAuthenticated: boolean;
+  guestEmail: string;
+  onEmailChange: (email: string) => void;
 }
 
 export function PriceCard({
@@ -33,6 +37,9 @@ export function PriceCard({
   popular,
   onCheckout,
   checkoutLoading,
+  isAuthenticated,
+  guestEmail,
+  onEmailChange,
 }: PriceCardProps) {
   return (
     <Card
@@ -67,7 +74,16 @@ export function PriceCard({
           ))}
         </ul>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="flex-col gap-3">
+        {!isAuthenticated && (
+          <Input
+            type="email"
+            placeholder="votre@email.com"
+            value={guestEmail}
+            onChange={(e) => onEmailChange(e.target.value)}
+            className="w-full"
+          />
+        )}
         <Button
           className="h-12 w-full"
           variant={popular ? "default" : "outline"}

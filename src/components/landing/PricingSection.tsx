@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
 import { PriceCard, type BillingPlan } from "@/components/landing/PriceCard";
+import { useStripeCheckout } from "@/hooks/useStripeCheckout";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 const plans = [
   {
@@ -60,22 +61,16 @@ const getPriceLabel = (isAnnual: boolean) => (isAnnual ? " / an" : " / mois");
 
 export function PricingSection() {
   const [isAnnual, setIsAnnual] = useState(false);
+  const [guestEmail, setGuestEmail] = useState("");
+  const { createCheckout, loading: checkoutLoading } = useStripeCheckout();
   const { user } = useAuth();
-  const navigate = useNavigate();
   
-  const handleCheckout = (plan: BillingPlan) => {
-    // Stocker le plan choisi dans le localStorage pour le récupérer après l'auth
-    localStorage.setItem('selected_plan', JSON.stringify({
-      plan,
-      billing_period: isAnnual ? 'annual' : 'monthly'
-    }));
-    
-    // Rediriger vers l'auth si pas connecté
-    if (!user) {
-      navigate('/auth?from=pricing');
-    } else {
-      navigate('/billing');
+  const handleCheckout = async (plan: BillingPlan) => {
+    if (!user && !guestEmail) {
+      toast.error("Veuillez entrer votre email pour continuer");
+      return;
     }
+    await createCheckout(plan, isAnnual ? "annual" : "monthly", undefined, guestEmail || undefined);
   };
 
   return (
@@ -125,7 +120,10 @@ export function PricingSection() {
               plan={plan.plan}
               popular={plan.popular}
               onCheckout={handleCheckout}
-              checkoutLoading={false}
+              checkoutLoading={checkoutLoading}
+              isAuthenticated={!!user}
+              guestEmail={guestEmail}
+              onEmailChange={setGuestEmail}
             />
           ))}
         </div>

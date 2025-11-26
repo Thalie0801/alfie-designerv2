@@ -105,13 +105,6 @@ export default function Auth() {
       vipBypass: isWhitelisted ? 'VIP ACCESS GRANTED' : 'no bypass'
     });
     
-    // Vérifier si l'utilisateur vient de la page pricing
-    const fromPricing = searchParams.get('from') === 'pricing';
-    if (fromPricing) {
-      console.debug('[Auth redirect] → /billing (from pricing)');
-      return navigate('/billing');
-    }
-    
     // 1. Admin d'abord (priorité absolue)
     if (effectiveIsAdmin) {
       console.debug('[Auth redirect] → /admin (admin user)');
@@ -127,7 +120,7 @@ export default function Auth() {
     // 3. Sinon onboarding
     console.debug('[Auth redirect] → /onboarding/activate (not authorized)');
     return navigate('/onboarding/activate');
-  }, [effectiveIsAdmin, effectiveIsAuthorized, isAuthorized, isWhitelisted, navigate, user?.email, flagsReady, searchParams]);
+  }, [effectiveIsAdmin, effectiveIsAuthorized, isAuthorized, isWhitelisted, navigate, user?.email, flagsReady]);
 
   // Check for payment success (vérifie une seule fois au montage ou changement de sessionId)
   useEffect(() => {

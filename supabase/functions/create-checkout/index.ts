@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
     }
 
     const stripe = new Stripe(stripeSecret, {
-      apiVersion: "2025-08-27.basil" as any,
+      apiVersion: "2024-11-20",
     });
 
     const frontendUrl =

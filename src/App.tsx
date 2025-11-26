@@ -5,8 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { useSupabaseHealth } from "@/hooks/useSupabaseHealth";
-import { MaintenanceScreen } from "@/components/MaintenanceScreen";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 
@@ -268,31 +266,6 @@ const AppRoutes = () => {
 const App = () => {
   const location = useLocation();
   const shouldShowChatWidget = !PUBLIC_ROUTES_WITH_PROSPECT_BUBBLE.has(location.pathname);
-  const { isHealthy, isChecking, retry } = useSupabaseHealth();
-
-  // Afficher l'écran de maintenance si Supabase est down
-  if (isChecking) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Vérification du service...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Liste des routes publiques qui n'ont PAS besoin de Supabase
-  const PUBLIC_ROUTES_NO_SUPABASE = new Set([
-    "/", "/auth", "/contact", "/privacy", "/legal", "/faq", "/devenir-partenaire"
-  ]);
-
-  // Ne bloquer QUE si Supabase est down ET la route nécessite Supabase
-  const shouldBlock = isHealthy === false && !PUBLIC_ROUTES_NO_SUPABASE.has(location.pathname);
-
-  if (shouldBlock) {
-    return <MaintenanceScreen onRetry={retry} />;
-  }
 
   return (
     <QueryClientProvider client={queryClient}>
