@@ -37,7 +37,7 @@ type MediaEntry = {
   type: string;
   status: string;
   order_id?: string | null;
-  output_url: string | null;
+  output_url?: string | null; // Optional, loaded on demand
   thumbnail_url?: string | null;
   metadata?: Record<string, any> | null;
   created_at: string;
@@ -346,7 +346,7 @@ export function ChatGenerator() {
             .in("order_id", orderIds),
           supabase
             .from("media_generations")
-            .select("id, type, status, output_url, thumbnail_url, metadata, created_at")
+            .select("id, type, status, thumbnail_url, metadata, created_at")
             .eq("user_id", userId)
             .eq("brand_id", resolvedBrandId)
             .in("type", ["video"])
@@ -440,7 +440,7 @@ export function ChatGenerator() {
 
           pushAsset(linkedOrderId, {
             id: video.id,
-            url: typeof video.output_url === "string" ? video.output_url : "",
+            url: typeof video.thumbnail_url === "string" ? video.thumbnail_url : "",
             thumbnailUrl: typeof video.thumbnail_url === "string" ? video.thumbnail_url : undefined,
             slideIndex: 0,
             type: "video",
@@ -520,7 +520,7 @@ export function ChatGenerator() {
 
       let assetsQuery = supabase
         .from("media_generations")
-        .select("*")
+        .select("id, type, status, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes")
         .eq("user_id", currentUser.id)
         .order("created_at", { ascending: false })
         .limit(50);
