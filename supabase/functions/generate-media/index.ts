@@ -58,6 +58,7 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
+    console.log("[generate-media] 🎯 BOOT PROJECT =", SUPABASE_URL?.includes("itsjon") ? "itsjonazifiiikozengd ✅" : SUPABASE_URL);
     console.log("[generate-media] Starting job creation", {
       timestamp: new Date().toISOString(),
       hasURL: !!SUPABASE_URL,

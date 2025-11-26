@@ -5,7 +5,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../../config/env";
 // Ça évite les erreurs de typage et les crashs de preview.
 // Si les vraies VITE_SUPABASE_* sont bien set (ce qui est ton cas),
 // ce sont elles qui seront utilisées.
-const url = SUPABASE_URL || "https://onxqgtuiagiuomlstcmt.supabase.co";
+const url = SUPABASE_URL || "https://itsjonazifiiikozengd.supabase.co";
 const key = SUPABASE_ANON_KEY || "public-anon-key-placeholder";
 
 if (!SUPABASE_ANON_KEY) {

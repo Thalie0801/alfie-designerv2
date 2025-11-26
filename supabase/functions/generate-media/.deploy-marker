@@ -1,9 +1,9 @@
-# FORCE REDEPLOYMENT - HARDCODED CONFIG TEST
-# Timestamp: 2025-01-26T02:45:00Z
-# Target: onxqgtuiagiuomlstcmt.supabase.co
-# THIS FILE FORCES REDEPLOYMENT WITH INLINE HARDCODED CONFIG
+# DEPLOYMENT MARKER - Alfie Designer
+# Timestamp: 2025-01-26T16:00:00Z
+# Target: itsjonazifiiikozengd.supabase.co
+# Project: Alfie Designer (Lovable Cloud)
 
-DEPLOY_ID=force-inline-config-test-v3
-TIMESTAMP=2025-01-26T02:45:00Z
-TARGET_PROJECT=onxqgtuiagiuomlstcmt
-CONFIG_METHOD=inline_hardcoded_bypass_all_env
+DEPLOY_ID=align-itsjon-project-v1
+TIMESTAMP=2025-01-26T16:00:00Z
+TARGET_PROJECT=itsjonazifiiikozengd
+CONFIG_METHOD=alfie_env_standard

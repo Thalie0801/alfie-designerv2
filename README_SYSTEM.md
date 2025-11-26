@@ -195,11 +195,11 @@ Pour tester manuellement les cron jobs :
 
 ```bash
 # Tester la purge
-curl -X POST https://onxqgtuiagiuomlstcmt.supabase.co/functions/v1/purge-expired-assets \
+curl -X POST https://itsjonazifiiikozengd.supabase.co/functions/v1/purge-expired-assets \
   -H "Authorization: Bearer YOUR_ANON_KEY"
 
 # Tester le reset quotas
-curl -X POST https://onxqgtuiagiuomlstcmt.supabase.co/functions/v1/reset-monthly-quotas \
+curl -X POST https://itsjonazifiiikozengd.supabase.co/functions/v1/reset-monthly-quotas \
   -H "Authorization: Bearer YOUR_ANON_KEY"
 ```
 
