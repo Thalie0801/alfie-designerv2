@@ -125,24 +125,25 @@ serve(async (req: Request): Promise<Response> => {
       ratio,
     });
 
-    // 🔹 Création du job dans la table jobs
-    const metadata: Record<string, unknown> = {
-      user_id: userId,
+    // 🔹 Création du job dans la table job_queue
+    const payload: Record<string, unknown> = {
+      userId,
+      brandId,
       type: kind,
       count,
       ratio,
+      prompt,
     };
 
-    if (brandId) {
-      metadata.brand_id = brandId;
-    }
-
     const { data: job, error: insertError } = await supabaseAdmin
-      .from("jobs")
+      .from("job_queue")
       .insert({
+        user_id: userId,
+        brand_id: brandId,
+        type: kind === "carousel" ? "render_carousels" : "render_images",
+        kind,
         status: "queued",
-        prompt,
-        metadata,
+        payload,
       })
       .select("*")
       .single();
