@@ -89,6 +89,23 @@ serve(async (req: Request): Promise<Response> => {
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
+    // 🔐 CRITICAL: Verify we're on the NEW project (onxqgtu...)
+    if (!supabaseUrl.includes("onxqgtuiagiuomlstcmt")) {
+      console.error("[generate-media] ❌ WRONG PROJECT DETECTED!", {
+        currentUrl: supabaseUrl,
+        expectedUrl: "https://onxqgtuiagiuomlstcmt.supabase.co"
+      });
+      return new Response(JSON.stringify({ 
+        ok: false, 
+        error: "WRONG_SUPABASE_PROJECT",
+        message: "Edge Function deployed to incorrect Supabase project",
+        details: "This function must be deployed to the NEW project (onxqgtu...)"
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // 🔍 Verify connection and schema
     console.log("[generate-media] 🔍 Testing database connection and schema...");
     const { data: schemaTest, error: testError } = await supabaseAdmin
