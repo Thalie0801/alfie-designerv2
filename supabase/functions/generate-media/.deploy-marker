@@ -1,0 +1,7 @@
+# Deployment marker to force Edge Function redeployment
+# Last updated: 2025-01-26T00:00:00Z
+# Target project: onxqgtuiagiuomlstcmt.supabase.co
+# This file forces the function to redeploy to the correct Supabase project
+
+DEPLOY_TIMESTAMP=2025-01-26T00:00:00Z
+TARGET_PROJECT=onxqgtuiagiuomlstcmt
