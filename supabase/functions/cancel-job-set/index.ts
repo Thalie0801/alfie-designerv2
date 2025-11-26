@@ -100,10 +100,11 @@ Deno.serve(async (req) => {
     }
 
     // Count remaining jobs (queued or running)
+    // Note: Migrated from legacy 'jobs' table to 'job_queue'
     const { data: remainingJobs, error: jobsError } = await supabaseAdmin
-      .from('jobs')
-      .select('id, index_in_set')
-      .eq('job_set_id', jobSetId)
+      .from('job_queue')
+      .select('id')
+      .eq('order_id', jobSetId)
       .in('status', ['queued', 'running']);
 
     if (jobsError) {
@@ -117,14 +118,13 @@ Deno.serve(async (req) => {
     // Cancel all remaining jobs
     if (remainingCount > 0) {
       const { error: updateJobsError } = await supabaseAdmin
-        .from('jobs')
+        .from('job_queue')
         .update({ 
-          status: 'canceled', 
-          started_at: null,
+          status: 'failed', 
           error: 'Canceled by user',
-          finished_at: new Date().toISOString()
+          updated_at: new Date().toISOString()
         })
-        .eq('job_set_id', jobSetId)
+        .eq('order_id', jobSetId)
         .in('status', ['queued', 'running']);
 
       if (updateJobsError) {

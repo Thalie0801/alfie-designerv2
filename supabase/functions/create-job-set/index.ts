@@ -283,9 +283,17 @@ Deno.serve(async (req) => {
       });
 
       console.log(`[create-job-set] 🎨 Inserting ${jobsData.length} jobs into database...`);
+      // LEGACY WARNING: This function creates jobs in the legacy 'jobs' table
+      // TODO: Migrate to job_queue system
       const { error: jobsErr } = await supabase
-        .from('jobs')
-        .insert(jobsData);
+        .from('job_queue')
+        .insert(jobsData.map((job: any) => ({
+          user_id: user.id,
+          brand_id: brandId,
+          type: 'render_carousels',
+          payload: job,
+          status: job.status
+        })));
 
       if (jobsErr) {
         console.error('[create-job-set] ❌ Failed to insert jobs:', jobsErr);
