@@ -178,3 +178,6 @@ verify_jwt = true
 
 [functions.queue-monitor]
 verify_jwt = true
+
+[functions.generate-media]
+verify_jwt = false
