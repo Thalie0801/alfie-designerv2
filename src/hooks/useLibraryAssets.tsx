@@ -185,7 +185,7 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
       // Output URL will be loaded individually when downloading
       const { data, error } = await supabase
         .from('media_generations')
-        .select('id, type, status, output_url, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes')
+        .select('id, type, status, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes')
         .eq('user_id', userId)
         .eq('type', assetType)
         .order('created_at', { ascending: false })
@@ -201,7 +201,7 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
       // Map data to include a placeholder output_url that will be loaded on demand
       const mappedAssets = (data || []).map(asset => ({
         ...asset,
-        output_url: asset.output_url || asset.thumbnail_url || '',
+        output_url: asset.thumbnail_url || '', // Use thumbnail as placeholder, full URL loaded on download
         thumbnail_url: asset.thumbnail_url || undefined,
       })) as LibraryAsset[];
       
