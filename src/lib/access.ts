@@ -8,7 +8,11 @@ const CACHE_TTL = 60000; // 1 minute
  * Récupère les rôles d'un utilisateur depuis la base de données
  * Utilise un cache pour optimiser les performances
  */
-export async function getUserRoles(userId: string): Promise<string[]> {
+export async function getUserRoles(userId: string, forceRefresh = false): Promise<string[]> {
+  if (forceRefresh) {
+    roleCache.delete(userId);
+  }
+
   const cached = roleCache.get(userId);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.roles;
@@ -26,6 +30,7 @@ export async function getUserRoles(userId: string): Promise<string[]> {
 
   const roles = data.map(r => r.role);
   roleCache.set(userId, { roles, timestamp: Date.now() });
+  console.log(`[Access] Loaded roles for ${userId.substring(0, 8)}...: ${roles.join(', ')}`);
   return roles;
 }
 
@@ -40,8 +45,8 @@ export async function isVip(userId: string): Promise<boolean> {
 /**
  * Vérifie si un utilisateur a le rôle Admin
  */
-export async function isAdmin(userId: string): Promise<boolean> {
-  const roles = await getUserRoles(userId);
+export async function isAdmin(userId: string, forceRefresh = false): Promise<boolean> {
+  const roles = await getUserRoles(userId, forceRefresh);
   return roles.includes('admin');
 }
 
