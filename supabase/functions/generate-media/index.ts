@@ -138,10 +138,34 @@ serve(async (req: Request): Promise<Response> => {
       prompt: prompt.substring(0, 50) + '...'
     });
 
+    // 🔹 Créer un ordre pour tracer la demande
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from("orders")
+      .insert({
+        user_id: userId,
+        brand_id: brandId,
+        campaign_name: prompt.substring(0, 100),
+        status: "processing",
+        brief_json: { prompt, kind, count, ratio }
+      })
+      .select("id")
+      .single();
+
+    if (orderError || !order) {
+      console.error("[generate-media] ❌ ORDER_INSERT_FAILED", orderError);
+      return new Response(JSON.stringify({ ok: false, error: "ORDER_INSERT_FAILED" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    console.log("[generate-media] ✅ Order created", { orderId: order.id });
+
     // 🔹 Création du job dans la table job_queue
     const payload: Record<string, unknown> = {
       userId,
       brandId,
+      orderId: order.id,
       type: kind,
       count,
       ratio,
@@ -153,6 +177,7 @@ serve(async (req: Request): Promise<Response> => {
       .insert({
         user_id: userId,
         brand_id: brandId,
+        order_id: order.id,
         type: kind === "carousel" ? "render_carousels" : "render_images",
         kind,
         status: "queued",
@@ -171,6 +196,7 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log("[generate-media] ✅ Job created", {
       jobId: job.id,
+      orderId: order.id,
       userId,
       brandId,
       kind,
@@ -183,7 +209,7 @@ serve(async (req: Request): Promise<Response> => {
     console.log("[generate-media] 🔄 Invoking alfie-job-worker...");
     try {
       const { error: workerError } = await supabaseAdmin.functions.invoke("alfie-job-worker", {
-        body: { trigger: "generate-media", jobId: job.id }
+        body: { trigger: "generate-media", jobId: job.id, orderId: order.id }
       });
       
       if (workerError) {
@@ -195,7 +221,7 @@ serve(async (req: Request): Promise<Response> => {
       console.error("[generate-media] ⚠️ Worker invoke error:", workerErr);
     }
 
-    return new Response(JSON.stringify({ ok: true, jobId: job.id }), {
+    return new Response(JSON.stringify({ ok: true, jobId: job.id, orderId: order.id }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

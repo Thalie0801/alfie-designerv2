@@ -297,6 +297,25 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // 🔹 Mettre à jour l'ordre si présent
+        if (job.order_id) {
+          const { error: orderUpdateError } = await supabaseAdmin
+            .from("orders")
+            .update({ status: "completed", updated_at: finishedAt })
+            .eq("id", job.order_id);
+          
+          if (orderUpdateError) {
+            console.warn("[alfie-job-worker] ⚠️ Failed to update order status", {
+              orderId: job.order_id,
+              error: orderUpdateError
+            });
+          } else {
+            console.log("[alfie-job-worker] ✅ Order marked as completed", {
+              orderId: job.order_id
+            });
+          }
+        }
+
         console.log("✅ job_done", { id: job.id, type: job.type });
         results.push({ job_id: job.id, success: true });
 
@@ -326,15 +345,28 @@ Deno.serve(async (req) => {
       } catch (e) {
         console.error("❌ job_failed", { jobId: job.id, error: e });
 
+        const failedAt = new Date().toISOString();
         await supabaseAdmin
           .from("job_queue")
           .update({
             status: "failed",
             error: e instanceof Error ? e.message : String(e),
-            updated_at: new Date().toISOString(),
-            finished_at: new Date().toISOString(),
+            updated_at: failedAt,
+            finished_at: failedAt,
           })
           .eq("id", job.id);
+
+        // 🔹 Mettre à jour l'ordre en "failed" aussi
+        if (job.order_id) {
+          await supabaseAdmin
+            .from("orders")
+            .update({ status: "failed", updated_at: failedAt })
+            .eq("id", job.order_id);
+          
+          console.log("[alfie-job-worker] ❌ Order marked as failed", {
+            orderId: job.order_id
+          });
+        }
 
         const message = e instanceof Error ? e.message : "Unknown error";
         results.push({ job_id: job.id, success: false, retried: false, error: message });
