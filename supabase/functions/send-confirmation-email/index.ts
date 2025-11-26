@@ -1,4 +1,5 @@
 import { corsHeaders } from "../_shared/cors.ts";
+import { SUPABASE_URL } from "../_shared/env.ts";
 const PLAN_NAMES = {
   starter: "Starter",
   pro: "Pro",
@@ -65,7 +66,7 @@ Deno.serve(async (req) => {
 });
 
 function getEmailHtml(planName: string, plan: string): string {
-  const baseUrl = Deno.env.get("SUPABASE_URL")?.replace("supabase.co", "lovable.app") || "";
+  const baseUrl = SUPABASE_URL?.replace("supabase.co", "lovable.app") || "";
   
   return `<!DOCTYPE html>
 <html>

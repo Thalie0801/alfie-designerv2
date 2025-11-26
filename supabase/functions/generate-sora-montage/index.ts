@@ -34,10 +34,15 @@ Deno.serve(async (req) => {
 
     console.log(`Generating ${clipCount}-clip montage for job ${jobId}`);
 
+    // LEGACY WARNING: Migrated from 'jobs' to 'job_queue'
     // Update job status
     await supabase
-      .from('jobs')
-      .update({ status: 'running', progress: 10 })
+      .from('job_queue')
+      .update({ 
+        status: 'running',
+        payload: { progress: 10 },
+        updated_at: new Date().toISOString()
+      })
       .eq('id', jobId);
 
     const clipPromises: Promise<string>[] = [];
@@ -88,13 +93,14 @@ Deno.serve(async (req) => {
 
     // Update progress
     await supabase
-      .from('jobs')
+      .from('job_queue')
       .update({ 
-        progress: 30,
-        output_data: { 
+        result: { 
           clipPredictionIds,
-          clipCount 
-        }
+          clipCount,
+          progress: 30
+        },
+        updated_at: new Date().toISOString()
       })
       .eq('id', jobId);
 
@@ -109,8 +115,11 @@ Deno.serve(async (req) => {
 
       const progress = 30 + Math.floor((clipUrls.length / clipCount) * 50);
       await supabase
-        .from('jobs')
-        .update({ progress })
+        .from('job_queue')
+        .update({ 
+          result: { progress },
+          updated_at: new Date().toISOString()
+        })
         .eq('id', jobId);
 
       for (let i = 0; i < clipPredictionIds.length; i++) {
@@ -159,16 +168,17 @@ Deno.serve(async (req) => {
     const finalVideoUrl = clipUrls[0];
 
     await supabase
-      .from('jobs')
+      .from('job_queue')
       .update({ 
-        status: 'checking',
-        progress: 90,
-        output_data: {
+        status: 'completed',
+        result: {
           clipUrls,
           finalVideoUrl,
           clipCount,
-          montageStatus: 'pending_concatenation'
-        }
+          montageStatus: 'pending_concatenation',
+          progress: 90
+        },
+        updated_at: new Date().toISOString()
       })
       .eq('id', jobId);
 
@@ -193,10 +203,11 @@ Deno.serve(async (req) => {
     const { jobId } = await req.json();
     if (jobId) {
       await supabase
-        .from('jobs')
+        .from('job_queue')
         .update({ 
           status: 'failed',
-          error: error.message
+          error: error.message,
+          updated_at: new Date().toISOString()
         })
         .eq('id', jobId);
     }

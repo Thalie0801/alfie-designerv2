@@ -43,10 +43,15 @@ Deno.serve(async (req) => {
 
     console.log(`Verifying video for job ${jobId}, prediction ${predictionId}`);
 
+    // LEGACY WARNING: Migrated from 'jobs' to 'job_queue'
     // Update job to checking status
     await supabase
-      .from('jobs')
-      .update({ status: 'checking', progress: 90 })
+      .from('job_queue')
+      .update({ 
+        status: 'running',
+        result: { progress: 90 },
+        updated_at: new Date().toISOString()
+      })
       .eq('id', jobId);
 
     // Fetch prediction status from Replicate
@@ -65,10 +70,11 @@ Deno.serve(async (req) => {
 
     if (prediction.status === 'failed') {
       await supabase
-        .from('jobs')
+        .from('job_queue')
         .update({ 
           status: 'failed', 
-          error: prediction.error || 'Video generation failed'
+          error: prediction.error || 'Video generation failed',
+          updated_at: new Date().toISOString()
         })
         .eq('id', jobId);
 
@@ -105,21 +111,21 @@ Deno.serve(async (req) => {
 
     // Update job to ready
     await supabase
-      .from('jobs')
+      .from('job_queue')
       .update({ 
-        status: 'ready',
-        progress: 100,
-        output_data: { 
+        status: 'completed',
+        result: { 
           videoUrl,
-          duration: prediction.metrics?.predict_time || 0
+          duration: prediction.metrics?.predict_time || 0,
+          progress: 100
         },
-        completed_at: new Date().toISOString()
+        updated_at: new Date().toISOString()
       })
       .eq('id', jobId);
 
     // Get job details to create media generation record
     const { data: job } = await supabase
-      .from('jobs')
+      .from('job_queue')
       .select('*')
       .eq('id', jobId)
       .single();
@@ -174,10 +180,11 @@ Deno.serve(async (req) => {
       const { jobId } = await req.json().catch(() => ({ jobId: null }));
       if (jobId) {
         await supabase
-          .from('jobs')
+          .from('job_queue')
           .update({
             status: 'failed',
             error: error.message,
+            updated_at: new Date().toISOString()
           })
           .eq('id', jobId);
       }

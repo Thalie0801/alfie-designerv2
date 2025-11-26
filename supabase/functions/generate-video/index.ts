@@ -495,11 +495,8 @@ Deno.serve(async (req) => {
       const authHeader = req.headers.get("Authorization")?.replace("Bearer ", "").trim();
       if (authHeader && jobId) {
         try {
-          const supabaseUrl = Deno.env.get("SUPABASE_URL");
-          const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-          
-          if (supabaseUrl && supabaseKey) {
-            const supabase = createClient(supabaseUrl, supabaseKey);
+          if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+            const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
             const { data: { user } } = await supabase.auth.getUser(authHeader);
             
             if (user) {
