@@ -1,8 +1,12 @@
 // supabase/functions/generate-media/index.ts
-// Crée un job dans la table "jobs" que le worker traitera.
+// Crée un job dans la table "job_queue" que le worker traitera.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+
+// 🔐 HARDCODED NEW PROJECT CONFIG - BYPASS ALL ENV RESOLUTION
+const FORCE_NEW_PROJECT_URL = "https://onxqgtuiagiuomlstcmt.supabase.co";
+const FORCE_NEW_PROJECT_ID = "onxqgtuiagiuomlstcmt";
 
 // CORS local (plus de dépendance à ../_shared/cors)
 const corsHeaders: Record<string, string> = {
@@ -57,23 +61,27 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    // 🔐 Priorité ALFIE_* (nouveau projet), fallback si besoin
-    const supabaseUrl = Deno.env.get("ALFIE_SUPABASE_URL") ?? 
-                        Deno.env.get("SUPABASE_URL") ?? 
-                        "https://onxqgtuiagiuomlstcmt.supabase.co";
+    // 🚨 FORCE NEW PROJECT - IGNORE ALL ENV VARS
+    console.log("[generate-media] 🚨 DEPLOYMENT DIAGNOSTIC v4");
+    console.log("[generate-media] ENV SNAPSHOT:", {
+      SUPABASE_URL: Deno.env.get("SUPABASE_URL"),
+      VITE_SUPABASE_URL: Deno.env.get("VITE_SUPABASE_URL"),
+      ALFIE_SUPABASE_URL: Deno.env.get("ALFIE_SUPABASE_URL"),
+      SUPABASE_SERVICE_ROLE_KEY_exists: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+      ALFIE_SUPABASE_SERVICE_ROLE_KEY_exists: !!Deno.env.get("ALFIE_SUPABASE_SERVICE_ROLE_KEY"),
+    });
     
+    const supabaseUrl = FORCE_NEW_PROJECT_URL;  // HARDCODED - NO ENV VARS
     const serviceRoleKey = Deno.env.get("ALFIE_SUPABASE_SERVICE_ROLE_KEY") ?? 
                            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    console.log("[generate-media] 🔧 Configuration", {
-      urlSource: Deno.env.get("ALFIE_SUPABASE_URL") ? "ALFIE_SUPABASE_URL" : 
-                 Deno.env.get("SUPABASE_URL") ? "SUPABASE_URL" : "hardcoded_fallback",
+    console.log("[generate-media] 🔧 FORCED Configuration", {
       url: supabaseUrl,
-      projectId: supabaseUrl.includes("onxqgtuiagiuomlstcmt") ? "NEW (onxqgtu...)" : 
-                 supabaseUrl.includes("itsjonazifiiikozengd") ? "OLD (itsjona...)" : "UNKNOWN",
+      urlSource: "HARDCODED_INLINE",
+      projectId: "NEW (onxqgtuiagiuomlstcmt)",
       hasServiceKey: !!serviceRoleKey,
-      keySource: Deno.env.get("ALFIE_SUPABASE_SERVICE_ROLE_KEY") ? "ALFIE_SUPABASE_SERVICE_ROLE_KEY" : "SUPABASE_SERVICE_ROLE_KEY",
-      deployTimestamp: new Date().toISOString()
+      deployTimestamp: new Date().toISOString(),
+      deployId: "force-inline-v4"
     });
 
     if (!supabaseUrl || !serviceRoleKey) {
@@ -89,8 +97,14 @@ serve(async (req: Request): Promise<Response> => {
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    // 🔐 CRITICAL: Verify we're on the NEW project (onxqgtu...)
-    if (!supabaseUrl.includes("onxqgtuiagiuomlstcmt")) {
+    console.log("[generate-media] 📊 Supabase Client Created:", {
+      url: supabaseUrl,
+      hasServiceKey: !!serviceRoleKey,
+      serviceKeyPrefix: serviceRoleKey?.substring(0, 20)
+    });
+
+    // 🔐 CRITICAL: This should NEVER trigger since we're using hardcoded URL
+    if (!supabaseUrl.includes(FORCE_NEW_PROJECT_ID)) {
       console.error("[generate-media] ❌ WRONG PROJECT DETECTED!", {
         currentUrl: supabaseUrl,
         expectedUrl: "https://onxqgtuiagiuomlstcmt.supabase.co"

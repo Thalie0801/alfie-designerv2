@@ -1,7 +1,9 @@
-# Deployment marker to force Edge Function redeployment
-# Last updated: 2025-01-26T00:00:00Z
-# Target project: onxqgtuiagiuomlstcmt.supabase.co
-# This file forces the function to redeploy to the correct Supabase project
+# FORCE REDEPLOYMENT - HARDCODED CONFIG TEST
+# Timestamp: 2025-01-26T02:45:00Z
+# Target: onxqgtuiagiuomlstcmt.supabase.co
+# THIS FILE FORCES REDEPLOYMENT WITH INLINE HARDCODED CONFIG
 
-DEPLOY_TIMESTAMP=2025-01-26T00:00:00Z
+DEPLOY_ID=force-inline-config-test-v3
+TIMESTAMP=2025-01-26T02:45:00Z
 TARGET_PROJECT=onxqgtuiagiuomlstcmt
+CONFIG_METHOD=inline_hardcoded_bypass_all_env
