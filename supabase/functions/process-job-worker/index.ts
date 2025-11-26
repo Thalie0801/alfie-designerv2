@@ -1,9 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 import { corsHeaders } from "../_shared/cors.ts";
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const INTERNAL_FN_SECRET = Deno.env.get("INTERNAL_FN_SECRET");
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, INTERNAL_FN_SECRET } from "../_shared/env.ts";
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !INTERNAL_FN_SECRET) {
   throw new Error("Missing required environment variables for process-job-worker");

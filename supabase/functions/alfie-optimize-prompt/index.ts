@@ -7,6 +7,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { callAIWithFallback, enrichPromptWithBrandKit, type AgentContext } from "../_shared/aiOrchestrator.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
 type GenType = "image" | "carousel" | "video";
 
 interface OptimizationRequest {
@@ -36,9 +37,7 @@ Deno.serve(async (req) => {
     if (!authHeader) {
       return jsonError("Missing authorization", 401);
     }
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
     const token = authHeader.replace("Bearer ", "").trim();
     const {

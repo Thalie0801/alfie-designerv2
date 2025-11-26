@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 import { corsHeaders } from "../_shared/cors.ts";
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
 const CANVA_SCOPES = [
   "design:content:read",
   "design:content:write",
@@ -37,18 +38,14 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const clientId = Deno.env.get("CANVA_CLIENT_ID");
     const redirectUri = Deno.env.get("CANVA_REDIRECT_URI");
-
-    if (!supabaseUrl || !serviceKey) {
-      throw new Error("missing_supabase_config");
-    }
-
+    
     if (!clientId || !redirectUri) {
       throw new Error("missing_canva_config");
     }
+
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
     const authHeader = req.headers.get("Authorization") ?? req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -66,9 +63,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    const supabaseAdmin = supabase;
 
     const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
     if (userError || !userData?.user) {

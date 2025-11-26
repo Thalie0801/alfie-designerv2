@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { userHasAccess } from "../_shared/accessControl.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
 const jsonResponse = (data: unknown, init?: ResponseInit) =>
   new Response(JSON.stringify(data), {
     status: init?.status ?? 200,

@@ -3,10 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-
-// 🔐 HARDCODED NEW PROJECT CONFIG - BYPASS ALL ENV RESOLUTION
-const FORCE_NEW_PROJECT_URL = "https://onxqgtuiagiuomlstcmt.supabase.co";
-const FORCE_NEW_PROJECT_ID = "onxqgtuiagiuomlstcmt";
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
 
 // CORS local (plus de dépendance à ../_shared/cors)
 const corsHeaders: Record<string, string> = {
@@ -61,64 +58,23 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    // 🚨 FORCE NEW PROJECT - IGNORE ALL ENV VARS
-    console.log("[generate-media] 🚨 DEPLOYMENT DIAGNOSTIC v4");
-    console.log("[generate-media] ENV SNAPSHOT:", {
-      SUPABASE_URL: Deno.env.get("SUPABASE_URL"),
-      VITE_SUPABASE_URL: Deno.env.get("VITE_SUPABASE_URL"),
-      ALFIE_SUPABASE_URL: Deno.env.get("ALFIE_SUPABASE_URL"),
-      SUPABASE_SERVICE_ROLE_KEY_exists: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
-      ALFIE_SUPABASE_SERVICE_ROLE_KEY_exists: !!Deno.env.get("ALFIE_SUPABASE_SERVICE_ROLE_KEY"),
-    });
-    
-    const supabaseUrl = FORCE_NEW_PROJECT_URL;  // HARDCODED - NO ENV VARS
-    const serviceRoleKey = Deno.env.get("ALFIE_SUPABASE_SERVICE_ROLE_KEY") ?? 
-                           Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-    console.log("[generate-media] 🔧 FORCED Configuration", {
-      url: supabaseUrl,
-      urlSource: "HARDCODED_INLINE",
-      projectId: "NEW (onxqgtuiagiuomlstcmt)",
-      hasServiceKey: !!serviceRoleKey,
-      deployTimestamp: new Date().toISOString(),
-      deployId: "force-inline-v4"
+    console.log("[generate-media] Starting job creation", {
+      timestamp: new Date().toISOString(),
+      hasURL: !!SUPABASE_URL,
+      hasServiceKey: !!SUPABASE_SERVICE_ROLE_KEY
     });
 
-    if (!supabaseUrl || !serviceRoleKey) {
-      console.error("[generate-media] ❌ Supabase env missing", {
-        hasUrl: !!supabaseUrl,
-        hasServiceKey: !!serviceRoleKey,
-      });
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("[generate-media] ❌ Supabase env missing");
       return new Response(JSON.stringify({ ok: false, error: "SUPABASE_ENV_MISSING" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    console.log("[generate-media] 📊 Supabase Client Created:", {
-      url: supabaseUrl,
-      hasServiceKey: !!serviceRoleKey,
-      serviceKeyPrefix: serviceRoleKey?.substring(0, 20)
-    });
-
-    // 🔐 CRITICAL: This should NEVER trigger since we're using hardcoded URL
-    if (!supabaseUrl.includes(FORCE_NEW_PROJECT_ID)) {
-      console.error("[generate-media] ❌ WRONG PROJECT DETECTED!", {
-        currentUrl: supabaseUrl,
-        expectedUrl: "https://onxqgtuiagiuomlstcmt.supabase.co"
-      });
-      return new Response(JSON.stringify({ 
-        ok: false, 
-        error: "WRONG_SUPABASE_PROJECT",
-        message: "Edge Function deployed to incorrect Supabase project",
-        details: "This function must be deployed to the NEW project (onxqgtu...)"
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    console.log("[generate-media] 📊 Supabase Client Created");
 
     // 🔍 Verify connection and schema
     console.log("[generate-media] 🔍 Testing database connection and schema...");
