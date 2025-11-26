@@ -1,6 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 import { corsHeaders } from "../_shared/cors.ts";
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, INTERNAL_FN_SECRET } from "../_shared/env.ts";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -12,7 +14,7 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("authorization");
     const internalSecret = req.headers.get("x-internal-secret");
     
-    if (!authHeader && internalSecret !== Deno.env.get("INTERNAL_FN_SECRET")) {
+    if (!authHeader && internalSecret !== INTERNAL_FN_SECRET) {
       return new Response(
         JSON.stringify({ error: "Unauthorized: Admin access required" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -20,8 +22,8 @@ Deno.serve(async (req) => {
     }
 
     const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      SUPABASE_URL!,
+      SUPABASE_SERVICE_ROLE_KEY!,
       {
         auth: {
           autoRefreshToken: false,

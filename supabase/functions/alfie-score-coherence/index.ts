@@ -1,4 +1,6 @@
 import { corsHeaders } from "../_shared/cors.ts";
+import { LOVABLE_API_KEY } from "../_shared/env.ts";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -9,9 +11,6 @@ Deno.serve(async (req) => {
 
     console.log("[Alfie Score Coherence] Starting analysis", { render_url, has_brand_spec: !!brand_spec });
 
-    // Phase 2: AI analysis with Lovable AI (Gemini 2.5 Flash)
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY not configured");
     }

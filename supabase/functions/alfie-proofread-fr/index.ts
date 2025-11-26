@@ -1,6 +1,5 @@
 import { edgeHandler } from '../_shared/edgeHandler.ts';
-
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+import { LOVABLE_API_KEY } from '../_shared/env.ts';
 
 export default {
   fetch: (req: Request) => edgeHandler(req, async ({ input }) => {
