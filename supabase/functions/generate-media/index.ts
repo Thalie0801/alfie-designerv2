@@ -57,9 +57,21 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    // 🔐 Récup des env Supabase directement (sans _shared/env)
-    const supabaseUrl = Deno.env.get("ALFIE_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
-    const serviceRoleKey = Deno.env.get("ALFIE_SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    // 🔐 Priorité ALFIE_* (nouveau projet), fallback si besoin
+    const supabaseUrl = Deno.env.get("ALFIE_SUPABASE_URL") ?? 
+                        Deno.env.get("SUPABASE_URL") ?? 
+                        "https://onxqgtuiagiuomlstcmt.supabase.co";
+    
+    const serviceRoleKey = Deno.env.get("ALFIE_SUPABASE_SERVICE_ROLE_KEY") ?? 
+                           Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    console.log("[generate-media] 🔧 Configuration", {
+      urlSource: Deno.env.get("ALFIE_SUPABASE_URL") ? "ALFIE_SUPABASE_URL" : 
+                 Deno.env.get("SUPABASE_URL") ? "SUPABASE_URL" : "hardcoded_fallback",
+      url: supabaseUrl,
+      hasServiceKey: !!serviceRoleKey,
+      keySource: Deno.env.get("ALFIE_SUPABASE_SERVICE_ROLE_KEY") ? "ALFIE_SUPABASE_SERVICE_ROLE_KEY" : "SUPABASE_SERVICE_ROLE_KEY"
+    });
 
     if (!supabaseUrl || !serviceRoleKey) {
       console.error("[generate-media] ❌ Supabase env missing", {
@@ -117,12 +129,13 @@ serve(async (req: Request): Promise<Response> => {
       console.warn("[generate-media] Empty prompt", { userId, brandId });
     }
 
-    console.log("[generate-media] Normalized intent", {
+    console.log("[generate-media] 📊 Normalized intent", {
       userId,
       brandId,
       kind,
       count,
       ratio,
+      prompt: prompt.substring(0, 50) + '...'
     });
 
     // 🔹 Création du job dans la table job_queue
@@ -162,7 +175,25 @@ serve(async (req: Request): Promise<Response> => {
       brandId,
       kind,
       count,
+      jobType: kind === "carousel" ? "render_carousels" : "render_images",
+      targetTable: "job_queue"
     });
+
+    // 🚀 Déclencher le worker immédiatement
+    console.log("[generate-media] 🔄 Invoking alfie-job-worker...");
+    try {
+      const { error: workerError } = await supabaseAdmin.functions.invoke("alfie-job-worker", {
+        body: { trigger: "generate-media", jobId: job.id }
+      });
+      
+      if (workerError) {
+        console.error("[generate-media] ⚠️ Worker invoke failed:", workerError);
+      } else {
+        console.log("[generate-media] ✅ Worker invoked successfully");
+      }
+    } catch (workerErr) {
+      console.error("[generate-media] ⚠️ Worker invoke error:", workerErr);
+    }
 
     return new Response(JSON.stringify({ ok: true, jobId: job.id }), {
       status: 200,
