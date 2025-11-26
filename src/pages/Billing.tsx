@@ -107,6 +107,30 @@ export default function Billing() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Récupérer le plan sélectionné depuis la landing page
+  useEffect(() => {
+    const selectedPlanData = localStorage.getItem('selected_plan');
+    if (selectedPlanData && user) {
+      try {
+        const { plan, billing_period } = JSON.parse(selectedPlanData);
+        console.log('[Billing] Plan pré-sélectionné détecté:', plan, billing_period);
+        
+        // Déclencher automatiquement le checkout
+        const planToCheckout = plans.find(p => p.key === plan);
+        if (planToCheckout && !planToCheckout.isEnterprise) {
+          toast.info(`Traitement de votre abonnement ${planToCheckout.name}...`);
+          createCheckout(plan as 'starter' | 'pro' | 'studio' | 'enterprise');
+        }
+        
+        // Nettoyer le localStorage après traitement
+        localStorage.removeItem('selected_plan');
+      } catch (error) {
+        console.error('[Billing] Erreur lors du traitement du plan pré-sélectionné:', error);
+        localStorage.removeItem('selected_plan');
+      }
+    }
+  }, [user, createCheckout]);
+
   const handleSelectPlan = async (plan: typeof plans[0]) => {
     if (plan.isEnterprise) {
       window.location.href = '/contact';
