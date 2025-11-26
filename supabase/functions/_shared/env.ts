@@ -26,20 +26,20 @@ export function env(...keys: string[]): string | undefined {
 // puis aux anciens noms si jamais ils existent encore,
 // puis fallback sur l'URL du projet Supabase officiel itsjonazifiiikozengd.
 export const SUPABASE_URL =
-  env('ALFIE_SUPABASE_URL', 'SUPABASE_URL', 'VITE_SUPABASE_URL') ||
+  env('SUPABASE_URL', 'VITE_SUPABASE_URL', 'ALFIE_SUPABASE_URL') ||
   'https://itsjonazifiiikozengd.supabase.co';
 
 export const SUPABASE_ANON_KEY = env(
-  'ALFIE_SUPABASE_ANON_KEY',
   'SUPABASE_ANON_KEY',
-  'VITE_SUPABASE_ANON_KEY'
+  'VITE_SUPABASE_ANON_KEY',
+  'ALFIE_SUPABASE_ANON_KEY'
 );
 
 // ✅ Private secrets (service role, pas de VITE_ pour éviter les fuites)
 export const SUPABASE_SERVICE_ROLE_KEY = env(
-  'ALFIE_SUPABASE_SERVICE_ROLE_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
-  'SERVICE_ROLE_KEY'
+  'SERVICE_ROLE_KEY',
+  'ALFIE_SUPABASE_SERVICE_ROLE_KEY'
 );
 
 export const INTERNAL_FN_SECRET = env('INTERNAL_FN_SECRET', 'INTERNAL_SECRET');
