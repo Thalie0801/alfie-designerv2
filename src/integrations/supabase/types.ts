@@ -1527,6 +1527,13 @@ export type Database = {
             referencedRelation: "v_brand_quota_current"
             referencedColumns: ["brand_id"]
           },
+          {
+            foreignKeyName: "orders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       payment_sessions: {
