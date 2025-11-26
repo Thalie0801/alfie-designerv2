@@ -69,8 +69,11 @@ serve(async (req: Request): Promise<Response> => {
       urlSource: Deno.env.get("ALFIE_SUPABASE_URL") ? "ALFIE_SUPABASE_URL" : 
                  Deno.env.get("SUPABASE_URL") ? "SUPABASE_URL" : "hardcoded_fallback",
       url: supabaseUrl,
+      projectId: supabaseUrl.includes("onxqgtuiagiuomlstcmt") ? "NEW (onxqgtu...)" : 
+                 supabaseUrl.includes("itsjonazifiiikozengd") ? "OLD (itsjona...)" : "UNKNOWN",
       hasServiceKey: !!serviceRoleKey,
-      keySource: Deno.env.get("ALFIE_SUPABASE_SERVICE_ROLE_KEY") ? "ALFIE_SUPABASE_SERVICE_ROLE_KEY" : "SUPABASE_SERVICE_ROLE_KEY"
+      keySource: Deno.env.get("ALFIE_SUPABASE_SERVICE_ROLE_KEY") ? "ALFIE_SUPABASE_SERVICE_ROLE_KEY" : "SUPABASE_SERVICE_ROLE_KEY",
+      deployTimestamp: new Date().toISOString()
     });
 
     if (!supabaseUrl || !serviceRoleKey) {
@@ -87,22 +90,32 @@ serve(async (req: Request): Promise<Response> => {
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
     // 🔍 Verify connection and schema
-    console.log("[generate-media] 🔍 Testing database connection...");
-    const { data: testData, error: testError } = await supabaseAdmin
+    console.log("[generate-media] 🔍 Testing database connection and schema...");
+    const { data: schemaTest, error: testError } = await supabaseAdmin
       .from("job_queue")
-      .select("id")
+      .select("id,payload,status,type")
       .limit(1);
     
     if (testError) {
-      console.error("[generate-media] ❌ Database connection test failed:", {
+      console.error("[generate-media] ❌ Schema test failed:", {
         error: testError,
         message: testError.message,
         code: testError.code,
         details: testError.details,
-        hint: testError.hint
+        hint: testError.hint,
+        table: "job_queue"
+      });
+      return new Response(JSON.stringify({ 
+        ok: false, 
+        error: "SCHEMA_TEST_FAILED",
+        message: testError.message,
+        code: testError.code
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     } else {
-      console.log("[generate-media] ✅ Database connection OK, job_queue accessible");
+      console.log("[generate-media] ✅ Schema validated - job_queue has required columns (id, payload, status, type)");
     }
 
     const rawBody = (await req.json()) as GenerateMediaPayload;
