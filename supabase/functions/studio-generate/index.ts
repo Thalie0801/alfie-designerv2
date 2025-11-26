@@ -41,6 +41,8 @@ function jsonResponse(
 }
 
 Deno.serve(async (req) => {
+  console.log("[studio-generate] 🎯 BOOT PROJECT =", SUPABASE_URL?.includes("itsjon") ? "itsjonazifiiikozengd ✅" : SUPABASE_URL);
+  
   // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });

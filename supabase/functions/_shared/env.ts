@@ -3,6 +3,9 @@
  *
  * Resolves environment variables with fallback support for Lovable's VITE_ prefix.
  * This allows Edge Functions to work seamlessly whether vars are prefixed or not.
+ * 
+ * 🎯 Projet Supabase de référence pour Alfie Designer (Lovable Cloud) : itsjonazifiiikozengd
+ * Ce projet est le seul backend officiel pour cette application.
  */
 
 /**
@@ -21,10 +24,10 @@ export function env(...keys: string[]): string | undefined {
 // ✅ Public variables (RLS client)
 // Priorité aux secrets ALFIE_* (non gérés par Lovable),
 // puis aux anciens noms si jamais ils existent encore,
-// puis fallback sur l'URL publique du NOUVEAU projet Supabase.
+// puis fallback sur l'URL du projet Supabase officiel itsjonazifiiikozengd.
 export const SUPABASE_URL =
   env('ALFIE_SUPABASE_URL', 'SUPABASE_URL', 'VITE_SUPABASE_URL') ||
-  'https://onxqgtuiagiuomlstcmt.supabase.co';
+  'https://itsjonazifiiikozengd.supabase.co';
 
 export const SUPABASE_ANON_KEY = env(
   'ALFIE_SUPABASE_ANON_KEY',

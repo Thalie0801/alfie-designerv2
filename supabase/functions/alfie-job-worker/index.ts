@@ -18,13 +18,14 @@ type JobRow = {
 };
 
 const supabaseAdmin = createClient(
-  SUPABASE_URL ?? "https://onxqgtuiagiuomlstcmt.supabase.co",
+  SUPABASE_URL ?? "https://itsjonazifiiikozengd.supabase.co",
   SUPABASE_SERVICE_ROLE_KEY ?? "",
   { auth: { autoRefreshToken: false, persistSession: false } },
 );
 
+console.log("[alfie-job-worker] 🎯 BOOT PROJECT =", SUPABASE_URL?.includes("itsjon") ? "itsjonazifiiikozengd ✅" : SUPABASE_URL);
 console.log("[alfie-job-worker] 🔧 Supabase client initialized", {
-  url: SUPABASE_URL ?? "https://onxqgtuiagiuomlstcmt.supabase.co",
+  url: SUPABASE_URL ?? "https://itsjonazifiiikozengd.supabase.co",
   hasKey: !!SUPABASE_SERVICE_ROLE_KEY
 });
 
