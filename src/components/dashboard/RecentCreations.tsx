@@ -81,28 +81,29 @@ export function RecentCreations() {
 
     load();
 
-    // Realtime: écoute des nouvelles générations du user
-    const channel = supabase
-      .channel(`media_generations_user_${user.id}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "media_generations", filter: `user_id=eq.${user.id}` },
-        (payload) => {
-          const row = payload.new as any as Creation;
-          // injecte en tête et garde 6 éléments max
-          setCreations((prev) => {
-            const curr = prev ?? [];
-            // évite doublons
-            if (curr.some((c) => c.id === row.id)) return curr;
-            return [row, ...curr].slice(0, 6);
-          });
-        },
-      )
-      .subscribe();
+    // TEMPORARILY DISABLED: Realtime subscription on media_generations causes DB overload
+    // Users will still see updates via manual refresh or navigation
+    // const channel = supabase
+    //   .channel(`media_generations_user_${user.id}`)
+    //   .on(
+    //     "postgres_changes",
+    //     { event: "INSERT", schema: "public", table: "media_generations", filter: `user_id=eq.${user.id}` },
+    //     (payload) => {
+    //       const row = payload.new as any as Creation;
+    //       // injecte en tête et garde 6 éléments max
+    //       setCreations((prev) => {
+    //         const curr = prev ?? [];
+    //         // évite doublons
+    //         if (curr.some((c) => c.id === row.id)) return curr;
+    //         return [row, ...curr].slice(0, 6);
+    //       });
+    //     },
+    //   )
+    //   .subscribe();
 
     return () => {
       cancelled = true;
-      supabase.removeChannel(channel);
+      // supabase.removeChannel(channel);
     };
   }, [user?.id]);
 
