@@ -165,7 +165,7 @@ serve(async (req: Request): Promise<Response> => {
         user_id: userId,
         brand_id: brandId,
         campaign_name: prompt.substring(0, 100),
-        status: "processing",
+        status: "queued",
         brief_json: { prompt, kind, count, ratio }
       })
       .select("id")
