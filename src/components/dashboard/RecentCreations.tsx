@@ -14,7 +14,7 @@ type CreationType = "image" | "video";
 interface Creation {
   id: string;
   type: CreationType;
-  output_url: string;
+  output_url?: string; // Optional, we use thumbnail_url instead
   thumbnail_url: string | null;
   created_at: string | null;
   prompt: string | null;
@@ -62,7 +62,7 @@ export function RecentCreations() {
       try {
         const { data, error } = await supabase
           .from("media_generations")
-          .select("id, type, output_url, thumbnail_url, created_at, prompt")
+          .select("id, type, thumbnail_url, created_at, prompt")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
           .limit(6);
@@ -181,7 +181,7 @@ export function RecentCreations() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {creations!.map((c) => {
               const isVideo = c.type === "video";
-              const thumb = c.thumbnail_url || c.output_url;
+              const thumb = c.thumbnail_url || "";
               const alt = c.prompt?.trim()
                 ? `Création ${c.type} — ${c.prompt.slice(0, 80)}${c.prompt.length > 80 ? "…" : ""}`
                 : `Création ${c.type}`;
