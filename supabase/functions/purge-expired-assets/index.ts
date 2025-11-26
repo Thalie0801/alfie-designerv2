@@ -17,10 +17,10 @@ Deno.serve(async (req) => {
     console.log("[PURGE] Starting expired assets cleanup...");
     const now = new Date().toISOString();
 
-    // 1. Récupérer tous les assets expirés
+    // 1. Récupérer tous les assets expirés (WITHOUT output_url to avoid loading heavy base64 data)
     const { data: expiredAssets, error: fetchError } = await supabaseClient
       .from("media_generations")
-      .select("id, type, output_url, brand_id, expires_at, user_id")
+      .select("id, type, brand_id, expires_at, user_id")
       .lt("expires_at", now)
       .eq("status", "completed");
 

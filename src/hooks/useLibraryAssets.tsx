@@ -189,7 +189,7 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
         .eq('user_id', userId)
         .eq('type', assetType)
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(20); // REDUCED from 100 to prevent DB timeouts
 
       if (error) {
         console.error('[LibraryAssets] Query error:', error);

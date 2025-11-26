@@ -516,14 +516,14 @@ export function ChatGenerator() {
         .select("*")
         .eq("user_id", currentUser.id)
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(20); // REDUCED from 50 to prevent DB timeouts
 
       let assetsQuery = supabase
         .from("media_generations")
         .select("id, type, status, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes")
         .eq("user_id", currentUser.id)
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(20); // REDUCED from 50 to prevent DB timeouts
 
       if (orderId) {
         jobsQuery = jobsQuery.eq("order_id", orderId);
@@ -597,13 +597,14 @@ export function ChatGenerator() {
             if (mounted) void refetchAll();
           },
         )
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "media_generations", filter: `user_id=eq.${currentUser.id}` },
-          () => {
-            if (mounted) void refetchAll();
-          },
-        )
+        // TEMPORARILY DISABLED: media_generations realtime subscription causes DB overload
+        // .on(
+        //   "postgres_changes",
+        //   { event: "*", schema: "public", table: "media_generations", filter: `user_id=eq.${currentUser.id}` },
+        //   () => {
+        //     if (mounted) void refetchAll();
+        //   },
+        // )
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "library_assets", filter: `user_id=eq.${currentUser.id}` },
@@ -629,7 +630,7 @@ export function ChatGenerator() {
       console.info("[Studio] enabling polling fallback for orders/assets");
       pollingRef.current = setInterval(() => {
         void refetchAll();
-      }, 6000);
+      }, 15000); // INCREASED from 6s to 15s to reduce DB load
     }
 
     if (!shouldPoll && pollingRef.current) {

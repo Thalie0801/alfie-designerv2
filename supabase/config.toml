@@ -181,3 +181,6 @@ verify_jwt = true
 
 [functions.generate-media]
 verify_jwt = false
+
+[functions.admin-cleanup-media]
+verify_jwt = false

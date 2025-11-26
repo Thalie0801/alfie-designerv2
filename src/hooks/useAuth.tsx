@@ -126,11 +126,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // Safety timeout: force loading to false after 10 seconds
+    // Safety timeout: force loading to false after 5 seconds (REDUCED from 10s)
     const safetyTimeout = setTimeout(() => {
       console.warn('[Auth] Session verification timeout - forcing loading to false');
       setLoading(false);
-    }, 10000);
+    }, 5000);
 
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
