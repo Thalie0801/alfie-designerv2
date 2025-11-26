@@ -126,9 +126,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // Safety timeout: force loading to false after 10 seconds
+    const safetyTimeout = setTimeout(() => {
+      console.warn('[Auth] Session verification timeout - forcing loading to false');
+      setLoading(false);
+    }, 10000);
+
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, currentSession) => {
+        clearTimeout(safetyTimeout);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
@@ -145,22 +152,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // Then check for existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      
-      if (currentSession?.user) {
-        setTimeout(() => {
-          refreshProfile().then(() => setLoading(false));
-        }, 0);
-      } else {
+    // Then check for existing session with timeout
+    supabase.auth.getSession()
+      .then(({ data: { session: currentSession } }) => {
+        clearTimeout(safetyTimeout);
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        
+        if (currentSession?.user) {
+          setTimeout(() => {
+            refreshProfile().then(() => setLoading(false));
+          }, 0);
+        } else {
+          setLoading(false);
+          setSubscription(null);
+        }
+      })
+      .catch((error) => {
+        console.error('[Auth] Failed to get session:', error);
+        clearTimeout(safetyTimeout);
         setLoading(false);
-        setSubscription(null);
-      }
-    });
+        setSession(null);
+        setUser(null);
+      });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(safetyTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
