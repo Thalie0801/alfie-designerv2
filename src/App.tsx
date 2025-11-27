@@ -31,7 +31,6 @@ import CloudinaryTest from "./pages/CloudinaryTest";
 import Creator from "./pages/Creator";
 
 import ActivateAccess from "./pages/onboarding/Activate";
-import { AlfieChat } from "./components/AlfieChat";
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 import { ChatGenerator } from "@/features/studio";
 import ChatWidget from "./components/chat/ChatWidget";
@@ -57,17 +56,6 @@ const AppRoutes = () => {
             <ProtectedRoute>
               <AppLayoutWithSidebar>
                 <BrandKitQuestionnaire />
-              </AppLayoutWithSidebar>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/chat"
-          element={
-            <ProtectedRoute>
-              <AppLayoutWithSidebar>
-                <AlfieChat />
               </AppLayoutWithSidebar>
             </ProtectedRoute>
           }
