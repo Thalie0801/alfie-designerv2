@@ -140,12 +140,12 @@ export default function Auth() {
 
     (async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('verify-payment', {
+        const { data, error } = await supabase.functions.invoke('verify-session', {
           body: { session_id: sessionId },
         });
 
-        if (error || !data?.success) {
-          throw error || new Error(data?.message || 'Erreur pendant la vérification du paiement');
+        if (error || !data?.ok) {
+          throw error || new Error(data?.error || 'Erreur pendant la vérification du paiement');
         }
 
         if (!isMountedRef.current) {
@@ -153,7 +153,7 @@ export default function Auth() {
         }
 
         setCanSignUp(true);
-        toast.success(`✅ Abonnement ${data?.plan || ''} activé !`);
+        toast.success('✅ Paiement validé ! Ton compte est prêt.');
         stripPaymentParams();
 
         setTimeout(() => {

@@ -17,7 +17,6 @@ export function useStripeCheckout() {
     try {
       const affiliateRef = getAffiliateRef();
 
-      // Récupérer l'email de l'utilisateur authentifié ou utiliser l'email guest
       const { data: { user } } = await supabase.auth.getUser();
       const email = user?.email || guestEmail;
 
@@ -46,7 +45,6 @@ export function useStripeCheckout() {
       }
 
       if (data?.url) {
-        // Open checkout in new tab if the browser environment exists
         if (typeof window !== 'undefined') {
           window.open(data.url, '_blank');
         }
