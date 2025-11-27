@@ -40,6 +40,71 @@ export function useBrandKit() {
     }
   }, [user]);
 
+  // Auto-création d'une marque par défaut si aucune n'existe
+  useEffect(() => {
+    const createDefaultBrand = async () => {
+      if (!user || loading || brands.length > 0) return;
+
+      try {
+        console.log('[useBrandKit] No brand found, creating default brand...');
+        
+        // Récupérer le plan de l'utilisateur
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('plan')
+          .eq('id', user.id)
+          .single();
+
+        const plan = profileData?.plan || 'starter';
+
+        // Créer la marque par défaut
+        const { data: newBrand, error: brandError } = await supabase
+          .from('brands')
+          .insert({
+            user_id: user.id,
+            name: 'Ma première marque',
+            plan: plan,
+            is_default: true,
+            palette: ['#FF6B9D', '#C44569', '#8B4789'],
+          })
+          .select()
+          .single();
+
+        if (brandError) throw brandError;
+
+        // Définir comme marque active
+        await supabase
+          .from('profiles')
+          .update({ active_brand_id: newBrand.id })
+          .eq('id', user.id);
+
+        // Initialiser counters_monthly
+        const now = new Date();
+        const period = parseInt(
+          now.getFullYear().toString() + 
+          (now.getMonth() + 1).toString().padStart(2, '0')
+        );
+
+        await supabase.rpc('increment_monthly_counters', {
+          p_brand_id: newBrand.id,
+          p_period_yyyymm: period,
+          p_images: 0,
+          p_reels: 0,
+          p_woofs: 0,
+        });
+
+        console.log('[useBrandKit] Default brand created successfully:', newBrand.id);
+        
+        // Recharger les marques
+        await loadBrands();
+      } catch (error) {
+        console.error('[useBrandKit] Error creating default brand:', error);
+      }
+    };
+
+    createDefaultBrand();
+  }, [user, loading, brands.length]);
+
   const loadBrands = async () => {
     if (!user) return;
     
