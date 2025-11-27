@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { enrichPromptWithBrandKit } from "../_shared/aiOrchestrator.ts";
 import { uploadWithRichMetadata, type RichMetadata } from "../_shared/cloudinaryUploader.ts";
 import { getUserRoles, isAdminUser } from "../_shared/auth.ts";
+import { WOOF_COSTS } from "../_shared/woofsCosts.ts";
 import {
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
@@ -100,57 +101,42 @@ export default {
         isAdminFlag: isAdminHint,
       });
 
-      // 1. Vérifier quota (skip for internal calls or admin)
-      if (!isInternalCall && supabaseAuth && !isAdmin) {
+      // 1. Vérifier et consommer les Woofs (skip for internal calls or admin)
+      if (!isInternalCall && brand_id && !isAdmin) {
         try {
-          const { data: checkData, error: checkError } = await supabaseAuth.functions.invoke("alfie-check-quota", {
-            body: { cost_woofs, brand_id },
-          });
+          const { data: woofsData, error: woofsError } = await supabaseAdmin.functions.invoke(
+            "woofs-check-consume",
+            {
+              body: {
+                brand_id,
+                cost_woofs: WOOF_COSTS.image,
+                reason: "image",
+                metadata: { prompt: prompt?.substring(0, 100) },
+              },
+            }
+          );
 
-          if (checkError) {
-            // ⚠️ On log mais on ne bloque pas la génération si la fonction de quota bug
-            console.error("[alfie-render-image] Quota check failed with error:", checkError);
+          if (woofsError || !woofsData?.ok) {
+            const errorCode = woofsData?.error?.code || "QUOTA_ERROR";
+            if (errorCode === "INSUFFICIENT_WOOFS") {
+              console.error("[alfie-render-image] Insufficient Woofs:", woofsData?.error);
+              throw new Error("INSUFFICIENT_WOOFS");
+            }
+            console.error("[alfie-render-image] Woofs consumption failed:", woofsError);
+            throw new Error("WOOFS_CONSUMPTION_FAILED");
           }
 
-          if (checkData?.data?.is_admin || checkData?.is_admin) {
-            isAdmin = true;
-          }
-
-          const quotaOk = checkError
-            ? true
-            : checkData?.data?.ok ?? checkData?.ok ?? true;
-
-          if (!isAdmin && quotaOk === false) {
-            console.error("[alfie-render-image] Quota check indicates insufficient quota:", checkData);
-            throw new Error("INSUFFICIENT_QUOTA");
-          }
-        } catch (quotaError) {
-          // ⚠️ Safety net : en cas d’exception, on n’empêche pas la génération
-          console.error("[alfie-render-image] Exception while calling alfie-check-quota:", quotaError);
-          // Si tu veux être ultra stricte pour les non-admins, tu peux remettre :
-          // throw new Error('INSUFFICIENT_QUOTA');
+          console.log("[alfie-render-image] ✅ Consumed 1 Woof, remaining:", woofsData.data.remaining_woofs);
+        } catch (woofsCheckError) {
+          console.error("[alfie-render-image] Exception during woofs-check-consume:", woofsCheckError);
+          throw woofsCheckError;
         }
       } else {
-        console.log("[alfie-render-image] ⏭️ Skipping quota check (internal call or admin user)", {
+        console.log("[alfie-render-image] ⏭️ Skipping Woofs check", {
           isInternalCall,
-          userId,
-          isAdminUser: isAdmin,
+          hasBrand: !!brand_id,
+          isAdmin,
         });
-      }
-
-      // 2. Débiter (via RPC)
-      if (!isAdmin) {
-        const { error: consumeError } = await supabaseAdmin.rpc("consume_woofs", {
-          user_id_param: userId,
-          woofs_amount: cost_woofs,
-        });
-
-        if (consumeError) {
-          console.error("Failed to consume woofs:", consumeError);
-          throw new Error("DEBIT_FAILED");
-        }
-      } else {
-        console.log(`[quota] admin bypass applied for ${userEmail ?? "unknown-email"}`);
       }
 
       try {
@@ -407,28 +393,7 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
           });
         }
 
-        // ✅ NOUVEAU : Incrémenter le compteur visuals si brand_id présent
-        if (brand_id) {
-          const now = new Date();
-          const periodYYYYMM = parseInt(
-            now.getFullYear().toString() + (now.getMonth() + 1).toString().padStart(2, "0"),
-          );
-
-          const { error: counterError } = await supabaseAdmin.rpc("increment_monthly_counters", {
-            p_brand_id: brand_id,
-            p_period_yyyymm: periodYYYYMM,
-            p_images: 1,
-            p_reels: 0,
-            p_woofs: 0,
-          });
-
-          if (counterError) {
-            console.error("[Render] Failed to increment visuals counter:", counterError);
-            // Ne pas bloquer la réponse
-          } else {
-            console.log("[Render] Incremented visuals counter for brand", brand_id);
-          }
-        }
+        // Note: counters_monthly déjà incrémenté par woofs-check-consume
 
         return {
           image_urls: [finalImageUrl],
@@ -436,16 +401,28 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
           meta: { provider: provider || "gemini_image", format, cost: cost_woofs },
         };
       } catch (genError: any) {
-        // 5. REMBOURSEMENT en cas d'échec
-        console.error("[Render] Generation failed, refunding woofs:", genError);
+        // 5. REMBOURSEMENT en cas d'échec (via décrémentation counters_monthly)
+        console.error("[Render] Generation failed, refunding Woofs:", genError);
 
-        const { error: refundError } = await supabaseAdmin.rpc("refund_woofs", {
-          user_id_param: userId,
-          woofs_amount: cost_woofs,
-        });
+        if (brand_id && !isAdmin) {
+          const now = new Date();
+          const periodYYYYMM = parseInt(
+            now.getFullYear().toString() + (now.getMonth() + 1).toString().padStart(2, "0")
+          );
 
-        if (refundError) {
-          console.error("Failed to refund woofs:", refundError);
+          const { error: refundError } = await supabaseAdmin.rpc("decrement_monthly_counters", {
+            p_brand_id: brand_id,
+            p_period_yyyymm: periodYYYYMM,
+            p_images: 0,
+            p_reels: 0,
+            p_woofs: WOOF_COSTS.image,
+          });
+
+          if (refundError) {
+            console.error("[Render] Failed to refund Woofs:", refundError);
+          } else {
+            console.log("[Render] ✅ Refunded 1 Woof");
+          }
         }
 
         throw genError;
