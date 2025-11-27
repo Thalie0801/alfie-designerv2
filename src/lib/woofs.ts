@@ -35,21 +35,23 @@ export function getPlanWoofs(plan: PlanType): number {
 /**
  * Calcule le coût total en Woofs pour un pack d'assets
  * @param pack Le pack Alfie contenant les assets
- * @param selectedAssetIds Les IDs des assets sélectionnés
+ * @param selectedAssetIds Les IDs des assets sélectionnés (optionnel, tous si vide)
  * @returns Le coût total en Woofs
  */
 export function calculatePackWoofCost(
   pack: { assets: Array<{ id: string; woofCostType: WoofCostType; count?: number }> },
-  selectedAssetIds: string[]
+  selectedAssetIds?: string[]
 ): number {
-  return pack.assets
-    .filter((asset) => selectedAssetIds.includes(asset.id))
-    .reduce((total, asset) => {
-      const baseCost = getWoofCost(asset.woofCostType);
-      // Pour les carrousels, multiplier par le nombre de slides
-      const multiplier = asset.woofCostType === "carousel_slide" ? (asset.count || 1) : 1;
-      return total + baseCost * multiplier;
-    }, 0);
+  const assetsToCount = selectedAssetIds 
+    ? pack.assets.filter((asset) => selectedAssetIds.includes(asset.id))
+    : pack.assets;
+
+  return assetsToCount.reduce((total, asset) => {
+    const baseCost = getWoofCost(asset.woofCostType);
+    // Pour les carrousels, multiplier par le nombre de slides
+    const multiplier = asset.woofCostType === "carousel_slide" ? (asset.count || 1) : 1;
+    return total + baseCost * multiplier;
+  }, 0);
 }
 
 // Legacy function for video duration-based woofs (kept for compatibility)
