@@ -75,9 +75,8 @@ export function AddPaidBrandDialog({ disabled }: { disabled?: boolean }) {
           <div className="p-3 rounded-lg bg-muted text-sm space-y-1">
             <p className="font-medium">Quotas Starter inclus :</p>
             <ul className="list-disc list-inside text-muted-foreground space-y-1">
-              <li>{SYSTEM_CONFIG.QUOTAS.starter.images} visuels/mois</li>
-              <li>{SYSTEM_CONFIG.QUOTAS.starter.videos} vidéos/mois</li>
               <li>{SYSTEM_CONFIG.QUOTAS.starter.woofs} Woofs/mois</li>
+              <li className="text-xs text-muted-foreground">Créez images, carrousels et vidéos avec vos Woofs</li>
             </ul>
           </div>
         </div>

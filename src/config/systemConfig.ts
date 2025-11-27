@@ -61,23 +61,11 @@ export const SYSTEM_CONFIG = {
     pro_to_studio: 100,     // 199 - 99
   },
   
-  // Quotas par tier
+  // Quotas par tier (système Woofs unifié)
   QUOTAS: {
-    starter: {
-      images: 150,
-      videos: 15,
-      woofs: 15,
-    },
-    pro: {
-      images: 450,
-      videos: 45,
-      woofs: 45,
-    },
-    studio: {
-      images: 1000,
-      videos: 100,
-      woofs: 100,
-    },
+    starter: { woofs: 150 },
+    pro: { woofs: 450 },
+    studio: { woofs: 1000 },
   },
 } as const;
 

@@ -10,7 +10,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUpCircle, Check, Zap } from 'lucide-react';
+import { ArrowUpCircle, Zap } from 'lucide-react';
 import { BrandTier, useBrandManagement } from '@/hooks/useBrandManagement';
 import { SYSTEM_CONFIG } from '@/config/systemConfig';
 import { useStripeCheckout } from '@/hooks/useStripeCheckout';
@@ -101,14 +101,6 @@ export function BrandUpgradeDialog({
                   </div>
 
                   <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-primary" />
-                      <span>{quotas.images} visuels/mois</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-primary" />
-                      <span>{quotas.videos} vidéos/mois</span>
-                    </div>
                     <div className="flex items-center gap-2">
                       <Zap className="w-4 h-4 text-primary" />
                       <span>{quotas.woofs} Woofs/mois</span>

@@ -68,8 +68,6 @@ export function BrandUpgradePayment({
           <div className="p-3 rounded-lg bg-muted space-y-2">
             <p className="font-medium text-sm">Quotas Starter inclus par marque :</p>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-              <li>{SYSTEM_CONFIG.QUOTAS.starter.images} visuels/mois</li>
-              <li>{SYSTEM_CONFIG.QUOTAS.starter.videos} vidéos/mois</li>
               <li>{SYSTEM_CONFIG.QUOTAS.starter.woofs} Woofs/mois</li>
             </ul>
           </div>
