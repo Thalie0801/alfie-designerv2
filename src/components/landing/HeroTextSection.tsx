@@ -6,7 +6,7 @@ import { Globe, Palette, Zap } from "lucide-react";
 const featurePills = [
   { icon: Zap, label: "IA ultra-rapide" },
   { icon: Palette, label: "Design personnalisé" },
-  { icon: Globe, label: "Intégration Canva" },
+  { icon: Globe, label: "Multi-formats" },
 ];
 
 const heroAdjectives = ["viraux", "professionnels", "impactants"];
@@ -84,7 +84,7 @@ export function HeroTextSection() {
             en quelques secondes
           </h1>
           <p className="mx-auto max-w-2xl text-base text-slate-600 sm:text-lg">
-            Alfie génère tes visuels Instagram, carrousels et reels directement dans Canva. Pas de design, juste tes idées.
+            Alfie génère tes visuels pour tous les réseaux sociaux : posts, carrousels et reels. Pas de design, juste tes idées.
           </p>
         </div>
 
