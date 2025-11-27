@@ -1,5 +1,5 @@
 // Logger pour les générations (conformité RGPD - logs sobres)
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { truncatePromptForLog } from "@/config/systemConfig";
 
 export type EngineType = "nano" | "sora" | "veo3";

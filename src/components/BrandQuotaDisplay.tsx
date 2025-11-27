@@ -9,7 +9,7 @@ import { useBrandKit } from '@/hooks/useBrandKit';
 import { BrandUpgradeDialog } from './BrandUpgradeDialog';
 import { WoofsPackDialog } from './WoofsPackDialog';
 import { BrandTier } from '@/hooks/useBrandManagement';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 export function BrandQuotaDisplay() {
   const { activeBrandId, activeBrand } = useBrandKit();
