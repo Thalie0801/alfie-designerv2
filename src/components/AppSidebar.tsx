@@ -13,6 +13,7 @@ import {
   Sparkles,
   Link2,
 } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   Sidebar,
   SidebarContent,
@@ -145,15 +146,18 @@ export function AppSidebar() {
               </Badge>
             </div>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleSignOut}
-            className="w-full justify-start min-h-[44px] touch-target"
-          >
-            <LogOut className={cn(open && !isMobile ? "mr-2" : "mx-auto")} size={isMobile ? 22 : 16} />
-            {(open || isMobile) && <span>Déconnexion</span>}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSignOut}
+              className="flex-1 justify-start min-h-[44px] touch-target"
+            >
+              <LogOut className={cn(open && !isMobile ? "mr-2" : "mx-auto")} size={isMobile ? 22 : 16} />
+              {(open || isMobile) && <span>Déconnexion</span>}
+            </Button>
+            <ThemeToggle />
+          </div>
         </div>
       </SidebarFooter>
     </Sidebar>
