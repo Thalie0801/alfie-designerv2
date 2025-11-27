@@ -13,14 +13,14 @@ const steps = [
   {
     step: "02",
     icon: Zap,
-    title: "L'IA génère",
+    title: "Alfie génère",
     description: "Alfie crée ton design en respectant ton identité de marque",
   },
   {
     step: "03",
     icon: Share2,
     title: "Télécharge et publie",
-    description: "Récupère tes créations en ZIP, prêtes à poster sur tes réseaux",
+    description: "Récupère tes créations en ZIP, prêtes à poster sur tes réseaux, et retrouve-les dans ton dashboard Canva",
   },
 ] as const;
 
