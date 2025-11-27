@@ -33,6 +33,7 @@ import Creator from "./pages/Creator";
 import ActivateAccess from "./pages/onboarding/Activate";
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 import { ChatGenerator } from "@/features/studio";
+import { StudioGenerator } from "@/pages/StudioGenerator";
 import ChatWidget from "./components/chat/ChatWidget";
 
 const queryClient = new QueryClient();
@@ -63,6 +64,17 @@ const AppRoutes = () => {
 
         <Route
           path="/studio"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <StudioGenerator />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/studio-legacy"
           element={
             <ProtectedRoute>
               <AppLayoutWithSidebar>
