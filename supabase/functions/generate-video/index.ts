@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-
+import { WOOF_COSTS } from "../_shared/woofsCosts.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 const REPLICATE_API = "https://api.replicate.com/v1/predictions";
 const DEFAULT_REPLICATE_MODEL_VERSION = "minimax/video-01"; // Remplace par le hash/slug exact
@@ -221,8 +221,62 @@ Deno.serve(async (req) => {
 
     const isStatusCheck = !!(generationId || jobId) && !prompt;
 
+    // Récupérer le brand_id actif pour les quotas
+    let brandId: string | null = null;
+    if (!isStatusCheck) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('active_brand_id')
+        .eq('id', user.id)
+        .maybeSingle();
+      
+      brandId = profile?.active_brand_id || null;
+    }
+
     if (!isStatusCheck && (!prompt || typeof prompt !== "string")) {
       return jsonResponse({ error: "Missing prompt" }, { status: 400 });
+    }
+
+    // Vérifier et consommer les Woofs pour les nouvelles générations (pas pour les status checks)
+    if (!isStatusCheck && brandId) {
+      const isPremium = providerEngine === "sora" || provider === "veo" || provider === "premium";
+      const woofsCost = isPremium ? WOOF_COSTS.video_premium : WOOF_COSTS.video_basic;
+      
+      console.log(`[generate-video] Checking ${woofsCost} Woofs for ${isPremium ? 'premium' : 'basic'} video (brand ${brandId})`);
+      
+      const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY!);
+      const { data: woofsData, error: woofsError } = await adminClient.functions.invoke(
+        "woofs-check-consume",
+        {
+          body: {
+            brand_id: brandId,
+            cost_woofs: woofsCost,
+            reason: isPremium ? "video_premium" : "video_basic",
+            metadata: { 
+              prompt: prompt?.substring(0, 100),
+              provider: providerDisplay,
+              engine: providerEngine
+            },
+          },
+        }
+      );
+
+      if (woofsError || !woofsData?.ok) {
+        const errorCode = woofsData?.error?.code || "QUOTA_ERROR";
+        if (errorCode === "INSUFFICIENT_WOOFS") {
+          console.error("[generate-video] Insufficient Woofs:", woofsData?.error);
+          return jsonResponse({ 
+            error: "INSUFFICIENT_WOOFS",
+            message: woofsData?.error?.message || "Tu n'as plus assez de Woofs pour cette génération.",
+            remaining: woofsData?.error?.remaining || 0,
+            required: woofsCost
+          }, { status: 402 });
+        }
+        console.error("[generate-video] Woofs consumption failed:", woofsError);
+        return jsonResponse({ error: 'Failed to consume Woofs' }, { status: 500 });
+      }
+
+      console.log(`[generate-video] ✅ Consumed ${woofsCost} Woofs, remaining: ${woofsData.data.remaining_woofs}`);
     }
 
     if (isStatusCheck) {

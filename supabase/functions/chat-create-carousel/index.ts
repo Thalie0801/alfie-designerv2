@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY, env } from "../_shared/env.ts";
 import { generateMasterSeed } from "../_shared/seedGenerator.ts";
-
+import { WOOF_COSTS } from "../_shared/woofsCosts.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -93,54 +93,41 @@ Deno.serve(async (req) => {
       return json({ jobSetId: reuse?.id });
     }
 
-    // 2) Vérifier et réserver les quotas
-    console.log(`[CreateCarousel] Reserving ${count} visuals for brand ${brandId}`);
+    // 2) Vérifier et consommer les Woofs
+    const totalWoofsCost = count * WOOF_COSTS.carousel_slide;
+    console.log(`[CreateCarousel] Checking ${totalWoofsCost} Woofs for ${count} slides (brand ${brandId})`);
     
-    const { data: quotaResult, error: quotaErr } = await adminClient.rpc(
-      "reserve_brand_quotas",
+    const { data: woofsData, error: woofsError } = await adminClient.functions.invoke(
+      "woofs-check-consume",
       {
-        p_brand_id: brandId,
-        p_visuals_count: count,
-        p_reels_count: 0,
-        p_woofs_count: 0,
+        body: {
+          brand_id: brandId,
+          cost_woofs: totalWoofsCost,
+          reason: "carousel_slide",
+          metadata: { 
+            prompt: prompt?.substring(0, 100),
+            slides_count: count 
+          },
+        },
       }
     );
 
-    if (quotaErr) {
-      console.error("[CreateCarousel] Quota check error:", quotaErr);
-      throw new Error(`Quota error: ${quotaErr.message}`);
+    if (woofsError || !woofsData?.ok) {
+      const errorCode = woofsData?.error?.code || "QUOTA_ERROR";
+      if (errorCode === "INSUFFICIENT_WOOFS") {
+        console.error("[CreateCarousel] Insufficient Woofs:", woofsData?.error);
+        return json({ 
+          error: "INSUFFICIENT_WOOFS",
+          message: woofsData?.error?.message || "Tu n'as plus assez de Woofs pour cette génération.",
+          remaining: woofsData?.error?.remaining || 0,
+          required: totalWoofsCost
+        }, 402);
+      }
+      console.error("[CreateCarousel] Woofs consumption failed:", woofsError);
+      throw new Error("WOOFS_CONSUMPTION_FAILED");
     }
 
-    if (!quotaResult?.[0]?.success) {
-      console.error("[CreateCarousel] Quota exceeded:", quotaResult?.[0]?.reason);
-      throw new Error(quotaResult?.[0]?.reason || "quota_exceeded");
-    }
-
-    console.log(`[CreateCarousel] Quota reserved successfully`);
-    
-    // AUSSI incrémenter counters_monthly pour synchronisation
-    const now = new Date();
-    const periodYYYYMM = parseInt(
-      now.getFullYear().toString() + 
-      (now.getMonth() + 1).toString().padStart(2, '0')
-    );
-
-    console.log(`[CreateCarousel] Incrementing monthly counters for brand ${brandId} in period ${periodYYYYMM}`);
-    
-    const { error: monthlyCounterError } = await adminClient.rpc('increment_monthly_counters', {
-      p_brand_id: brandId,
-      p_period_yyyymm: periodYYYYMM,
-      p_images: count,
-      p_reels: 0,
-      p_woofs: 0
-    });
-
-    if (monthlyCounterError) {
-      console.error('[CreateCarousel] Failed to increment monthly counters:', monthlyCounterError);
-      // Non-fatal mais important à log
-    } else {
-      console.log('[CreateCarousel] Monthly counters incremented successfully');
-    }
+    console.log(`[CreateCarousel] ✅ Consumed ${totalWoofsCost} Woofs, remaining: ${woofsData.data.remaining_woofs}`);
 
     // 3) Créer le job_set avec l'aspectRatio
     const { data: set, error: setErr } = await adminClient
@@ -162,10 +149,18 @@ Deno.serve(async (req) => {
     if (setErr || !set) {
       console.error("[CreateCarousel] Job set creation failed:", setErr);
       
-      // Refund quota
-      await adminClient.rpc("refund_brand_quotas", {
+      // Refund Woofs via decrement
+      const now = new Date();
+      const periodYYYYMM = parseInt(
+        now.getFullYear().toString() + (now.getMonth() + 1).toString().padStart(2, '0')
+      );
+      
+      await adminClient.rpc("decrement_monthly_counters", {
         p_brand_id: brandId,
-        p_visuals_count: count,
+        p_period_yyyymm: periodYYYYMM,
+        p_images: 0,
+        p_reels: 0,
+        p_woofs: totalWoofsCost,
       });
       
       throw new Error(`Job set creation failed: ${setErr?.message}`);
@@ -182,10 +177,21 @@ Deno.serve(async (req) => {
 
     if (brandErr || !brand) {
       console.error("[CreateCarousel] Brand fetch failed:", brandErr);
-      await adminClient.rpc("refund_brand_quotas", {
+      
+      // Refund Woofs
+      const now = new Date();
+      const periodYYYYMM = parseInt(
+        now.getFullYear().toString() + (now.getMonth() + 1).toString().padStart(2, '0')
+      );
+      
+      await adminClient.rpc("decrement_monthly_counters", {
         p_brand_id: brandId,
-        p_visuals_count: count,
+        p_period_yyyymm: periodYYYYMM,
+        p_images: 0,
+        p_reels: 0,
+        p_woofs: totalWoofsCost,
       });
+      
       throw new Error(`Brand not found: ${brandErr?.message}`);
     }
 
@@ -380,10 +386,21 @@ Deno.serve(async (req) => {
 
     if (jobsErr) {
       console.error("[CreateCarousel] Job creation failed:", jobsErr);
-      await adminClient.rpc("refund_brand_quotas", {
+      
+      // Refund Woofs
+      const now = new Date();
+      const periodYYYYMM = parseInt(
+        now.getFullYear().toString() + (now.getMonth() + 1).toString().padStart(2, '0')
+      );
+      
+      await adminClient.rpc("decrement_monthly_counters", {
         p_brand_id: brandId,
-        p_visuals_count: count,
+        p_period_yyyymm: periodYYYYMM,
+        p_images: 0,
+        p_reels: 0,
+        p_woofs: totalWoofsCost,
       });
+      
       throw new Error(`Job creation failed: ${String(jobsErr)}`);
     }
 

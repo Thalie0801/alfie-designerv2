@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-
+import { WOOF_COSTS } from "../_shared/woofsCosts.ts";
 import { corsHeaders } from "../_shared/cors.ts";
-import { SUPABASE_ANON_KEY, SUPABASE_URL, validateEnv } from "../_shared/env.ts";
+import { SUPABASE_ANON_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, validateEnv } from "../_shared/env.ts";
 
 const envValidation = validateEnv();
 if (!envValidation.valid) {
@@ -46,47 +46,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Vérifier les quotas avec la fonction can_create_video
-    const { data: quotaCheck, error: quotaError } = await supabase.rpc('can_create_video', {
-      user_id_param: user.id,
-      duration_seconds: duration
-    });
-
-    if (quotaError || !quotaCheck || quotaCheck.length === 0) {
-      console.error('Quota check error:', quotaError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to check quota' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const quota = quotaCheck[0];
-    if (!quota.can_create) {
-      const statusCode = quota.reason.includes('Insufficient') ? 402 : 403;
-      return new Response(
-        JSON.stringify({ 
-          error: quota.reason,
-          woofs_available: quota.woofs_available,
-          woofs_needed: quota.woofs_needed
-        }),
-        { status: statusCode, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Consommer les Woofs
-    const { data: consumeResult, error: consumeError } = await supabase.rpc('consume_woofs', {
-      user_id_param: user.id,
-      woofs_amount: quota.woofs_needed
-    });
-
-    if (consumeError || !consumeResult) {
-      console.error('Consume woofs error:', consumeError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to consume Woofs' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     // Récupérer le brand_id actif de l'utilisateur
     const { data: profile } = await supabase
       .from('profiles')
@@ -94,12 +53,64 @@ Deno.serve(async (req) => {
       .eq('id', user.id)
       .single();
 
+    if (!profile?.active_brand_id) {
+      return new Response(
+        JSON.stringify({ error: 'No active brand found' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const brandId = profile.active_brand_id;
+
+    // Vérifier et consommer les Woofs (vidéo basic = 10 Woofs)
+    const adminClient = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    const woofsCost = WOOF_COSTS.video_basic;
+    
+    const { data: woofsData, error: woofsError } = await adminClient.functions.invoke(
+      "woofs-check-consume",
+      {
+        body: {
+          brand_id: brandId,
+          cost_woofs: woofsCost,
+          reason: "video_basic",
+          metadata: { 
+            title,
+            duration,
+            ratio: ratio || '16:9'
+          },
+        },
+      }
+    );
+
+    if (woofsError || !woofsData?.ok) {
+      const errorCode = woofsData?.error?.code || "QUOTA_ERROR";
+      if (errorCode === "INSUFFICIENT_WOOFS") {
+        console.error("[create-video] Insufficient Woofs:", woofsData?.error);
+        return new Response(
+          JSON.stringify({ 
+            error: "INSUFFICIENT_WOOFS",
+            message: woofsData?.error?.message || "Tu n'as plus assez de Woofs pour cette génération.",
+            remaining: woofsData?.error?.remaining || 0,
+            required: woofsCost
+          }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      console.error("[create-video] Woofs consumption failed:", woofsError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to consume Woofs' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`[create-video] ✅ Consumed ${woofsCost} Woofs, remaining: ${woofsData.data.remaining_woofs}`);
+
     // Créer l'entrée vidéo
     const { data: video, error: videoError } = await supabase
       .from('videos')
       .insert({
         user_id: user.id,
-        brand_id: profile?.active_brand_id,
+        brand_id: brandId,
         title,
         duration,
         ratio: ratio || '16:9',
@@ -107,18 +118,28 @@ Deno.serve(async (req) => {
         status: 'queued',
         assets,
         tts_config: tts,
-        woofs_cost: quota.woofs_needed
+        woofs_cost: woofsCost
       })
       .select()
       .single();
 
     if (videoError) {
       console.error('Video creation error:', videoError);
-      // Rembourser les Woofs en cas d'erreur
-      await supabase.rpc('refund_woofs', {
-        user_id_param: user.id,
-        woofs_amount: quota.woofs_needed
+      
+      // Rembourser les Woofs via decrement
+      const now = new Date();
+      const periodYYYYMM = parseInt(
+        now.getFullYear().toString() + (now.getMonth() + 1).toString().padStart(2, '0')
+      );
+      
+      await adminClient.rpc('decrement_monthly_counters', {
+        p_brand_id: brandId,
+        p_period_yyyymm: periodYYYYMM,
+        p_images: 0,
+        p_reels: 0,
+        p_woofs: woofsCost,
       });
+      
       return new Response(
         JSON.stringify({ error: 'Failed to create video' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -128,10 +149,10 @@ Deno.serve(async (req) => {
     // Log de la génération
     await supabase.from('generation_logs').insert({
       user_id: user.id,
-      brand_id: profile?.active_brand_id,
+      brand_id: brandId,
       type: 'video',
       status: 'queued',
-      woofs_cost: quota.woofs_needed,
+      woofs_cost: woofsCost,
       metadata: { duration, ratio, template_id, assets_count: assets.length }
     });
 
