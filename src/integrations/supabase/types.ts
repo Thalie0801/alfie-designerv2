@@ -2288,6 +2288,7 @@ export type Database = {
           woofs_needed: number
         }[]
       }
+      check_db_size_alert: { Args: never; Returns: undefined }
       claim_next_job: {
         Args: never
         Returns: {
