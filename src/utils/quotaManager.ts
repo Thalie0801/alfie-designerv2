@@ -1,26 +1,15 @@
-// Gestionnaire de quotas mensuels par marque (visuels, vidéos, Woofs)
+// Gestionnaire de quotas mensuels par marque (Woofs uniquement)
 
 import { supabase } from '@/lib/supabase';
-import { SYSTEM_CONFIG } from '@/config/systemConfig';
+import { WOOF_COSTS } from '@/config/woofs';
 
 export interface QuotaStatus {
-  visuals: {
-    used: number;
-    limit: number;
-    percentage: number;
-    canGenerate: boolean;
-  };
-  videos: {
-    used: number;
-    limit: number;
-    percentage: number;
-    canGenerate: boolean;
-  };
   woofs: {
-    consumed: number;
+    used: number;
     limit: number;
     remaining: number;
-    canUse: (cost: number) => boolean;
+    percentage: number;
+    canGenerate: (cost: number) => boolean;
   };
   brandName?: string;
   plan?: string;
@@ -28,46 +17,33 @@ export interface QuotaStatus {
 }
 
 /**
- * Récupère le statut des quotas pour une marque
+ * Récupère le statut des quotas Woofs pour une marque
  */
 export async function getQuotaStatus(brandId: string): Promise<QuotaStatus | null> {
   try {
-    const { data, error } = await supabase
-      .from('v_brand_quota_current')
-      .select('*')
-      .eq('brand_id', brandId)
-      .maybeSingle();
+    const { data, error } = await supabase.functions.invoke('get-quota', {
+      body: { brand_id: brandId }
+    });
 
     if (error) throw error;
     if (!data) return null;
 
-    const hardStopThreshold = SYSTEM_CONFIG.HARD_STOP_MULTIPLIER * 100; // 110%
+    const used = data.woofs_used || 0;
+    const limit = data.woofs_quota || 0;
+    const remaining = Math.max(0, limit - used);
+    const percentage = limit > 0 ? (used / limit) * 100 : 0;
 
     return {
-      visuals: {
-        used: data.images_used || 0,
-        limit: data.quota_images || 0,
-        percentage: data.images_usage_pct || 0,
-        canGenerate: (data.images_usage_pct || 0) < hardStopThreshold
-      },
-      videos: {
-        used: data.videos_used || 0,
-        limit: data.quota_videos || 0,
-        percentage: data.videos_usage_pct || 0,
-        canGenerate: (data.videos_usage_pct || 0) < hardStopThreshold
-      },
       woofs: {
-        consumed: data.woofs_used || 0,
-        limit: data.quota_woofs || 0,
-        remaining: Math.max(0, (data.quota_woofs || 0) - (data.woofs_used || 0)),
-        canUse: (cost: number) => {
-          const remaining = Math.max(0, (data.quota_woofs || 0) - (data.woofs_used || 0));
-          return remaining >= cost;
-        }
+        used,
+        limit,
+        remaining,
+        percentage,
+        canGenerate: (cost: number) => remaining >= cost
       },
-      brandName: data.name ?? undefined,
+      brandName: data.brand_name ?? undefined,
       plan: data.plan ?? undefined,
-      resetsOn: data.resets_on ?? undefined
+      resetsOn: data.reset_date ?? undefined
     };
   } catch (error) {
     console.error('Error fetching quota status:', error);
@@ -76,41 +52,27 @@ export async function getQuotaStatus(brandId: string): Promise<QuotaStatus | nul
 }
 
 /**
- * Consomme des quotas pour une marque (images et/ou vidéos + Woofs)
+ * Consomme des Woofs pour une marque via l'Edge Function centralisée
  */
 export async function consumeQuota(
-  brandId: string, 
-  type: 'visual' | 'video',
-  woofCost?: number
+  brandId: string,
+  type: 'image' | 'carousel_slide' | 'video_basic' | 'video_premium',
+  metadata?: Record<string, any>
 ): Promise<boolean> {
   try {
-    const { data: brand, error: fetchError } = await supabase
-      .from('brands')
-      .select('images_used, videos_used, woofs_used')
-      .eq('id', brandId)
-      .single();
+    const costWoofs = WOOF_COSTS[type];
+    
+    const { data, error } = await supabase.functions.invoke('woofs-check-consume', {
+      body: {
+        brand_id: brandId,
+        cost_woofs: costWoofs,
+        reason: type,
+        metadata: metadata || {}
+      }
+    });
 
-    if (fetchError) throw fetchError;
-
-    const updates: any = {};
-
-    if (type === 'visual') {
-      updates.images_used = (brand.images_used || 0) + 1;
-    }
-
-    if (type === 'video' && woofCost !== undefined) {
-      updates.videos_used = (brand.videos_used || 0) + 1;
-      updates.woofs_used = (brand.woofs_used || 0) + woofCost;
-    }
-
-    const { error: updateError } = await supabase
-      .from('brands')
-      .update(updates)
-      .eq('id', brandId);
-
-    if (updateError) throw updateError;
-
-    return true;
+    if (error) throw error;
+    return data?.ok === true;
   } catch (error) {
     console.error('Error consuming quota:', error);
     return false;
@@ -118,7 +80,7 @@ export async function consumeQuota(
 }
 
 /**
- * Vérifie si une marque peut générer un visuel (avant de lancer)
+ * Vérifie si une marque peut générer un visuel (1 Woof)
  */
 export async function canGenerateVisual(brandId: string): Promise<{ canGenerate: boolean; reason?: string }> {
   const status = await getQuotaStatus(brandId);
@@ -127,11 +89,13 @@ export async function canGenerateVisual(brandId: string): Promise<{ canGenerate:
     return { canGenerate: false, reason: 'Impossible de récupérer les quotas de la marque' };
   }
 
-  if (!status.visuals.canGenerate) {
+  const cost = WOOF_COSTS.image;
+  
+  if (!status.woofs.canGenerate(cost)) {
     const resetDate = new Date(status.resetsOn || '').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
     return { 
       canGenerate: false, 
-      reason: `Quota atteint pour ${status.brandName}. Ajoutez un Pack Visuels ou patientez jusqu'au ${resetDate}.` 
+      reason: `Woofs insuffisants pour ${status.brandName} (${status.woofs.remaining} restants, ${cost} requis). Ajoutez un Pack Woofs ou patientez jusqu'au ${resetDate}.` 
     };
   }
 
@@ -142,8 +106,8 @@ export async function canGenerateVisual(brandId: string): Promise<{ canGenerate:
  * Vérifie si une marque peut générer une vidéo (avec coût Woofs)
  */
 export async function canGenerateVideo(
-  brandId: string, 
-  woofCost: number
+  brandId: string,
+  isPremium: boolean = false
 ): Promise<{ canGenerate: boolean; reason?: string; fallbackMessage?: string }> {
   const status = await getQuotaStatus(brandId);
   
@@ -151,28 +115,22 @@ export async function canGenerateVideo(
     return { canGenerate: false, reason: 'Impossible de récupérer les quotas de la marque' };
   }
 
+  const cost = isPremium ? WOOF_COSTS.video_premium : WOOF_COSTS.video_basic;
   const resetDate = new Date(status.resetsOn || '').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 
-  if (!status.videos.canGenerate) {
-    return { 
-      canGenerate: false, 
-      reason: `Quota vidéos atteint pour ${status.brandName}. Ajoutez un Pack Woofs (+50 / +100) ou patientez jusqu'au ${resetDate}.` 
-    };
-  }
-
-  if (!status.woofs.canUse(woofCost)) {
-    // Si Veo3 demandé mais pas assez de Woofs, suggérer Sora
-    if (woofCost === 4) {
+  if (!status.woofs.canGenerate(cost)) {
+    // Si vidéo premium demandée mais pas assez de Woofs, suggérer basique
+    if (isPremium && status.woofs.canGenerate(WOOF_COSTS.video_basic)) {
       return { 
         canGenerate: false, 
-        reason: `Veo 3 consomme 4 Woofs, budget insuffisant pour ${status.brandName}. Utilisez Sora (1 Woof) ou ajoutez un Pack Woofs (+50 / +100).`,
-        fallbackMessage: `Il vous reste ${status.woofs.remaining} Woofs. Veo 3 nécessite 4 Woofs, mais Sora n'en utilise qu'1.`
+        reason: `Vidéo premium consomme ${cost} Woofs, budget insuffisant pour ${status.brandName}. Utilisez une vidéo standard (${WOOF_COSTS.video_basic} Woofs) ou ajoutez un Pack Woofs.`,
+        fallbackMessage: `Il vous reste ${status.woofs.remaining} Woofs. Vidéo premium nécessite ${cost} Woofs, mais vidéo standard n'en utilise que ${WOOF_COSTS.video_basic}.`
       };
     }
     
     return { 
       canGenerate: false, 
-      reason: `Woofs insuffisants pour ${status.brandName} (${status.woofs.remaining} restants, ${woofCost} requis). Ajoutez un Pack Woofs (+50 / +100) ou patientez jusqu'au ${resetDate}.` 
+      reason: `Woofs insuffisants pour ${status.brandName} (${status.woofs.remaining} restants, ${cost} requis). Ajoutez un Pack Woofs ou patientez jusqu'au ${resetDate}.` 
     };
   }
 
@@ -180,29 +138,23 @@ export async function canGenerateVideo(
 }
 
 /**
- * Affiche une alerte si les quotas approchent de la limite (80% ou 100%)
+ * Affiche une alerte si les Woofs approchent de la limite (80% ou 100%)
  */
 export function checkQuotaAlert(status: QuotaStatus): { level: 'warning' | 'error' | null; message: string } | null {
-  const visualsPercent = status.visuals.percentage;
-  const videosPercent = status.videos.percentage;
-  const woofsPercent = status.woofs.limit > 0 ? (status.woofs.consumed / status.woofs.limit) * 100 : 0;
-
+  const woofsPercent = status.woofs.percentage;
   const resetDate = new Date(status.resetsOn || '').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
-  const alertThreshold = SYSTEM_CONFIG.ALERT_THRESHOLD * 100; // 80%
-  const packSizes = SYSTEM_CONFIG.PACK_WOOFS_SIZES.join(' / +');
 
-  if (visualsPercent >= 100 || videosPercent >= 100 || woofsPercent >= 100) {
+  if (woofsPercent >= 100) {
     return {
       level: 'error',
-      message: `⚠️ Quota atteint pour ${status.brandName}! Ajoutez un Pack Woofs (+${packSizes}) ou patientez jusqu'au ${resetDate}.`
+      message: `⚠️ Quota Woofs atteint pour ${status.brandName}! Ajoutez un Pack Woofs ou patientez jusqu'au ${resetDate}.`
     };
   }
 
-  const maxPercent = Math.max(visualsPercent, videosPercent, woofsPercent);
-  if (maxPercent >= alertThreshold) {
+  if (woofsPercent >= 80) {
     return {
       level: 'warning',
-      message: `⚠️ Vous avez utilisé ${maxPercent.toFixed(0)}% de vos quotas pour ${status.brandName}.`
+      message: `⚠️ Vous avez utilisé ${woofsPercent.toFixed(0)}% de vos Woofs pour ${status.brandName}.`
     };
   }
 
