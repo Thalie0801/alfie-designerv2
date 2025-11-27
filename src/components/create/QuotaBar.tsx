@@ -1,26 +1,28 @@
-import { useState, useEffect, useMemo } from "react";
-import { callEdge } from "@/lib/edgeClient";
+import { useEffect, useState, useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, RefreshCcw } from "lucide-react";
+import { AlertCircle, RefreshCcw, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
+import { callEdge } from "@/lib/edgeClient";
 import { cn } from "@/lib/utils";
-
-interface QuotaData {
-  woofs_quota: number;
-  woofs_used: number;
-  woofs_remaining: number;
-  visuals_quota: number;
-  visuals_used: number;
-  visuals_remaining: number;
-  videos_quota: number;
-  videos_used: number;
-  videos_remaining: number;
-  plan: string;
-  reset_date: string | null;
-}
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface QuotaBarProps {
   activeBrandId: string | null;
+}
+
+interface QuotaData {
+  woofs_used: number;
+  woofs_quota: number;
+  woofs_remaining: number;
+  threshold_80: boolean;
+  plan?: string;
+  reset_date?: string;
+  is_admin?: boolean;
 }
 
 function clampPct(n: number) {
@@ -35,14 +37,8 @@ function pct(used: number, quota: number) {
 
 function colorFor(percent: number) {
   if (percent >= 90) return "bg-red-500";
-  if (percent >= 70) return "bg-yellow-500";
+  if (percent >= 70) return "bg-amber-400";
   return "bg-green-500";
-}
-
-function textTone(percent: number) {
-  if (percent >= 90) return "text-destructive";
-  if (percent >= 70) return "text-accent";
-  return "text-muted-foreground";
 }
 
 function formatReset(date: string | null) {
@@ -55,9 +51,11 @@ function formatReset(date: string | null) {
 const HIDE_BACKEND_BADGES = (import.meta as any)?.env?.VITE_HIDE_BACKEND_BADGES === "true";
 
 export function QuotaBar({ activeBrandId }: QuotaBarProps) {
+  const navigate = useNavigate();
   const [quota, setQuota] = useState<QuotaData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -93,8 +91,6 @@ export function QuotaBar({ activeBrandId }: QuotaBarProps) {
     };
   }, [activeBrandId]);
 
-  const visualsPercent = useMemo(() => pct(quota?.visuals_used ?? 0, quota?.visuals_quota ?? 0), [quota]);
-  const videosPercent = useMemo(() => pct(quota?.videos_used ?? 0, quota?.videos_quota ?? 0), [quota]);
   const woofsPercent = useMemo(() => pct(quota?.woofs_used ?? 0, quota?.woofs_quota ?? 0), [quota]);
 
   if (loading) {
@@ -102,8 +98,6 @@ export function QuotaBar({ activeBrandId }: QuotaBarProps) {
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border">
         <div className="px-4 py-3 flex items-center gap-3">
           <Skeleton className="h-6 w-32" />
-          <Skeleton className="h-6 w-32" />
-          <Skeleton className="h-6 w-24" />
         </div>
       </div>
     );
@@ -126,74 +120,27 @@ export function QuotaBar({ activeBrandId }: QuotaBarProps) {
     );
   }
 
-  const visualsLeft = Math.max(0, quota.visuals_remaining ?? 0);
-  const videosLeft = Math.max(0, quota.videos_remaining ?? 0);
   const woofsLeft = Math.max(0, quota.woofs_remaining ?? 0);
-
-  const visualsQuota = Math.max(0, quota.visuals_quota ?? 0);
-  const videosQuota = Math.max(0, quota.videos_quota ?? 0);
   const woofsQuota = Math.max(0, quota.woofs_quota ?? 0);
+  const isUnlimited = quota.is_admin || woofsQuota >= 1_000_000_000;
 
   return (
-    <details className="sticky top-0 z-30 bg-gradient-to-r from-background via-background/98 to-background backdrop-blur-xl border-b border-border/50 shadow-sm group">
-      <summary className="flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-muted/30 transition-all duration-200 list-none">
-        <div className="flex items-center gap-3">
-          {!HIDE_BACKEND_BADGES ? (
-            <>
-              <div className="flex flex-col gap-1 min-w-[88px]">
-                <div
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-1 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 text-sm font-semibold border border-blue-200 dark:border-blue-800 shadow-sm",
-                    textTone(visualsPercent),
-                  )}
-                  title="Visuels IA"
-                >
-                  <span className="text-xs" aria-hidden>
-                    📸
-                  </span>
-                  <span className="text-xs">{visualsQuota ? `${visualsLeft}/${visualsQuota}` : "—/0"}</span>
-                </div>
-                <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    className={cn("h-full transition-all duration-500", colorFor(visualsPercent))}
-                    style={{ width: `${visualsPercent}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1 min-w-[88px]">
-                <div
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-1 rounded-lg bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 text-sm font-semibold border border-purple-200 dark:border-purple-800 shadow-sm",
-                    textTone(videosPercent),
-                  )}
-                  title="Vidéos IA"
-                >
-                  <span className="text-xs" aria-hidden>
-                    🎬
-                  </span>
-                  <span className="text-xs">{videosQuota ? `${videosLeft}/${videosQuota}` : "—/0"}</span>
-                </div>
-                <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    className={cn("h-full transition-all duration-500", colorFor(videosPercent))}
-                    style={{ width: `${videosPercent}%` }}
-                  />
-                </div>
-              </div>
-
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="sticky top-0 z-30 bg-gradient-to-r from-background via-background/98 to-background backdrop-blur-xl border-b border-border/50 shadow-sm">
+      <CollapsibleTrigger asChild>
+        <div className="flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-muted/30 transition-all duration-200">
+          <div className="flex items-center gap-3">
+            {!HIDE_BACKEND_BADGES ? (
               <div className="flex flex-col gap-1 min-w-[88px]">
                 <div
                   className={cn(
                     "flex items-center gap-2 px-3 py-1 rounded-lg bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 text-sm font-semibold border border-orange-200 dark:border-orange-800 shadow-sm",
-                    textTone(woofsPercent),
                   )}
-                  title="Budget vidéo (Woofs)"
+                  title="Woofs (crédits unifiés)"
                 >
                   <span className="text-xs" aria-hidden>
                     🐾
                   </span>
-                  <span className="text-xs">{woofsQuota ? `${woofsLeft}/${woofsQuota}` : "—/0"}</span>
+                  <span className="text-xs">{isUnlimited ? "∞" : `${woofsLeft}/${woofsQuota}`}</span>
                 </div>
                 <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                   <div
@@ -202,45 +149,87 @@ export function QuotaBar({ activeBrandId }: QuotaBarProps) {
                   />
                 </div>
               </div>
-            </>
-          ) : (
-            <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-              <span>Visuels : {visualsQuota ? `${visualsLeft}/${visualsQuota}` : "—/0"}</span>
-              <span>Vidéos : {videosQuota ? `${videosLeft}/${videosQuota}` : "—/0"}</span>
-              <span>Woofs : {woofsQuota ? `${woofsLeft}/${woofsQuota}` : "—/0"}</span>
+            ) : (
+              <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                <span>Woofs : {isUnlimited ? "∞" : `${woofsLeft}/${woofsQuota}`}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span
+              className="text-xs font-medium text-muted-foreground bg-muted/50 px-2 py-1 rounded-md"
+              title="Date de réinitialisation des quotas"
+            >
+              Reset : {formatReset(quota.reset_date ?? null)}
+            </span>
+            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")} />
+          </div>
+        </div>
+      </CollapsibleTrigger>
+
+      <CollapsibleContent>
+        <div className="px-4 pb-3 text-sm text-muted-foreground border-t border-border bg-muted/30">
+          <div className="py-3 space-y-3">
+            {/* Détails quota */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Utilisés :</span>
+                <span className="font-medium">{quota.woofs_used} Woofs</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Total mensuel :</span>
+                <span className="font-medium">
+                  {isUnlimited ? "∞" : `${woofsQuota} Woofs`}
+                </span>
+              </div>
+              {quota.plan && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Plan :</span>
+                  <span className="font-medium capitalize">{quota.plan}</span>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        <div className="flex items-center gap-3">
-          <span
-            className="text-xs font-medium text-muted-foreground bg-muted/50 px-2 py-1 rounded-md"
-            title="Date de réinitialisation des quotas"
-          >
-            Reset : {formatReset(quota.reset_date)}
-          </span>
-          <span
-            className="text-xs text-muted-foreground group-open:rotate-180 transition-transform duration-200"
-            aria-hidden
-          >
-            ▼
-          </span>
-        </div>
-      </summary>
+            {/* Coûts */}
+            <div className="pt-3 border-t space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground">Coûts en Woofs :</p>
+              <ul className="text-xs text-muted-foreground space-y-1">
+                <li>• Image / Slide de carrousel : <strong>1 Woof</strong></li>
+                <li>• Vidéo animée standard : <strong>10 Woofs</strong></li>
+                <li>• Vidéo premium (Veo 3.1) : <strong>50 Woofs</strong></li>
+              </ul>
+              <p className="text-xs text-muted-foreground mt-2">
+                Les quotas se réinitialisent le 1er de chaque mois.
+              </p>
+            </div>
 
-      <div className="px-4 pb-3 text-sm text-muted-foreground border-t border-border bg-muted/30">
-        <div className="py-3">
-          <p className="text-xs text-muted-foreground">
-            Les vidéos consomment des Woofs : <strong>1 Woof par 12s</strong>. Les quotas se réinitialisent le 1er de chaque
-            mois.
-          </p>
-          <ul className="text-sm text-muted-foreground mt-2">
-            <li>• Draft 10s : version courte et économique (1 Woof).</li>
-            <li>• Batch de nuit : génère plusieurs assets d’un coup.</li>
-            <li>• Templates : adaptation auto avec ton Brand Kit.</li>
-          </ul>
+            {/* Alerte seuil */}
+            {quota.threshold_80 && !isUnlimited && (
+              <div className="pt-3 border-t">
+                <div className="flex items-start gap-2 text-amber-600 bg-amber-50 dark:bg-amber-950/20 p-2 rounded">
+                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs">
+                    Tu approches de la limite ! Pense à upgrader ton plan.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* CTA Upgrade */}
+            {woofsPercent >= 80 && !isUnlimited && (
+              <Button 
+                onClick={() => navigate("/billing")} 
+                variant="outline" 
+                size="sm" 
+                className="w-full mt-2"
+              >
+                Voir les plans
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
-    </details>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

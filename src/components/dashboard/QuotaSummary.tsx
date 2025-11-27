@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import { Image as ImageIcon, Video as VideoIcon, Zap, Gauge } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertTriangle, RefreshCw, Gauge } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
 import { callEdge } from "@/lib/edgeClient";
 import { cn } from "@/lib/utils";
 
@@ -12,106 +15,67 @@ interface QuotaSummaryProps {
 }
 
 interface QuotaResponse {
-  visuals_quota: number;
-  visuals_used: number;
-  videos_quota: number;
-  videos_used: number;
   woofs_quota: number;
   woofs_used: number;
+  woofs_remaining: number;
+  threshold_80: boolean;
   plan?: string;
+  reset_date?: string;
   is_admin?: boolean;
 }
 
-const HUMAN_FORMATTER = new Intl.NumberFormat("fr-FR");
-
-function percent(used: number, quota: number) {
-  if (!quota || quota <= 0) return 0;
-  const p = (used / quota) * 100;
-  return Number.isFinite(p) ? Math.max(0, p) : 0;
-}
-
-function barClass(p: number) {
-  if (p >= 110) return "bg-destructive";
-  if (p >= 80) return "bg-amber-400";
-  return "bg-primary";
-}
-
-function isUnlimited(quota: number, isAdmin?: boolean) {
-  return isAdmin || !quota || quota >= 1_000_000_000;
-}
-
-function human(n: number) {
-  return HUMAN_FORMATTER.format(n);
-}
-
 export function QuotaSummary({ activeBrandId }: QuotaSummaryProps) {
-  const [data, setData] = useState<QuotaResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const [quota, setQuota] = useState<QuotaResponse | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const fetchQuota = async () => {
     if (!activeBrandId) {
-      setData(null);
-      setError(null);
       setLoading(false);
       return;
     }
 
-    const load = async () => {
+    try {
       setLoading(true);
       setError(null);
-      try {
-        const response = await callEdge<QuotaResponse>("get-quota", { brand_id: activeBrandId }, { silent: true });
-        if (cancelled) return;
-        if (response.ok && response.data) {
-          setData(response.data);
-        } else {
-          setError("Quotas indisponibles");
-        }
-      } catch (err) {
-        console.error("[QuotaSummary] error", err);
-        if (!cancelled) setError("Quotas indisponibles");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
 
-    load();
-    return () => {
-      cancelled = true;
-    };
+      const result = await callEdge<QuotaResponse>("get-quota", { brand_id: activeBrandId }, { silent: true });
+
+      if (!result?.ok || !result.data) {
+        throw new Error(result?.error || "Erreur de chargement des quotas");
+      }
+      setQuota(result.data);
+    } catch (err: any) {
+      console.error("Error fetching quota:", err);
+      setError(err.message || "Erreur lors du chargement des quotas");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchQuota();
   }, [activeBrandId]);
 
-  const rows = useMemo(
-    () =>
-      data
-        ? [
-            {
-              label: "Images",
-              used: data.visuals_used ?? 0,
-              quota: data.visuals_quota ?? 0,
-              icon: ImageIcon,
-              testId: "images",
-            },
-            {
-              label: "Reels/Carrousels",
-              used: data.videos_used ?? 0,
-              quota: data.videos_quota ?? 0,
-              icon: VideoIcon,
-              testId: "videos",
-            },
-            {
-              label: "Woofs",
-              used: data.woofs_used ?? 0,
-              quota: data.woofs_quota ?? 0,
-              icon: Zap,
-              testId: "woofs",
-            },
-          ]
-        : [],
-    [data],
-  );
+  const woofsData = useMemo(() => {
+    if (!quota) return null;
+
+    const used = quota.woofs_used;
+    const total = quota.woofs_quota;
+    const remaining = quota.woofs_remaining;
+    const percentage = total > 0 ? Math.round((used / total) * 100) : 0;
+
+    let barColor = "bg-green-500";
+    
+    if (percentage >= 100) {
+      barColor = "bg-red-500";
+    } else if (percentage >= 80) {
+      barColor = "bg-amber-400";
+    }
+
+    return { used, total, remaining, percentage, barColor };
+  }, [quota]);
 
   if (!activeBrandId) {
     return (
@@ -129,88 +93,144 @@ export function QuotaSummary({ activeBrandId }: QuotaSummaryProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Gauge className="h-5 w-5 text-primary" />
-            Quotas
+            Quotas 🐶
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {[0, 1, 2].map((key) => (
-            <div className="space-y-2" key={key}>
-              <div className="flex items-center justify-between">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-4 w-16" />
-              </div>
-              <Skeleton className="h-2 w-full" />
-            </div>
-          ))}
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
         </CardContent>
       </Card>
     );
   }
 
-  if (error || !data) {
+  if (error) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-destructive">
-            <Gauge className="h-5 w-5" />
-            Quotas
+          <CardTitle className="flex items-center gap-2">
+            <Gauge className="h-5 w-5 text-primary" />
+            Quotas 🐶
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-destructive">{error || "Quotas indisponibles"}</p>
+        <CardContent className="space-y-4">
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+          <Button onClick={fetchQuota} variant="outline" size="sm" className="w-full">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Réessayer
+          </Button>
         </CardContent>
       </Card>
     );
   }
 
-  const hasUnlimitedQuotas = data.is_admin || rows.some((row) => isUnlimited(row.quota, data.is_admin));
+  if (!quota || !woofsData) return null;
+
+  const isUnlimited = quota.is_admin || quota.woofs_quota >= 1_000_000_000;
 
   return (
     <Card className="bg-muted/30 border-primary/10 shadow-strong">
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="flex items-center gap-2">
           <Gauge className="h-5 w-5 text-primary" />
-          Quotas
-          {data.is_admin ? <Badge className="ml-2" variant="secondary">Admin</Badge> : null}
+          Quotas 🐶
+          {quota.is_admin ? <Badge variant="secondary">Admin</Badge> : null}
         </CardTitle>
         <div className="flex items-center gap-2">
-          {hasUnlimitedQuotas ? <Badge variant="secondary">Illimité</Badge> : null}
-          {data.plan ? <Badge variant="outline">Plan {data.plan}</Badge> : null}
+          {isUnlimited ? <Badge variant="secondary">Illimité</Badge> : null}
+          {quota.plan ? <Badge variant="outline">Plan {quota.plan}</Badge> : null}
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {rows.map(({ label, used, quota, icon: Icon, testId }) => {
-          const unlimited = isUnlimited(quota, data.is_admin);
-          const p = unlimited ? 0 : percent(used, quota);
-          const remaining = unlimited ? "Illimité" : `${human(Math.max(0, quota - used))} restants`;
+      <CardContent className="space-y-6">
+        {/* Alerte si seuil 80% atteint */}
+        {quota.threshold_80 && !isUnlimited && (
+          <Alert variant="default" className="border-amber-500">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <AlertDescription>
+              Tu approches de la limite de ton quota mensuel. Pense à upgrader ton plan si besoin !
+            </AlertDescription>
+          </Alert>
+        )}
 
-          return (
-            <div className="space-y-2" key={testId} data-testid={`quota-${testId}`}>
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">{label}</span>
-                  <Badge variant={unlimited ? "outline" : "secondary"}>{remaining}</Badge>
-                </div>
-                <span className="tabular-nums text-muted-foreground">
-                  {human(used)} / {unlimited ? "Illimité" : human(quota)} {unlimited ? "" : `(${Math.round(p)}%)`}
-                </span>
-              </div>
+        {/* Alerte si quota épuisé */}
+        {woofsData.percentage >= 100 && !isUnlimited && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Tu as atteint ta limite mensuelle de Woofs. Upgrade ton plan pour continuer à créer.
+            </AlertDescription>
+          </Alert>
+        )}
 
-              {!unlimited ? (
-                <Progress
-                  value={Math.min(120, p)}
-                  className={cn("h-2", barClass(p))}
-                  aria-valuenow={p}
-                  aria-valuemin={0}
-                  aria-valuemax={120}
-                />
-              ) : (
-                <div className="h-2 rounded-full bg-primary/20" aria-label="Quota illimité" />
-              )}
+        {/* Barre de progression Woofs */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Woofs utilisés ce mois-ci</span>
+            <Badge variant={isUnlimited ? "outline" : "secondary"}>
+              {isUnlimited ? "∞" : `${woofsData.remaining} restants`}
+            </Badge>
+          </div>
+
+          <div className="flex items-center justify-between text-sm tabular-nums text-muted-foreground">
+            <span>
+              {woofsData.used} / {isUnlimited ? "Illimité" : woofsData.total}
+            </span>
+            {!isUnlimited && (
+              <span>
+                ({woofsData.percentage}%)
+              </span>
+            )}
+          </div>
+          
+          {!isUnlimited ? (
+            <Progress 
+              value={Math.min(120, woofsData.percentage)} 
+              className={cn("h-2", woofsData.barColor)}
+            />
+          ) : (
+            <div className="h-2 rounded-full bg-primary/20" aria-label="Quota illimité" />
+          )}
+
+          <p className="text-xs text-muted-foreground">
+            {isUnlimited 
+              ? "Woofs illimités 🎉" 
+              : `Il te reste ${woofsData.remaining} Woofs pour créer visuels et vidéos`}
+          </p>
+        </div>
+
+        {/* Info coûts */}
+        <div className="pt-4 border-t space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground">Coûts en Woofs :</p>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">• Image/Slide :</span>
+              <span className="font-medium">1 Woof</span>
             </div>
-          );
-        })}
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">• Vidéo standard :</span>
+              <span className="font-medium">10 Woofs</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">• Vidéo premium :</span>
+              <span className="font-medium">50 Woofs</span>
+            </div>
+          </div>
+        </div>
+
+        {/* CTA Upgrade si nécessaire */}
+        {woofsData.percentage >= 80 && !isUnlimited && (
+          <Button 
+            onClick={() => navigate("/billing")} 
+            variant="outline" 
+            size="sm" 
+            className="w-full"
+          >
+            Voir les plans
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

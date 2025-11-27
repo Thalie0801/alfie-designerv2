@@ -39,8 +39,8 @@ export function useBrandManagement() {
           name: brandData.name,
           plan: 'starter',
           is_addon: true,
-          quota_images: quotas.images,
-          quota_videos: quotas.videos,
+          quota_images: 0,
+          quota_videos: 0,
           quota_woofs: quotas.woofs,
           images_used: 0,
           videos_used: 0,
@@ -101,8 +101,8 @@ export function useBrandManagement() {
         .from('brands')
         .update({
           plan: newTier,
-          quota_images: quotas.images,
-          quota_videos: quotas.videos,
+          quota_images: 0,
+          quota_videos: 0,
           quota_woofs: quotas.woofs,
         })
         .eq('id', brandId);

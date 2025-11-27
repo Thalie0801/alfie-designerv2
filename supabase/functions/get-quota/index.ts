@@ -58,27 +58,20 @@ export default {
         (now.getMonth() + 1).toString().padStart(2, '0')
       );
 
-      // Defaults pour éviter null → 0 fantôme
-      let finalQuotas = {
-        woofs_quota: profile.quota_videos ?? 0,
-        woofs_used: 0,
-        visuals_quota: profile.quota_visuals_per_month ?? 0,
-        visuals_used: 0,
-        videos_quota: 0,
-        videos_used: 0,
-      };
+      // Système unifié Woofs : tout est en Woofs maintenant
+      let woofs_quota = profile.quota_videos ?? 0;
+      let woofs_used = 0;
 
       // Fallback sur plans_config si quotas = 0 mais plan défini
-      if (finalQuotas.woofs_quota === 0 && profile.plan) {
+      if (woofs_quota === 0 && profile.plan) {
         const { data: planConfig } = await supabaseRls
           .from('plans_config')
-          .select('woofs_per_month, visuals_per_month')
+          .select('woofs_per_month')
           .eq('plan', profile.plan)
           .maybeSingle();
         
         if (planConfig) {
-          finalQuotas.woofs_quota = planConfig.woofs_per_month;
-          finalQuotas.visuals_quota = planConfig.visuals_per_month;
+          woofs_quota = planConfig.woofs_per_month;
           console.log(`[get-quota] Fallback to plans_config for plan ${profile.plan}`);
         }
       }
@@ -87,26 +80,20 @@ export default {
       if (brand_id) {
         const { data: brand } = await supabaseRls
           .from('brands')
-          .select('quota_woofs, quota_images, quota_videos')
+          .select('quota_woofs, resets_on')
           .eq('id', brand_id)
           .maybeSingle();
 
         const { data: counter } = await supabaseRls
           .from('counters_monthly')
-          .select('images_used, reels_used, woofs_used')
+          .select('woofs_used')
           .eq('brand_id', brand_id)
           .eq('period_yyyymm', periodYYYYMM)
           .maybeSingle();
 
         if (brand) {
-          finalQuotas = {
-            woofs_quota: brand.quota_woofs ?? finalQuotas.woofs_quota,
-            woofs_used: counter?.woofs_used ?? 0,
-            visuals_quota: brand.quota_images ?? finalQuotas.visuals_quota,
-            visuals_used: counter?.images_used ?? 0,
-            videos_quota: brand.quota_videos ?? 0,
-            videos_used: counter?.reels_used ?? 0,
-          };
+          woofs_quota = brand.quota_woofs ?? woofs_quota;
+          woofs_used = counter?.woofs_used ?? 0;
           console.log(`[get-quota] Using counters_monthly for brand ${brand_id}, period ${periodYYYYMM}`);
         }
       }
@@ -114,31 +101,20 @@ export default {
       if (isAdmin) {
         const unlimited = 1_000_000_000;
         console.log(`[quota] admin bypass applied for ${userEmail}`);
-        finalQuotas = {
-          ...finalQuotas,
-          woofs_quota: unlimited,
-          visuals_quota: unlimited,
-          videos_quota: unlimited,
-        };
+        woofs_quota = unlimited;
       }
 
-      const woofs_remaining = Math.max(0, finalQuotas.woofs_quota - finalQuotas.woofs_used);
-      const visuals_remaining = Math.max(0, finalQuotas.visuals_quota - finalQuotas.visuals_used);
-      const videos_remaining = Math.max(0, finalQuotas.videos_quota - finalQuotas.videos_used);
+      const woofs_remaining = Math.max(0, woofs_quota - woofs_used);
+      const threshold_80 = (woofs_used / woofs_quota) >= 0.8;
 
       const resetDate = profile.generations_reset_date || 
         new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString();
 
       return {
-        woofs_quota: finalQuotas.woofs_quota,
-        woofs_used: finalQuotas.woofs_used,
+        woofs_quota,
+        woofs_used,
         woofs_remaining,
-        visuals_quota: finalQuotas.visuals_quota,
-        visuals_used: finalQuotas.visuals_used,
-        visuals_remaining,
-        videos_quota: finalQuotas.videos_quota,
-        videos_used: finalQuotas.videos_used,
-        videos_remaining,
+        threshold_80,
         plan: profile.plan || 'starter',
         reset_date: resetDate,
         is_admin: isAdmin,
