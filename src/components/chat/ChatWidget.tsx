@@ -195,42 +195,6 @@ export default function ChatWidget() {
 
   // registerIdeas supprimé - géré par le LLM
 
-  function extractInterestingLines(text: string): string[] {
-    const lines = text
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    const matches: string[] = [];
-
-    const allowLine = (line: string) => !/^ok,? sur changement d['’]angle/i.test(line);
-
-    for (const line of lines) {
-      if (!allowLine(line)) continue;
-      const cleaned = line.replace(/^[-•*+]\s*/, "");
-
-      if (
-        /^(carrousel|carousel|vid[ée]o|video|image|visuel)/i.test(cleaned) ||
-        /^th[eè]me\s*[:–-]/i.test(cleaned) ||
-        /^hook\s*[:–-]/i.test(cleaned) ||
-        /^id[ée]e?\s*\d*\s*[:–-]/i.test(cleaned)
-      ) {
-        matches.push(cleaned);
-      }
-
-      if (matches.length >= 3) break;
-    }
-
-    if (matches.length === 0) {
-      const fallback = lines.find((line) => allowLine(line));
-      if (fallback) {
-        matches.push(fallback.replace(/^[-•*+]\s*/, ""));
-      }
-    }
-
-    return matches;
-  }
-
   const buildNeedTopicReply = (): AssistantReply => {
     const suggestions = [
       "Carrousel 5 slides 4:5 Instagram : 3 erreurs en pub Meta pour PME",
