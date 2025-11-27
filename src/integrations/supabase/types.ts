@@ -2298,6 +2298,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      cleanup_expired_assets: { Args: never; Returns: undefined }
       consume_visuals: {
         Args: {
           brand_id_param: string
@@ -2321,6 +2322,15 @@ export type Database = {
         Returns: undefined
       }
       generate_short_job_id: { Args: never; Returns: string }
+      get_table_sizes: {
+        Args: never
+        Returns: {
+          row_count: number
+          table_name: string
+          total_size: string
+          total_size_bytes: number
+        }[]
+      }
       has_active_plan: { Args: { user_id_param: string }; Returns: boolean }
       has_role: {
         Args: {
