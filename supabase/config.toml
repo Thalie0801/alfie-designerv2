@@ -1,1 +1,4 @@
 project_id = "gbuvtzqqzyiytypenzae"
+
+[functions.alfie-chat-widget]
+verify_jwt = false
