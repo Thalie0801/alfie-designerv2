@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { adminCreateUser, type CreateUserParams } from '@/lib/admin-api';
 
 export async function createUser(params: CreateUserParams) {
