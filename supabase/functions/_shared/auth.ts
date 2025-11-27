@@ -1,11 +1,11 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
-import { ADMIN_EMAILS, ALFIE_ADMIN_EMAILS } from "./env.ts";
+import { ADMIN_EMAILS } from "./env.ts";
 
 function parseAdminEmails(): string[] {
-  return (ALFIE_ADMIN_EMAILS ?? ADMIN_EMAILS ?? "")
+  return (ADMIN_EMAILS ?? "")
     .split(",")
-    .map((email) => email.trim().toLowerCase())
+    .map((email: string) => email.trim().toLowerCase())
     .filter(Boolean);
 }
 

@@ -18,7 +18,6 @@ import ManageAmbassadors from "./pages/admin/ManageAmbassadors";
 import ResetUserPassword from "./pages/admin/ResetUserPassword";
 import Affiliate from "./pages/Affiliate";
 import Profile from "./pages/Profile";
-import Integrations from "./pages/Integrations";
 import DevenirPartenaire from "./pages/DevenirPartenaire";
 import Privacy from "./pages/Privacy";
 import Legal from "./pages/Legal";
@@ -30,10 +29,9 @@ import Library from "./pages/Library";
 import Videos from "./pages/Videos";
 import CloudinaryTest from "./pages/CloudinaryTest";
 import Creator from "./pages/Creator";
-import Campaigns from "./pages/Campaigns";
 
 import ActivateAccess from "./pages/onboarding/Activate";
-import { AlfieChat } from "./components/AlfieChat"; // si tu gardes /chat
+import { AlfieChat } from "./components/AlfieChat";
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 import { ChatGenerator } from "@/features/studio";
 import ChatWidget from "./components/chat/ChatWidget";
@@ -120,16 +118,6 @@ const AppRoutes = () => {
           }
         />
         <Route
-          path="/campaigns"
-          element={
-            <ProtectedRoute>
-              <AppLayoutWithSidebar>
-                <Campaigns />
-              </AppLayoutWithSidebar>
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/videos"
           element={
             <ProtectedRoute>
@@ -173,16 +161,6 @@ const AppRoutes = () => {
             <ProtectedRoute>
               <AppLayoutWithSidebar>
                 <Profile />
-              </AppLayoutWithSidebar>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/integrations"
-          element={
-            <ProtectedRoute>
-              <AppLayoutWithSidebar>
-                <Integrations />
               </AppLayoutWithSidebar>
             </ProtectedRoute>
           }
