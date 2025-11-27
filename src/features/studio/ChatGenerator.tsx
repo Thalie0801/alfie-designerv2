@@ -11,6 +11,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { QuotaBar } from "@/components/create/QuotaBar";
 
 type GeneratedAsset = {
   url: string;
@@ -1033,6 +1034,9 @@ export function ChatGenerator() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {/* Quota Bar */}
+      <QuotaBar activeBrandId={resolvedBrandId} />
+      
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         {/* Header */}
         <div className="mb-8 text-center">
