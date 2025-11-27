@@ -228,7 +228,7 @@ Deno.serve(async (req) => {
     }
 
     const stripeSecret = requireEnv("STRIPE_SECRET_KEY");
-    const stripe = new Stripe(stripeSecret, { apiVersion: "2024-11-20" });
+    const stripe = new Stripe(stripeSecret, { apiVersion: "2025-08-27.basil" });
 
     // Retrieve session from Stripe
     const session = await stripe.checkout.sessions.retrieve(session_id);

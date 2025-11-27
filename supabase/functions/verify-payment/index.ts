@@ -287,7 +287,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ ok: false, error: "STRIPE_WEBHOOK_SECRET missing" }, 500);
   }
 
-  const stripe = new Stripe(stripeSecret, { apiVersion: "2024-11-20" });
+  const stripe = new Stripe(stripeSecret, { apiVersion: "2025-08-27.basil" });
 
   const signature = req.headers.get("stripe-signature");
   const body = await req.text();
