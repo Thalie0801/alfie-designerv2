@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: false, error: "STRIPE_SECRET_KEY missing" }, 500);
     }
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2024-11-20" });
+    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
     let customerId: string | undefined;
     const existing = await stripe.customers.list({ email, limit: 1 });
