@@ -369,6 +369,12 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
           }
         }
 
+        // ⚠️ SECURITY: NEVER store base64 URLs in database (saturation prevention)
+        if (finalImageUrl.startsWith('data:')) {
+          console.error('[alfie-render-image] 🚨 BLOCKED: base64 URL forbidden in library_assets');
+          throw new Error('SECURITY: base64 URLs are forbidden in database. Use Cloudinary URLs only.');
+        }
+
         // 5. Stocker la génération
         const { data: generation, error: insertError } = await supabaseAdmin
           .from("media_generations")
