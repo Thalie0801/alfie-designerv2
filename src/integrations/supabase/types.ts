@@ -1698,6 +1698,7 @@ export type Database = {
           quota_brands: number | null
           quota_videos: number | null
           quota_visuals_per_month: number | null
+          status: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           updated_at: string | null
@@ -1724,6 +1725,7 @@ export type Database = {
           quota_brands?: number | null
           quota_videos?: number | null
           quota_visuals_per_month?: number | null
+          status?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           updated_at?: string | null
@@ -1750,6 +1752,7 @@ export type Database = {
           quota_brands?: number | null
           quota_videos?: number | null
           quota_visuals_per_month?: number | null
+          status?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           updated_at?: string | null
