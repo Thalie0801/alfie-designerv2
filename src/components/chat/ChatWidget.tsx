@@ -3,10 +3,14 @@ import { createPortal } from "react-dom";
 import { MessageCircle, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBrief, type Brief } from "@/hooks/useBrief";
-import { useBrandKit } from "@/hooks/useBrandKit";
+import { useAuth } from "@/hooks/useAuth";
 import { detectContentIntent, detectPlatformHelp } from "@/lib/chat/detect";
 import { chooseCarouselOutline, chooseImageVariant, chooseVideoVariant } from "@/lib/chat/coachPresets";
 import { whatCanDoBlocks } from "@/lib/chat/helpMap";
+import type { AlfiePack, AlfieWidgetResponse } from "@/types/alfiePack";
+import PackPreviewCard from "./PackPreviewCard";
+import PackPreparationModal from "./PackPreparationModal";
+import { supabase } from "@/integrations/supabase/client";
 
 type CoachMode = "strategy" | "da" | "maker";
 type ChatMessage = { role: "user" | "assistant"; node: ReactNode };
@@ -20,10 +24,11 @@ export default function ChatWidget() {
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [modeCoach, setModeCoach] = useState<CoachMode>("strategy");
   const [seed, setSeed] = useState(0);
-  const [previousIdeas, setPreviousIdeas] = useState<string[]>([]);
+  const [pendingPack, setPendingPack] = useState<AlfiePack | null>(null);
+  const [showPackModal, setShowPackModal] = useState(false);
 
   const brief = useBrief();
-  const { brandKit } = useBrandKit();
+  const { profile } = useAuth();
   const navigate = useNavigate();
 
   const BRAND = useMemo(
@@ -188,19 +193,7 @@ export default function ChatWidget() {
     return { intent, mergedBrief };
   };
 
-  const registerIdeas = (ideas: string[]) => {
-    setPreviousIdeas((prev) => {
-      const next = [...prev];
-      const seen = new Set(prev);
-      for (const idea of ideas) {
-        const normalised = idea.trim().replace(/\s+/g, " ");
-        if (!normalised || seen.has(normalised)) continue;
-        seen.add(normalised);
-        next.push(normalised);
-      }
-      return next;
-    });
-  };
+  // registerIdeas supprimé - géré par le LLM
 
   function extractInterestingLines(text: string): string[] {
     const lines = text
@@ -334,9 +327,7 @@ export default function ChatWidget() {
       body = variant;
     }
 
-    if (collectedIdeas.length > 0) {
-      registerIdeas(collectedIdeas);
-    }
+    // Ideas tracking géré par le LLM maintenant
 
     return {
       role: "assistant" as const,
@@ -399,6 +390,13 @@ export default function ChatWidget() {
 
   // --------- LOGIQUE AI PRINCIPALE ---------
 
+  // Mapping des personas pour alfie-chat-widget
+  const personaMap = {
+    strategy: "coach",
+    da: "da_junior",
+    maker: "realisateur_studio",
+  } as const;
+
   async function replyContentWithAI(raw: string): Promise<AssistantReply> {
     const { intent, mergedBrief } = applyIntent(raw);
 
@@ -406,41 +404,57 @@ export default function ChatWidget() {
       return buildNeedTopicReply();
     }
 
-    const contextPayload: Record<string, unknown> = {
-      mode: modeCoach,
-      brief: mergedBrief,
-    };
+    const activeBrandId = profile?.active_brand_id;
+    if (!activeBrandId) {
+      console.warn("No active brand ID, falling back to local reply");
+      return buildLocalReply(intent, mergedBrief);
+    }
 
-    if (mergedBrief.format) contextPayload.contentType = mergedBrief.format;
-    if (mergedBrief.platform) contextPayload.platform = mergedBrief.platform;
-    if (brandKit) contextPayload.brandKit = brandKit;
+    // Construire l'historique des messages pour le LLM
+    const chatHistory = msgs
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => ({
+        role: m.role,
+        content: typeof m.node === "string" ? m.node : raw, // Simplification
+      }));
+
+    // Ajouter le message utilisateur actuel
+    chatHistory.push({
+      role: "user",
+      content: raw,
+    });
 
     try {
-      const res = await fetch("/functions/v1/chat-ai-assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: raw,
-          context: contextPayload,
-          previousIdeas,
-        }),
+      // Appeler alfie-chat-widget au lieu de chat-ai-assistant
+      const response = await supabase.functions.invoke("alfie-chat-widget", {
+        body: {
+          brandId: activeBrandId,
+          persona: personaMap[modeCoach],
+          messages: chatHistory,
+          lang: "fr",
+        },
       });
 
-      if (!res.ok) {
-        console.error("chat-ai-assistant: provider error", res.status, await res.text().catch(() => ""));
+      if (response.error) {
+        console.error("alfie-chat-widget error:", response.error);
         return buildLocalReply(intent, mergedBrief);
       }
 
-      const payload = (await res.json().catch(() => null)) as { data?: { message?: string } } | null;
-      const aiMessage = typeof payload?.data?.message === "string" ? payload.data.message.trim() : "";
+      const { reply, pack } = response.data as AlfieWidgetResponse;
 
-      if (!aiMessage) {
+      if (!reply) {
         return buildLocalReply(intent, mergedBrief);
       }
 
-      registerIdeas(extractInterestingLines(aiMessage));
+      // Si un pack est détecté, le stocker
+      if (pack) {
+        console.log("Pack détecté:", pack);
+        setPendingPack(pack);
+      }
 
-      const blocks = aiMessage
+      // Ideas tracking géré par le LLM maintenant
+
+      const blocks = reply
         .split(/\n{2,}/)
         .map((block) => block.trim())
         .filter((block) => block.length > 0);
@@ -453,10 +467,17 @@ export default function ChatWidget() {
 
       return {
         role: "assistant" as const,
-        node: assistantCard(<div className="space-y-2">{paragraphs}</div>),
+        node: assistantCard(
+          <div className="space-y-2">
+            {paragraphs}
+            {pack && activeBrandId && (
+              <PackPreviewCard pack={pack} onOpenDetail={() => setShowPackModal(true)} />
+            )}
+          </div>
+        ),
       };
     } catch (error) {
-      console.error("chat-ai-assistant: unexpected error", error);
+      console.error("alfie-chat-widget: unexpected error", error);
       return buildLocalReply(intent, mergedBrief);
     }
   }
@@ -521,6 +542,15 @@ export default function ChatWidget() {
         >
           <MessageCircle className="w-6 h-6" />
         </button>
+      )}
+
+      {/* Modal de préparation du pack */}
+      {showPackModal && pendingPack && profile?.active_brand_id && (
+        <PackPreparationModal
+          pack={pendingPack}
+          brandId={profile.active_brand_id}
+          onClose={() => setShowPackModal(false)}
+        />
       )}
 
       {open && (
