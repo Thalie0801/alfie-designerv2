@@ -42,7 +42,7 @@ export function CreateHeader({ onClearChat }: CreateHeaderProps) {
 
   // Option 2 (Cloudinary-only) : pas de backend vidéo IA
   const ffmpegBackend = import.meta.env.VITE_FFMPEG_BACKEND_URL as string | undefined;
-  const isVideoIADisabled = !ffmpegBackend; // on affiche un bandeau d’info dans le popover
+  const isVideoIADisabled = !ffmpegBackend; // on affiche un bandeau d'info dans le popover
 
   useEffect(() => {
     let mounted = true;
@@ -80,19 +80,7 @@ export function CreateHeader({ onClearChat }: CreateHeaderProps) {
   const resetDate = formatResetDate(quotaStatus?.resetsOn ?? null);
 
   // valeurs sûres pour éviter les crashes si quotaStatus est null/incomplet
-  const visuals = quotaStatus?.visuals ?? { used: 0, limit: 0, percentage: 0 };
-  const videos = quotaStatus?.videos ?? { used: 0, limit: 0, percentage: 0 };
-  const woofs = quotaStatus?.woofs ?? { consumed: 0, remaining: 0, limit: 0 };
-
-  const visualsRemaining =
-    typeof visuals.limit === 'number' && typeof visuals.used === 'number'
-      ? Math.max(0, visuals.limit - visuals.used)
-      : 0;
-
-  const videosRemaining =
-    typeof videos.limit === 'number' && typeof videos.used === 'number'
-      ? Math.max(0, videos.limit - videos.used)
-      : 0;
+  const woofs = quotaStatus?.woofs ?? { used: 0, remaining: 0, limit: 0, percentage: 0 };
 
   const hasBrandAndQuotas = !!brandKit && !!quotaStatus;
 
@@ -146,7 +134,7 @@ export function CreateHeader({ onClearChat }: CreateHeaderProps) {
                       <div className="space-y-1.5">
                         <h4 className="font-semibold">Quotas de {brandName}</h4>
                         <p className="text-xs text-slate-500">
-                          Confection Canva : incluse et non comptabilisée.
+                          Système unifié Woofs : toutes les générations consomment des Woofs 🐶
                         </p>
                         {isVideoIADisabled && (
                           <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-800">
@@ -154,7 +142,7 @@ export function CreateHeader({ onClearChat }: CreateHeaderProps) {
                             <p className="text-xs">
                               <strong>Mode Cloudinary-only :</strong> la vidéo IA est désactivée (pas
                               de backend). Les montages vidéo simples (images→vidéo, concat) restent disponibles
-                              via Cloudinary et ne consomment pas de quotas “Vidéos IA”.
+                              via Cloudinary.
                             </p>
                           </div>
                         )}
@@ -162,39 +150,20 @@ export function CreateHeader({ onClearChat }: CreateHeaderProps) {
 
                       <Separator />
 
-                      {/* Visuels IA */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span>Visuels IA</span>
-                          <span className="font-medium">
-                            {visualsRemaining}/{visuals.limit || 0}
-                          </span>
-                        </div>
-                        <Progress value={clampPct(visuals.percentage)} />
-                      </div>
-
-                      {/* Vidéos IA (désactivées si pas de backend) */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className={cn(isVideoIADisabled && 'text-slate-400')}>
-                            Vidéos IA
-                          </span>
-                          <span className="font-medium">
-                            {videosRemaining}/{videos.limit || 0}
-                          </span>
-                        </div>
-                        <Progress value={clampPct(videos.percentage)} />
-                      </div>
-
                       {/* Woofs */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
-                          <span>Woofs</span>
+                          <span className="font-medium">Woofs 🐶</span>
                           <span className="font-medium">
                             {woofs.remaining}/{woofs.limit || 0}
                           </span>
                         </div>
-                        <Progress value={clampPct(100 - (woofs.remaining / (woofs.limit || 1)) * 100)} />
+                        <Progress value={clampPct(woofs.percentage)} />
+                        <div className="text-xs text-slate-500 space-y-1">
+                          <p>💡 Coûts en Woofs :</p>
+                          <p>• Image = 1 Woof · Slide carrousel = 1 Woof</p>
+                          <p>• Vidéo standard = 10 Woofs · Vidéo premium = 50 Woofs</p>
+                        </div>
                       </div>
                     </div>
                   ) : (
