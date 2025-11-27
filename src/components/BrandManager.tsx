@@ -5,6 +5,7 @@ import { BrandSelector } from './BrandSelector';
 import { BrandDialog } from './BrandDialog';
 import { Palette, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
+import { AddPaidBrandDialog } from './AddPaidBrandDialog';
 
 export function BrandManager() {
   const { 
@@ -121,18 +122,21 @@ export function BrandManager() {
           </Alert>
         )}
 
-        {/* Add Brand Section - Hidden since only 1 brand allowed */}
-        {totalBrands === 0 && (
-          <div className="space-y-4 pt-4 border-t">
-            <div className="space-y-2">
-              <label className="text-sm font-semibold">Créer votre marque</label>
-              <p className="text-xs text-muted-foreground">
-                Vous avez droit à 1 marque incluse dans votre compte
+        {/* Add Brand Section */}
+        <div className="space-y-4 pt-4 border-t">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold">Ajouter une marque</label>
+            <p className="text-xs text-muted-foreground">
+              Créez une marque additionnelle avec le plan Starter
+            </p>
+            <AddPaidBrandDialog disabled={totalBrands >= quotaBrands} />
+            {totalBrands >= quotaBrands && (
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                Limite de marques atteinte ({totalBrands}/{quotaBrands})
               </p>
-              <BrandDialog onSuccess={loadBrands} />
-            </div>
+            )}
           </div>
-        )}
+        </div>
       </CardContent>
     </Card>
   );
