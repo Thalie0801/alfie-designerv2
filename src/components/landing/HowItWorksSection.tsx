@@ -19,8 +19,8 @@ const steps = [
   {
     step: "03",
     icon: Share2,
-    title: "Récupère dans Canva",
-    description: "Ton design arrive directement dans ton espace Canva",
+    title: "Télécharge et publie",
+    description: "Récupère tes créations en ZIP, prêtes à poster sur tes réseaux",
   },
 ] as const;
 
