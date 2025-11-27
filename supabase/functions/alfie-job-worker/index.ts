@@ -473,6 +473,12 @@ async function processRenderImage(payload: any) {
     throw new Error("Missing imageUrl");
   }
 
+  // ⚠️ SECURITY: NEVER store base64 URLs in database (saturation prevention)
+  if (imageUrl.startsWith('data:')) {
+    console.error('[alfie-job-worker] 🚨 BLOCKED: base64 URL forbidden in database');
+    throw new Error('SECURITY: base64 URLs are forbidden. Use Cloudinary URLs only.');
+  }
+
   const expiresAt = new Date(Date.now() + THIRTY_DAYS_MS).toISOString();
 
   const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
