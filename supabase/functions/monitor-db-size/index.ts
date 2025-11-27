@@ -31,13 +31,13 @@ Deno.serve(async (req) => {
     }
 
     // Récupérer les stats générales
-    const { data: mediaCount } = await supabaseAdmin
+    const { count: mediaCount } = await supabaseAdmin
       .from("media_generations")
-      .select("id", { count: "exact", head: true });
+      .select("*", { count: "exact", head: true });
 
-    const { data: libraryCount } = await supabaseAdmin
+    const { count: libraryCount } = await supabaseAdmin
       .from("library_assets")
-      .select("id", { count: "exact", head: true });
+      .select("*", { count: "exact", head: true });
 
     const stats = {
       timestamp: new Date().toISOString(),
