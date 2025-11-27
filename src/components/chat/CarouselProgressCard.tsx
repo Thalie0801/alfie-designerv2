@@ -11,7 +11,7 @@ import {
   PlayCircle,
   Image as ImageIcon,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
 interface CarouselProgressCardProps {

@@ -3,7 +3,7 @@ import { Sparkles, ImagePlus, Loader2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { cn } from "@/lib/utils";
 import { uploadToChatBucket } from "@/lib/chatUploads";
