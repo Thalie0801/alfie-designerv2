@@ -45,9 +45,8 @@ export function useStripeCheckout() {
       }
 
       if (data?.url) {
-        if (typeof window !== 'undefined') {
-          window.open(data.url, '_blank');
-        }
+        // Redirect to Stripe Checkout in the same window
+        window.location.href = data.url;
       }
     } catch (error: any) {
       console.error('Checkout error:', error);

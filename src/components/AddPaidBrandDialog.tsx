@@ -15,7 +15,7 @@ import { CreditCard } from 'lucide-react';
 import { useStripeCheckout } from '@/hooks/useStripeCheckout';
 import { SYSTEM_CONFIG } from '@/config/systemConfig';
 
-export function AddPaidBrandDialog() {
+export function AddPaidBrandDialog({ disabled }: { disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const [brandName, setBrandName] = useState('');
   const { createCheckout, loading } = useStripeCheckout();
@@ -33,9 +33,9 @@ export function AddPaidBrandDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="default" className="w-full">
+        <Button variant="default" className="w-full" disabled={disabled}>
           <CreditCard className="w-4 h-4 mr-2" />
-          Ajouter une marque + 39€
+          Ajouter une marque - 39€/mois
         </Button>
       </DialogTrigger>
       <DialogContent>
