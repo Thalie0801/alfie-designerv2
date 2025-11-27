@@ -125,15 +125,27 @@ export function BrandManager() {
         {/* Add Brand Section */}
         <div className="space-y-4 pt-4 border-t">
           <div className="space-y-2">
-            <label className="text-sm font-semibold">Ajouter une marque</label>
-            <p className="text-xs text-muted-foreground">
-              Créez une marque additionnelle avec le plan Starter
-            </p>
-            <AddPaidBrandDialog disabled={totalBrands >= quotaBrands} />
-            {totalBrands >= quotaBrands && (
-              <p className="text-xs text-muted-foreground text-center mt-2">
-                Limite de marques atteinte ({totalBrands}/{quotaBrands})
-              </p>
+            {totalBrands === 0 ? (
+              <>
+                <label className="text-sm font-semibold">Créer votre première marque</label>
+                <p className="text-xs text-muted-foreground">
+                  Vous avez droit à 1 marque gratuite incluse dans votre compte
+                </p>
+                <BrandDialog onSuccess={loadBrands} />
+              </>
+            ) : (
+              <>
+                <label className="text-sm font-semibold">Ajouter une marque</label>
+                <p className="text-xs text-muted-foreground">
+                  Créez une marque additionnelle avec le plan Starter (39€/mois)
+                </p>
+                <AddPaidBrandDialog disabled={totalBrands >= quotaBrands} />
+                {totalBrands >= quotaBrands && (
+                  <p className="text-xs text-muted-foreground text-center mt-2">
+                    Limite de marques atteinte ({totalBrands}/{quotaBrands})
+                  </p>
+                )}
+              </>
             )}
           </div>
         </div>

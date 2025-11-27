@@ -119,14 +119,33 @@ export function useBrandKit() {
     niche: (activeBrand as any).niche
   } : null;
 
+  // Get quota_brands from profile
+  const [quotaBrands, setQuotaBrands] = useState<number>(1);
+
+  useEffect(() => {
+    const fetchQuotaBrands = async () => {
+      if (!user) return;
+      
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('quota_brands')
+        .eq('id', user.id)
+        .single();
+      
+      if (profileData?.quota_brands) {
+        setQuotaBrands(profileData.quota_brands);
+      }
+    };
+    
+    fetchQuotaBrands();
+  }, [user]);
+
   const canAddBrand = () => {
-    // Limiter à 1 seule marque
-    return brands.length < 1;
+    return brands.length < quotaBrands;
   };
 
   const remainingBrands = () => {
-    // Toujours 1 marque maximum
-    return Math.max(0, 1 - brands.length);
+    return Math.max(0, quotaBrands - brands.length);
   };
 
   return {
@@ -141,11 +160,11 @@ export function useBrandKit() {
     setActiveBrand,
     loadBrands,
     
-    // Quota management (limité à 1 marque)
+    // Quota management
     canAddBrand: canAddBrand(),
     remainingBrands: remainingBrands(),
     totalBrands: brands.length,
-    quotaBrands: 1, // Limité à 1 marque
+    quotaBrands: quotaBrands,
     
     loading,
     
