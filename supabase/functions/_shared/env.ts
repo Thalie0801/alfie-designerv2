@@ -55,7 +55,6 @@ export const FFMPEG_BACKEND_URL = env('FFMPEG_BACKEND_URL');
 export const FFMPEG_BACKEND_API_KEY = env('FFMPEG_BACKEND_API_KEY');
 export const ALFIE_ADMIN_EMAILS = env('ALFIE_ADMIN_EMAILS');
 export const ADMIN_EMAILS = env('ADMIN_EMAILS');
-export const VIP_EMAILS = env('VIP_EMAILS');
 export const RESEND_API_KEY = env('RESEND_API_KEY');
 export const STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY');
 
