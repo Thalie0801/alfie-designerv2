@@ -18,34 +18,48 @@ export default function ResetPassword() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Écouter les événements d'authentification pour détecter PASSWORD_RECOVERY
+    // Écouter les événements d'authentification
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[ResetPassword] Auth event:', event);
+      console.log('[ResetPassword] Auth event:', event, 'Session:', !!session);
       
       if (event === 'PASSWORD_RECOVERY') {
-        console.log('[ResetPassword] Password recovery detected, session valid');
+        console.log('[ResetPassword] Password recovery event detected');
         setVerifyingToken(false);
       } else if (event === 'SIGNED_IN' && session) {
-        console.log('[ResetPassword] User signed in during recovery');
         setVerifyingToken(false);
       }
     });
 
-    // Vérifier aussi la session existante
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        console.error('[ResetPassword] No session found');
-        toast.error('Lien de réinitialisation invalide ou expiré');
-        navigate('/auth');
-      } else {
-        console.log('[ResetPassword] Session found');
-        setVerifyingToken(false);
-      }
-    });
+    // Vérifier si des hash parameters existent (token de récupération)
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const hasRecoveryToken = hashParams.has('access_token') || hashParams.has('token');
+    
+    console.log('[ResetPassword] Has recovery token in URL:', hasRecoveryToken);
+    
+    // Si pas de token dans l'URL, vérifier la session après un court délai
+    if (!hasRecoveryToken) {
+      const checkSession = setTimeout(async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.log('[ResetPassword] No valid session found after delay, redirecting');
+          toast.error('Lien de réinitialisation invalide ou expiré');
+          navigate('/auth');
+        } else {
+          console.log('[ResetPassword] Valid session found');
+          setVerifyingToken(false);
+        }
+      }, 2000); // Attendre 2 secondes pour que Supabase traite le token
+      
+      return () => {
+        clearTimeout(checkSession);
+        subscription.unsubscribe();
+      };
+    } else {
+      // Si on a un token, attendre l'événement PASSWORD_RECOVERY
+      setVerifyingToken(true);
+    }
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, [navigate]);
 
   const handleResetPassword = async (e: React.FormEvent) => {

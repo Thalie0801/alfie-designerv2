@@ -217,9 +217,12 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.functions.invoke('request-password-reset', {
-        body: { email }
-      });
+    const { error } = await supabase.functions.invoke('request-password-reset', {
+      body: { 
+        email,
+        appOrigin: window.location.origin
+      }
+    });
 
       if (error) throw error;
 
