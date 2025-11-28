@@ -20,3 +20,6 @@ verify_jwt = true
 
 [functions.alfie-generate-texts]
 verify_jwt = true
+
+[functions.request-affiliate-payout]
+verify_jwt = true
