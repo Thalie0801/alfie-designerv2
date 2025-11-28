@@ -585,8 +585,20 @@ export default function Affiliate() {
 
             {/* Message si demande en cours */}
             {hasPendingPayout && (
-              <p className="mt-2 text-xs text-orange-600">
-                Une demande est déjà en cours de traitement
+              <div className="mt-2 space-y-1">
+                <p className="text-xs text-orange-600">
+                  Une demande est déjà en cours de traitement
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  📅 Les paiements sont traités le 15 du mois suivant
+                </p>
+              </div>
+            )}
+            
+            {/* Message sur la date de paiement si pas de demande en cours */}
+            {!hasPendingPayout && canRequestPayout && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                📅 Les demandes effectuées avant fin du mois sont payées le 15 du mois suivant
               </p>
             )}
           </CardContent>
