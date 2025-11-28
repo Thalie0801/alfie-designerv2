@@ -78,7 +78,7 @@ export function detectPlatformHelp(raw: string) {
     { test: /(studio|génération|créer|lancer)/, to: "/studio", label: "Ouvrir Studio" },
     { test: /(template|catalogue|modèles?)/, to: "/templates", label: "Catalogue" },
     { test: /(bibliothèque|assets?|médias?)/, to: "/library", label: "Bibliothèque" },
-    { test: /(brand[\s-]?kit|marque|couleurs|typo)/, to: "/brand-kit-questionnaire", label: "Brand Kit" },
+    { test: /(brand[\s-]?kit|modifier (ma |mon |les )?couleurs|configurer (ma |mes )?typo)/, to: "/brand-kit-questionnaire", label: "Brand Kit" },
     { test: /(factur|abonnement|paiement|pricing|prix|crédit|woofs)/, to: "/billing", label: "Facturation" },
     { test: /(profil|compte|email|mot de passe)/, to: "/profile", label: "Profil" },
     { test: /(dashboard|stat|performances?)/, to: "/dashboard", label: "Dashboard" },
