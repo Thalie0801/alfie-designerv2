@@ -1,4 +1,4 @@
-import { Copy, Trash2, ChevronDown, ChevronUp, Upload, X as XIcon } from "lucide-react";
+import { Copy, Trash2, ChevronDown, ChevronUp, Upload, X as XIcon, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import type { PackAsset } from "@/types/alfiePack";
 import { WOOF_COSTS } from "@/config/woofs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { AssetEditDialog } from "./AssetEditDialog";
 
 interface PackAssetRowProps {
   asset: PackAsset;
@@ -45,6 +46,7 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
   const [isOpen, setIsOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [referenceImage, setReferenceImage] = useState(asset.referenceImageUrl || "");
+  const [showEditDialog, setShowEditDialog] = useState(false);
 
   const woofCost = WOOF_COSTS[asset.woofCostType];
   const totalCost = asset.kind === "carousel" ? woofCost * asset.count : woofCost;
@@ -230,12 +232,20 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
             variant="outline" 
             size="sm" 
             className="w-full"
-            onClick={() => onEdit(asset)}
+            onClick={() => setShowEditDialog(true)}
           >
+            <Edit className="h-4 w-4 mr-2" />
             Modifier cet asset
           </Button>
         </CollapsibleContent>
       </Collapsible>
+
+      <AssetEditDialog
+        asset={asset}
+        isOpen={showEditDialog}
+        onClose={() => setShowEditDialog(false)}
+        onSave={onEdit}
+      />
     </Card>
   );
 }
