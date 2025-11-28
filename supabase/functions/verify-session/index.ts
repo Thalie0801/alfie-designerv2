@@ -15,19 +15,19 @@ const PLAN_CONFIG = {
     quota_brands: 1,
     quota_images: 150,
     quota_videos: 15,
-    quota_woofs: 15,
+    quota_woofs: 150,
   },
   pro: {
-    quota_brands: 1,
+    quota_brands: 3,
     quota_images: 450,
     quota_videos: 45,
-    quota_woofs: 45,
+    quota_woofs: 450,
   },
   studio: {
-    quota_brands: 1,
+    quota_brands: 5,
     quota_images: 1000,
     quota_videos: 100,
-    quota_woofs: 100,
+    quota_woofs: 1000,
   },
   enterprise: {
     quota_brands: 999,
@@ -263,7 +263,10 @@ Deno.serve(async (req) => {
       session.amount_total ? session.amount_total / 100 : 0,
     );
 
-    const userId = await ensureUserExists(email);
+    const supabaseUserId = session.metadata?.supabase_user_id as string | undefined;
+
+    // Si on a l'ID utilisateur dans les metadata, l'utiliser directement
+    const userId = supabaseUserId || await ensureUserExists(email);
 
     await upsertProfile(userId, email, plan, session.customer as string, session.subscription as string);
 

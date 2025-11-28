@@ -2,9 +2,6 @@ import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { PriceCard, type BillingPlan } from "@/components/landing/PriceCard";
-import { useStripeCheckout } from "@/hooks/useStripeCheckout";
-import { useAuth } from "@/hooks/useAuth";
-import { toast } from "sonner";
 
 const plans = [
   {
@@ -61,16 +58,10 @@ const getPriceLabel = (isAnnual: boolean) => (isAnnual ? " / an" : " / mois");
 
 export function PricingSection() {
   const [isAnnual, setIsAnnual] = useState(false);
-  const [guestEmail, setGuestEmail] = useState("");
-  const { createCheckout, loading: checkoutLoading } = useStripeCheckout();
-  const { user } = useAuth();
   
-  const handleCheckout = async (plan: BillingPlan) => {
-    if (!user && !guestEmail) {
-      toast.error("Veuillez entrer votre email pour continuer");
-      return;
-    }
-    await createCheckout(plan, isAnnual ? "annual" : "monthly", undefined, guestEmail || undefined);
+  const handleSelectPlan = (plan: BillingPlan) => {
+    // Rediriger vers /auth avec le plan en paramètre
+    window.location.href = `/auth?plan=${plan}`;
   };
 
   return (
@@ -119,14 +110,13 @@ export function PricingSection() {
               features={plan.features}
               plan={plan.plan}
               popular={plan.popular}
-              onCheckout={handleCheckout}
-              checkoutLoading={checkoutLoading}
-              isAuthenticated={!!user}
-              guestEmail={guestEmail}
-              onEmailChange={setGuestEmail}
+              onSelectPlan={handleSelectPlan}
             />
           ))}
         </div>
+        <p className="text-center text-sm text-muted-foreground mt-6">
+          Crée ton compte Alfie, puis choisis ton plan et finalise le paiement dans ton espace sécurisé.
+        </p>
       </div>
     </section>
   );

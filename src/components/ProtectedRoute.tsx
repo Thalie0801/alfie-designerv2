@@ -7,14 +7,16 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAdmin?: boolean;
   allowPending?: boolean;
+  requireActivePlan?: boolean;
 }
 
 export function ProtectedRoute({
   children,
   requireAdmin = false,
   allowPending = false,
+  requireActivePlan = true,
 }: ProtectedRouteProps) {
-  const { user, isAdmin, isAuthorized, roles, loading, refreshProfile } = useAuth();
+  const { user, isAdmin, isAuthorized, roles, profile, loading, refreshProfile } = useAuth();
   const [checkingAdmin, setCheckingAdmin] = useState(false);
 
   // ============================================================================
@@ -26,6 +28,9 @@ export function ProtectedRoute({
   const effectiveIsAuthorized = isAuthorized || isWhitelisted;
   const effectiveIsAdmin = isAdmin; // Admin déjà calculé dans useAuth
   const hasAccess = effectiveIsAuthorized || allowPending;
+
+  // Vérifier si l'utilisateur a un plan actif
+  const hasActivePlan = profile?.status === 'active' && profile?.plan && profile.plan !== 'none';
 
   useEffect(() => {
     if (requireAdmin && user && !effectiveIsAdmin && !checkingAdmin) {
@@ -55,15 +60,25 @@ export function ProtectedRoute({
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Vérifier les accès généraux (abonnement/autorisation)
+  // Priorité 2: Vérifier si un plan actif est requis
+  if (requireActivePlan && !hasActivePlan && !isWhitelisted) {
+    console.debug('[ProtectedRoute] No active plan, redirecting to /billing', {
+      email: user?.email,
+      plan: profile?.plan,
+      status: profile?.status,
+    });
+    return <Navigate to="/billing" replace />;
+  }
+
+  // Priorité 3: Vérifier les accès généraux (abonnement/autorisation)
   if (!hasAccess) {
-    console.debug('[ProtectedRoute] Access denied, redirecting to /onboarding/activate', {
+    console.debug('[ProtectedRoute] Access denied, redirecting to /billing', {
       email: user?.email,
       effectiveIsAuthorized,
       allowPending,
       isWhitelisted,
     });
-    return <Navigate to="/onboarding/activate" replace />;
+    return <Navigate to="/billing" replace />;
   }
 
   // Note: On ne redirige JAMAIS vers /onboarding/activate ici pour les admins whitelistes
