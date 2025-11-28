@@ -1012,6 +1012,7 @@ export type Database = {
           brand_id: string | null
           created_at: string
           error: string | null
+          finished_at: string | null
           id: string
           idempotency_key: string | null
           kind: string | null
@@ -1021,6 +1022,7 @@ export type Database = {
           payload: Json
           result: Json | null
           retry_count: number
+          started_at: string | null
           status: string
           type: string
           updated_at: string
@@ -1031,6 +1033,7 @@ export type Database = {
           brand_id?: string | null
           created_at?: string
           error?: string | null
+          finished_at?: string | null
           id?: string
           idempotency_key?: string | null
           kind?: string | null
@@ -1040,6 +1043,7 @@ export type Database = {
           payload: Json
           result?: Json | null
           retry_count?: number
+          started_at?: string | null
           status?: string
           type: string
           updated_at?: string
@@ -1050,6 +1054,7 @@ export type Database = {
           brand_id?: string | null
           created_at?: string
           error?: string | null
+          finished_at?: string | null
           id?: string
           idempotency_key?: string | null
           kind?: string | null
@@ -1059,6 +1064,7 @@ export type Database = {
           payload?: Json
           result?: Json | null
           retry_count?: number
+          started_at?: string | null
           status?: string
           type?: string
           updated_at?: string
