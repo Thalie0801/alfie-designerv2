@@ -1,6 +1,16 @@
 import Stripe from "https://esm.sh/stripe@18.5.0";
-import { supabaseUserFromReq, getAuthUserId, assertIsAdmin, json } from "../_shared/utils/admin.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { isAdminUser } from "../_shared/auth.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
+
+
+function json(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -8,29 +18,45 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Vérifier l'authentification admin
-    const userId = await getAuthUserId(req);
-    if (!userId) {
-      console.error("[admin-stripe-coupons] No user ID found in request");
+    // Get JWT from Authorization header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("[admin-stripe-coupons] No authorization header");
       return json({ error: "Unauthorized" }, 401);
     }
 
-    const supabase = supabaseUserFromReq(req);
-    const isAdmin = await assertIsAdmin(supabase, userId);
+    // Create service role client to verify user
+    const supabaseAdmin = createClient(SUPABASE_URL ?? "", SUPABASE_SERVICE_ROLE_KEY ?? "");
+    
+    // Extract JWT and get user
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (userError || !user) {
+      console.error("[admin-stripe-coupons] Failed to get user:", userError);
+      return json({ error: "Unauthorized" }, 401);
+    }
+
+    console.log("[admin-stripe-coupons] User found:", user.email);
+
+    // Check admin status using shared utility
+    const { data: roles } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id);
+
+    const isAdmin = isAdminUser(user.email, roles, { logContext: "admin-stripe-coupons" });
     
     if (!isAdmin) {
-      console.error("[admin-stripe-coupons] User is not admin:", userId);
+      console.error("[admin-stripe-coupons] User is not admin:", user.email);
       return json({ error: "Forbidden - Admin access required" }, 403);
     }
 
-    console.log("[admin-stripe-coupons] Admin access granted for user:", userId);
+    console.log("[admin-stripe-coupons] Admin access granted for:", user.email);
 
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeSecretKey) {
-      return new Response(
-        JSON.stringify({ error: "Stripe not configured" }), 
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return json({ error: "Stripe not configured" }, 500);
     }
 
     const stripe = new Stripe(stripeSecretKey, {
