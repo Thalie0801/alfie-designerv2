@@ -133,9 +133,13 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
       setSaveStatus('saved');
       onSuccess();
       
+      // Toast de succès pour rendre la sauvegarde VISIBLE
+      toast.success('✓ Brand Kit sauvegardé', { duration: 2000 });
+      
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (error) {
       console.error('Auto-save error:', error);
+      toast.error('Erreur lors de la sauvegarde');
       setSaveStatus('idle');
     }
   };
@@ -300,10 +304,10 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
               {brand ? 'Modifier la marque' : 'Nouvelle marque'}
             </DialogTitle>
             {brand && (
-              <div className="text-xs text-muted-foreground">
-                {saveStatus === 'pending' && '● Non sauvegardé'}
-                {saveStatus === 'saving' && '⏳ Sauvegarde...'}
-                {saveStatus === 'saved' && '✓ Sauvegardé'}
+              <div className="flex items-center gap-2 text-sm font-medium">
+                {saveStatus === 'pending' && <span className="text-orange-500">● Modifications non sauvegardées</span>}
+                {saveStatus === 'saving' && <span className="text-blue-500">⏳ Sauvegarde en cours...</span>}
+                {saveStatus === 'saved' && <span className="text-green-600">✓ Sauvegardé</span>}
               </div>
             )}
           </div>
