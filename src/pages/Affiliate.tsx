@@ -439,9 +439,17 @@ export default function Affiliate() {
               <p className="text-muted-foreground mb-4">
                 Complete la configuration de ton compte Stripe
               </p>
-              <Button onClick={handleStripeRefresh} variant="outline">
-                Reprendre la configuration
-              </Button>
+              <div className="flex gap-2 justify-center flex-wrap">
+                <Button onClick={handleStripeRefresh} variant="outline">
+                  Reprendre la configuration
+                </Button>
+                <Button onClick={handleStripeDisconnect} variant="ghost" size="sm" className="text-destructive">
+                  Changer de compte
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                Problème d'accès ? Tu peux déconnecter et reconnecter un autre compte.
+              </p>
             </div>
           ) : (
             <div className="text-center py-4">
