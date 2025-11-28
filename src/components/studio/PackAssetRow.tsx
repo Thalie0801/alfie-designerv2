@@ -28,6 +28,7 @@ const goalDescriptions: Record<string, string> = {
 const assetKindLabel: Record<string, string> = {
   image: "Image",
   carousel: "Carrousel",
+  animated_image: "Image animée",
   video_basic: "Vidéo standard",
   video_premium: "Vidéo premium (Veo 3.1)",
 };

@@ -25,7 +25,7 @@ Quand l'utilisateur est prêt à générer un pack de visuels, tu peux proposer 
   "assets": [
     {
       "id": "asset_1",
-      "kind": "image" | "carousel" | "video_basic" | "video_premium",
+      "kind": "image" | "carousel" | "animated_image" | "video_basic" | "video_premium",
       "count": 1,
       "platform": "instagram",
       "format": "post",
@@ -56,7 +56,7 @@ Quand l'utilisateur est prêt à générer un pack de visuels, tu peux proposer 
   "assets": [
     {
       "id": "asset_1",
-      "kind": "image" | "carousel" | "video_basic" | "video_premium",
+      "kind": "image" | "carousel" | "animated_image" | "video_basic" | "video_premium",
       "count": 1,
       "platform": "instagram",
       "format": "post",
@@ -85,7 +85,7 @@ Quand l'utilisateur demande de préparer un pack, génère un pack structuré en
 <alfie-pack>
 {
   "title": "Pack lancement produit",
-  "summary": "3 visuels + 1 carrousel + 1 vidéo",
+  "summary": "3 images + 1 carrousel + 1 image animée",
   "assets": [
     {
       "id": "asset_1",
@@ -102,6 +102,20 @@ Quand l'utilisateur demande de préparer un pack, génère un pack structuré en
     },
     {
       "id": "asset_2",
+      "kind": "animated_image",
+      "count": 1,
+      "platform": "instagram",
+      "format": "reel",
+      "ratio": "9:16",
+      "durationSeconds": 3,
+      "title": "Image animée : produit en situation",
+      "goal": "engagement",
+      "tone": "élégant, dynamique",
+      "prompt": "Description détaillée pour l'image source (l'effet Ken Burns sera appliqué automatiquement)",
+      "woofCostType": "animated_image"
+    },
+    {
+      "id": "asset_3",
       "kind": "video_basic",
       "count": 1,
       "platform": "instagram",
@@ -116,7 +130,10 @@ Quand l'utilisateur demande de préparer un pack, génère un pack structuré en
     }
   ]
 }
-</alfie-pack>`,
+</alfie-pack>
+
+Les types disponibles : "image", "carousel", "animated_image", "video_basic", "video_premium"
+Les woofCostType correspondants : "image", "carousel_slide", "animated_image", "video_basic", "video_premium"`,
 } as const;
 
 /**
@@ -125,9 +142,10 @@ Quand l'utilisateur demande de préparer un pack, génère un pack structuré en
 async function callLLM(
   messages: { role: string; content: string }[],
   systemPrompt: string,
-  brandContext?: { niche?: string; voice?: string }
+  brandContext?: { niche?: string; voice?: string },
+  woofsRemaining?: number
 ): Promise<string> {
-  // Enrichir le system prompt avec le contexte de marque si disponible
+  // Enrichir le system prompt avec le contexte de marque et Woofs si disponibles
   let enrichedPrompt = systemPrompt;
   if (brandContext) {
     const brandInfo: string[] = [];
@@ -140,6 +158,27 @@ async function callLLM(
     if (brandInfo.length > 0) {
       enrichedPrompt += `\n\nCONTEXTE DE LA MARQUE :\n${brandInfo.join('\n')}\n\nAdapte tes suggestions en fonction de ce contexte.`;
     }
+  }
+
+  // Ajouter le contexte Woofs pour adapter les recommandations
+  if (typeof woofsRemaining === 'number') {
+    enrichedPrompt += `\n\nBUDGET WOOFS de l'utilisateur : ${woofsRemaining} Woofs restants
+COÛTS en Woofs :
+- Image : 1 Woof
+- Image animée (Ken Burns via Cloudinary) : 3 Woofs
+- Carrousel (par slide) : 1 Woof
+- Vidéo standard : 10 Woofs
+- Vidéo premium (Veo 3.1) : 50 Woofs
+
+RÈGLES D'ADAPTATION AU BUDGET :
+- Si Woofs < 3 : propose uniquement des images statiques (1 Woof chacune)
+- Si Woofs >= 3 mais < 10 : propose des images et images animées (évite les vidéos)
+- Si Woofs >= 10 mais < 50 : propose images, images animées et vidéos standard (évite premium)
+- Si Woofs >= 50 : tu peux proposer toutes les options, y compris vidéo premium
+
+Quand tu proposes une image animée, explique brièvement qu'il s'agit d'un effet Ken Burns (zoom/pan) appliqué sur une image statique, ce qui crée un mouvement élégant sans la complexité d'une vraie vidéo IA.
+
+Adapte intelligemment tes propositions de pack au budget disponible. Si l'utilisateur demande quelque chose de trop coûteux, propose des alternatives créatives dans son budget.`;
   }
 
   // 1. Essayer Vertex AI si configuré
@@ -232,7 +271,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { brandId, persona, messages, lang } = await req.json();
+    const { brandId, persona, messages, lang, woofsRemaining } = await req.json();
 
     if (!brandId || !persona || !messages) {
       return new Response(
@@ -279,8 +318,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Appeler le LLM avec le contexte de marque
-    const rawReply = await callLLM(messages, systemPrompt, brandContext);
+    // Appeler le LLM avec le contexte de marque et Woofs
+    const rawReply = await callLLM(messages, systemPrompt, brandContext, woofsRemaining);
 
     // Parser le pack si présent
     const pack = parsePack(rawReply);
