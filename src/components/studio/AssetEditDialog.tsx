@@ -67,6 +67,40 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Type d'asset */}
+          <div className="space-y-2">
+            <Label htmlFor="kind">Type de visuel</Label>
+            <Select
+              value={formData.kind}
+              onValueChange={(value) => {
+                const newKind = value as PackAsset["kind"];
+                const newWoofCostType = 
+                  newKind === "image" ? "image" :
+                  newKind === "carousel" ? "carousel_slide" :
+                  newKind === "video_basic" ? "video_basic" :
+                  "video_premium";
+                
+                setFormData({ 
+                  ...formData, 
+                  kind: newKind,
+                  woofCostType: newWoofCostType,
+                  count: newKind === "carousel" ? (formData.count || 5) : 1,
+                  durationSeconds: newKind.includes("video") ? (formData.durationSeconds || 10) : undefined
+                });
+              }}
+            >
+              <SelectTrigger id="kind">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="image">🖼️ Image</SelectItem>
+                <SelectItem value="carousel">📊 Carrousel</SelectItem>
+                <SelectItem value="video_basic">🎬 Vidéo standard</SelectItem>
+                <SelectItem value="video_premium">✨ Vidéo premium (Veo 3.1)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Titre */}
           <div className="space-y-2">
             <Label htmlFor="title">Titre de l'asset</Label>

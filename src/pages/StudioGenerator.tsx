@@ -7,6 +7,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { useAuth } from "@/hooks/useAuth";
@@ -498,10 +504,28 @@ Prépare-moi un pack complet avec plusieurs types de visuels (images, carrousels
             <Card className="p-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold">Visuels de ta campagne ({pack.assets.length})</h3>
-                <Button onClick={() => addAsset()} size="sm">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Ajouter un visuel
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm">
+                      <Plus className="h-4 w-4 mr-1" />
+                      Ajouter un visuel
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => addAsset({ kind: "image", woofCostType: "image" })}>
+                      🖼️ Image
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => addAsset({ kind: "carousel", count: 5, woofCostType: "carousel_slide" })}>
+                      📊 Carrousel
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => addAsset({ kind: "video_basic", durationSeconds: 10, woofCostType: "video_basic" })}>
+                      🎬 Vidéo standard
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => addAsset({ kind: "video_premium", durationSeconds: 10, woofCostType: "video_premium" })}>
+                      ✨ Vidéo premium (Veo 3.1)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               {/* CTA pour générer depuis le brief */}
