@@ -25,6 +25,7 @@ import Privacy from "./pages/Privacy";
 import Legal from "./pages/Legal";
 import FAQ from "./pages/FAQ";
 import BrandKitQuestionnaire from "./pages/BrandKitQuestionnaire";
+import BrandKit from "./pages/BrandKit";
 import NotFound from "./pages/NotFound";
 import Templates from "./pages/Templates";
 import Library from "./pages/Library";
@@ -61,6 +62,17 @@ const AppRoutes = () => {
             <ProtectedRoute>
               <AppLayoutWithSidebar>
                 <BrandKitQuestionnaire />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/brand-kit"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <BrandKit />
               </AppLayoutWithSidebar>
             </ProtectedRoute>
           }
