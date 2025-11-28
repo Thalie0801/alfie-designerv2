@@ -124,7 +124,7 @@ export function PackSummarySidebar({
 
         {pack.assets.length === 0 ? (
           <p className="text-xs text-muted-foreground text-center py-2">
-            Ajoute des visuels pour commencer 🎨
+            Ajoute des visuels 🎨
           </p>
         ) : (
           <p className="text-xs text-muted-foreground mt-2">

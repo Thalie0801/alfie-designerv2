@@ -1,6 +1,6 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, useRef, useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { MessageCircle, X } from "lucide-react";
+import { MessageCircle, X, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBrief, type Brief } from "@/hooks/useBrief";
 import { useAuth } from "@/hooks/useAuth";
@@ -30,6 +30,12 @@ export default function ChatWidget() {
   const brief = useBrief();
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll quand les messages changent
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [msgs]);
 
   const BRAND = useMemo(
     () =>
@@ -109,12 +115,18 @@ export default function ChatWidget() {
     );
   }
 
-  const assistantCard = (content: ReactNode) => (
+  // Fonction pour détecter un message de confirmation
+  function isConfirmationMessage(raw: string): boolean {
+    const text = raw.toLowerCase().trim();
+    return /^(ok|oui|c'est bon|on y va|lance|parfait|go|génère|crée|d'accord|da)/i.test(text);
+  }
+
+  const assistantCard = (content: ReactNode, showPrefillButton: boolean = false) => (
     <div className="space-y-2">
       <div className="space-y-2 bg-white rounded-lg p-3 border" style={{ borderColor: BRAND.grayBorder }}>
         {content}
       </div>
-      <div className="pt-1">{primaryBtn("Pré-remplir Studio", prefillStudio)}</div>
+      {showPrefillButton && <div className="pt-1">{primaryBtn("Pré-remplir Studio", prefillStudio)}</div>}
     </div>
   );
 
@@ -300,6 +312,7 @@ export default function ChatWidget() {
           {header}
           {body}
         </div>,
+        true, // Afficher le bouton "Pré-remplir Studio" pour les suggestions locales
       ),
     };
   };
@@ -437,7 +450,8 @@ export default function ChatWidget() {
             {pack && activeBrandId && (
               <PackPreviewCard pack={pack} onOpenDetail={() => setShowPackModal(true)} />
             )}
-          </div>
+          </div>,
+          false, // Ne pas afficher "Pré-remplir Studio" quand il y a un pack (le pack a sa propre action)
         ),
       };
     } catch (error) {
@@ -484,8 +498,28 @@ export default function ChatWidget() {
     if (!text) return;
     setInput("");
     pushUser(text);
+    
+    // Si c'est un message de confirmation et qu'un pack est en attente, ouvrir le modal
+    if (isConfirmationMessage(text) && pendingPack) {
+      setShowPackModal(true);
+      return;
+    }
+    
     const reply = await makeReply(text);
     if (reply) setMsgs((m) => [...m, reply]);
+  }
+
+  // Fonction pour réinitialiser la conversation
+  function resetConversation() {
+    setMsgs([]);
+    setPendingPack(null);
+    setInput("");
+  }
+
+  // Fonction pour changer de mode et réinitialiser
+  function handleModeChange(mode: CoachMode) {
+    setModeCoach(mode);
+    resetConversation();
   }
 
   const portalTarget = typeof document !== "undefined" ? document.body : null;
@@ -536,21 +570,34 @@ export default function ChatWidget() {
             <div className="font-medium" style={{ color: BRAND.text }}>
               Alfie Chat (coach & DA)
             </div>
-            <button
-              onClick={() => setOpen(false)}
-              className="p-2 rounded hover:bg-white/50"
-              style={{ color: BRAND.text }}
-              aria-label="Fermer"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              {msgs.length > 0 && (
+                <button
+                  onClick={resetConversation}
+                  className="p-2 rounded hover:bg-white/50"
+                  style={{ color: BRAND.text }}
+                  aria-label="Nouvelle conversation"
+                  title="Nouvelle conversation"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              )}
+              <button
+                onClick={() => setOpen(false)}
+                className="p-2 rounded hover:bg-white/50"
+                style={{ color: BRAND.text }}
+                aria-label="Fermer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           <div className="px-3 py-2 flex gap-2">
             {coachModes.map((m) => (
               <button
                 key={m}
-                onClick={() => setModeCoach(m)}
+                onClick={() => handleModeChange(m)}
                 className={`px-3 py-1 rounded-full text-xs border ${modeCoach === m ? "font-semibold" : ""}`}
                 style={{
                   borderColor: BRAND.grayBorder,
@@ -578,6 +625,7 @@ export default function ChatWidget() {
                 </div>
               ))
             )}
+            <div ref={messagesEndRef} />
           </div>
 
           {msgs.length === 0 && (
