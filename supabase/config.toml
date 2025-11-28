@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.create-ambassadeur-coupon]
 verify_jwt = false
+
+[functions.admin-stripe-coupons]
+verify_jwt = false
