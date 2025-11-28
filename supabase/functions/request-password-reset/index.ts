@@ -1,7 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { Resend } from "https://esm.sh/resend@4.0.0";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,7 +13,6 @@ const corsHeaders = {
 
 interface PasswordResetRequest {
   email: string;
-  resetLink: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -19,10 +21,42 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, resetLink }: PasswordResetRequest = await req.json();
+    const { email }: PasswordResetRequest = await req.json();
 
-    console.log(`[send-password-reset] Sending email to ${email}`);
+    if (!email) {
+      throw new Error("Email requis");
+    }
 
+    console.log(`[request-password-reset] Processing reset for ${email}`);
+
+    // Créer client admin Supabase
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    // Générer un lien de récupération sécurisé via Supabase Admin
+    const { data, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'recovery',
+      email,
+      options: {
+        redirectTo: `${new URL(req.url).origin}/reset-password`
+      }
+    });
+
+    if (linkError) {
+      console.error("[request-password-reset] Link generation error:", linkError);
+      throw new Error("Erreur lors de la génération du lien");
+    }
+
+    if (!data?.properties?.action_link) {
+      throw new Error("Lien de réinitialisation non généré");
+    }
+
+    const resetLink = data.properties.action_link;
+
+    console.log(`[request-password-reset] Sending email to ${email}`);
+
+    // Envoyer l'email avec template Alfie en français
     const emailResponse = await resend.emails.send({
       from: "Alfie <onboarding@resend.dev>",
       to: [email],
@@ -68,18 +102,18 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     if (emailResponse.error) {
-      console.error("[send-password-reset] Error:", emailResponse.error);
+      console.error("[request-password-reset] Email error:", emailResponse.error);
       throw emailResponse.error;
     }
 
-    console.log("[send-password-reset] Email sent successfully:", emailResponse.data?.id);
+    console.log("[request-password-reset] Email sent successfully:", emailResponse.data?.id);
 
     return new Response(JSON.stringify({ success: true, id: emailResponse.data?.id }), {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   } catch (error: any) {
-    console.error("[send-password-reset] Error:", error);
+    console.error("[request-password-reset] Error:", error);
     return new Response(
       JSON.stringify({ error: error.message || "Erreur lors de l'envoi de l'email" }),
       {
