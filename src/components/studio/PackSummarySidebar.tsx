@@ -28,6 +28,9 @@ export function PackSummarySidebar({
   const quota = safeWoofs(woofsQuota);
   const hasEnough = available >= totalCost;
   const percentUsed = quota > 0 ? ((quota - available) / quota) * 100 : 0;
+  
+  // Logique simplifiée : le bouton est activé dès qu'il y a au moins 1 visuel
+  const hasAssets = pack.assets.length > 0;
 
   // Compter par type
   const imageCount = pack.assets.filter((a) => a.kind === "image").length;
@@ -124,7 +127,7 @@ export function PackSummarySidebar({
 
         {pack.assets.length === 0 ? (
           <p className="text-xs text-muted-foreground text-center py-2">
-            Ajoute des visuels 🎨
+            Ajoute des visuels pour commencer 🐾
           </p>
         ) : (
           <p className="text-xs text-muted-foreground mt-2">
@@ -136,7 +139,7 @@ export function PackSummarySidebar({
       {/* Bouton lancer */}
       <Button
         onClick={onLaunch}
-        disabled={!hasEnough || pack.assets.length === 0 || isLaunching}
+        disabled={!hasAssets || isLaunching}
         className="w-full"
         size="lg"
       >
