@@ -4,12 +4,24 @@ import { isAdminUser } from "../_shared/auth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
 
-
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+// Decode JWT to get user info (Supabase has already validated it with verify_jwt=true)
+function decodeJWT(token: string): { sub: string; email: string } | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    
+    const payload = JSON.parse(atob(parts[1]));
+    return { sub: payload.sub, email: payload.email };
+  } catch {
+    return null;
+  }
 }
 
 Deno.serve(async (req) => {
@@ -18,41 +30,44 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Get JWT from Authorization header
+    // Get JWT from Authorization header (already validated by Supabase with verify_jwt=true)
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       console.error("[admin-stripe-coupons] No authorization header");
       return json({ error: "Unauthorized" }, 401);
     }
 
-    // Create service role client to verify user
-    const supabaseAdmin = createClient(SUPABASE_URL ?? "", SUPABASE_SERVICE_ROLE_KEY ?? "");
-    
-    // Extract JWT and get user
+    // Decode JWT to get user info
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    const decoded = decodeJWT(token);
     
-    if (userError || !user) {
-      console.error("[admin-stripe-coupons] Failed to get user:", userError);
+    if (!decoded || !decoded.sub || !decoded.email) {
+      console.error("[admin-stripe-coupons] Invalid JWT payload");
       return json({ error: "Unauthorized" }, 401);
     }
 
-    console.log("[admin-stripe-coupons] User found:", user.email);
+    const userId = decoded.sub;
+    const userEmail = decoded.email;
+    
+    console.log("[admin-stripe-coupons] User found:", userEmail);
 
+    // Create service role client to check admin status
+    const supabaseAdmin = createClient(SUPABASE_URL ?? "", SUPABASE_SERVICE_ROLE_KEY ?? "");
+    
     // Check admin status using shared utility
     const { data: roles } = await supabaseAdmin
       .from("user_roles")
       .select("role")
-      .eq("user_id", user.id);
+      .eq("user_id", userId);
 
-    const isAdmin = isAdminUser(user.email, roles, { logContext: "admin-stripe-coupons" });
+    const isAdmin = isAdminUser(userEmail, roles, { logContext: "admin-stripe-coupons" });
     
     if (!isAdmin) {
-      console.error("[admin-stripe-coupons] User is not admin:", user.email);
+      console.error("[admin-stripe-coupons] User is not admin:", userEmail);
       return json({ error: "Forbidden - Admin access required" }, 403);
     }
 
-    console.log("[admin-stripe-coupons] Admin access granted for:", user.email);
+    console.log("[admin-stripe-coupons] Admin access granted for:", userEmail);
 
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeSecretKey) {
