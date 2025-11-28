@@ -171,6 +171,7 @@ async function createAssetJob(
 
   // Créer un job dans la queue
   const jobType = asset.kind === "carousel" ? "render_carousels" : 
+                  asset.kind === "animated_image" ? "animate_image" :
                   asset.kind.includes("video") ? "generate_video" : 
                   "render_images";
 

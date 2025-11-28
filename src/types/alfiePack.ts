@@ -3,11 +3,11 @@
  * Utilisé par le Chat Widget pour proposer des packs de visuels structurés
  */
 
-export type PackAssetKind = "image" | "carousel" | "video_basic" | "video_premium";
+export type PackAssetKind = "image" | "carousel" | "animated_image" | "video_basic" | "video_premium";
 export type Platform = "instagram" | "tiktok" | "youtube" | "linkedin" | "facebook" | "pinterest" | "generic";
 export type AssetFormat = "post" | "story" | "reel" | "short" | "pin";
 export type AssetGoal = "education" | "vente" | "lead" | "engagement";
-export type WoofCostType = "image" | "carousel_slide" | "video_basic" | "video_premium";
+export type WoofCostType = "image" | "carousel_slide" | "animated_image" | "video_basic" | "video_premium";
 
 export interface PackAsset {
   id: string;

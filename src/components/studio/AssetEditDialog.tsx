@@ -77,6 +77,7 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                 const newWoofCostType = 
                   newKind === "image" ? "image" :
                   newKind === "carousel" ? "carousel_slide" :
+                  newKind === "animated_image" ? "animated_image" :
                   newKind === "video_basic" ? "video_basic" :
                   "video_premium";
                 
@@ -85,7 +86,7 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                   kind: newKind,
                   woofCostType: newWoofCostType,
                   count: newKind === "carousel" ? (formData.count || 5) : 1,
-                  durationSeconds: newKind.includes("video") ? (formData.durationSeconds || 10) : undefined
+                  durationSeconds: (newKind.includes("video") || newKind === "animated_image") ? (formData.durationSeconds || (newKind === "animated_image" ? 3 : 10)) : undefined
                 });
               }}
             >
@@ -95,7 +96,8 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
               <SelectContent>
                 <SelectItem value="image">🖼️ Image</SelectItem>
                 <SelectItem value="carousel">📊 Carrousel</SelectItem>
-                <SelectItem value="video_basic">🎬 Vidéo standard</SelectItem>
+                <SelectItem value="animated_image">🎬 Image animée</SelectItem>
+                <SelectItem value="video_basic">🎥 Vidéo standard</SelectItem>
                 <SelectItem value="video_premium">✨ Vidéo premium (Veo 3.1)</SelectItem>
               </SelectContent>
             </Select>
@@ -210,17 +212,17 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
             </div>
           )}
 
-          {/* Duration (pour vidéos) */}
-          {formData.kind.includes("video") && (
+          {/* Duration (pour vidéos et images animées) */}
+          {(formData.kind.includes("video") || formData.kind === "animated_image") && (
             <div className="space-y-2">
               <Label htmlFor="duration">Durée (secondes)</Label>
               <Input
                 id="duration"
                 type="number"
-                min={5}
+                min={formData.kind === "animated_image" ? 2 : 5}
                 max={60}
-                value={formData.durationSeconds || 10}
-                onChange={(e) => setFormData({ ...formData, durationSeconds: parseInt(e.target.value) || 10 })}
+                value={formData.durationSeconds || (formData.kind === "animated_image" ? 3 : 10)}
+                onChange={(e) => setFormData({ ...formData, durationSeconds: parseInt(e.target.value) || (formData.kind === "animated_image" ? 3 : 10) })}
               />
             </div>
           )}

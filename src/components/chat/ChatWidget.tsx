@@ -402,13 +402,27 @@ export default function ChatWidget() {
     });
 
     try {
-      // Appeler alfie-chat-widget au lieu de chat-ai-assistant
+      // Récupérer les Woofs restants
+      let woofsRemaining: number | undefined;
+      try {
+        const { data: quotaData } = await supabase.functions.invoke("get-quota", {
+          body: { brandId: activeBrandId },
+        });
+        if (quotaData?.woofs_remaining !== undefined) {
+          woofsRemaining = quotaData.woofs_remaining;
+        }
+      } catch (quotaError) {
+        console.warn("Could not fetch Woofs quota:", quotaError);
+      }
+
+      // Appeler alfie-chat-widget avec le contexte Woofs
       const response = await supabase.functions.invoke("alfie-chat-widget", {
         body: {
           brandId: activeBrandId,
           persona: personaMap[modeCoach],
           messages: chatHistory,
           lang: "fr",
+          woofsRemaining,
         },
       });
 

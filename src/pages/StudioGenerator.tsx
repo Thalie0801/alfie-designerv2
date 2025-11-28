@@ -518,8 +518,11 @@ Prépare-moi un pack complet avec plusieurs types de visuels (images, carrousels
                     <DropdownMenuItem onClick={() => addAsset({ kind: "carousel", count: 5, woofCostType: "carousel_slide" })}>
                       📊 Carrousel
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => addAsset({ kind: "animated_image", durationSeconds: 3, woofCostType: "animated_image" })}>
+                      🎬 Image animée
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => addAsset({ kind: "video_basic", durationSeconds: 10, woofCostType: "video_basic" })}>
-                      🎬 Vidéo standard
+                      🎥 Vidéo standard
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => addAsset({ kind: "video_premium", durationSeconds: 10, woofCostType: "video_premium" })}>
                       ✨ Vidéo premium (Veo 3.1)

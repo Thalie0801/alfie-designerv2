@@ -9,7 +9,7 @@ type JobRow = {
   id: string;
   user_id: string;
   order_id: string;
-  type: "generate_texts" | "render_images" | "render_carousels" | "generate_video";
+  type: "generate_texts" | "render_images" | "render_carousels" | "generate_video" | "animate_image";
   status: "queued" | "processing" | "running" | "completed" | "failed";
   retry_count: number | null;
   max_retries: number | null;
@@ -265,6 +265,9 @@ Deno.serve(async (req) => {
             break;
           case "generate_video":
             result = await processGenerateVideo(job.payload);
+            break;
+          case "animate_image":
+            result = await processAnimateImage(job.payload);
             break;
           default:
             console.warn("⚠️ unknown job type", job.type);
@@ -864,7 +867,7 @@ Format: ${aspectRatio} aspect ratio optimized.`;
 async function processGenerateVideo(payload: any) {
   console.log("🎥 [processGenerateVideo]", payload?.orderId);
 
-  const { userId, brandId, orderId, aspectRatio, duration, prompt, sourceUrl, sourceType } = payload;
+  const { userId, brandId, orderId, aspectRatio, duration, prompt, sourceUrl, sourceType, provider } = payload;
 
   // ✅ Phase C: Use existing generate-video function instead of non-existent alfie-assemble-video
   const renderResult = await callFn<any>("generate-video", {
@@ -876,6 +879,7 @@ async function processGenerateVideo(payload: any) {
     sourceType,
     brandId,
     orderId,
+    provider, // ✅ Pass provider (vertex_veo for premium)
   });
 
   const renderPayload = unwrapResult<any>(renderResult);
@@ -894,14 +898,8 @@ async function processGenerateVideo(payload: any) {
     getResultValue<string>(renderPayload, ["thumbnail_url", "thumbnailUrl", "preview_url", "previewUrl"]) ??
     getResultValue<string>(renderResult, ["thumbnail_url", "thumbnailUrl", "preview_url", "previewUrl"]);
 
-  const seconds = Number(duration) || 12;
-  const woofs = Math.max(1, Math.ceil(seconds / 12));
-
-  const { error: debitError } = await supabaseAdmin.rpc("debit_woofs", {
-    user_id_input: userId,
-    amount: woofs,
-  });
-  if (debitError) throw new Error(debitError.message);
+  // ✅ FIXED: Woofs already consumed by generate-video via woofs-check-consume
+  // Removing duplicate debit_woofs call to prevent double-counting
 
   const { error: assetErr } = await supabaseAdmin.from("media_generations").insert({
     user_id: userId,
@@ -912,17 +910,50 @@ async function processGenerateVideo(payload: any) {
     thumbnail_url: thumbnailUrl ?? null,
     metadata: {
       aspectRatio,
-      duration: seconds,
+      duration: duration || 10,
       prompt,
       sourceUrl,
       sourceType,
       generator: "generate-video",
-      woofs,
+      provider,
       orderId,
       thumbnailUrl: thumbnailUrl ?? undefined,
     },
   });
   if (assetErr) throw new Error(assetErr.message);
+
+  return { videoUrl };
+}
+
+async function processAnimateImage(payload: any) {
+  console.log("🎬 [processAnimateImage]", payload?.orderId);
+
+  const { userId, brandId, orderId, imagePublicId, cloudName, title, subtitle, duration, aspect } = payload;
+
+  if (!imagePublicId || !cloudName) {
+    throw new Error("Missing imagePublicId or cloudName for animation");
+  }
+
+  const animateResult = await callFn<any>("animate-image", {
+    userId,
+    brandId,
+    orderId,
+    imagePublicId,
+    cloudName,
+    title,
+    subtitle,
+    duration: duration || 3,
+    aspect: aspect || "4:5",
+  });
+
+  const animatePayload = unwrapResult<any>(animateResult);
+  const animateError = extractError(animateResult) ?? extractError(animatePayload);
+  if (animateError) throw new Error(animateError || "Image animation failed");
+
+  const videoUrl = animatePayload?.videoUrl || animatePayload?.data?.videoUrl;
+  if (!videoUrl) throw new Error("Missing videoUrl from animate-image response");
+
+  console.log("✅ [processAnimateImage] Animated image:", videoUrl);
 
   return { videoUrl };
 }

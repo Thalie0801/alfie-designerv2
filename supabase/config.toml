@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.admin-stripe-coupons]
 verify_jwt = true
+
+[functions.animate-image]
+verify_jwt = true
