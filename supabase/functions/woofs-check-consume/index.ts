@@ -20,9 +20,15 @@ Deno.serve(async (req) => {
       throw new Error("Missing authorization header");
     }
 
-    const { brand_id, cost_woofs, reason, metadata } = await req.json();
+    const rawBody = await req.json();
+    console.log("[woofs-check-consume] Raw body received:", JSON.stringify(rawBody));
 
-    if (!brand_id || !cost_woofs || !reason) {
+    // Le SDK peut wrapper le body dans { body: {...} } ou l'envoyer directement
+    const payload = rawBody.body || rawBody;
+    const { brand_id, cost_woofs, reason, metadata } = payload;
+
+    if (!brand_id || cost_woofs === undefined || !reason) {
+      console.error("[woofs-check-consume] Missing fields in payload:", { brand_id, cost_woofs, reason, rawBody });
       throw new Error("Missing required fields: brand_id, cost_woofs, reason");
     }
 
