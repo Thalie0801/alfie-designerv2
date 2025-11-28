@@ -15,7 +15,6 @@ import {
   Palette,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { QuotaBar } from "@/components/create/QuotaBar";
 import {
   Sidebar,
   SidebarContent,
@@ -129,8 +128,6 @@ export function AppSidebar() {
 
       {/* Footer */}
       <SidebarFooter>
-        <Separator />
-        <QuotaBar activeBrandId={profile?.active_brand_id || null} />
         <Separator />
         <div className="p-3 space-y-2">
           {open && (
