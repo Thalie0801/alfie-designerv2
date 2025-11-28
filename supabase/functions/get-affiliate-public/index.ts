@@ -43,11 +43,20 @@ Deno.serve(async (req) => {
 
     const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    const { data, error } = await supabaseAdmin
+    // Check if ref is a UUID or a slug
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ref);
+    
+    let query = supabaseAdmin
       .from('affiliates')
-      .select('name, email')
-      .eq('id', ref)
-      .maybeSingle();
+      .select('name, email');
+    
+    if (isUUID) {
+      query = query.eq('id', ref);
+    } else {
+      query = query.eq('slug', ref);
+    }
+    
+    const { data, error } = await query.maybeSingle();
 
     if (error) {
       console.error('get-affiliate-public error:', error);

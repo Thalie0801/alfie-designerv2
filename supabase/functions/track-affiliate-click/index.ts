@@ -43,12 +43,39 @@ Deno.serve(async (req) => {
       SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    // Lookup affiliate by slug or UUID
+    let affiliateId: string;
+    
+    // Check if ref is a UUID or a slug
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ref);
+    
+    if (isUUID) {
+      affiliateId = ref;
+    } else {
+      // Lookup by slug
+      const { data: affiliate, error: lookupError } = await supabaseAdmin
+        .from("affiliates")
+        .select("id")
+        .eq("slug", ref)
+        .maybeSingle();
+      
+      if (lookupError || !affiliate) {
+        console.error("Affiliate not found for slug:", ref, lookupError);
+        return new Response(JSON.stringify({ error: "Affiliate not found" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 404,
+        });
+      }
+      
+      affiliateId = affiliate.id;
+    }
+
     const click_id = crypto.randomUUID();
 
     const { error } = await supabaseAdmin
       .from("affiliate_clicks")
       .insert({
-        affiliate_id: ref,
+        affiliate_id: affiliateId,
         click_id,
         utm_source,
         utm_medium,
