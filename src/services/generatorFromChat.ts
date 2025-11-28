@@ -82,14 +82,37 @@ export async function sendPackToGenerator({
   // 3. Créer les orders/jobs pour chaque asset sélectionné
   const selectedAssets = pack.assets.filter((a) => selectedAssetIds.includes(a.id));
   
-  const results = await Promise.all(
-    selectedAssets.map((asset) => createAssetJob(asset, brandId, userId, pack.title))
-  );
+  try {
+    const results = await Promise.all(
+      selectedAssets.map((asset) => createAssetJob(asset, brandId, userId, pack.title))
+    );
 
-  const orderIds = results.map((r) => r.orderId);
-  console.log(`[Pack] Génération lancée, orderIds:`, orderIds);
+    const orderIds = results.map((r) => r.orderId);
+    console.log(`[Pack] Génération lancée, orderIds:`, orderIds);
 
-  return { success: true, orderIds };
+    return { success: true, orderIds };
+  } catch (error) {
+    console.error("[Pack] Job creation failed, refunding Woofs:", error);
+    
+    // Refund des Woofs en cas d'échec de création des jobs
+    try {
+      await supabase.functions.invoke("alfie-refund-woofs", {
+        body: {
+          amount: totalWoofs,
+          reason: "pack_creation_failed",
+          metadata: { 
+            packTitle: pack.title,
+            error: error instanceof Error ? error.message : String(error)
+          }
+        }
+      });
+      console.log(`[Pack] Refunded ${totalWoofs} Woofs after job creation failure`);
+    } catch (refundError) {
+      console.error("[Pack] Failed to refund Woofs:", refundError);
+    }
+    
+    throw error;
+  }
 }
 
 /**
