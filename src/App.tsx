@@ -184,7 +184,7 @@ const AppRoutes = () => {
         <Route
           path="/billing"
           element={
-            <ProtectedRoute allowPending>
+            <ProtectedRoute allowPending requireActivePlan={false}>
               <AppLayoutWithSidebar>
                 <Billing />
               </AppLayoutWithSidebar>
@@ -194,7 +194,7 @@ const AppRoutes = () => {
         <Route
           path="/credit-purchase-success"
           element={
-            <ProtectedRoute allowPending>
+            <ProtectedRoute allowPending requireActivePlan={false}>
               <AppLayoutWithSidebar>
                 <CreditPurchaseSuccess />
               </AppLayoutWithSidebar>
@@ -244,7 +244,7 @@ const AppRoutes = () => {
         <Route
           path="/onboarding/activate"
           element={
-            <ProtectedRoute allowPending={true}>
+            <ProtectedRoute allowPending requireActivePlan={false}>
               <AppLayoutWithSidebar>
                 <ActivateAccess />
               </AppLayoutWithSidebar>

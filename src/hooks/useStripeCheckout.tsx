@@ -10,21 +10,21 @@ export function useStripeCheckout() {
   const createCheckout = async (
     plan: 'starter' | 'pro' | 'studio' | 'enterprise',
     billingPeriod: 'monthly' | 'annual' = 'monthly',
-    brandName?: string,
-    guestEmail?: string
+    brandName?: string
   ) => {
     setLoading(true);
     try {
       const affiliateRef = getAffiliateRef();
-
       const { data: { user } } = await supabase.auth.getUser();
-      const email = user?.email || guestEmail;
-
-      if (!email) {
-        throw new Error("Email requis pour le checkout");
+      
+      // L'utilisateur DOIT être connecté
+      if (!user?.email) {
+        toast.error("Vous devez être connecté pour souscrire");
+        window.location.href = '/auth';
+        return;
       }
 
-      console.log("[useStripeCheckout] Creating checkout with email:", email);
+      console.log("[useStripeCheckout] Creating checkout for user:", user.email);
 
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
@@ -32,7 +32,7 @@ export function useStripeCheckout() {
           billing_period: billingPeriod,
           affiliate_ref: affiliateRef,
           brand_name: brandName,
-          email: email
+          // Plus besoin d'envoyer l'email - le backend le récupère du JWT
         },
       });
 

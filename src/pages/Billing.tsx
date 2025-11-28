@@ -8,6 +8,7 @@ import { useStripeCheckout } from '@/hooks/useStripeCheckout';
 import { useCustomerPortal } from '@/hooks/useCustomerPortal';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { safeWoofs } from '@/lib/woofs';
@@ -87,6 +88,8 @@ export default function Billing() {
   const { profile, user, refreshProfile, isAdmin, loading: authLoading } = useAuth();
   const { createCheckout, loading } = useStripeCheckout();
   const { openCustomerPortal, loading: portalLoading } = useCustomerPortal();
+  const [searchParams] = useSearchParams();
+  const preselectedPlan = searchParams.get('plan');
   const currentPlan = profile?.plan || null;
   const hasActivePlan = Boolean(profile?.status === 'active' || profile?.granted_by_admin);
   const isAmbassador = profile?.granted_by_admin;
@@ -130,8 +133,16 @@ export default function Billing() {
   useEffect(() => {
     refreshProfile();
     fetchWoofs();
+    
+    // Scroll automatiquement vers le plan pré-sélectionné
+    if (preselectedPlan) {
+      setTimeout(() => {
+        const planCard = document.getElementById(`plan-${preselectedPlan}`);
+        planCard?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.active_brand_id]);
+  }, [profile?.active_brand_id, preselectedPlan]);
 
   const handleSelectPlan = async (plan: typeof plans[0]) => {
     if (plan.isEnterprise) {
@@ -170,6 +181,17 @@ export default function Billing() {
           </p>
         )}
       </div>
+
+      {preselectedPlan && !hasActivePlan && (
+        <Alert className="bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200">
+          <Sparkles className="h-4 w-4 text-blue-600" />
+          <AlertTitle className="text-blue-800">Finalise ton abonnement</AlertTitle>
+          <AlertDescription className="text-blue-700">
+            Tu as choisi le plan <strong>{preselectedPlan.charAt(0).toUpperCase() + preselectedPlan.slice(1)}</strong>. 
+            Clique sur le bouton ci-dessous pour procéder au paiement.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {!authLoading && isAdmin && (
         <Alert className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
@@ -292,10 +314,12 @@ export default function Billing() {
           return (
             <Card
               key={plan.name}
+              id={`plan-${plan.key}`}
               className={cn(
                 "relative hover:scale-105 transition-all",
                 plan.popular && "border-primary border-2 shadow-strong",
                 isCurrentPlan && "border-primary shadow-lg scale-105",
+                preselectedPlan === plan.key && !isCurrentPlan && "ring-2 ring-primary animate-pulse",
                 !plan.popular && !isCurrentPlan && "shadow-medium"
               )}
             >

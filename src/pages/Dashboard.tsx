@@ -3,7 +3,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { Sparkles, MessageSquare, Award } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { NewsWidget } from '@/components/NewsWidget';
 import { FeatureRequestDialog } from '@/components/FeatureRequestDialog';
 import { AccessGuard } from '@/components/AccessGuard';
@@ -21,10 +24,50 @@ import { BrandManager } from '@/components/BrandManager';
 import { QuotaSummary } from '@/components/dashboard/QuotaSummary';
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { affiliate } = useAffiliateStatus();
   const { activeBrandId } = useBrandKit();
+  const [verifyingPayment, setVerifyingPayment] = useState(false);
+
+  // Gérer le retour après paiement Stripe
+  useEffect(() => {
+    const sessionId = searchParams.get('session_id');
+    const paymentStatus = searchParams.get('payment');
+
+    if (paymentStatus === 'success' && sessionId && !verifyingPayment) {
+      setVerifyingPayment(true);
+      
+      (async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke('verify-session', {
+            body: { session_id: sessionId },
+          });
+
+          if (error || !data?.ok) {
+            throw error || new Error(data?.error);
+          }
+
+          // Rafraîchir le profil pour avoir les nouveaux quotas
+          await refreshProfile();
+          
+          toast.success('🎉 Paiement validé ! Ton abonnement est maintenant actif.');
+          
+          // Nettoyer l'URL
+          const next = new URLSearchParams(searchParams);
+          next.delete('session_id');
+          next.delete('payment');
+          setSearchParams(next, { replace: true });
+        } catch (err) {
+          console.error('[Dashboard] Payment verification failed:', err);
+          toast.error('Erreur lors de la vérification du paiement');
+        } finally {
+          setVerifyingPayment(false);
+        }
+      })();
+    }
+  }, [searchParams, verifyingPayment, refreshProfile, setSearchParams]);
 
 
   return (

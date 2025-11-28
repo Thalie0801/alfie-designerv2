@@ -3,7 +3,6 @@ import { Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 
 export type BillingPlan = "starter" | "pro" | "studio" | "enterprise";
 export type BillingPeriod = "monthly" | "annual";
@@ -18,11 +17,7 @@ export interface PriceCardProps {
   features: string[];
   plan: BillingPlan;
   popular?: boolean;
-  onCheckout: (plan: BillingPlan) => Promise<void>;
-  checkoutLoading: boolean;
-  isAuthenticated: boolean;
-  guestEmail: string;
-  onEmailChange: (email: string) => void;
+  onSelectPlan: (plan: BillingPlan) => void;
 }
 
 export function PriceCard({
@@ -35,11 +30,7 @@ export function PriceCard({
   features,
   plan,
   popular,
-  onCheckout,
-  checkoutLoading,
-  isAuthenticated,
-  guestEmail,
-  onEmailChange,
+  onSelectPlan,
 }: PriceCardProps) {
   return (
     <Card
@@ -74,23 +65,13 @@ export function PriceCard({
           ))}
         </ul>
       </CardContent>
-      <CardFooter className="flex-col gap-3">
-        {!isAuthenticated && (
-          <Input
-            type="email"
-            placeholder="votre@email.com"
-            value={guestEmail}
-            onChange={(e) => onEmailChange(e.target.value)}
-            className="w-full"
-          />
-        )}
+      <CardFooter>
         <Button
           className="h-12 w-full"
           variant={popular ? "default" : "outline"}
-          disabled={checkoutLoading}
-          onClick={() => onCheckout(plan)}
+          onClick={() => onSelectPlan(plan)}
         >
-          {checkoutLoading ? "Chargement..." : "Commencer"}
+          Commencer
         </Button>
       </CardFooter>
     </Card>
