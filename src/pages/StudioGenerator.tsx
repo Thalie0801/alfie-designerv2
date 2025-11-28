@@ -147,6 +147,8 @@ export function StudioGenerator() {
   const [isLaunching, setIsLaunching] = useState(false);
   const [woofsAvailable, setWoofsAvailable] = useState(0);
   const [woofsQuota, setWoofsQuota] = useState(0);
+  const [isGeneratingFromBrief, setIsGeneratingFromBrief] = useState(false);
+  const [briefGenerationError, setBriefGenerationError] = useState<string | null>(null);
 
   // Charger les Woofs disponibles
   useEffect(() => {
@@ -242,6 +244,56 @@ export function StudioGenerator() {
       ...prev,
       assets: prev.assets.map((a) => (a.id === updatedAsset.id ? updatedAsset : a)),
     }));
+  };
+
+  // Fonction pour générer un pack à partir du brief
+  const handleGenerateFromBrief = async () => {
+    if (!activeBrandId || !campaignName.trim() || !brief.trim()) {
+      toast.error("Veuillez remplir le nom de campagne et le brief");
+      return;
+    }
+
+    setIsGeneratingFromBrief(true);
+    setBriefGenerationError(null);
+
+    try {
+      const prompt = `En tant que Réalisateur Studio, analyse ce brief et propose un pack de visuels complet :
+
+Nom de la campagne : ${campaignName}
+Brief : ${brief}
+
+Propose un pack adapté avec des images, carrousels et/ou vidéos selon les besoins détectés. Utilise le format JSON <alfie-pack> comme d'habitude.`;
+
+      const { data, error } = await supabase.functions.invoke("alfie-chat-widget", {
+        body: {
+          message: prompt,
+          mode: "maker",
+          brandId: activeBrandId,
+        },
+      });
+
+      if (error) throw error;
+
+      const reply = data?.reply || "";
+      const packMatch = reply.match(/<alfie-pack>([\s\S]*?)<\/alfie-pack>/);
+      
+      if (packMatch) {
+        const packData = JSON.parse(packMatch[1]);
+        setPack(packData);
+        toast.success("Pack proposé par Alfie ! Tu peux maintenant l'ajuster.");
+      } else {
+        setBriefGenerationError(
+          "Alfie n'a pas réussi à proposer un pack automatiquement. Tu peux ajouter tes visuels manuellement ou réessayer plus tard."
+        );
+      }
+    } catch (err) {
+      console.error("Error generating pack from brief:", err);
+      setBriefGenerationError(
+        "Alfie n'a pas réussi à proposer un pack automatiquement. Tu peux ajouter tes visuels manuellement ou réessayer plus tard."
+      );
+    } finally {
+      setIsGeneratingFromBrief(false);
+    }
   };
 
   const launchGeneration = async () => {
@@ -414,12 +466,56 @@ export function StudioGenerator() {
                 </Button>
               </div>
 
-              {pack.assets.length === 0 ? (
+              {/* CTA pour générer depuis le brief */}
+              {pack.assets.length === 0 && brief.trim() !== "" && !briefGenerationError && (
+                <Card className="p-6 text-center space-y-3 bg-gradient-to-br from-alfie-mint/10 to-alfie-pink/10 border-alfie-mint/30 mb-4">
+                  <Sparkles className="h-8 w-8 mx-auto text-alfie-pink" />
+                  <p className="text-sm text-muted-foreground">
+                    Tu peux demander à Alfie de te proposer un pack à partir de ton brief ✨
+                  </p>
+                  <Button
+                    onClick={handleGenerateFromBrief}
+                    disabled={isGeneratingFromBrief}
+                    className="gap-2"
+                  >
+                    {isGeneratingFromBrief ? (
+                      <>
+                        <Sparkles className="h-4 w-4 animate-spin" />
+                        Alfie analyse ton brief...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Proposer un pack avec Alfie
+                      </>
+                    )}
+                  </Button>
+                </Card>
+              )}
+
+              {/* Message d'erreur si la génération a échoué */}
+              {briefGenerationError && (
+                <Card className="p-4 bg-orange-50 border-orange-200 mb-4">
+                  <p className="text-sm text-orange-800">{briefGenerationError}</p>
+                  <Button
+                    onClick={handleGenerateFromBrief}
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                  >
+                    Réessayer
+                  </Button>
+                </Card>
+              )}
+
+              {pack.assets.length === 0 && !brief.trim() && (
                 <div className="text-center py-8 text-muted-foreground">
                   <Sparkles className="h-12 w-12 mx-auto mb-3 opacity-50" />
                   <p>Ajoute des visuels pour construire ton pack, ou charge un pack prédéfini à gauche ✨</p>
                 </div>
-              ) : (
+              )}
+
+              {pack.assets.length > 0 && (
                 <>
                   {pack.title !== "Mon pack personnalisé" && (
                     <div className="mb-4 p-3 bg-muted/30 rounded-lg">
