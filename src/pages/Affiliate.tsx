@@ -16,6 +16,7 @@ export default function Affiliate() {
   const [loading, setLoading] = useState(true);
   const [commissions, setCommissions] = useState<any[]>([]);
   const [directReferrals, setDirectReferrals] = useState<any[]>([]);
+  const [requestingPayout, setRequestingPayout] = useState(false);
   const [stats, setStats] = useState({
     totalClicks: 0,
     totalConversions: 0,
@@ -170,6 +171,31 @@ export default function Affiliate() {
     toast.success('Lien copié !');
   };
 
+  const requestPayout = async () => {
+    setRequestingPayout(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('request-affiliate-payout');
+
+      if (error || !data?.success) {
+        console.error('[Affiliate] Payout request error:', error || data?.error);
+        toast.error(data?.error || "Erreur lors de la demande de paiement");
+        return;
+      }
+
+      toast.success(
+        `Ta demande de paiement de ${data.amount}€ a bien été envoyée. Alfie s'occupe du reste 🐶✨`
+      );
+
+      // Rafraîchir les données
+      await loadAffiliateData();
+    } catch (err: any) {
+      console.error('[Affiliate] Unexpected error:', err);
+      toast.error("Erreur inattendue lors de la demande de paiement");
+    } finally {
+      setRequestingPayout(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -217,6 +243,15 @@ export default function Affiliate() {
   };
 
   const nextStatus = getNextStatusProgress();
+
+  // Calculer les gains non payés
+  const MIN_PAYOUT = 50;
+  const paidPayouts = payouts
+    .filter(p => p.status === 'paid')
+    .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const unpaidEarnings = stats.totalEarnings - paidPayouts;
+  const hasPendingPayout = payouts.some(p => p.status === 'pending');
+  const canRequestPayout = unpaidEarnings >= MIN_PAYOUT && !hasPendingPayout;
 
   return (
     <div className="space-y-6">
@@ -297,6 +332,38 @@ export default function Affiliate() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-purple-600">{stats.totalEarnings.toFixed(2)}€</div>
+            
+            {/* Gains non payés */}
+            <div className="mt-2 text-sm">
+              <span className="text-muted-foreground">Disponible : </span>
+              <span className="font-semibold text-green-600">
+                {unpaidEarnings.toFixed(2)}€
+              </span>
+            </div>
+            
+            {/* Bouton demande paiement */}
+            <Button
+              onClick={requestPayout}
+              disabled={!canRequestPayout || requestingPayout}
+              className="mt-4 w-full gradient-hero text-white"
+              size="sm"
+            >
+              {requestingPayout ? 'Demande en cours…' : 'Demander un paiement'}
+            </Button>
+
+            {/* Message si gains insuffisants */}
+            {unpaidEarnings < MIN_PAYOUT && !hasPendingPayout && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Minimum {MIN_PAYOUT}€ requis pour demander un paiement
+              </p>
+            )}
+
+            {/* Message si demande en cours */}
+            {hasPendingPayout && (
+              <p className="mt-2 text-xs text-orange-600">
+                Une demande est déjà en cours de traitement
+              </p>
+            )}
           </CardContent>
         </Card>
 
