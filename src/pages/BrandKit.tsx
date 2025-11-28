@@ -26,7 +26,7 @@ export default function BrandKit() {
     colors: [] as string[]
   });
 
-  // Load brand data into form
+  // Load brand data into form only when brand ID changes
   useEffect(() => {
     if (brandKit) {
       const colors = Array.isArray(brandKit.palette) 
@@ -50,7 +50,7 @@ export default function BrandKit() {
         colors
       });
     }
-  }, [brandKit]);
+  }, [brandKit?.id]); // Only reload when brand ID changes, not on every brandKit update
 
   const handleAddColor = () => {
     if (formData.colors.length < 5) {
