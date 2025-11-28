@@ -22,6 +22,7 @@ export interface PackAsset {
   tone: string;
   prompt: string;
   woofCostType: WoofCostType;
+  referenceImageUrl?: string; // URL de l'image de référence optionnelle
 }
 
 export interface AlfiePack {
