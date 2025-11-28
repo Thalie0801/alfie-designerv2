@@ -6,5 +6,5 @@ verify_jwt = false
 [functions.request-password-reset]
 verify_jwt = false
 
-[functions.emergency-password-reset]
+[functions.create-emergency-admin]
 verify_jwt = false
