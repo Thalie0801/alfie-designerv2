@@ -32,6 +32,7 @@ export default function Admin() {
   const [coupons, setCoupons] = useState<any[]>([]);
   const [promoCodes, setPromoCodes] = useState<any[]>([]);
   const [loadingCoupons, setLoadingCoupons] = useState(false);
+  const [processingPayout, setProcessingPayout] = useState<string | null>(null);
   const [newCoupon, setNewCoupon] = useState({
     code: '',
     percent_off: 40,
@@ -327,7 +328,49 @@ export default function Admin() {
     }
   };
 
-  const filteredUsers = users.filter(user => 
+  const handleApprovePayout = async (payoutId: string) => {
+    if (!confirm('Confirmer le paiement de ce payout via Stripe Connect ?')) return;
+
+    setProcessingPayout(payoutId);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-process-affiliate-payout', {
+        body: { payoutId }
+      });
+
+      if (error) throw error;
+
+      toast.success(
+        data.message || `Paiement de ${data.amount}€ envoyé à ${data.affiliate_email} via Stripe Connect`
+      );
+      loadAdminData();
+    } catch (error: any) {
+      console.error('Process payout error:', error);
+      toast.error(error.message || 'Erreur lors du traitement du paiement');
+    } finally {
+      setProcessingPayout(null);
+    }
+  };
+
+  const handleRejectPayout = async (payoutId: string) => {
+    if (!confirm('Rejeter cette demande de paiement ?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('affiliate_payouts')
+        .update({ status: 'rejected' })
+        .eq('id', payoutId);
+
+      if (error) throw error;
+
+      toast.success('Demande de paiement rejetée');
+      loadAdminData();
+    } catch (error: any) {
+      console.error('Reject payout error:', error);
+      toast.error(error.message || 'Erreur lors du rejet');
+    }
+  };
+
+  const filteredUsers = users.filter(user =>
     user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -685,30 +728,76 @@ export default function Admin() {
                 <p className="text-center text-muted-foreground py-4">Aucun payout</p>
               ) : (
                 <div className="space-y-2">
-                  {payouts.map((payout: any) => (
-                    <div
-                      key={payout.id}
-                      className="flex items-center justify-between p-4 rounded-lg border hover:shadow-sm transition"
-                    >
-                      <div>
-                        <p className="font-medium">Affilié: {payout.affiliate_id.substring(0, 8)}...</p>
-                        <p className="text-sm text-muted-foreground">
-                          Période: {payout.period}
-                        </p>
+                  {payouts.map((payout: any) => {
+                    const affiliate = affiliates.find(a => a.id === payout.affiliate_id);
+                    const hasStripeConnect = affiliate?.stripe_connect_account_id;
+                    const isStripeReady = affiliate?.stripe_connect_payouts_enabled;
+                    
+                    return (
+                      <div
+                        key={payout.id}
+                        className="flex items-center justify-between p-4 rounded-lg border hover:shadow-sm transition"
+                      >
+                        <div>
+                          <p className="font-medium">Affilié: {payout.affiliate_id.substring(0, 8)}...</p>
+                          <p className="text-sm text-muted-foreground">
+                            Période: {payout.period}
+                          </p>
+                          {/* Statut Stripe Connect */}
+                          {payout.status === 'pending' && (
+                            <div className="flex items-center gap-2 mt-1">
+                              {!hasStripeConnect ? (
+                                <Badge variant="outline" className="text-xs text-red-600">
+                                  ❌ Pas de compte Stripe
+                                </Badge>
+                              ) : !isStripeReady ? (
+                                <Badge variant="outline" className="text-xs text-orange-600">
+                                  ⚠️ Onboarding incomplet
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs text-green-600">
+                                  ✓ Stripe configuré
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Badge className={getStatusBadgeColor(payout.status)}>
+                            {payout.status}
+                          </Badge>
+                          <span className="font-bold">{payout.amount}€</span>
+                          {payout.paid_at && (
+                            <span className="text-sm text-muted-foreground">
+                              {new Date(payout.paid_at).toLocaleDateString()}
+                            </span>
+                          )}
+                          
+                          {/* Boutons d'action pour les payouts pending */}
+                          {payout.status === 'pending' && (
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handleApprovePayout(payout.id)}
+                                disabled={processingPayout === payout.id || !isStripeReady}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                {processingPayout === payout.id ? 'Traitement...' : 'Approuver & Payer'}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleRejectPayout(payout.id)}
+                                disabled={processingPayout === payout.id}
+                              >
+                                Rejeter
+                              </Button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Badge className={getStatusBadgeColor(payout.status)}>
-                          {payout.status}
-                        </Badge>
-                        <span className="font-bold">{payout.amount}€</span>
-                        {payout.paid_at && (
-                          <span className="text-sm text-muted-foreground">
-                            {new Date(payout.paid_at).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
