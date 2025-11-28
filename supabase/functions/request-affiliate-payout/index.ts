@@ -57,6 +57,32 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Vérifier que l'affilié a un abonnement actif
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('plan, stripe_subscription_id')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError) {
+      console.error('[request-affiliate-payout] Profile lookup error:', profileError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Erreur lors de la vérification du profil' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Bloquer si pas d'abonnement actif
+    if (!profile.plan || profile.plan === 'none' || !profile.stripe_subscription_id) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Abonnement actif requis pour demander un paiement. Merci de renouveler votre abonnement.' 
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Calculer les commissions totales
     const { data: commissions, error: commissionsError } = await supabase
       .from('affiliate_commissions')

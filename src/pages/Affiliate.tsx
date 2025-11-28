@@ -11,7 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 
 export default function Affiliate() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [affiliate, setAffiliate] = useState<any>(null);
   const [payouts, setPayouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -356,7 +356,11 @@ export default function Affiliate() {
     .reduce((sum, p) => sum + Number(p.amount || 0), 0);
   const unpaidEarnings = stats.totalEarnings - paidPayouts;
   const hasPendingPayout = payouts.some(p => p.status === 'pending');
-  const canRequestPayout = unpaidEarnings >= MIN_PAYOUT && !hasPendingPayout;
+  
+  // Vérifier si l'utilisateur a un abonnement actif
+  const hasActiveSubscription = profile?.plan && profile?.plan !== 'none' && profile?.stripe_subscription_id;
+  
+  const canRequestPayout = unpaidEarnings >= MIN_PAYOUT && !hasPendingPayout && hasActiveSubscription;
 
   // Generate affiliate link using slug if available, otherwise fallback to ID
   const affiliateLink = affiliate?.slug 
@@ -577,10 +581,22 @@ export default function Affiliate() {
             </Button>
 
             {/* Message si gains insuffisants */}
-            {unpaidEarnings < MIN_PAYOUT && !hasPendingPayout && (
+            {unpaidEarnings < MIN_PAYOUT && !hasPendingPayout && hasActiveSubscription && (
               <p className="mt-2 text-xs text-muted-foreground">
                 Minimum {MIN_PAYOUT}€ requis pour demander un paiement
               </p>
+            )}
+
+            {/* Message si pas d'abonnement actif */}
+            {!hasActiveSubscription && (
+              <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                <p className="text-xs text-red-600 dark:text-red-400 font-medium">
+                  ⚠️ Abonnement actif requis pour demander un paiement
+                </p>
+                <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-1">
+                  Merci de renouveler votre abonnement pour débloquer les paiements
+                </p>
+              </div>
             )}
 
             {/* Message si demande en cours */}
