@@ -280,6 +280,15 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // ✅ VALIDATION JWT (activé dans config.toml)
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Non authentifié" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { brandId, persona, messages, lang, woofsRemaining } = await req.json();
 
     if (!brandId || !persona || !messages) {
@@ -292,25 +301,52 @@ Deno.serve(async (req) => {
     // Récupérer le Brand Kit COMPLET de la marque (palette, niche, voice, name)
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
     
     let brandContext: { name?: string; niche?: string; voice?: string; palette?: string[] } | undefined;
     
-    if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+    if (SUPABASE_URL && SUPABASE_ANON_KEY) {
       try {
-        const brandResponse = await fetch(`${SUPABASE_URL}/rest/v1/brands?id=eq.${brandId}&select=name,niche,voice,palette`, {
+        // ✅ VALIDATION PROPRIÉTÉ DE LA MARQUE
+        const supabaseAuth = await import("https://esm.sh/@supabase/supabase-js@2.57.2").then(mod => mod.createClient);
+        const supabase = supabaseAuth(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          global: { headers: { Authorization: authHeader } }
+        });
+
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          return new Response(
+            JSON.stringify({ error: "Token invalide" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Vérifier que l'utilisateur possède la brand
+        const brandResponse = await fetch(`${SUPABASE_URL}/rest/v1/brands?id=eq.${brandId}&select=user_id,name,niche,voice,palette`, {
           headers: {
-            'apikey': SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': authHeader
           }
         });
         
         if (brandResponse.ok) {
           const brands = await brandResponse.json();
           if (brands && brands.length > 0) {
+            if (brands[0].user_id !== user.id) {
+              return new Response(
+                JSON.stringify({ error: "Accès non autorisé à cette marque" }),
+                { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              );
+            }
             brandContext = {
               niche: brands[0].niche,
               voice: brands[0].voice
             };
+          } else {
+            return new Response(
+              JSON.stringify({ error: "Marque introuvable" }),
+              { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
           }
         }
       } catch (error) {
