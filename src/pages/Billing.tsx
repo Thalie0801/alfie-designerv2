@@ -2,29 +2,28 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Check, Settings, Sparkles, Award } from 'lucide-react';
+import { Check, Settings, Sparkles, Award, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useStripeCheckout } from '@/hooks/useStripeCheckout';
 import { useCustomerPortal } from '@/hooks/useCustomerPortal';
 import { toast } from 'sonner';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { safeWoofs } from '@/lib/woofs';
 
 const plans = [
   {
     name: 'Starter',
     key: 'starter',
     price: '39€',
-    quota_brands: 1,
-    quota_visuals: 150,
-    quota_videos: 15,
+    quota_woofs: 150,
     features: [
-      '1 Brand Kit dédié',
-      '150 visuels/mois (quotas non reportables)',
-      '15 vidéos/mois (15 Woofs)',
+      '150 Woofs/mois',
+      '1 marque',
+      'Images & Carrousels',
       'Canva : adaptation & dépôt inclus',
       'Stockage 30 jours (purge auto)',
-      'Téléchargement illimité',
       'Support email'
     ],
     popular: false
@@ -33,16 +32,13 @@ const plans = [
     name: 'Pro',
     key: 'pro',
     price: '99€',
-    quota_brands: 1,
-    quota_visuals: 450,
-    quota_videos: 45,
+    quota_woofs: 450,
     features: [
-      '1 Brand Kit dédié',
-      '450 visuels/mois (quotas non reportables)',
-      '45 vidéos/mois (45 Woofs)',
+      '450 Woofs/mois',
+      '3 marques',
+      'Vidéos standard (10 Woofs)',
       'Canva : adaptation & dépôt inclus',
       'Stockage 30 jours (purge auto)',
-      'Téléchargement illimité',
       'Add-on : Marque suppl. +39€/mois',
       'Support prioritaire'
     ],
@@ -52,16 +48,13 @@ const plans = [
     name: 'Studio',
     key: 'studio',
     price: '199€',
-    quota_brands: 1,
-    quota_visuals: 1000,
-    quota_videos: 100,
+    quota_woofs: 1000,
     features: [
-      '1 Brand Kit dédié',
-      '1000 visuels/mois (quotas non reportables)',
-      '100 vidéos/mois (100 Woofs)',
+      '1000 Woofs/mois',
+      '5 marques',
+      'Vidéos premium Veo 3.1 (50 Woofs)',
       'Canva : adaptation & dépôt inclus',
       'Stockage 30 jours (purge auto)',
-      'Téléchargement illimité',
       'Add-on : Marque suppl. +39€/mois',
       'Packs Woofs (+50, +100)',
       'Analytics avancés',
@@ -73,13 +66,11 @@ const plans = [
     name: 'Enterprise',
     key: 'enterprise',
     price: null,
-    quota_brands: 999,
-    quota_visuals: 9999,
-    quota_videos: 9999,
+    quota_woofs: 999999,
     features: [
+      'Woofs illimités',
       'Marques illimitées',
-      'Visuels illimités',
-      'Vidéos illimitées (Woofs illimités)',
+      'Tout débloquer',
       'Canva : adaptation & dépôt inclus',
       'Stockage personnalisé',
       'API & SSO',
@@ -100,12 +91,47 @@ export default function Billing() {
   const hasActivePlan = Boolean(profile?.status === 'active' || profile?.granted_by_admin);
   const isAmbassador = profile?.granted_by_admin;
   const hasStripeSubscription = profile?.stripe_subscription_id;
+  
+  const [woofsData, setWoofsData] = useState<{
+    used: number;
+    quota: number;
+    remaining: number;
+  } | null>(null);
+  const [loadingWoofs, setLoadingWoofs] = useState(true);
+
+  // Charger les Woofs
+  const fetchWoofs = async () => {
+    if (!profile?.active_brand_id) {
+      setLoadingWoofs(false);
+      return;
+    }
+
+    try {
+      setLoadingWoofs(true);
+      const { data, error } = await supabase.functions.invoke("get-quota", {
+        body: { brand_id: profile.active_brand_id },
+      });
+
+      if (!error && data?.ok) {
+        setWoofsData({
+          used: safeWoofs(data.data.woofs_used),
+          quota: safeWoofs(data.data.woofs_quota),
+          remaining: safeWoofs(data.data.woofs_remaining),
+        });
+      }
+    } catch (err) {
+      console.error("[Billing] Error fetching woofs:", err);
+    } finally {
+      setLoadingWoofs(false);
+    }
+  };
 
   // Ensure fresh profile on page load (avoids stale plan state)
   useEffect(() => {
     refreshProfile();
+    fetchWoofs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [profile?.active_brand_id]);
 
   const handleSelectPlan = async (plan: typeof plans[0]) => {
     if (plan.isEnterprise) {
@@ -191,33 +217,60 @@ export default function Billing() {
                   Profitez de tous les avantages de votre abonnement
                 </CardDescription>
               </div>
-              {hasStripeSubscription && (
+              <div className="flex items-center gap-2">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  onClick={openCustomerPortal}
-                  disabled={portalLoading}
+                  onClick={fetchWoofs}
+                  disabled={loadingWoofs}
                   className="gap-2"
                 >
-                  <Settings className="h-4 w-4" />
-                  {portalLoading ? 'Chargement...' : 'Gérer'}
+                  <RefreshCw className={`h-4 w-4 ${loadingWoofs ? 'animate-spin' : ''}`} />
                 </Button>
-              )}
+                {hasStripeSubscription && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={openCustomerPortal}
+                    disabled={portalLoading}
+                    className="gap-2"
+                  >
+                    <Settings className="h-4 w-4" />
+                    {portalLoading ? 'Chargement...' : 'Gérer'}
+                  </Button>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="bg-card/50">
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-                <span className="font-medium text-blue-700 dark:text-blue-300">📊 Visuels ce mois:</span>
-                <span className="text-blue-600 dark:text-blue-400 font-bold">{profile?.generations_this_month || 0} / {profile?.quota_visuals_per_month || 0}</span>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
-                <span className="font-medium text-purple-700 dark:text-purple-300">🎬 Vidéos ce mois:</span>
-                <span className="text-purple-600 dark:text-purple-400 font-bold">0 / {profile?.quota_videos || 0}</span>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-                <span className="font-medium text-green-700 dark:text-green-300">🎨 Brand Kits:</span>
-                <span className="text-green-600 dark:text-green-400 font-bold">0 / {profile?.quota_brands || 0}</span>
+              {/* Compteur Woofs unifié */}
+              <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 border-2 border-orange-200 dark:border-orange-800">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">🐾</span>
+                  <div>
+                    <p className="font-semibold text-orange-700 dark:text-orange-300">Woofs ce mois</p>
+                    <p className="text-xs text-orange-600/70 dark:text-orange-400/70">
+                      1 Woof = 1 image/slide • 10 Woofs = 1 vidéo standard • 50 Woofs = 1 vidéo premium
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  {loadingWoofs ? (
+                    <div className="text-orange-600 dark:text-orange-400 font-bold">Chargement...</div>
+                  ) : woofsData ? (
+                    <>
+                      <div className="text-2xl font-bold text-orange-700 dark:text-orange-300">
+                        {woofsData.used} / {woofsData.quota}
+                      </div>
+                      <div className="text-xs text-orange-600/80 dark:text-orange-400/80">
+                        {woofsData.remaining} restants
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-orange-600 dark:text-orange-400">-</div>
+                  )}
+                </div>
               </div>
             </div>
           </CardContent>
