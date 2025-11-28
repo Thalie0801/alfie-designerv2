@@ -14,6 +14,7 @@ interface PackSummarySidebarProps {
   woofsQuota: number;
   onLaunch: () => void;
   isLaunching: boolean;
+  "data-tour-id"?: string;
 }
 
 export function PackSummarySidebar({
@@ -22,6 +23,7 @@ export function PackSummarySidebar({
   woofsQuota,
   onLaunch,
   isLaunching,
+  "data-tour-id": dataTourId,
 }: PackSummarySidebarProps) {
   const totalCost = safeWoofs(calculatePackWoofCost(pack));
   const available = safeWoofs(woofsAvailable);
@@ -39,7 +41,7 @@ export function PackSummarySidebar({
   const videoPremiumCount = pack.assets.filter((a) => a.kind === "video_premium").length;
 
   return (
-    <div className="space-y-4 sticky top-4">
+    <div className="space-y-4 sticky top-4" data-tour-id={dataTourId}>
       {/* Récap Woofs */}
       <Card className="p-4 space-y-3">
         <div className="flex items-center gap-2">
@@ -134,6 +136,7 @@ export function PackSummarySidebar({
 
       {/* Bouton lancer */}
       <Button
+        data-tour-id="studio-launch"
         onClick={onLaunch}
         disabled={!hasAssets || isLaunching}
         className="w-full"

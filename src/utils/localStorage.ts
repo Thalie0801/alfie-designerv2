@@ -38,3 +38,6 @@ export const completedKey = (email?: string | null): string =>
 
 export const autoCompletedKey = (email?: string | null): string => 
   `alfie.tour.auto-completed:${normalizeEmail(email)}`;
+
+export const studioCompletedKey = (email?: string | null): string => 
+  `alfie.tour.studio-completed:${normalizeEmail(email)}`;

@@ -545,6 +545,7 @@ export default function ChatWidget() {
     <>
       {!open && (
         <button
+          data-tour-id="chat-widget-bubble"
           onClick={() => setOpen(true)}
           className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 rounded-full shadow-lg w-12 h-12 sm:w-14 sm:h-14 grid place-items-center hover:scale-105 transition z-[9998]"
           style={{

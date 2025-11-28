@@ -25,6 +25,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { calculatePackWoofCost } from "@/lib/woofs";
 import { useQueueMonitor } from "@/hooks/useQueueMonitor";
 import { QueueStatus } from "@/components/chat/QueueStatus";
+import { TourProvider, HelpLauncher } from "@/components/tour/InteractiveTour";
+import { StudioTourAutoStart } from "@/components/tour/StudioTourAutoStart";
+import { STUDIO_STEPS } from "@/components/tour/StudioTourSteps";
 
 // Packs prédéfinis
 const PRESET_PACKS = {
@@ -468,23 +471,26 @@ Prépare-moi un pack complet avec plusieurs types de visuels (images, carrousels
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 lg:pb-8">
-      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
-        {/* Header */}
-        <div className="mb-6 sm:mb-8 text-center">
-          <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-            <Sparkles className="w-6 h-6 sm:w-8 sm:h-8 text-alfie-pink" />
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">Studio Alfie</h1>
+    <TourProvider steps={STUDIO_STEPS} options={{ userEmail: user?.email }}>
+      <StudioTourAutoStart />
+      
+      <div className="min-h-screen bg-background pb-20 lg:pb-8">
+        <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
+          {/* Header */}
+          <div data-tour-id="studio-header" className="mb-6 sm:mb-8 text-center">
+            <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+              <Sparkles className="w-6 h-6 sm:w-8 sm:h-8 text-alfie-pink" />
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">Studio Alfie</h1>
+            </div>
+            <p className="text-muted-foreground text-sm sm:text-base md:text-lg">
+              Crée ton pack de visuels sur mesure 🎬
+            </p>
           </div>
-          <p className="text-muted-foreground text-sm sm:text-base md:text-lg">
-            Crée ton pack de visuels sur mesure 🎬
-          </p>
-        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
           {/* Colonne 1 : Brief global */}
           <div className="lg:col-span-3 space-y-4">
-            <Card className="p-4 space-y-4">
+            <Card data-tour-id="studio-brief" className="p-4 space-y-4">
               <div>
                 <h3 className="font-semibold mb-2 text-sm">Nom de la campagne</h3>
                 <Input
@@ -506,7 +512,7 @@ Prépare-moi un pack complet avec plusieurs types de visuels (images, carrousels
 
               <Separator />
 
-              <div>
+              <div data-tour-id="studio-brandkit">
                 <h3 className="font-semibold mb-2 text-sm">Brand Kit</h3>
                 {activeBrand && (
                   <div className="space-y-2 text-xs text-muted-foreground">
@@ -565,7 +571,7 @@ Prépare-moi un pack complet avec plusieurs types de visuels (images, carrousels
 
           {/* Colonne 2 : Pack d'assets */}
           <div className="lg:col-span-6 space-y-4">
-            <Card className="p-4">
+            <Card data-tour-id="studio-assets" className="p-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold">Visuels de ta campagne ({pack.assets.length})</h3>
                 <DropdownMenu>
@@ -606,6 +612,7 @@ Prépare-moi un pack complet avec plusieurs types de visuels (images, carrousels
                     }
                   </p>
                   <Button
+                    data-tour-id="studio-propose-pack"
                     onClick={handleGenerateFromBrief}
                     disabled={isGeneratingFromBrief}
                     className="gap-2"
@@ -682,6 +689,7 @@ Prépare-moi un pack complet avec plusieurs types de visuels (images, carrousels
           {/* Colonne 3 : Récap Woofs */}
           <div className="lg:col-span-3">
             <PackSummarySidebar
+              data-tour-id="studio-woofs-recap"
               pack={pack}
               woofsAvailable={woofsAvailable}
               woofsQuota={woofsQuota}
@@ -691,6 +699,12 @@ Prépare-moi un pack complet avec plusieurs types de visuels (images, carrousels
           </div>
         </div>
       </div>
+      
+      {/* Help Launcher Button */}
+      <div className="fixed bottom-20 right-4 z-50">
+        <HelpLauncher />
+      </div>
     </div>
+    </TourProvider>
   );
 }

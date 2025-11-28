@@ -56,7 +56,9 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <HelpLauncher />
+            <div data-tour-id="help-launcher">
+              <HelpLauncher />
+            </div>
             <div data-tour-id="news">
               <NewsWidget />
             </div>

@@ -2,13 +2,13 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { X, ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
-import { lsGet, lsSet, autoCompletedKey } from "@/utils/localStorage";
+import { lsGet, lsSet, completedKey, studioCompletedKey } from "@/utils/localStorage";
 import DOMPurify from "dompurify";
 
 /* ================= Types ================= */
 type Placement = "top" | "bottom" | "left" | "right" | "center";
 
-interface TourStep {
+export interface TourStep {
   selector: string; // 'center' => bubble centrée
   title: string;
   content: string; // accepte du markdown simple **bold** + \n\n
@@ -98,85 +98,65 @@ const waitForTargets = (selectors: string[], maxWaitMs = 4000) =>
     timeoutId = window.setTimeout(() => done(false), maxWaitMs);
   });
 
-/* ============== Steps par défaut (inchangés) ============== */
-const DEFAULT_STEPS: TourStep[] = [
+/* ============== Steps par défaut - Dashboard ============== */
+const DASHBOARD_STEPS: TourStep[] = [
   {
     selector: '[data-tour-id="nav-dashboard"]',
-    title: "🏠 Bienvenue sur votre Dashboard",
-    content: "Voici votre espace central. Retrouvez ici toutes vos statistiques et actions rapides.",
-    placement: "right",
-  },
-  {
-    selector: '[data-sidebar-id="chat"]',
-    title: "💬 Chat Alfie - Mode Exploration",
-    content:
-      "Discutez naturellement avec Alfie. Idéal pour explorer des idées, poser des questions et être guidé pas à pas. Uploadez des images pour créer des variations ou les transformer en vidéos.",
-    placement: "right",
-  },
-  {
-    selector: '[data-tour-id="btn-create"]',
-    title: "⚡ Créateur - Mode Expert",
-    content:
-      "Accès direct au générateur avec formulaire complet. Pour ceux qui savent exactement ce qu'ils veulent créer et veulent contrôler tous les paramètres.",
+    title: "🏠 Ton Dashboard",
+    content: "Bienvenue ! Ici, c'est ta vue d'ensemble : tes dernières créations, tes Woofs, et tes marques actives.",
     placement: "bottom",
   },
   {
-    selector: "center",
-    title: "🎭 Deux modes pour deux usages",
-    content:
-      "**Chat Alfie** : Pour explorer et être guidé avec une IA conversationnelle.\n\n**Créateur** : Pour produire rapidement avec contrôle total sur les paramètres.\n\nChoisissez selon votre besoin du moment !",
-    placement: "center",
+    selector: '[data-sidebar-id="studio"]',
+    title: "🎬 Studio",
+    content: "C'est ici que tu crées tes packs de visuels sur mesure : images, carrousels, vidéos… Alfie te guide !",
+    placement: "right",
+  },
+  {
+    selector: '[data-sidebar-id="library"]',
+    title: "📚 Bibliothèque",
+    content: "Tous tes visuels générés sont rangés ici, classés par type : images, carrousels, vidéos.",
+    placement: "right",
+  },
+  {
+    selector: '[data-tour-id="brand-kit"]',
+    title: "🎨 Brand Kit",
+    content: "Gère ta marque active ici : couleurs, voix, niche… Alfie s'en sert pour personnaliser tes créations.",
+    placement: "bottom",
   },
   {
     selector: '[data-tour-id="quotas"]',
-    title: "📊 Vos quotas & Woofs",
-    content:
-      "Suivez vos images, vidéos et Woofs (crédits pour vidéos Premium Sora/Veo). Les compteurs se réinitialisent automatiquement le 1er de chaque mois. Les Woofs non utilisés ne sont pas reportés.",
+    title: "🐶 Tes Woofs",
+    content: "Les Woofs sont la monnaie d'Alfie. Chaque image = 1 Woof, carrousel = 1 Woof/slide, vidéo standard = 10 Woofs. Ils se rechargent chaque mois.",
     placement: "top",
   },
   {
     selector: '[data-tour-id="quick-actions"]',
     title: "⚡ Actions rapides",
-    content: "Accédez rapidement à vos actions les plus courantes.",
+    content: "Accède directement à tes actions les plus courantes sans passer par le menu.",
     placement: "top",
   },
   {
-    selector: '[data-tour-id="brand-kit"]',
-    title: "🎨 Brand Kit",
-    content: "Gérez vos marques et personnalisez vos contenus avec votre identité visuelle.",
-    placement: "bottom",
-  },
-  {
-    selector: '[data-tour-id="add-brand"]',
-    title: "➕ Ajouter une marque",
-    content: "Créez une nouvelle marque pour organiser vos contenus.",
+    selector: '[data-tour-id="chat-widget-bubble"]',
+    title: "💬 Chat avec Alfie",
+    content: "Tu peux discuter avec Alfie à tout moment via cette bulle. Il peut te coacher, te proposer des idées, ou préparer un pack pour toi !",
     placement: "left",
   },
   {
-    selector: '[data-sidebar-id="library"]',
-    title: "📚 Bibliothèque",
-    content: "Retrouvez tous vos contenus créés dans la bibliothèque.",
-    placement: "right",
-  },
-  {
-    selector: '[data-tour-id="news"]',
-    title: "📰 Actualités",
-    content: "Restez informé des dernières nouveautés et mises à jour.",
-    placement: "top",
-  },
-  {
-    selector: '[data-tour-id="suggest"]',
-    title: "💡 Suggestions",
-    content: "Partagez vos idées pour améliorer la plateforme.",
-    placement: "top",
-  },
-  {
     selector: '[data-sidebar-id="affiliate"]',
-    title: "🤝 Programme d'affiliation",
-    content: "Parrainez vos amis et gagnez des récompenses.",
+    title: "🤝 Affiliation",
+    content: "Parraine tes amis et gagne des récompenses. Chaque filleul compte !",
     placement: "right",
+  },
+  {
+    selector: '[data-tour-id="help-launcher"]',
+    title: "❓ Besoin d'aide ?",
+    content: "Tu peux relancer ce guide à tout moment en cliquant ici. À bientôt !",
+    placement: "bottom",
   },
 ];
+
+const DEFAULT_STEPS = DASHBOARD_STEPS;
 
 /* ============== Provider ============== */
 interface TourProviderProps {
@@ -197,19 +177,23 @@ export function TourProvider({ children, steps = DEFAULT_STEPS, options = {} }: 
   // marque auto-complete quand on sort d'un état actif
   useEffect(() => {
     if (wasActiveRef.current && !isActive && userEmail) {
-      lsSet(autoCompletedKey(userEmail), "1");
-      console.debug("[Tour] Marked as auto-completed for", userEmail);
+      lsSet(completedKey(userEmail), "true");
+      // Also mark studio tour if applicable
+      if (steps.some(s => s.selector.includes('studio'))) {
+        lsSet(studioCompletedKey(userEmail), "true");
+      }
+      console.debug("[Tour] Marked as completed for", userEmail);
     }
     wasActiveRef.current = isActive;
-  }, [isActive, userEmail]);
+  }, [isActive, userEmail, steps]);
 
   const start = useCallback(
     (force = false) => {
       forceRef.current = !!force;
       if (!force && autoStart !== "always" && userEmail) {
-        const done = lsGet(autoCompletedKey(userEmail)) === "1";
+        const done = lsGet(completedKey(userEmail)) === "true";
         if (done) {
-          console.debug("[Tour] Already auto-completed for", userEmail);
+          console.debug("[Tour] Already completed for", userEmail);
           return;
         }
       }
@@ -222,7 +206,18 @@ export function TourProvider({ children, steps = DEFAULT_STEPS, options = {} }: 
 
   const stop = useCallback(() => {
     setIsActive(false);
-  }, []);
+    setCurrentStep(0);
+    setBubbleVisible(false);
+    
+    // Mark as completed in localStorage
+    if (options?.userEmail) {
+      lsSet(completedKey(options.userEmail), "true");
+      // Also mark studio tour if applicable
+      if (steps.some(s => s.selector.includes('studio'))) {
+        lsSet(studioCompletedKey(options.userEmail), "true");
+      }
+    }
+  }, [options?.userEmail, steps]);
   const next = useCallback(
     () => setCurrentStep((s) => (s < steps.length - 1 ? s + 1 : (stop(), s))),
     [steps.length, stop],
