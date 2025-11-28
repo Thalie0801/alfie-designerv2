@@ -46,6 +46,46 @@ export default function Affiliate() {
         return;
       }
 
+      // Auto-create affiliate if not exists
+      if (!aff.data) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        if (profile) {
+          const { data: newAff, error: createError } = await supabase
+            .from('affiliates')
+            .insert({
+              id: user.id,
+              email: user.email || '',
+              name: user.email?.split('@')[0] || 'Affilié',
+              status: 'active',
+              affiliate_status: 'creator',
+              active_direct_referrals: 0
+            })
+            .select()
+            .single();
+
+          if (createError) {
+            console.error('Failed to create affiliate:', createError);
+            toast.error('Impossible de créer le compte affilié');
+            setAffiliate(null);
+            return;
+          }
+
+          setAffiliate(newAff);
+          toast.success('Votre compte affilié a été créé automatiquement ! 🎉');
+
+          // Continue to load stats for the new affiliate
+          aff.data = newAff;
+        } else {
+          setAffiliate(null);
+          return;
+        }
+      }
+
       if (!aff.data) {
         setAffiliate(null);
         return;
