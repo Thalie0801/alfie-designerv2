@@ -18,8 +18,20 @@ verify_jwt = true
 [functions.alfie-generate-texts]
 verify_jwt = true
 
-[functions.alfie-generate-texts]
+[functions.request-affiliate-payout]
 verify_jwt = true
 
-[functions.request-affiliate-payout]
+[functions.stripe-connect-onboard]
+verify_jwt = true
+
+[functions.stripe-connect-refresh]
+verify_jwt = true
+
+[functions.stripe-connect-dashboard]
+verify_jwt = true
+
+[functions.stripe-connect-webhook]
+verify_jwt = false
+
+[functions.admin-process-affiliate-payout]
 verify_jwt = true

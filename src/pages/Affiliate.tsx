@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import { Copy, DollarSign, MousePointerClick, TrendingUp, Users, Award, Target, Crown } from 'lucide-react';
+import { Copy, DollarSign, MousePointerClick, TrendingUp, Users, Award, Target, Crown, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 
@@ -17,6 +17,7 @@ export default function Affiliate() {
   const [commissions, setCommissions] = useState<any[]>([]);
   const [directReferrals, setDirectReferrals] = useState<any[]>([]);
   const [requestingPayout, setRequestingPayout] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [stats, setStats] = useState({
     totalClicks: 0,
     totalConversions: 0,
@@ -196,6 +197,51 @@ export default function Affiliate() {
     }
   };
 
+  const handleStripeConnect = async () => {
+    setConnecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('stripe-connect-onboard');
+      if (error || !data?.url) {
+        toast.error("Erreur lors de la connexion à Stripe");
+        return;
+      }
+      window.location.href = data.url;
+    } catch (err: any) {
+      console.error('[Stripe Connect] Error:', err);
+      toast.error("Erreur lors de la connexion à Stripe");
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const handleStripeRefresh = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('stripe-connect-refresh');
+      if (error || !data?.url) {
+        toast.error("Erreur lors de la génération du lien");
+        return;
+      }
+      window.location.href = data.url;
+    } catch (err: any) {
+      console.error('[Stripe Refresh] Error:', err);
+      toast.error("Erreur lors de la génération du lien");
+    }
+  };
+
+  const handleStripeDashboard = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('stripe-connect-dashboard');
+      if (error || !data?.url) {
+        toast.error("Erreur lors de l'accès au dashboard");
+        return;
+      }
+      window.open(data.url, '_blank');
+    } catch (err: any) {
+      console.error('[Stripe Dashboard] Error:', err);
+      toast.error("Erreur lors de l'accès au dashboard");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -297,6 +343,51 @@ export default function Affiliate() {
           </CardContent>
         </Card>
       )}
+
+      {/* Carte Stripe Connect */}
+      <Card className="border-primary/20 shadow-medium">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-primary" />
+            Compte de paiement
+          </CardTitle>
+          <CardDescription>
+            Configure ton compte Stripe pour recevoir tes paiements
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!affiliate?.stripe_connect_account_id ? (
+            <div className="text-center py-4">
+              <p className="text-muted-foreground mb-4">
+                Connecte ton compte Stripe pour recevoir tes paiements
+              </p>
+              <Button onClick={handleStripeConnect} disabled={connecting} className="gradient-hero text-white">
+                {connecting ? 'Connexion...' : 'Connecter mon compte Stripe'}
+              </Button>
+            </div>
+          ) : !affiliate?.stripe_connect_onboarding_complete ? (
+            <div className="text-center py-4">
+              <Badge className="bg-yellow-500 mb-3">Onboarding en cours</Badge>
+              <p className="text-muted-foreground mb-4">
+                Complete la configuration de ton compte Stripe
+              </p>
+              <Button onClick={handleStripeRefresh} variant="outline">
+                Reprendre la configuration
+              </Button>
+            </div>
+          ) : (
+            <div className="text-center py-4">
+              <Badge className="bg-green-500 mb-3">✓ Compte configuré</Badge>
+              <p className="text-muted-foreground mb-4">
+                Ton compte Stripe est prêt à recevoir des paiements
+              </p>
+              <Button onClick={handleStripeDashboard} variant="outline" size="sm">
+                Accéder à mon dashboard Stripe
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Stats Cards */}
       <div className="grid md:grid-cols-4 gap-4">
