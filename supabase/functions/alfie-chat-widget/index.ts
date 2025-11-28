@@ -118,14 +118,30 @@ Quand l'utilisateur demande de préparer un pack, génère un pack structuré en
  */
 async function callLLM(
   messages: { role: string; content: string }[],
-  systemPrompt: string
+  systemPrompt: string,
+  brandContext?: { niche?: string; voice?: string }
 ): Promise<string> {
+  // Enrichir le system prompt avec le contexte de marque si disponible
+  let enrichedPrompt = systemPrompt;
+  if (brandContext) {
+    const brandInfo: string[] = [];
+    if (brandContext.niche) {
+      brandInfo.push(`Niche/secteur : ${brandContext.niche}`);
+    }
+    if (brandContext.voice) {
+      brandInfo.push(`Voix de marque : ${brandContext.voice}`);
+    }
+    if (brandInfo.length > 0) {
+      enrichedPrompt += `\n\nCONTEXTE DE LA MARQUE :\n${brandInfo.join('\n')}\n\nAdapte tes suggestions en fonction de ce contexte.`;
+    }
+  }
+
   // 1. Essayer Vertex AI si configuré
   try {
     const vertexConfigured = Deno.env.get("VERTEX_PROJECT_ID") && Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
     if (vertexConfigured) {
       console.log("🎯 Using Vertex AI (Gemini)...");
-      return await callVertexChat(messages, systemPrompt);
+      return await callVertexChat(messages, enrichedPrompt);
     }
   } catch (error: any) {
     console.warn("⚠️ Vertex AI failed, falling back to Lovable AI:", error?.message || String(error));
@@ -148,7 +164,7 @@ async function callLLM(
     body: JSON.stringify({
       model: "google/gemini-2.5-flash",
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: enrichedPrompt },
         ...messages,
       ],
       temperature: 0.7,
@@ -210,6 +226,35 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Récupérer les informations de la marque (niche, voice)
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    
+    let brandContext: { niche?: string; voice?: string } | undefined;
+    
+    if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const brandResponse = await fetch(`${SUPABASE_URL}/rest/v1/brands?id=eq.${brandId}&select=niche,voice`, {
+          headers: {
+            'apikey': SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+          }
+        });
+        
+        if (brandResponse.ok) {
+          const brands = await brandResponse.json();
+          if (brands && brands.length > 0) {
+            brandContext = {
+              niche: brands[0].niche,
+              voice: brands[0].voice
+            };
+          }
+        }
+      } catch (error) {
+        console.warn("Could not fetch brand context:", error);
+      }
+    }
+
     // Sélectionner le system prompt selon la persona
     const systemPrompt = SYSTEM_PROMPTS[persona as keyof typeof SYSTEM_PROMPTS];
     if (!systemPrompt) {
@@ -219,8 +264,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Appeler le LLM
-    const rawReply = await callLLM(messages, systemPrompt);
+    // Appeler le LLM avec le contexte de marque
+    const rawReply = await callLLM(messages, systemPrompt, brandContext);
 
     // Parser le pack si présent
     const pack = parsePack(rawReply);

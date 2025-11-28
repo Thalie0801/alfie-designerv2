@@ -50,6 +50,7 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
   const [formData, setFormData] = useState({
     name: brand?.name || '',
     logo_url: brand?.logo_url || '',
+    niche: brand?.niche || '',
     voice: brand?.voice || '',
     font_primary: brand?.fonts?.primary || '',
     font_secondary: brand?.fonts?.secondary || '',
@@ -62,6 +63,7 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
       setFormData({
         name: brand.name || '',
         logo_url: brand.logo_url || '',
+        niche: brand.niche || '',
         voice: brand.voice || '',
         font_primary: brand.fonts?.primary || '',
         font_secondary: brand.fonts?.secondary || '',
@@ -115,6 +117,7 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
         .update({
           name: formData.name,
           logo_url: formData.logo_url || null,
+          niche: formData.niche || null,
           voice: formData.voice || null,
           palette: formData.colors,
           fonts: {
@@ -210,6 +213,7 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
           .update({
             name: formData.name,
             logo_url: formData.logo_url || null,
+            niche: formData.niche || null,
             voice: formData.voice || null,
             palette: formData.colors,
             fonts: {
@@ -251,6 +255,7 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
             user_id: user.id,
             name: formData.name,
             logo_url: formData.logo_url || null,
+            niche: formData.niche || null,
             voice: formData.voice || null,
             palette: formData.colors,
             fonts: {
@@ -264,7 +269,7 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
       }
 
       setOpen(false);
-      setFormData({ name: '', logo_url: '', voice: '', font_primary: '', font_secondary: '', colors: [] });
+      setFormData({ name: '', logo_url: '', niche: '', voice: '', font_primary: '', font_secondary: '', colors: [] });
       onSuccess();
     } catch (error: any) {
       console.error('Error saving brand:', error);
@@ -331,6 +336,19 @@ export function BrandDialog({ brand, onSuccess, children }: BrandDialogProps) {
             />
             <p className="text-xs text-muted-foreground">
               Lien vers votre logo (optionnel)
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="niche">Niche / Secteur d'activité</Label>
+            <Input
+              id="niche"
+              placeholder="Ex: Coaching en développement personnel, E-commerce mode..."
+              value={formData.niche}
+              onChange={(e) => setFormData({ ...formData, niche: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Le secteur ou la thématique principale de votre marque
             </p>
           </div>
 
