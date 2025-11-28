@@ -532,15 +532,14 @@ export default function ChatWidget() {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 rounded-full shadow-lg w-14 h-14 grid place-items-center hover:scale-105 transition"
+          className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 rounded-full shadow-lg w-12 h-12 sm:w-14 sm:h-14 grid place-items-center hover:scale-105 transition z-[9998]"
           style={{
             background: `linear-gradient(135deg, ${BRAND.mint}, ${BRAND.mintDark})`,
             color: "white",
-            zIndex: 9999,
           }}
           aria-label="Ouvrir Alfie Chat"
         >
-          <MessageCircle className="w-6 h-6" />
+          <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6" />
         </button>
       )}
 
@@ -555,11 +554,10 @@ export default function ChatWidget() {
 
       {open && (
         <div
-          className="fixed bottom-6 right-6 w-[360px] max-w-[95vw] h-[520px] rounded-2xl shadow-2xl border flex flex-col"
+          className="fixed bottom-2 right-2 left-2 sm:bottom-6 sm:right-6 sm:left-auto w-auto sm:w-[400px] h-[calc(100vh-120px)] sm:h-[580px] max-h-[90vh] rounded-2xl shadow-2xl border flex flex-col z-[9999]"
           style={{
             background: BRAND.light,
             borderColor: BRAND.grayBorder,
-            zIndex: 9999,
           }}
         >
           <div

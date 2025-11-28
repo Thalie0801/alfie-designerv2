@@ -74,21 +74,21 @@ export function PricingSection() {
   };
 
   return (
-    <section id="pricing" className="bg-muted/30 px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-24">
+    <section id="pricing" className="bg-muted/30 px-4 py-8 sm:py-12 md:py-16 lg:py-24 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-16 text-center">
-          <Badge className="mb-4 border border-alfie-mint/40 bg-alfie-mintSoft text-slate-700" variant="secondary">
+        <div className="mb-8 md:mb-16 text-center">
+          <Badge className="mb-3 md:mb-4 border border-alfie-mint/40 bg-alfie-mintSoft text-slate-700 text-xs md:text-sm" variant="secondary">
             Tarifs
           </Badge>
-          <h2 className="mb-4 text-3xl font-bold leading-tight text-slate-900 sm:text-4xl md:text-5xl">Choisis ton plan</h2>
-          <p className="mx-auto mb-8 max-w-2xl text-xl text-muted-foreground text-center">
+          <h2 className="mb-3 md:mb-4 text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold leading-tight text-slate-900">Choisis ton plan</h2>
+          <p className="mx-auto mb-6 md:mb-8 max-w-2xl text-base sm:text-lg md:text-xl text-muted-foreground text-center px-4">
             Tous les plans incluent l'intégration Canva et le support
           </p>
 
-          <div className="inline-flex items-center gap-3 rounded-full border border-border/50 bg-card/50 p-1 backdrop-blur-md">
+          <div className="inline-flex items-center gap-2 md:gap-3 rounded-full border border-border/50 bg-card/50 p-1 backdrop-blur-md text-sm md:text-base">
             <button
               onClick={() => setIsAnnual(false)}
-              className={`rounded-full px-6 py-2 transition-all ${
+              className={`rounded-full px-4 md:px-6 py-2 transition-all min-h-[40px] ${
                 !isAnnual ? "bg-alfie-mint text-slate-900 shadow-md" : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -96,7 +96,7 @@ export function PricingSection() {
             </button>
             <button
               onClick={() => setIsAnnual(true)}
-              className={`rounded-full px-6 py-2 transition-all ${
+              className={`rounded-full px-4 md:px-6 py-2 transition-all min-h-[40px] ${
                 isAnnual ? "bg-alfie-mint text-slate-900 shadow-md" : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -106,7 +106,7 @@ export function PricingSection() {
           </div>
         </div>
 
-        <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-3">
+        <div className="mx-auto grid max-w-6xl gap-6 md:gap-8 grid-cols-1 md:grid-cols-3">
           {plans.map((plan) => (
             <PriceCard
               key={plan.title}

@@ -370,20 +370,20 @@ Propose un pack adapté avec des images, carrousels et/ou vidéos selon les beso
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 mr-0 lg:mr-[360px]">
+    <div className="min-h-screen bg-background pb-20 lg:pb-8">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
         {/* Header */}
-        <div className="mb-8 text-center">
-          <div className="flex items-center justify-center gap-3 mb-3">
-            <Sparkles className="w-8 h-8 text-alfie-pink" />
-            <h1 className="text-4xl font-bold">Studio Alfie</h1>
+        <div className="mb-6 sm:mb-8 text-center">
+          <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+            <Sparkles className="w-6 h-6 sm:w-8 sm:h-8 text-alfie-pink" />
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">Studio Alfie</h1>
           </div>
-          <p className="text-muted-foreground text-lg">
+          <p className="text-muted-foreground text-sm sm:text-base md:text-lg">
             Crée ton pack de visuels sur mesure 🎬
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
           {/* Colonne 1 : Brief global */}
           <div className="lg:col-span-3 space-y-4">
             <Card className="p-4 space-y-4">
