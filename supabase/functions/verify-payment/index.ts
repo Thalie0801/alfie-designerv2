@@ -216,7 +216,51 @@ async function createBrandIfNeeded(userId: string, brandName?: string | null, su
   }
 }
 
-async function processCheckoutSession(session: Stripe.Checkout.Session) {
+async function assignAmbassadorRole(userId: string) {
+  const supabase = getSupabaseClient();
+  
+  // Check if role already exists
+  const { data: existing } = await supabase
+    .from("user_roles")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("role", "ambassadeur")
+    .maybeSingle();
+  
+  if (existing) {
+    console.log("[verify-payment] User already has ambassadeur role");
+    return;
+  }
+  
+  const { error } = await supabase
+    .from("user_roles")
+    .insert({ user_id: userId, role: "ambassadeur" } as any);
+  
+  if (error) {
+    console.error("[verify-payment] Error assigning ambassadeur role:", error);
+  } else {
+    console.log("[verify-payment] Ambassadeur role assigned to:", userId);
+  }
+}
+
+async function addBadge(userId: string, badge: string) {
+  const supabase = getSupabaseClient();
+  
+  const { error } = await supabase
+    .from("user_badges")
+    .upsert(
+      { user_id: userId, badge } as any,
+      { onConflict: "user_id,badge", ignoreDuplicates: true }
+    );
+  
+  if (error && error.code !== "23505") {
+    console.error("[verify-payment] Error adding badge:", error);
+  } else {
+    console.log("[verify-payment] Badge added:", badge, "for user:", userId);
+  }
+}
+
+async function processCheckoutSession(session: Stripe.Checkout.Session, stripe: Stripe) {
   const email = (session.customer_details?.email || session.metadata?.email) as string | undefined;
   const plan = session.metadata?.plan as keyof typeof PLAN_CONFIG | undefined;
   const billingPeriod = session.metadata?.billing_period;
@@ -224,6 +268,24 @@ async function processCheckoutSession(session: Stripe.Checkout.Session) {
   const brandName = session.metadata?.brand_name as string | undefined;
 
   console.log("[verify-payment] checkout.session.completed", { email, plan, billingPeriod });
+
+  // Detect AMBASSADEUR promo code usage
+  let usedAmbassadorCode = false;
+  
+  if (session.total_details?.breakdown?.discounts) {
+    for (const discount of session.total_details.breakdown.discounts) {
+      if (discount.discount?.promotion_code) {
+        const promoCodeId = discount.discount.promotion_code as string;
+        const promoCode = await stripe.promotionCodes.retrieve(promoCodeId);
+        
+        if (promoCode.code?.toUpperCase() === "AMBASSADEUR") {
+          usedAmbassadorCode = true;
+          console.log("[verify-payment] AMBASSADEUR promo code detected!");
+          break;
+        }
+      }
+    }
+  }
 
   if (!email) {
     throw new Error("Missing customer email on checkout session");
@@ -245,6 +307,12 @@ async function processCheckoutSession(session: Stripe.Checkout.Session) {
   await upsertProfile(userId, email, plan, session.customer as string, session.subscription as string);
 
   await createBrandIfNeeded(userId, brandName, session.subscription as string | undefined);
+
+  // Assign ambassador role and badge if AMBASSADEUR code was used
+  if (usedAmbassadorCode) {
+    await assignAmbassadorRole(userId);
+    await addBadge(userId, "ambassadeur");
+  }
 
   await handleAffiliateConversion(
     affiliateRef,
@@ -310,7 +378,13 @@ Deno.serve(async (req) => {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
-        await processCheckoutSession(session);
+        
+        // Retrieve session with discount details
+        const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
+          expand: ['total_details.breakdown.discounts'],
+        });
+        
+        await processCheckoutSession(fullSession, stripe);
         break;
       }
       case "invoice.paid": {

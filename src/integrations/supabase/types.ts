@@ -1965,6 +1965,27 @@ export type Database = {
           },
         ]
       }
+      user_badges: {
+        Row: {
+          badge: string
+          created_at: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          badge: string
+          created_at?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          badge?: string
+          created_at?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -2396,7 +2417,7 @@ export type Database = {
       user_has_access: { Args: { user_id_param: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "user" | "admin" | "affiliate" | "vip"
+      app_role: "user" | "admin" | "affiliate" | "vip" | "ambassadeur"
       asset_engine: "nano" | "sora" | "veo3"
       brand_plan: "starter" | "pro" | "studio"
       plan_type: "starter" | "pro" | "studio"
@@ -2528,7 +2549,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["user", "admin", "affiliate", "vip"],
+      app_role: ["user", "admin", "affiliate", "vip", "ambassadeur"],
       asset_engine: ["nano", "sora", "veo3"],
       brand_plan: ["starter", "pro", "studio"],
       plan_type: ["starter", "pro", "studio"],

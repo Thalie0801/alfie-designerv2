@@ -97,6 +97,7 @@ Deno.serve(async (req) => {
         brand_name: brand_name || "",
         affiliate_ref: affiliate_ref || "",
       },
+      allow_promotion_codes: true,
       success_url: `${frontendUrl}/auth?payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${frontendUrl}/?payment=canceled`,
     });
