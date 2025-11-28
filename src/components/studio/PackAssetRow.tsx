@@ -14,6 +14,14 @@ interface PackAssetRowProps {
   onEdit: (asset: PackAsset) => void;
 }
 
+const goalDescriptions: Record<string, string> = {
+  engagement: "Alfie t'aide à créer du lien avec ta communauté.",
+  vente: "Un visuel pour convertir tes prospects en clients.",
+  education: "Partage ton expertise de façon simple et impactante.",
+  notoriety: "Fais-toi connaître auprès de ta cible idéale.",
+  default: "Un contenu pensé pour ta marque.",
+};
+
 const assetKindLabel: Record<string, string> = {
   image: "Image",
   carousel: "Carrousel",
@@ -55,6 +63,10 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
                 {totalCost} 🐾
               </Badge>
             </div>
+            
+            <p className="text-xs text-muted-foreground">
+              {goalDescriptions[asset.goal] || goalDescriptions.default}
+            </p>
 
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>{asset.platform}</span>

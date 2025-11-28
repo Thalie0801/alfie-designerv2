@@ -564,7 +564,13 @@ export default function ChatWidget() {
 
           <div className="flex-1 overflow-auto p-3 space-y-2" style={{ color: BRAND.ink }}>
             {msgs.length === 0 ? (
-              <p className="text-sm">Pose-moi une question sur tes visuels, formats, idées… Je te guide ✨</p>
+              <p className="text-sm">
+                {modeCoach === "strategy"
+                  ? "Je suis ton Coach Stratégie. Dis-moi ce que tu veux créer et on définit ensemble la meilleure approche 💡"
+                  : modeCoach === "da"
+                  ? "Je suis ton DA junior. Décris-moi ton projet et je t'aide à trouver la direction créative idéale 🎨"
+                  : "Je suis ton Réalisateur Studio. Dis-moi ton objectif et je te prépare un pack complet prêt à lancer 🎬"}
+              </p>
             ) : (
               msgs.map((m, i) => (
                 <div key={i} className={m.role === "user" ? "text-right" : "text-left"}>

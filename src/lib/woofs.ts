@@ -61,3 +61,10 @@ export function woofsForVideo(durationSec: number) {
   const d = Number.isFinite(durationSec) && durationSec > 0 ? durationSec : WOOF_SECONDS;
   return Math.max(1, Math.ceil(d / WOOF_SECONDS));
 }
+
+/**
+ * Protège contre les valeurs NaN ou undefined
+ * Retourne toujours un nombre valide
+ */
+export const safeWoofs = (value: number | null | undefined): number =>
+  Number.isFinite(value as number) ? (value as number) : 0;
