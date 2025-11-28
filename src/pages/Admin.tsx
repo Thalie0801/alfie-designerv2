@@ -29,6 +29,17 @@ export default function Admin() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [designDialogOpen, setDesignDialogOpen] = useState(false);
   const [resettingJobs, setResettingJobs] = useState(false);
+  const [coupons, setCoupons] = useState<any[]>([]);
+  const [promoCodes, setPromoCodes] = useState<any[]>([]);
+  const [loadingCoupons, setLoadingCoupons] = useState(false);
+  const [newCoupon, setNewCoupon] = useState({
+    code: '',
+    percent_off: 40,
+    duration: 'forever',
+    duration_in_months: 1,
+    name: '',
+    max_redemptions: '',
+  });
 
   useEffect(() => {
     loadAdminData();
@@ -241,6 +252,81 @@ export default function Admin() {
     }
   };
 
+  const loadCoupons = async () => {
+    setLoadingCoupons(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-stripe-coupons', {
+        body: { action: 'list' }
+      });
+
+      if (error) throw error;
+
+      setCoupons(data.coupons || []);
+      setPromoCodes(data.promo_codes || []);
+    } catch (error: any) {
+      console.error('Load coupons error:', error);
+      toast.error('Erreur lors du chargement des coupons');
+    } finally {
+      setLoadingCoupons(false);
+    }
+  };
+
+  const handleCreateCoupon = async () => {
+    if (!newCoupon.code || !newCoupon.name) {
+      toast.error('Code et nom requis');
+      return;
+    }
+
+    setLoadingCoupons(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-stripe-coupons', {
+        body: { 
+          action: 'create',
+          ...newCoupon
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success(data.message || 'Coupon créé avec succès');
+      setNewCoupon({
+        code: '',
+        percent_off: 40,
+        duration: 'forever',
+        duration_in_months: 1,
+        name: '',
+        max_redemptions: '',
+      });
+      loadCoupons();
+    } catch (error: any) {
+      console.error('Create coupon error:', error);
+      toast.error(error.message || 'Erreur lors de la création du coupon');
+    } finally {
+      setLoadingCoupons(false);
+    }
+  };
+
+  const handleDeactivateCoupon = async (promoCodeId: string, code: string) => {
+    if (!confirm(`Désactiver le code promo ${code} ?`)) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-stripe-coupons', {
+        body: { 
+          action: 'deactivate',
+          promo_code_id: promoCodeId
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success(data.message || 'Code promo désactivé');
+      loadCoupons();
+    } catch (error: any) {
+      console.error('Deactivate coupon error:', error);
+      toast.error(error.message || 'Erreur lors de la désactivation');
+    }
+  };
+
   const filteredUsers = users.filter(user => 
     user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -367,7 +453,11 @@ export default function Admin() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="users" className="space-y-4">
+      <Tabs defaultValue="users" className="space-y-4" onValueChange={(value) => {
+        if (value === 'coupons' && promoCodes.length === 0) {
+          loadCoupons();
+        }
+      }}>
         <TabsList>
           <TabsTrigger value="users">Utilisateurs</TabsTrigger>
           <TabsTrigger value="affiliates">Affiliés</TabsTrigger>
@@ -382,6 +472,7 @@ export default function Admin() {
               </Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="coupons">Coupons</TabsTrigger>
           <TabsTrigger value="news">Actualités</TabsTrigger>
           <TabsTrigger value="diagnostic">Diagnostic</TabsTrigger>
         </TabsList>
@@ -804,6 +895,184 @@ export default function Admin() {
                   })}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Coupons Tab */}
+        <TabsContent value="coupons" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>🎫 Gestion des Coupons Stripe</CardTitle>
+                  <CardDescription>Créez et gérez vos codes promo pour les abonnements</CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={loadCoupons}
+                  disabled={loadingCoupons}
+                >
+                  <RefreshCw className={`h-4 w-4 ${loadingCoupons ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Create Coupon Form */}
+              <div className="border rounded-lg p-4 space-y-4 bg-muted/50">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <Plus className="h-5 w-5" />
+                  Créer un nouveau coupon
+                </h3>
+                
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="coupon-code">Code promo *</Label>
+                    <Input
+                      id="coupon-code"
+                      placeholder="SUMMER2024"
+                      value={newCoupon.code}
+                      onChange={(e) => setNewCoupon({ ...newCoupon, code: e.target.value.toUpperCase() })}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="coupon-name">Nom descriptif *</Label>
+                    <Input
+                      id="coupon-name"
+                      placeholder="Promo été 2024"
+                      value={newCoupon.name}
+                      onChange={(e) => setNewCoupon({ ...newCoupon, name: e.target.value })}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="coupon-percent">Réduction (%)</Label>
+                    <Input
+                      id="coupon-percent"
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={newCoupon.percent_off}
+                      onChange={(e) => setNewCoupon({ ...newCoupon, percent_off: parseInt(e.target.value) })}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="coupon-duration">Durée</Label>
+                    <Select
+                      value={newCoupon.duration}
+                      onValueChange={(value) => setNewCoupon({ ...newCoupon, duration: value })}
+                    >
+                      <SelectTrigger id="coupon-duration">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="once">Une fois (1er mois)</SelectItem>
+                        <SelectItem value="forever">Toujours (à vie)</SelectItem>
+                        <SelectItem value="repeating">Répétition (X mois)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {newCoupon.duration === 'repeating' && (
+                    <div>
+                      <Label htmlFor="coupon-months">Nombre de mois</Label>
+                      <Input
+                        id="coupon-months"
+                        type="number"
+                        min="1"
+                        value={newCoupon.duration_in_months}
+                        onChange={(e) => setNewCoupon({ ...newCoupon, duration_in_months: parseInt(e.target.value) })}
+                      />
+                    </div>
+                  )}
+                  
+                  <div>
+                    <Label htmlFor="coupon-max">Limite d'utilisations (optionnel)</Label>
+                    <Input
+                      id="coupon-max"
+                      type="number"
+                      placeholder="Vide = illimité"
+                      value={newCoupon.max_redemptions}
+                      onChange={(e) => setNewCoupon({ ...newCoupon, max_redemptions: e.target.value })}
+                    />
+                  </div>
+                </div>
+                
+                <Button 
+                  onClick={handleCreateCoupon} 
+                  disabled={loadingCoupons}
+                  className="w-full"
+                >
+                  {loadingCoupons ? 'Création...' : '🎫 Créer le coupon'}
+                </Button>
+              </div>
+
+              {/* Existing Coupons List */}
+              <div>
+                <h3 className="font-semibold text-lg mb-3">📋 Coupons actifs</h3>
+                
+                {loadingCoupons && promoCodes.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">Chargement des coupons...</p>
+                ) : promoCodes.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    Aucun coupon créé. Créez votre premier coupon ci-dessus.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {promoCodes.map((promoCode) => {
+                      const coupon = coupons.find(c => c.id === promoCode.coupon.id);
+                      const durationText = 
+                        coupon?.duration === 'forever' ? 'À vie' :
+                        coupon?.duration === 'once' ? '1 mois' :
+                        `${coupon?.duration_in_months} mois`;
+                      
+                      return (
+                        <div
+                          key={promoCode.id}
+                          className={`flex items-center justify-between p-4 rounded-lg border ${
+                            promoCode.active ? 'bg-background' : 'bg-muted opacity-60'
+                          }`}
+                        >
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-mono font-bold text-lg">{promoCode.code}</p>
+                              <Badge variant={promoCode.active ? 'default' : 'secondary'}>
+                                {promoCode.active ? 'Actif' : 'Inactif'}
+                              </Badge>
+                              <Badge variant="outline" className="bg-green-50 dark:bg-green-950">
+                                -{coupon?.percent_off}%
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">{coupon?.name}</p>
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <span>Durée: {durationText}</span>
+                              <span>Utilisations: {promoCode.times_redeemed || 0}</span>
+                              {promoCode.max_redemptions && (
+                                <span>Max: {promoCode.max_redemptions}</span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {promoCode.active && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeactivateCoupon(promoCode.id, promoCode.code)}
+                              className="gap-2 border-red-500 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950"
+                            >
+                              <UserX className="h-4 w-4" />
+                              Désactiver
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
