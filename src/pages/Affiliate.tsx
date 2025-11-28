@@ -283,9 +283,17 @@ export default function Affiliate() {
 
       if (error) {
         console.error('[Affiliate] Slug update error:', error);
-        toast.error(error.message.includes('duplicate') 
-          ? 'Ce slug est déjà utilisé, veuillez en choisir un autre'
-          : 'Erreur lors de la mise à jour du slug');
+        if (error.message.includes('duplicate') || error.code === '23505') {
+          toast.error(
+            'Ce nom de lien n\'est pas disponible',
+            { 
+              description: 'Quelqu\'un d\'autre utilise déjà ce lien. Essaie avec un autre nom ! 🐶',
+              duration: 5000
+            }
+          );
+        } else {
+          toast.error('Erreur lors de la mise à jour du slug');
+        }
         return;
       }
 
