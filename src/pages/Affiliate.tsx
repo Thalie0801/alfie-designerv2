@@ -250,6 +250,27 @@ export default function Affiliate() {
     }
   };
 
+  const handleStripeDisconnect = async () => {
+    const confirmDisconnect = window.confirm(
+      "Êtes-vous sûr de vouloir déconnecter votre compte Stripe ? Vous devrez le reconnecter pour recevoir vos paiements."
+    );
+    
+    if (!confirmDisconnect) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('stripe-connect-disconnect');
+      if (error || !data?.success) {
+        toast.error("Erreur lors de la déconnexion");
+        return;
+      }
+      toast.success("Compte Stripe déconnecté avec succès");
+      await loadAffiliateData();
+    } catch (err: any) {
+      console.error('[Stripe Disconnect] Error:', err);
+      toast.error("Erreur lors de la déconnexion");
+    }
+  };
+
   const handleUpdateSlug = async () => {
     if (!editingSlug || !affiliate) return;
     
@@ -424,9 +445,14 @@ export default function Affiliate() {
               <p className="text-muted-foreground mb-4">
                 Ton compte Stripe est prêt à recevoir des paiements
               </p>
-              <Button onClick={handleStripeDashboard} variant="outline" size="sm">
-                Accéder à mon dashboard Stripe
-              </Button>
+              <div className="flex gap-2 justify-center">
+                <Button onClick={handleStripeDashboard} variant="outline" size="sm">
+                  Accéder à mon dashboard Stripe
+                </Button>
+                <Button onClick={handleStripeDisconnect} variant="destructive" size="sm">
+                  Déconnecter
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
