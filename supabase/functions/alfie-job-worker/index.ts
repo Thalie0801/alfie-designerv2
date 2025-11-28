@@ -617,6 +617,11 @@ async function processRenderImages(
       ? payload.brief
       : payload?.topic ?? payload?.brief?.content ?? payload?.brief?.objective ?? "";
   const imagesCount = Math.max(1, Number(payload?.count ?? payload?.images?.length ?? payload?.brief?.numSlides ?? 1));
+  
+  // Générer carousel_id si carrousel et non fourni
+  const carousel_id = resolvedKind === "carousel" 
+    ? (payload.carousel_id || `carousel_${Date.now()}_${Math.random().toString(36).substring(7)}`)
+    : undefined;
 
   let imagesToRender: Array<{
     prompt: string;
@@ -682,6 +687,28 @@ Format: ${aspectRatio} aspect ratio optimized.`;
     const aspectRatio = img.aspectRatio || "4:5";
     const slideIndex = typeof img.slideIndex === "number" ? img.slideIndex : img.briefIndex ?? null;
     const assetType = resolvedKind === "carousel" ? "carousel_slide" : "image";
+    
+    // Enrichir le prompt avec les textes générés si disponibles
+    let enrichedPrompt = img.prompt;
+    if (payload.generatedTexts && resolvedKind === "carousel" && typeof slideIndex === "number") {
+      const slideTexts = payload.generatedTexts.slides?.[slideIndex];
+      if (slideTexts) {
+        enrichedPrompt = `${img.prompt}
+
+TEXTE À INTÉGRER :
+Titre : "${slideTexts.title}"
+${slideTexts.subtitle ? `Sous-titre : "${slideTexts.subtitle}"` : ""}
+${slideTexts.bullets ? slideTexts.bullets.map((b: string) => `• ${b}`).join("\n") : ""}`;
+      }
+    } else if (payload.generatedTexts?.text && resolvedKind === "image") {
+      const imageTexts = payload.generatedTexts.text;
+      enrichedPrompt = `${img.prompt}
+
+TEXTE À INTÉGRER :
+Titre : "${imageTexts.title}"
+${imageTexts.body ? `Texte : "${imageTexts.body}"` : ""}
+${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
+    }
     try {
       // 1) generate
       console.log("[processRenderImages] calling image engine", {
@@ -693,7 +720,7 @@ Format: ${aspectRatio} aspect ratio optimized.`;
       );
 
       const imageResult = await callFn<any>("alfie-generate-ai-image", {
-        prompt: img.prompt,
+        prompt: enrichedPrompt,
         resolution: img.resolution,
         backgroundOnly: false,
         brandKit: await loadBrandMini(img.brandId ?? payload.brandId),
@@ -704,6 +731,8 @@ Format: ${aspectRatio} aspect ratio optimized.`;
         requestId: payload.requestId ?? null,
         templateImageUrl: img.templateImageUrl ?? payload.sourceUrl ?? null,
         uploadedSourceUrl: payload.sourceUrl ?? null,
+        carousel_id, // Passer le carousel_id
+        slideIndex, // Passer l'index de slide
       });
 
       const imagePayload = unwrapResult<any>(imageResult);
@@ -791,11 +820,14 @@ Format: ${aspectRatio} aspect ratio optimized.`;
             brand_id: img.brandId ?? payload.brandId ?? null,
             order_id: orderId,
             order_item_id: payload.orderItemId ?? null,
-            type: assetType as any,
+          type: assetType as any,
             cloudinary_url: cloud.secureUrl,
             cloudinary_public_id: cloud.publicId,
+            carousel_id: carousel_id || null, // Lier au carrousel si applicable
+            slide_index: resolvedKind === "carousel" ? slideIndex : null,
             format: aspectRatio,
             tags: ["ai-generated", "alfie", `order:${orderId}`],
+            text_json: payload.generatedTexts?.slides?.[slideIndex!] || payload.generatedTexts?.text || null, // Sauvegarder les textes générés
             metadata: {
               orderId,
               orderItemId: payload.orderItemId ?? null,

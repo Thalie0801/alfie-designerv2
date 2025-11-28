@@ -14,3 +14,9 @@ verify_jwt = true
 
 [functions.animate-image]
 verify_jwt = true
+
+[functions.alfie-generate-texts]
+verify_jwt = true
+
+[functions.alfie-generate-texts]
+verify_jwt = true

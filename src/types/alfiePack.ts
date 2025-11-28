@@ -23,6 +23,12 @@ export interface PackAsset {
   prompt: string;
   woofCostType: WoofCostType;
   referenceImageUrl?: string; // URL de l'image de référence optionnelle
+  generatedTexts?: {
+    // Textes générés par Gemini avant la génération visuelle
+    slides?: Array<{ title: string; subtitle?: string; bullets?: string[] }>; // Pour carrousels
+    text?: { title: string; body: string; cta?: string }; // Pour images
+    video?: { hook: string; script: string; cta?: string }; // Pour vidéos
+  };
 }
 
 export interface AlfiePack {
