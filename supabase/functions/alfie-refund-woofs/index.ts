@@ -33,20 +33,20 @@ Deno.serve(async (req) => {
     const { amount, reason = "refund", metadata = {} } = await req.json();
 
     // Récupérer le brand_id actif de l'utilisateur
-    const { data: profile } = await supabaseClient
+    const { data: userProfile } = await supabaseClient
       .from("profiles")
       .select("active_brand_id")
       .eq("id", user.id)
       .single();
 
-    if (!profile?.active_brand_id) {
+    if (!userProfile?.active_brand_id) {
       throw new Error("No active brand found");
     }
 
     // Décrémenter les Woofs dans counters_monthly
     const currentPeriod = parseInt(new Date().toISOString().slice(0, 7).replace("-", ""));
     const { error: decrementError } = await supabaseClient.rpc("decrement_monthly_counters", {
-      p_brand_id: profile.active_brand_id,
+      p_brand_id: userProfile.active_brand_id,
       p_period_yyyymm: currentPeriod,
       p_woofs: amount,
     });
@@ -56,21 +56,28 @@ Deno.serve(async (req) => {
     // Logger dans generation_logs
     await supabaseClient.from("generation_logs").insert({
       user_id: user.id,
-      brand_id: profile.active_brand_id,
+      brand_id: userProfile.active_brand_id,
       type: "refund",
       status: "completed",
       woofs_cost: -amount,
       metadata: { reason, ...metadata },
     });
 
-    // Récupérer nouveau solde
-    const { data: profile } = await supabaseClient
-      .from("profiles")
-      .select("quota_videos, woofs_consumed_this_month")
-      .eq("id", user.id)
+    // Récupérer nouveau solde depuis counters_monthly
+    const { data: counter } = await supabaseClient
+      .from("counters_monthly")
+      .select("woofs_used")
+      .eq("brand_id", userProfile.active_brand_id)
+      .eq("period_yyyymm", currentPeriod)
       .single();
 
-    const newBalance = (profile?.quota_videos || 0) - (profile?.woofs_consumed_this_month || 0);
+    const { data: brand } = await supabaseClient
+      .from("brands")
+      .select("quota_woofs")
+      .eq("id", userProfile.active_brand_id)
+      .single();
+
+    const newBalance = (brand?.quota_woofs || 0) - (counter?.woofs_used || 0);
 
     return new Response(
       JSON.stringify({ ok: true, new_balance: newBalance }),
