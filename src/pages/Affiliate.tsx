@@ -603,18 +603,6 @@ export default function Affiliate() {
               </p>
             )}
 
-            {/* Message si pas d'abonnement actif */}
-            {!hasActiveSubscription && (
-              <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                <p className="text-xs text-red-600 dark:text-red-400 font-medium">
-                  ⚠️ Abonnement actif requis pour demander un paiement
-                </p>
-                <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-1">
-                  Merci de renouveler votre abonnement pour débloquer les paiements
-                </p>
-              </div>
-            )}
-
             {/* Message si demande en cours */}
             {hasPendingPayout && (
               <div className="mt-2 space-y-1">
