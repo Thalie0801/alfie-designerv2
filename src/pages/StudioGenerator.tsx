@@ -257,31 +257,39 @@ export function StudioGenerator() {
     setBriefGenerationError(null);
 
     try {
-      const prompt = `En tant que Réalisateur Studio, analyse ce brief et propose un pack de visuels complet :
+      // Construire un message pour le Réalisateur Studio
+      const userMessage = `Nom de la campagne : ${campaignName}
 
-Nom de la campagne : ${campaignName}
 Brief : ${brief}
 
-Propose un pack adapté avec des images, carrousels et/ou vidéos selon les besoins détectés. Utilise le format JSON <alfie-pack> comme d'habitude.`;
+Prépare-moi un pack complet avec plusieurs types de visuels (images, carrousels, vidéos) adaptés à cet objectif.`;
 
       const { data, error } = await supabase.functions.invoke("alfie-chat-widget", {
         body: {
-          message: prompt,
-          mode: "maker",
           brandId: activeBrandId,
+          persona: "realisateur_studio",
+          messages: [
+            { role: "user", content: userMessage }
+          ],
+          lang: "fr",
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Edge function error:", error);
+        throw new Error(error.message || "Erreur lors de l'appel à Alfie");
+      }
 
       const reply = data?.reply || "";
-      const packMatch = reply.match(/<alfie-pack>([\s\S]*?)<\/alfie-pack>/);
+      const packData = data?.pack;
       
-      if (packMatch) {
-        const packData = JSON.parse(packMatch[1]);
+      if (packData && packData.assets && packData.assets.length > 0) {
         setPack(packData);
         toast.success("Pack proposé par Alfie ! Tu peux maintenant l'ajuster.");
+        // Effacer l'erreur précédente
+        setBriefGenerationError(null);
       } else {
+        console.warn("No pack detected in response:", reply);
         setBriefGenerationError(
           "Alfie n'a pas réussi à proposer un pack automatiquement. Tu peux ajouter tes visuels manuellement ou réessayer plus tard."
         );
@@ -289,7 +297,9 @@ Propose un pack adapté avec des images, carrousels et/ou vidéos selon les beso
     } catch (err) {
       console.error("Error generating pack from brief:", err);
       setBriefGenerationError(
-        "Alfie n'a pas réussi à proposer un pack automatiquement. Tu peux ajouter tes visuels manuellement ou réessayer plus tard."
+        err instanceof Error 
+          ? `Erreur : ${err.message}` 
+          : "Alfie a rencontré un souci technique. Réessaie dans quelques instants."
       );
     } finally {
       setIsGeneratingFromBrief(false);

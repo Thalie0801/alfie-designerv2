@@ -17,22 +17,23 @@ export default function AlfieLanding() {
 
       {/* SECTION 1 : Image Alfie + vidéo */}
       <section className="relative h-[80vh] md:h-screen overflow-hidden">
-        {/* Image Alfie en arrière-plan permanent */}
-        <img
-          src="/images/alfie-hero-background.jpeg"
-          alt="Alfie Golden Retriever"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-        
-        {/* Overlay sombre pour lisibilité */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/50" />
+        {/* Image Alfie en arrière-plan permanent avec overlay fort */}
+        <div className="absolute inset-0">
+          <img
+            src="/images/alfie-hero-background.jpeg"
+            alt="Alfie Golden Retriever"
+            className="h-full w-full object-cover"
+          />
+          {/* Overlay sombre très fort sur l'image pour qu'elle soit subtile */}
+          <div className="absolute inset-0 bg-black/70" />
+        </div>
         
         {/* Loading skeleton pour la vidéo */}
         {!videoLoaded && (
-          <div className="absolute inset-0 bg-black/20 animate-pulse" />
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 animate-pulse" />
         )}
         
-        {/* Vidéo qui s'affiche progressivement par-dessus */}
+        {/* Vidéo qui s'affiche progressivement par-dessus avec opacité totale */}
         <video
           src="/videos/hero-background.mp4"
           autoPlay
@@ -42,12 +43,12 @@ export default function AlfieLanding() {
           preload="auto"
           onLoadedData={() => setVideoLoaded(true)}
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ${
-            videoLoaded ? 'opacity-80' : 'opacity-0'
+            videoLoaded ? 'opacity-100' : 'opacity-0'
           }`}
         />
         
-        {/* Overlay gradient par-dessus la vidéo */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/40" />
+        {/* Overlay gradient léger par-dessus la vidéo pour lisibilité du texte */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/30" />
         
         {/* Scroll indicator */}
         <div className={`pointer-events-none absolute bottom-6 md:bottom-10 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 text-white/90 transition-opacity duration-500 ${
