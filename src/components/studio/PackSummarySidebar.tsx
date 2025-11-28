@@ -83,58 +83,54 @@ export function PackSummarySidebar({
         )}
       </Card>
 
-      {/* Détail du pack */}
-      <Card className="p-4 space-y-3">
-        <h3 className="font-semibold text-sm">Ce que ce pack va créer pour toi :</h3>
-        <Separator />
-        <div className="space-y-1.5 text-sm">
-          {imageCount > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Images</span>
-              <Badge variant="outline">
-                {imageCount} × {WOOF_COSTS.image} 🐾
-              </Badge>
-            </div>
-          )}
-          {carouselCount > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Carrousels</span>
-              <Badge variant="outline">
-                {pack.assets
-                  .filter((a) => a.kind === "carousel")
-                  .reduce((sum, a) => sum + a.count, 0)}{" "}
-                slides
-              </Badge>
-            </div>
-          )}
-          {videoBasicCount > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Vidéos standard</span>
-              <Badge variant="outline">
-                {videoBasicCount} × {WOOF_COSTS.video_basic} 🐾
-              </Badge>
-            </div>
-          )}
-          {videoPremiumCount > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Vidéos premium</span>
-              <Badge variant="outline">
-                {videoPremiumCount} × {WOOF_COSTS.video_premium} 🐾
-              </Badge>
-            </div>
-          )}
-        </div>
+      {/* Détail du pack - seulement si des assets existent */}
+      {pack.assets.length > 0 && (
+        <Card className="p-4 space-y-3">
+          <h3 className="font-semibold text-sm">Ce que ce pack va créer pour toi :</h3>
+          <Separator />
+          <div className="space-y-1.5 text-sm">
+            {imageCount > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Images</span>
+                <Badge variant="outline">
+                  {imageCount} × {WOOF_COSTS.image} 🐾
+                </Badge>
+              </div>
+            )}
+            {carouselCount > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Carrousels</span>
+                <Badge variant="outline">
+                  {pack.assets
+                    .filter((a) => a.kind === "carousel")
+                    .reduce((sum, a) => sum + a.count, 0)}{" "}
+                  slides
+                </Badge>
+              </div>
+            )}
+            {videoBasicCount > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Vidéos standard</span>
+                <Badge variant="outline">
+                  {videoBasicCount} × {WOOF_COSTS.video_basic} 🐾
+                </Badge>
+              </div>
+            )}
+            {videoPremiumCount > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Vidéos premium</span>
+                <Badge variant="outline">
+                  {videoPremiumCount} × {WOOF_COSTS.video_premium} 🐾
+                </Badge>
+              </div>
+            )}
+          </div>
 
-        {pack.assets.length === 0 ? (
-          <p className="text-xs text-muted-foreground text-center py-2">
-            Ajoute des visuels pour commencer 🐾
-          </p>
-        ) : (
           <p className="text-xs text-muted-foreground mt-2">
             Tu pourras tout ajuster après la génération dans le Studio.
           </p>
-        )}
-      </Card>
+        </Card>
+      )}
 
       {/* Bouton lancer */}
       <Button
