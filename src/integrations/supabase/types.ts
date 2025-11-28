@@ -183,6 +183,7 @@ export type Database = {
           name: string
           parent_id: string | null
           payout_method: string | null
+          slug: string | null
           status: string | null
           stripe_connect_account_id: string | null
           stripe_connect_charges_enabled: boolean | null
@@ -200,6 +201,7 @@ export type Database = {
           name: string
           parent_id?: string | null
           payout_method?: string | null
+          slug?: string | null
           status?: string | null
           stripe_connect_account_id?: string | null
           stripe_connect_charges_enabled?: boolean | null
@@ -217,6 +219,7 @@ export type Database = {
           name?: string
           parent_id?: string | null
           payout_method?: string | null
+          slug?: string | null
           status?: string | null
           stripe_connect_account_id?: string | null
           stripe_connect_charges_enabled?: boolean | null
@@ -2348,6 +2351,10 @@ export type Database = {
           p_woofs?: number
         }
         Returns: undefined
+      }
+      generate_affiliate_slug: {
+        Args: { affiliate_id: string; affiliate_name: string }
+        Returns: string
       }
       generate_short_job_id: { Args: never; Returns: string }
       get_table_sizes: {

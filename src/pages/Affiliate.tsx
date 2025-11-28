@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Copy, DollarSign, MousePointerClick, TrendingUp, Users, Award, Target, Crown, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
+import { Label } from '@/components/ui/label';
 
 export default function Affiliate() {
   const { user } = useAuth();
@@ -18,6 +19,8 @@ export default function Affiliate() {
   const [directReferrals, setDirectReferrals] = useState<any[]>([]);
   const [requestingPayout, setRequestingPayout] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [editingSlug, setEditingSlug] = useState('');
+  const [updatingSlug, setUpdatingSlug] = useState(false);
   const [stats, setStats] = useState({
     totalClicks: 0,
     totalConversions: 0,
@@ -94,6 +97,11 @@ export default function Affiliate() {
       }
 
       setAffiliate(aff.data);
+
+      // Initialize editing slug
+      if (aff.data.slug) {
+        setEditingSlug(aff.data.slug);
+      }
 
       const [clicks, conv, pays, comms, refs] = await Promise.all([
         supabase
@@ -242,6 +250,36 @@ export default function Affiliate() {
     }
   };
 
+  const handleUpdateSlug = async () => {
+    if (!editingSlug || !affiliate) return;
+    
+    setUpdatingSlug(true);
+    try {
+      const { error } = await supabase
+        .from('affiliates')
+        .update({ slug: editingSlug })
+        .eq('id', affiliate.id);
+
+      if (error) {
+        console.error('[Affiliate] Slug update error:', error);
+        toast.error(error.message.includes('duplicate') 
+          ? 'Ce slug est déjà utilisé, veuillez en choisir un autre'
+          : 'Erreur lors de la mise à jour du slug');
+        return;
+      }
+
+      toast.success('Lien personnalisé mis à jour ! 🎉');
+      
+      // Refresh affiliate data
+      await loadAffiliateData();
+    } catch (err: any) {
+      console.error('[Affiliate] Unexpected error:', err);
+      toast.error('Erreur lors de la mise à jour');
+    } finally {
+      setUpdatingSlug(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -298,6 +336,11 @@ export default function Affiliate() {
   const unpaidEarnings = stats.totalEarnings - paidPayouts;
   const hasPendingPayout = payouts.some(p => p.status === 'pending');
   const canRequestPayout = unpaidEarnings >= MIN_PAYOUT && !hasPendingPayout;
+
+  // Generate affiliate link using slug if available, otherwise fallback to ID
+  const affiliateLink = affiliate?.slug 
+    ? `${window.location.origin}?ref=${affiliate.slug}`
+    : `${window.location.origin}?ref=${affiliate?.id}`;
 
   return (
     <div className="space-y-6">
@@ -389,7 +432,72 @@ export default function Affiliate() {
         </CardContent>
       </Card>
 
-      {/* Stats Cards */}
+      {/* Affiliate Link */}
+      <Card className="border-primary/30 shadow-medium">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Copy className="h-5 w-5 text-primary" />
+            Votre lien d'affiliation personnalisé
+          </CardTitle>
+          <CardDescription>
+            Partagez ce lien pour construire votre réseau MLM
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Slug Editor */}
+          <div className="space-y-2">
+            <Label htmlFor="slug">Personnaliser votre lien</Label>
+            <div className="flex gap-2">
+              <div className="flex-1 flex items-center gap-2 px-3 py-2 border rounded-md bg-muted/30">
+                <span className="text-sm text-muted-foreground">{window.location.origin}?ref=</span>
+                <Input
+                  id="slug"
+                  value={editingSlug}
+                  onChange={(e) => setEditingSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleUpdateSlug();
+                    }
+                  }}
+                  placeholder="votre-nom"
+                  className="border-0 bg-transparent p-0 h-auto focus-visible:ring-0 flex-1"
+                />
+              </div>
+              <Button 
+                onClick={handleUpdateSlug} 
+                disabled={updatingSlug || !editingSlug || editingSlug === affiliate.slug}
+                className="gap-2"
+              >
+                {updatingSlug ? 'Enregistrement...' : 'Enregistrer'}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Utilisez uniquement des lettres minuscules, chiffres et tirets
+            </p>
+          </div>
+
+          {/* Current Link Display */}
+          <div className="flex gap-2">
+            <Input
+              readOnly
+              value={affiliateLink}
+              className="font-mono text-sm border-primary/30"
+            />
+            <Button onClick={copyAffiliateLink} className="gap-2 gradient-hero text-white">
+              <Copy className="h-4 w-4" />
+              Copier
+            </Button>
+          </div>
+          <div className="bg-muted/50 rounded-lg p-4">
+            <p className="text-sm font-medium mb-2">Structure des commissions :</p>
+            <ul className="text-sm space-y-1 text-muted-foreground">
+              <li>• <strong className="text-green-600">Niveau 1:</strong> 15% sur vos filleuls directs (minimum 29€/mois)</li>
+              <li>• <strong className="text-blue-600">Niveau 2:</strong> 5% sur le réseau niveau 2 (≥3 filleuls actifs)</li>
+              <li>• <strong className="text-purple-600">Niveau 3:</strong> 2% sur le réseau niveau 3 (≥5 filleuls actifs)</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
       <div className="grid md:grid-cols-4 gap-4">
         <Card className="border-blue-500/20 shadow-soft hover:shadow-medium transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -505,40 +613,6 @@ export default function Affiliate() {
               <div className="text-2xl font-bold text-purple-600">{stats.level3Earnings.toFixed(2)}€</div>
               <p className="text-xs text-muted-foreground mt-1">Réseau de niveau 3</p>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Affiliate Link */}
-      <Card className="border-primary/30 shadow-medium">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Copy className="h-5 w-5 text-primary" />
-            Votre lien d'affiliation
-          </CardTitle>
-          <CardDescription>
-            Partagez ce lien pour construire votre réseau MLM
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              readOnly
-              value={`${window.location.origin}?ref=${affiliate.id}`}
-              className="font-mono text-sm border-primary/30"
-            />
-            <Button onClick={copyAffiliateLink} className="gap-2 gradient-hero text-white">
-              <Copy className="h-4 w-4" />
-              Copier
-            </Button>
-          </div>
-          <div className="bg-muted/50 rounded-lg p-4">
-            <p className="text-sm font-medium mb-2">Structure des commissions :</p>
-            <ul className="text-sm space-y-1 text-muted-foreground">
-              <li>• <strong className="text-green-600">Niveau 1:</strong> 15% sur vos filleuls directs (minimum 29€/mois)</li>
-              <li>• <strong className="text-blue-600">Niveau 2:</strong> 5% sur le réseau niveau 2 (≥3 filleuls actifs)</li>
-              <li>• <strong className="text-purple-600">Niveau 3:</strong> 2% sur le réseau niveau 3 (≥5 filleuls actifs)</li>
-            </ul>
           </div>
         </CardContent>
       </Card>
