@@ -25,7 +25,7 @@ export default function AlfieLanding() {
             className="h-full w-full object-cover"
           />
           {/* Overlay sombre très fort sur l'image pour qu'elle soit subtile */}
-          <div className="absolute inset-0 bg-black/70" />
+          <div className="absolute inset-0 bg-black/85" />
         </div>
         
         {/* Pas de loading skeleton - la photo est déjà visible */}
