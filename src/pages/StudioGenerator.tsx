@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -490,6 +489,7 @@ Prépare-moi un pack complet avec plusieurs types de visuels (images, carrousels
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
           {/* Colonne 1 : Brief global */}
           <div className="lg:col-span-3 space-y-4">
+            {/* Card Brief de campagne */}
             <Card data-tour-id="studio-brief" className="p-4 space-y-4">
               <div>
                 <h3 className="font-semibold mb-2 text-sm">Nom de la campagne</h3>
@@ -509,33 +509,32 @@ Prépare-moi un pack complet avec plusieurs types de visuels (images, carrousels
                   rows={6}
                 />
               </div>
+            </Card>
 
-              <Separator />
-
-              <div data-tour-id="studio-brandkit">
-                <h3 className="font-semibold mb-2 text-sm">Brand Kit</h3>
-                {activeBrand && (
-                  <div className="space-y-2 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">{activeBrand.name}</Badge>
-                    </div>
-                    {activeBrand.palette && Array.isArray(activeBrand.palette) && (
-                      <div className="flex items-center gap-1">
-                        {activeBrand.palette.slice(0, 5).map((color, i) => (
-                          <div
-                            key={i}
-                            className="w-6 h-6 rounded border border-border"
-                            style={{ backgroundColor: color }}
-                          />
-                        ))}
-                      </div>
-                    )}
-                    {activeBrand.voice && (
-                      <p className="italic">"{activeBrand.voice}"</p>
-                    )}
+            {/* Card Brand Kit - SÉPARÉE */}
+            <Card data-tour-id="studio-brandkit" className="p-4">
+              <h3 className="font-semibold mb-2 text-sm">Brand Kit</h3>
+              {activeBrand && (
+                <div className="space-y-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{activeBrand.name}</Badge>
                   </div>
-                )}
-              </div>
+                  {activeBrand.palette && Array.isArray(activeBrand.palette) && (
+                    <div className="flex items-center gap-1">
+                      {activeBrand.palette.slice(0, 5).map((color, i) => (
+                        <div
+                          key={i}
+                          className="w-6 h-6 rounded border border-border"
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {activeBrand.voice && (
+                    <p className="italic">"{activeBrand.voice}"</p>
+                  )}
+                </div>
+              )}
             </Card>
 
             <Card className="p-4">
