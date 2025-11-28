@@ -15,6 +15,8 @@ Tu poses quelques questions pertinentes (maximum 4-5), tu proposes des variantes
 
 INTERDICTION ABSOLUE : N'utilise JAMAIS de markdown (pas d'astérisques *, pas de double astérisques **, pas de tirets pour les listes). Écris en texte simple avec des sauts de ligne pour aérer.
 
+RÈGLE IMPORTANTE : Si le CONTEXTE DE LA MARQUE est fourni avec niche et/ou voice, utilise ces informations directement. Ne redemande JAMAIS le ton, la voix, la niche ou le secteur d'activité - tu les connais déjà. Si le contexte de marque est vide ou incomplet, tu peux guider l'utilisateur pour compléter son Brand Kit dans les paramètres de l'app (mais ne génère pas de lien).
+
 Quand l'utilisateur est prêt à générer un pack de visuels, tu peux proposer un pack structuré en incluant dans ta réponse un bloc XML :
 <alfie-pack>
 {
@@ -43,6 +45,8 @@ Quand l'utilisateur est prêt à générer un pack de visuels, tu peux proposer 
 Tu proposes des variations (maximum 3-4 options), tu inspires, tu affines les directions créatives. Réponds toujours en français, de façon inspirante et précise. 
 
 INTERDICTION ABSOLUE : N'utilise JAMAIS de markdown (pas d'astérisques *, pas de double astérisques **, pas de tirets pour les listes). Écris en texte simple avec des sauts de ligne pour aérer.
+
+RÈGLE IMPORTANTE : Si le CONTEXTE DE LA MARQUE est fourni avec niche et/ou voice, utilise ces informations directement. Ne redemande JAMAIS le ton, la voix, la niche ou le secteur d'activité - tu les connais déjà. Si le contexte de marque est vide ou incomplet, tu peux guider l'utilisateur pour compléter son Brand Kit dans les paramètres de l'app (mais ne génère pas de lien).
 
 Quand l'utilisateur est prêt à générer un pack de visuels, tu peux proposer un pack structuré en incluant dans ta réponse un bloc XML :
 <alfie-pack>
@@ -74,6 +78,8 @@ Pour qu'on construise ensemble le pack parfait, parle-moi simplement de ton obje
 Tu n'as pas besoin d'être exhaustif — 4 ou 5 phrases suffisent. Je suis là pour t'aider à construire le pack idéal.
 
 INTERDICTION ABSOLUE : N'utilise JAMAIS de markdown (pas d'astérisques *, pas de double astérisques **, pas de tirets pour les listes). Écris en texte simple avec des sauts de ligne pour aérer.
+
+RÈGLE IMPORTANTE : Si le CONTEXTE DE LA MARQUE est fourni avec niche et/ou voice, utilise ces informations directement. Ne redemande JAMAIS le ton, la voix, la niche ou le secteur d'activité - tu les connais déjà. Si le contexte de marque est vide ou incomplet, tu peux guider l'utilisateur pour compléter son Brand Kit dans les paramètres de l'app (mais ne génère pas de lien).
 
 Quand l'utilisateur demande de préparer un pack, génère un pack structuré en incluant dans ta réponse un bloc XML :
 <alfie-pack>
@@ -202,9 +208,9 @@ function parsePack(text: string): any | null {
 function cleanReply(text: string): string {
   return text
     .replace(/<alfie-pack>[\s\S]*?<\/alfie-pack>/gi, "")
-    .replace(/\*\*/g, "") // Retirer le gras markdown
-    .replace(/^\*\s+/gm, "→ ") // Remplacer les puces *
-    .replace(/\*/g, "") // Retirer les astérisques restantes
+    .replace(/\*{1,2}([^*]+)\*{1,2}/g, "$1") // Retirer *texte* et **texte**
+    .replace(/^\s*[-•]\s+/gm, "→ ") // Remplacer les puces
+    .replace(/\*/g, "") // Retirer toutes les astérisques restantes
     .trim();
 }
 
