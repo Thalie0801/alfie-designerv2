@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { PackAsset } from "@/types/alfiePack";
 import { Badge } from "@/components/ui/badge";
 import { WOOF_COSTS } from "@/config/woofs";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 interface AssetEditDialogProps {
   asset: PackAsset;
@@ -241,6 +242,224 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
               Plus ton prompt est précis, meilleures seront les générations d'Alfie.
             </p>
           </div>
+
+          {/* Generated texts section */}
+          {formData.generatedTexts && (
+            <div className="border-t pt-4 space-y-3">
+              <Label className="text-base">Textes générés par Alfie</Label>
+              <p className="text-xs text-muted-foreground">
+                Alfie a pré-rédigé ces textes marketing pour toi. Tu peux les modifier avant la génération des visuels.
+              </p>
+
+              {/* For carousels: show slides in accordion */}
+              {formData.kind === "carousel" && formData.generatedTexts.slides && (
+                <Accordion type="single" collapsible className="w-full">
+                  {formData.generatedTexts.slides.map((slide: any, index: number) => (
+                    <AccordionItem key={index} value={`slide-${index}`}>
+                      <AccordionTrigger className="text-sm">
+                        Slide {index + 1}: {slide.title || "(sans titre)"}
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-2">
+                        <div>
+                          <Label className="text-xs">Titre</Label>
+                          <Input
+                            value={slide.title || ""}
+                            onChange={(e) => {
+                              const newSlides = [...(formData.generatedTexts?.slides || [])];
+                              newSlides[index] = { ...newSlides[index], title: e.target.value };
+                              setFormData({
+                                ...formData,
+                                generatedTexts: { ...formData.generatedTexts, slides: newSlides },
+                              });
+                            }}
+                            placeholder="Titre de la slide"
+                          />
+                        </div>
+                        {slide.subtitle && (
+                          <div>
+                            <Label className="text-xs">Sous-titre</Label>
+                            <Input
+                              value={slide.subtitle || ""}
+                              onChange={(e) => {
+                                const newSlides = [...(formData.generatedTexts?.slides || [])];
+                                newSlides[index] = { ...newSlides[index], subtitle: e.target.value };
+                                setFormData({
+                                  ...formData,
+                                  generatedTexts: { ...formData.generatedTexts, slides: newSlides },
+                                });
+                              }}
+                              placeholder="Sous-titre"
+                            />
+                          </div>
+                        )}
+                        {slide.bullets && slide.bullets.length > 0 && (
+                          <div>
+                            <Label className="text-xs">Points clés</Label>
+                            {slide.bullets.map((bullet: string, bulletIndex: number) => (
+                              <Input
+                                key={bulletIndex}
+                                value={bullet}
+                                onChange={(e) => {
+                                  const newSlides = [...(formData.generatedTexts?.slides || [])];
+                                  const newBullets = [...(newSlides[index].bullets || [])];
+                                  newBullets[bulletIndex] = e.target.value;
+                                  newSlides[index] = { ...newSlides[index], bullets: newBullets };
+                                  setFormData({
+                                    ...formData,
+                                    generatedTexts: { ...formData.generatedTexts, slides: newSlides },
+                                  });
+                                }}
+                                placeholder={`Point ${bulletIndex + 1}`}
+                                className="mt-1"
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              )}
+
+              {/* For images: show title, body, cta */}
+              {formData.generatedTexts.text && (
+                <div className="space-y-2">
+                  <div>
+                    <Label className="text-xs">Titre</Label>
+                    <Input
+                      value={formData.generatedTexts.text.title || ""}
+                      onChange={(e) => {
+                        if (!formData.generatedTexts?.text) return;
+                        setFormData({
+                          ...formData,
+                          generatedTexts: {
+                            ...formData.generatedTexts,
+                            text: { 
+                              ...formData.generatedTexts.text, 
+                              title: e.target.value 
+                            },
+                          },
+                        });
+                      }}
+                      placeholder="Titre du visuel"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Texte principal</Label>
+                    <Textarea
+                      value={formData.generatedTexts.text.body || ""}
+                      onChange={(e) => {
+                        if (!formData.generatedTexts?.text) return;
+                        setFormData({
+                          ...formData,
+                          generatedTexts: {
+                            ...formData.generatedTexts,
+                            text: { 
+                              ...formData.generatedTexts.text, 
+                              body: e.target.value 
+                            },
+                          },
+                        });
+                      }}
+                      placeholder="Texte du visuel"
+                      rows={3}
+                    />
+                  </div>
+                  {formData.generatedTexts.text.cta !== undefined && (
+                    <div>
+                      <Label className="text-xs">Call-to-action</Label>
+                      <Input
+                        value={formData.generatedTexts.text.cta || ""}
+                        onChange={(e) => {
+                          if (!formData.generatedTexts?.text) return;
+                          setFormData({
+                            ...formData,
+                            generatedTexts: {
+                              ...formData.generatedTexts,
+                              text: { 
+                                ...formData.generatedTexts.text, 
+                                cta: e.target.value 
+                              },
+                            },
+                          });
+                        }}
+                        placeholder="CTA (optionnel)"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* For videos: show hook, script, cta */}
+              {formData.generatedTexts.video && (
+                <div className="space-y-2">
+                  <div>
+                    <Label className="text-xs">Hook (accroche)</Label>
+                    <Input
+                      value={formData.generatedTexts.video.hook || ""}
+                      onChange={(e) => {
+                        if (!formData.generatedTexts?.video) return;
+                        setFormData({
+                          ...formData,
+                          generatedTexts: {
+                            ...formData.generatedTexts,
+                            video: { 
+                              ...formData.generatedTexts.video, 
+                              hook: e.target.value 
+                            },
+                          },
+                        });
+                      }}
+                      placeholder="Phrase d'accroche"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Script</Label>
+                    <Textarea
+                      value={formData.generatedTexts.video.script || ""}
+                      onChange={(e) => {
+                        if (!formData.generatedTexts?.video) return;
+                        setFormData({
+                          ...formData,
+                          generatedTexts: {
+                            ...formData.generatedTexts,
+                            video: { 
+                              ...formData.generatedTexts.video, 
+                              script: e.target.value 
+                            },
+                          },
+                        });
+                      }}
+                      placeholder="Script de la vidéo"
+                      rows={4}
+                    />
+                  </div>
+                  {formData.generatedTexts.video.cta !== undefined && (
+                    <div>
+                      <Label className="text-xs">Call-to-action final</Label>
+                      <Input
+                        value={formData.generatedTexts.video.cta || ""}
+                        onChange={(e) => {
+                          if (!formData.generatedTexts?.video) return;
+                          setFormData({
+                            ...formData,
+                            generatedTexts: {
+                              ...formData.generatedTexts,
+                              video: { 
+                                ...formData.generatedTexts.video, 
+                                cta: e.target.value 
+                              },
+                            },
+                          });
+                        }}
+                        placeholder="CTA final (optionnel)"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Coût Woofs */}
           <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
