@@ -141,10 +141,6 @@ export function ChatGenerator() {
       const params = new URLSearchParams(location.search);
       return params.get("orderId") || params.get("order");
     }, [location.search]) || null;
-  const orderLabel = useMemo(
-    () => (orderId ? `Commande ${orderId}` : "Toutes les commandes"),
-    [orderId],
-  );
 
   const [prompt, setPrompt] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -156,10 +152,10 @@ export function ChatGenerator() {
     null,
   );
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
-  const [jobs, setJobs] = useState<JobEntry[]>([]);
-  const [assets, setAssets] = useState<MediaEntry[]>([]);
+  const [, setJobs] = useState<JobEntry[]>([]);
+  const [, setAssets] = useState<MediaEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
   const [orderSummaries, setOrderSummaries] = useState<OrderSummary[]>([]);
   const [orderSummariesLoading, setOrderSummariesLoading] = useState(false);
   const [orderSummariesError, setOrderSummariesError] = useState<string | null>(null);
@@ -254,34 +250,6 @@ export function ChatGenerator() {
 
     fetchOrderPrefill();
   }, [orderId]);
-
-  const jobBadgeVariant = (status: string): "default" | "secondary" | "outline" | "destructive" => {
-    switch (status) {
-      case "queued":
-        return "secondary";
-      case "running":
-        return "default";
-      case "failed":
-        return "destructive";
-      case "completed":
-      default:
-        return "outline";
-    }
-  };
-
-  const mediaBadgeVariant = (status: string): "default" | "secondary" | "outline" | "destructive" => {
-    switch (status) {
-      case "queued":
-        return "secondary";
-      case "running":
-        return "default";
-      case "failed":
-        return "destructive";
-      case "completed":
-      default:
-        return "outline";
-    }
-  };
 
   const formatDate = (value: string) => {
     if (!value) return "";
@@ -646,98 +614,6 @@ export function ChatGenerator() {
       }
     };
   }, [isSubmitting, orderSummaries, refetchAll]);
-
-  const requeueJob = useCallback(
-    async (job: JobEntry) => {
-      try {
-        let payload: unknown = job.payload ?? null;
-        if (typeof payload === "string" && payload.trim()) {
-          try {
-            payload = JSON.parse(payload);
-          } catch (parseError) {
-            throw new Error("Impossible de relancer le job: payload invalide");
-          }
-        }
-
-        if (payload == null) {
-          throw new Error("Impossible de relancer ce job sans payload");
-        }
-
-        const { error: insertError } = await supabase.from("job_queue").insert([{
-          order_id: job.order_id,
-          type: job.type,
-          status: "queued" as const,
-          payload,
-        }] as any);
-
-        if (insertError) throw insertError;
-
-        showToast({
-          title: "Job relancé",
-          description: "Le job a été renvoyé en file d'attente",
-        });
-
-        await refetchAll();
-      } catch (err) {
-        console.error("[Studio] requeueJob error:", err);
-        showToast({
-          title: "Échec du renvoi",
-          description: err instanceof Error ? err.message : "Erreur inconnue lors du renvoi du job",
-          variant: "destructive",
-        });
-      }
-    },
-    [refetchAll, showToast],
-  );
-
-  const cleanupLegacyJobs = useCallback(async () => {
-    const {
-      data: { user: currentUser },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError) {
-      toast.error(`Nettoyage échoué: ${authError.message}`);
-      return;
-    }
-
-    if (!currentUser) {
-      toast.error("Nettoyage impossible: utilisateur non authentifié");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("job_queue")
-      .delete()
-      .match({ user_id: currentUser.id })
-      .in("status", ["failed", "queued"]);
-
-    if (error) {
-      toast.error(`Nettoyage échoué: ${error.message}`);
-      return;
-    }
-
-    toast.success("Anciennes tâches masquées ✅");
-    await refetchAll();
-  }, [refetchAll]);
-
-  const archiveJob = useCallback(
-    async (jobId: string) => {
-      const { error } = await supabase
-        .from("job_queue")
-        .delete()
-        .eq("id", jobId);
-
-      if (error) {
-        toast.error(`Impossible de masquer le job: ${error.message}`);
-        return;
-      }
-
-      toast.success("Job masqué ✅");
-      await refetchAll();
-    },
-    [refetchAll],
-  );
 
   const handleSourceUpload = useCallback(
     async (file: File) => {
@@ -1342,205 +1218,6 @@ export function ChatGenerator() {
           )}
         </Card>
 
-        <div className="grid gap-6 mt-6 lg:grid-cols-2">
-          <Card className="p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold">Jobs en file</h3>
-                <p className="text-xs text-muted-foreground">{orderLabel}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    void cleanupLegacyJobs();
-                  }}
-                  disabled={loading}
-                >
-                  Nettoyer
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    void refetchAll();
-                  }}
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <span className="flex items-center gap-1 text-xs">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      …
-                    </span>
-                  ) : (
-                    "Rafraîchir"
-                  )}
-                </Button>
-              </div>
-            </div>
-            {error && <div className="text-xs text-red-600 mt-2">{error}</div>}
-
-            {loading ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Chargement des jobs…
-              </div>
-            ) : jobs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Aucun job {orderId ? "pour cette commande pour le moment." : "en cours pour le moment."}
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {jobs.map((job) => {
-                  const jobError = job.error;
-                  const isLegacy = false; // Will be re-enabled after types regenerate
-
-                  return (
-                    <div key={job.id} className="rounded-lg border p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-medium capitalize">
-                            {job.type.replace(/_/g, " ")}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{formatDate(job.created_at)}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            className="text-xs underline"
-                            onClick={() => {
-                              void archiveJob(job.id);
-                            }}
-                          >
-                            Masquer
-                          </button>
-                          <Badge variant={jobBadgeVariant(job.status)} className="uppercase">
-                            {job.status}
-                          </Badge>
-                        </div>
-                      </div>
-                      {job.order_id && (
-                        <p className="mt-1 text-xs text-muted-foreground">Order #{job.order_id}</p>
-                      )}
-                      {jobError && (
-                        <div className="mt-2 text-xs text-red-600 flex flex-wrap items-center gap-2">
-                          <span className="break-words flex-1">{jobError}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={isLegacy}
-                            title={
-                              isLegacy
-                                ? "Ancienne version : impossible de relancer"
-                                : "Retenter"
-                            }
-                            onClick={() => {
-                              if (!isLegacy) {
-                                void requeueJob(job);
-                              }
-                            }}
-                          >
-                            Retenter
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold">Médias générés</h3>
-                <p className="text-xs text-muted-foreground">{orderLabel}</p>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  void refetchAll();
-                }}
-                disabled={loading}
-              >
-                {loading ? (
-                  <span className="flex items-center gap-1 text-xs">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    …
-                  </span>
-                ) : (
-                  "Rafraîchir"
-                )}
-              </Button>
-            </div>
-
-            {loading ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Chargement des médias…
-              </div>
-            ) : assets.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Aucun média {orderId ? "pour cette commande." : "enregistré pour le moment."}
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {assets.map((item) => {
-                  const previewUrl = item.thumbnail_url || item.output_url || "";
-                  const woofs =
-                    typeof item.metadata === "object" && item.metadata && "woofs" in item.metadata
-                      ? (item.metadata as Record<string, any>).woofs
-                      : null;
-
-                  return (
-                    <div key={item.id} className="rounded-lg border p-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium capitalize">{item.type}</p>
-                          <p className="text-xs text-muted-foreground">{formatDate(item.created_at)}</p>
-                        </div>
-                        <Badge variant={mediaBadgeVariant(item.status)} className="uppercase">
-                          {item.status}
-                        </Badge>
-                      </div>
-                      {item.order_id && (
-                        <p className="mt-1 text-xs text-muted-foreground">Order #{item.order_id}</p>
-                      )}
-                      {previewUrl && (
-                        <div className="mt-3 overflow-hidden rounded-md bg-muted">
-                          {item.type === "video" ? (
-                            <video
-                              src={item.output_url ?? undefined}
-                              controls
-                              className="w-full"
-                            />
-                          ) : (
-                            <img src={previewUrl} alt="Media généré" className="w-full" />
-                          )}
-                        </div>
-                      )}
-                      {woofs !== null && woofs !== undefined && (
-                        <p className="mt-2 text-xs text-muted-foreground">Woofs consommés : {woofs}</p>
-                      )}
-                      {item.output_url && (
-                        <div className="mt-2">
-                          <Button asChild size="sm" variant="link" className="px-0">
-                            <a href={item.output_url} target="_blank" rel="noopener noreferrer">
-                              Ouvrir l’asset →
-                            </a>
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
-        </div>
         {/* Result preview */}
         {generatedAsset && (
           <Card className="p-6">
