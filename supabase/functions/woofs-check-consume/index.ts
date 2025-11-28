@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY } from "../_shared/env.ts";
 import { WOOF_COSTS } from "../_shared/woofsCosts.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -17,8 +17,40 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      throw new Error("Missing authorization header");
+      return new Response(
+        JSON.stringify({ 
+          ok: false, 
+          error: { 
+            code: "MISSING_AUTH", 
+            message: "Authorization header manquant" 
+          } 
+        }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
+
+    // ✅ VALIDATION JWT COMPLÈTE
+    const jwt = authHeader.replace("Bearer ", "");
+    const supabaseAuth = createClient(SUPABASE_URL ?? "", SUPABASE_ANON_KEY ?? "", {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
+    if (userError || !user) {
+      console.error("[woofs-check-consume] Invalid token:", userError);
+      return new Response(
+        JSON.stringify({ 
+          ok: false, 
+          error: { 
+            code: "UNAUTHORIZED", 
+            message: "Token invalide ou expiré" 
+          } 
+        }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`[woofs-check-consume] Authenticated user: ${user.id}`);
 
     const rawBody = await req.json();
     console.log("[woofs-check-consume] Raw body received:", JSON.stringify(rawBody));
@@ -34,15 +66,30 @@ Deno.serve(async (req) => {
 
     console.log(`[woofs-check-consume] Checking ${cost_woofs} Woofs for brand ${brand_id} (reason: ${reason})`);
 
-    // 1. Récupérer les quotas de la brand
+    // 1. Récupérer les quotas de la brand ET vérifier propriété
     const { data: brand, error: brandError } = await admin
       .from("brands")
-      .select("quota_woofs, plan")
+      .select("id, user_id, quota_woofs, plan")
       .eq("id", brand_id)
       .single();
 
     if (brandError || !brand) {
       throw new Error(`Brand not found: ${brandError?.message}`);
+    }
+
+    // ✅ VÉRIFICATION PROPRIÉTÉ DE LA MARQUE
+    if (brand.user_id !== user.id) {
+      console.error(`[woofs-check-consume] User ${user.id} attempted to consume Woofs for brand ${brand_id} owned by ${brand.user_id}`);
+      return new Response(
+        JSON.stringify({ 
+          ok: false, 
+          error: { 
+            code: "FORBIDDEN", 
+            message: "Accès non autorisé à cette marque" 
+          } 
+        }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const woofs_limit = brand.quota_woofs || 150;
