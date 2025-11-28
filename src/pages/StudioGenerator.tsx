@@ -269,6 +269,8 @@ export function StudioGenerator() {
     setBriefGenerationError(null);
 
     try {
+      let packStructure: AlfiePack;
+
       // Cas 1 : Brief rempli - générer pack personnalisé
       if (brief.trim()) {
         const userMessage = `Nom de la campagne : ${campaignName}
@@ -293,24 +295,22 @@ Prépare-moi un pack complet avec plusieurs types de visuels (images, carrousels
           throw new Error(error.message || "Erreur lors de l'appel à Alfie");
         }
 
-        const reply = data?.reply || "";
         const packData = data?.pack;
         
         if (packData && packData.assets && packData.assets.length > 0) {
-          setPack(packData);
-          toast.success("Pack proposé par Alfie ! Tu peux maintenant l'ajuster.");
-          setBriefGenerationError(null);
+          packStructure = packData;
         } else {
-          console.warn("No pack detected in response:", reply);
+          console.warn("No pack detected in response");
           setBriefGenerationError(
             "Alfie n'a pas réussi à proposer un pack automatiquement. Tu peux ajouter tes visuels manuellement ou réessayer plus tard."
           );
+          return;
         }
       } else {
         // Cas 2 : Brief vide - proposer un pack par défaut "présentation de marque"
         console.log("[Studio] Brief empty, creating default brand presentation pack");
         
-        const defaultPack: AlfiePack = {
+        packStructure = {
           title: `Présentation ${activeBrand?.name || "de la marque"}`,
           summary: "Pack par défaut pour présenter ta marque",
           assets: [
@@ -329,11 +329,47 @@ Prépare-moi un pack complet avec plusieurs types de visuels (images, carrousels
             },
           ],
         };
-
-        setPack(defaultPack);
-        toast.success("Pack par défaut créé ! Ajuste-le selon tes besoins.");
-        setBriefGenerationError(null);
       }
+
+      // Step 2: Generate texts for each asset
+      const assetBriefs = packStructure.assets.map((asset) => ({
+        id: asset.id,
+        kind: asset.kind,
+        title: asset.title,
+        goal: asset.goal,
+        tone: asset.tone,
+        platform: asset.platform,
+        ratio: asset.ratio,
+        count: asset.count,
+        durationSeconds: asset.durationSeconds,
+        prompt: asset.prompt,
+      }));
+
+      const { data: textsData, error: textsError } = await supabase.functions.invoke("alfie-generate-texts", {
+        body: {
+          brandId: activeBrandId,
+          brief: brief || `Présentation de ${activeBrand?.name || "la marque"}`,
+          assets: assetBriefs,
+        },
+      });
+
+      if (textsError) {
+        console.warn("Text generation failed, continuing without texts:", textsError);
+      }
+
+      // Step 3: Merge generated texts into assets
+      const assetsWithTexts = packStructure.assets.map((asset) => {
+        const generatedTexts = textsData?.texts?.[asset.id];
+        return {
+          ...asset,
+          generatedTexts: generatedTexts || undefined,
+        };
+      });
+
+      setPack({ ...packStructure, assets: assetsWithTexts });
+      toast.success("Pack proposé ! Tu peux éditer les textes avant génération.");
+      setBriefGenerationError(null);
+
     } catch (err) {
       console.error("Error generating pack from brief:", err);
       setBriefGenerationError(

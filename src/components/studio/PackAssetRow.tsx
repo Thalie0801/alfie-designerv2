@@ -175,6 +175,42 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
         </div>
 
         <CollapsibleContent className="pt-3 space-y-3">
+          {/* Generated texts preview */}
+          {asset.generatedTexts && (
+            <div className="text-sm border-l-2 border-primary pl-3 mb-3">
+              <p className="font-medium mb-2 text-primary">✨ Textes générés par Alfie</p>
+              
+              {asset.generatedTexts.text && (
+                <div className="space-y-1 text-muted-foreground">
+                  <p className="font-medium">{asset.generatedTexts.text.title}</p>
+                  <p className="text-xs">{asset.generatedTexts.text.body}</p>
+                  {asset.generatedTexts.text.cta && (
+                    <p className="text-xs italic">→ {asset.generatedTexts.text.cta}</p>
+                  )}
+                </div>
+              )}
+
+              {asset.generatedTexts.slides && (
+                <div className="space-y-1 text-muted-foreground text-xs">
+                  <p className="font-medium">Carrousel {asset.generatedTexts.slides.length} slides :</p>
+                  {asset.generatedTexts.slides.slice(0, 2).map((slide: any, i: number) => (
+                    <p key={i}>• {slide.title}</p>
+                  ))}
+                  {asset.generatedTexts.slides.length > 2 && (
+                    <p className="italic">... et {asset.generatedTexts.slides.length - 2} autres slides</p>
+                  )}
+                </div>
+              )}
+
+              {asset.generatedTexts.video && (
+                <div className="space-y-1 text-muted-foreground">
+                  <p className="font-medium">{asset.generatedTexts.video.hook}</p>
+                  <p className="text-xs line-clamp-2">{asset.generatedTexts.video.script}</p>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="text-sm text-muted-foreground border-l-2 border-border pl-3">
             <p className="font-medium mb-1">Prompt IA :</p>
             <p>{asset.prompt}</p>
