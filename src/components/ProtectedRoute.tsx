@@ -2,6 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect, useState } from 'react';
 import { hasRole } from '@/lib/access';
+import { toast } from 'sonner';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -67,6 +68,16 @@ export function ProtectedRoute({
       plan: profile?.plan,
       status: profile?.status,
     });
+    
+    // Afficher un toast pour expliquer le blocage
+    toast.error(
+      'Abonnement requis',
+      {
+        description: 'Pour accéder à la plateforme, tu dois avoir un abonnement actif. Choisis ton plan pour continuer avec Alfie 🐶',
+        duration: 6000,
+      }
+    );
+    
     return <Navigate to="/billing" replace />;
   }
 
@@ -78,6 +89,16 @@ export function ProtectedRoute({
       allowPending,
       isWhitelisted,
     });
+    
+    // Afficher un toast pour expliquer le blocage
+    toast.error(
+      'Abonnement requis',
+      {
+        description: 'Pour accéder à la plateforme, tu dois avoir un abonnement actif. Choisis ton plan pour continuer avec Alfie 🐶',
+        duration: 6000,
+      }
+    );
+    
     return <Navigate to="/billing" replace />;
   }
 
