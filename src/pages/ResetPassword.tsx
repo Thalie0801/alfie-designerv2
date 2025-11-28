@@ -12,18 +12,40 @@ export default function ResetPassword() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verifyingToken, setVerifyingToken] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Vérifier que l'utilisateur a un token valide
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        toast.error('Lien de réinitialisation invalide ou expiré');
-        navigate('/auth');
+    // Écouter les événements d'authentification pour détecter PASSWORD_RECOVERY
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[ResetPassword] Auth event:', event);
+      
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log('[ResetPassword] Password recovery detected, session valid');
+        setVerifyingToken(false);
+      } else if (event === 'SIGNED_IN' && session) {
+        console.log('[ResetPassword] User signed in during recovery');
+        setVerifyingToken(false);
       }
     });
+
+    // Vérifier aussi la session existante
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        console.error('[ResetPassword] No session found');
+        toast.error('Lien de réinitialisation invalide ou expiré');
+        navigate('/auth');
+      } else {
+        console.log('[ResetPassword] Session found');
+        setVerifyingToken(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -61,6 +83,21 @@ export default function ResetPassword() {
       setLoading(false);
     }
   };
+
+  if (verifyingToken) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="py-12">
+            <div className="text-center space-y-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
+              <p className="text-muted-foreground">Vérification du lien de réinitialisation...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
