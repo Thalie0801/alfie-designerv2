@@ -12,6 +12,7 @@ import {
   FolderOpen,
   Sparkles,
   Link2,
+  Palette,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { QuotaBar } from "@/components/create/QuotaBar";
@@ -49,6 +50,7 @@ export function AppSidebar() {
     tourId?: string;
   }> = [
     { path: "/studio", label: "Studio", icon: Sparkles, tourId: "studio" },
+    { path: "/brand-kit", label: "Brand Kit", icon: Palette },
     { path: "/templates", label: "Catalogue", icon: Layers, badge: "Bientôt" },
     { path: "/library", label: "Bibliothèque", icon: FolderOpen, tourId: "library" },
     { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },

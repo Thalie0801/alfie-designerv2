@@ -2,7 +2,7 @@ export const HELP = [
   { match: /studio|génération|créer|lancer/i, to: "/studio", label: "Ouvrir Studio", why: "Lancer une génération guidée" },
   { match: /template|catalogue|modèles?/i, to: "/templates", label: "Catalogue", why: "Parcourir les modèles" },
   { match: /bibli|assets?|médias?/i, to: "/library", label: "Bibliothèque", why: "Retrouver vos visuels" },
-  { match: /brand.?kit|couleurs|typo/i, to: "/brand-kit-questionnaire", label: "Brand Kit", why: "Couleurs, typographies, ton" },
+  { match: /brand.?kit|couleurs|typo/i, to: "/brand-kit", label: "Brand Kit", why: "Couleurs, typographies, ton" },
   { match: /factur|abonn|paiement|pricing|prix|crédit|woofs/i, to: "/billing", label: "Facturation", why: "Plan et crédits" },
   { match: /profil|compte|email|mot de passe/i, to: "/profile", label: "Profil", why: "Infos du compte" },
   { match: /dashboard|stat|performances?/i, to: "/dashboard", label: "Dashboard", why: "Vue d'ensemble" },
