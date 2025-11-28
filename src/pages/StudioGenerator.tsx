@@ -310,7 +310,7 @@ Propose un pack adapté avec des images, carrousels et/ou vidéos selon les beso
     setIsLaunching(true);
 
     try {
-      const result = await sendPackToGenerator({
+      await sendPackToGenerator({
         brandId: activeBrandId,
         pack,
         userId: user.id,
