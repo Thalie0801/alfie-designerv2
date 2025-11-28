@@ -82,6 +82,28 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Vérifier que l'affilié a un abonnement actif
+    const { data: affiliateProfile, error: profileError } = await supabaseClient
+      .from("profiles")
+      .select("plan, stripe_subscription_id")
+      .eq("id", payout.affiliate_id)
+      .single();
+
+    if (profileError || !affiliateProfile) {
+      return new Response(
+        JSON.stringify({ error: "Affiliate profile not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Bloquer le paiement si pas d'abonnement actif
+    if (!affiliateProfile.plan || affiliateProfile.plan === 'none' || !affiliateProfile.stripe_subscription_id) {
+      return new Response(
+        JSON.stringify({ error: "Affiliate has no active subscription - payout blocked" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     console.log("[Admin Process Payout] Creating transfer for:", {
       payoutId,
       affiliateId: payout.affiliate_id,

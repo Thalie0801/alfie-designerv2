@@ -732,8 +732,10 @@ export default function Admin() {
                 <div className="space-y-2">
                   {payouts.map((payout: any) => {
                     const affiliate = affiliates.find(a => a.id === payout.affiliate_id);
+                    const affiliateUser = users.find(u => u.id === payout.affiliate_id);
                     const hasStripeConnect = affiliate?.stripe_connect_account_id;
                     const isStripeReady = affiliate?.stripe_connect_payouts_enabled;
+                    const hasActiveSubscription = affiliateUser?.plan && affiliateUser?.plan !== 'none' && affiliateUser?.stripe_subscription_id;
                     
                     return (
                       <div
@@ -745,9 +747,14 @@ export default function Admin() {
                           <p className="text-sm text-muted-foreground">
                             Période: {payout.period}
                           </p>
-                          {/* Statut Stripe Connect */}
+                          {/* Statut Stripe Connect & Abonnement */}
                           {payout.status === 'pending' && (
-                            <div className="flex items-center gap-2 mt-1">
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              {!hasActiveSubscription && (
+                                <Badge variant="outline" className="text-xs text-red-600">
+                                  ⚠️ Pas d'abonnement actif
+                                </Badge>
+                              )}
                               {!hasStripeConnect ? (
                                 <Badge variant="outline" className="text-xs text-red-600">
                                   ❌ Pas de compte Stripe
@@ -781,8 +788,9 @@ export default function Admin() {
                               <Button
                                 size="sm"
                                 onClick={() => handleApprovePayout(payout.id)}
-                                disabled={processingPayout === payout.id || !isStripeReady}
+                                disabled={processingPayout === payout.id || !isStripeReady || !hasActiveSubscription}
                                 className="bg-green-600 hover:bg-green-700"
+                                title={!hasActiveSubscription ? 'Abonnement requis' : !isStripeReady ? 'Stripe non configuré' : ''}
                               >
                                 {processingPayout === payout.id ? 'Traitement...' : 'Approuver & Payer'}
                               </Button>
