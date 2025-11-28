@@ -171,7 +171,7 @@ async function createAssetJob(
 
   // Créer un job dans la queue
   const jobType = asset.kind === "carousel" ? "render_carousels" : 
-                  asset.kind.includes("video") ? "render_videos" : 
+                  asset.kind.includes("video") ? "generate_video" : 
                   "render_images";
 
   const { error: jobError } = await supabase.from("job_queue").insert({
