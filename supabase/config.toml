@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.request-password-reset]
 verify_jwt = false
+
+[functions.create-ambassadeur-coupon]
+verify_jwt = false
