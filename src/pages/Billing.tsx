@@ -20,12 +20,11 @@ const plans = [
     price: '39€',
     quota_woofs: 150,
     features: [
-      '150 Woofs/mois',
-      '1 marque',
-      'Images & Carrousels',
-      'Canva : adaptation & dépôt inclus',
-      'Stockage 30 jours (purge auto)',
-      'Support email'
+      '≈ 150 Woofs créatifs / mois',
+      'Exemple : jusqu\'à 120 visuels ou 80 visuels + 3 vidéos courtes',
+      '1 marque avec votre brand kit (couleurs, polices, logos, mood)',
+      'Génération d\'images, carrousels et vidéos animées',
+      'Export ZIP des créations prêtes à télécharger',
     ],
     popular: false
   },
@@ -35,13 +34,12 @@ const plans = [
     price: '99€',
     quota_woofs: 450,
     features: [
-      '450 Woofs/mois',
-      '3 marques',
-      'Vidéos standard (10 Woofs)',
-      'Canva : adaptation & dépôt inclus',
-      'Stockage 30 jours (purge auto)',
-      'Add-on : Marque suppl. +39€/mois',
-      'Support prioritaire'
+      '≈ 450 Woofs créatifs / mois',
+      'Exemple : jusqu\'à 350 visuels ou 250 visuels + 10 vidéos courtes',
+      '1 marque avec votre brand kit enrichi (palettes, ton de voix, assets récurrents)',
+      'Flows complets images + carrousels + vidéos',
+      'Export ZIP optimisé pour réutiliser vos contenus',
+      'Support prioritaire',
     ],
     popular: true
   },
@@ -51,15 +49,12 @@ const plans = [
     price: '199€',
     quota_woofs: 1000,
     features: [
-      '1000 Woofs/mois',
-      '5 marques',
-      'Vidéos premium Veo 3.1 (50 Woofs)',
-      'Canva : adaptation & dépôt inclus',
-      'Stockage 30 jours (purge auto)',
-      'Add-on : Marque suppl. +39€/mois',
-      'Packs Woofs (+50, +100)',
-      'Analytics avancés',
-      'Support prioritaire'
+      '≈ 1000 Woofs créatifs / mois',
+      'Exemple : jusqu\'à 800 visuels ou 600 visuels + 20 vidéos courtes + 4 vidéos premium',
+      '1 marque avec votre brand kit complet (templates, presets, visuels piliers…)',
+      'Export Canva + packs ZIP pour livrer vite à vos clients',
+      'Bibliothèque longue durée + priorité de génération',
+      'Support dédié',
     ],
     popular: false
   },
@@ -72,7 +67,7 @@ const plans = [
       'Woofs illimités',
       'Marques illimitées',
       'Tout débloquer',
-      'Canva : adaptation & dépôt inclus',
+      'Export Canva + API',
       'Stockage personnalisé',
       'API & SSO',
       'White-label',
