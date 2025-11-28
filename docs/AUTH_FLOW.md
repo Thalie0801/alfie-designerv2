@@ -7,16 +7,14 @@ La fonction `navigateAfterAuth()` dans `src/pages/Auth.tsx` applique cette logiq
 1. **Admin** (`effectiveIsAdmin === true`) → `/admin`
 2. **Whitelist VIP OU Autorisé** (`effectiveIsAuthorized === true`) → `/dashboard`
    - `effectiveIsAuthorized = isAuthorized || isForceDashboard`
-   - Whitelist VIP : comptes clients exceptionnels (Sandrine, Patricia)
+   - Whitelist VIP : comptes clients exceptionnels avec accès garanti
 3. **Non autorisé** → `/onboarding/activate`
 
 ## Comptes VIP (Whitelist)
 
-Certains clients bénéficient d'un accès **garanti** au dashboard, même sans plan actif :
-- `sandrine.guedra54@gmail.com`
-- `borderonpatricia7@gmail.com`
+Certains clients bénéficient d'un accès **garanti** au dashboard, même sans plan actif.
 
-Voir `docs/WHITELIST_VIP.md` pour plus de détails.
+Voir `docs/WHITELIST_VIP.md` pour plus de détails sur la gestion des comptes VIP.
 
 ## Garanties de sécurité
 
