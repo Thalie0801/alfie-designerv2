@@ -122,7 +122,7 @@ export function QuotaBar({ activeBrandId }: QuotaBarProps) {
 
   const woofsLeft = Math.max(0, quota.woofs_remaining ?? 0);
   const woofsQuota = Math.max(0, quota.woofs_quota ?? 0);
-  const isUnlimited = quota.is_admin || woofsQuota >= 1_000_000_000;
+  const isUnlimited = quota.is_admin || woofsQuota >= 999_999_000;
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen} className="sticky top-0 z-30 bg-gradient-to-r from-background via-background/98 to-background backdrop-blur-xl border-b border-border/50 shadow-sm">

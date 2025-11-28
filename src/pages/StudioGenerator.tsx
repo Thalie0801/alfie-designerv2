@@ -16,6 +16,7 @@ import { PackSummarySidebar } from "@/components/studio/PackSummarySidebar";
 import { OrderStatusList } from "@/components/studio/OrderStatusList";
 import { sendPackToGenerator, InsufficientWoofsError } from "@/services/generatorFromChat";
 import { supabase } from "@/integrations/supabase/client";
+import { calculatePackWoofCost } from "@/lib/woofs";
 
 // Packs prédéfinis
 const PRESET_PACKS = {
@@ -314,6 +315,18 @@ Prépare-moi un pack complet avec plusieurs types de visuels (images, carrousels
 
     if (pack.assets.length === 0) {
       toast.error("Ajoute au moins un asset pour lancer la génération");
+      return;
+    }
+
+    // Calculer le coût pour afficher dans la confirmation
+    const totalCost = calculatePackWoofCost(pack);
+
+    // Confirmation explicite avant de lancer
+    const confirmed = window.confirm(
+      `Tu vas créer ${pack.assets.length} visuel(s) pour un coût de ${totalCost} Woofs.\n\nConfirmer ?`
+    );
+
+    if (!confirmed) {
       return;
     }
 
