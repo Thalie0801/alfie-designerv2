@@ -175,6 +175,9 @@ async function createAssetJob(
                   asset.kind.includes("video") ? "generate_video" : 
                   "render_images";
 
+  // Générer un carousel_id unique pour les carrousels
+  const carousel_id = asset.kind === "carousel" ? `carousel_${Date.now()}_${Math.random().toString(36).substring(7)}` : undefined;
+
   const { error: jobError } = await supabase.from("job_queue").insert({
     user_id: userId,
     order_id: order.id,
@@ -189,6 +192,10 @@ async function createAssetJob(
       brief: order.brief_json,
       assetId: asset.id,
       prompt: asset.prompt,
+      carousel_id, // Pour carrousels uniquement
+      count: asset.kind === "carousel" ? asset.count : 1,
+      referenceImageUrl: asset.referenceImageUrl, // Image de référence
+      generatedTexts: asset.generatedTexts, // Textes générés par Gemini
     },
   });
 

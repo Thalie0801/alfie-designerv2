@@ -260,8 +260,8 @@ export function StudioGenerator() {
 
   // Fonction pour générer un pack à partir du brief
   const handleGenerateFromBrief = async () => {
-    if (!activeBrandId || !campaignName.trim() || !brief.trim()) {
-      toast.error("Veuillez remplir le nom de campagne et le brief");
+    if (!activeBrandId || !campaignName.trim()) {
+      toast.error("Veuillez remplir au moins le nom de campagne");
       return;
     }
 
@@ -269,42 +269,70 @@ export function StudioGenerator() {
     setBriefGenerationError(null);
 
     try {
-      // Construire un message pour le Réalisateur Studio
-      const userMessage = `Nom de la campagne : ${campaignName}
+      // Cas 1 : Brief rempli - générer pack personnalisé
+      if (brief.trim()) {
+        const userMessage = `Nom de la campagne : ${campaignName}
 
 Brief : ${brief}
 
 Prépare-moi un pack complet avec plusieurs types de visuels (images, carrousels, vidéos) adaptés à cet objectif.`;
 
-      const { data, error } = await supabase.functions.invoke("alfie-chat-widget", {
-        body: {
-          brandId: activeBrandId,
-          persona: "realisateur_studio",
-          messages: [
-            { role: "user", content: userMessage }
-          ],
-          lang: "fr",
-        },
-      });
+        const { data, error } = await supabase.functions.invoke("alfie-chat-widget", {
+          body: {
+            brandId: activeBrandId,
+            persona: "realisateur_studio",
+            messages: [
+              { role: "user", content: userMessage }
+            ],
+            lang: "fr",
+          },
+        });
 
-      if (error) {
-        console.error("Edge function error:", error);
-        throw new Error(error.message || "Erreur lors de l'appel à Alfie");
-      }
+        if (error) {
+          console.error("Edge function error:", error);
+          throw new Error(error.message || "Erreur lors de l'appel à Alfie");
+        }
 
-      const reply = data?.reply || "";
-      const packData = data?.pack;
-      
-      if (packData && packData.assets && packData.assets.length > 0) {
-        setPack(packData);
-        toast.success("Pack proposé par Alfie ! Tu peux maintenant l'ajuster.");
-        // Effacer l'erreur précédente
-        setBriefGenerationError(null);
+        const reply = data?.reply || "";
+        const packData = data?.pack;
+        
+        if (packData && packData.assets && packData.assets.length > 0) {
+          setPack(packData);
+          toast.success("Pack proposé par Alfie ! Tu peux maintenant l'ajuster.");
+          setBriefGenerationError(null);
+        } else {
+          console.warn("No pack detected in response:", reply);
+          setBriefGenerationError(
+            "Alfie n'a pas réussi à proposer un pack automatiquement. Tu peux ajouter tes visuels manuellement ou réessayer plus tard."
+          );
+        }
       } else {
-        console.warn("No pack detected in response:", reply);
-        setBriefGenerationError(
-          "Alfie n'a pas réussi à proposer un pack automatiquement. Tu peux ajouter tes visuels manuellement ou réessayer plus tard."
-        );
+        // Cas 2 : Brief vide - proposer un pack par défaut "présentation de marque"
+        console.log("[Studio] Brief empty, creating default brand presentation pack");
+        
+        const defaultPack: AlfiePack = {
+          title: `Présentation ${activeBrand?.name || "de la marque"}`,
+          summary: "Pack par défaut pour présenter ta marque",
+          assets: [
+            {
+              id: `default_${Date.now()}_1`,
+              kind: "carousel",
+              count: 5,
+              platform: "instagram",
+              format: "post",
+              ratio: "4:5",
+              title: "Carrousel : Découvrez notre marque",
+              goal: "education",
+              tone: activeBrand?.voice || "professionnel, accessible",
+              prompt: `Carrousel de présentation de la marque ${activeBrand?.name || ""}. Slide 1: Accroche, Slide 2: Notre mission, Slides 3-4: Nos valeurs et notre offre, Slide 5: Call-to-action pour découvrir`,
+              woofCostType: "carousel_slide",
+            },
+          ],
+        };
+
+        setPack(defaultPack);
+        toast.success("Pack par défaut créé ! Ajuste-le selon tes besoins.");
+        setBriefGenerationError(null);
       }
     } catch (err) {
       console.error("Error generating pack from brief:", err);
@@ -531,12 +559,15 @@ Prépare-moi un pack complet avec plusieurs types de visuels (images, carrousels
                 </DropdownMenu>
               </div>
 
-              {/* CTA pour générer depuis le brief */}
-              {pack.assets.length === 0 && brief.trim() !== "" && !briefGenerationError && (
+              {/* CTA pour générer depuis le brief - TOUJOURS AFFICHÉ */}
+              {pack.assets.length === 0 && !briefGenerationError && (
                 <Card className="p-6 text-center space-y-3 bg-gradient-to-br from-alfie-mint/10 to-alfie-pink/10 border-alfie-mint/30 mb-4">
                   <Sparkles className="h-8 w-8 mx-auto text-alfie-pink" />
                   <p className="text-sm text-muted-foreground">
-                    Tu peux demander à Alfie de te proposer un pack à partir de ton brief ✨
+                    {brief.trim() 
+                      ? "Tu peux demander à Alfie de te proposer un pack à partir de ton brief ✨" 
+                      : "Alfie peut te proposer un pack de présentation de ta marque par défaut ✨"
+                    }
                   </p>
                   <Button
                     onClick={handleGenerateFromBrief}

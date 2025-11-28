@@ -179,17 +179,23 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
         return;
       }
 
-      const assetType = type === 'images' ? 'image' : 'video';
-      
-      // Optimized query: exclude output_url to avoid loading large base64 images
-      // Output URL will be loaded individually when downloading
-      const { data, error } = await supabase
+      // Pour images : exclure les carousel_slide qui doivent apparaître uniquement dans l'onglet Carrousels
+      let query = supabase
         .from('media_generations')
         .select('id, type, status, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes')
-        .eq('user_id', userId)
-        .eq('type', assetType)
+        .eq('user_id', userId);
+
+      if (type === 'images') {
+        // Images = type 'image' uniquement, PAS les carousel_slide
+        query = query.eq('type', 'image').is('metadata->carousel_id', null);
+      } else {
+        // Videos = type 'video'
+        query = query.eq('type', 'video');
+      }
+
+      const { data, error } = await query
         .order('created_at', { ascending: false })
-        .limit(20); // REDUCED from 100 to prevent DB timeouts
+        .limit(20);
 
       if (error) {
         console.error('[LibraryAssets] Query error:', error);

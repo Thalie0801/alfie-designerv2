@@ -142,43 +142,52 @@ Les woofCostType correspondants : "image", "carousel_slide", "animated_image", "
 async function callLLM(
   messages: { role: string; content: string }[],
   systemPrompt: string,
-  brandContext?: { niche?: string; voice?: string },
+  brandContext?: { name?: string; niche?: string; voice?: string; palette?: string[] },
   woofsRemaining?: number
 ): Promise<string> {
-  // Enrichir le system prompt avec le contexte de marque et Woofs si disponibles
+  // Enrichir le system prompt avec le Brand Kit COMPLET et Woofs si disponibles
   let enrichedPrompt = systemPrompt;
+  
+  // Brand context COMPLET (niche, voice, palette, logo)
   if (brandContext) {
-    const brandInfo: string[] = [];
+    enrichedPrompt += `\n\n--- CONTEXTE BRAND KIT DU CLIENT ---`;
+    if (brandContext.name) {
+      enrichedPrompt += `\nNom de la marque : ${brandContext.name}`;
+    }
     if (brandContext.niche) {
-      brandInfo.push(`Niche/secteur : ${brandContext.niche}`);
+      enrichedPrompt += `\nSecteur d'activité : ${brandContext.niche}`;
     }
     if (brandContext.voice) {
-      brandInfo.push(`Voix de marque : ${brandContext.voice}`);
+      enrichedPrompt += `\nTon de la marque : ${brandContext.voice}`;
     }
-    if (brandInfo.length > 0) {
-      enrichedPrompt += `\n\nCONTEXTE DE LA MARQUE :\n${brandInfo.join('\n')}\n\nAdapte tes suggestions en fonction de ce contexte.`;
+    if (brandContext.palette && Array.isArray(brandContext.palette) && brandContext.palette.length > 0) {
+      enrichedPrompt += `\nCouleurs de la marque : ${brandContext.palette.slice(0, 5).join(", ")}`;
     }
+    enrichedPrompt += `\n\n🎨 UTILISE CE BRAND KIT pour adapter tes propositions :`;
+    enrichedPrompt += `\n- Propose des visuels cohérents avec les couleurs et le ton de la marque`;
+    enrichedPrompt += `\n- Adapte le style des assets (fun vs premium vs sobre) selon la voix définie`;
+    enrichedPrompt += `\n- Prends en compte le secteur d'activité pour proposer des formats pertinents`;
+    enrichedPrompt += `\n\nIMPORTANT : Tu connais déjà le ton, le positionnement, les couleurs et le secteur via le Brand Kit. Ne redemande JAMAIS ces informations (ton, voix, niche, industrie, couleurs). Utilise ces données pour adapter tes recommandations de pack sans poser de questions redondantes.`;
   }
 
-  // Ajouter le contexte Woofs pour adapter les recommandations
+  // Si woofsRemaining fourni, inclure dans le contexte avec recommandations budget
   if (typeof woofsRemaining === 'number') {
-    enrichedPrompt += `\n\nBUDGET WOOFS de l'utilisateur : ${woofsRemaining} Woofs restants
-COÛTS en Woofs :
-- Image : 1 Woof
-- Image animée (Ken Burns via Cloudinary) : 3 Woofs
-- Carrousel (par slide) : 1 Woof
-- Vidéo standard : 10 Woofs
-- Vidéo premium (Veo 3.1) : 50 Woofs
-
-RÈGLES D'ADAPTATION AU BUDGET :
-- Si Woofs < 3 : propose uniquement des images statiques (1 Woof chacune)
-- Si Woofs >= 3 mais < 10 : propose des images et images animées (évite les vidéos)
-- Si Woofs >= 10 mais < 50 : propose images, images animées et vidéos standard (évite premium)
-- Si Woofs >= 50 : tu peux proposer toutes les options, y compris vidéo premium
-
-Quand tu proposes une image animée, explique brièvement qu'il s'agit d'un effet Ken Burns (zoom/pan) appliqué sur une image statique, ce qui crée un mouvement élégant sans la complexité d'une vraie vidéo IA.
-
-Adapte intelligemment tes propositions de pack au budget disponible. Si l'utilisateur demande quelque chose de trop coûteux, propose des alternatives créatives dans son budget.`;
+    enrichedPrompt += `\n\n--- BUDGET WOOFS DE L'UTILISATEUR ---`;
+    enrichedPrompt += `\nWoofs restants : ${woofsRemaining} 🐾`;
+    enrichedPrompt += `\n\nCOÛTS PAR TYPE DE VISUEL :`;
+    enrichedPrompt += `\n- Image : 1 Woof`;
+    enrichedPrompt += `\n- Carrousel : 1 Woof par slide (ex: 5 slides = 5 Woofs)`;
+    enrichedPrompt += `\n- Image animée (Ken Burns via Cloudinary, effet zoom/pan élégant) : 3 Woofs`;
+    enrichedPrompt += `\n- Vidéo standard (IA générative Replicate/Kling) : 10 Woofs`;
+    enrichedPrompt += `\n- Vidéo premium (IA Vertex AI Veo 3.1, qualité cinéma) : 50 Woofs`;
+    enrichedPrompt += `\n\n💡 RECOMMANDATIONS BUDGET-INTELLIGENTES :`;
+    enrichedPrompt += `\n- Budget < 10 Woofs : Mise en avant images (1 Woof) et images animées (3 Woofs). Les images animées Ken Burns sont une excellente option pour ajouter du mouvement sans exploser le budget.`;
+    enrichedPrompt += `\n- Budget 10-49 Woofs : Tu peux proposer carrousels (5-7 slides) + images animées + vidéo standard si justifié.`;
+    enrichedPrompt += `\n- Budget >= 50 Woofs : Tous les formats possibles, y compris vidéo premium Veo 3.1.`;
+    enrichedPrompt += `\n\nEXPLIQUE LES DIFFÉRENCES quand tu proposes des options :`;
+    enrichedPrompt += `\n- "Image animée" = effet Ken Burns (zoom/pan élégant sur image fixe, 3 Woofs) - idéal pour donner vie à une image sans coût élevé`;
+    enrichedPrompt += `\n- "Vidéo standard" = IA générative complète (10 Woofs) - création vidéo à partir de zéro`;
+    enrichedPrompt += `\n- "Vidéo premium" = qualité cinématique Veo 3.1 (50 Woofs) - top qualité pour campagnes premium`;
   }
 
   // 1. Essayer Vertex AI si configuré
@@ -280,15 +289,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Récupérer les informations de la marque (niche, voice)
+    // Récupérer le Brand Kit COMPLET de la marque (palette, niche, voice, name)
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
-    let brandContext: { niche?: string; voice?: string } | undefined;
+    let brandContext: { name?: string; niche?: string; voice?: string; palette?: string[] } | undefined;
     
     if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
       try {
-        const brandResponse = await fetch(`${SUPABASE_URL}/rest/v1/brands?id=eq.${brandId}&select=niche,voice`, {
+        const brandResponse = await fetch(`${SUPABASE_URL}/rest/v1/brands?id=eq.${brandId}&select=name,niche,voice,palette`, {
           headers: {
             'apikey': SUPABASE_SERVICE_ROLE_KEY,
             'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
