@@ -132,7 +132,7 @@ async function createAssetJob(
       user_id: userId,
       brand_id: brandId,
       campaign_name: `${packTitle} - ${asset.title}`,
-      status: "pending",
+      status: "queued",
       brief_json: {
         format: asset.kind === "carousel" ? "carousel" : asset.kind.includes("video") ? "video" : "image",
         platform: asset.platform,
