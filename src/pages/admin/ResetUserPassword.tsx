@@ -81,14 +81,6 @@ export default function ResetUserPassword() {
               {loading ? 'Réinitialisation...' : 'Réinitialiser le mot de passe'}
             </Button>
           </form>
-
-          <div className="mt-6 p-4 bg-muted rounded-md">
-            <h4 className="font-medium mb-2">Comptes VIP à réinitialiser :</h4>
-            <ul className="space-y-1 text-sm">
-              <li>• borderonpatricia7@gmail.com → Animaux32021.</li>
-              <li>• sandrine.guedra54@gmail.com → Sgu54700!</li>
-            </ul>
-          </div>
         </CardContent>
       </Card>
     </div>

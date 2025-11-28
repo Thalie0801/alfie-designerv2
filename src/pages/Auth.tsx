@@ -22,7 +22,7 @@ export default function Auth() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { signIn, signUp, user, isAdmin, isAuthorized, roles, loading: authLoading } = useAuth();
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -30,6 +30,7 @@ export default function Auth() {
   const [verifyingPayment, setVerifyingPayment] = useState(false);
   const [canSignUp, setCanSignUp] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
   const warnedAboutSignupRedirect = useRef(false);
   const isMountedRef = useRef(true);
 
@@ -202,6 +203,35 @@ export default function Auth() {
     }
 
     setMode(nextMode);
+    setResetEmailSent(false);
+  };
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!email) {
+      toast.error('Veuillez entrer votre email');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) throw error;
+
+      setResetEmailSent(true);
+      toast.success('Email de réinitialisation envoyé !');
+      console.log('[Auth] Password reset email sent to:', email);
+    } catch (error: any) {
+      console.error('[Auth] Password reset error:', error);
+      toast.error(error.message || 'Erreur lors de l\'envoi de l\'email');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -320,10 +350,12 @@ export default function Auth() {
               </span>
             </div>
             <CardTitle className="text-2xl">
-              {mode === 'login' ? 'Connexion' : 'Créer un compte'}
+              {mode === 'reset' ? 'Mot de passe oublié' : mode === 'login' ? 'Connexion' : 'Créer un compte'}
             </CardTitle>
             <CardDescription>
-              {mode === 'login'
+              {mode === 'reset' 
+                ? 'Entrez votre email pour recevoir un lien de réinitialisation'
+                : mode === 'login'
                 ? 'Connectez-vous pour accéder à Alfie Designer'
                 : 'Commencez à créer vos visuels avec Alfie'}
             </CardDescription>
@@ -344,7 +376,42 @@ export default function Auth() {
               </Alert>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4 mt-6">
+            {mode === 'reset' && resetEmailSent && (
+              <Alert className="mb-4 border-green-500/50 bg-green-50 dark:bg-green-900/20">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-700 dark:text-green-300">
+                  Email envoyé ! Vérifiez votre boîte de réception.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {mode === 'reset' ? (
+              <form onSubmit={handlePasswordReset} className="space-y-4 mt-6">
+                <div>
+                  <Input
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={loading}
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Envoi...' : 'Envoyer le lien'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setMode('login')}
+                  disabled={loading}
+                >
+                  Retour à la connexion
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4 mt-6">
               {mode === 'signup' && (
                 <div>
                   <Input
@@ -378,7 +445,7 @@ export default function Auth() {
                 {mode === 'login' && (
                   <button
                     type="button"
-                    onClick={() => toast.info('Fonctionnalité bientôt disponible')}
+                    onClick={() => setMode('reset')}
                     className="text-xs text-primary hover:underline mt-1 block text-right"
                   >
                     Mot de passe oublié ?
@@ -393,9 +460,10 @@ export default function Auth() {
                 {loading || verifyingPayment ? 'Chargement...' : mode === 'login' ? 'Se connecter' : 'Créer mon compte'}
               </Button>
             </form>
+            )}
 
             <div className="mt-4 text-center text-sm">
-              {mode === 'login' ? (
+              {mode === 'reset' ? null : mode === 'login' ? (
                 <p>
                   Pas encore de compte ?{' '}
                   <button

@@ -8,8 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { Plus, Award, Trash2, Link2 } from 'lucide-react';
-import { linkAffiliateToParent } from '@/lib/admin-link-affiliate';
+import { Plus, Award, Trash2 } from 'lucide-react';
 
 export default function ManageAmbassadors() {
   const [ambassadors, setAmbassadors] = useState<any[]>([]);
@@ -103,23 +102,6 @@ export default function ManageAmbassadors() {
     }
   };
 
-  const handleLinkSandrine = async () => {
-    try {
-      const result = await linkAffiliateToParent(
-        'sandrine.guedra54@gmail.com',
-        'nathaliestaelens@gmail.com'
-      );
-
-      if (result.success) {
-        toast.success('✅ Sandrine liée avec succès à Nathalie');
-      } else {
-        toast.error('Erreur: ' + result.error);
-      }
-    } catch (error: any) {
-      toast.error('Erreur lors du lien: ' + error.message);
-    }
-  };
-
   const getPlanBadgeColor = (plan: string) => {
     switch (plan) {
       case 'starter': return 'bg-orange-500';
@@ -166,16 +148,10 @@ export default function ManageAmbassadors() {
           <h1 className="text-3xl font-bold">Gestion des Ambassadeurs</h1>
           <p className="text-muted-foreground">Gérez les accès ambassadeurs spéciaux</p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={handleLinkSandrine} variant="outline" className="gap-2">
-            <Link2 className="h-4 w-4" />
-            Lier Sandrine
-          </Button>
-          <Button onClick={() => setDialogOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Ajouter un ambassadeur
-          </Button>
-        </div>
+        <Button onClick={() => setDialogOpen(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Ajouter un ambassadeur
+        </Button>
       </div>
 
       <div className="grid gap-4">
