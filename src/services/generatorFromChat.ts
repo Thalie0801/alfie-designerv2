@@ -59,16 +59,22 @@ export async function sendPackToGenerator({
   });
 
   if (!quotaCheck.data?.ok) {
-    const error = quotaCheck.data?.error || "Quota verification failed";
-    console.error("[Pack] Quota check failed:", error);
+    const errorObj = quotaCheck.data?.error;
+    const errorMessage = typeof errorObj === 'string' 
+      ? errorObj 
+      : errorObj?.message || "Quota verification failed";
+    const errorCode = typeof errorObj === 'object' ? errorObj?.code : undefined;
+
+    console.error("[Pack] Quota check failed:", { errorCode, errorMessage, errorObj });
     
-    if (error.includes("INSUFFICIENT") || error.includes("quota")) {
+    if (errorCode === "INSUFFICIENT_WOOFS" || 
+        (typeof errorMessage === 'string' && errorMessage.includes("quota"))) {
       throw new InsufficientWoofsError(
         `Il te reste moins de ${totalWoofs} Woofs. Ce pack en coûte ${totalWoofs}.`
       );
     }
     
-    throw new Error(error);
+    throw new Error(errorMessage);
   }
 
   console.log(`[Pack] Quota OK, remaining Woofs: ${quotaCheck.data.remaining_woofs}`);

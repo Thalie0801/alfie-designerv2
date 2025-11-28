@@ -317,7 +317,7 @@ Propose un pack adapté avec des images, carrousels et/ou vidéos selon les beso
         selectedAssetIds: pack.assets.map((a) => a.id),
       });
 
-      toast.success(`🎉 C'est parti ! ${result.orderIds.length} générations lancées`);
+      toast.success(`Super ! Alfie lance la génération de tes visuels 🐶`);
       
       // Recharger les Woofs
       const { data } = await supabase.functions.invoke("get-quota", {
@@ -336,11 +336,21 @@ Propose un pack adapté avec des images, carrousels et/ou vidéos selon les beso
       setCampaignName("");
       setBrief("");
     } catch (error) {
+      console.error("[Studio] Launch error:", error);
+      
       if (error instanceof InsufficientWoofsError) {
         toast.error(error.message);
+      } else if (error instanceof Error) {
+        // Message humain selon le type d'erreur
+        if (error.message.includes("Brand not found")) {
+          toast.error("Il manque encore quelques infos. Vérifie qu'une marque est bien sélectionnée.");
+        } else if (error.message.includes("Failed to create order")) {
+          toast.error("Alfie a rencontré un souci pour créer ta commande. Réessaie dans quelques instants.");
+        } else {
+          toast.error(`Alfie a rencontré un souci technique : ${error.message}`);
+        }
       } else {
-        toast.error("Erreur lors du lancement de la génération");
-        console.error("[Studio] Launch error:", error);
+        toast.error("Alfie a rencontré un souci technique pour lancer la génération. Réessaie dans quelques minutes.");
       }
     } finally {
       setIsLaunching(false);
