@@ -13,6 +13,7 @@ const corsHeaders = {
 
 interface PasswordResetRequest {
   email: string;
+  appOrigin: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -21,7 +22,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email }: PasswordResetRequest = await req.json();
+    const { email, appOrigin }: PasswordResetRequest = await req.json();
 
     if (!email) {
       throw new Error("Email requis");
@@ -39,7 +40,7 @@ const handler = async (req: Request): Promise<Response> => {
       type: 'recovery',
       email,
       options: {
-        redirectTo: `${new URL(req.url).origin}/reset-password`
+        redirectTo: `${appOrigin}/reset-password`
       }
     });
 
