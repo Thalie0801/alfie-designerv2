@@ -30,22 +30,37 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { amount, meta = {} } = await req.json();
+    const { amount, reason = "refund", metadata = {} } = await req.json();
 
-    // Appeler la fonction existante refund_woofs
-    const { error: refundError } = await supabaseClient.rpc("refund_woofs", {
-      user_id_param: user.id,
-      woofs_amount: amount,
+    // Récupérer le brand_id actif de l'utilisateur
+    const { data: profile } = await supabaseClient
+      .from("profiles")
+      .select("active_brand_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.active_brand_id) {
+      throw new Error("No active brand found");
+    }
+
+    // Décrémenter les Woofs dans counters_monthly
+    const currentPeriod = parseInt(new Date().toISOString().slice(0, 7).replace("-", ""));
+    const { error: decrementError } = await supabaseClient.rpc("decrement_monthly_counters", {
+      p_brand_id: profile.active_brand_id,
+      p_period_yyyymm: currentPeriod,
+      p_woofs: amount,
     });
 
-    if (refundError) throw refundError;
+    if (decrementError) throw decrementError;
 
-    // Logger la transaction
-    await supabaseClient.from("transactions").insert({
+    // Logger dans generation_logs
+    await supabaseClient.from("generation_logs").insert({
       user_id: user.id,
-      delta_woofs: amount,
-      reason: "refund",
-      meta,
+      brand_id: profile.active_brand_id,
+      type: "refund",
+      status: "completed",
+      woofs_cost: -amount,
+      metadata: { reason, ...metadata },
     });
 
     // Récupérer nouveau solde
