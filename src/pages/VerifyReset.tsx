@@ -23,7 +23,7 @@ export default function VerifyReset() {
     setIsVerifying(true);
 
     // Construire l'URL de vérification Supabase
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://gbuvtzqqzyiytypenzae.supabase.co';
     const appOrigin = window.location.origin;
     const verifyUrl = `${supabaseUrl}/auth/v1/verify?token=${encodeURIComponent(token)}&type=${encodeURIComponent(type)}&redirect_to=${encodeURIComponent(appOrigin + '/reset-password')}`;
 
