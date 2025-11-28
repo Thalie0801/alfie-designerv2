@@ -203,15 +203,24 @@ function parsePack(text: string): any | null {
 }
 
 /**
- * Nettoie le texte en retirant le bloc <alfie-pack> et les astérisques markdown
+ * Nettoie le texte en retirant le bloc <alfie-pack> et TOUS les astérisques markdown
  */
 function cleanReply(text: string): string {
-  return text
-    .replace(/<alfie-pack>[\s\S]*?<\/alfie-pack>/gi, "")
-    .replace(/\*{1,2}([^*]+)\*{1,2}/g, "$1") // Retirer *texte* et **texte**
-    .replace(/^\s*[-•]\s+/gm, "→ ") // Remplacer les puces
-    .replace(/\*/g, "") // Retirer toutes les astérisques restantes
-    .trim();
+  let cleaned = text;
+  
+  // 1. Retirer le bloc <alfie-pack>
+  cleaned = cleaned.replace(/<alfie-pack>[\s\S]*?<\/alfie-pack>/gi, "");
+  
+  // 2. Retirer markdown **gras** et *italique*
+  cleaned = cleaned.replace(/\*{1,2}([^*]+)\*{1,2}/g, "$1");
+  
+  // 3. Remplacer les listes à puces markdown
+  cleaned = cleaned.replace(/^\s*[-•*]\s+/gm, "");
+  
+  // 4. Retirer TOUTES les astérisques orphelines restantes
+  cleaned = cleaned.replace(/\*/g, "");
+  
+  return cleaned.trim();
 }
 
 /**

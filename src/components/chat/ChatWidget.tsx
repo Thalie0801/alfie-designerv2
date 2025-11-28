@@ -518,8 +518,10 @@ export default function ChatWidget() {
 
   // Fonction pour changer de mode et réinitialiser
   function handleModeChange(mode: CoachMode) {
+    console.log(`🎨 Changing mode from ${modeCoach} to ${mode}`);
     setModeCoach(mode);
     resetConversation();
+    console.log("✓ Conversation reset complete");
   }
 
   const portalTarget = typeof document !== "undefined" ? document.body : null;
@@ -598,7 +600,7 @@ export default function ChatWidget() {
               <button
                 key={m}
                 onClick={() => handleModeChange(m)}
-                className={`px-3 py-1 rounded-full text-xs border ${modeCoach === m ? "font-semibold" : ""}`}
+                className={`px-3 py-1 rounded-full text-xs border transition-all duration-200 ${modeCoach === m ? "font-semibold scale-105" : "hover:scale-102"}`}
                 style={{
                   borderColor: BRAND.grayBorder,
                   background: modeCoach === m ? `${BRAND.mint}33` : "white",
