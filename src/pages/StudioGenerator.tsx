@@ -405,31 +405,39 @@ export function StudioGenerator() {
           <div className="lg:col-span-6 space-y-4">
             <Card className="p-4">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">Assets du pack ({pack.assets.length})</h3>
+                <h3 className="font-semibold">Visuels de ta campagne ({pack.assets.length})</h3>
                 <Button onClick={() => addAsset()} size="sm">
                   <Plus className="h-4 w-4 mr-1" />
-                  Ajouter un asset
+                  Ajouter un visuel
                 </Button>
               </div>
 
               {pack.assets.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Sparkles className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>Ajoute des assets pour construire ton pack</p>
-                  <p className="text-xs mt-1">ou charge un pack prédéfini à gauche</p>
+                  <p>Ajoute des visuels pour construire ton pack, ou charge un pack prédéfini à gauche ✨</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {pack.assets.map((assetItem) => (
-                    <PackAssetRow
-                      key={assetItem.id}
-                      asset={assetItem}
-                      onDuplicate={duplicateAsset}
-                      onDelete={deleteAsset}
-                      onEdit={editAsset}
-                    />
-                  ))}
-                </div>
+                <>
+                  {pack.title !== "Mon pack personnalisé" && (
+                    <div className="mb-4 p-3 bg-muted/30 rounded-lg">
+                      <p className="text-sm text-muted-foreground">
+                        Alfie prépare avec toi le pack : <strong>{pack.title}</strong>. Voici tout ce qu'il va créer pour ta marque 👇
+                      </p>
+                    </div>
+                  )}
+                  <div className="space-y-3">
+                    {pack.assets.map((assetItem) => (
+                      <PackAssetRow
+                        key={assetItem.id}
+                        asset={assetItem}
+                        onDuplicate={duplicateAsset}
+                        onDelete={deleteAsset}
+                        onEdit={editAsset}
+                      />
+                    ))}
+                  </div>
+                </>
               )}
             </Card>
 

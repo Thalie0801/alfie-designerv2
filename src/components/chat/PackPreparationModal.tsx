@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { X, Image, Film, Grid3x3, AlertCircle } from "lucide-react";
 import type { AlfiePack, PackAsset } from "@/types/alfiePack";
-import { calculatePackWoofCost } from "@/lib/woofs";
+import { calculatePackWoofCost, safeWoofs } from "@/lib/woofs";
 import { sendPackToGenerator, InsufficientWoofsError } from "@/services/generatorFromChat";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -23,7 +23,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
 
   // Calculer le coût dynamique selon la sélection
   const totalWoofs = useMemo(
-    () => calculatePackWoofCost(pack, Array.from(selectedAssetIds)),
+    () => safeWoofs(calculatePackWoofCost(pack, Array.from(selectedAssetIds))),
     [pack, selectedAssetIds]
   );
 
@@ -137,7 +137,12 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
       <div className="bg-background rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">Préparer la génération avec Alfie 🐾</h2>
+          <div>
+            <h2 className="text-lg font-semibold">On prépare ta campagne avec Alfie 🐶</h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              Alfie a pré-rempli ce pack pour toi. Tu peux cocher/décocher les éléments avant de lancer la création.
+            </p>
+          </div>
           <button
             onClick={onClose}
             className="p-1 hover:bg-muted rounded-lg transition-colors"
@@ -226,7 +231,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
             className="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors"
             disabled={isGenerating}
           >
-            Annuler
+            Retour au Studio
           </button>
           <div className="flex gap-2">
             <button
@@ -241,7 +246,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
               disabled={isGenerating || selectedAssetIds.size === 0}
               className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isGenerating ? "Génération en cours..." : "Lancer la génération"}
+              {isGenerating ? "Alfie prépare tes visuels..." : "Créer ce pack avec Alfie"}
             </button>
           </div>
         </div>
