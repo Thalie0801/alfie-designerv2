@@ -719,7 +719,9 @@ export default function Admin() {
           <Card>
             <CardHeader>
               <CardTitle>Payouts</CardTitle>
-              <CardDescription>Gérer les paiements aux affiliés</CardDescription>
+              <CardDescription>
+                Gérer les paiements aux affiliés - Les demandes effectuées avant la fin du mois sont traitées le 15 du mois suivant
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (
