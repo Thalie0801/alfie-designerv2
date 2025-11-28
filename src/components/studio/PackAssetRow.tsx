@@ -1,4 +1,4 @@
-import { Copy, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Copy, Trash2, ChevronDown, ChevronUp, Upload, X as XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -6,6 +6,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useState } from "react";
 import type { PackAsset } from "@/types/alfiePack";
 import { WOOF_COSTS } from "@/config/woofs";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface PackAssetRowProps {
   asset: PackAsset;
@@ -41,9 +43,64 @@ const platformEmoji: Record<string, string> = {
 
 export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAssetRowProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [referenceImage, setReferenceImage] = useState(asset.referenceImageUrl || "");
 
   const woofCost = WOOF_COSTS[asset.woofCostType];
   const totalCost = asset.kind === "carousel" ? woofCost * asset.count : woofCost;
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validation du fichier
+    if (!file.type.startsWith("image/")) {
+      toast.error("Seules les images sont acceptées");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("L'image ne doit pas dépasser 5 MB");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+      const { data, error } = await supabase.storage
+        .from("chat-uploads")
+        .upload(`references/${fileName}`, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (error) throw error;
+
+      const { data: urlData } = supabase.storage
+        .from("chat-uploads")
+        .getPublicUrl(data.path);
+
+      setReferenceImage(urlData.publicUrl);
+      
+      // Mettre à jour l'asset avec la nouvelle image
+      const updatedAsset = { ...asset, referenceImageUrl: urlData.publicUrl };
+      onEdit(updatedAsset);
+      
+      toast.success("Image de référence ajoutée !");
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error("Erreur lors de l'upload de l'image");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setReferenceImage("");
+    const updatedAsset = { ...asset, referenceImageUrl: undefined };
+    onEdit(updatedAsset);
+    toast.success("Image de référence retirée");
+  };
 
   return (
     <Card className="p-4 hover:shadow-md transition-shadow">
@@ -114,11 +171,66 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
           </div>
         </div>
 
-        <CollapsibleContent className="pt-3 space-y-2">
+        <CollapsibleContent className="pt-3 space-y-3">
           <div className="text-sm text-muted-foreground border-l-2 border-border pl-3">
             <p className="font-medium mb-1">Prompt IA :</p>
             <p>{asset.prompt}</p>
           </div>
+
+          {/* Section image de référence */}
+          <div className="space-y-2 border-t pt-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Image de référence (optionnelle)</p>
+                <p className="text-xs text-muted-foreground">Alfie s'en sert comme inspiration visuelle pour la création.</p>
+              </div>
+            </div>
+
+            {referenceImage ? (
+              <div className="relative">
+                <img
+                  src={referenceImage}
+                  alt="Référence"
+                  className="w-full h-32 object-cover rounded-lg border"
+                />
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="absolute top-2 right-2"
+                  onClick={handleRemoveImage}
+                >
+                  <XIcon className="h-4 w-4 mr-1" />
+                  Retirer
+                </Button>
+              </div>
+            ) : (
+              <div className="relative">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  disabled={uploading}
+                  className="hidden"
+                  id={`upload-${asset.id}`}
+                />
+                <label htmlFor={`upload-${asset.id}`}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    disabled={uploading}
+                    asChild
+                  >
+                    <span>
+                      <Upload className="h-4 w-4 mr-2" />
+                      {uploading ? "Upload en cours..." : "Ajouter une image de référence"}
+                    </span>
+                  </Button>
+                </label>
+              </div>
+            )}
+          </div>
+
           <Button 
             variant="outline" 
             size="sm" 

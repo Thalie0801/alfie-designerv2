@@ -237,9 +237,11 @@ export function StudioGenerator() {
     toast.success("Asset supprimé");
   };
 
-  const editAsset = (_asset: PackAsset) => {
-    // TODO: Ouvrir un dialog pour éditer l'asset
-    toast.info("Édition d'asset (à implémenter)");
+  const editAsset = (updatedAsset: PackAsset) => {
+    setPack((prev) => ({
+      ...prev,
+      assets: prev.assets.map((a) => (a.id === updatedAsset.id ? updatedAsset : a)),
+    }));
   };
 
   const launchGeneration = async () => {
@@ -307,7 +309,7 @@ export function StudioGenerator() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 mr-0 lg:mr-[360px]">
         {/* Header */}
         <div className="mb-8 text-center">
           <div className="flex items-center justify-center gap-3 mb-3">
