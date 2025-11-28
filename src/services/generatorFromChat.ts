@@ -90,6 +90,18 @@ export async function sendPackToGenerator({
     const orderIds = results.map((r) => r.orderId);
     console.log(`[Pack] Génération lancée, orderIds:`, orderIds);
 
+    // 🚀 Déclencher le worker pour traiter les jobs immédiatement
+    try {
+      console.log("[Pack] Triggering alfie-job-worker...");
+      await supabase.functions.invoke("alfie-job-worker", {
+        body: { trigger: "pack_from_chat", orderIds }
+      });
+      console.log("[Pack] Worker triggered successfully");
+    } catch (workerErr) {
+      console.error("[Pack] Worker trigger failed (jobs will be processed by queue-monitor):", workerErr);
+      // On ne throw pas - le queue-monitor finira par déclencher le worker
+    }
+
     return { success: true, orderIds };
   } catch (error) {
     console.error("[Pack] Job creation failed, refunding Woofs:", error);
