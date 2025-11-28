@@ -53,9 +53,20 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Lien de réinitialisation non généré");
     }
 
-    const resetLink = data.properties.action_link;
+    // Extraire le token et type du lien Supabase généré
+    const actionLink = data.properties.action_link;
+    const actionUrl = new URL(actionLink);
+    const token = actionUrl.searchParams.get('token');
+    const type = actionUrl.searchParams.get('type');
 
-    console.log(`[request-password-reset] Sending email to ${email}`);
+    if (!token || !type) {
+      throw new Error("Token ou type manquant dans le lien généré");
+    }
+
+    // Construire le lien vers notre page intermédiaire (anti-préchargement)
+    const resetLink = `${appOrigin}/verify-reset?token=${encodeURIComponent(token)}&type=${encodeURIComponent(type)}`;
+
+    console.log(`[request-password-reset] Sending email to ${email} with safe link`);
 
     // Envoyer l'email avec template Alfie en français
     const emailResponse = await resend.emails.send({
