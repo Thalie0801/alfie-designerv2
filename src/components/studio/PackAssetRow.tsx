@@ -210,23 +210,18 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
                   accept="image/*"
                   onChange={handleImageUpload}
                   disabled={uploading}
-                  className="hidden"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                   id={`upload-${asset.id}`}
                 />
-                <label htmlFor={`upload-${asset.id}`}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    disabled={uploading}
-                    asChild
-                  >
-                    <span>
-                      <Upload className="h-4 w-4 mr-2" />
-                      {uploading ? "Upload en cours..." : "Ajouter une image de référence"}
-                    </span>
-                  </Button>
-                </label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full pointer-events-none"
+                  disabled={uploading}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {uploading ? "Upload en cours..." : "Ajouter une image de référence"}
+                </Button>
               </div>
             )}
           </div>
