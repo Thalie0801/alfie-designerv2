@@ -1,10 +1,6 @@
 import Stripe from "https://esm.sh/stripe@18.5.0";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { supabaseUserFromReq, getAuthUserId, assertIsAdmin, json } from "../_shared/utils/admin.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -13,41 +9,21 @@ Deno.serve(async (req) => {
 
   try {
     // Vérifier l'authentification admin
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }), 
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    const userId = await getAuthUserId(req);
+    if (!userId) {
+      console.error("[admin-stripe-coupons] No user ID found in request");
+      return json({ error: "Unauthorized" }, 401);
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }), 
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Vérifier que l'utilisateur est admin
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id);
-
-    const isAdmin = roles?.some((r) => r.role === "admin");
+    const supabase = supabaseUserFromReq(req);
+    const isAdmin = await assertIsAdmin(supabase, userId);
+    
     if (!isAdmin) {
-      return new Response(
-        JSON.stringify({ error: "Forbidden - Admin access required" }), 
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error("[admin-stripe-coupons] User is not admin:", userId);
+      return json({ error: "Forbidden - Admin access required" }, 403);
     }
+
+    console.log("[admin-stripe-coupons] Admin access granted for user:", userId);
 
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeSecretKey) {
@@ -72,14 +48,11 @@ Deno.serve(async (req) => {
         stripe.promotionCodes.list({ limit: 100 }),
       ]);
 
-      return new Response(
-        JSON.stringify({
-          ok: true,
-          coupons: coupons.data,
-          promo_codes: promoCodes.data,
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return json({
+        ok: true,
+        coupons: coupons.data,
+        promo_codes: promoCodes.data,
+      });
     }
 
     // ACTION: create - Créer un nouveau coupon + code promo
@@ -87,10 +60,7 @@ Deno.serve(async (req) => {
       const { code, percent_off, duration, duration_in_months, name, max_redemptions } = params;
 
       if (!code || !percent_off || !duration || !name) {
-        return new Response(
-          JSON.stringify({ error: "Missing required fields: code, percent_off, duration, name" }), 
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return json({ error: "Missing required fields: code, percent_off, duration, name" }, 400);
       }
 
       console.log(`[admin-stripe-coupons] Creating coupon: ${name} (${code})`);
@@ -125,15 +95,12 @@ Deno.serve(async (req) => {
 
       console.log(`[admin-stripe-coupons] Created coupon ${coupon.id} with promo code ${promoCode.code}`);
 
-      return new Response(
-        JSON.stringify({
-          ok: true,
-          coupon_id: coupon.id,
-          promo_code: promoCode.code,
-          message: `Coupon ${promoCode.code} créé avec succès!`,
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return json({
+        ok: true,
+        coupon_id: coupon.id,
+        promo_code: promoCode.code,
+        message: `Coupon ${promoCode.code} créé avec succès!`,
+      });
     }
 
     // ACTION: deactivate - Désactiver un code promo
@@ -141,10 +108,7 @@ Deno.serve(async (req) => {
       const { promo_code_id } = params;
 
       if (!promo_code_id) {
-        return new Response(
-          JSON.stringify({ error: "Missing promo_code_id" }), 
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return json({ error: "Missing promo_code_id" }, 400);
       }
 
       console.log(`[admin-stripe-coupons] Deactivating promo code: ${promo_code_id}`);
@@ -153,40 +117,28 @@ Deno.serve(async (req) => {
         active: false,
       });
 
-      return new Response(
-        JSON.stringify({
-          ok: true,
-          promo_code: promoCode.code,
-          message: `Code promo ${promoCode.code} désactivé`,
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return json({
+        ok: true,
+        promo_code: promoCode.code,
+        message: `Code promo ${promoCode.code} désactivé`,
+      });
     }
 
-    return new Response(
-      JSON.stringify({ error: "Invalid action. Use: list, create, or deactivate" }), 
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return json({ error: "Invalid action. Use: list, create, or deactivate" }, 400);
 
   } catch (error: any) {
     console.error("[admin-stripe-coupons] Error:", error);
     
     if (error.type === 'StripeInvalidRequestError' && error.message.includes('already exists')) {
-      return new Response(
-        JSON.stringify({ 
-          error: "Ce coupon ou code promo existe déjà dans Stripe",
-          details: error.message 
-        }), 
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return json({ 
+        error: "Ce coupon ou code promo existe déjà dans Stripe",
+        details: error.message 
+      }, 400);
     }
 
-    return new Response(
-      JSON.stringify({ 
-        error: "Erreur lors de l'opération",
-        details: error.message 
-      }), 
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return json({ 
+      error: "Erreur lors de l'opération",
+      details: error.message 
+    }, 500);
   }
 });
