@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { getAuthHeader } from '@/lib/auth';
 import { useAuth } from '@/hooks/useAuth';
 
 export type QueueMonitorPayload = {
@@ -25,8 +24,7 @@ export function useQueueMonitor(enabled: boolean) {
     setLoading(true);
     setError(null);
     try {
-      const headers = await getAuthHeader();
-      const { data, error } = await supabase.functions.invoke('queue-monitor', { headers });
+      const { data, error } = await supabase.functions.invoke('queue-monitor');
       if (error) throw error;
       setData(data as QueueMonitorPayload);
     } catch (e: any) {
