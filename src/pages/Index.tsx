@@ -28,10 +28,7 @@ export default function AlfieLanding() {
           <div className="absolute inset-0 bg-black/70" />
         </div>
         
-        {/* Loading skeleton pour la vidéo */}
-        {!videoLoaded && (
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 animate-pulse" />
-        )}
+        {/* Pas de loading skeleton - la photo est déjà visible */}
         
         {/* Vidéo qui s'affiche progressivement par-dessus avec opacité totale */}
         <video
