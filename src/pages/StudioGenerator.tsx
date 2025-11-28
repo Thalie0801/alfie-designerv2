@@ -17,6 +17,8 @@ import { OrderStatusList } from "@/components/studio/OrderStatusList";
 import { sendPackToGenerator, InsufficientWoofsError } from "@/services/generatorFromChat";
 import { supabase } from "@/integrations/supabase/client";
 import { calculatePackWoofCost } from "@/lib/woofs";
+import { useQueueMonitor } from "@/hooks/useQueueMonitor";
+import { QueueStatus } from "@/components/chat/QueueStatus";
 
 // Packs prédéfinis
 const PRESET_PACKS = {
@@ -137,6 +139,9 @@ export function StudioGenerator() {
   const { activeBrandId, activeBrand } = useBrandKit();
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // Monitoring de la queue avec auto-kick du worker
+  const { data: queueData } = useQueueMonitor(!!user?.id && !!activeBrandId);
 
   const [campaignName, setCampaignName] = useState("");
   const [brief, setBrief] = useState("");
@@ -573,7 +578,10 @@ Prépare-moi un pack complet avec plusieurs types de visuels (images, carrousels
             </Card>
 
             {user && activeBrandId && (
-              <OrderStatusList brandId={activeBrandId} userId={user.id} />
+              <>
+                <OrderStatusList brandId={activeBrandId} userId={user.id} />
+                {queueData && <QueueStatus data={queueData} />}
+              </>
             )}
           </div>
 
