@@ -178,14 +178,40 @@ async function callLLM(
   messages: { role: string; content: string }[],
   systemPrompt: string,
   brandContext?: { name?: string; niche?: string; voice?: string; palette?: string[] },
-  woofsRemaining?: number
+  woofsRemaining?: number,
+  useBrandKit: boolean = true
 ): Promise<string> {
-  // Enrichir le system prompt avec le Brand Kit COMPLET et Woofs si disponibles
+  // Enrichir le system prompt avec les RÈGLES DE PRIORITÉ BRIEF > BRAND KIT
   let enrichedPrompt = systemPrompt;
   
-  // Brand context COMPLET (niche, voice, palette, logo)
+  // RÈGLES DE PRIORITÉ BRIEF > BRAND KIT
+  enrichedPrompt += `\n\n--- RÈGLES D'UTILISATION DU BRIEF ET DU BRAND KIT ---
+  
+1. Le BRIEF DE CAMPAGNE est TOUJOURS prioritaire.
+   - S'il y a un conflit entre le brief et le brand kit, tu suis le BRIEF.
+   - Le contenu, l'angle, le message principal viennent du BRIEF.
+
+2. Si [BRAND_KIT_ENABLED] = true :
+   - Tu utilises le Brand Kit pour adapter le ton de voix, le style des visuels, les références à la marque.
+   - Mais tu restes aligné avec l'objectif précis du brief (offre, cible, plateforme…).
+   - Tu ne COPIES JAMAIS mot pour mot le texte du Brand Kit.
+
+3. Si [BRAND_KIT_ENABLED] = false :
+   - Tu ne réutilises PAS le storytelling, les slogans ou le style du Brand Kit.
+   - Tu peux éventuellement déduire le type de business pour rester cohérent.
+   - Tu écris des textes neutres/génériques, alignés sur le brief uniquement.
+
+4. CAS BRIEF VIDE OU TRÈS VAGUE :
+   - Si le brief est vide ou ne donne presque aucune info exploitable, tu crées un pack "Présentation de la marque".
+   - Ce pack doit contenir AU MINIMUM : 1 carrousel découverte (5 slides), 1 image citation/valeur, 1 image promesse/bénéfice, 1 idée vidéo "Qui sommes-nous ?".
+   - Tu t'inspires du Brand Kit mais tu reformules ENTIÈREMENT avec tes mots.`;
+
+  // INDICATEUR BRAND_KIT_ENABLED
+  enrichedPrompt += `\n\n[BRAND_KIT_ENABLED]\n${useBrandKit}`;
+  
+  // BRAND KIT CONTEXT (toujours envoyé pour info, mais avec instructions différentes selon le toggle)
   if (brandContext) {
-    enrichedPrompt += `\n\n--- CONTEXTE BRAND KIT DU CLIENT (POUR STYLE UNIQUEMENT) ---`;
+    enrichedPrompt += `\n\n[BRAND_KIT]`;
     if (brandContext.name) {
       enrichedPrompt += `\nNom de la marque : ${brandContext.name}`;
     }
@@ -198,13 +224,12 @@ async function callLLM(
     if (brandContext.palette && Array.isArray(brandContext.palette) && brandContext.palette.length > 0) {
       enrichedPrompt += `\nCouleurs de la marque : ${brandContext.palette.slice(0, 5).join(", ")}`;
     }
-    enrichedPrompt += `\n\n--- ATTENTION - UTILISATION DU BRAND KIT ---`;
-    enrichedPrompt += `\n- Le Brand Kit est UNIQUEMENT un CONTEXTE DE STYLE`;
-    enrichedPrompt += `\n- INSPIRE-TOI du ton, des couleurs et de l'ambiance`;
-    enrichedPrompt += `\n- NE COPIE JAMAIS le texte du Brand Kit mot pour mot`;
-    enrichedPrompt += `\n- Le CONTENU doit TOUJOURS etre base sur le BRIEF DE CAMPAGNE`;
-    enrichedPrompt += `\n- Utilise le secteur d'activite pour proposer des formats pertinents`;
-    enrichedPrompt += `\n\nIMPORTANT : Tu connais deja le ton, le positionnement, les couleurs et le secteur via le Brand Kit. Ne redemande JAMAIS ces informations (ton, voix, niche, industrie, couleurs). Utilise ces donnees pour adapter tes recommandations de pack sans poser de questions redondantes.`;
+    
+    if (!useBrandKit) {
+      enrichedPrompt += `\n\n⚠️ ATTENTION : L'utilisateur a DÉSACTIVÉ le Brand Kit. Tu dois créer des visuels NEUTRES sans reprendre le ton, le style ou les couleurs de la marque. Utilise uniquement le secteur d'activité pour rester pertinent.`;
+    } else {
+      enrichedPrompt += `\n\nIMPORTANT : Tu connais déjà le ton, le positionnement, les couleurs et le secteur via le Brand Kit. Ne redemande JAMAIS ces informations (ton, voix, niche, industrie, couleurs). Utilise ces données pour adapter tes recommandations de pack sans poser de questions redondantes.`;
+    }
   }
 
   // Si woofsRemaining fourni, inclure dans le contexte avec recommandations budget
@@ -326,7 +351,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { brandId, persona, messages, lang, woofsRemaining } = await req.json();
+    const { brandId, persona, messages, lang, woofsRemaining, useBrandKit = true } = await req.json();
 
     if (!brandId || !persona || !messages) {
       return new Response(
@@ -400,8 +425,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Appeler le LLM avec le contexte de marque et Woofs
-    const rawReply = await callLLM(messages, systemPrompt, brandContext, woofsRemaining);
+    // Appeler le LLM avec le contexte de marque, Woofs et toggle Brand Kit
+    const rawReply = await callLLM(messages, systemPrompt, brandContext, woofsRemaining, useBrandKit);
 
     // Parser le pack si présent
     const pack = parsePack(rawReply);

@@ -82,23 +82,40 @@ async function callGemini(systemPrompt: string, userPrompt: string) {
   return data.choices?.[0]?.message?.content || "";
 }
 
-function buildCarouselPrompt(asset: AssetBrief, brandKit: BrandKit, brief: string): string {
-  return `Génère les textes pour un carrousel de ${asset.count || 5} slides pour réseaux sociaux.
+function buildCarouselPrompt(asset: AssetBrief, brandKit: BrandKit, brief: string, useBrandKit: boolean): string {
+  let prompt = `Génère les textes pour un carrousel de ${asset.count || 5} slides pour réseaux sociaux.
 
-BRIEF DU CLIENT :
+[CAMPAGNE_BRIEF]
 ${brief}
 
-BRAND KIT :
+[BRAND_KIT_ENABLED]
+${useBrandKit}
+`;
+
+  if (useBrandKit) {
+    prompt += `
+[BRAND_KIT]
 - Marque : ${brandKit.name || "Non spécifié"}
 - Secteur : ${brandKit.niche || "Non spécifié"}
 - Ton : ${brandKit.voice || "Non spécifié"}
-- Style du visuel : ${asset.tone}
 
+INSTRUCTIONS : Utilise le Brand Kit pour adapter le ton et le style, mais le CONTENU doit venir du BRIEF. Le BRIEF est PRIORITAIRE.`;
+  } else {
+    prompt += `
+[BRAND_KIT]
+- Secteur : ${brandKit.niche || "Non spécifié"}
+
+INSTRUCTIONS : L'utilisateur a DÉSACTIVÉ le Brand Kit. Crée des textes NEUTRES et GÉNÉRIQUES basés uniquement sur le brief. N'utilise pas de ton de marque spécifique.`;
+  }
+
+  prompt += `
+  
 CONTEXTE ASSET :
 - Titre : ${asset.title}
 - Objectif : ${asset.goal}
 - Plateforme : ${asset.platform}
 - Format : ${asset.ratio}
+- Style du visuel : ${asset.tone}
 
 STRUCTURE ATTENDUE (progression narrative) :
 Slide 1 : Accroche / Hook percutant
@@ -107,11 +124,10 @@ Slides 3-4 : Solution / Bénéfices / Preuve
 Slide 5 : Call-to-Action
 
 RÈGLES CRITIQUES :
+- LE BRIEF EST PRIORITAIRE sur le Brand Kit
 - Français PARFAIT, sans aucune faute d'orthographe
-- Respecter le tutoiement/vouvoiement selon le ton de la marque
 - Textes courts, lisibles, adaptés au format visuel
 - Ne JAMAIS écrire de codes couleur ni de texte technique
-- Chaque slide doit avoir un titre + optionnellement 1-3 points courts
 
 Retourne un JSON strictement conforme à ce format :
 {
@@ -120,30 +136,49 @@ Retourne un JSON strictement conforme à ce format :
     ...
   ]
 }`;
+
+  return prompt;
 }
 
-function buildImagePrompt(asset: AssetBrief, brandKit: BrandKit, brief: string): string {
-  return `Génère le texte marketing pour une image réseaux sociaux.
+function buildImagePrompt(asset: AssetBrief, brandKit: BrandKit, brief: string, useBrandKit: boolean): string {
+  let prompt = `Génère le texte marketing pour une image réseaux sociaux.
 
-BRIEF DU CLIENT :
+[CAMPAGNE_BRIEF]
 ${brief}
 
-BRAND KIT :
+[BRAND_KIT_ENABLED]
+${useBrandKit}
+`;
+
+  if (useBrandKit) {
+    prompt += `
+[BRAND_KIT]
 - Marque : ${brandKit.name || "Non spécifié"}
 - Secteur : ${brandKit.niche || "Non spécifié"}
 - Ton : ${brandKit.voice || "Non spécifié"}
-- Style du visuel : ${asset.tone}
+
+INSTRUCTIONS : Utilise le Brand Kit pour adapter le ton et le style, mais le CONTENU doit venir du BRIEF. Le BRIEF est PRIORITAIRE.`;
+  } else {
+    prompt += `
+[BRAND_KIT]
+- Secteur : ${brandKit.niche || "Non spécifié"}
+
+INSTRUCTIONS : L'utilisateur a DÉSACTIVÉ le Brand Kit. Crée des textes NEUTRES et GÉNÉRIQUES basés uniquement sur le brief. N'utilise pas de ton de marque spécifique.`;
+  }
+
+  prompt += `
 
 CONTEXTE ASSET :
 - Titre : ${asset.title}
 - Objectif : ${asset.goal}
 - Plateforme : ${asset.platform}
 - Format : ${asset.ratio}
+- Style du visuel : ${asset.tone}
 - Description : ${asset.prompt}
 
 RÈGLES CRITIQUES :
+- LE BRIEF EST PRIORITAIRE sur le Brand Kit
 - Français PARFAIT, sans aucune faute d'orthographe
-- Respecter le tutoiement/vouvoiement selon le ton de la marque
 - Titre percutant (max 8 mots)
 - Texte principal concis et impactant (max 20 mots)
 - CTA clair et engageant (optionnel, max 5 mots)
@@ -155,28 +190,48 @@ Retourne un JSON strictement conforme à ce format :
   "body": "Texte principal court et percutant",
   "cta": "Call-to-action optionnel"
 }`;
+
+  return prompt;
 }
 
-function buildVideoPrompt(asset: AssetBrief, brandKit: BrandKit, brief: string): string {
-  return `Génère le script pour une vidéo réseaux sociaux de ${asset.durationSeconds || 10} secondes.
+function buildVideoPrompt(asset: AssetBrief, brandKit: BrandKit, brief: string, useBrandKit: boolean): string {
+  let prompt = `Génère le script pour une vidéo réseaux sociaux de ${asset.durationSeconds || 10} secondes.
 
-BRIEF DU CLIENT :
+[CAMPAGNE_BRIEF]
 ${brief}
 
-BRAND KIT :
+[BRAND_KIT_ENABLED]
+${useBrandKit}
+`;
+
+  if (useBrandKit) {
+    prompt += `
+[BRAND_KIT]
 - Marque : ${brandKit.name || "Non spécifié"}
 - Secteur : ${brandKit.niche || "Non spécifié"}
 - Ton : ${brandKit.voice || "Non spécifié"}
-- Style : ${asset.tone}
+
+INSTRUCTIONS : Utilise le Brand Kit pour adapter le ton et le style, mais le CONTENU doit venir du BRIEF. Le BRIEF est PRIORITAIRE.`;
+  } else {
+    prompt += `
+[BRAND_KIT]
+- Secteur : ${brandKit.niche || "Non spécifié"}
+
+INSTRUCTIONS : L'utilisateur a DÉSACTIVÉ le Brand Kit. Crée des textes NEUTRES et GÉNÉRIQUES basés uniquement sur le brief. N'utilise pas de ton de marque spécifique.`;
+  }
+
+  prompt += `
 
 CONTEXTE ASSET :
 - Titre : ${asset.title}
 - Objectif : ${asset.goal}
 - Plateforme : ${asset.platform}
 - Durée : ${asset.durationSeconds || 10}s
+- Style : ${asset.tone}
 - Description : ${asset.prompt}
 
 RÈGLES CRITIQUES :
+- LE BRIEF EST PRIORITAIRE sur le Brand Kit
 - Français PARFAIT, sans aucune faute d'orthographe
 - Hook fort dès les 2 premières secondes
 - Script adapté à la durée (environ ${Math.round((asset.durationSeconds || 10) / 3)} phrases)
@@ -188,6 +243,8 @@ Retourne un JSON strictement conforme à ce format :
   "script": "Script complet de la vidéo, phrase par phrase",
   "cta": "Call-to-action final"
 }`;
+
+  return prompt;
 }
 
 Deno.serve(async (req) => {
@@ -196,10 +253,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { brandId, brief, assets } = await req.json() as {
+    const { brandId, brief, assets, useBrandKit = true } = await req.json() as {
       brandId: string;
       brief: string;
       assets: AssetBrief[];
+      useBrandKit?: boolean;
     };
 
     if (!brandId || !assets || assets.length === 0) {
@@ -240,12 +298,12 @@ Deno.serve(async (req) => {
         let systemPrompt = "Tu es un expert en copywriting pour réseaux sociaux. Tu génères des textes marketing en français parfait, adaptés à chaque marque et objectif.";
 
         if (asset.kind === "carousel") {
-          prompt = buildCarouselPrompt(asset, brandKit, brief);
+          prompt = buildCarouselPrompt(asset, brandKit, brief, useBrandKit);
         } else if (asset.kind.includes("video")) {
-          prompt = buildVideoPrompt(asset, brandKit, brief);
+          prompt = buildVideoPrompt(asset, brandKit, brief, useBrandKit);
         } else {
           // image, animated_image
-          prompt = buildImagePrompt(asset, brandKit, brief);
+          prompt = buildImagePrompt(asset, brandKit, brief, useBrandKit);
         }
 
         const response = await callGemini(systemPrompt, prompt);

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -163,6 +164,7 @@ export function StudioGenerator() {
   const [woofsQuota, setWoofsQuota] = useState(0);
   const [isGeneratingFromBrief, setIsGeneratingFromBrief] = useState(false);
   const [briefGenerationError, setBriefGenerationError] = useState<string | null>(null);
+  const [useBrandKitForPack, setUseBrandKitForPack] = useState(true);
 
   // Charger les Woofs disponibles
   useEffect(() => {
@@ -275,9 +277,12 @@ export function StudioGenerator() {
 
       // Cas 1 : Brief rempli - générer pack personnalisé
       if (brief.trim()) {
-        const userMessage = `BRIEF DE CAMPAGNE :
+        const userMessage = `[CAMPAGNE_BRIEF]
 Nom : ${campaignName}
 Objectif : ${brief}
+
+[BRAND_KIT_ENABLED]
+${useBrandKitForPack}
 
 Ta mission : Propose-moi un PACK COMPLET de 4 à 6 visuels cohérents avec ce brief.
 
@@ -288,9 +293,7 @@ Chaque visuel doit avoir un RÔLE DISTINCT dans la campagne :
 - Call-to-action fort
 - Behind-the-scenes ou storytelling
 
-Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vidéo selon mon budget.
-
-Base-toi sur mon BRIEF pour le contenu, et utilise mon Brand Kit uniquement pour le style.`;
+Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vidéo selon mon budget.`;
 
         const { data, error } = await supabase.functions.invoke("alfie-chat-widget", {
           body: {
@@ -300,6 +303,7 @@ Base-toi sur mon BRIEF pour le contenu, et utilise mon Brand Kit uniquement pour
               { role: "user", content: userMessage }
             ],
             lang: "fr",
+            useBrandKit: useBrandKitForPack,
           },
         });
 
@@ -363,6 +367,7 @@ Base-toi sur mon BRIEF pour le contenu, et utilise mon Brand Kit uniquement pour
           brandId: activeBrandId,
           brief: brief || `Présentation de ${activeBrand?.name || "la marque"}`,
           assets: assetBriefs,
+          useBrandKit: useBrandKitForPack,
         },
       });
 
@@ -523,9 +528,29 @@ Base-toi sur mon BRIEF pour le contenu, et utilise mon Brand Kit uniquement pour
             </Card>
 
             {/* Card Brand Kit - SÉPARÉE */}
-            <Card data-tour-id="studio-brandkit" className="p-4">
-              <h3 className="font-semibold mb-2 text-sm">Brand Kit</h3>
-              {activeBrand && (
+            <Card data-tour-id="studio-brandkit" className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-sm">Brand Kit</h3>
+                <Switch
+                  checked={useBrandKitForPack}
+                  onCheckedChange={setUseBrandKitForPack}
+                />
+              </div>
+              
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">
+                  Utiliser le Brand Kit pour cette campagne
+                </span>
+              </div>
+              
+              {!useBrandKitForPack && (
+                <p className="text-xs text-muted-foreground italic">
+                  Alfie créera des visuels plus neutres, sans reprendre ta charte de marque.
+                </p>
+              )}
+              
+              {/* Affichage Brand Kit existant (si toggle activé) */}
+              {useBrandKitForPack && activeBrand && (
                 <div className="space-y-2 text-xs text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{activeBrand.name}</Badge>
