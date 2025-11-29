@@ -1342,11 +1342,21 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
       hasPublicId: !!imageData?.cloudinaryPublicId,
     });
     
-    console.log("[processAnimateImage] cloudinaryPublicId format:", {
+    console.log("[processAnimateImage] cloudinaryPublicId format validation:", {
       publicId: imageData?.cloudinaryPublicId,
       includesFolder: imageData?.cloudinaryPublicId?.startsWith('alfie/'),
       includesSlash: imageData?.cloudinaryPublicId?.includes('/'),
+      expectedFormat: `alfie/${brandId}/orders/${orderId}/animated_base_*`,
     });
+    
+    // ✅ STRICT VALIDATION: publicId MUST include folder path
+    if (!imageData?.cloudinaryPublicId?.includes('/')) {
+      console.error("[processAnimateImage] ❌ Invalid publicId format - missing folder path", {
+        received: imageData?.cloudinaryPublicId,
+        expected: `alfie/${brandId}/orders/${orderId}/animated_base_*`,
+      });
+      throw new Error(`Invalid publicId format: expected folder path, got "${imageData?.cloudinaryPublicId}"`);
+    }
 
     const imageUrl = imageData?.imageUrl || imageData?.url || imageData?.data?.url;
     if (!imageUrl) throw new Error("No image URL returned from generation");
