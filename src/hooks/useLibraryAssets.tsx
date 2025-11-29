@@ -162,8 +162,9 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
 
         if (videoError) {
           console.error('[LibraryAssets] Video query error:', videoError);
-          throw videoError;
         }
+
+        console.log('[LibraryAssets] Standard videos loaded:', videoData?.length || 0);
 
         // 2. Vidéos animées Ken Burns depuis media_generations
         const { data: animatedFromMedia, error: mediaAnimError } = await supabase
@@ -178,6 +179,8 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
         if (mediaAnimError) {
           console.error('[LibraryAssets] Animated from media query error:', mediaAnimError);
         }
+
+        console.log('[LibraryAssets] Ken Burns videos loaded:', animatedFromMedia?.length || 0);
 
         // 3. Vidéos animées depuis library_assets (backup)
         const { data: animatedData, error: animatedError } = await supabase
