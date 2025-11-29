@@ -292,6 +292,8 @@ Deno.serve(async (req) => {
     }
 
     // --- TOUJOURS uploader sur Cloudinary (requis pour Ken Burns) ---
+    let cloudinaryPublicId: string | null = null;
+    
     if (generatedImageUrl) {
       const isBase64 = generatedImageUrl.startsWith('data:');
       const isCloudinary = generatedImageUrl.includes('cloudinary.com');
@@ -299,6 +301,11 @@ Deno.serve(async (req) => {
       // Upload uniquement si ce n'est pas déjà une URL Cloudinary
       if (!isCloudinary) {
         console.log(`[alfie-generate-ai-image] Uploading ${isBase64 ? 'base64' : 'HTTP URL'} to Cloudinary...`);
+        
+        if (!brandId) {
+          console.warn('[alfie-generate-ai-image] ⚠️ Missing brandId, using "unknown" folder');
+        }
+        
         try {
           const cloudinaryResult = await uploadToCloudinary(generatedImageUrl, {
             folder: `brands/${brandId || 'unknown'}/images`,
@@ -306,6 +313,7 @@ Deno.serve(async (req) => {
             tags: [userId, 'generated', 'image'].filter(Boolean) as string[],
           });
           generatedImageUrl = cloudinaryResult.secureUrl;
+          cloudinaryPublicId = cloudinaryResult.publicId;
           console.log('[alfie-generate-ai-image] ✅ Uploaded to Cloudinary:', cloudinaryResult.publicId);
         } catch (cloudinaryError) {
           console.error('[alfie-generate-ai-image] Cloudinary upload failed:', cloudinaryError);
@@ -313,6 +321,11 @@ Deno.serve(async (req) => {
         }
       } else {
         console.log('[alfie-generate-ai-image] ✅ Already a Cloudinary URL, no upload needed');
+        // Extraire le publicId depuis l'URL Cloudinary existante
+        const match = generatedImageUrl.match(/\/upload\/(?:v\d+\/)?(.+?)(?:\.[^.]+)?$/);
+        if (match) {
+          cloudinaryPublicId = match[1].replace(/\.[^.]+$/, '');
+        }
       }
     }
 
@@ -376,6 +389,7 @@ Deno.serve(async (req) => {
 
     return jsonRes({
       imageUrl: generatedImageUrl,
+      cloudinaryPublicId: cloudinaryPublicId || null,
       message: data?.choices?.[0]?.message?.content || "Image générée avec succès",
       saved,
       errorDetail,
