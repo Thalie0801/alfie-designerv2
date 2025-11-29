@@ -39,11 +39,23 @@ function safeTimeAgo(dateISO?: string | null) {
 
 export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, daysUntilExpiry }: AssetCardProps) {
   const [imageError, setImageError] = useState(false);
+  const [videoError, setVideoError] = useState(false);
 
-  // Reset l'état d'erreur si l’URL change
+  // Reset des états d'erreur si les URLs changent
   useEffect(() => {
     setImageError(false);
+    setVideoError(false);
   }, [asset.output_url, asset.thumbnail_url, asset.type]);
+
+  const handleVideoError = () => {
+    console.info("[AssetCard] Video preview unavailable", asset.id);
+    setVideoError(true);
+  };
+
+  const handleImageError = () => {
+    console.info("[AssetCard] Image preview unavailable", asset.id);
+    setImageError(true);
+  };
 
   const expiryBadge = useMemo(() => {
     // ✅ Vidéos permanentes (Cloudinary) : pas de badge d'expiration
@@ -127,7 +139,7 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
         <div className="relative aspect-video bg-muted overflow-hidden rounded-t-lg">
           {asset.type === "video" ? (
             <>
-              {videoSrc && !imageError ? (
+              {videoSrc && !videoError ? (
                 <video
                   src={videoSrc}
                   className="w-full h-full object-cover"
@@ -137,10 +149,7 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
                   muted
                   loop
                   playsInline
-                  onError={() => {
-                    console.warn("[AssetCard] Video preview failed", asset.id, videoSrc);
-                    setImageError(true);
-                  }}
+                  onError={handleVideoError}
                   aria-label="Aperçu vidéo"
                 />
               ) : (
@@ -149,7 +158,7 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
                   <p className="text-xs text-muted-foreground text-center px-4">
                     {asset.status === "processing" 
                       ? "⏳ Génération en cours…" 
-                      : imageError 
+                      : videoError 
                       ? "Aperçu indisponible (URL vidéo invalide)"
                       : "Aperçu indisponible"}
                   </p>
@@ -171,7 +180,7 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
                   src={asset.output_url}
                   alt="Création"
                   className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                  onError={() => setImageError(true)}
+                  onError={handleImageError}
                   loading="lazy"
                 />
               ) : asset.thumbnail_url && !imageError ? (
@@ -179,7 +188,7 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
                   src={asset.thumbnail_url}
                   alt="Miniature"
                   className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                  onError={() => setImageError(true)}
+                  onError={handleImageError}
                   loading="lazy"
                 />
               ) : (
