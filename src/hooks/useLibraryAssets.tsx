@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { cleanCloudinaryUrl, getBestAvailableUrl } from '@/lib/cloudinary/cleanCloudinaryUrl';
 
 const MEDIA_URL_KEYS = [
   'videoUrl',
@@ -186,11 +187,17 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
 
         console.log(`[LibraryAssets] Loaded ${videoData?.length || 0} videos (all types)`);
         
-        const mappedAssets = combinedData.map(asset => ({
-          ...asset,
-          output_url: asset.output_url || asset.thumbnail_url || '',
-          thumbnail_url: asset.thumbnail_url || undefined,
-        })) as LibraryAsset[];
+        const mappedAssets = combinedData.map(asset => {
+          const cleanedOutput = cleanCloudinaryUrl(asset.output_url);
+          const cleanedThumbnail = cleanCloudinaryUrl(asset.thumbnail_url);
+          const bestUrl = getBestAvailableUrl(cleanedOutput, cleanedThumbnail);
+          
+          return {
+            ...asset,
+            output_url: bestUrl || '',
+            thumbnail_url: cleanedThumbnail || undefined,
+          };
+        }) as LibraryAsset[];
         
         setAssets(mappedAssets);
         setRetryCount(0);
@@ -210,11 +217,17 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
       console.log(`[LibraryAssets] Loaded ${data?.length || 0} ${type}`);
       
       // Map data with actual output_url from database
-      const mappedAssets = (data || []).map(asset => ({
-        ...asset,
-        output_url: asset.output_url || asset.thumbnail_url || '',
-        thumbnail_url: asset.thumbnail_url || undefined,
-      })) as LibraryAsset[];
+      const mappedAssets = (data || []).map(asset => {
+        const cleanedOutput = cleanCloudinaryUrl(asset.output_url);
+        const cleanedThumbnail = cleanCloudinaryUrl(asset.thumbnail_url);
+        const bestUrl = getBestAvailableUrl(cleanedOutput, cleanedThumbnail);
+        
+        return {
+          ...asset,
+          output_url: bestUrl || '',
+          thumbnail_url: cleanedThumbnail || undefined,
+        };
+      }) as LibraryAsset[];
       
       setAssets(mappedAssets);
       setRetryCount(0); // Reset retry count on success
