@@ -183,6 +183,58 @@ function resolveUseBrandKit(payload: any, jobMeta?: { use_brand_kit?: boolean })
   return true;
 }
 
+/**
+ * Extrait le CONTENU (thème/sujet) du payload
+ * Le thème utilisateur doit TOUJOURS être préservé
+ */
+function buildContentPrompt(payload: any): string {
+  const sources = [
+    payload.prompt,
+    payload.brief?.topic,
+    payload.brief?.content,
+    payload.brief?.full,
+    payload.topic,
+    payload.campaign,
+    payload.brief?.objective,
+  ];
+  
+  const content = sources.find(s => s && typeof s === 'string' && s.trim().length > 0);
+  
+  if (!content) {
+    console.warn("[buildContentPrompt] ⚠️ No user content found in payload");
+    return "Professional marketing visual";
+  }
+  
+  return content.trim();
+}
+
+/**
+ * Construit le suffixe de STYLE selon useBrandKit
+ * Le style est AJOUTÉ au contenu, jamais substitué
+ */
+function buildStyleSuffix(useBrandKit: boolean, brand?: { niche?: string; palette?: string[]; voice?: string }): string {
+  if (useBrandKit && brand) {
+    const parts = [];
+    if (brand.niche) parts.push(`Industry: ${brand.niche}`);
+    if (brand.palette?.length) parts.push(`Color palette: ${brand.palette.slice(0, 3).join(", ")}`);
+    if (brand.voice) parts.push(`Tone: ${brand.voice}`);
+    return parts.length > 0 
+      ? parts.join(". ") + ". High quality, professional."
+      : "Branded style. High quality, professional.";
+  }
+  
+  return "Professional, modern, clean design with neutral color palette. High quality.";
+}
+
+/**
+ * Combine contenu utilisateur + style pour le prompt final
+ */
+function buildFinalPrompt(payload: any, useBrandKit: boolean, brand?: any): string {
+  const content = buildContentPrompt(payload);
+  const style = buildStyleSuffix(useBrandKit, brand);
+  return `${content}. ${style}`;
+}
+
 // ---------- HTTP Entrypoint ----------
 Deno.serve(async (req) => {
   console.log("[alfie-job-worker] 🚀 Invoked at", new Date().toISOString());
@@ -600,7 +652,7 @@ async function processRenderImages(
 
   const userId = payload.userId as string;
   const orderId = payload.orderId as string;
-  const brandId = (payload.brandId as string | undefined) ?? null;
+  const brandId = (payload.brandId as string | undefined) || undefined;
   
   // ✅ Résoudre useBrandKit une seule fois pour toute la fonction
   const useBrandKit = resolveUseBrandKit(payload, jobMeta);
@@ -664,7 +716,10 @@ async function processRenderImages(
   } else if (resolvedKind && typeof payload.count === "number") {
     const ratioToUse = ratioFromPayload || "4:5";
     const { w, h } = AR_MAP[ratioToUse] || AR_MAP["4:5"];
-    const basePrompt = briefText || payload.topic || "Alfie creative image";
+    
+    // ✅ Utiliser buildFinalPrompt pour préserver le thème
+    const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : undefined;
+    const basePrompt = buildFinalPrompt(payload, useBrandKit, brandMini);
 
     imagesToRender = Array.from({ length: imagesCount }).map((_, index) => ({
       prompt: `${basePrompt}. ${resolvedKind === "carousel" ? `Carousel slide ${index + 1}.` : ""} Format ${ratioToUse}.`,
@@ -687,20 +742,12 @@ async function processRenderImages(
       const aspectRatio = (brief?.format?.split(" ")?.[0] as string) || "1:1";
       const { w, h } = AR_MAP[aspectRatio] || AR_MAP["1:1"];
       
-      const prompt = useBrandKit
-        ? `${brief?.content || "A detailed subject scene"}.
-Style: ${brief?.style || "realistic photo or clean illustration"}.
-Context: ${brief?.objective || "social media post"}.
-Brand: ${brand?.niche || ""}, tone: ${brand?.voice || "professional"}.
-Colors: ${brand?.palette?.slice(0, 3).join(", ") || "modern palette"}.
-Composition: clear main subject, depth, lighting, natural shadows. No text overlays.
-Format: ${aspectRatio} aspect ratio optimized.`
-        : `${brief?.content || "A detailed subject scene"}.
-Style: ${brief?.style || "realistic photo or clean illustration"}.
-Context: ${brief?.objective || "social media post"}.
-Professional, modern, clean design with neutral color palette.
-Composition: clear main subject, depth, lighting, natural shadows. No text overlays.
-Format: ${aspectRatio} aspect ratio optimized.`;
+      // ✅ Extraire le contenu du brief (thème utilisateur)
+      const userContent = brief?.content || brief?.topic || payload.prompt || "Marketing visual";
+      
+      const prompt = useBrandKit && brand
+        ? `${userContent}. Style: ${brief?.style || "realistic"}. Context: ${brief?.objective || "social media"}. Brand: ${brand?.niche || ""}, tone: ${brand?.voice || "professional"}. Colors: ${brand?.palette?.slice(0, 3).join(", ") || "modern"}.`
+        : `${userContent}. Style: ${brief?.style || "realistic"}. Context: ${brief?.objective || "social media"}. Professional, modern design with neutral colors.`;
 
       return {
         prompt,
@@ -950,12 +997,9 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
   if (engine === "veo_3_1") {
     console.log("[processGenerateVideo] Using VEO 3.1 engine for premium video");
     
-    // Charger brand pour style conditionnel
+    // ✅ Utiliser buildFinalPrompt pour préserver le thème
     const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : null;
-    
-    const videoPrompt = useBrandKit && brandMini
-      ? `${prompt}. Style: ${brandMini.niche || 'professional'}, palette: ${(brandMini.palette || []).join(", ")}`
-      : `${prompt}. Professional, modern, clean design with neutral colors.`;
+    const videoPrompt = buildFinalPrompt(payload, useBrandKit, brandMini);
 
     // Appeler Vertex AI VEO 3.1
     const veoResult = await callFn<any>("generate-video", {
@@ -1023,12 +1067,9 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
   };
   const resolution = AR_MAP[aspectRatio] || AR_MAP["4:5"];
 
-  // Charger brand pour style conditionnel
+  // ✅ Utiliser buildFinalPrompt pour préserver le thème
   const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : null;
-  
-  const imagePrompt = useBrandKit && brandMini
-    ? `${prompt}. Style: ${brandMini.niche || 'professional'}, palette: ${(brandMini.palette || []).join(", ")}`
-    : `${prompt}. Professional, modern, clean design with neutral colors.`;
+  const imagePrompt = buildFinalPrompt(payload, useBrandKit, brandMini);
 
   const imageResult = await callFn<any>("alfie-generate-ai-image", {
     prompt: imagePrompt,
@@ -1152,12 +1193,17 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   
   // ✅ Résoudre useBrandKit avec le helper
   const useBrandKit = resolveUseBrandKit(payload, jobMeta);
-  const globalStyle = useBrandKit 
-    ? `Professional social media carousel background for ${brandMini?.niche || 'business'}. Clean, modern, aesthetic design with subtle visual elements. Brand palette: ${(brandMini?.palette || []).join(", ")}`
-    : `Professional social media carousel background. Clean, modern, neutral design with subtle visual elements.`;
+  
+  // ✅ Le globalStyle contient SEULEMENT le style visuel, pas le contenu
+  const globalStyle = useBrandKit && brandMini
+    ? `Brand aesthetic. Industry: ${brandMini.niche || 'business'}. Colors: ${(brandMini.palette || []).join(", ")}. Modern, professional.`
+    : `Neutral professional aesthetic. Clean, modern design.`;
 
   // Ratio à partir du brief ou 4:5 par défaut
   const aspectRatio = payload.brief?.ratio || payload.ratio || "4:5";
+
+  // ✅ Extraire le contenu utilisateur (thème)
+  const contentPrompt = buildContentPrompt(payload);
 
   // Générer toutes les slides en parallèle
   const slidePromises = slides.map(async (slide: any, index: number) => {
@@ -1168,7 +1214,7 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
     try {
       const slideResult = await callFn("alfie-render-carousel-slide", {
         userId: jobMeta?.user_id || payload.userId,
-        prompt: payload.prompt || payload.brief?.topic || "Professional carousel slide background",
+        prompt: contentPrompt, // ✅ Le thème est TOUJOURS là
         globalStyle,
         slideContent: {
           title: slide.title || "",

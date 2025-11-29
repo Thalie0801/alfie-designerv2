@@ -86,14 +86,19 @@ function normalizeAspectRatio(ar: string | undefined): { ar: string; size: GenSi
 }
 
 function buildImagePrompt(globalStyle: string, prompt: string, useBrandKit: boolean = true) {
-  // Si useBrandKit = false, on ignore le globalStyle et on génère un visuel neutre
-  const stylePrefix = useBrandKit && globalStyle 
-    ? `${globalStyle}. ` 
-    : "Professional, modern, clean design. ";
+  // ✅ Le thème utilisateur est TOUJOURS prioritaire
+  const themeContent = prompt && prompt.trim().length > 0 
+    ? prompt 
+    : "Professional background visual";
   
-  return `${stylePrefix}${prompt}. 
+  // Le style est un AJOUT, pas un remplacement
+  const styleHint = useBrandKit && globalStyle 
+    ? globalStyle 
+    : "Professional, modern, clean design";
+  
+  return `${themeContent}. ${styleHint}. 
 Background only. No text, no typography, no letters, no logos, no watermark. 
-Clean, professional, high quality, detailed, natural light, soft shadows.`;
+High quality, detailed, natural light, soft shadows.`;
 }
 
 async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, ms = 30000) {
