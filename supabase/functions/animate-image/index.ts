@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
     };
 
     const dim = ASPECT_DIM[aspect] || ASPECT_DIM['4:5'];
-    const kenBurns = `e_zoompan:duration_${duration};zoom_20,g_center`;
+    const kenBurns = `e_zoompan:d_${duration}:z_20,g_center`;
 
     const overlays: string[] = [];
     if (title) {

@@ -49,7 +49,7 @@ export function imageToVideoUrl(params: {
   const kbY =
     pan === 'top' ? ',g_north,y_150' :
     pan === 'bottom' ? ',g_south,y_150' : ',g_center';
-  const kenBurns = `e_zoompan:duration_${durationSec};zoom_${zoomPercent}${kbY}`;
+  const kenBurns = `e_zoompan:d_${durationSec}:z_${zoomPercent}${kbY}`;
 
   const overlays: string[] = [];
   if (title) {
