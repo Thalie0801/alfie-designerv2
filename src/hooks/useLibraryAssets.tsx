@@ -166,6 +166,17 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
           url: v.output_url?.substring(0, 60) + '...',
           animType: (v.metadata as any)?.animationType
         })));
+        
+        // Diagnostic: vidéos avec URL invalide
+        console.log('[LibraryAssets] Videos with invalid URLs:', 
+          videoData?.filter(v => !v.output_url?.startsWith('https://res.cloudinary.com'))
+            .map(v => ({ 
+              id: v.id.substring(0, 8), 
+              url: v.output_url?.substring(0, 50),
+              hasUrl: !!v.output_url,
+              urlType: v.output_url?.startsWith('http') ? 'http' : 'other'
+            }))
+        );
 
         const combinedData = (videoData || []).sort((a, b) => {
           const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
