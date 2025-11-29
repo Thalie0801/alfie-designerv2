@@ -367,6 +367,27 @@ export default function ChatWidget() {
 
   // --------- LOGIQUE AI PRINCIPALE ---------
 
+  // Fonction pour parser plusieurs packs dans une réponse brute
+  function parseMultipleIntents(raw: string): AlfiePack[] {
+    const packs: AlfiePack[] = [];
+    
+    // Chercher tous les blocs <alfie-pack>
+    const matches = raw.matchAll(/<alfie-pack>\s*(\{[\s\S]*?\})\s*<\/alfie-pack>/gi);
+    
+    for (const match of matches) {
+      try {
+        const parsed = JSON.parse(match[1]);
+        if (parsed.assets?.length > 0) {
+          packs.push(parsed as AlfiePack);
+        }
+      } catch (e) {
+        console.warn("Failed to parse pack:", e);
+      }
+    }
+    
+    return packs;
+  }
+
   // Mapping des personas pour alfie-chat-widget
   const personaMap = {
     strategy: "coach",
@@ -437,10 +458,30 @@ export default function ChatWidget() {
         return buildLocalReply(intent, mergedBrief);
       }
 
-      // Si un pack est détecté, le stocker
+      // ✅ MULTI-INTENT PARSING : Supporter plusieurs packs dans la réponse
+      let finalPack: AlfiePack | null = null;
+      
       if (pack) {
-        console.log("Pack détecté:", pack);
-        setPendingPack(pack);
+        // Pack déjà parsé par l'edge function
+        finalPack = pack;
+      } else {
+        // Chercher des packs dans la réponse brute (fallback)
+        const parsedPacks = parseMultipleIntents(reply);
+        if (parsedPacks.length > 0) {
+          // Fusionner tous les packs en un seul
+          finalPack = {
+            title: parsedPacks.length === 1 
+              ? parsedPacks[0].title 
+              : `Pack combiné (${parsedPacks.reduce((sum, p) => sum + p.assets.length, 0)} assets)`,
+            summary: parsedPacks.map(p => p.summary).join(' + '),
+            assets: parsedPacks.flatMap(p => p.assets),
+          };
+        }
+      }
+
+      if (finalPack) {
+        console.log("Pack détecté:", finalPack);
+        setPendingPack(finalPack);
       }
 
       // Ideas tracking géré par le LLM maintenant
