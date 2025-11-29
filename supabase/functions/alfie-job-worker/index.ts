@@ -1298,12 +1298,57 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
   const brandId = payload.brandId;
   const useBrandKit = resolveUseBrandKit(payload, jobMeta);
   
-  const { imagePublicId, cloudName, title, subtitle, duration, aspect } = payload;
+  let imagePublicId = payload.imagePublicId;
+  let cloudName = payload.cloudName || Deno.env.get("CLOUDINARY_CLOUD_NAME");
+  const title = payload.title;
+  const subtitle = payload.subtitle;
+  const duration = payload.duration || payload.durationSeconds || 3;
+  const aspect = payload.aspectRatio || payload.aspect || "4:5";
 
-  if (!imagePublicId || !cloudName) {
-    throw new Error("Missing imagePublicId or cloudName for animation");
+  // Si l'image n'existe pas encore, la générer d'abord
+  if (!imagePublicId) {
+    console.log("🎨 [processAnimateImage] Generating base image first...");
+    
+    // Construire le prompt pour l'image de base
+    const contentPrompt = buildContentPrompt(payload);
+    const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : null;
+    const styleSuffix = buildStyleSuffix(useBrandKit, brandMini || undefined);
+    const finalPrompt = `${contentPrompt}. ${styleSuffix}`;
+    
+    console.log("[processAnimateImage] Image prompt:", finalPrompt);
+
+    // Générer l'image via alfie-generate-ai-image
+    const imageResult = await callFn<any>("alfie-generate-ai-image", {
+      prompt: finalPrompt,
+      brand_id: brandId,
+      userId,
+      orderId,
+      aspectRatio: aspect,
+      useBrandKit,
+    });
+
+    const imageData = unwrapResult<any>(imageResult);
+    const imageError = extractError(imageResult) ?? extractError(imageData);
+    if (imageError) throw new Error(imageError || "Base image generation failed");
+
+    const imageUrl = imageData?.imageUrl || imageData?.url || imageData?.data?.url;
+    if (!imageUrl) throw new Error("No image URL returned from generation");
+
+    console.log("[processAnimateImage] ✅ Base image generated:", imageUrl);
+
+    // Extraire le public_id Cloudinary de l'URL
+    // Format typique : https://res.cloudinary.com/{cloud_name}/image/upload/{transformations}/{public_id}.{format}
+    const cloudinaryMatch = imageUrl.match(/cloudinary\.com\/([^\/]+)\/image\/upload\/(?:v\d+\/)?(.+?)(?:\.[^.]+)?$/);
+    if (cloudinaryMatch) {
+      cloudName = cloudinaryMatch[1];
+      imagePublicId = cloudinaryMatch[2].replace(/\.[^.]+$/, ''); // Retirer l'extension
+      console.log("[processAnimateImage] Extracted:", { cloudName, imagePublicId });
+    } else {
+      throw new Error("Could not extract Cloudinary public_id from generated image URL");
+    }
   }
 
+  // Maintenant animer l'image avec l'effet Ken Burns
   const animateResult = await callFn<any>("animate-image", {
     userId,
     brandId,
@@ -1312,8 +1357,8 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
     cloudName,
     title,
     subtitle,
-    duration: duration || 3,
-    aspect: aspect || "4:5",
+    duration,
+    aspect,
   });
 
   const animatePayload = unwrapResult<any>(animateResult);
