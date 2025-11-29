@@ -197,9 +197,18 @@ async function createAssetJob(
       orderId: order.id,
       userId,
       brandId,
-      brief: order.brief_json,
+      brief: typeof order.brief_json === 'object' && order.brief_json !== null && !Array.isArray(order.brief_json)
+        ? {
+            ...(order.brief_json as Record<string, any>),
+            topic: asset.prompt || asset.title || packTitle, // ✅ Thème toujours présent
+            content: asset.prompt || asset.title, // ✅ Contenu explicite
+          }
+        : {
+            topic: asset.prompt || asset.title || packTitle,
+            content: asset.prompt || asset.title,
+          },
       assetId: asset.id,
-      prompt: asset.prompt,
+      prompt: asset.prompt || asset.title || packTitle, // ✅ Prompt jamais vide
       carousel_id, // Pour carrousels uniquement
       count: asset.kind === "carousel" ? asset.count : 1,
       referenceImageUrl: asset.referenceImageUrl, // Image de référence
