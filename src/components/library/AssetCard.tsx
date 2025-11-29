@@ -46,6 +46,9 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
   }, [asset.output_url, asset.thumbnail_url, asset.type]);
 
   const expiryBadge = useMemo(() => {
+    // ✅ Vidéos permanentes (Cloudinary) : pas de badge d'expiration
+    if (daysUntilExpiry > 365) return null;
+    
     if (daysUntilExpiry < 0) {
       return (
         <Badge variant="destructive" className="text-xs">
