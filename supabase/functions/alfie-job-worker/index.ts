@@ -834,12 +834,12 @@ ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
             brand_id: img.brandId ?? payload.brandId ?? null,
             order_id: orderId,
             order_item_id: payload.orderItemId ?? null,
-          type: assetType as any,
+            type: assetType as any,
             cloudinary_url: cloud.secureUrl,
             cloudinary_public_id: cloud.publicId,
             carousel_id: carousel_id || null, // Lier au carrousel si applicable
             slide_index: resolvedKind === "carousel" ? slideIndex : null,
-            format: aspectRatio,
+            format: aspectRatio, // ✅ Store correct aspect ratio format
             tags: ["ai-generated", "alfie", `order:${orderId}`],
             text_json: payload.generatedTexts?.slides?.[slideIndex!] || payload.generatedTexts?.text || null, // Sauvegarder les textes générés
             metadata: {
@@ -913,60 +913,104 @@ ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
 async function processGenerateVideo(payload: any) {
   console.log("🎥 [processGenerateVideo]", payload?.orderId);
 
-  const { userId, brandId, orderId, aspectRatio, duration, prompt, sourceUrl, sourceType, provider } = payload;
+  const { userId, brandId, orderId, aspectRatio, duration, prompt } = payload;
+  const cloudName = Deno.env.get("CLOUDINARY_CLOUD_NAME");
 
-  // ✅ Phase C: Use existing generate-video function instead of non-existent alfie-assemble-video
-  const renderResult = await callFn<any>("generate-video", {
-    userId, // ✅ Required for internal call validation
-    aspectRatio,
-    duration,
+  if (!cloudName) {
+    throw new Error("CLOUDINARY_CLOUD_NAME not configured");
+  }
+
+  const durationSec = duration || 5;
+
+  // ✅ Stratégie Cloudinary : Générer image + animer avec Ken Burns
+  console.log("[processGenerateVideo] Generating base image for video...");
+
+  // 1) Générer l'image de base
+  const AR_MAP: Record<string, string> = {
+    "1:1": "1024x1024",
+    "4:5": "1080x1350",
+    "9:16": "1080x1920",
+    "16:9": "1920x1080",
+  };
+  const resolution = AR_MAP[aspectRatio] || AR_MAP["4:5"];
+
+  const imageResult = await callFn<any>("alfie-generate-ai-image", {
     prompt,
-    sourceUrl,
-    sourceType,
+    resolution,
+    backgroundOnly: false,
+    userId,
     brandId,
     orderId,
-    provider, // ✅ Pass provider (vertex_veo for premium)
   });
 
-  const renderPayload = unwrapResult<any>(renderResult);
-  const renderError = extractError(renderResult) ?? extractError(renderPayload);
-  if (renderError) throw new Error(renderError || "Video render failed");
+  const imageUrl = extractImageUrl(imageResult);
+  if (!imageUrl) throw new Error("Failed to generate base image for video");
 
-  let videoUrl =
-    (typeof renderPayload === "string"
-      ? renderPayload
-      : getResultValue<string>(renderPayload, ["video_url", "videoUrl", "output_url", "outputUrl"])) ??
-    getResultValue<string>(renderResult, ["video_url", "videoUrl", "output_url", "outputUrl"]);
+  console.log("[processGenerateVideo] Base image generated:", imageUrl);
 
-  if (!videoUrl) throw new Error("Missing video_url from renderer response");
+  // 2) Uploader sur Cloudinary
+  const cloud = await uploadFromUrlToCloudinary(imageUrl, {
+    folder: `alfie/${brandId}/videos/${orderId}`,
+    publicId: `video_base_${Date.now()}`,
+    tags: ["video", "alfie", "kenburns", `brand:${brandId}`, `order:${orderId}`],
+  });
 
-  const thumbnailUrl =
-    getResultValue<string>(renderPayload, ["thumbnail_url", "thumbnailUrl", "preview_url", "previewUrl"]) ??
-    getResultValue<string>(renderResult, ["thumbnail_url", "thumbnailUrl", "preview_url", "previewUrl"]);
+  console.log("[processGenerateVideo] Uploaded to Cloudinary:", cloud.publicId);
 
-  // ✅ FIXED: Woofs already consumed by generate-video via woofs-check-consume
-  // Removing duplicate debit_woofs call to prevent double-counting
+  // 3) Créer vidéo via Cloudinary Ken Burns
+  const ASPECT_DIM: Record<string, string> = {
+    "1:1": "w_1080,h_1080",
+    "16:9": "w_1920,h_1080",
+    "9:16": "w_1080,h_1920",
+    "4:5": "w_1080,h_1350",
+  };
 
-  const { error: assetErr } = await supabaseAdmin.from("media_generations").insert({
+  const dim = ASPECT_DIM[aspectRatio] || ASPECT_DIM["4:5"];
+  const kenBurns = `e_zoompan:duration_${durationSec};zoom_20,g_center`;
+
+  const videoUrl = `https://res.cloudinary.com/${cloudName}/video/upload/${dim},c_fill,f_mp4,${kenBurns}/${cloud.publicId}.mp4`;
+  const thumbnailUrl = cloud.secureUrl;
+
+  console.log("[processGenerateVideo] ✅ Video created via Cloudinary:", videoUrl);
+
+  // 4) Sauvegarder
+  const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
     user_id: userId,
     brand_id: brandId,
     type: "video",
     status: "completed",
     output_url: videoUrl,
-    thumbnail_url: thumbnailUrl ?? null,
+    thumbnail_url: thumbnailUrl,
     metadata: {
-      aspectRatio,
-      duration: duration || 10,
       prompt,
-      sourceUrl,
-      sourceType,
-      generator: "generate-video",
-      provider,
+      aspectRatio,
+      duration: durationSec,
+      generator: "cloudinary_kenburns",
       orderId,
-      thumbnailUrl: thumbnailUrl ?? undefined,
+      cloudinary_public_id: cloud.publicId,
     },
   });
-  if (assetErr) throw new Error(assetErr.message);
+  if (mediaErr) throw new Error(mediaErr.message);
+
+  const { error: libErr } = await supabaseAdmin.from("library_assets").insert({
+    user_id: userId,
+    brand_id: brandId,
+    order_id: orderId,
+    type: "video",
+    format: aspectRatio,
+    cloudinary_url: videoUrl,
+    cloudinary_public_id: cloud.publicId,
+    tags: ["video", "alfie", "kenburns"],
+    metadata: {
+      prompt,
+      duration: durationSec,
+      thumbnailUrl,
+      generator: "cloudinary_kenburns",
+    },
+  });
+  if (libErr) throw new Error(libErr.message);
+
+  console.log("[processGenerateVideo] ✅ Video saved to library");
 
   return { videoUrl };
 }

@@ -6,6 +6,7 @@ import { sendPackToGenerator, InsufficientWoofsError } from "@/services/generato
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PackPreparationModalProps {
   pack: AlfiePack;
@@ -82,9 +83,49 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
     setIsGenerating(true);
 
     try {
+      // ✅ ÉTAPE 1 : Générer les textes pour les assets sélectionnés
+      const selectedAssets = pack.assets.filter((a) => selectedAssetIds.has(a.id));
+      
+      console.log("[PackPreparationModal] Generating texts for", selectedAssets.length, "assets");
+      
+      const { data: textsData, error: textsError } = await supabase.functions.invoke("alfie-generate-texts", {
+        body: {
+          brandId,
+          brief: pack.summary || pack.title,
+          assets: selectedAssets.map((asset) => ({
+            id: asset.id,
+            kind: asset.kind,
+            title: asset.title,
+            goal: asset.goal,
+            tone: asset.tone,
+            platform: asset.platform,
+            ratio: asset.ratio,
+            count: asset.count,
+            durationSeconds: asset.durationSeconds,
+            prompt: asset.prompt,
+          })),
+          useBrandKit: true,
+        },
+      });
+
+      if (textsError) {
+        console.warn("[PackPreparationModal] Text generation failed, continuing without texts:", textsError);
+      } else {
+        console.log("[PackPreparationModal] ✅ Texts generated:", textsData);
+      }
+
+      // ✅ ÉTAPE 2 : Merger les textes générés dans les assets
+      const assetsWithTexts = pack.assets.map((asset) => ({
+        ...asset,
+        generatedTexts: textsData?.texts?.[asset.id] || undefined,
+      }));
+
+      const packWithTexts = { ...pack, assets: assetsWithTexts };
+
+      // ✅ ÉTAPE 3 : Envoyer le pack AVEC les textes
       await sendPackToGenerator({
         brandId,
-        pack,
+        pack: packWithTexts,
         userId: profile.id,
         selectedAssetIds: Array.from(selectedAssetIds),
       });
