@@ -1115,7 +1115,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
   };
 
   const dim = ASPECT_DIM[aspectRatio] || ASPECT_DIM["4:5"];
-  const kenBurns = `e_zoompan:duration_${durationSec};zoom_20,g_center`;
+  const kenBurns = `e_zoompan:d_${durationSec}:z_20,g_center`;
 
   const videoUrl = `https://res.cloudinary.com/${cloudName}/video/upload/${dim},c_fill,f_mp4,${kenBurns}/${cloud.publicId}.mp4`;
   const thumbnailUrl = cloud.secureUrl;
