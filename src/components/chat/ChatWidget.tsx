@@ -10,7 +10,10 @@ import { whatCanDoBlocks } from "@/lib/chat/helpMap";
 import type { AlfiePack, AlfieWidgetResponse } from "@/types/alfiePack";
 import PackPreviewCard from "./PackPreviewCard";
 import PackPreparationModal from "./PackPreparationModal";
+import { IntentPanel } from "./IntentPanel";
 import { supabase } from "@/integrations/supabase/client";
+import { sendPackToGenerator, InsufficientWoofsError } from "@/services/generatorFromChat";
+import { toast } from "sonner";
 
 type CoachMode = "strategy" | "da" | "maker";
 type ChatMessage = { role: "user" | "assistant"; node: ReactNode };
@@ -26,6 +29,7 @@ export default function ChatWidget() {
   const [seed, setSeed] = useState(0);
   const [pendingPack, setPendingPack] = useState<AlfiePack | null>(null);
   const [showPackModal, setShowPackModal] = useState(false);
+  const [showIntentPanel, setShowIntentPanel] = useState(false);
 
   const brief = useBrief();
   const { profile } = useAuth();
@@ -482,6 +486,11 @@ export default function ChatWidget() {
       if (finalPack) {
         console.log("Pack détecté:", finalPack);
         setPendingPack(finalPack);
+        
+        // ✅ Mode contrôlé : ouvrir IntentPanel pour plusieurs assets
+        if (finalPack.assets.length > 1) {
+          setShowIntentPanel(true);
+        }
       }
 
       // Ideas tracking géré par le LLM maintenant
@@ -564,11 +573,38 @@ export default function ChatWidget() {
     if (reply) setMsgs((m) => [...m, reply]);
   }
 
+  // Fonction pour confirmer génération depuis IntentPanel
+  async function handleConfirmGeneration(selectedIds: string[]) {
+    if (!pendingPack || !profile?.active_brand_id || !profile?.id) return;
+    
+    try {
+      await sendPackToGenerator({
+        brandId: profile.active_brand_id,
+        pack: pendingPack,
+        userId: profile.id,
+        selectedAssetIds: selectedIds,
+        useBrandKit: true, // Par défaut, peut être contrôlé via un toggle dédié plus tard
+      });
+      
+      toast.success(`${selectedIds.length} asset(s) en cours de génération !`);
+      setShowIntentPanel(false);
+      setPendingPack(null);
+    } catch (error) {
+      if (error instanceof InsufficientWoofsError) {
+        toast.error(error.message);
+      } else {
+        toast.error("Erreur lors de la génération");
+        console.error("Generation error:", error);
+      }
+    }
+  }
+
   // Fonction pour réinitialiser la conversation
   function resetConversation() {
     setMsgs([]);
     setPendingPack(null);
     setInput("");
+    setShowIntentPanel(false);
   }
 
   // Fonction pour changer de mode et réinitialiser
@@ -599,7 +635,26 @@ export default function ChatWidget() {
         </button>
       )}
 
-      {/* Modal de préparation du pack */}
+      {/* IntentPanel pour mode contrôlé (plusieurs assets) */}
+      {showIntentPanel && pendingPack && (
+        <IntentPanel
+          intents={pendingPack.assets}
+          onConfirm={handleConfirmGeneration}
+          onEdit={(intent) => {
+            console.log("Edit intent:", intent);
+            // TODO: Ouvrir AssetEditDialog
+          }}
+          onRemove={(id) => {
+            setPendingPack(prev => prev ? {
+              ...prev,
+              assets: prev.assets.filter(a => a.id !== id)
+            } : null);
+          }}
+          onClose={() => setShowIntentPanel(false)}
+        />
+      )}
+
+      {/* Modal de préparation du pack (pour assets uniques) */}
       {showPackModal && pendingPack && profile?.active_brand_id && (
         <PackPreparationModal
           pack={pendingPack}

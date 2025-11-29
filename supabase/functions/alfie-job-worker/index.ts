@@ -265,7 +265,12 @@ Deno.serve(async (req) => {
             });
             break;
           case "generate_video":
-            result = await processGenerateVideo(job.payload);
+            result = await processGenerateVideo(job.payload, {
+              user_id: job.user_id,
+              order_id: job.order_id,
+              job_id: job.id,
+              use_brand_kit: job.payload?.useBrandKit ?? true, // ✅ Extraction de useBrandKit
+            });
             break;
           case "animate_image":
             result = await processAnimateImage(job.payload);
@@ -910,22 +915,90 @@ ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
   return { images: results };
 }
 
-async function processGenerateVideo(payload: any) {
+async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; order_id?: string; job_id?: string; use_brand_kit?: boolean }) {
   console.log("🎥 [processGenerateVideo]", payload?.orderId);
 
-  const { userId, brandId, orderId, aspectRatio, duration, prompt } = payload;
+  const { userId, brandId, orderId, aspectRatio, duration, prompt, engine } = payload;
   const cloudName = Deno.env.get("CLOUDINARY_CLOUD_NAME");
 
   if (!cloudName) {
     throw new Error("CLOUDINARY_CLOUD_NAME not configured");
   }
 
-  const durationSec = duration || 5;
+  const durationSec = duration || payload.durationSeconds || 5;
+  const useBrandKit = payload.useBrandKit ?? jobMeta?.use_brand_kit ?? true;
 
-  // ✅ Stratégie Cloudinary : Générer image + animer avec Ken Burns
-  console.log("[processGenerateVideo] Generating base image for video...");
+  console.log("[processGenerateVideo] Engine:", engine, "| useBrandKit:", useBrandKit);
 
-  // 1) Générer l'image de base
+  // ✅ Support VEO 3.1 pour vidéos premium
+  if (engine === "veo_3_1") {
+    console.log("[processGenerateVideo] Using VEO 3.1 engine for premium video");
+    
+    // Charger brand pour style conditionnel
+    const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : null;
+    
+    const videoPrompt = useBrandKit && brandMini
+      ? `${prompt}. Style: ${brandMini.niche || 'professional'}, palette: ${(brandMini.palette || []).join(", ")}`
+      : `${prompt}. Professional, modern, clean design with neutral colors.`;
+
+    // Appeler Vertex AI VEO 3.1
+    const veoResult = await callFn<any>("generate-video", {
+      prompt: videoPrompt,
+      aspectRatio: aspectRatio || "4:5",
+      duration: durationSec,
+      engine: "veo_3_1",
+      userId,
+      brandId,
+      orderId,
+    });
+
+    const videoUrl = veoResult?.video_url || veoResult?.url;
+    if (!videoUrl) throw new Error("VEO 3.1 failed to generate video");
+
+    console.log("[processGenerateVideo] ✅ VEO 3.1 video created:", videoUrl);
+
+    // Sauvegarder
+    const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
+      user_id: userId,
+      brand_id: brandId,
+      type: "video",
+      engine: "veo_3_1",
+      status: "completed",
+      output_url: videoUrl,
+      metadata: {
+        prompt: videoPrompt,
+        aspectRatio,
+        duration: durationSec,
+        generator: "veo_3_1",
+        orderId,
+      },
+    });
+    if (mediaErr) throw new Error(mediaErr.message);
+
+    const { error: libErr } = await supabaseAdmin.from("library_assets").insert({
+      user_id: userId,
+      brand_id: brandId,
+      order_id: orderId,
+      type: "video",
+      format: aspectRatio,
+      cloudinary_url: videoUrl,
+      tags: ["video", "alfie", "veo3"],
+      metadata: {
+        prompt: videoPrompt,
+        duration: durationSec,
+        generator: "veo_3_1",
+      },
+    });
+    if (libErr) throw new Error(libErr.message);
+
+    console.log("[processGenerateVideo] ✅ VEO 3.1 video saved to library");
+    return { videoUrl };
+  }
+
+  // ✅ Stratégie Cloudinary Ken Burns : Générer image + animer
+  console.log("[processGenerateVideo] Generating base image for video (Ken Burns)...");
+
+  // 1) Générer l'image de base avec useBrandKit
   const AR_MAP: Record<string, string> = {
     "1:1": "1024x1024",
     "4:5": "1080x1350",
@@ -934,13 +1007,21 @@ async function processGenerateVideo(payload: any) {
   };
   const resolution = AR_MAP[aspectRatio] || AR_MAP["4:5"];
 
+  // Charger brand pour style conditionnel
+  const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : null;
+  
+  const imagePrompt = useBrandKit && brandMini
+    ? `${prompt}. Style: ${brandMini.niche || 'professional'}, palette: ${(brandMini.palette || []).join(", ")}`
+    : `${prompt}. Professional, modern, clean design with neutral colors.`;
+
   const imageResult = await callFn<any>("alfie-generate-ai-image", {
-    prompt,
+    prompt: imagePrompt,
     resolution,
     backgroundOnly: false,
     userId,
     brandId,
     orderId,
+    useBrandKit, // ✅ Propagation
   });
 
   const imageUrl = extractImageUrl(imageResult);

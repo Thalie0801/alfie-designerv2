@@ -82,7 +82,7 @@ export function useAlfieMemory() {
       goal: intent.goal || (memory?.preferred_goals?.[0] as any) || 'engagement',
       tone: intent.tone || memory?.default_tone || 'professionnel',
       prompt: intent.prompt || '',
-      useBrandKit: intent.useBrandKit ?? true,
+      useBrandKit: intent.useBrandKit, // ✅ Ne plus forcer true - laisser le toggle UI décider
       campaign: intent.campaign,
       copyBrief: intent.copyBrief,
       durationSeconds: intent.durationSeconds,
