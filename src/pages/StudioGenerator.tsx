@@ -238,6 +238,7 @@ export function StudioGenerator() {
       tone: template?.tone || "friendly",
       prompt: template?.prompt || "",
       woofCostType: template?.woofCostType || "image",
+      useBrandKit: useBrandKitForPack, // ✅ Propager le toggle Brand Kit
       ...template,
     };
 

@@ -167,6 +167,22 @@ function deepGet(obj: any, key: string): any {
   return null;
 }
 
+/**
+ * ✅ Helper robuste pour résoudre useBrandKit sans faux-positifs
+ */
+function resolveUseBrandKit(payload: any, jobMeta?: { use_brand_kit?: boolean }): boolean {
+  // Priorité 1 : payload.useBrandKit explicite (boolean)
+  if (typeof payload?.useBrandKit === "boolean") {
+    return payload.useBrandKit;
+  }
+  // Priorité 2 : jobMeta.use_brand_kit
+  if (typeof jobMeta?.use_brand_kit === "boolean") {
+    return jobMeta.use_brand_kit;
+  }
+  // Default : true (seulement si RIEN n'est spécifié)
+  return true;
+}
+
 // ---------- HTTP Entrypoint ----------
 Deno.serve(async (req) => {
   console.log("[alfie-job-worker] 🚀 Invoked at", new Date().toISOString());
@@ -585,6 +601,9 @@ async function processRenderImages(
   const userId = payload.userId as string;
   const orderId = payload.orderId as string;
   const brandId = (payload.brandId as string | undefined) ?? null;
+  
+  // ✅ Résoudre useBrandKit une seule fois pour toute la fonction
+  const useBrandKit = resolveUseBrandKit(payload, jobMeta);
 
   const payloadEmail =
     typeof payload?.userEmail === "string" ? payload.userEmail.toLowerCase() : null;
@@ -667,9 +686,6 @@ async function processRenderImages(
     imagesToRender = (briefs || [payload.brief]).map((brief: any, i: number) => {
       const aspectRatio = (brief?.format?.split(" ")?.[0] as string) || "1:1";
       const { w, h } = AR_MAP[aspectRatio] || AR_MAP["1:1"];
-
-      // ✅ Conditionner l'injection du Brand Kit selon useBrandKit
-      const useBrandKit = payload.useBrandKit ?? jobMeta?.use_brand_kit ?? true;
       
       const prompt = useBrandKit
         ? `${brief?.content || "A detailed subject scene"}.
@@ -751,7 +767,7 @@ ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
         uploadedSourceUrl: payload.sourceUrl ?? null,
         carousel_id, // Passer le carousel_id
         slideIndex, // Passer l'index de slide
-        useBrandKit: jobMeta?.use_brand_kit ?? true, // ✅ Propagation de useBrandKit
+        useBrandKit, // ✅ Utiliser la variable déjà résolue ligne 672
       });
 
       const imagePayload = unwrapResult<any>(imageResult);
@@ -926,7 +942,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
   }
 
   const durationSec = duration || payload.durationSeconds || 5;
-  const useBrandKit = payload.useBrandKit ?? jobMeta?.use_brand_kit ?? true;
+  const useBrandKit = resolveUseBrandKit(payload, jobMeta);
 
   console.log("[processGenerateVideo] Engine:", engine, "| useBrandKit:", useBrandKit);
 
@@ -1134,8 +1150,8 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   // Charger le brand minimal
   const brandMini = await loadBrandMini(payload.brandId, false);
   
-  // ✅ Construire le globalStyle selon le toggle useBrandKit
-  const useBrandKit = payload.useBrandKit ?? jobMeta?.use_brand_kit ?? true;
+  // ✅ Résoudre useBrandKit avec le helper
+  const useBrandKit = resolveUseBrandKit(payload, jobMeta);
   const globalStyle = useBrandKit 
     ? `Professional social media carousel background for ${brandMini?.niche || 'business'}. Clean, modern, aesthetic design with subtle visual elements. Brand palette: ${(brandMini?.palette || []).join(", ")}`
     : `Professional social media carousel background. Clean, modern, neutral design with subtle visual elements.`;

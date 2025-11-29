@@ -158,6 +158,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         // Générer des textes par défaut localement
         assetsWithTexts = pack.assets.map((asset) => ({
           ...asset,
+          useBrandKit, // ✅ Propager useBrandKit du toggle
           generatedTexts: generateFallbackTexts(asset, pack.title),
         }));
         
@@ -166,6 +167,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         console.log("[PackPreparationModal] ✅ Texts generated:", textsData);
         assetsWithTexts = pack.assets.map((asset) => ({
           ...asset,
+          useBrandKit, // ✅ Propager useBrandKit du toggle
           generatedTexts: textsData.texts?.[asset.id] || generateFallbackTexts(asset, pack.title),
         }));
       }

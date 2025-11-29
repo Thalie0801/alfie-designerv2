@@ -44,6 +44,7 @@ interface GenerateRequest {
   backgroundOnly?: boolean;
   seed?: string;
   negativePrompt?: string;
+  useBrandKit?: boolean; // ✅ AJOUT : Contrôle si le Brand Kit doit être appliqué
 }
 
 /* --------------------------- Small helpers -------------------------- */
@@ -80,15 +81,17 @@ function buildMainPrompt(input: GenerateRequest): string {
     resolution,
     seed,
     negativePrompt,
+    useBrandKit,
   } = input;
 
   const res = clampRes(resolution);
+  const shouldApplyBrand = useBrandKit !== false; // Default true, explicit false = disable
 
   let fullPrompt = prompt || "Create a high-quality marketing visual based on the description";
 
   // Mode background pur
   if (backgroundOnly) {
-    fullPrompt = buildBackgroundOnlyPrompt(brandKit);
+    fullPrompt = buildBackgroundOnlyPrompt(shouldApplyBrand ? brandKit : undefined);
   } else {
     // Mode normal : forcing overlayText exact si présent
     if (overlayText) {
@@ -110,10 +113,13 @@ function buildMainPrompt(input: GenerateRequest): string {
     }
   }
 
-  // Brand info si pas backgroundOnly
-  if (!backgroundOnly) {
+  // ✅ Brand info conditionné par useBrandKit
+  if (!backgroundOnly && shouldApplyBrand) {
     if (brandKit?.palette?.length) fullPrompt += `\n\nBrand Colors: ${brandKit.palette.join(", ")}`;
     if (brandKit?.voice) fullPrompt += `\nBrand Voice: ${brandKit.voice}`;
+  } else if (!backgroundOnly) {
+    // Style neutre si Brand Kit désactivé
+    fullPrompt += `\n\nStyle: Professional, modern, clean design with neutral color palette.`;
   }
 
   // Infos tech libres
