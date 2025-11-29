@@ -19,31 +19,51 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return jsonResponse({ error: "Missing Authorization header" }, { status: 401 });
-    }
-
+    // 1️⃣ Vérifier si c'est un appel interne via x-internal-secret
+    const internalSecret = req.headers.get("x-internal-secret") || req.headers.get("X-Internal-Secret");
     const { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY } = await import("../_shared/env.ts");
-    
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      return jsonResponse({ error: "Server configuration error" }, { status: 500 });
-    }
+    const INTERNAL_FN_SECRET = Deno.env.get("INTERNAL_FN_SECRET");
+    const isInternalCall = internalSecret && INTERNAL_FN_SECRET && internalSecret === INTERNAL_FN_SECRET;
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } }
-    });
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      console.error("[animate-image] Authentication failed:", authError);
-      return jsonResponse({ error: "Authentication required" }, { status: 401 });
-    }
-
-    console.log(`[animate-image] ✅ Authenticated user: ${user.id}`);
-
+    // 2️⃣ Lire le body UNE SEULE FOIS
     const body = await req.json();
+
+    let userId: string;
+    let skipWoofs = false;
+
+    if (isInternalCall) {
+      // Appel interne - récupérer userId depuis le body
+      userId = body.userId;
+      skipWoofs = body.skipWoofs === true;
+      if (!userId) {
+        return jsonResponse({ error: "userId required for internal call" }, { status: 400 });
+      }
+      console.log(`[animate-image] ✅ Internal call for user: ${userId}`);
+    } else {
+      // Auth JWT standard
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) {
+        return jsonResponse({ error: "Missing Authorization header" }, { status: 401 });
+      }
+
+      if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        return jsonResponse({ error: "Server configuration error" }, { status: 500 });
+      }
+
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        global: { headers: { Authorization: authHeader } }
+      });
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        console.error("[animate-image] Authentication failed:", authError);
+        return jsonResponse({ error: "Authentication required" }, { status: 401 });
+      }
+
+      userId = user.id;
+      console.log(`[animate-image] ✅ Authenticated user: ${userId}`);
+    }
     const imagePublicId = typeof body?.imagePublicId === "string" ? body.imagePublicId : undefined;
     const cloudName = typeof body?.cloudName === "string" ? body.cloudName : Deno.env.get("CLOUDINARY_CLOUD_NAME");
     const brandId = typeof body?.brandId === "string" ? body.brandId : undefined;
@@ -61,42 +81,49 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Missing brandId" }, { status: 400 });
     }
 
-    // Vérifier et consommer les Woofs
-    console.log(`[animate-image] Checking ${WOOF_COSTS.animated_image} Woofs for brand ${brandId}`);
-    
+    // 3️⃣ Conditionner la consommation de Woofs
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY!);
-    const { data: woofsData, error: woofsError } = await adminClient.functions.invoke(
-      "woofs-check-consume",
-      {
-        body: {
-          brand_id: brandId,
-          cost_woofs: WOOF_COSTS.animated_image,
-          reason: "animated_image",
-          metadata: { 
-            imagePublicId,
-            duration,
-            aspect
+    let remainingWoofs = 0;
+
+    if (!skipWoofs) {
+      console.log(`[animate-image] Checking ${WOOF_COSTS.animated_image} Woofs for brand ${brandId}`);
+      
+      const { data: woofsData, error: woofsError } = await adminClient.functions.invoke(
+        "woofs-check-consume",
+        {
+          body: {
+            brand_id: brandId,
+            cost_woofs: WOOF_COSTS.animated_image,
+            reason: "animated_image",
+            metadata: { 
+              imagePublicId,
+              duration,
+              aspect
+            },
           },
-        },
-      }
-    );
+        }
+      );
 
-    if (woofsError || !woofsData?.ok) {
-      const errorCode = woofsData?.error?.code || "QUOTA_ERROR";
-      if (errorCode === "INSUFFICIENT_WOOFS") {
-        console.error("[animate-image] Insufficient Woofs:", woofsData?.error);
-        return jsonResponse({ 
-          error: "INSUFFICIENT_WOOFS",
-          message: woofsData?.error?.message || "Tu n'as plus assez de Woofs pour cette animation.",
-          remaining: woofsData?.error?.remaining || 0,
-          required: WOOF_COSTS.animated_image
-        }, { status: 402 });
+      if (woofsError || !woofsData?.ok) {
+        const errorCode = woofsData?.error?.code || "QUOTA_ERROR";
+        if (errorCode === "INSUFFICIENT_WOOFS") {
+          console.error("[animate-image] Insufficient Woofs:", woofsData?.error);
+          return jsonResponse({ 
+            error: "INSUFFICIENT_WOOFS",
+            message: woofsData?.error?.message || "Tu n'as plus assez de Woofs pour cette animation.",
+            remaining: woofsData?.error?.remaining || 0,
+            required: WOOF_COSTS.animated_image
+          }, { status: 402 });
+        }
+        console.error("[animate-image] Woofs consumption failed:", woofsError);
+        return jsonResponse({ error: 'Failed to consume Woofs' }, { status: 500 });
       }
-      console.error("[animate-image] Woofs consumption failed:", woofsError);
-      return jsonResponse({ error: 'Failed to consume Woofs' }, { status: 500 });
+
+      remainingWoofs = woofsData.data.remaining_woofs;
+      console.log(`[animate-image] ✅ Consumed ${WOOF_COSTS.animated_image} Woofs, remaining: ${remainingWoofs}`);
+    } else {
+      console.log(`[animate-image] ⏭️ Skipping Woofs consumption (already consumed by pack)`);
     }
-
-    console.log(`[animate-image] ✅ Consumed ${WOOF_COSTS.animated_image} Woofs, remaining: ${woofsData.data.remaining_woofs}`);
 
     // Générer l'URL Cloudinary avec effet Ken Burns
     const ASPECT_DIM: Record<string, string> = {
@@ -130,11 +157,16 @@ Deno.serve(async (req) => {
 
     console.log("[animate-image] Generated video URL:", videoUrl);
 
+    // 4️⃣ Utiliser adminClient pour les sauvegardes DB quand appel interne
+    const dbClient = isInternalCall ? adminClient : createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+      global: { headers: { Authorization: req.headers.get("Authorization") || "" } }
+    });
+
     // Sauvegarder dans media_generations
-    const { error: mediaError } = await supabase
+    const { error: mediaError } = await dbClient
       .from('media_generations')
       .insert({
-        user_id: user.id,
+        user_id: userId,
         brand_id: brandId,
         type: 'video',
         engine: 'cloudinary_kenburns',
@@ -159,10 +191,10 @@ Deno.serve(async (req) => {
 
     // Sauvegarder dans library_assets
     if (orderId) {
-      const { error: libError } = await supabase
+      const { error: libError } = await dbClient
         .from('library_assets')
         .insert({
-          user_id: user.id,
+          user_id: userId,
           brand_id: brandId,
           order_id: orderId,
           type: 'video',
@@ -189,8 +221,8 @@ Deno.serve(async (req) => {
       videoUrl,
       thumbnailUrl: `https://res.cloudinary.com/${cloudName}/image/upload/${imagePublicId}.jpg`,
       duration,
-      woofsCost: WOOF_COSTS.animated_image,
-      remainingWoofs: woofsData.data.remaining_woofs
+      woofsCost: skipWoofs ? 0 : WOOF_COSTS.animated_image,
+      remainingWoofs
     });
 
   } catch (error: any) {
