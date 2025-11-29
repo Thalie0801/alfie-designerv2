@@ -1317,6 +1317,11 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
     
     console.log("[processAnimateImage] Image prompt:", finalPrompt);
 
+    // Validation brandId
+    if (!brandId) {
+      throw new Error("brandId is required for animated image generation");
+    }
+
     // Générer l'image via alfie-generate-ai-image
     const imageResult = await callFn<any>("alfie-generate-ai-image", {
       prompt: finalPrompt,
@@ -1336,15 +1341,21 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
 
     console.log("[processAnimateImage] ✅ Base image generated:", imageUrl);
 
-    // Extraire le public_id Cloudinary de l'URL
-    // Format typique : https://res.cloudinary.com/{cloud_name}/image/upload/{transformations}/{public_id}.{format}
-    const cloudinaryMatch = imageUrl.match(/cloudinary\.com\/([^\/]+)\/image\/upload\/(?:v\d+\/)?(.+?)(?:\.[^.]+)?$/);
-    if (cloudinaryMatch) {
-      cloudName = cloudinaryMatch[1];
-      imagePublicId = cloudinaryMatch[2].replace(/\.[^.]+$/, ''); // Retirer l'extension
-      console.log("[processAnimateImage] Extracted:", { cloudName, imagePublicId });
+    // ✅ NOUVEAU : Utiliser le publicId retourné directement par alfie-generate-ai-image
+    imagePublicId = imageData?.cloudinaryPublicId;
+    
+    if (!imagePublicId) {
+      // Fallback : extraire depuis l'URL (mais logguer un warning)
+      const cloudinaryMatch = imageUrl.match(/cloudinary\.com\/([^\/]+)\/image\/upload\/(?:v\d+\/)?(.+?)(?:\.[^.]+)?$/);
+      if (cloudinaryMatch) {
+        cloudName = cloudinaryMatch[1];
+        imagePublicId = cloudinaryMatch[2].replace(/\.[^.]+$/, '');
+        console.warn("[processAnimateImage] ⚠️ Using extracted publicId (fallback):", imagePublicId);
+      } else {
+        throw new Error("Could not get Cloudinary public_id - generation failed");
+      }
     } else {
-      throw new Error("Could not extract Cloudinary public_id from generated image URL");
+      console.log("[processAnimateImage] ✅ Using returned publicId:", imagePublicId);
     }
   }
 
