@@ -209,26 +209,38 @@ async function callLLM(
   // INDICATEUR BRAND_KIT_ENABLED
   enrichedPrompt += `\n\n[BRAND_KIT_ENABLED]\n${useBrandKit}`;
   
-  // BRAND KIT CONTEXT (toujours envoyé pour info, mais avec instructions différentes selon le toggle)
+  // BRAND KIT CONTEXT (filtré selon useBrandKit)
   if (brandContext) {
     enrichedPrompt += `\n\n[BRAND_KIT]`;
-    if (brandContext.name) {
-      enrichedPrompt += `\nNom de la marque : ${brandContext.name}`;
-    }
-    if (brandContext.niche) {
-      enrichedPrompt += `\nSecteur d'activité : ${brandContext.niche}`;
-    }
-    if (brandContext.voice) {
-      enrichedPrompt += `\nTon de la marque : ${brandContext.voice}`;
-    }
-    if (brandContext.palette && Array.isArray(brandContext.palette) && brandContext.palette.length > 0) {
-      enrichedPrompt += `\nCouleurs de la marque : ${brandContext.palette.slice(0, 5).join(", ")}`;
-    }
     
-    if (!useBrandKit) {
-      enrichedPrompt += `\n\n⚠️ ATTENTION : L'utilisateur a DÉSACTIVÉ le Brand Kit. Tu dois créer des visuels NEUTRES sans reprendre le ton, le style ou les couleurs de la marque. Utilise uniquement le secteur d'activité pour rester pertinent.`;
-    } else {
+    if (useBrandKit) {
+      // Mode complet : tout le Brand Kit
+      if (brandContext.name) {
+        enrichedPrompt += `\nNom de la marque : ${brandContext.name}`;
+      }
+      if (brandContext.niche) {
+        enrichedPrompt += `\nSecteur d'activité : ${brandContext.niche}`;
+      }
+      if (brandContext.voice) {
+        enrichedPrompt += `\nTon de la marque : ${brandContext.voice}`;
+      }
+      if (brandContext.palette && Array.isArray(brandContext.palette) && brandContext.palette.length > 0) {
+        enrichedPrompt += `\nCouleurs de la marque : ${brandContext.palette.slice(0, 5).join(", ")}`;
+      }
       enrichedPrompt += `\n\nIMPORTANT : Tu connais déjà le ton, le positionnement, les couleurs et le secteur via le Brand Kit. Ne redemande JAMAIS ces informations (ton, voix, niche, industrie, couleurs). Utilise ces données pour adapter tes recommandations de pack sans poser de questions redondantes.`;
+    } else {
+      // Mode neutre : secteur uniquement
+      if (brandContext.niche) {
+        enrichedPrompt += `\nSecteur d'activité : ${brandContext.niche}`;
+      }
+      enrichedPrompt += `\n\n⚠️ RÈGLE ABSOLUE : L'utilisateur a EXPLICITEMENT DÉSACTIVÉ le Brand Kit.
+Tu NE DOIS PAS :
+- Reprendre le ton de voix, le style ou les couleurs de la marque
+- Utiliser des mascottes, personnages ou éléments narratifs du Brand Kit
+- Faire référence à l'identité de marque
+
+Tu DOIS créer des visuels GÉNÉRIQUES et NEUTRES basés UNIQUEMENT sur le brief de campagne.
+Le secteur d'activité est fourni pour contexte minimal, mais reste neutre dans ton approche créative.`;
     }
   }
 

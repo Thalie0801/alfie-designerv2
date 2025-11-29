@@ -256,8 +256,7 @@ Deno.serve(async (req) => {
             });
             break;
           case "render_carousels":
-            // Utiliser processRenderImages pour les carrousels également
-            result = await processRenderImages(job.payload, {
+            result = await processRenderCarousels(job.payload, {
               user_id: job.user_id,
               order_id: job.order_id,
               job_id: job.id,
@@ -955,6 +954,115 @@ async function processGenerateVideo(payload: any) {
   if (assetErr) throw new Error(assetErr.message);
 
   return { videoUrl };
+}
+
+// ========================================
+// processRenderCarousels
+// ========================================
+async function processRenderCarousels(payload: any, jobMeta?: any): Promise<any> {
+  console.log("[processRenderCarousels] start", {
+    orderId: payload.orderId,
+    brandId: payload.brandId,
+    count: payload.count,
+    hasGeneratedTexts: !!payload.generatedTexts,
+  });
+
+  const carousel_id = payload.carousel_id || `carousel_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  const totalSlides = payload.count || 5;
+  
+  // Vérifier si on a des textes générés
+  if (!payload.generatedTexts?.slides) {
+    console.error("[processRenderCarousels] ❌ No generated texts/slides in payload");
+    throw new Error("Missing generated texts for carousel");
+  }
+
+  const slides = payload.generatedTexts.slides;
+  if (!Array.isArray(slides) || slides.length === 0) {
+    throw new Error("Generated texts must contain an array of slides");
+  }
+
+  console.log(`[processRenderCarousels] 🎨 Rendering ${slides.length} slides for carousel ${carousel_id}`);
+
+  // Charger le brand minimal
+  const brandMini = await loadBrandMini(payload.brandId, false);
+  
+  // Construire le globalStyle pour le carrousel
+  const globalStyle = `Professional social media carousel background for ${brandMini?.niche || 'business'}. Clean, modern, aesthetic design with subtle visual elements. Brand palette: ${(brandMini?.palette || []).join(", ")}`;
+
+  // Ratio à partir du brief ou 4:5 par défaut
+  const aspectRatio = payload.brief?.ratio || payload.ratio || "4:5";
+
+  // Générer toutes les slides en parallèle
+  const slidePromises = slides.map(async (slide: any, index: number) => {
+    console.log(`[processRenderCarousels] 📄 Slide ${index + 1}/${slides.length}:`, {
+      title: slide.title?.slice(0, 50),
+    });
+
+    try {
+      const slideResult = await callFn("alfie-render-carousel-slide", {
+        userId: jobMeta?.user_id || payload.userId,
+        prompt: payload.prompt || payload.brief?.topic || "Professional carousel slide background",
+        globalStyle,
+        slideContent: {
+          title: slide.title || "",
+          subtitle: slide.subtitle || "",
+          bullets: slide.bullets || [],
+          alt: `Slide ${index + 1} of ${slides.length}`,
+        },
+        brandId: payload.brandId,
+        orderId: jobMeta?.order_id || payload.orderId,
+        orderItemId: payload.orderItemId || null,
+        carouselId: carousel_id,
+        slideIndex: index,
+        totalSlides: slides.length,
+        aspectRatio,
+        textVersion: 1,
+        renderVersion: 1,
+        campaign: payload.campaign || payload.brief?.campaign || "carousel",
+        language: "FR",
+      });
+
+      return { success: true, slideIndex: index, result: slideResult };
+    } catch (error: any) {
+      console.error(`[processRenderCarousels] ❌ Failed slide ${index + 1}:`, error.message);
+      return { success: false, slideIndex: index, error: error.message };
+    }
+  });
+
+  const results = await Promise.all(slidePromises);
+
+  // Compter les succès
+  const successCount = results.filter((r) => r.success).length;
+  const failedCount = results.filter((r) => !r.success).length;
+
+  console.log(`[processRenderCarousels] ✅ ${successCount}/${slides.length} slides rendered successfully`);
+  
+  if (failedCount > 0) {
+    console.warn(`[processRenderCarousels] ⚠️ ${failedCount} slides failed`);
+  }
+
+  // Consommer le quota pour les slides réussies
+  if (successCount > 0) {
+    try {
+      await consumeBrandQuotas(
+        payload.brandId,
+        successCount, // 1 Woof per slide
+        0, // videos
+        0  // woofs
+      );
+      console.log(`✅ [consumeBrandQuotas] Consumed ${successCount} Woofs for carousel slides`);
+    } catch (quotaErr) {
+      console.error("❌ [processRenderCarousels] Quota consumption failed:", quotaErr);
+    }
+  }
+
+  return {
+    carousel_id,
+    totalSlides: slides.length,
+    successCount,
+    failedCount,
+    results,
+  };
 }
 
 async function processAnimateImage(payload: any) {
