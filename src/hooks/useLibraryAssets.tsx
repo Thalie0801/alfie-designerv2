@@ -147,83 +147,33 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
           .is('metadata->carousel_id', null)
           .is('metadata->isAnimatedVideo', null);
       } else {
-        // Videos = type 'video' OU type 'image' avec tag animated_image
-        // On utilise une approche en trois requêtes pour gérer les cas
-
-        // 1. Vidéos classiques (type='video' SANS ken_burns)
+        // Vidéos: requête unique depuis media_generations pour TOUTES les vidéos
         const { data: videoData, error: videoError } = await supabase
           .from('media_generations')
           .select('id, type, status, output_url, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes')
           .eq('user_id', userId)
           .eq('type', 'video')
-          .or('metadata->>animationType.is.null,metadata->>animationType.neq.ken_burns')
           .order('created_at', { ascending: false })
-          .limit(20);
+          .limit(30);
 
         if (videoError) {
           console.error('[LibraryAssets] Video query error:', videoError);
         }
 
-        console.log('[LibraryAssets] Standard videos loaded:', videoData?.length || 0);
+        console.log('[LibraryAssets] Videos loaded:', videoData?.length || 0);
+        console.log('[LibraryAssets] Video URLs sample:', videoData?.slice(0, 3).map(v => ({
+          id: v.id,
+          url: v.output_url?.substring(0, 60) + '...',
+          animType: (v.metadata as any)?.animationType
+        })));
 
-        // 2. Vidéos animées Ken Burns depuis media_generations
-        const { data: animatedFromMedia, error: mediaAnimError } = await supabase
-          .from('media_generations')
-          .select('id, type, status, output_url, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes')
-          .eq('user_id', userId)
-          .eq('type', 'video')
-          .filter('metadata->>animationType', 'eq', 'ken_burns')
-          .order('created_at', { ascending: false })
-          .limit(20);
-
-        if (mediaAnimError) {
-          console.error('[LibraryAssets] Animated from media query error:', mediaAnimError);
-        }
-
-        console.log('[LibraryAssets] Ken Burns videos loaded:', animatedFromMedia?.length || 0);
-
-        // 3. Vidéos animées depuis library_assets (backup)
-        const { data: animatedData, error: animatedError } = await supabase
-          .from('library_assets')
-          .select('id, type, cloudinary_url, metadata, created_at, brand_id, tags, format')
-          .eq('user_id', userId)
-          .contains('tags', ['animated_image'])
-          .order('created_at', { ascending: false })
-          .limit(20);
-
-        if (animatedError) {
-          console.error('[LibraryAssets] Animated from library query error:', animatedError);
-        }
-
-        // Fusionner les trois sources
-        const combinedData = [
-          ...(videoData || []),
-          ...(animatedFromMedia || []),
-          ...(animatedData || []).map(a => ({
-            id: a.id,
-            type: 'video' as const,
-            status: 'completed',
-            output_url: a.cloudinary_url,
-            thumbnail_url: a.cloudinary_url?.replace('/video/', '/image/').replace('.mp4', '.jpg') || null,
-            prompt: null,
-            engine: null,
-            woofs: 3,
-            created_at: a.created_at || new Date().toISOString(),
-            expires_at: null,
-            metadata: a.metadata,
-            job_id: null,
-            is_source_upload: false,
-            brand_id: a.brand_id,
-            duration_seconds: (a.metadata as any)?.duration || 3,
-            file_size_bytes: null,
-          }))
-        ].sort((a, b) => {
+        const combinedData = (videoData || []).sort((a, b) => {
           const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
           const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
           return dateB - dateA;
         });
 
-        console.log(`[LibraryAssets] Loaded ${videoData?.length || 0} videos + ${animatedFromMedia?.length || 0} ken_burns + ${animatedData?.length || 0} animated images`);
+        console.log(`[LibraryAssets] Loaded ${videoData?.length || 0} videos (all types)`);
         
         const mappedAssets = combinedData.map(asset => ({
           ...asset,
