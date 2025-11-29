@@ -78,6 +78,22 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
   const fileSize = formatFileSize((asset as any).file_size_bytes);
   const engine = (asset.engine || "").toString();
 
+  // ✅ Helper pour obtenir une URL vidéo valide
+  const getVideoSrc = (): string => {
+    // 1) Priorité à output_url si c'est une vraie URL
+    if (asset.output_url && asset.output_url.startsWith("http")) {
+      return asset.output_url;
+    }
+    // 2) Sinon thumbnail_url si c'est une vraie URL (pour fallback sur image)
+    if (asset.thumbnail_url && asset.thumbnail_url.startsWith("http")) {
+      return asset.thumbnail_url;
+    }
+    // 3) Aucune URL valide
+    return "";
+  };
+
+  const videoSrc = asset.type === "video" ? getVideoSrc() : "";
+
   return (
     <Card className={`group hover:shadow-lg transition-all ${selected ? "ring-2 ring-primary" : ""}`}>
       <CardContent className="p-0 relative">
@@ -111,29 +127,31 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
         <div className="relative aspect-video bg-muted overflow-hidden rounded-t-lg">
           {asset.type === "video" ? (
             <>
-              {asset.output_url && !imageError ? (
+              {videoSrc && !imageError ? (
                 <video
-                  src={asset.output_url}
+                  src={videoSrc}
                   className="w-full h-full object-cover"
                   poster={asset.thumbnail_url || undefined}
                   preload="metadata"
                   controls
-                  onError={() => setImageError(true)}
+                  muted
+                  loop
+                  playsInline
+                  onError={() => {
+                    console.warn("[AssetCard] Video preview failed", asset.id, videoSrc);
+                    setImageError(true);
+                  }}
                   aria-label="Aperçu vidéo"
-                />
-              ) : asset.thumbnail_url && !imageError ? (
-                <img
-                  src={asset.thumbnail_url}
-                  alt="Miniature vidéo"
-                  className="w-full h-full object-cover"
-                  onError={() => setImageError(true)}
-                  loading="lazy"
                 />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 to-secondary/10">
                   <PlayCircle className="h-16 w-16 text-muted-foreground mb-2" />
                   <p className="text-xs text-muted-foreground text-center px-4">
-                    {asset.status === "processing" ? "⏳ Génération en cours…" : "Aperçu indisponible"}
+                    {asset.status === "processing" 
+                      ? "⏳ Génération en cours…" 
+                      : imageError 
+                      ? "Aperçu indisponible (URL vidéo invalide)"
+                      : "Aperçu indisponible"}
                   </p>
                 </div>
               )}
