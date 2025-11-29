@@ -156,7 +156,7 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
           .select('id, type, status, output_url, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes')
           .eq('user_id', userId)
           .eq('type', 'video')
-          .is('metadata->animationType', null)
+          .or('metadata->>animationType.is.null,metadata->>animationType.neq.ken_burns')
           .order('created_at', { ascending: false })
           .limit(20);
 
@@ -171,7 +171,7 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
           .select('id, type, status, output_url, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes')
           .eq('user_id', userId)
           .eq('type', 'video')
-          .eq('metadata->animationType', 'ken_burns')
+          .filter('metadata->>animationType', 'eq', 'ken_burns')
           .order('created_at', { ascending: false })
           .limit(20);
 
