@@ -178,32 +178,54 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // 🔒 SECURITY: Verify authentication before processing
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return jsonResponse({ error: "Missing Authorization header" }, { status: 401 });
-    }
-
-    const { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY } = await import("../_shared/env.ts");
+    const { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, INTERNAL_FN_SECRET } = await import("../_shared/env.ts");
     
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
       return jsonResponse({ error: "Server configuration error" }, { status: 500 });
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } }
-    });
+    // Parse body once
+    const body = await req.json();
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // ✅ Support authentication via internal secret (for job worker calls) or JWT (for direct calls)
+    const internalSecret = req.headers.get("x-internal-secret") || req.headers.get("X-Internal-Secret");
+    const isInternalCall = internalSecret && internalSecret === INTERNAL_FN_SECRET;
     
-    if (authError || !user) {
-      console.error("[generate-video] Authentication failed:", authError);
-      return jsonResponse({ error: "Authentication required" }, { status: 401 });
+    let userId: string;
+    let supabase;
+    
+    if (isInternalCall) {
+      // Internal call from job worker - get userId from body
+      userId = body.userId;
+      if (!userId) {
+        return jsonResponse({ error: "Missing userId in internal call" }, { status: 400 });
+      }
+      console.log(`[generate-video] ✅ Internal call authenticated for user: ${userId}`);
+      
+      // Use service role client for internal calls
+      supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY!);
+    } else {
+      // External call - verify JWT
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) {
+        return jsonResponse({ error: "Missing Authorization header" }, { status: 401 });
+      }
+
+      supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        global: { headers: { Authorization: authHeader } }
+      });
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        console.error("[generate-video] Authentication failed:", authError);
+        return jsonResponse({ error: "Authentication required" }, { status: 401 });
+      }
+
+      userId = user.id;
+      console.log(`[generate-video] ✅ Authenticated user: ${userId}`);
     }
 
-    console.log(`[generate-video] ✅ Authenticated user: ${user.id}`);
-
-    const body = await req.json();
     const prompt = typeof body?.prompt === "string" ? body.prompt : undefined;
     const aspectRatio = typeof body?.aspectRatio === "string" ? body.aspectRatio : "16:9";
     const imageUrl = typeof body?.imageUrl === "string" ? body.imageUrl : undefined;
@@ -227,7 +249,7 @@ Deno.serve(async (req) => {
       const { data: profile } = await supabase
         .from('profiles')
         .select('active_brand_id')
-        .eq('id', user.id)
+        .eq('id', userId)
         .maybeSingle();
       
       brandId = profile?.active_brand_id || null;

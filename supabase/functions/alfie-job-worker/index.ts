@@ -663,11 +663,21 @@ async function processRenderImages(
       const aspectRatio = (brief?.format?.split(" ")?.[0] as string) || "1:1";
       const { w, h } = AR_MAP[aspectRatio] || AR_MAP["1:1"];
 
-      const prompt = `${brief?.content || "A detailed subject scene"}.
+      // ✅ Conditionner l'injection du Brand Kit selon useBrandKit
+      const useBrandKit = jobMeta?.use_brand_kit ?? true;
+      
+      const prompt = useBrandKit
+        ? `${brief?.content || "A detailed subject scene"}.
 Style: ${brief?.style || "realistic photo or clean illustration"}.
 Context: ${brief?.objective || "social media post"}.
 Brand: ${brand?.niche || ""}, tone: ${brand?.voice || "professional"}.
 Colors: ${brand?.palette?.slice(0, 3).join(", ") || "modern palette"}.
+Composition: clear main subject, depth, lighting, natural shadows. No text overlays.
+Format: ${aspectRatio} aspect ratio optimized.`
+        : `${brief?.content || "A detailed subject scene"}.
+Style: ${brief?.style || "realistic photo or clean illustration"}.
+Context: ${brief?.objective || "social media post"}.
+Professional, modern, clean design with neutral color palette.
 Composition: clear main subject, depth, lighting, natural shadows. No text overlays.
 Format: ${aspectRatio} aspect ratio optimized.`;
 
@@ -972,7 +982,8 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
     hasGeneratedTexts: !!payload.generatedTexts,
   });
 
-  const carousel_id = payload.carousel_id || `carousel_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  // ✅ Utiliser un UUID valide pour carousel_id
+  const carousel_id = payload.carousel_id || crypto.randomUUID();
   const totalSlides = payload.count || 5;
   
   // Vérifier si on a des textes générés
