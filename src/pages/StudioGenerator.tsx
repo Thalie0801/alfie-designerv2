@@ -431,6 +431,7 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
         pack,
         userId: user.id,
         selectedAssetIds: pack.assets.map((a) => a.id),
+        useBrandKit: useBrandKitForPack, // ✅ Propagation du toggle Brand Kit
       });
 
       toast.success(`Super ! Alfie lance la génération de tes visuels 🐶`);
