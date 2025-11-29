@@ -181,6 +181,11 @@ async function createAssetJob(
   // Générer un carousel_id unique (UUID valide) pour les carrousels
   const carousel_id = asset.kind === "carousel" ? crypto.randomUUID() : undefined;
 
+  // ✅ Déterminer l'engine pour les vidéos
+  const videoEngine = asset.kind === "video_premium" ? "veo_3_1" : 
+                      asset.kind === "video_basic" ? "eco_t2v" : 
+                      undefined;
+
   const { error: jobError } = await supabase.from("job_queue").insert({
     user_id: userId,
     order_id: order.id,
@@ -201,6 +206,9 @@ async function createAssetJob(
       generatedTexts: asset.generatedTexts, // ✅ CRITIQUE : Textes générés (slides pour carrousels, textes pour images)
       campaign: packTitle, // Nom de la campagne pour organisation Cloudinary
       useBrandKit, // ✅ Contrôle si le Brand Kit doit être appliqué
+      engine: videoEngine, // ✅ AJOUT: engine pour vidéos
+      durationSeconds: asset.durationSeconds || 5,
+      aspectRatio: asset.ratio || "4:5",
     },
   });
 
