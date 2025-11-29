@@ -35,13 +35,21 @@ function derivePublicIdFromUrl(url?: string): string | undefined {
 const CONTROL = new RegExp('[\\x00-\\x1F\\x7F\\u00A0\\uFEFF]', 'g');
 
 function cleanText(text: string, maxLen = 220): string {
-  let cleaned = text.replace(CONTROL, '');
-  // Remove emojis
-  try {
-    cleaned = cleaned.replace(/\p{Extended_Pictographic}/gu, '');
-  } catch {
-    cleaned = cleaned.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '');
-  }
+  let cleaned = text
+    .replace(CONTROL, '')
+    // Remove all emojis AND variation selectors (FE00-FE0F)
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}]/gu, '')
+    // Replace curly apostrophes with straight apostrophes
+    .replace(/[\u2018\u2019]/g, "'")
+    // Replace curly quotes with straight quotes
+    .replace(/[\u201C\u201D]/g, '"')
+    // Replace ellipsis with three dots
+    .replace(/\u2026/g, '...')
+    // Remove zero-width characters
+    .replace(/[\u200B-\u200F\u202A-\u202E]/g, '')
+    // Remove any remaining non-ASCII that could cause issues
+    .replace(/[^\x20-\x7E\u00C0-\u017F]/g, '');
+  
   return cleaned.length > maxLen ? cleaned.slice(0, maxLen).trim() : cleaned.trim();
 }
 
@@ -99,31 +107,35 @@ function buildOverlayUrl(slide: any): string | null {
   
   const overlays: string[] = [];
   
-  // Titre centré en haut (même logique que slideUrl)
-  const titleSize = format === '9:16' ? 80 : format === '16:9' ? 64 : 72;
-  const titleY = Math.round(dims.h * 0.1);
+  // Configuration responsive selon format (layout centré verticalement)
+  const config = format === '9:16' 
+    ? { titleSize: 80, subSize: 52, bulletSize: 36, titleY: -350, subOffset: 80, bulletStart: -100, bulletStep: 60 }
+    : format === '16:9'
+    ? { titleSize: 64, subSize: 38, bulletSize: 32, titleY: -200, subOffset: 60, bulletStart: -50, bulletStep: 50 }
+    : format === '1:1'
+    ? { titleSize: 72, subSize: 42, bulletSize: 36, titleY: -280, subOffset: 70, bulletStart: -80, bulletStep: 55 }
+    : { titleSize: 72, subSize: 42, bulletSize: 36, titleY: -320, subOffset: 70, bulletStart: -100, bulletStep: 55 }; // 4:5
+  
+  // TITRE - centré verticalement vers le haut
   overlays.push(
-    `l_text:Arial_${titleSize}_bold:${encodeCloudinaryText(cleanTitle)},co_rgb:FFFFFF,g_north,y_${titleY},w_${Math.round(dims.w * 0.9)},c_fit`
+    `l_text:Arial_${config.titleSize}_bold:${encodeCloudinaryText(cleanTitle)},co_rgb:FFFFFF,g_center,y_${config.titleY},w_${Math.round(dims.w * 0.9)},c_fit`
   );
   
-  // Sous-titre centré bas
+  // SOUS-TITRE - juste sous le titre
   if (cleanSubtitle && cleanSubtitle.trim() !== '') {
-    const subSize = format === '9:16' ? 52 : format === '16:9' ? 38 : 42;
-    const subY = format === '9:16' ? 220 : 140;
+    const subY = config.titleY + config.subOffset + config.titleSize;
     overlays.push(
-      `l_text:Arial_${subSize}:${encodeCloudinaryText(cleanSubtitle)},co_rgb:E5E7EB,g_south,y_${subY},w_${Math.round(dims.w * 0.84)},c_fit`
+      `l_text:Arial_${config.subSize}:${encodeCloudinaryText(cleanSubtitle)},co_rgb:E5E7EB,g_center,y_${subY},w_${Math.round(dims.w * 0.84)},c_fit`
     );
   }
   
-  // Bullets centrés
+  // BULLETS - centrés
   if (cleanBullets.length > 0) {
-    const bulletSize = format === '16:9' ? 32 : 36;
-    const startY = Math.round(dims.h * 0.45);
-    const step = 56;
     cleanBullets.forEach((b: string, i: number) => {
       if (b.trim() !== '') {
+        const bulletY = config.bulletStart + i * config.bulletStep;
         overlays.push(
-          `l_text:Arial_${bulletSize}:${encodeCloudinaryText('• ' + b)},co_rgb:FFFFFF,g_center,y_${startY + i * step},w_${Math.round(dims.w * 0.8)},c_fit`
+          `l_text:Arial_${config.bulletSize}:${encodeCloudinaryText('• ' + b)},co_rgb:FFFFFF,g_center,y_${bulletY},w_${Math.round(dims.w * 0.8)},c_fit`
         );
       }
     });

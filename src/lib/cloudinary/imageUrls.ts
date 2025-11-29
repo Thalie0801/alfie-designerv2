@@ -39,40 +39,42 @@ export function slideUrl(publicId: string, o: SlideUrlOptions): string {
   const bullets = (o.bulletPoints ?? []).map((b) => cleanText(b, 80)).slice(0, 6);
   const cta = cleanText(o.cta ?? '', 60);
 
-  // Texte adapté au format (tailles + offsets)
+  // Configuration responsive selon format (layout centré verticalement)
+  const config = o.aspectRatio === '9:16' 
+    ? { titleSize: 80, subSize: 52, bulletSize: 36, titleY: -350, subOffset: 80, bulletStart: -100, bulletStep: 60 }
+    : o.aspectRatio === '16:9'
+    ? { titleSize: 64, subSize: 38, bulletSize: 32, titleY: -200, subOffset: 60, bulletStart: -50, bulletStep: 50 }
+    : o.aspectRatio === '1:1'
+    ? { titleSize: 72, subSize: 42, bulletSize: 36, titleY: -280, subOffset: 70, bulletStart: -80, bulletStep: 55 }
+    : { titleSize: 72, subSize: 42, bulletSize: 36, titleY: -320, subOffset: 70, bulletStart: -100, bulletStep: 55 }; // 4:5
+
+  // TITRE - centré verticalement vers le haut
   if (title) {
-    const size = o.aspectRatio === '9:16' ? 80 : o.aspectRatio === '16:9' ? 64 : 72;
-    const y = o.aspectRatio === '9:16' ? 140 : 120;
     overlays.push(
-      `l_text:Arial_${size}_bold:${enc(title)},co_rgb:FFFFFF,g_north,y_${y},w_${Math.round(
-        w * 0.9
-      )},c_fit`
+      `l_text:Arial_${config.titleSize}_bold:${enc(title)},co_rgb:FFFFFF,g_center,y_${config.titleY},w_${Math.round(w * 0.9)},c_fit`
     );
   }
 
+  // SOUS-TITRE - juste sous le titre
   if (sub) {
-    const size = o.aspectRatio === '9:16' ? 52 : o.aspectRatio === '16:9' ? 38 : 42;
-    const y = o.aspectRatio === '9:16' ? 220 : 140;
+    const subY = config.titleY + config.subOffset + (title ? config.titleSize : 0);
     overlays.push(
-      `l_text:Arial_${size}:${enc(sub)},co_rgb:E5E7EB,g_south,y_${y},w_${Math.round(
-        w * 0.84
-      )},c_fit`
+      `l_text:Arial_${config.subSize}:${enc(sub)},co_rgb:E5E7EB,g_center,y_${subY},w_${Math.round(w * 0.84)},c_fit`
     );
   }
 
+  // BULLETS - centrés
   bullets.forEach((b, i) => {
-    const size = o.aspectRatio === '16:9' ? 32 : 36;
-    const startY = o.aspectRatio === '9:16' ? 380 : 300;
+    const bulletY = config.bulletStart + i * config.bulletStep;
     overlays.push(
-      `l_text:Arial_${size}:${enc('• ' + b)},co_rgb:FFFFFF,g_center,y_${
-        startY + i * 60
-      },w_${Math.round(w * 0.8)},c_fit`
+      `l_text:Arial_${config.bulletSize}:${enc('• ' + b)},co_rgb:FFFFFF,g_center,y_${bulletY},w_${Math.round(w * 0.8)},c_fit`
     );
   });
 
+  // CTA - en bas
   if (cta) {
-    const size = o.aspectRatio === '16:9' ? 44 : 48;
-    overlays.push(`l_text:Arial_${size}_bold:${enc(cta)},co_rgb:FFFFFF,g_south,y_80`);
+    const ctaSize = o.aspectRatio === '16:9' ? 44 : 48;
+    overlays.push(`l_text:Arial_${ctaSize}_bold:${enc(cta)},co_rgb:FFFFFF,g_south,y_80`);
   }
 
   const tf = overlays.length ? `/${overlays.join('/')}` : '';
