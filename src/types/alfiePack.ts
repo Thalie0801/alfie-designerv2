@@ -1,34 +1,37 @@
 /**
- * Types pour le système de packs de génération Alfie
- * Utilisé par le Chat Widget pour proposer des packs de visuels structurés
+ * Pack Types - Simplified to use UnifiedAlfieIntent
  */
 
-export type PackAssetKind = "image" | "carousel" | "animated_image" | "video_basic" | "video_premium";
-export type Platform = "instagram" | "tiktok" | "youtube" | "linkedin" | "facebook" | "pinterest" | "generic";
+import type { UnifiedAlfieIntent, AssetKind } from '@/lib/types/alfie';
+
+// Re-export for convenience
+export type { AssetKind, Platform, Ratio, Goal, GeneratedTexts } from '@/lib/types/alfie';
+
+// Legacy type mappings
+export type PackAssetKind = AssetKind;
 export type AssetFormat = "post" | "story" | "reel" | "short" | "pin";
 export type AssetGoal = "education" | "vente" | "lead" | "engagement";
 export type WoofCostType = "image" | "carousel_slide" | "animated_image" | "video_basic" | "video_premium";
 
-export interface PackAsset {
-  id: string;
-  kind: PackAssetKind;
-  count: number; // nombre de slides pour carousel, 1 pour les autres
-  platform: Platform;
-  format: AssetFormat;
-  ratio: "1:1" | "4:5" | "9:16" | "16:9";
-  durationSeconds?: number; // pour vidéos seulement
-  title: string;
-  goal: AssetGoal;
-  tone: string;
-  prompt: string;
+// PackAsset is now just UnifiedAlfieIntent with additional legacy fields
+export interface PackAsset extends UnifiedAlfieIntent {
+  format?: AssetFormat; // Legacy - kept for compatibility
   woofCostType: WoofCostType;
-  referenceImageUrl?: string; // URL de l'image de référence optionnelle
-  generatedTexts?: {
-    // Textes générés par Gemini avant la génération visuelle
-    slides?: Array<{ title: string; subtitle?: string; bullets?: string[] }>; // Pour carrousels
-    text?: { title: string; body: string; cta?: string }; // Pour images
-    video?: { hook: string; script: string; cta?: string }; // Pour vidéos
-  };
+}
+
+// Woof cost mapping
+export const WOOF_COST_MAP: Record<AssetKind, number | 'perSlide'> = {
+  image: 1,
+  carousel: 'perSlide', // 1 par slide
+  animated_image: 3,
+  video_basic: 10,
+  video_premium: 50,
+};
+
+export function getWoofCost(asset: UnifiedAlfieIntent | PackAsset): number {
+  const costType = WOOF_COST_MAP[asset.kind];
+  if (costType === 'perSlide') return asset.count;
+  return costType;
 }
 
 export interface AlfiePack {
