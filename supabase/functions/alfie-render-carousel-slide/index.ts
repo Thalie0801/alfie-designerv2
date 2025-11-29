@@ -35,6 +35,7 @@ interface SlideRequest {
   campaign: string;
   language?: Lang | string;
   requestId?: string | null;
+  useBrandKit?: boolean;        // ✅ NOUVEAU: contrôle si le Brand Kit doit être appliqué
 }
 
 type GenSize = { w: number; h: number };
@@ -84,7 +85,7 @@ function normalizeAspectRatio(ar: string | undefined): { ar: string; size: GenSi
   return { ar: ratio, size: AR_MAP[ratio] };
 }
 
-function buildImagePrompt(globalStyle: string, prompt: string) {
+function buildImagePrompt(globalStyle: string, prompt: string, useBrandKit: boolean = true) {
   // “NO TEXT” blinders + qualité
   return `${globalStyle}. ${prompt}. 
 Background only. No text, no typography, no letters, no logos, no watermark. 
@@ -162,6 +163,7 @@ Deno.serve(async (req) => {
       campaign,
       language = "FR",
       requestId = null,
+      useBrandKit = true, // ✅ Par défaut : utiliser le Brand Kit
     } = params;
 
     // —— Supabase admin client (service role)
@@ -271,7 +273,7 @@ Deno.serve(async (req) => {
     // STEP 2/4 — Générer background (Lovable AI)
     // =========================================
     console.log(`[render-slide] ${logCtx} 2/4 Generate background via Lovable AI`);
-    const enrichedPrompt = buildImagePrompt(globalStyle, prompt);
+    const enrichedPrompt = buildImagePrompt(globalStyle, prompt, useBrandKit); // ✅ Propagation de useBrandKit
 
     const aiRes = await fetchWithRetries(
       "https://ai.gateway.lovable.dev/v1/chat/completions",

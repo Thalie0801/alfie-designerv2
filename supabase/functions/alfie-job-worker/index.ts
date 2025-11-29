@@ -248,11 +248,12 @@ Deno.serve(async (req) => {
             result = await processGenerateTexts(job.payload);
             break;
           case "render_images":
-            // ✅ on passe aussi user_id / order_id pour réparer les payloads legacy
+            // ✅ on passe aussi user_id / order_id / useBrandKit pour réparer les payloads legacy
             result = await processRenderImages(job.payload, {
               user_id: job.user_id,
               order_id: job.order_id,
               job_id: job.id,
+              use_brand_kit: job.payload?.useBrandKit ?? true, // ✅ Extraction de useBrandKit
             });
             break;
           case "render_carousels":
@@ -260,6 +261,7 @@ Deno.serve(async (req) => {
               user_id: job.user_id,
               order_id: job.order_id,
               job_id: job.id,
+              use_brand_kit: job.payload?.useBrandKit ?? true, // ✅ Extraction de useBrandKit
             });
             break;
           case "generate_video":
@@ -461,6 +463,7 @@ async function processRenderImage(payload: any) {
     sourceUrl,
     userId,
     orderId,
+    useBrandKit: payload.useBrandKit ?? true, // ✅ Propagation de useBrandKit
   });
   const data = resp as any;
   const error = data && data.error ? { message: data.error } : null;
@@ -512,7 +515,7 @@ async function processRenderImage(payload: any) {
 
 async function processRenderImages(
   payload: any,
-  jobMeta?: { user_id?: string | null; order_id?: string | null; job_id?: string | null },
+  jobMeta?: { user_id?: string | null; order_id?: string | null; job_id?: string | null; use_brand_kit?: boolean },
 ) {
   const jobUserId = jobMeta?.user_id ?? null;
   const jobOrderId = jobMeta?.order_id ?? null;
@@ -708,6 +711,7 @@ Titre : "${imageTexts.title}"
 ${imageTexts.body ? `Texte : "${imageTexts.body}"` : ""}
 ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
     }
+
     try {
       // 1) generate
       console.log("[processRenderImages] calling image engine", {
@@ -732,6 +736,7 @@ ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
         uploadedSourceUrl: payload.sourceUrl ?? null,
         carousel_id, // Passer le carousel_id
         slideIndex, // Passer l'index de slide
+        useBrandKit: jobMeta?.use_brand_kit ?? true, // ✅ Propagation de useBrandKit
       });
 
       const imagePayload = unwrapResult<any>(imageResult);
@@ -959,7 +964,7 @@ async function processGenerateVideo(payload: any) {
 // ========================================
 // processRenderCarousels
 // ========================================
-async function processRenderCarousels(payload: any, jobMeta?: any): Promise<any> {
+async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string; order_id?: string; job_id?: string; use_brand_kit?: boolean }): Promise<any> {
   console.log("[processRenderCarousels] start", {
     orderId: payload.orderId,
     brandId: payload.brandId,
@@ -986,8 +991,11 @@ async function processRenderCarousels(payload: any, jobMeta?: any): Promise<any>
   // Charger le brand minimal
   const brandMini = await loadBrandMini(payload.brandId, false);
   
-  // Construire le globalStyle pour le carrousel
-  const globalStyle = `Professional social media carousel background for ${brandMini?.niche || 'business'}. Clean, modern, aesthetic design with subtle visual elements. Brand palette: ${(brandMini?.palette || []).join(", ")}`;
+  // ✅ Construire le globalStyle selon le toggle useBrandKit
+  const useBrandKit = jobMeta?.use_brand_kit ?? true;
+  const globalStyle = useBrandKit 
+    ? `Professional social media carousel background for ${brandMini?.niche || 'business'}. Clean, modern, aesthetic design with subtle visual elements. Brand palette: ${(brandMini?.palette || []).join(", ")}`
+    : `Professional social media carousel background. Clean, modern, neutral design with subtle visual elements.`;
 
   // Ratio à partir du brief ou 4:5 par défaut
   const aspectRatio = payload.brief?.ratio || payload.ratio || "4:5";
@@ -1020,6 +1028,7 @@ async function processRenderCarousels(payload: any, jobMeta?: any): Promise<any>
         renderVersion: 1,
         campaign: payload.campaign || payload.brief?.campaign || "carousel",
         language: "FR",
+        useBrandKit, // ✅ Propagation de useBrandKit
       });
 
       return { success: true, slideIndex: index, result: slideResult };

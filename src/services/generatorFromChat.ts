@@ -19,6 +19,7 @@ export interface SendPackParams {
   pack: AlfiePack;
   userId: string;
   selectedAssetIds: string[];
+  useBrandKit?: boolean; // ✅ Contrôle si le Brand Kit doit être appliqué
 }
 
 export interface SendPackResult {
@@ -37,6 +38,7 @@ export async function sendPackToGenerator({
   pack,
   userId,
   selectedAssetIds,
+  useBrandKit = true, // Par défaut : utiliser le Brand Kit
 }: SendPackParams): Promise<SendPackResult> {
   // 1. Calculer le coût total Woofs
   const totalWoofs = calculatePackWoofCost(pack, selectedAssetIds);
@@ -84,7 +86,7 @@ export async function sendPackToGenerator({
   
   try {
     const results = await Promise.all(
-      selectedAssets.map((asset) => createAssetJob(asset, brandId, userId, pack.title))
+      selectedAssets.map((asset) => createAssetJob(asset, brandId, userId, pack.title, useBrandKit))
     );
 
     const orderIds = results.map((r) => r.orderId);
@@ -135,7 +137,8 @@ async function createAssetJob(
   asset: any,
   brandId: string,
   userId: string,
-  packTitle: string
+  packTitle: string,
+  useBrandKit: boolean = true
 ): Promise<{ orderId: string }> {
   // Créer un order pour cet asset
   const { data: order, error: orderError } = await supabase
@@ -197,6 +200,7 @@ async function createAssetJob(
       referenceImageUrl: asset.referenceImageUrl, // Image de référence
       generatedTexts: asset.generatedTexts, // ✅ CRITIQUE : Textes générés (slides pour carrousels, textes pour images)
       campaign: packTitle, // Nom de la campagne pour organisation Cloudinary
+      useBrandKit, // ✅ Contrôle si le Brand Kit doit être appliqué
     },
   });
 

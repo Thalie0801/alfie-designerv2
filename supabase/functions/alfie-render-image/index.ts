@@ -31,6 +31,7 @@ export default {
         format = "1024x1024",
         brand_id,
         cost_woofs = 1,
+        useBrandKit = true, // ✅ NOUVEAU: contrôle si le Brand Kit doit être appliqué
         // Nouveaux params carrousel (optionnels)
         backgroundOnly = false,
         slideIndex,
@@ -237,10 +238,10 @@ Ensure strong typographic hierarchy, ample margins, and WCAG AA contrast.`;
 A reference image is provided. Mirror its composition rhythm, spacing, and text placement to maintain visual consistency across slides.`;
         }
 
-        // Récupérer le Brand Kit et enrichir le prompt automatiquement
+        // ✅ Enrichir le prompt UNIQUEMENT si useBrandKit est activé
         let enrichedPrompt = prompt;
 
-        if (brandKitData) {
+        if (brandKitData && useBrandKit) {
           enrichedPrompt = enrichPromptWithBrandKit(prompt, brandKitData);
 
           console.log("[Render] Brand Kit auto-injected:", {
@@ -248,6 +249,8 @@ A reference image is provided. Mirror its composition rhythm, spacing, and text 
             enrichedPromptLength: enrichedPrompt.length,
             brandColors: brandColors.slice(0, 2),
           });
+        } else if (brandKitData && !useBrandKit) {
+          console.log("[Render] ⏭️ Brand Kit désactivé - génération neutre sans charte de marque");
         }
 
         // ✅ NOUVEAU: Préfixer avec le style global si fourni
