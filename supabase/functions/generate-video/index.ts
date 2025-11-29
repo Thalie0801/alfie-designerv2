@@ -267,10 +267,16 @@ Deno.serve(async (req) => {
       console.log(`[generate-video] Checking ${woofsCost} Woofs for ${isPremium ? 'premium' : 'basic'} video (brand ${brandId})`);
       
       const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY!);
+      const INTERNAL_FN_SECRET = Deno.env.get("INTERNAL_FN_SECRET");
+      
       const { data: woofsData, error: woofsError } = await adminClient.functions.invoke(
         "woofs-check-consume",
         {
+          headers: {
+            "x-internal-secret": INTERNAL_FN_SECRET!,
+          },
           body: {
+            userId,  // ✅ Passer userId pour appel interne
             brand_id: brandId,
             cost_woofs: woofsCost,
             reason: isPremium ? "video_premium" : "video_basic",

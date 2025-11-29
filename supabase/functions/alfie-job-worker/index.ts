@@ -664,7 +664,7 @@ async function processRenderImages(
       const { w, h } = AR_MAP[aspectRatio] || AR_MAP["1:1"];
 
       // ✅ Conditionner l'injection du Brand Kit selon useBrandKit
-      const useBrandKit = jobMeta?.use_brand_kit ?? true;
+      const useBrandKit = payload.useBrandKit ?? jobMeta?.use_brand_kit ?? true;
       
       const prompt = useBrandKit
         ? `${brief?.content || "A detailed subject scene"}.
@@ -1003,7 +1003,7 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   const brandMini = await loadBrandMini(payload.brandId, false);
   
   // ✅ Construire le globalStyle selon le toggle useBrandKit
-  const useBrandKit = jobMeta?.use_brand_kit ?? true;
+  const useBrandKit = payload.useBrandKit ?? jobMeta?.use_brand_kit ?? true;
   const globalStyle = useBrandKit 
     ? `Professional social media carousel background for ${brandMini?.niche || 'business'}. Clean, modern, aesthetic design with subtle visual elements. Brand palette: ${(brandMini?.palette || []).join(", ")}`
     : `Professional social media carousel background. Clean, modern, neutral design with subtle visual elements.`;

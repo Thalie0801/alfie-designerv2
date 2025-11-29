@@ -178,8 +178,8 @@ async function createAssetJob(
                   asset.kind.includes("video") ? "generate_video" : 
                   "render_images";
 
-  // Générer un carousel_id unique pour les carrousels
-  const carousel_id = asset.kind === "carousel" ? `carousel_${Date.now()}_${Math.random().toString(36).substring(7)}` : undefined;
+  // Générer un carousel_id unique (UUID valide) pour les carrousels
+  const carousel_id = asset.kind === "carousel" ? crypto.randomUUID() : undefined;
 
   const { error: jobError } = await supabase.from("job_queue").insert({
     user_id: userId,
