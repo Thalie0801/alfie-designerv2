@@ -105,7 +105,13 @@ INSTRUCTIONS : Utilise le Brand Kit pour adapter le ton et le style, mais le CON
 [BRAND_KIT]
 - Secteur : ${brandKit.niche || "Non spécifié"}
 
-INSTRUCTIONS : L'utilisateur a DÉSACTIVÉ le Brand Kit. Crée des textes NEUTRES et GÉNÉRIQUES basés uniquement sur le brief. N'utilise pas de ton de marque spécifique.`;
+⚠️ RÈGLE ABSOLUE : Brand Kit DÉSACTIVÉ par l'utilisateur.
+Tu NE DOIS PAS utiliser :
+- Le ton de voix, le style ou les couleurs de la marque
+- Les mascottes, personnages ou éléments narratifs du Brand Kit
+- Les références à l'identité de marque
+
+Crée des textes NEUTRES et GÉNÉRIQUES basés UNIQUEMENT sur le brief de campagne.`;
   }
 
   prompt += `
@@ -163,7 +169,9 @@ INSTRUCTIONS : Utilise le Brand Kit pour adapter le ton et le style, mais le CON
 [BRAND_KIT]
 - Secteur : ${brandKit.niche || "Non spécifié"}
 
-INSTRUCTIONS : L'utilisateur a DÉSACTIVÉ le Brand Kit. Crée des textes NEUTRES et GÉNÉRIQUES basés uniquement sur le brief. N'utilise pas de ton de marque spécifique.`;
+⚠️ RÈGLE ABSOLUE : Brand Kit DÉSACTIVÉ.
+Ne pas utiliser le ton, les couleurs ou les éléments narratifs de la marque.
+Textes NEUTRES basés uniquement sur le brief.`;
   }
 
   prompt += `
@@ -217,7 +225,8 @@ INSTRUCTIONS : Utilise le Brand Kit pour adapter le ton et le style, mais le CON
 [BRAND_KIT]
 - Secteur : ${brandKit.niche || "Non spécifié"}
 
-INSTRUCTIONS : L'utilisateur a DÉSACTIVÉ le Brand Kit. Crée des textes NEUTRES et GÉNÉRIQUES basés uniquement sur le brief. N'utilise pas de ton de marque spécifique.`;
+⚠️ RÈGLE ABSOLUE : Brand Kit DÉSACTIVÉ.
+Script NEUTRE sans ton de marque ni éléments narratifs spécifiques.`;
   }
 
   prompt += `
