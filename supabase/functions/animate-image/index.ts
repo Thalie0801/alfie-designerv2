@@ -162,14 +162,14 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: req.headers.get("Authorization") || "" } }
     });
 
-    // Sauvegarder dans media_generations
+    // Sauvegarder dans media_generations (type=video, engine=NULL pour Cloudinary)
     const { error: mediaError } = await dbClient
       .from('media_generations')
       .insert({
         user_id: userId,
         brand_id: brandId,
         type: 'video',
-        engine: 'cloudinary_kenburns',
+        engine: null, // Cloudinary Ken Burns n'est pas dans l'enum video_engine
         status: 'completed',
         output_url: videoUrl,
         thumbnail_url: `https://res.cloudinary.com/${cloudName}/image/upload/${imagePublicId}.jpg`,
@@ -181,7 +181,8 @@ Deno.serve(async (req) => {
           title,
           subtitle,
           generatedAt: new Date().toISOString(),
-          animationType: 'ken_burns'
+          animationType: 'ken_burns',
+          engine: 'cloudinary_kenburns' // Stocker ici pour référence
         },
       });
 
@@ -189,7 +190,7 @@ Deno.serve(async (req) => {
       console.error("[animate-image] Failed to save to media_generations:", mediaError);
     }
 
-    // Sauvegarder dans library_assets
+    // Sauvegarder dans library_assets (type=image car constraint accepte seulement image/carousel_slide)
     if (orderId) {
       const { error: libError } = await dbClient
         .from('library_assets')
@@ -197,17 +198,18 @@ Deno.serve(async (req) => {
           user_id: userId,
           brand_id: brandId,
           order_id: orderId,
-          type: 'video',
+          type: 'image', // ✅ Type autorisé dans library_assets constraint
           cloudinary_url: videoUrl,
           format: aspect,
-          tags: ["animated_image", "ken_burns", "alfie"],
+          tags: ["animated_image", "ken_burns", "alfie", "video"],
           metadata: {
             sourceImagePublicId: imagePublicId,
             duration,
             aspect,
             title,
             subtitle,
-            animationType: 'ken_burns'
+            animationType: 'ken_burns',
+            isAnimatedVideo: true // Flag pour différencier des images statiques
           },
         });
 

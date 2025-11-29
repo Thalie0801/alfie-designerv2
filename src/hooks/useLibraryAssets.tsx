@@ -17,10 +17,6 @@ const MEDIA_URL_KEYS = [
   'file_url'
 ] as const;
 
-const COMPLETED_STATUSES = ['succeeded', 'completed', 'ready', 'success', 'finished'];
-
-type ProviderEngine = 'sora' | 'seededance' | 'kling';
-
 const isRecord = (value: unknown): value is Record<string, any> =>
   typeof value === 'object' && value !== null;
 
@@ -88,47 +84,6 @@ const extractDuration = (payload: unknown): number | null => {
   return null;
 };
 
-interface ProviderStatusInfo {
-  provider: string;
-  engine?: ProviderEngine;
-}
-
-const resolveProviderForStatus = (asset: any): ProviderStatusInfo => {
-  const metadata = isRecord(asset?.metadata) ? asset.metadata : {};
-  const candidates = [
-    metadata.providerResolved,
-    metadata.providerStatus,
-    metadata.providerInternal,
-    metadata.providerNormalized,
-    metadata.provider,
-    asset?.engine,
-  ];
-
-  for (const candidate of candidates) {
-    if (typeof candidate !== 'string') continue;
-    const value = candidate.trim().toLowerCase();
-    if (!value) continue;
-
-    if (['seededance', 'replicate', 'replicate-bytedance', 'bytedance', 'byte-dance'].includes(value)) {
-      return { provider: 'seededance', engine: 'seededance' };
-    }
-
-    if (['kling', 'kie', 'kie.ai', 'kling-ai'].includes(value)) {
-      return { provider: 'kling', engine: 'kling' };
-    }
-
-    if (['sora', 'sora2'].includes(value)) {
-      return { provider: 'sora', engine: 'sora' };
-    }
-
-    if (['animate', 'ffmpeg-backend', 'animate-backend'].includes(value)) {
-      return { provider: 'animate' };
-    }
-  }
-
-  return { provider: 'seededance', engine: 'seededance' };
-};
-
 export interface LibraryAsset {
   id: string;
   type: 'image' | 'video';
@@ -186,11 +141,79 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
         .eq('user_id', userId);
 
       if (type === 'images') {
-        // Images = type 'image' uniquement, PAS les carousel_slide
-        query = query.eq('type', 'image').is('metadata->carousel_id', null);
+        // Images = type 'image' uniquement, PAS les carousel_slide, PAS les animated_image
+        query = query
+          .eq('type', 'image')
+          .is('metadata->carousel_id', null)
+          .is('metadata->isAnimatedVideo', null);
       } else {
-        // Videos = type 'video'
-        query = query.eq('type', 'video');
+        // Videos = type 'video' OU type 'image' avec tag animated_image
+        // On utilise une approche en deux requêtes pour gérer les deux cas
+        const { data: videoData, error: videoError } = await supabase
+          .from('media_generations')
+          .select('id, type, status, output_url, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes')
+          .eq('user_id', userId)
+          .eq('type', 'video')
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (videoError) {
+          console.error('[LibraryAssets] Video query error:', videoError);
+          throw videoError;
+        }
+
+        // Récupérer aussi les library_assets avec tag animated_image
+        const { data: animatedData, error: animatedError } = await supabase
+          .from('library_assets')
+          .select('id, type, cloudinary_url, metadata, created_at, brand_id, tags, format')
+          .eq('user_id', userId)
+          .contains('tags', ['animated_image'])
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (animatedError) {
+          console.error('[LibraryAssets] Animated query error:', animatedError);
+        }
+
+        // Fusionner les deux sources
+        const combinedData = [
+          ...(videoData || []),
+          ...(animatedData || []).map(a => ({
+            id: a.id,
+            type: 'video' as const,
+            status: 'completed',
+            output_url: a.cloudinary_url,
+            thumbnail_url: a.cloudinary_url?.replace('/video/', '/image/').replace('.mp4', '.jpg') || null,
+            prompt: null,
+            engine: null,
+            woofs: 3,
+            created_at: a.created_at || new Date().toISOString(),
+            expires_at: null,
+            metadata: a.metadata,
+            job_id: null,
+            is_source_upload: false,
+            brand_id: a.brand_id,
+            duration_seconds: (a.metadata as any)?.duration || 3,
+            file_size_bytes: null,
+          }))
+        ].sort((a, b) => {
+          const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return dateB - dateA;
+        });
+
+        console.log(`[LibraryAssets] Loaded ${videoData?.length || 0} videos + ${animatedData?.length || 0} animated images`);
+        
+        const mappedAssets = combinedData.map(asset => ({
+          ...asset,
+          output_url: asset.output_url || asset.thumbnail_url || '',
+          thumbnail_url: asset.thumbnail_url || undefined,
+        })) as LibraryAsset[];
+        
+        setAssets(mappedAssets);
+        setRetryCount(0);
+        setLoading(false);
+        return;
       }
 
       const { data, error } = await query
@@ -213,92 +236,6 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
       
       setAssets(mappedAssets);
       setRetryCount(0); // Reset retry count on success
-
-      // Vérifier et débloquer les vidéos "processing" (si prédiction connue)
-      if (type === 'videos' && data && data.length > 0) {
-        const processing = (data as any[]).filter(
-          a => a.type === 'video' && ((a.status === 'processing') || !a.output_url)
-        );
-        for (const a of processing) {
-          const genId = a.metadata?.predictionId || a.metadata?.id;
-          const { provider: providerForStatus, engine: engineForDb } = resolveProviderForStatus(a);
-          const jobId =
-            a.job_id ||
-            a.metadata?.jobId ||
-            a.metadata?.job_id ||
-            a.metadata?.taskId ||
-            a.metadata?.task_id;
-          if (!genId) continue;
-          try {
-            const { data: statusData, error: statusError } = await supabase.functions.invoke('generate-video', {
-              body: { generationId: genId, provider: providerForStatus, jobId },
-            });
-            const hasBackendError = Boolean(statusData?.error);
-            if (!statusError && !hasBackendError) {
-              const rawStatus =
-                (typeof statusData?.status === 'string' && statusData.status) ||
-                (typeof statusData?.state === 'string' && statusData.state) ||
-                '';
-              const status = rawStatus.toLowerCase();
-              const isCompleted = COMPLETED_STATUSES.includes(status);
-              const isFailed = ['failed', 'error', 'cancelled', 'canceled'].includes(status);
-              const videoUrl =
-                extractMediaUrl(statusData?.output) ||
-                extractMediaUrl(statusData?.metadata) ||
-                extractMediaUrl(statusData);
-
-              const updatePayload: Record<string, any> = {};
-
-              const metadataUpdate: Record<string, any> = isRecord(a.metadata) ? { ...a.metadata } : {};
-              metadataUpdate.providerResolved = providerForStatus;
-              metadataUpdate.provider = metadataUpdate.provider ?? providerForStatus;
-              metadataUpdate.providerInternal = metadataUpdate.providerInternal ?? providerForStatus;
-              if (typeof statusData?.provider === 'string') {
-                metadataUpdate.provider = statusData.provider;
-              }
-              if (typeof statusData?.providerInternal === 'string') {
-                metadataUpdate.providerInternal = statusData.providerInternal;
-              }
-              metadataUpdate.lastStatus = status || rawStatus;
-              metadataUpdate.statusCheckedAt = new Date().toISOString();
-
-              if (videoUrl) {
-                metadataUpdate.outputUrl = videoUrl;
-              }
-
-              const durationFromStatus =
-                extractDuration(statusData?.metadata) ?? extractDuration(statusData?.duration) ?? extractDuration(statusData);
-              if (durationFromStatus !== null) {
-                updatePayload.duration_seconds = Math.round(durationFromStatus);
-              }
-
-              if (isCompleted && videoUrl) {
-                updatePayload.output_url = videoUrl;
-                updatePayload.status = 'completed';
-                if (engineForDb) {
-                  updatePayload.engine = engineForDb;
-                  metadataUpdate.provider = metadataUpdate.provider ?? engineForDb;
-                }
-              } else if (isFailed) {
-                updatePayload.status = 'failed';
-              }
-
-              if (Object.keys(metadataUpdate).length > 0) {
-                updatePayload.metadata = metadataUpdate;
-              }
-
-              if (Object.keys(updatePayload).length > 0) {
-                await supabase
-                  .from('media_generations')
-                  .update(updatePayload)
-                  .eq('id', a.id);
-              }
-            }
-          } catch (e) {
-            console.warn('Verification vidéo échouée pour', a.id, e);
-          }
-        }
-      }
     } catch (error: any) {
       console.error('[LibraryAssets] Fetch error:', error);
       
