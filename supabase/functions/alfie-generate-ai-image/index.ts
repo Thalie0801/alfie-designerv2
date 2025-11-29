@@ -308,8 +308,12 @@ Deno.serve(async (req) => {
         
         try {
           const cloudinaryResult = await uploadToCloudinary(generatedImageUrl, {
-            folder: `brands/${brandId || 'unknown'}/images`,
-            publicId: `img_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+            folder: orderId 
+              ? `alfie/${brandId}/orders/${orderId}` 
+              : `alfie/${brandId}/images`,  // ✅ Cohérent avec le reste du système
+            publicId: orderId 
+              ? `animated_base_${Date.now()}`
+              : `img_${Date.now()}_${Math.random().toString(36).substring(7)}`,
             tags: [userId, 'generated', 'image'].filter(Boolean) as string[],
           });
           generatedImageUrl = cloudinaryResult.secureUrl;
