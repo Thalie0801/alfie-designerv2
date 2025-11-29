@@ -7,7 +7,6 @@ import {
 } from '../_shared/env.ts';
 
 import { corsHeaders } from "../_shared/cors.ts";
-import { uploadToCloudinary } from "../_shared/cloudinaryUploader.ts";
 /* ------------------------------- CORS ------------------------------- */
 function jsonRes(body: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(body), {
@@ -308,39 +307,52 @@ Deno.serve(async (req) => {
       
       // Upload uniquement si ce n'est pas déjà une URL Cloudinary
       if (!isCloudinary) {
-        console.log(`[alfie-generate-ai-image] Uploading ${isBase64 ? 'base64' : 'HTTP URL'} to Cloudinary...`);
+        console.log(`[alfie-generate-ai-image] Uploading ${isBase64 ? 'base64' : 'HTTP URL'} to Cloudinary via SDK...`);
         
         if (!brandId) {
           console.warn('[alfie-generate-ai-image] ⚠️ Missing brandId, using "unknown" folder');
         }
         
         try {
-          const cloudinaryResult = await uploadToCloudinary(generatedImageUrl, {
-            folder: orderId 
-              ? `alfie/${brandId}/orders/${orderId}` 
-              : `alfie/${brandId}/images`,  // ✅ Cohérent avec le reste du système
-            publicId: orderId 
-              ? `animated_base_${Date.now()}`
-              : `img_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-            tags: [userId, 'generated', 'image'].filter(Boolean) as string[],
+          // ✅ ALIGNED WITH CAROUSELS: Use official Cloudinary SDK via edge function
+          const { data: cloudinaryResult, error: uploadErr } = await sbService.functions.invoke("cloudinary", {
+            body: {
+              action: "upload",
+              params: {
+                file: generatedImageUrl,  // ← Accepts base64 OR HTTP URL
+                folder: orderId 
+                  ? `alfie/${brandId}/orders/${orderId}` 
+                  : `alfie/${brandId}/images`,
+                public_id: orderId 
+                  ? `animated_base_${Date.now()}`
+                  : `img_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+                resource_type: "image",
+                tags: [userId, 'generated', 'animated_base'].filter(Boolean),
+              },
+            },
           });
-          generatedImageUrl = cloudinaryResult.secureUrl;
-          cloudinaryPublicId = cloudinaryResult.publicId;
+
+          if (uploadErr || !cloudinaryResult) {
+            throw new Error(`Cloudinary upload failed: ${uploadErr?.message || 'Unknown error'}`);
+          }
+
+          // ✅ Le SDK Cloudinary retourne TOUJOURS le public_id complet avec folder
+          cloudinaryPublicId = cloudinaryResult.public_id;  // ← "alfie/.../animated_base_1234"
+          generatedImageUrl = cloudinaryResult.secure_url;  // ← URL complète
           
           // Logs détaillés du résultat d'upload
-          console.log('[alfie-generate-ai-image] Cloudinary upload result:', {
-            secure_url: cloudinaryResult.secureUrl,
-            public_id: cloudinaryResult.publicId,
-            publicId_includes_folder: cloudinaryResult.publicId?.includes('/'),
+          console.log('[alfie-generate-ai-image] ✅ Cloudinary SDK upload result:', {
+            secure_url: cloudinaryResult.secure_url,
+            public_id: cloudinaryResult.public_id,
+            publicId_includes_folder: cloudinaryResult.public_id?.includes('/'),
+            publicId_starts_with_alfie: cloudinaryResult.public_id?.startsWith('alfie/'),
             expected_format: `alfie/${brandId}/orders/${orderId}/animated_base_...`,
           });
           
-          console.log('[alfie-generate-ai-image] Full publicId from Cloudinary:', cloudinaryResult.publicId);
-          console.log('[alfie-generate-ai-image] Expected format: alfie/{brandId}/orders/{orderId}/animated_base_...');
+          console.log('[alfie-generate-ai-image] Full publicId from Cloudinary SDK:', cloudinaryResult.public_id);
 
           // Vérification debug : l'image existe-t-elle vraiment ?
-          const verifyUrl = cloudinaryResult.secureUrl ?? 
-            `https://res.cloudinary.com/${Deno.env.get("CLOUDINARY_CLOUD_NAME")}/image/upload/${cloudinaryResult.publicId}`;
+          const verifyUrl = cloudinaryResult.secure_url;
           console.log('[alfie-generate-ai-image] Verifying image exists:', verifyUrl);
           
           try {
@@ -348,7 +360,8 @@ Deno.serve(async (req) => {
             if (!verifyResponse.ok) {
               console.error('[alfie-generate-ai-image] ⚠️ Image verification failed:', {
                 status: verifyResponse.status,
-                statusText: verifyResponse.statusText
+                statusText: verifyResponse.statusText,
+                url: verifyUrl,
               });
             } else {
               console.log('[alfie-generate-ai-image] ✅ Image verified on Cloudinary');
