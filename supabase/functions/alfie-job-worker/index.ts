@@ -1336,6 +1336,12 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
     const imageError = extractError(imageResult) ?? extractError(imageData);
     if (imageError) throw new Error(imageError || "Base image generation failed");
 
+    console.log("[processAnimateImage] Received from alfie-generate-ai-image:", {
+      imageUrl: imageData?.imageUrl,
+      cloudinaryPublicId: imageData?.cloudinaryPublicId,
+      hasPublicId: !!imageData?.cloudinaryPublicId,
+    });
+
     const imageUrl = imageData?.imageUrl || imageData?.url || imageData?.data?.url;
     if (!imageUrl) throw new Error("No image URL returned from generation");
 
@@ -1376,6 +1382,11 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
   const animatePayload = unwrapResult<any>(animateResult);
   const animateError = extractError(animateResult) ?? extractError(animatePayload);
   if (animateError) throw new Error(animateError || "Image animation failed");
+
+  console.log("[processAnimateImage] Received from animate-image:", {
+    videoUrl: animatePayload?.videoUrl,
+    success: !!animatePayload?.success,
+  });
 
   const videoUrl = animatePayload?.videoUrl || animatePayload?.data?.videoUrl;
   if (!videoUrl) throw new Error("Missing videoUrl from animate-image response");

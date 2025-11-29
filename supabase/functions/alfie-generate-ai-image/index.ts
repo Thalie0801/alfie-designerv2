@@ -326,7 +326,31 @@ Deno.serve(async (req) => {
           });
           generatedImageUrl = cloudinaryResult.secureUrl;
           cloudinaryPublicId = cloudinaryResult.publicId;
-          console.log('[alfie-generate-ai-image] ✅ Uploaded to Cloudinary:', cloudinaryResult.publicId);
+          
+          // Logs détaillés du résultat d'upload
+          console.log('[alfie-generate-ai-image] Cloudinary upload result:', {
+            secure_url: cloudinaryResult.secureUrl,
+            public_id: cloudinaryResult.publicId,
+          });
+
+          // Vérification debug : l'image existe-t-elle vraiment ?
+          const verifyUrl = cloudinaryResult.secureUrl ?? 
+            `https://res.cloudinary.com/${Deno.env.get("CLOUDINARY_CLOUD_NAME")}/image/upload/${cloudinaryResult.publicId}`;
+          console.log('[alfie-generate-ai-image] Verifying image exists:', verifyUrl);
+          
+          try {
+            const verifyResponse = await fetch(verifyUrl, { method: "HEAD" });
+            if (!verifyResponse.ok) {
+              console.error('[alfie-generate-ai-image] ⚠️ Image verification failed:', {
+                status: verifyResponse.status,
+                statusText: verifyResponse.statusText
+              });
+            } else {
+              console.log('[alfie-generate-ai-image] ✅ Image verified on Cloudinary');
+            }
+          } catch (err) {
+            console.error('[alfie-generate-ai-image] ⚠️ Error verifying image:', err);
+          }
         } catch (cloudinaryError) {
           console.error('[alfie-generate-ai-image] Cloudinary upload failed:', cloudinaryError);
           throw new Error(`Failed to upload to Cloudinary: ${cloudinaryError instanceof Error ? cloudinaryError.message : 'Unknown error'}`);

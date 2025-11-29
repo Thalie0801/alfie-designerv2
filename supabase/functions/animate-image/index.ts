@@ -74,6 +74,16 @@ Deno.serve(async (req) => {
     const duration = typeof body?.duration === "number" ? body.duration : 3;
     const aspect = typeof body?.aspect === "string" ? body.aspect : "4:5";
 
+    // Logs d'entrée détaillés
+    console.log("[animate-image] Input parameters:", {
+      imagePublicId,
+      cloudName,
+      brandId,
+      orderId,
+      duration,
+      aspect,
+    });
+
     if (!imagePublicId || !cloudName) {
       return jsonResponse({ error: "Missing imagePublicId or cloudName" }, { status: 400 });
     }
@@ -126,6 +136,37 @@ Deno.serve(async (req) => {
       console.log(`[animate-image] ⏭️ Skipping Woofs consumption (already consumed by pack)`);
     }
 
+    // Vérifier que l'image source existe sur Cloudinary
+    const sourceImageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${imagePublicId}`;
+    console.log("[animate-image] Verifying source image:", sourceImageUrl);
+
+    try {
+      const verifyResponse = await fetch(sourceImageUrl, { method: "HEAD" });
+      if (!verifyResponse.ok) {
+        console.error("[animate-image] ❌ Source image does not exist on Cloudinary:", {
+          imagePublicId,
+          status: verifyResponse.status,
+          statusText: verifyResponse.statusText,
+        });
+        return jsonResponse({
+          error: "Source image not found on Cloudinary",
+          imagePublicId,
+          sourceImageUrl,
+          status: verifyResponse.status,
+        }, { status: 404 });
+      }
+      console.log("[animate-image] ✅ Source image verified");
+    } catch (err) {
+      console.error("[animate-image] ❌ Error verifying source image:", {
+        imagePublicId,
+        error: String(err),
+      });
+      return jsonResponse({
+        error: "Error while verifying source image",
+        imagePublicId,
+      }, { status: 500 });
+    }
+
     // Générer l'URL Cloudinary avec effet Ken Burns
     const ASPECT_DIM: Record<string, string> = {
       '1:1':  'w_1080,h_1080',
@@ -153,10 +194,11 @@ Deno.serve(async (req) => {
       `https://res.cloudinary.com/${cloudName}/video/upload`,
       `/${dim},c_fill,f_mp4,${kenBurns}`,
       overlays.length ? `/${overlays.join('/')}` : '',
-      `/${imagePublicId}.mp4`
+      `/${imagePublicId}`  // ✅ Sans extension - Cloudinary gère automatiquement le format
     ].join('');
 
-    console.log("[animate-image] Generated video URL:", videoUrl);
+    console.log("[animate-image] sourcePublicId:", imagePublicId);
+    console.log("[animate-image] animationUrl:", videoUrl);
 
     // 4️⃣ Utiliser adminClient pour les sauvegardes DB quand appel interne
     const dbClient = isInternalCall ? adminClient : createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
