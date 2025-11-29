@@ -88,8 +88,15 @@ export default function Library() {
   };
 
   const getDaysUntilExpiry = (expiresAt: string) => {
+    // ✅ Vidéos permanentes (Cloudinary) n'ont pas d'expiration
+    if (!expiresAt || expiresAt === 'null') return 9999;
+    
     const now = new Date();
     const expiry = new Date(expiresAt);
+    
+    // Si date invalide, considérer comme permanent
+    if (isNaN(expiry.getTime())) return 9999;
+    
     const days = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     return days;
   };

@@ -175,6 +175,7 @@ Deno.serve(async (req) => {
         output_url: videoUrl,
         thumbnail_url: `https://res.cloudinary.com/${cloudName}/image/upload/${imagePublicId}.jpg`,
         duration_seconds: duration,
+        expires_at: null, // ✅ Vidéos Cloudinary permanentes - pas d'expiration
         metadata: {
           orderId,
           sourceImagePublicId: imagePublicId,
