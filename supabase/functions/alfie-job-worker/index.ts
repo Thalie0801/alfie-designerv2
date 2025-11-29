@@ -1359,6 +1359,7 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
     subtitle,
     duration,
     aspect,
+    skipWoofs: true, // ✅ Woofs déjà consommés lors de la création du pack
   });
 
   const animatePayload = unwrapResult<any>(animateResult);
