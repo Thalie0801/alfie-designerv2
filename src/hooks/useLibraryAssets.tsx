@@ -148,12 +148,15 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
           .is('metadata->isAnimatedVideo', null);
       } else {
         // Videos = type 'video' OU type 'image' avec tag animated_image
-        // On utilise une approche en deux requêtes pour gérer les deux cas
+        // On utilise une approche en trois requêtes pour gérer les cas
+
+        // 1. Vidéos classiques (type='video' SANS ken_burns)
         const { data: videoData, error: videoError } = await supabase
           .from('media_generations')
           .select('id, type, status, output_url, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes')
           .eq('user_id', userId)
           .eq('type', 'video')
+          .is('metadata->animationType', null)
           .order('created_at', { ascending: false })
           .limit(20);
 
@@ -162,7 +165,21 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
           throw videoError;
         }
 
-        // Récupérer aussi les library_assets avec tag animated_image
+        // 2. Vidéos animées Ken Burns depuis media_generations
+        const { data: animatedFromMedia, error: mediaAnimError } = await supabase
+          .from('media_generations')
+          .select('id, type, status, output_url, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes')
+          .eq('user_id', userId)
+          .eq('type', 'video')
+          .eq('metadata->animationType', 'ken_burns')
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (mediaAnimError) {
+          console.error('[LibraryAssets] Animated from media query error:', mediaAnimError);
+        }
+
+        // 3. Vidéos animées depuis library_assets (backup)
         const { data: animatedData, error: animatedError } = await supabase
           .from('library_assets')
           .select('id, type, cloudinary_url, metadata, created_at, brand_id, tags, format')
@@ -172,12 +189,13 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
           .limit(20);
 
         if (animatedError) {
-          console.error('[LibraryAssets] Animated query error:', animatedError);
+          console.error('[LibraryAssets] Animated from library query error:', animatedError);
         }
 
-        // Fusionner les deux sources
+        // Fusionner les trois sources
         const combinedData = [
           ...(videoData || []),
+          ...(animatedFromMedia || []),
           ...(animatedData || []).map(a => ({
             id: a.id,
             type: 'video' as const,
@@ -202,7 +220,7 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
           return dateB - dateA;
         });
 
-        console.log(`[LibraryAssets] Loaded ${videoData?.length || 0} videos + ${animatedData?.length || 0} animated images`);
+        console.log(`[LibraryAssets] Loaded ${videoData?.length || 0} videos + ${animatedFromMedia?.length || 0} ken_burns + ${animatedData?.length || 0} animated images`);
         
         const mappedAssets = combinedData.map(asset => ({
           ...asset,

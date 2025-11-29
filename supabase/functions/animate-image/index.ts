@@ -1,6 +1,7 @@
 /**
  * animate-image - Applique un effet Ken Burns (Cloudinary) sur une image
  * Coût : 3 Woofs
+ * Deployed: 2025-01-30 - Force re-deploy to fix library_assets type
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
