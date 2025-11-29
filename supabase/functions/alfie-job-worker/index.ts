@@ -1341,6 +1341,12 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
       cloudinaryPublicId: imageData?.cloudinaryPublicId,
       hasPublicId: !!imageData?.cloudinaryPublicId,
     });
+    
+    console.log("[processAnimateImage] cloudinaryPublicId format:", {
+      publicId: imageData?.cloudinaryPublicId,
+      includesFolder: imageData?.cloudinaryPublicId?.startsWith('alfie/'),
+      includesSlash: imageData?.cloudinaryPublicId?.includes('/'),
+    });
 
     const imageUrl = imageData?.imageUrl || imageData?.url || imageData?.data?.url;
     if (!imageUrl) throw new Error("No image URL returned from generation");
@@ -1392,10 +1398,14 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
   const videoUrl = animatePayload?.videoUrl || animatePayload?.data?.videoUrl;
   if (!videoUrl) throw new Error("Missing videoUrl from animate-image response");
 
-  // ✅ Valider que c'est une vraie URL Cloudinary
-  if (!videoUrl.startsWith("http")) {
-    console.error("[processAnimateImage] ❌ Invalid videoUrl from animate-image", { videoUrl });
-    throw new Error("Invalid video URL for animated image");
+  // ✅ Valider que c'est une vraie URL Cloudinary complète
+  if (!videoUrl || !videoUrl.startsWith('https://res.cloudinary.com')) {
+    console.error("[processAnimateImage] ❌ Invalid videoUrl format - expected full Cloudinary URL", { 
+      videoUrl,
+      startsWithHttp: videoUrl?.startsWith('http'),
+      startsWithCloudinary: videoUrl?.startsWith('https://res.cloudinary.com')
+    });
+    throw new Error("Invalid video URL for animated image - expected full Cloudinary URL");
   }
 
   console.log("✅ [processAnimateImage] Animated image:", videoUrl);

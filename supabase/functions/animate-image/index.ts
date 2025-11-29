@@ -20,6 +20,9 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Version marker for debugging
+    console.log("[animate-image] 🚀 NEW VERSION DEPLOYED - v2.0 - KenBurns fix");
+    
     // 1️⃣ Vérifier si c'est un appel interne via x-internal-secret
     const internalSecret = req.headers.get("x-internal-secret") || req.headers.get("X-Internal-Secret");
     const { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY } = await import("../_shared/env.ts");
@@ -77,6 +80,8 @@ Deno.serve(async (req) => {
     // Logs d'entrée détaillés
     console.log("[animate-image] Input parameters:", {
       imagePublicId,
+      imagePublicIdFormat: imagePublicId?.includes('/') ? 'WITH_FOLDER' : 'NO_FOLDER',
+      imagePublicIdStartsWithAlfie: imagePublicId?.startsWith('alfie/'),
       cloudName,
       brandId,
       orderId,
@@ -145,9 +150,11 @@ Deno.serve(async (req) => {
       if (!verifyResponse.ok) {
         console.error("[animate-image] ❌ Source image does not exist on Cloudinary:", {
           imagePublicId,
+          sourceImageUrl,
           status: verifyResponse.status,
           statusText: verifyResponse.statusText,
         });
+        console.error("[animate-image] ❌ HEAD request failed for:", sourceImageUrl);
         return jsonResponse({
           error: "Source image not found on Cloudinary",
           imagePublicId,
@@ -205,34 +212,8 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: req.headers.get("Authorization") || "" } }
     });
 
-    // Sauvegarder dans media_generations (type=video, engine=NULL pour Cloudinary)
-    const { error: mediaError } = await dbClient
-      .from('media_generations')
-      .insert({
-        user_id: userId,
-        brand_id: brandId,
-        type: 'video',
-        engine: null, // Cloudinary Ken Burns n'est pas dans l'enum video_engine
-        status: 'completed',
-        output_url: videoUrl,
-        thumbnail_url: `https://res.cloudinary.com/${cloudName}/image/upload/${imagePublicId}.jpg`,
-        duration_seconds: duration,
-        expires_at: null, // ✅ Vidéos Cloudinary permanentes - pas d'expiration
-        metadata: {
-          orderId,
-          sourceImagePublicId: imagePublicId,
-          aspect,
-          title,
-          subtitle,
-          generatedAt: new Date().toISOString(),
-          animationType: 'ken_burns',
-          engine: 'cloudinary_kenburns' // Stocker ici pour référence
-        },
-      });
-
-    if (mediaError) {
-      console.error("[animate-image] Failed to save to media_generations:", mediaError);
-    }
+    // ✅ Suppression de la double insertion dans media_generations
+    // alfie-job-worker gère déjà cette insertion - on garde uniquement library_assets ici
 
     // Sauvegarder dans library_assets (type=image car constraint accepte seulement image/carousel_slide)
     if (orderId) {

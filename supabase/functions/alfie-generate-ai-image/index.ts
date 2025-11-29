@@ -331,7 +331,12 @@ Deno.serve(async (req) => {
           console.log('[alfie-generate-ai-image] Cloudinary upload result:', {
             secure_url: cloudinaryResult.secureUrl,
             public_id: cloudinaryResult.publicId,
+            publicId_includes_folder: cloudinaryResult.publicId?.includes('/'),
+            expected_format: `alfie/${brandId}/orders/${orderId}/animated_base_...`,
           });
+          
+          console.log('[alfie-generate-ai-image] Full publicId from Cloudinary:', cloudinaryResult.publicId);
+          console.log('[alfie-generate-ai-image] Expected format: alfie/{brandId}/orders/{orderId}/animated_base_...');
 
           // Vérification debug : l'image existe-t-elle vraiment ?
           const verifyUrl = cloudinaryResult.secureUrl ?? 
