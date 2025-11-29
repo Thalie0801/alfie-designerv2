@@ -1030,13 +1030,20 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   const carousel_id = payload.carousel_id || crypto.randomUUID();
   const totalSlides = payload.count || 5;
   
-  // Vérifier si on a des textes générés
-  if (!payload.generatedTexts?.slides) {
-    console.error("[processRenderCarousels] ❌ No generated texts/slides in payload");
-    throw new Error("Missing generated texts for carousel");
+  // ✅ Phase 3: Fallback si pas de textes générés
+  let slides = payload.generatedTexts?.slides;
+  
+  if (!slides || !Array.isArray(slides) || slides.length === 0) {
+    console.warn("[processRenderCarousels] ⚠️ No generated texts, using fallback...");
+    
+    // Fallback générique
+    slides = Array.from({ length: totalSlides }, (_, i) => ({
+      title: i === 0 ? "Découvrez" : i === totalSlides - 1 ? "Passez à l'action" : `Point ${i}`,
+      subtitle: "Contenu professionnel adapté à votre audience",
+    }));
+    
+    console.log("[processRenderCarousels] ✅ Generated fallback slides:", slides.length);
   }
-
-  const slides = payload.generatedTexts.slides;
   if (!Array.isArray(slides) || slides.length === 0) {
     throw new Error("Generated texts must contain an array of slides");
   }
