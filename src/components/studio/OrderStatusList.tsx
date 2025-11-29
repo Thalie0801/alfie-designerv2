@@ -37,7 +37,7 @@ export function OrderStatusList({ brandId, userId }: OrderStatusListProps) {
           .eq("user_id", userId)
           .eq("brand_id", brandId)
           .order("created_at", { ascending: false })
-          .limit(10);
+          .limit(5);
 
         if (ordersError) throw ordersError;
 
@@ -141,7 +141,7 @@ export function OrderStatusList({ brandId, userId }: OrderStatusListProps) {
   };
 
   return (
-    <Card className="p-4 space-y-3">
+    <Card className="p-4 space-y-3 overflow-hidden">
       <h3 className="font-semibold text-sm">Générations récentes</h3>
       <div className="space-y-2">
         {orders.map((order) => (
@@ -154,8 +154,8 @@ export function OrderStatusList({ brandId, userId }: OrderStatusListProps) {
             }}
           >
             <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 space-y-1">
-                <p className="text-sm font-medium truncate">{order.campaign_name}</p>
+              <div className="flex-1 min-w-0 space-y-1">
+                <p className="text-sm font-medium truncate max-w-full">{order.campaign_name}</p>
                 <p className="text-xs text-muted-foreground">
                   {order.created_at &&
                     formatDistanceToNow(new Date(order.created_at), {
