@@ -182,7 +182,7 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
       // Pour images : exclure les carousel_slide qui doivent apparaître uniquement dans l'onglet Carrousels
       let query = supabase
         .from('media_generations')
-        .select('id, type, status, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes')
+        .select('id, type, status, output_url, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes')
         .eq('user_id', userId);
 
       if (type === 'images') {
@@ -204,10 +204,10 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
 
       console.log(`[LibraryAssets] Loaded ${data?.length || 0} ${type}`);
       
-      // Map data to include a placeholder output_url that will be loaded on demand
+      // Map data with actual output_url from database
       const mappedAssets = (data || []).map(asset => ({
         ...asset,
-        output_url: asset.thumbnail_url || '', // Use thumbnail as placeholder, full URL loaded on download
+        output_url: asset.output_url || asset.thumbnail_url || '',
         thumbnail_url: asset.thumbnail_url || undefined,
       })) as LibraryAsset[];
       
