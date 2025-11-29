@@ -341,7 +341,12 @@ Deno.serve(async (req) => {
             });
             break;
           case "animate_image":
-            result = await processAnimateImage(job.payload);
+            result = await processAnimateImage(job.payload, {
+              user_id: job.user_id,
+              order_id: job.order_id,
+              job_id: job.id,
+              use_brand_kit: job.payload?.useBrandKit ?? true,
+            });
             break;
           default:
             console.warn("⚠️ unknown job type", job.type);
@@ -1017,6 +1022,10 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
 
     console.log("[processGenerateVideo] ✅ VEO 3.1 video created:", videoUrl);
 
+    // Générer thumbnail pour VEO 3.1 (extraire une frame ou utiliser placeholder)
+    const thumbnailUrl = veoResult?.thumbnail_url || 
+      `https://res.cloudinary.com/${cloudName}/video/upload/so_0,w_400,h_400,c_fill,f_jpg/${veoResult?.public_id || 'video_placeholder'}.jpg`;
+
     // Sauvegarder
     const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
       user_id: userId,
@@ -1025,6 +1034,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       engine: "veo_3_1",
       status: "completed",
       output_url: videoUrl,
+      thumbnail_url: thumbnailUrl,
       metadata: {
         prompt: videoPrompt,
         aspectRatio,
@@ -1047,6 +1057,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
         prompt: videoPrompt,
         duration: durationSec,
         generator: "veo_3_1",
+        thumbnailUrl,
       },
     });
     if (libErr) throw new Error(libErr.message);
@@ -1279,10 +1290,15 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   };
 }
 
-async function processAnimateImage(payload: any) {
-  console.log("🎬 [processAnimateImage]", payload?.orderId);
+async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; order_id?: string; job_id?: string; use_brand_kit?: boolean }) {
+  console.log("🎬 [processAnimateImage]", payload?.orderId || jobMeta?.order_id);
 
-  const { userId, brandId, orderId, imagePublicId, cloudName, title, subtitle, duration, aspect } = payload;
+  const userId = payload.userId || jobMeta?.user_id;
+  const orderId = payload.orderId || jobMeta?.order_id;
+  const brandId = payload.brandId;
+  const useBrandKit = resolveUseBrandKit(payload, jobMeta);
+  
+  const { imagePublicId, cloudName, title, subtitle, duration, aspect } = payload;
 
   if (!imagePublicId || !cloudName) {
     throw new Error("Missing imagePublicId or cloudName for animation");
