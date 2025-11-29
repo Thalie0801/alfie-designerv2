@@ -275,11 +275,22 @@ export function StudioGenerator() {
 
       // Cas 1 : Brief rempli - générer pack personnalisé
       if (brief.trim()) {
-        const userMessage = `Nom de la campagne : ${campaignName}
+        const userMessage = `BRIEF DE CAMPAGNE :
+Nom : ${campaignName}
+Objectif : ${brief}
 
-Brief : ${brief}
+Ta mission : Propose-moi un PACK COMPLET de 4 à 6 visuels cohérents avec ce brief.
 
-Prépare-moi un pack complet avec plusieurs types de visuels (images, carrousels, vidéos) adaptés à cet objectif.`;
+Chaque visuel doit avoir un RÔLE DISTINCT dans la campagne :
+- Teaser ou accroche
+- Éducation ou explication
+- Preuve sociale ou témoignage
+- Call-to-action fort
+- Behind-the-scenes ou storytelling
+
+Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vidéo selon mon budget.
+
+Base-toi sur mon BRIEF pour le contenu, et utilise mon Brand Kit uniquement pour le style.`;
 
         const { data, error } = await supabase.functions.invoke("alfie-chat-widget", {
           body: {
