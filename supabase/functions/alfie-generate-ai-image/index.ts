@@ -291,20 +291,28 @@ Deno.serve(async (req) => {
       if (!generatedImageUrl) throw new Error("No image generated");
     }
 
-    // --- Upload to Cloudinary if base64 ---
-    if (generatedImageUrl && generatedImageUrl.startsWith('data:')) {
-      console.log('[alfie-generate-ai-image] Uploading base64 to Cloudinary...');
-      try {
-        const cloudinaryResult = await uploadToCloudinary(generatedImageUrl, {
-          folder: `brands/${brandId || 'unknown'}/images`,
-          publicId: `img_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-          tags: [userId, 'generated', 'image'].filter(Boolean) as string[],
-        });
-        generatedImageUrl = cloudinaryResult.secureUrl;
-        console.log('[alfie-generate-ai-image] ✅ Uploaded to Cloudinary:', cloudinaryResult.publicId);
-      } catch (cloudinaryError) {
-        console.error('[alfie-generate-ai-image] Cloudinary upload failed:', cloudinaryError);
-        throw new Error(`Failed to upload to Cloudinary: ${cloudinaryError instanceof Error ? cloudinaryError.message : 'Unknown error'}`);
+    // --- TOUJOURS uploader sur Cloudinary (requis pour Ken Burns) ---
+    if (generatedImageUrl) {
+      const isBase64 = generatedImageUrl.startsWith('data:');
+      const isCloudinary = generatedImageUrl.includes('cloudinary.com');
+      
+      // Upload uniquement si ce n'est pas déjà une URL Cloudinary
+      if (!isCloudinary) {
+        console.log(`[alfie-generate-ai-image] Uploading ${isBase64 ? 'base64' : 'HTTP URL'} to Cloudinary...`);
+        try {
+          const cloudinaryResult = await uploadToCloudinary(generatedImageUrl, {
+            folder: `brands/${brandId || 'unknown'}/images`,
+            publicId: `img_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+            tags: [userId, 'generated', 'image'].filter(Boolean) as string[],
+          });
+          generatedImageUrl = cloudinaryResult.secureUrl;
+          console.log('[alfie-generate-ai-image] ✅ Uploaded to Cloudinary:', cloudinaryResult.publicId);
+        } catch (cloudinaryError) {
+          console.error('[alfie-generate-ai-image] Cloudinary upload failed:', cloudinaryError);
+          throw new Error(`Failed to upload to Cloudinary: ${cloudinaryError instanceof Error ? cloudinaryError.message : 'Unknown error'}`);
+        }
+      } else {
+        console.log('[alfie-generate-ai-image] ✅ Already a Cloudinary URL, no upload needed');
       }
     }
 
