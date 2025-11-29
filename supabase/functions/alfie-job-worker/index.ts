@@ -1386,12 +1386,73 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
   console.log("[processAnimateImage] Received from animate-image:", {
     videoUrl: animatePayload?.videoUrl,
     success: !!animatePayload?.success,
+    raw: animatePayload,
   });
 
   const videoUrl = animatePayload?.videoUrl || animatePayload?.data?.videoUrl;
   if (!videoUrl) throw new Error("Missing videoUrl from animate-image response");
 
+  // ✅ Valider que c'est une vraie URL Cloudinary
+  if (!videoUrl.startsWith("http")) {
+    console.error("[processAnimateImage] ❌ Invalid videoUrl from animate-image", { videoUrl });
+    throw new Error("Invalid video URL for animated image");
+  }
+
   console.log("✅ [processAnimateImage] Animated image:", videoUrl);
+
+  // ✅ Sauvegarder dans media_generations
+  const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
+    user_id: userId,
+    brand_id: brandId,
+    type: "video",
+    status: "completed",
+    output_url: videoUrl,
+    thumbnail_url: `https://res.cloudinary.com/${cloudName}/image/upload/${imagePublicId}.jpg`,
+    metadata: {
+      orderId,
+      sourceImagePublicId: imagePublicId,
+      aspectRatio: aspect,
+      duration: duration,
+      title,
+      subtitle,
+      generator: "cloudinary_kenburns",
+      animationType: "ken_burns",
+    },
+  });
+  if (mediaErr) {
+    console.error("[processAnimateImage] Failed to save to media_generations:", mediaErr);
+  }
+
+  // ✅ Sauvegarder dans library_assets
+  const { error: libErr } = await supabaseAdmin.from("library_assets").insert({
+    user_id: userId,
+    brand_id: brandId,
+    order_id: orderId,
+    type: "video",
+    format: aspect,
+    cloudinary_url: videoUrl,
+    cloudinary_public_id: imagePublicId,
+    tags: ["video", "alfie", "animated_image", "kenburns"],
+    metadata: {
+      sourceImagePublicId: imagePublicId,
+      duration,
+      aspect,
+      title,
+      subtitle,
+      animationType: "ken_burns",
+      generator: "cloudinary_kenburns",
+    },
+  } as any);
+  
+  if (libErr) {
+    console.error("[processAnimateImage] Failed to save to library_assets:", libErr);
+  }
+
+  console.log("[processAnimateImage] Saved animated video asset in library_assets", {
+    orderId,
+    videoUrl,
+    imagePublicId,
+  });
 
   return { videoUrl };
 }
