@@ -227,6 +227,14 @@ Deno.serve(async (req) => {
       console.warn("[alfie-generate-ai-image] Missing orderId in payload");
     }
 
+    console.log('[alfie-generate-ai-image] Received request:', { userId, brandId, orderId, orderItemId });
+
+    // Validation stricte du brandId
+    if (!brandId) {
+      console.error("[alfie-generate-ai-image] ❌ Missing brandId - cannot upload to Cloudinary");
+      return jsonRes({ error: "Missing brandId - required for image generation" }, { status: 400 });
+    }
+
     const sbService = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // --- Construire prompts & payload ---
