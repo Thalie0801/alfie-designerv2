@@ -198,33 +198,33 @@ async function callLLM(
     if (brandContext.palette && Array.isArray(brandContext.palette) && brandContext.palette.length > 0) {
       enrichedPrompt += `\nCouleurs de la marque : ${brandContext.palette.slice(0, 5).join(", ")}`;
     }
-    enrichedPrompt += `\n\n⚠️ ATTENTION - UTILISATION DU BRAND KIT :`;
+    enrichedPrompt += `\n\n--- ATTENTION - UTILISATION DU BRAND KIT ---`;
     enrichedPrompt += `\n- Le Brand Kit est UNIQUEMENT un CONTEXTE DE STYLE`;
     enrichedPrompt += `\n- INSPIRE-TOI du ton, des couleurs et de l'ambiance`;
     enrichedPrompt += `\n- NE COPIE JAMAIS le texte du Brand Kit mot pour mot`;
-    enrichedPrompt += `\n- Le CONTENU doit TOUJOURS être basé sur le BRIEF DE CAMPAGNE`;
-    enrichedPrompt += `\n- Utilise le secteur d'activité pour proposer des formats pertinents`;
-    enrichedPrompt += `\n\nIMPORTANT : Tu connais déjà le ton, le positionnement, les couleurs et le secteur via le Brand Kit. Ne redemande JAMAIS ces informations (ton, voix, niche, industrie, couleurs). Utilise ces données pour adapter tes recommandations de pack sans poser de questions redondantes.`;
+    enrichedPrompt += `\n- Le CONTENU doit TOUJOURS etre base sur le BRIEF DE CAMPAGNE`;
+    enrichedPrompt += `\n- Utilise le secteur d'activite pour proposer des formats pertinents`;
+    enrichedPrompt += `\n\nIMPORTANT : Tu connais deja le ton, le positionnement, les couleurs et le secteur via le Brand Kit. Ne redemande JAMAIS ces informations (ton, voix, niche, industrie, couleurs). Utilise ces donnees pour adapter tes recommandations de pack sans poser de questions redondantes.`;
   }
 
   // Si woofsRemaining fourni, inclure dans le contexte avec recommandations budget
   if (typeof woofsRemaining === 'number') {
     enrichedPrompt += `\n\n--- BUDGET WOOFS DE L'UTILISATEUR ---`;
-    enrichedPrompt += `\nWoofs restants : ${woofsRemaining} 🐾`;
-    enrichedPrompt += `\n\nCOÛTS PAR TYPE DE VISUEL :`;
+    enrichedPrompt += `\nWoofs restants : ${woofsRemaining}`;
+    enrichedPrompt += `\n\nCOUTS PAR TYPE DE VISUEL :`;
     enrichedPrompt += `\n- Image : 1 Woof`;
     enrichedPrompt += `\n- Carrousel : 1 Woof par slide (ex: 5 slides = 5 Woofs)`;
-    enrichedPrompt += `\n- Image animée (Ken Burns via Cloudinary, effet zoom/pan élégant) : 3 Woofs`;
-    enrichedPrompt += `\n- Vidéo standard (IA générative Replicate/Kling) : 10 Woofs`;
-    enrichedPrompt += `\n- Vidéo premium (IA Vertex AI Veo 3.1, qualité cinéma) : 50 Woofs`;
-    enrichedPrompt += `\n\n💡 RECOMMANDATIONS BUDGET-INTELLIGENTES :`;
-    enrichedPrompt += `\n- Budget < 10 Woofs : Mise en avant images (1 Woof) et images animées (3 Woofs). Les images animées Ken Burns sont une excellente option pour ajouter du mouvement sans exploser le budget.`;
-    enrichedPrompt += `\n- Budget 10-49 Woofs : Tu peux proposer carrousels (5-7 slides) + images animées + vidéo standard si justifié.`;
-    enrichedPrompt += `\n- Budget >= 50 Woofs : Tous les formats possibles, y compris vidéo premium Veo 3.1.`;
-    enrichedPrompt += `\n\nEXPLIQUE LES DIFFÉRENCES quand tu proposes des options :`;
-    enrichedPrompt += `\n- "Image animée" = effet Ken Burns (zoom/pan élégant sur image fixe, 3 Woofs) - idéal pour donner vie à une image sans coût élevé`;
-    enrichedPrompt += `\n- "Vidéo standard" = IA générative complète (10 Woofs) - création vidéo à partir de zéro`;
-    enrichedPrompt += `\n- "Vidéo premium" = qualité cinématique Veo 3.1 (50 Woofs) - top qualité pour campagnes premium`;
+    enrichedPrompt += `\n- Image animee (Ken Burns via Cloudinary, effet zoom/pan elegant) : 3 Woofs`;
+    enrichedPrompt += `\n- Video standard (IA generative Replicate/Kling) : 10 Woofs`;
+    enrichedPrompt += `\n- Video premium (IA Vertex AI Veo 3.1, qualite cinema) : 50 Woofs`;
+    enrichedPrompt += `\n\nRECOMMANDATIONS BUDGET-INTELLIGENTES :`;
+    enrichedPrompt += `\n- Budget < 10 Woofs : Mise en avant images (1 Woof) et images animees (3 Woofs). Les images animees Ken Burns sont une excellente option pour ajouter du mouvement sans exploser le budget.`;
+    enrichedPrompt += `\n- Budget 10-49 Woofs : Tu peux proposer carrousels (5-7 slides) + images animees + video standard si justifie.`;
+    enrichedPrompt += `\n- Budget >= 50 Woofs : Tous les formats possibles, y compris video premium Veo 3.1.`;
+    enrichedPrompt += `\n\nEXPLIQUE LES DIFFERENCES quand tu proposes des options :`;
+    enrichedPrompt += `\n- "Image animee" = effet Ken Burns (zoom/pan elegant sur image fixe, 3 Woofs) - ideal pour donner vie a une image sans cout eleve`;
+    enrichedPrompt += `\n- "Video standard" = IA generative complete (10 Woofs) - creation video a partir de zero`;
+    enrichedPrompt += `\n- "Video premium" = qualite cinematique Veo 3.1 (50 Woofs) - top qualite pour campagnes premium`;
   }
 
   // 1. Essayer Vertex AI si configuré
