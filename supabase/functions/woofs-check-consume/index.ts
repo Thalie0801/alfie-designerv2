@@ -15,48 +15,74 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ 
-          ok: false, 
-          error: { 
-            code: "MISSING_AUTH", 
-            message: "Authorization header manquant" 
-          } 
-        }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // 1️⃣ Vérifier si c'est un appel interne via x-internal-secret
+    const internalSecret = req.headers.get("x-internal-secret") || req.headers.get("X-Internal-Secret");
+    const INTERNAL_FN_SECRET = Deno.env.get("INTERNAL_FN_SECRET");
+    const isInternalCall = internalSecret && INTERNAL_FN_SECRET && internalSecret === INTERNAL_FN_SECRET;
 
-    // ✅ VALIDATION JWT COMPLÈTE
-    const jwt = authHeader.replace("Bearer ", "");
-    const supabaseAuth = createClient(SUPABASE_URL ?? "", SUPABASE_ANON_KEY ?? "", {
-      global: { headers: { Authorization: authHeader } }
-    });
-
-    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
-    if (userError || !user) {
-      console.error("[woofs-check-consume] Invalid token:", userError);
-      return new Response(
-        JSON.stringify({ 
-          ok: false, 
-          error: { 
-            code: "UNAUTHORIZED", 
-            message: "Token invalide ou expiré" 
-          } 
-        }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log(`[woofs-check-consume] Authenticated user: ${user.id}`);
-
+    // 2️⃣ Lire le body UNE SEULE FOIS
     const rawBody = await req.json();
     console.log("[woofs-check-consume] Raw body received:", JSON.stringify(rawBody));
-
-    // Le SDK peut wrapper le body dans { body: {...} } ou l'envoyer directement
     const payload = rawBody.body || rawBody;
+
+    let userId: string;
+
+    if (isInternalCall) {
+      // Appel interne - récupérer userId depuis le body
+      userId = payload.userId;
+      if (!userId) {
+        return new Response(
+          JSON.stringify({ 
+            ok: false, 
+            error: { 
+              code: "MISSING_USER_ID", 
+              message: "userId requis pour appel interne" 
+            } 
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      console.log(`[woofs-check-consume] ✅ Internal call for user: ${userId}`);
+    } else {
+      // 3️⃣ Authentification JWT standard
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) {
+        return new Response(
+          JSON.stringify({ 
+            ok: false, 
+            error: { 
+              code: "MISSING_AUTH", 
+              message: "Authorization header manquant" 
+            } 
+          }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const supabaseAuth = createClient(SUPABASE_URL ?? "", SUPABASE_ANON_KEY ?? "", {
+        global: { headers: { Authorization: authHeader } }
+      });
+
+      const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
+      if (userError || !user) {
+        console.error("[woofs-check-consume] Invalid token:", userError);
+        return new Response(
+          JSON.stringify({ 
+            ok: false, 
+            error: { 
+              code: "UNAUTHORIZED", 
+              message: "Token invalide ou expiré" 
+            } 
+          }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      userId = user.id;
+      console.log(`[woofs-check-consume] Authenticated user: ${userId}`);
+    }
+
+    // 4️⃣ Continuer avec la logique existante
     const { brand_id, cost_woofs, reason, metadata } = payload;
 
     if (!brand_id || cost_woofs === undefined || !reason) {
@@ -78,8 +104,8 @@ Deno.serve(async (req) => {
     }
 
     // ✅ VÉRIFICATION PROPRIÉTÉ DE LA MARQUE
-    if (brand.user_id !== user.id) {
-      console.error(`[woofs-check-consume] User ${user.id} attempted to consume Woofs for brand ${brand_id} owned by ${brand.user_id}`);
+    if (brand.user_id !== userId) {
+      console.error(`[woofs-check-consume] User ${userId} attempted to consume Woofs for brand ${brand_id} owned by ${brand.user_id}`);
       return new Response(
         JSON.stringify({ 
           ok: false, 
