@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
       `https://res.cloudinary.com/${cloudName}/video/upload`,
       `/${dim},c_fill,f_mp4,${kenBurns}`,
       overlays.length ? `/${overlays.join('/')}` : '',
-      `/${imagePublicId}`  // ✅ Sans extension - Cloudinary gère automatiquement le format
+      `/${imagePublicId}.mp4`  // ✅ Extension .mp4 requise par Cloudinary pour Ken Burns
     ].join('');
 
     console.log("[animate-image] sourcePublicId:", imagePublicId);
@@ -246,7 +246,7 @@ Deno.serve(async (req) => {
     return jsonResponse({
       success: true,
       videoUrl,
-      thumbnailUrl: `https://res.cloudinary.com/${cloudName}/image/upload/${imagePublicId}.jpg`,
+      thumbnailUrl: `https://res.cloudinary.com/${cloudName}/image/upload/${imagePublicId}`,
       duration,
       woofsCost: skipWoofs ? 0 : WOOF_COSTS.animated_image,
       remainingWoofs
