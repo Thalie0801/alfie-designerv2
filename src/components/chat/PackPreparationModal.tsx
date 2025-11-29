@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { Switch } from "@/components/ui/switch";
 
 interface PackPreparationModalProps {
   pack: AlfiePack;
@@ -14,11 +15,42 @@ interface PackPreparationModalProps {
   onClose: () => void;
 }
 
+// ✅ Phase 2: Fallback text generation function
+function generateFallbackTexts(asset: PackAsset, campaignTitle: string): any {
+  if (asset.kind === 'carousel') {
+    return {
+      slides: Array.from({ length: asset.count }, (_, i) => ({
+        title: i === 0 ? asset.title : i === asset.count - 1 ? "Passez à l'action" : `Point ${i}`,
+        subtitle: i === 0 ? campaignTitle : `Élément ${i + 1} de ${asset.goal}`,
+      })),
+    };
+  }
+  
+  if (asset.kind.includes('video')) {
+    return {
+      video: {
+        hook: asset.title || "Découvrez notre secret",
+        script: asset.prompt.slice(0, 200),
+        cta: "En savoir plus",
+      },
+    };
+  }
+  
+  return {
+    text: {
+      title: asset.title,
+      body: asset.prompt.slice(0, 120),
+      cta: "En savoir plus",
+    },
+  };
+}
+
 export default function PackPreparationModal({ pack, brandId, onClose }: PackPreparationModalProps) {
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(
     new Set(pack.assets.map((a) => a.id))
   );
   const [isGenerating, setIsGenerating] = useState(false);
+  const [useBrandKit, setUseBrandKit] = useState(true); // ✅ Phase 2: Toggle Brand Kit
   const { profile } = useAuth();
   const navigate = useNavigate();
 
@@ -88,37 +120,55 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
       
       console.log("[PackPreparationModal] Generating texts for", selectedAssets.length, "assets");
       
-      const { data: textsData, error: textsError } = await supabase.functions.invoke("alfie-generate-texts", {
-        body: {
-          brandId,
-          brief: pack.summary || pack.title,
-          assets: selectedAssets.map((asset) => ({
-            id: asset.id,
-            kind: asset.kind,
-            title: asset.title,
-            goal: asset.goal,
-            tone: asset.tone,
-            platform: asset.platform,
-            ratio: asset.ratio,
-            count: asset.count,
-            durationSeconds: asset.durationSeconds,
-            prompt: asset.prompt,
-          })),
-          useBrandKit: true,
-        },
-      });
-
-      if (textsError) {
-        console.warn("[PackPreparationModal] Text generation failed, continuing without texts:", textsError);
-      } else {
-        console.log("[PackPreparationModal] ✅ Texts generated:", textsData);
+      let textsData: any = null;
+      let textsError: any = null;
+      
+      try {
+        const response = await supabase.functions.invoke("alfie-generate-texts", {
+          body: {
+            brandId,
+            brief: pack.summary || pack.title,
+            assets: selectedAssets.map((asset) => ({
+              id: asset.id,
+              kind: asset.kind,
+              title: asset.title,
+              goal: asset.goal,
+              tone: asset.tone,
+              platform: asset.platform,
+              ratio: asset.ratio,
+              count: asset.count,
+              durationSeconds: asset.durationSeconds,
+              prompt: asset.prompt,
+            })),
+            useBrandKit, // ✅ Use toggle value
+          },
+        });
+        textsData = response.data;
+        textsError = response.error;
+      } catch (e) {
+        textsError = e;
       }
 
-      // ✅ ÉTAPE 2 : Merger les textes générés dans les assets
-      const assetsWithTexts = pack.assets.map((asset) => ({
-        ...asset,
-        generatedTexts: textsData?.texts?.[asset.id] || undefined,
-      }));
+      // ✅ ÉTAPE 2 : Fallback si génération de textes échoue (Phase 2)
+      let assetsWithTexts = pack.assets;
+      
+      if (textsError || !textsData?.texts) {
+        console.warn("[PackPreparationModal] Text generation failed, using fallback texts:", textsError);
+        
+        // Générer des textes par défaut localement
+        assetsWithTexts = pack.assets.map((asset) => ({
+          ...asset,
+          generatedTexts: generateFallbackTexts(asset, pack.title),
+        }));
+        
+        toast.warning("Textes générés localement. Tu peux les éditer dans le Studio.", { duration: 4000 });
+      } else {
+        console.log("[PackPreparationModal] ✅ Texts generated:", textsData);
+        assetsWithTexts = pack.assets.map((asset) => ({
+          ...asset,
+          generatedTexts: textsData.texts?.[asset.id] || generateFallbackTexts(asset, pack.title),
+        }));
+      }
 
       const packWithTexts = { ...pack, assets: assetsWithTexts };
 
@@ -128,6 +178,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         pack: packWithTexts,
         userId: profile.id,
         selectedAssetIds: Array.from(selectedAssetIds),
+        useBrandKit, // ✅ Pass toggle value
       });
 
       toast.success("C'est parti ! Alfie prépare ton pack de visuels 🎬");
@@ -252,6 +303,15 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
           <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border">
             <span className="font-medium text-sm">Coût total</span>
             <span className="font-bold text-lg text-primary">{totalWoofs} Woofs 🐶</span>
+          </div>
+
+          {/* ✅ Phase 2: Toggle useBrandKit */}
+          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+            <div>
+              <span className="font-medium text-sm">Utiliser le Brand Kit</span>
+              <p className="text-xs text-muted-foreground">Adapter le ton et le style à ta marque</p>
+            </div>
+            <Switch checked={useBrandKit} onCheckedChange={setUseBrandKit} />
           </div>
 
           {/* Warning si pas assez de Woofs */}

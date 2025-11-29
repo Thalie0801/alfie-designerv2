@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import { Check, Edit2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Edit2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import type { UnifiedAlfieIntent } from '@/lib/types/alfie';
 import { getWoofCost } from '@/types/alfiePack';
 import { Button } from '@/components/ui/button';

@@ -1,6 +1,7 @@
 /**
  * Phase 5: Alfie Memory Hook
  * Manages user-specific generation preferences and defaults
+ * Note: Uses raw queries until types are regenerated
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -29,10 +30,11 @@ export function useAlfieMemory() {
   const { data: memory, isLoading } = useQuery({
     queryKey: ['alfie-memory', user?.id, activeBrandId],
     queryFn: async () => {
-      if (!user?.id) return null;
+      if (!user?.id || !activeBrandId) return null;
       
+      // Use raw query since types.ts doesn't have alfie_memory yet
       const { data, error } = await supabase
-        .from('alfie_memory')
+        .from('alfie_memory' as any)
         .select('*')
         .eq('user_id', user.id)
         .eq('brand_id', activeBrandId)
@@ -49,7 +51,7 @@ export function useAlfieMemory() {
       if (!user?.id || !activeBrandId) throw new Error('Not authenticated');
       
       const { data, error } = await supabase
-        .from('alfie_memory')
+        .from('alfie_memory' as any)
         .upsert({
           user_id: user.id,
           brand_id: activeBrandId,

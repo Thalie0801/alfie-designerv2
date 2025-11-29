@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { useAlfieIntent } from '@/hooks/useAlfieIntent';
-import type { AlfieFormat } from '@/lib/types/alfie';
 import { GenerationError, triggerGenerationFromChat } from '@/lib/alfie/generation';
 import { BrandSelector } from '@/components/BrandSelector';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -64,7 +63,7 @@ export default function Creator() {
       return;
     }
 
-    if (!intent.topic.trim()) {
+    if (!intent.prompt?.trim() && !intent.topic?.trim()) {
       toast.error('Ajoutez un sujet ou une idée pour lancer la génération.');
       return;
     }
@@ -73,8 +72,20 @@ export default function Creator() {
     setLastOrderId(null);
 
     try {
-      const payload = { ...intent, count: formattedCount };
-      const { orderId } = await triggerGenerationFromChat(user.id, payload);
+      // Convert to full UnifiedAlfieIntent for API
+      const payload = {
+        id: `intent_${Date.now()}`,
+        brandId: intent.brandId || '',
+        kind: intent.kind || 'image',
+        count: formattedCount,
+        platform: intent.platform || 'instagram',
+        ratio: intent.ratio || '4:5',
+        title: intent.prompt || intent.topic || '',
+        goal: intent.goal || 'engagement',
+        tone: intent.tone || 'professionnel',
+        prompt: intent.prompt || intent.topic || '',
+      };
+      const { orderId } = await triggerGenerationFromChat(user.id, payload as any);
       setLastOrderId(orderId);
       toast.success('Génération lancée !', {
         description: `Commande ${orderId} créée. Tu seras notifié dès que c'est prêt.`,
@@ -110,7 +121,7 @@ export default function Creator() {
         <CardHeader>
           <CardTitle>Paramètres de génération</CardTitle>
           <CardDescription>
-            Alfie produira automatiquement {formattedCount} {intent.format === 'image' ? 'image(s)' : 'carrousel(s)'}
+            Alfie produira automatiquement {formattedCount} {intent.kind === 'image' ? 'image(s)' : 'carrousel(s)'}
             à partir de ton sujet.
           </CardDescription>
         </CardHeader>
@@ -118,9 +129,9 @@ export default function Creator() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="format">Format</Label>
-                <Select value={intent.format} onValueChange={(value: AlfieFormat) => setField('format', value)}>
-                  <SelectTrigger id="format">
+                <Label htmlFor="kind">Format</Label>
+                <Select value={intent.kind} onValueChange={(value: 'image' | 'carousel') => setField('kind', value)}>
+                  <SelectTrigger id="kind">
                     <SelectValue placeholder="Choisir un format" />
                   </SelectTrigger>
                   <SelectContent>
@@ -149,7 +160,7 @@ export default function Creator() {
                 <Label htmlFor="ratio">Ratio</Label>
                 <Select
                   value={intent.ratio ?? ''}
-                  onValueChange={(value) => setField('ratio', value ? (value as typeof RATIO_OPTIONS[number]['value']) : undefined)}
+                  onValueChange={(value) => setField('ratio', value || '4:5')}
                 >
                   <SelectTrigger id="ratio">
                     <SelectValue placeholder="Optionnel" />
@@ -169,7 +180,7 @@ export default function Creator() {
                 <Label htmlFor="platform">Plateforme</Label>
                 <Select
                   value={intent.platform ?? ''}
-                  onValueChange={(value) => setField('platform', value ? (value as typeof PLATFORM_OPTIONS[number]['value']) : undefined)}
+                  onValueChange={(value) => setField('platform', value || 'instagram')}
                 >
                   <SelectTrigger id="platform">
                     <SelectValue placeholder="Optionnel" />
@@ -187,13 +198,16 @@ export default function Creator() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="topic">Sujet</Label>
+              <Label htmlFor="prompt">Sujet</Label>
               <Textarea
-                id="topic"
+                id="prompt"
                 rows={4}
                 placeholder="Décris le sujet, le ton ou les éléments à intégrer"
-                value={intent.topic}
-                onChange={(event) => setField('topic', event.target.value)}
+                value={intent.prompt || intent.topic || ''}
+                onChange={(event) => {
+                  setField('prompt', event.target.value);
+                  setField('topic', event.target.value); // Legacy compatibility
+                }}
               />
               <p className="text-xs text-muted-foreground">
                 Indique le thème principal, des angles ou messages clés pour guider Alfie.

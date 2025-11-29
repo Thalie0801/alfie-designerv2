@@ -350,6 +350,72 @@ export type Database = {
         }
         Relationships: []
       }
+      alfie_memory: {
+        Row: {
+          brand_id: string | null
+          created_at: string | null
+          default_cta: string | null
+          default_language: string | null
+          default_platform: string | null
+          default_ratio: string | null
+          default_slides: number | null
+          default_tone: string | null
+          id: string
+          last_format: string | null
+          last_topic: string | null
+          preferred_goals: string[] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          brand_id?: string | null
+          created_at?: string | null
+          default_cta?: string | null
+          default_language?: string | null
+          default_platform?: string | null
+          default_ratio?: string | null
+          default_slides?: number | null
+          default_tone?: string | null
+          id?: string
+          last_format?: string | null
+          last_topic?: string | null
+          preferred_goals?: string[] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          brand_id?: string | null
+          created_at?: string | null
+          default_cta?: string | null
+          default_language?: string | null
+          default_platform?: string | null
+          default_ratio?: string | null
+          default_slides?: number | null
+          default_tone?: string | null
+          id?: string
+          last_format?: string | null
+          last_topic?: string | null
+          preferred_goals?: string[] | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alfie_memory_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alfie_memory_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
+          },
+        ]
+      }
       alfie_messages: {
         Row: {
           asset_id: string | null

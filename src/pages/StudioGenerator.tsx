@@ -37,6 +37,7 @@ const PRESET_PACKS = {
     assets: [
       {
         id: "launch_1",
+        brandId: "", // Will be filled with activeBrandId
         kind: "image" as const,
         count: 1,
         platform: "instagram" as const,
@@ -50,6 +51,7 @@ const PRESET_PACKS = {
       },
       {
         id: "launch_2",
+        brandId: "",
         kind: "carousel" as const,
         count: 5,
         platform: "instagram" as const,
@@ -63,6 +65,7 @@ const PRESET_PACKS = {
       },
       {
         id: "launch_3",
+        brandId: "",
         kind: "image" as const,
         count: 1,
         platform: "instagram" as const,
@@ -82,6 +85,7 @@ const PRESET_PACKS = {
     assets: [
       {
         id: "evergreen_1",
+        brandId: "",
         kind: "carousel" as const,
         count: 7,
         platform: "instagram" as const,
@@ -95,6 +99,7 @@ const PRESET_PACKS = {
       },
       {
         id: "evergreen_2",
+        brandId: "",
         kind: "image" as const,
         count: 1,
         platform: "instagram" as const,
@@ -114,6 +119,7 @@ const PRESET_PACKS = {
     assets: [
       {
         id: "promo_1",
+        brandId: "",
         kind: "image" as const,
         count: 1,
         platform: "instagram" as const,
@@ -127,6 +133,7 @@ const PRESET_PACKS = {
       },
       {
         id: "promo_2",
+        brandId: "",
         kind: "video_basic" as const,
         count: 1,
         platform: "instagram" as const,
@@ -207,7 +214,12 @@ export function StudioGenerator() {
 
   const loadPreset = (presetKey: keyof typeof PRESET_PACKS) => {
     const preset = PRESET_PACKS[presetKey];
-    setPack(preset);
+    // Fill brandId for all assets
+    const assetsWithBrand = preset.assets.map(asset => ({
+      ...asset,
+      brandId: activeBrandId || "",
+    }));
+    setPack({ ...preset, assets: assetsWithBrand });
     setCampaignName(preset.title);
     toast.success(`Pack "${preset.title}" chargé !`);
   };
@@ -215,6 +227,7 @@ export function StudioGenerator() {
   const addAsset = (template?: Partial<PackAsset>) => {
     const newAsset: PackAsset = {
       id: `asset_${Date.now()}`,
+      brandId: activeBrandId || "",
       kind: template?.kind || "image",
       count: template?.count || 1,
       platform: template?.platform || "instagram",
@@ -333,6 +346,7 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
           assets: [
             {
               id: `default_${Date.now()}_1`,
+              brandId: activeBrandId || "",
               kind: "carousel",
               count: 5,
               platform: "instagram",
@@ -348,7 +362,7 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
         };
       }
 
-      // Step 2: Generate texts for each asset
+      // ✅ Phase 4: Generate texts with robust fallback
       const assetBriefs = packStructure.assets.map((asset) => ({
         id: asset.id,
         kind: asset.kind,
@@ -362,30 +376,61 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
         prompt: asset.prompt,
       }));
 
-      const { data: textsData, error: textsError } = await supabase.functions.invoke("alfie-generate-texts", {
-        body: {
-          brandId: activeBrandId,
-          brief: brief || `Présentation de ${activeBrand?.name || "la marque"}`,
-          assets: assetBriefs,
-          useBrandKit: useBrandKitForPack,
-        },
-      });
+      let textsData: any = null;
+      let textsError: any = null;
 
-      if (textsError) {
-        console.warn("Text generation failed, continuing without texts:", textsError);
+      try {
+        const response = await supabase.functions.invoke("alfie-generate-texts", {
+          body: {
+            brandId: activeBrandId,
+            brief: brief || `Présentation de ${activeBrand?.name || "la marque"}`,
+            assets: assetBriefs,
+            useBrandKit: useBrandKitForPack,
+          },
+        });
+        textsData = response.data;
+        textsError = response.error;
+      } catch (e) {
+        textsError = e;
       }
 
-      // Step 3: Merge generated texts into assets
-      const assetsWithTexts = packStructure.assets.map((asset) => {
-        const generatedTexts = textsData?.texts?.[asset.id];
-        return {
-          ...asset,
-          generatedTexts: generatedTexts || undefined,
-        };
-      });
+      // ✅ Phase 4: Local fallback helper
+      const generateLocalFallback = (asset: PackAsset) => {
+        const brandName = activeBrand?.name || "Notre marque";
+        
+        if (asset.kind === 'carousel') {
+          return {
+            slides: [
+              { title: asset.title || "Découvrez", subtitle: brief.slice(0, 80) || "Notre contenu exclusif" },
+              ...Array.from({ length: asset.count - 2 }, (_, i) => ({
+                title: `Point clé ${i + 1}`,
+                subtitle: `Élément ${i + 1}`,
+              })),
+              { title: "Passez à l'action", subtitle: `Rejoignez ${brandName}` },
+            ],
+          };
+        }
+        
+        if (asset.kind.includes('video')) {
+          return { video: { hook: asset.title, script: asset.prompt.slice(0, 200), cta: "En savoir plus" } };
+        }
+        
+        return { text: { title: asset.title, body: asset.prompt.slice(0, 120), cta: "En savoir plus" } };
+      };
+
+      // Merge texts with fallback
+      const assetsWithTexts = packStructure.assets.map((asset) => ({
+        ...asset,
+        generatedTexts: textsData?.texts?.[asset.id] || generateLocalFallback(asset),
+      }));
 
       setPack({ ...packStructure, assets: assetsWithTexts });
-      toast.success("Pack proposé ! Tu peux éditer les textes avant génération.");
+      
+      if (textsError) {
+        toast.warning("Textes générés localement. Tu peux les éditer avant génération.");
+      } else {
+        toast.success("Pack proposé ! Tu peux éditer les textes avant génération.");
+      }
       setBriefGenerationError(null);
 
     } catch (err) {
