@@ -86,8 +86,12 @@ function normalizeAspectRatio(ar: string | undefined): { ar: string; size: GenSi
 }
 
 function buildImagePrompt(globalStyle: string, prompt: string, useBrandKit: boolean = true) {
-  // “NO TEXT” blinders + qualité
-  return `${globalStyle}. ${prompt}. 
+  // Si useBrandKit = false, on ignore le globalStyle et on génère un visuel neutre
+  const stylePrefix = useBrandKit && globalStyle 
+    ? `${globalStyle}. ` 
+    : "Professional, modern, clean design. ";
+  
+  return `${stylePrefix}${prompt}. 
 Background only. No text, no typography, no letters, no logos, no watermark. 
 Clean, professional, high quality, detailed, natural light, soft shadows.`;
 }
@@ -173,7 +177,7 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    // —— Validations d’entrée minimales
+    // —— Validations d'entrée minimales
     const missing: string[] = [];
     if (!prompt) missing.push("prompt");
     if (!globalStyle) missing.push("globalStyle");
