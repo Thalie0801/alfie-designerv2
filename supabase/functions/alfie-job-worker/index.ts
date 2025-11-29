@@ -1325,7 +1325,7 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
     // Générer l'image via alfie-generate-ai-image
     const imageResult = await callFn<any>("alfie-generate-ai-image", {
       prompt: finalPrompt,
-      brand_id: brandId,
+      brandId,  // ✅ camelCase - sera correctement lu
       userId,
       orderId,
       aspectRatio: aspect,
