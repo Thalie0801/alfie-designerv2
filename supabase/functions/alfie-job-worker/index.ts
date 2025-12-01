@@ -925,24 +925,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
     });
     if (mediaErr) throw new Error(mediaErr.message);
 
-    const { error: libErr } = await supabaseAdmin.from("library_assets").insert({
-      user_id: userId,
-      brand_id: brandId,
-      order_id: orderId,
-      type: "video",
-      format: aspectRatio,
-      cloudinary_url: videoUrl,
-      tags: ["video", "alfie", "veo3"],
-      metadata: {
-        prompt: videoPrompt,
-        duration: durationSec,
-        generator: "veo_3_1",
-        thumbnailUrl,
-      },
-    });
-    if (libErr) throw new Error(libErr.message);
-
-    console.log("[processGenerateVideo] ✅ VEO 3.1 video saved to library");
+    console.log("[processGenerateVideo] ✅ VEO 3.1 video saved to media_generations");
     return { videoUrl };
   }
 
@@ -1017,26 +1000,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
   });
   if (mediaErr) throw new Error(mediaErr.message);
 
-  // Sauvegarder dans library_assets
-  const { error: libErr } = await supabaseAdmin.from("library_assets").insert({
-    user_id: userId,
-    brand_id: brandId,
-    order_id: orderId,
-    type: "video",
-    format: aspectRatio,
-    cloudinary_url: videoUrl,
-    tags: ["video", "alfie", "replicate"],
-    metadata: {
-      provider: "replicate",
-      tier: "standard",
-      prompt: videoPrompt,
-      duration: durationSec,
-      thumbnailUrl,
-    },
-  });
-  if (libErr) throw new Error(libErr.message);
-
-  console.log("[processGenerateVideo] ✅ Video saved to library");
+  console.log("[processGenerateVideo] ✅ Replicate video saved to media_generations");
   return { videoUrl };
 }
 
