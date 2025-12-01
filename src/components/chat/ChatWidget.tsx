@@ -433,6 +433,7 @@ export default function ChatWidget() {
           messages: chatHistory,
           lang: "fr",
           woofsRemaining,
+          brief: brief.state,
         },
       });
 

@@ -108,6 +108,9 @@ RÈGLES pour générer des packs :
 
 6. IMPORTANT : Place toujours le bloc <alfie-pack> APRÈS ton explication textuelle, jamais avant.
 
+7. PRIORITÉ AU BRIEF : Si un brief de campagne est fourni avec platform, format, ratio, topic, etc., 
+   utilise ces valeurs DIRECTEMENT dans le pack généré. Ne les ignore pas et ne demande pas de les confirmer.
+
 Exemple de réponse complète :
 
 "Super ! Je te prépare un carrousel sur l'organisation de ton business. Voici ce que je te propose :
@@ -179,7 +182,8 @@ async function callLLM(
   systemPrompt: string,
   brandContext?: { name?: string; niche?: string; voice?: string; palette?: string[] },
   woofsRemaining?: number,
-  useBrandKit: boolean = true
+  useBrandKit: boolean = true,
+  briefContext?: string
 ): Promise<string> {
   // Utiliser le system prompt unique
   let enrichedPrompt = SYSTEM_PROMPT;
@@ -260,6 +264,11 @@ Le secteur d'activité est fourni pour contexte minimal, mais reste neutre dans 
     enrichedPrompt += `\n\nEXPLIQUE LES DIFFERENCES quand tu proposes des options :`;
     enrichedPrompt += `\n- "Video standard" = IA generative complete Replicate (10 Woofs) - creation video a partir de zero`;
     enrichedPrompt += `\n- "Video premium" = qualite cinematique Veo 3.1 (50 Woofs) - top qualite pour campagnes premium`;
+  }
+
+  // Ajouter le brief au contexte si fourni
+  if (briefContext) {
+    enrichedPrompt += briefContext;
   }
 
   // 1. Essayer Vertex AI si configuré
@@ -361,7 +370,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { brandId, messages, lang, woofsRemaining, useBrandKit = true } = await req.json();
+    const { brandId, messages, lang, woofsRemaining, useBrandKit = true, brief } = await req.json();
 
     if (!brandId || !messages) {
       return new Response(
@@ -426,8 +435,25 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Ajouter le brief au contexte si fourni
+    let briefContext = "";
+    if (brief && Object.keys(brief).length > 0) {
+      briefContext += `\n\n--- BRIEF DE CAMPAGNE (UTILISEZ CES INFORMATIONS) ---`;
+      if (brief.platform) briefContext += `\nPlateforme cible : ${brief.platform}`;
+      if (brief.format) briefContext += `\nFormat demandé : ${brief.format}`;
+      if (brief.ratio) briefContext += `\nRatio : ${brief.ratio}`;
+      if (brief.topic) briefContext += `\nSujet/Thème : ${brief.topic}`;
+      if (brief.tone) briefContext += `\nTon souhaité : ${brief.tone}`;
+      if (brief.cta) briefContext += `\nCall-to-action : ${brief.cta}`;
+      if (brief.slides) briefContext += `\nNombre de slides : ${brief.slides}`;
+      if (brief.goal) briefContext += `\nObjectif : ${brief.goal}`;
+      if (brief.niche) briefContext += `\nNiche/Secteur : ${brief.niche}`;
+      if (brief.audience) briefContext += `\nAudience cible : ${brief.audience}`;
+      briefContext += `\n\nIMPORTANT : Utilise TOUTES ces informations du brief pour générer le pack. Ne redemande PAS ce qui est déjà renseigné ci-dessus.`;
+    }
+
     // Appeler le LLM avec le system prompt unique
-    const rawReply = await callLLM(messages, SYSTEM_PROMPT, brandContext, woofsRemaining, useBrandKit);
+    const rawReply = await callLLM(messages, SYSTEM_PROMPT, brandContext, woofsRemaining, useBrandKit, briefContext);
 
     // Parser le pack si présent
     const pack = parsePack(rawReply);
