@@ -239,11 +239,17 @@ export function ContentGenerator() {
             <div className="p-6 text-center space-y-4 bg-accent/20 rounded-lg border-2 border-dashed border-accent">
               <Video className="h-12 w-12 mx-auto text-muted-foreground" />
               <div className="space-y-2">
-                <h3 className="font-semibold text-lg">Génération vidéo bientôt disponible</h3>
+                <h3 className="font-semibold text-lg">Génération vidéo disponible dans le Studio</h3>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                  La génération de vidéos sera ajoutée très prochainement ! 
-                  En attendant, utilise l'onglet <strong>Studio</strong> pour créer des vidéos à partir d'images.
+                  Utilise le <strong>Studio</strong> pour créer des vidéos standard (10 Woofs) ou premium (50 Woofs) à partir d'images.
                 </p>
+                <Button 
+                  onClick={() => window.location.href = '/studio'}
+                  className="mt-4"
+                >
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Ouvrir le Studio
+                </Button>
               </div>
             </div>
           </TabsContent>

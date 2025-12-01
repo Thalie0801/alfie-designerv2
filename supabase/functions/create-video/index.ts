@@ -3,6 +3,10 @@ import { WOOF_COSTS } from "../_shared/woofsCosts.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { SUPABASE_ANON_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, validateEnv } from "../_shared/env.ts";
 
+/**
+ * DEPRECATED: This function is obsolete.
+ * Use generate-video via Studio instead.
+ */
 const envValidation = validateEnv();
 if (!envValidation.valid) {
   console.error("Missing required environment variables", { missing: envValidation.missing });
@@ -12,6 +16,15 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // Return 410 Gone - function deprecated
+  return new Response(JSON.stringify({
+    error: "DEPRECATED",
+    message: "Cette fonction est obsolète. Utilisez generate-video via le Studio (/studio).",
+    redirect: "/studio",
+    status: 410
+  }), { status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+  /* LEGACY CODE ARCHIVED BELOW
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -172,4 +185,5 @@ Deno.serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
+  */
 });

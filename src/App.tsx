@@ -29,7 +29,6 @@ import BrandKit from "./pages/BrandKit";
 import NotFound from "./pages/NotFound";
 import Templates from "./pages/Templates";
 import Library from "./pages/Library";
-import Videos from "./pages/Videos";
 import CloudinaryTest from "./pages/CloudinaryTest";
 import Creator from "./pages/Creator";
 
@@ -133,16 +132,8 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/videos"
-          element={
-            <ProtectedRoute>
-              <AppLayoutWithSidebar>
-                <Videos />
-              </AppLayoutWithSidebar>
-            </ProtectedRoute>
-          }
-        />
+        {/* Legacy /videos route redirects to Studio */}
+        <Route path="/videos" element={<Navigate to="/studio" replace />} />
         <Route
           path="/cloudinary-test"
           element={

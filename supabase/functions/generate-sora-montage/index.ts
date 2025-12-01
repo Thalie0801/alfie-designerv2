@@ -3,8 +3,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import { corsHeaders } from "../_shared/cors.ts";
 import { SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL, validateEnv } from "../_shared/env.ts";
 /**
- * Génère un montage de plusieurs clips Sora via Kie AI
- * Utilisé pour créer des vidéos de 20-30s à partir de plusieurs clips de 10s
+ * DEPRECATED: Sora montage generation is obsolete.
+ * Use generate-video via Studio instead.
  */
 const envValidation = validateEnv();
 if (!envValidation.valid) {
@@ -16,6 +16,15 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // Return 410 Gone - function deprecated
+  return new Response(JSON.stringify({
+    error: "DEPRECATED",
+    message: "Cette fonction est obsolète. Utilisez generate-video via le Studio (/studio).",
+    redirect: "/studio",
+    status: 410
+  }), { status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+  /* LEGACY CODE ARCHIVED BELOW
   try {
     const { jobId, clipCount, prompts, imageUrls, brandId } = await req.json();
     
@@ -217,4 +226,5 @@ Deno.serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
+  */
 });

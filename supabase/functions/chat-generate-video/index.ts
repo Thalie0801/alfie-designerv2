@@ -40,11 +40,24 @@ const buildBackendHeaders = () => {
   return headers;
 };
 
+/**
+ * DEPRECATED: This function is obsolete.
+ * Use generate-video via Studio instead.
+ */
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // Return 410 Gone - function deprecated
+  return jsonResponse({
+    error: "DEPRECATED",
+    message: "Cette fonction est obsolète. Utilisez generate-video via le Studio (/studio).",
+    redirect: "/studio",
+    status: 410
+  }, { status: 410 });
+
+  /* LEGACY CODE ARCHIVED BELOW
   try {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error("Supabase credentials are not configured");
@@ -224,4 +237,5 @@ Deno.serve(async (req) => {
     const message = error instanceof Error ? error.message : "Internal server error";
     return jsonResponse({ error: message }, { status: 500 });
   }
+  */
 });

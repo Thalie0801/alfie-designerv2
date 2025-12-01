@@ -54,12 +54,12 @@ export function calculatePackWoofCost(
   }, 0);
 }
 
-// Legacy function for video duration-based woofs (kept for compatibility)
+// Legacy function - now returns fixed cost of 10 Woofs for standard videos
 export const WOOF_SECONDS = 12;
 
-export function woofsForVideo(durationSec: number) {
-  const d = Number.isFinite(durationSec) && durationSec > 0 ? durationSec : WOOF_SECONDS;
-  return Math.max(1, Math.ceil(d / WOOF_SECONDS));
+export function woofsForVideo(_durationSec?: number) {
+  // All standard videos now cost 10 Woofs regardless of duration
+  return WOOF_COSTS.video_basic;
 }
 
 /**
