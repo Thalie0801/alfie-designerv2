@@ -142,7 +142,8 @@ Deno.serve(async (req) => {
     }
 
     // Vérifier que l'image source existe sur Cloudinary
-    const sourceImageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${imagePublicId}`;
+    // ✅ URL avec format explicite pour garantir affichage navigateur
+    const sourceImageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/f_auto,q_auto/${imagePublicId}`;
     console.log("[animate-image] Verifying source image:", sourceImageUrl);
 
     try {

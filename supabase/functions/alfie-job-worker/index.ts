@@ -1433,16 +1433,20 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
   console.log("✅ [processAnimateImage] Animated image (CSS):", imageUrl);
 
   // ✅ Sauvegarder dans media_generations avec type='image' et metadata.animationType='ken_burns'
+  // ✅ URLs avec format explicite pour garantir affichage navigateur
+  const sourceImagePublicId = animatePayload?.metadata?.sourceImagePublicId || imagePublicId;
+  const formattedImageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/f_auto,q_auto/${sourceImagePublicId}`;
+  
   const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
     user_id: userId,
     brand_id: brandId,
     type: "image", // ✅ Type 'image' avec metadata.animationType pour détection CSS Ken Burns
     status: "completed",
-    output_url: imageUrl,
-    thumbnail_url: imageUrl,
+    output_url: formattedImageUrl,
+    thumbnail_url: formattedImageUrl,
     metadata: {
       orderId,
-      sourceImagePublicId: imagePublicId,
+      sourceImagePublicId: sourceImagePublicId,
       aspectRatio: aspect,
       duration: duration,
       title,
