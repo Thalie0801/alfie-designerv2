@@ -975,7 +975,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
     console.log("[processGenerateVideo] ✅ Generated source image:", sourceImageUrl);
   }
 
-  // Appeler generate-video avec provider "replicate"
+  // Appeler generate-video avec provider "replicate" et timeout étendu pour le polling
   const videoResult = await callFn<any>("generate-video", {
     prompt: videoPrompt,
     imageUrl: sourceImageUrl, // ✅ Toujours défini (soit fourni, soit généré)
@@ -984,7 +984,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
     brandId,
     orderId,
     provider: "replicate",
-  });
+  }, 360_000); // 6 minutes pour laisser le temps au polling Replicate
 
   const videoUrl = videoResult?.output || videoResult?.videoUrl || videoResult?.url;
   if (!videoUrl) throw new Error("Replicate failed to generate video");
