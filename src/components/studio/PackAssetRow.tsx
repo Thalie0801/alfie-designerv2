@@ -222,12 +222,18 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
             <p>{asset.prompt}</p>
           </div>
 
-          {/* Section image de référence */}
+          {/* Section image de référence - OBLIGATOIRE pour video_basic */}
           <div className="space-y-2 border-t pt-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium">Image de référence (optionnelle)</p>
-                <p className="text-xs text-muted-foreground">Alfie s'en sert comme inspiration visuelle pour la création.</p>
+                <p className="text-sm font-medium">
+                  Image source {asset.kind === "video_basic" && <span className="text-red-500">*</span>}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {asset.kind === "video_basic" 
+                    ? "⚠️ Obligatoire : Alfie anime cette image pour créer ta vidéo."
+                    : "Alfie s'en sert comme inspiration visuelle pour la création."}
+                </p>
               </div>
             </div>
 

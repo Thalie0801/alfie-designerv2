@@ -457,6 +457,19 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
       return;
     }
 
+    // ✅ VALIDATION: Vérifier que les video_basic ont une image de référence
+    const videoBasicWithoutImage = pack.assets.filter(
+      a => a.kind === "video_basic" && !a.referenceImageUrl
+    );
+
+    if (videoBasicWithoutImage.length > 0) {
+      toast.error(
+        `${videoBasicWithoutImage.length} vidéo(s) sans image source. ` +
+        `Le générateur vidéo a besoin d'une image pour créer l'animation.`
+      );
+      return;
+    }
+
     // Calculer le coût pour afficher dans la confirmation
     const totalCost = calculatePackWoofCost(pack);
 

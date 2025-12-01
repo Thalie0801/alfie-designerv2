@@ -85,8 +85,16 @@ export async function sendPackToGenerator({
   const selectedAssets = pack.assets.filter((a) => selectedAssetIds.includes(a.id));
   
   try {
-    const results = await Promise.all(
-      selectedAssets.map((asset) => createAssetJob(asset, brandId, userId, pack.title, useBrandKit))
+  const results = await Promise.all(
+      selectedAssets.map((asset) => {
+        // ✅ DEBUG LOG : Vérifier si referenceImageUrl est présent
+        console.log(`[Pack] Creating job for asset ${asset.id}:`, {
+          kind: asset.kind,
+          referenceImageUrl: asset.referenceImageUrl || "❌ MISSING",
+          title: asset.title,
+        });
+        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit);
+      })
     );
 
     const orderIds = results.map((r) => r.orderId);

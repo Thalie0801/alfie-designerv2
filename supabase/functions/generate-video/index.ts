@@ -271,6 +271,15 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Missing prompt" }, { status: 400 });
     }
 
+    // ✅ VALIDATION BACKEND : Replicate image-to-video requiert une image source
+    if (!isStatusCheck && normalizedProvider === "replicate" && !imageUrl) {
+      console.error("[generate-video] No image provided for Replicate image-to-video");
+      return jsonResponse({ 
+        error: "Replicate requires an input image. Please provide imageUrl.",
+        code: "MISSING_IMAGE"
+      }, { status: 400 });
+    }
+
     // Vérifier et consommer les Woofs pour les nouvelles générations (pas pour les status checks)
     if (!isStatusCheck && brandId) {
       const isPremium = providerEngine === "sora" || provider === "veo" || provider === "premium";
