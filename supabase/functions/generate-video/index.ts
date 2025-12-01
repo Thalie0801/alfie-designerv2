@@ -830,9 +830,40 @@ Deno.serve(async (req) => {
       try {
         console.log('[generate-video] Starting VEO 3 → Cloudinary transfer...');
         
-        // Convertir gs://bucket/path → https://storage.googleapis.com/bucket/path
-        const httpUrl = videoUri.replace('gs://', 'https://storage.googleapis.com/');
-        console.log(`[generate-video] GCS HTTP URL: ${httpUrl}`);
+        // Extraire bucket et path depuis gs://bucket/path
+        const gcsMatch = videoUri.match(/^gs:\/\/([^\/]+)\/(.+)$/);
+        if (!gcsMatch) {
+          throw new Error(`Invalid GCS URI format: ${videoUri}`);
+        }
+        const [, bucket, objectPath] = gcsMatch;
+        console.log(`[generate-video] GCS bucket: ${bucket}, path: ${objectPath}`);
+        
+        // Obtenir le token d'accès pour GCS
+        const accessToken = await getAccessToken(serviceAccountJson);
+        console.log('[generate-video] Access token obtained');
+        
+        // Télécharger la vidéo depuis GCS avec authentification
+        const gcsApiUrl = `https://storage.googleapis.com/storage/v1/b/${bucket}/o/${encodeURIComponent(objectPath)}?alt=media`;
+        console.log(`[generate-video] Downloading from GCS: ${gcsApiUrl}`);
+        
+        const videoResponse = await fetch(gcsApiUrl, {
+          headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        
+        if (!videoResponse.ok) {
+          throw new Error(`Failed to download from GCS: ${videoResponse.status} ${await videoResponse.text()}`);
+        }
+        
+        const videoBlob = await videoResponse.blob();
+        console.log(`[generate-video] Video downloaded: ${videoBlob.size} bytes`);
+        
+        // Convertir en base64 data URI
+        const arrayBuffer = await videoBlob.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        const binaryString = Array.from(uint8Array, byte => String.fromCharCode(byte)).join('');
+        const base64Video = btoa(binaryString);
+        const dataUri = `data:video/mp4;base64,${base64Video}`;
+        console.log(`[generate-video] Video converted to base64 (${base64Video.length} chars)`);
         
         // Uploader vers Cloudinary via edge function
         const cloudinaryResp = await fetch(`${SUPABASE_URL}/functions/v1/cloudinary`, {
@@ -844,7 +875,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             action: 'upload',
             params: {
-              file: httpUrl,
+              file: dataUri,
               folder: `alfie/veo3/${operationName}`,
               resource_type: 'video',
               public_id: `veo3_${Date.now()}`
