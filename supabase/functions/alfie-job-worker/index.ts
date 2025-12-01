@@ -169,6 +169,30 @@ function deepGet(obj: any, key: string): any {
 }
 
 /**
+ * Convertit un code hex en description de couleur lisible
+ * Évite d'afficher des codes comme "#FF6B6B" sur les images
+ */
+function hexToColorName(hex: string): string {
+  const h = hex.toLowerCase().replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  
+  // Déterminer la couleur dominante
+  if (r > 200 && g < 100 && b < 100) return 'vibrant red';
+  if (r < 100 && g > 200 && b < 100) return 'fresh green';
+  if (r < 100 && g < 100 && b > 200) return 'deep blue';
+  if (r > 200 && g > 150 && b < 100) return 'warm orange';
+  if (r > 200 && g > 200 && b < 100) return 'bright yellow';
+  if (r > 200 && g < 100 && b > 150) return 'pink magenta';
+  if (r > 150 && g < 100 && b > 200) return 'purple violet';
+  if (r < 100 && g > 200 && b > 200) return 'turquoise cyan';
+  if (r > 150 && g > 150 && b > 150) return 'light neutral';
+  if (r < 80 && g < 80 && b < 80) return 'dark neutral';
+  return 'neutral tone';
+}
+
+/**
  * ✅ Helper robuste pour résoudre useBrandKit sans faux-positifs
  */
 function resolveUseBrandKit(payload: any, jobMeta?: { use_brand_kit?: boolean }): boolean {
@@ -217,7 +241,11 @@ function buildStyleSuffix(useBrandKit: boolean, brand?: { niche?: string; palett
   if (useBrandKit && brand) {
     const parts = [];
     if (brand.niche) parts.push(`Industry: ${brand.niche}`);
-    if (brand.palette?.length) parts.push(`Color palette: ${brand.palette.slice(0, 3).join(", ")}`);
+    if (brand.palette?.length) {
+      // ✅ Convertir hex en descriptions de couleurs
+      const colorNames = brand.palette.slice(0, 3).map(hexToColorName);
+      parts.push(`Color palette with ${colorNames.join(", ")}`);
+    }
     if (brand.voice) parts.push(`Tone: ${brand.voice}`);
     return parts.length > 0 
       ? parts.join(". ") + ". High quality, professional."
@@ -1063,8 +1091,13 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   const useBrandKit = resolveUseBrandKit(payload, jobMeta);
   
   // ✅ Le globalStyle contient SEULEMENT le style visuel, pas le contenu
+  // ✅ Convertir codes hex en descriptions de couleurs
+  const colorDescriptions = useBrandKit && brandMini?.palette?.length
+    ? (brandMini.palette || []).slice(0, 3).map(hexToColorName).join(", ")
+    : "";
+  
   const globalStyle = useBrandKit && brandMini
-    ? `Brand aesthetic. Industry: ${brandMini.niche || 'business'}. Colors: ${(brandMini.palette || []).join(", ")}. Modern, professional.`
+    ? `Brand aesthetic. Industry: ${brandMini.niche || 'business'}. Color palette with ${colorDescriptions}. Modern, professional.`
     : `Neutral professional aesthetic. Clean, modern design.`;
 
   // Ratio à partir du brief ou 4:5 par défaut

@@ -116,44 +116,64 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
     setIsGenerating(true);
 
     try {
-      // ✅ ÉTAPE 1 : Générer les textes pour les assets sélectionnés
+      // ✅ ÉTAPE 1 : Vérifier si les textes existent déjà dans le pack
       const selectedAssets = pack.assets.filter((a) => selectedAssetIds.has(a.id));
       
-      console.log("[PackPreparationModal] Generating texts for", selectedAssets.length, "assets");
+      const hasExistingTexts = pack.assets.some(a => 
+        (a.generatedTexts?.slides?.length ?? 0) > 0 || 
+        a.generatedTexts?.text?.title ||
+        a.generatedTexts?.video?.hook
+      );
+      
+      console.log("[PackPreparationModal] hasExistingTexts:", hasExistingTexts);
       
       let textsData: any = null;
       let textsError: any = null;
       
-      try {
-        const response = await supabase.functions.invoke("alfie-generate-texts", {
-          body: {
-            brandId,
-            brief: pack.summary || pack.title,
-            assets: selectedAssets.map((asset) => ({
-              id: asset.id,
-              kind: asset.kind,
-              title: asset.title,
-              goal: asset.goal,
-              tone: asset.tone,
-              platform: asset.platform,
-              ratio: asset.ratio,
-              count: asset.count,
-              durationSeconds: asset.durationSeconds,
-              prompt: asset.prompt,
-            })),
-            useBrandKit, // ✅ Use toggle value
-          },
-        });
-        textsData = response.data;
-        textsError = response.error;
-      } catch (e) {
-        textsError = e;
+      // ✅ Si les textes existent déjà, on les utilise directement
+      if (hasExistingTexts) {
+        console.log("[PackPreparationModal] ✅ Using existing texts from chat");
+      } else {
+        // ✅ Sinon, on génère les textes
+        console.log("[PackPreparationModal] Generating texts for", selectedAssets.length, "assets");
+        
+        try {
+          const response = await supabase.functions.invoke("alfie-generate-texts", {
+            body: {
+              brandId,
+              brief: pack.summary || pack.title,
+              assets: selectedAssets.map((asset) => ({
+                id: asset.id,
+                kind: asset.kind,
+                title: asset.title,
+                goal: asset.goal,
+                tone: asset.tone,
+                platform: asset.platform,
+                ratio: asset.ratio,
+                count: asset.count,
+                durationSeconds: asset.durationSeconds,
+                prompt: asset.prompt,
+              })),
+              useBrandKit, // ✅ Use toggle value
+            },
+          });
+          textsData = response.data;
+          textsError = response.error;
+        } catch (e) {
+          textsError = e;
+        }
       }
 
       // ✅ ÉTAPE 2 : Fallback si génération de textes échoue (Phase 2)
       let assetsWithTexts = pack.assets;
       
-      if (textsError || !textsData?.texts) {
+      if (hasExistingTexts) {
+        // ✅ Utiliser les textes existants du pack sans appeler alfie-generate-texts
+        assetsWithTexts = pack.assets.map((asset) => ({
+          ...asset,
+          useBrandKit, // ✅ Propager useBrandKit du toggle
+        }));
+      } else if (textsError || !textsData?.texts) {
         console.warn("[PackPreparationModal] Text generation failed, using fallback texts:", textsError);
         
         // Générer des textes par défaut localement
