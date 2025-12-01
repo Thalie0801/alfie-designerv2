@@ -146,33 +146,7 @@ Connaissances :
 - Tu peux proposer : idées de posts, textes de légende, scripts vidéo, structures de carrousels, hooks, plans éditoriaux.
 - Quand c'est utile, tu peux suggérer ce que l'utilisatrice pourrait générer dans le Studio (ex. « 1 carrousel + 2 images + 1 vidéo courte »), mais toujours sous forme de conseil, pas de commande technique.
 
-RÈGLE IMPORTANTE : Si le CONTEXTE DE LA MARQUE est fourni avec niche et/ou voice, utilise ces informations directement. Ne redemande JAMAIS le ton, la voix, la niche ou le secteur d'activité - tu les connais déjà.
-
-Quand l'utilisateur est prêt à générer un pack de visuels, tu peux proposer un pack structuré en incluant dans ta réponse un bloc XML :
-<alfie-pack>
-{
-  "title": "Titre du pack",
-  "summary": "Résumé court du pack",
-  "assets": [
-    {
-      "id": "asset_1",
-      "kind": "image" | "carousel" | "video_basic" | "video_premium",
-      "count": 1,
-      "platform": "instagram",
-      "format": "post",
-      "ratio": "4:5",
-      "title": "Titre du visuel",
-      "goal": "education",
-      "tone": "pédagogique, friendly",
-      "prompt": "Description détaillée pour la génération",
-      "woofCostType": "image"
-    }
-  ]
-}
-</alfie-pack>
-
-Types disponibles : "image", "carousel", "video_basic", "video_premium"
-WoofCostType : "image", "carousel_slide", "video_basic", "video_premium"`;
+RÈGLE IMPORTANTE : Si le CONTEXTE DE LA MARQUE est fourni avec niche et/ou voice, utilise ces informations directement. Ne redemande JAMAIS le ton, la voix, la niche ou le secteur d'activité - tu les connais déjà.`;
 
 /**
  * Appelle le LLM (Lovable AI principal, Vertex AI en fallback/futur)
