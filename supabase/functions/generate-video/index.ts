@@ -936,7 +936,8 @@ async function generateGcsSignedUrl(
         console.log(`[generate-video] GCS bucket: ${bucket}, path: ${objectPath}`);
         
         // Générer une URL signée V4 GCS (valide 15 minutes)
-        const signedUrl = await generateGcsSignedUrl(bucket, objectPath, serviceAccountJson, 900);
+        const parsedServiceAccount = JSON.parse(serviceAccountJson);
+        const signedUrl = await generateGcsSignedUrl(bucket, objectPath, parsedServiceAccount, 900);
         console.log(`[generate-video] Generated V4 signed GCS URL (expires in 15 min)`);
         
         // Uploader vers Cloudinary via edge function
