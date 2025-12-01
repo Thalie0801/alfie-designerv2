@@ -80,7 +80,7 @@ function extractImageUrl(response: any): string | null {
   return null;
 }
 
-async function callFn<T = unknown>(name: string, body: unknown): Promise<T> {
+async function callFn<T = unknown>(name: string, body: unknown, timeoutMs = 60_000): Promise<T> {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error(`Missing Supabase configuration for ${name}`);
   }
@@ -89,7 +89,7 @@ async function callFn<T = unknown>(name: string, body: unknown): Promise<T> {
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60_000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const resp = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
@@ -118,7 +118,7 @@ async function callFn<T = unknown>(name: string, body: unknown): Promise<T> {
       (error as any)?.name === "AbortError" ||
       (error instanceof DOMException && error.name === "AbortError");
     if (isAbort) {
-      throw new Error(`${name} timed out after 60s`);
+      throw new Error(`${name} timed out after ${timeoutMs / 1000}s`);
     }
     throw error;
   } finally {
@@ -1400,7 +1400,7 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
   // Animation prompt (par défaut ou depuis payload)
   const animationPrompt = payload.animationPrompt || "Smooth zoom in with subtle camera movement, cinematic";
   
-  // Appeler Replicate pour générer la vidéo IA
+  // Appeler Replicate pour générer la vidéo IA (timeout 5 minutes pour le polling)
   const animateResult = await callFn<any>("animate-image", {
     userId,
     brandId,
@@ -1409,7 +1409,7 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
     animationPrompt,
     duration,
     skipWoofs: true, // ✅ Woofs déjà consommés lors de la création du pack
-  });
+  }, 300_000); // 5 minutes timeout pour la génération vidéo Replicate
 
   const animatePayload = unwrapResult<any>(animateResult);
   const animateError = extractError(animateResult) ?? extractError(animatePayload);
