@@ -453,10 +453,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Unknown provider" }, { status: 400 });
     }
 
-    if (providerApi === "replicate") {
-      return jsonResponse({ error: "Unknown provider" }, { status: 400 });
-    }
-
+    // ✅ Replicate video generation
     if (normalizedProvider === "replicate") {
       if (!REPLICATE_TOKEN) {
         throw new Error("Missing REPLICATE_API_TOKEN");
