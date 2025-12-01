@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { X, Image, Film, Grid3x3, AlertCircle } from "lucide-react";
 import type { AlfiePack, PackAsset } from "@/types/alfiePack";
-import { calculatePackWoofCost, safeWoofs, WOOF_COSTS } from "@/lib/woofs";
+import { calculatePackWoofCost, safeWoofs } from "@/lib/woofs";
+import { getWoofCost } from "@/types/alfiePack";
 import { sendPackToGenerator, InsufficientWoofsError } from "@/services/generatorFromChat";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -255,11 +256,9 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
 
           {/* Liste des assets */}
           <div className="space-y-2">
-            {pack.assets.map((asset) => {
+          {pack.assets.map((asset) => {
               const isSelected = selectedAssetIds.has(asset.id);
-              const cost = asset.woofCostType === "carousel_slide" ? asset.count : 
-                           asset.woofCostType === "video_basic" ? WOOF_COSTS.video_basic :
-                           asset.woofCostType === "video_premium" ? WOOF_COSTS.video_premium : WOOF_COSTS.image;
+              const cost = getWoofCost(asset);
 
               return (
                 <label
