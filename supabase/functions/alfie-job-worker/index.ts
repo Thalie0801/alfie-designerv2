@@ -920,7 +920,6 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
         duration: durationSec,
         generator: "veo_3_fast",
         tier: "premium",
-        resolution: "1080P",
         orderId,
       },
     });

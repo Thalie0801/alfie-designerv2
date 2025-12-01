@@ -696,7 +696,6 @@ Deno.serve(async (req) => {
         parameters: {
           aspectRatio: veo3AspectRatio,
           durationSeconds,
-          resolution: "1080P",
           generateAudio: true,
         }
       };
@@ -821,7 +820,6 @@ Deno.serve(async (req) => {
                     source: 'text',
                     aspectRatio: veo3AspectRatio,
                     duration: durationSeconds,
-                    resolution: '1080P',
                     generatedAt: new Date().toISOString(),
                     operationName
                   }
@@ -849,7 +847,6 @@ Deno.serve(async (req) => {
           tier: "premium",
           aspectRatio: veo3AspectRatio,
           duration: durationSeconds,
-          resolution: "1080P",
           outputUrl: videoUri
         }
       });
