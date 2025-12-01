@@ -78,12 +78,22 @@ Deno.serve(async (req) => {
         );
       }
 
-      userId = user.id;
-      console.log(`[woofs-check-consume] Authenticated user: ${userId}`);
-    }
+    userId = user.id;
+    console.log(`[woofs-check-consume] Authenticated user: ${userId}`);
+  }
 
-    // 4️⃣ Continuer avec la logique existante
-    const { brand_id, cost_woofs, reason, metadata } = payload;
+  // 4️⃣ Vérifier si l'utilisateur est admin (quotas illimités)
+  const { data: isAdmin } = await admin.rpc("has_role", {
+    _user_id: userId,
+    _role: "admin",
+  });
+
+  if (isAdmin) {
+    console.log(`[woofs-check-consume] 👑 Admin user detected - bypassing quota checks`);
+  }
+
+  // 5️⃣ Continuer avec la logique existante
+  const { brand_id, cost_woofs, reason, metadata } = payload;
 
     if (!brand_id || cost_woofs === undefined || !reason) {
       console.error("[woofs-check-consume] Missing fields in payload:", { brand_id, cost_woofs, reason, rawBody });
@@ -145,8 +155,8 @@ Deno.serve(async (req) => {
 
     console.log(`[woofs-check-consume] Current usage: ${woofs_used}/${woofs_limit} Woofs (remaining: ${remaining})`);
 
-    // 4. Vérifier si suffisamment de Woofs
-    if (woofs_used + cost_woofs > woofs_limit) {
+    // 4. Vérifier si suffisamment de Woofs (bypass pour admins)
+    if (!isAdmin && woofs_used + cost_woofs > woofs_limit) {
       console.warn(`[woofs-check-consume] INSUFFICIENT_WOOFS: need ${cost_woofs}, have ${remaining}`);
       return new Response(
         JSON.stringify({
