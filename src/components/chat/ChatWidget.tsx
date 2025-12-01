@@ -600,12 +600,65 @@ export default function ChatWidget() {
 
     setIsGenerating(true);
     try {
+      // ✅ ÉTAPE 1 : Générer les textes marketing (comme PackPreparationModal)
+      console.log("[ChatWidget] Generating texts for", selectedAssets.length, "assets");
+      
+      let textsData: any = null;
+      let textsError: any = null;
+      
+      try {
+        const response = await supabase.functions.invoke("alfie-generate-texts", {
+          body: {
+            brandId: profile.active_brand_id,
+            brief: pendingPack.summary || pendingPack.title,
+            assets: selectedAssets.map((asset) => ({
+              id: asset.id,
+              kind: asset.kind,
+              title: asset.title,
+              goal: asset.goal,
+              tone: asset.tone,
+              platform: asset.platform,
+              ratio: asset.ratio,
+              count: asset.count,
+              durationSeconds: asset.durationSeconds,
+              prompt: asset.prompt,
+            })),
+            useBrandKit: true,
+          },
+        });
+        textsData = response.data;
+        textsError = response.error;
+      } catch (e) {
+        textsError = e;
+      }
+
+      // ✅ ÉTAPE 2 : Fallback si génération de textes échoue
+      let assetsWithTexts = pendingPack.assets;
+      
+      if (textsError || !textsData?.texts) {
+        console.warn("[ChatWidget] Text generation failed, using fallback:", textsError);
+        assetsWithTexts = pendingPack.assets.map((asset) => ({
+          ...asset,
+          generatedTexts: generateFallbackTexts(asset, pendingPack.title),
+        }));
+        toast.warning("Textes générés localement");
+      } else {
+        console.log("[ChatWidget] ✅ Texts generated successfully");
+        assetsWithTexts = pendingPack.assets.map((asset) => ({
+          ...asset,
+          generatedTexts: textsData.texts?.[asset.id] || generateFallbackTexts(asset, pendingPack.title),
+        }));
+      }
+
+      // ✅ ÉTAPE 3 : Envoyer le pack AVEC les textes générés
+      const packWithTexts = { ...pendingPack, assets: assetsWithTexts };
+      
       await sendPackToGenerator({
         brandId: profile.active_brand_id,
-        pack: pendingPack,
+        pack: packWithTexts,
         userId: profile.id,
         selectedAssetIds: selectedIds,
-        useBrandKit: true, // Par défaut, peut être contrôlé via un toggle dédié plus tard
+        useBrandKit: true,
       });
       
       toast.success(`${selectedIds.length} asset(s) en cours de génération !`);
@@ -621,6 +674,35 @@ export default function ChatWidget() {
     } finally {
       setIsGenerating(false);
     }
+  }
+
+  function generateFallbackTexts(asset: any, campaignTitle: string): any {
+    if (asset.kind === 'carousel') {
+      return {
+        slides: Array.from({ length: asset.count || 5 }, (_, i) => ({
+          title: i === 0 ? asset.title : i === (asset.count || 5) - 1 ? "Passez à l'action" : `Point ${i}`,
+          subtitle: i === 0 ? campaignTitle : `Élément ${i + 1}`,
+        })),
+      };
+    }
+    
+    if (asset.kind?.includes('video')) {
+      return {
+        video: {
+          hook: asset.title || "Découvrez",
+          script: asset.prompt?.slice(0, 200) || "",
+          cta: "En savoir plus",
+        },
+      };
+    }
+    
+    return {
+      text: {
+        title: asset.title,
+        body: asset.prompt?.slice(0, 120) || "",
+        cta: "En savoir plus",
+      },
+    };
   }
 
   // Fonction pour réinitialiser la conversation
