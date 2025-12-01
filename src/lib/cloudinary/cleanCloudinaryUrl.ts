@@ -23,8 +23,16 @@ export function cleanCloudinaryUrl(url: string | undefined | null): string | nul
     cleaned = cleaned.replace(regex, '');
   }
   
-  // Nettoyer les virgules ou slashes en double
-  cleaned = cleaned.replace(/\/+/g, '/').replace(/,+/g, ',').replace(/,\//g, '/');
+  // Nettoyer les virgules ou slashes en double, SANS casser le protocole https://
+  const protocolMatch = cleaned.match(/^(https?:\/\/[^/]+)/);
+  if (protocolMatch) {
+    const domain = protocolMatch[1]; // "https://res.cloudinary.com"
+    const path = cleaned.substring(domain.length);
+    cleaned = domain + path.replace(/\/+/g, '/').replace(/,+/g, ',').replace(/,\//g, '/');
+  } else {
+    // Fallback si pas de protocole détecté (ne devrait jamais arriver vu le check ligne 9)
+    cleaned = cleaned.replace(/\/+/g, '/').replace(/,+/g, ',').replace(/,\//g, '/');
+  }
   
   return cleaned;
 }
