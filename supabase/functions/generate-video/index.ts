@@ -486,8 +486,11 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           version: REPLICATE_MODEL_VERSION,
           input,
-          webhook: webhookUrl,
-          webhook_events_filter: ["completed", "failed"]
+          // ✅ N'inclure webhook que si défini (évite l'erreur webhook_events_filter sans webhook)
+          ...(webhookUrl && {
+            webhook: webhookUrl,
+            webhook_events_filter: ["completed", "failed"]
+          })
         })
       });
 
