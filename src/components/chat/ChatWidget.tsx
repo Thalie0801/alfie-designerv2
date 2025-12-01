@@ -30,6 +30,7 @@ export default function ChatWidget() {
   const [pendingPack, setPendingPack] = useState<AlfiePack | null>(null);
   const [showPackModal, setShowPackModal] = useState(false);
   const [showIntentPanel, setShowIntentPanel] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const brief = useBrief();
   const { profile } = useAuth();
@@ -575,8 +576,26 @@ export default function ChatWidget() {
 
   // Fonction pour confirmer génération depuis IntentPanel
   async function handleConfirmGeneration(selectedIds: string[]) {
-    if (!pendingPack || !profile?.active_brand_id || !profile?.id) return;
-    
+    if (!pendingPack || !profile?.active_brand_id || !profile?.id) {
+      toast.error("Données manquantes pour lancer la génération");
+      return;
+    }
+
+    // Validation des vidéos sans image source
+    const selectedAssets = pendingPack.assets.filter(a => selectedIds.includes(a.id));
+    const videosWithoutImage = selectedAssets.filter(
+      a => a.kind === "video_basic" && !a.referenceImageUrl
+    );
+
+    if (videosWithoutImage.length > 0) {
+      toast.error(
+        `${videosWithoutImage.length} vidéo(s) sans image source. ` +
+        `Ajoute une image de référence pour créer l'animation.`
+      );
+      return;
+    }
+
+    setIsGenerating(true);
     try {
       await sendPackToGenerator({
         brandId: profile.active_brand_id,
@@ -596,6 +615,8 @@ export default function ChatWidget() {
         toast.error("Erreur lors de la génération");
         console.error("Generation error:", error);
       }
+    } finally {
+      setIsGenerating(false);
     }
   }
 
@@ -640,6 +661,7 @@ export default function ChatWidget() {
         <IntentPanel
           intents={pendingPack.assets}
           onConfirm={handleConfirmGeneration}
+          isLoading={isGenerating}
           onEdit={(intent) => {
             console.log("Edit intent:", intent);
             // TODO: Ouvrir AssetEditDialog
