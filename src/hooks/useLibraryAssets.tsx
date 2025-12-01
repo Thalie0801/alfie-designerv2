@@ -142,10 +142,11 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
         .eq('user_id', userId);
 
       if (type === 'images') {
-        // Images = type 'image' uniquement, PAS les carousel_slide
+        // Images = type 'image' uniquement, PAS les carousel_slide, PAS les legacy Ken Burns
         query = query
           .eq('type', 'image')
-          .is('metadata->carousel_id', null);
+          .is('metadata->carousel_id', null)
+          .not('output_url', 'like', '%animated_base_%'); // ✅ Exclure legacy Ken Burns
       } else {
         // Vidéos: toutes les vidéos (type='video'), incluant Replicate AI
         const { data: videoData, error: videoError } = await supabase
