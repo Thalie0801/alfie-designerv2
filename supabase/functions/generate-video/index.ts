@@ -824,7 +824,7 @@ Deno.serve(async (req) => {
                   user_id: user.id,
                   brand_id: brandId!,
                   type: 'video',
-                  engine: 'veo3',
+                  engine: 'veo_3_1',
                   status: 'completed',
                   prompt: prompt.substring(0, 500),
                   output_url: videoUri,
