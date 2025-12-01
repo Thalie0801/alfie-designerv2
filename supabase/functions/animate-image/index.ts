@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        version: "47bdc14703c7b1c289c75da32c99e2f28dfdb0b8d5e042cebafa0b1b8e5d8be3",
+        version: "4bce7c1730a5fc582699fb7e630c2e39c3dd4ddb11ca87fa3b7f0fc52537dd09",
         input: {
           image: imageUrl,
           prompt: animationPrompt,
