@@ -3,13 +3,12 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Eye, Download, FileArchive, Loader2, Film } from "lucide-react";
+import { Eye, Download, FileArchive, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { slideUrl } from "@/lib/cloudinary/imageUrls";
 import { getCloudName } from "@/lib/cloudinary/config";
-import { generateCarouselVideoFromLibrary } from "@/lib/cloudinary/carouselToVideo";
 import { cn } from "@/lib/utils";
 
 interface CarouselSlide {
@@ -66,7 +65,6 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
   const [slides, setSlides] = useState<CarouselSlide[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingZip, setDownloadingZip] = useState<string | null>(null);
-  const [generatingVideo, setGeneratingVideo] = useState<string | null>(null);
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -220,32 +218,6 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     }
   }, []);
 
-  const handleGenerateVideo = useCallback(async (carouselKey: string, carouselSlides: CarouselSlide[]) => {
-    if (!carouselSlides.length) return;
-    setGeneratingVideo(carouselKey);
-    try {
-      const carouselId = carouselSlides[0]?.carousel_id || undefined;
-      const orderId = carouselSlides[0]?.order_id || undefined;
-      const format = (carouselSlides[0]?.format || "4:5") as Aspect;
-
-      const url = await generateCarouselVideoFromLibrary({
-        carouselId,
-        orderId,
-        aspect: format,
-        title: "Mon Carrousel",
-        durationPerSlide: 2,
-      });
-      if (!url) throw new Error("Aucune URL vidéo générée");
-      window.open(url, "_blank");
-      toast.success("Vidéo générée avec succès 🎬");
-    } catch (e: any) {
-      console.error("[CarouselsTab] Video generation error:", e);
-      toast.error(`Échec de la génération : ${e?.message ?? "Erreur inconnue"}`);
-    } finally {
-      setGeneratingVideo(null);
-    }
-  }, []);
-
   // Ouverture individuelle (throttle simple pour éviter les bloqueurs)
   const openIndividually = useCallback((arr: CarouselSlide[]) => {
     // ✅ Utiliser slideUrl avec overlays au lieu de URL brute
@@ -309,20 +281,6 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
               {carouselSlides[0]?.format && <Badge variant="outline">{carouselSlides[0].format}</Badge>}
             </div>
             <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="default"
-                onClick={() => handleGenerateVideo(key, carouselSlides)}
-                disabled={generatingVideo === key}
-                aria-label="Créer une vidéo à partir du carrousel"
-              >
-                {generatingVideo === key ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Film className="h-4 w-4 mr-2" />
-                )}
-                Créer une vidéo
-              </Button>
               <Button
                 size="sm"
                 variant="outline"
