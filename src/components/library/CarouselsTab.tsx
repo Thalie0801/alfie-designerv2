@@ -191,7 +191,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
           ? `Carrousel ${arr[0].carousel_id}`
           : "Carrousel",
     }));
-  }, []);
+  }, [slides]);
 
   const handleDownloadZip = useCallback(async (carouselKey: string, carouselSlides: CarouselSlide[]) => {
     if (!carouselSlides.length) return;

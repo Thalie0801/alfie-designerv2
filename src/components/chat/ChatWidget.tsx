@@ -23,13 +23,14 @@ type AssistantReply = ChatMessage;
 type ContentIntent = ReturnType<typeof detectContentIntent>;
 
 /**
- * Enrichit un pack avec woofCostType pour éviter NaN dans les calculs
+ * Enrichit un pack avec woofCostType et count par défaut pour éviter NaN dans les calculs
  */
 function enrichPackWithWoofCostType(pack: AlfiePack): AlfiePack {
   return {
     ...pack,
     assets: pack.assets.map(asset => ({
       ...asset,
+      count: asset.kind === 'carousel' ? (asset.count || 5) : (asset.count || 1),
       woofCostType: asset.kind === 'carousel' 
         ? 'carousel_slide' 
         : asset.kind === 'image'
