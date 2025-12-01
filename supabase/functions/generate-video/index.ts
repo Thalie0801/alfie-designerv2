@@ -475,7 +475,7 @@ Deno.serve(async (req) => {
       // ✅ Prioriser image-to-video
       const input = imageUrl 
         ? { 
-            image: imageUrl, 
+            input_image: imageUrl, 
             ...VIDEO_CONFIG 
           }
         : { 
