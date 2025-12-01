@@ -139,7 +139,7 @@ const PRESET_PACKS = {
         platform: "instagram" as const,
         format: "reel" as const,
         ratio: "9:16" as const,
-        durationSeconds: 10,
+        durationSeconds: 4,
         title: "Reel promo dynamique",
         goal: "vente" as const,
         tone: "dynamique, percutant",
