@@ -64,11 +64,11 @@ export function slideUrl(publicId: string, o: SlideUrlOptions): string {
     );
   }
 
-  // BULLETS - centrés
+  // BULLETS - centrés (tiret ASCII au lieu de • Unicode non supporté par Cloudinary)
   bullets.forEach((b, i) => {
     const bulletY = config.bulletStart + i * config.bulletStep;
     overlays.push(
-      `l_text:Arial_${config.bulletSize}:${enc('• ' + b)},co_rgb:FFFFFF,g_center,y_${bulletY},w_${Math.round(w * 0.8)},c_fit`
+      `l_text:Arial_${config.bulletSize}:${enc('- ' + b)},co_rgb:FFFFFF,g_center,y_${bulletY},w_${Math.round(w * 0.8)},c_fit`
     );
   });
 

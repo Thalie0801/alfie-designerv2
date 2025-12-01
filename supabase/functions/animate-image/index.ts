@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
       `https://res.cloudinary.com/${cloudName}/video/upload`,
       `/${dim},c_fill,f_mp4,${kenBurns}`,
       overlays.length ? `/${overlays.join('/')}` : '',
-      `/${imagePublicId}.mp4`  // ✅ Extension .mp4 requise par Cloudinary pour Ken Burns
+      `/${imagePublicId}`  // ✅ f_mp4 gère le format, pas d'extension manuelle nécessaire
     ].join('');
 
     console.log("[animate-image] sourcePublicId:", imagePublicId);
