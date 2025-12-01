@@ -207,6 +207,48 @@ Deno.serve(async (req) => {
     console.log("[animate-image] sourcePublicId:", imagePublicId);
     console.log("[animate-image] animationUrl:", videoUrl);
 
+    // 🔍 POST-TRANSFORMATION VERIFICATION - Vérifier que Ken Burns fonctionne
+    console.log("[animate-image] Verifying Ken Burns transformation:", videoUrl);
+    try {
+      const verifyVideoResponse = await fetch(videoUrl, { method: "HEAD" });
+      if (!verifyVideoResponse.ok) {
+        console.error("[animate-image] ❌ Ken Burns transformation failed:", {
+          videoUrl,
+          status: verifyVideoResponse.status,
+          statusText: verifyVideoResponse.statusText
+        });
+        
+        // ✅ FALLBACK GRACIEUX : Retourner l'image statique au lieu d'une vidéo 404
+        console.warn("[animate-image] ⚠️ Falling back to static image (Ken Burns unavailable)");
+        return jsonResponse({
+          success: false,
+          error: "Ken Burns transformation unavailable on Cloudinary",
+          fallbackUrl: sourceImageUrl,
+          message: "L'animation Ken Burns n'est pas disponible. L'image statique a été retournée.",
+          thumbnailUrl: sourceImageUrl,
+          woofsCost: 0, // Pas de débit Woofs car échec
+          remainingWoofs
+        }, { status: 503 });
+      }
+      console.log("[animate-image] ✅ Ken Burns transformation verified");
+    } catch (err) {
+      console.error("[animate-image] ❌ Error verifying Ken Burns transformation:", {
+        videoUrl,
+        error: String(err)
+      });
+      
+      // ✅ FALLBACK GRACIEUX en cas d'erreur réseau
+      return jsonResponse({
+        success: false,
+        error: "Error while verifying Ken Burns transformation",
+        fallbackUrl: sourceImageUrl,
+        message: "Impossible de vérifier l'animation. L'image statique a été retournée.",
+        thumbnailUrl: sourceImageUrl,
+        woofsCost: 0,
+        remainingWoofs
+      }, { status: 503 });
+    }
+
     // 4️⃣ Utiliser adminClient pour les sauvegardes DB quand appel interne
     const dbClient = isInternalCall ? adminClient : createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
       global: { headers: { Authorization: req.headers.get("Authorization") || "" } }
