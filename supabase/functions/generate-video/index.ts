@@ -250,6 +250,7 @@ Deno.serve(async (req) => {
     const publicBaseUrl = typeof body?.publicBaseUrl === "string" ? body.publicBaseUrl : undefined;
     const generationId = typeof body?.generationId === "string" ? body.generationId : undefined;
     const jobId = typeof body?.jobId === "string" ? body.jobId : undefined;
+    const orderId = typeof body?.orderId === "string" ? body.orderId : undefined;
 
     const providerRaw = typeof body?.provider === "string" ? body.provider : undefined;
     const providerResolution = resolveProvider(providerRaw);
@@ -698,6 +699,7 @@ Deno.serve(async (req) => {
           aspectRatio: veo3AspectRatio,
           durationSeconds,
           generateAudio: true,
+          outputStorageUri: orderId ? `gs://alfie-designer-videos/veo3/${orderId}/` : "gs://alfie-designer-videos/veo3/"
         }
       };
 
@@ -773,7 +775,10 @@ Deno.serve(async (req) => {
 
         console.log(`[generate-video] VEO 3 poll: done=${isDone}, elapsed=${Math.round((Date.now() - startTime) / 1000)}s`);
         
-        if (isDone) break;
+        if (isDone) {
+          console.log("[generate-video] VEO 3 full result:", JSON.stringify(result, null, 2));
+          break;
+        }
       }
 
       // Timeout si toujours en processing
@@ -785,11 +790,13 @@ Deno.serve(async (req) => {
         }, { status: 504 });
       }
 
-      // 5. Extraire l'URL vidéo
-      const videoUri = result?.response?.generatedSamples?.[0]?.video?.uri;
+      // 5. Extraire l'URL vidéo (format correct VEO 3)
+      const videoUri = 
+        result?.response?.generatedVideos?.[0]?.video?.uri ||   // Format VEO 3
+        result?.response?.generatedSamples?.[0]?.video?.uri;    // Fallback ancien format
       
       if (!videoUri || typeof videoUri !== "string") {
-        console.error(`[generate-video] No valid VEO 3 video URI:`, result);
+        console.error(`[generate-video] No valid VEO 3 video URI. Full result:`, JSON.stringify(result, null, 2));
         return jsonResponse({
           error: "No video URI in VEO 3 response",
           response: result?.response
