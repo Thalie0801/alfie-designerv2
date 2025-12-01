@@ -85,7 +85,7 @@ export function WoofsPackDialog({
         <div className="p-3 rounded-lg bg-primary/5 text-sm">
           <p className="font-medium mb-1">💡 Rappel</p>
           <p className="text-muted-foreground">
-            Veo 3 consomme 4 Woofs par vidéo, Sora en consomme 1.
+            Vidéos standard 4s = 10 Woofs · Vidéos premium 8s = 50 Woofs
           </p>
         </div>
 

@@ -85,7 +85,7 @@ export function BrandQuotaDisplay() {
             <TooltipContent className="max-w-xs">
               <p className="font-semibold mb-1">💡 Coûts en Woofs</p>
               <p className="text-sm">Image = 1 Woof · Slide carrousel = 1 Woof</p>
-              <p className="text-sm">Vidéo standard = 6 Woofs · Vidéo premium = 25 Woofs</p>
+              <p className="text-sm">Vidéo standard (4s) = 10 Woofs · Vidéo premium (8s) = 50 Woofs</p>
               <p className="text-sm mt-2">Les quotas se réinitialisent chaque 1er du mois et ne sont pas reportables.</p>
             </TooltipContent>
           </Tooltip>
