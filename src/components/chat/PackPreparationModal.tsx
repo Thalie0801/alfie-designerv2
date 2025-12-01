@@ -290,7 +290,12 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
                       <span>•</span>
                       <span>{asset.goal}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{asset.prompt}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      {asset.generatedTexts?.slides 
+                        ? asset.generatedTexts.slides.map((s, i) => `Slide ${i+1}: ${s.title}`).join(' • ')
+                        : asset.prompt
+                      }
+                    </p>
                   </div>
                   <div className="text-xs font-medium px-2 py-1 bg-primary/20 rounded-full">
                     {cost} Woofs
