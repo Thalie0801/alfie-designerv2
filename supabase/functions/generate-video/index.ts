@@ -673,12 +673,21 @@ Deno.serve(async (req) => {
       // ✅ CRITICAL: VEO 3 is ONLY available in us-central1, force it
       const location = "us-central1";
       const serviceAccountJson = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
+      const videosBucket = Deno.env.get("VERTEX_VIDEOS_BUCKET") || "alfie-designer-videos";
 
       if (!projectId || !serviceAccountJson) {
         return jsonResponse({ 
           error: "Vertex AI VEO 3 not configured. Missing VERTEX_PROJECT_ID or GOOGLE_SERVICE_ACCOUNT_JSON." 
         }, { status: 500 });
       }
+
+      if (!videosBucket) {
+        return jsonResponse({ 
+          error: "VERTEX_VIDEOS_BUCKET not configured" 
+        }, { status: 500 });
+      }
+
+      console.log(`[generate-video] VEO 3 storage bucket: ${videosBucket}`);
 
       console.log("[generate-video] 🎬 Using VEO 3 FAST for premium video");
 
@@ -699,7 +708,7 @@ Deno.serve(async (req) => {
           aspectRatio: veo3AspectRatio,
           durationSeconds,
           generateAudio: true,
-          storageUri: orderId ? `gs://alfie-designer-videos/veo3/${orderId}/` : "gs://alfie-designer-videos/veo3/"
+          storageUri: orderId ? `gs://${videosBucket}/veo3/${orderId}/` : `gs://${videosBucket}/veo3/`
         }
       };
 
