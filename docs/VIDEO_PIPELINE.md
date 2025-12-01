@@ -176,6 +176,24 @@ Types d'assets disponibles :
 - **Preview** : Thumbnails fiables depuis l'image source
 - **Cohérence** : Toutes les vidéos utilisent le même moteur
 
+## Fonctions Edge Dépréciées
+
+Les fonctions suivantes sont **obsolètes** et retournent `410 Gone` :
+
+| Fonction | Raison | Alternative |
+|----------|--------|-------------|
+| `chat-generate-video` | Utilisait FFmpeg backend externe | `generate-video` via Studio |
+| `alfie-generate-video-slideshow` | Cloudinary slideshow obsolète | `generate-video` avec image source |
+| `generate-sora-montage` | Montage multi-clips Sora non maintenu | `generate-video` standard/premium |
+| `create-video` | Table `videos` legacy | `generate-video` + `media_generations` |
+
+**Migration :** Toutes les générations vidéo passent désormais par :
+- **`generate-video`** (Replicate ou Veo 3.1)
+- **Studio UI** (`/studio`)
+- **Table `media_generations`** (plus de table `videos` séparée)
+
+**Route frontend `/videos`** redirige automatiquement vers `/studio`.
+
 ## Résolution des Problèmes
 
 ### URLs Cloudinary cassées
