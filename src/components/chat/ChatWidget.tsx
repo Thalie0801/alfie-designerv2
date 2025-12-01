@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { AssetEditDialog } from "@/components/studio/AssetEditDialog";
 import type { PackAsset } from "@/types/alfiePack";
 
-type ChatMessage = { role: "user" | "assistant"; node: ReactNode };
+type ChatMessage = { role: "user" | "assistant"; node: ReactNode; text?: string };
 type AssistantReply = ChatMessage;
 
 type ContentIntent = ReturnType<typeof detectContentIntent>;
@@ -158,21 +158,23 @@ export default function ChatWidget() {
 
   const buildAeditusReply = (): AssistantReply => {
     const url = getAeditusUrl();
+    const replyText = "Tu es en panne d'idées ? 💡 Aeditus peut prendre le relais avec 1 mois de contenu complet.";
 
     return {
       role: "assistant" as const,
+      text: replyText,
       node: assistantCard(
         <div className="space-y-2 text-sm">
           <p>
-            Tu es en panne d’idées ? 💡 <strong>Aeditus</strong> peut prendre le relais.
+            Tu es en panne d'idées ? 💡 <strong>Aeditus</strong> peut prendre le relais.
           </p>
           <p>
-            Aeditus, c’est <strong>1 mois de contenu complet</strong> dans ta niche : idées, structures, textes… Tu n’as
-            plus qu’à valider, planifier, et tu peux même remplacer les visuels par des images générées avec Alfie.
+            Aeditus, c'est <strong>1 mois de contenu complet</strong> dans ta niche : idées, structures, textes… Tu n'as
+            plus qu'à valider, planifier, et tu peux même remplacer les visuels par des images générées avec Alfie.
           </p>
           <p>
-            Résultat : tu gardes la main sur ton image de marque, sans avoir à réfléchir tous les jours à “qu’est-ce que
-            je poste ?”.
+            Résultat : tu gardes la main sur ton image de marque, sans avoir à réfléchir tous les jours à "qu'est-ce que
+            je poste ?".
           </p>
           <a
             href={url}
@@ -239,9 +241,11 @@ export default function ChatWidget() {
       "Visuel 1:1 LinkedIn : annonce webinar IA marketing",
       "Vidéo 9:16 TikTok : astuces Canva pour solopreneurs",
     ];
+    const replyText = "Donne-moi un sujet précis pour que je puisse t'aider.";
 
     return {
       role: "assistant" as const,
+      text: replyText,
       node: (
         <div className="space-y-3">
           <p className="text-sm">
@@ -322,8 +326,11 @@ export default function ChatWidget() {
 
     // Ideas tracking géré par le LLM maintenant
 
+    const localReplyText = `Suggestion ${formatLabel} — ${topic || 'sujet'}`;
+    
     return {
       role: "assistant" as const,
+      text: localReplyText,
       node: assistantCard(
         <div className="space-y-2">
           {header}
@@ -367,6 +374,7 @@ export default function ChatWidget() {
     if (plat.matches.length > 0) {
       return {
         role: "assistant" as const,
+        text: "Accès rapide vers les sections de l'app.",
         node: (
           <div className="space-y-2">
             <p className="text-sm">Accès rapide :</p>
@@ -377,7 +385,7 @@ export default function ChatWidget() {
     }
     if (plat.isWhatCanDo) {
       const blocks = whatCanDoBlocks();
-      return { role: "assistant" as const, node: blocks };
+      return { role: "assistant" as const, text: "Voici ce que je peux faire pour toi.", node: blocks };
     }
     return null;
   }
@@ -421,10 +429,10 @@ export default function ChatWidget() {
 
     // Construire l'historique des messages pour le LLM
     const chatHistory = msgs
-      .filter((m) => m.role === "user" || m.role === "assistant")
+      .filter((m) => m.text) // Seulement les messages avec texte brut
       .map((m) => ({
         role: m.role,
-        content: typeof m.node === "string" ? m.node : raw, // Simplification
+        content: m.text!,
       }));
 
     // Ajouter le message utilisateur actuel
@@ -517,14 +525,18 @@ export default function ChatWidget() {
         </p>
       ));
 
+      // Enrichir le pack pour l'affichage si nécessaire
+      const enrichedPackForDisplay = finalPack ? enrichPackWithWoofCostType(finalPack) : null;
+
       return {
         role: "assistant" as const,
+        text: reply,
         node: assistantCard(
           <div className="space-y-2">
             {paragraphs}
-        {pendingPack && activeBrandId && (
-          <PackPreviewCard pack={pendingPack} onOpenDetail={() => setShowPackModal(true)} />
-        )}
+            {enrichedPackForDisplay && activeBrandId && (
+              <PackPreviewCard pack={enrichedPackForDisplay} onOpenDetail={() => setShowPackModal(true)} />
+            )}
           </div>,
           false, // Ne pas afficher "Pré-remplir Studio" quand il y a un pack (le pack a sa propre action)
         ),
@@ -556,6 +568,7 @@ export default function ChatWidget() {
       ...m,
       {
         role: "user",
+        text: text,
         node: (
           <span
             className="inline-block rounded-2xl px-3 py-2 text-sm bg-white border"
