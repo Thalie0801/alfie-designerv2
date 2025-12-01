@@ -1071,81 +1071,55 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
     return { videoUrl };
   }
 
-  // ✅ Stratégie Cloudinary Ken Burns : Générer image + animer
-  console.log("[processGenerateVideo] Generating base image for video (Ken Burns)...");
-
-  // 1) Générer l'image de base avec useBrandKit
-  const AR_MAP: Record<string, string> = {
-    "1:1": "1024x1024",
-    "4:5": "1080x1350",
-    "9:16": "1080x1920",
-    "16:9": "1920x1080",
-  };
-  const resolution = AR_MAP[aspectRatio] || AR_MAP["4:5"];
-
-  // ✅ Utiliser buildFinalPrompt pour préserver le thème
+  // ✅ Vidéo standard via Replicate (image-to-video)
+  console.log("[processGenerateVideo] Generating standard video via Replicate...");
+  
   const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : null;
-  const imagePrompt = buildFinalPrompt(payload, useBrandKit, brandMini);
+  const videoPrompt = buildFinalPrompt(payload, useBrandKit, brandMini);
 
-  const imageResult = await callFn<any>("alfie-generate-ai-image", {
-    prompt: imagePrompt,
-    resolution,
-    backgroundOnly: false,
+  // Appeler generate-video avec provider "replicate"
+  const videoResult = await callFn<any>("generate-video", {
+    prompt: videoPrompt,
+    imageUrl: payload.sourceImageUrl, // Image source si fournie
+    aspectRatio: aspectRatio || "9:16",
     userId,
     brandId,
     orderId,
-    useBrandKit, // ✅ Propagation
+    provider: "replicate",
   });
 
-  const imageUrl = extractImageUrl(imageResult);
-  if (!imageUrl) throw new Error("Failed to generate base image for video");
+  const videoUrl = videoResult?.output || videoResult?.videoUrl || videoResult?.url;
+  if (!videoUrl) throw new Error("Replicate failed to generate video");
 
-  console.log("[processGenerateVideo] Base image generated:", imageUrl);
+  console.log("[processGenerateVideo] ✅ Replicate video created:", videoUrl);
 
-  // 2) Uploader sur Cloudinary
-  const cloud = await uploadFromUrlToCloudinary(imageUrl, {
-    folder: `alfie/${brandId}/videos/${orderId}`,
-    publicId: `video_base_${Date.now()}`,
-    tags: ["video", "alfie", "kenburns", `brand:${brandId}`, `order:${orderId}`],
-  });
+  // Thumbnail = image source ou capture
+  const thumbnailUrl = payload.sourceImageUrl || videoResult?.thumbnail_url || videoUrl;
 
-  console.log("[processGenerateVideo] Uploaded to Cloudinary:", cloud.publicId);
-
-  // 3) Créer vidéo via Cloudinary Ken Burns
-  const ASPECT_DIM: Record<string, string> = {
-    "1:1": "w_1080,h_1080",
-    "16:9": "w_1920,h_1080",
-    "9:16": "w_1080,h_1920",
-    "4:5": "w_1080,h_1350",
-  };
-
-  const dim = ASPECT_DIM[aspectRatio] || ASPECT_DIM["4:5"];
-  const kenBurns = `e_zoompan:d_${durationSec}:z_20,g_center`;
-
-  const videoUrl = `https://res.cloudinary.com/${cloudName}/video/upload/${dim},c_fill,f_mp4,${kenBurns}/${cloud.publicId}.mp4`;
-  const thumbnailUrl = cloud.secureUrl;
-
-  console.log("[processGenerateVideo] ✅ Video created via Cloudinary:", videoUrl);
-
-  // 4) Sauvegarder
+  // Sauvegarder dans media_generations
   const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
     user_id: userId,
     brand_id: brandId,
     type: "video",
+    engine: "replicate",
     status: "completed",
     output_url: videoUrl,
     thumbnail_url: thumbnailUrl,
     metadata: {
-      prompt,
+      provider: "replicate",
+      tier: "standard",
+      source: payload.sourceImageUrl ? "image" : "text",
+      prompt: videoPrompt,
       aspectRatio,
       duration: durationSec,
-      generator: "cloudinary_kenburns",
+      fps: 8,
+      resolution: "720x1280",
       orderId,
-      cloudinary_public_id: cloud.publicId,
     },
   });
   if (mediaErr) throw new Error(mediaErr.message);
 
+  // Sauvegarder dans library_assets
   const { error: libErr } = await supabaseAdmin.from("library_assets").insert({
     user_id: userId,
     brand_id: brandId,
@@ -1153,19 +1127,18 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
     type: "video",
     format: aspectRatio,
     cloudinary_url: videoUrl,
-    cloudinary_public_id: cloud.publicId,
-    tags: ["video", "alfie", "kenburns"],
+    tags: ["video", "alfie", "replicate"],
     metadata: {
-      prompt,
+      provider: "replicate",
+      tier: "standard",
+      prompt: videoPrompt,
       duration: durationSec,
       thumbnailUrl,
-      generator: "cloudinary_kenburns",
     },
   });
   if (libErr) throw new Error(libErr.message);
 
   console.log("[processGenerateVideo] ✅ Video saved to library");
-
   return { videoUrl };
 }
 

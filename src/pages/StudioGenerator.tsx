@@ -670,8 +670,8 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
                     <DropdownMenuItem onClick={() => addAsset({ kind: "carousel", count: 5, woofCostType: "carousel_slide" })}>
                       📊 Carrousel
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => addAsset({ kind: "video_basic", durationSeconds: 10, woofCostType: "video_basic" })}>
-                      🎥 Vidéo standard
+                    <DropdownMenuItem onClick={() => addAsset({ kind: "video_basic", durationSeconds: 3, woofCostType: "video_basic" })}>
+                      🎬 Vidéo depuis image (3s)
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => addAsset({ kind: "video_premium", durationSeconds: 10, woofCostType: "video_premium" })}>
                       ✨ Vidéo premium (Veo 3.1)

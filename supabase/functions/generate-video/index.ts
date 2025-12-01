@@ -2,12 +2,24 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { WOOF_COSTS } from "../_shared/woofsCosts.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 const REPLICATE_API = "https://api.replicate.com/v1/predictions";
-const DEFAULT_REPLICATE_MODEL_VERSION = "minimax/video-01"; // Remplace par le hash/slug exact
+// ✅ Image-to-video optimisé : Stable Video Diffusion
+const DEFAULT_REPLICATE_MODEL = "stability-ai/stable-video-diffusion:3f0457e4619daac51203dedb472816fd4af51f3149fa7a9e0b5ffcf1b8172438";
 const REPLICATE_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
 const KIE_TOKEN = Deno.env.get("KIE_API_KEY");
-const REPLICATE_MODEL_VERSION =
-  Deno.env.get("REPLICATE_VIDEO_MODEL_VERSION") ?? DEFAULT_REPLICATE_MODEL_VERSION;
+const REPLICATE_MODEL_VERSION = Deno.env.get("REPLICATE_VIDEO_MODEL_VERSION") ?? DEFAULT_REPLICATE_MODEL;
 const DEFAULT_FFMPEG_BACKEND_URL = "https://alfie-ffmpeg-backend.onrender.com";
+
+// ✅ Configuration optimisée pour vidéos image-to-video
+const VIDEO_CONFIG = {
+  fps: 8,
+  num_frames: 25, // ~3 secondes à 8fps
+  motion_bucket_id: 40, // Mouvement léger (0-255)
+  noise_aug_strength: 0.02, // Stabilité visuelle
+  width: 720,
+  height: 1280, // Format vertical
+};
+
+const DEFAULT_MOTION_PROMPT = "subtle, smooth camera movement, professional marketing, no distortions, no glitches";
 
 const jsonResponse = (data: unknown, init?: ResponseInit) =>
   new Response(JSON.stringify(data), {
@@ -454,6 +466,19 @@ Deno.serve(async (req) => {
       const sanitizedBase = rawBaseUrl ? rawBaseUrl.replace(/\/$/, "") : undefined;
       const webhookUrl = sanitizedBase ? `${sanitizedBase}/functions/v1/video-webhook` : undefined;
 
+      // ✅ Prioriser image-to-video
+      const input = imageUrl 
+        ? { 
+            image: imageUrl, 
+            ...VIDEO_CONFIG 
+          }
+        : { 
+            prompt: `${prompt}. ${DEFAULT_MOTION_PROMPT}`, 
+            ...VIDEO_CONFIG 
+          };
+
+      console.log("[generate-video] Replicate input:", { hasImage: !!imageUrl, config: VIDEO_CONFIG });
+
       const response = await fetch(REPLICATE_API, {
         method: "POST",
         headers: {
@@ -463,11 +488,7 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           version: REPLICATE_MODEL_VERSION,
-          input: {
-            prompt,
-            aspect_ratio: aspectRatio,
-            image: imageUrl || undefined
-          },
+          input,
           webhook: webhookUrl,
           webhook_events_filter: ["completed", "failed"]
         })
