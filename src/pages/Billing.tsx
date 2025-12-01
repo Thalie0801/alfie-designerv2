@@ -21,7 +21,7 @@ const plans = [
     quota_woofs: 150,
     features: [
       '≈ 150 Woofs créatifs / mois',
-      'Exemple : jusqu\'à 120 visuels ou 80 visuels + 3 vidéos courtes',
+      'Exemple : jusqu\'à 120 visuels ou 100 visuels + 8 vidéos courtes',
       '1 marque avec votre brand kit (couleurs, polices, logos, mood)',
       'Génération d\'images, carrousels et vidéos animées',
       'Export ZIP des créations prêtes à télécharger',
@@ -35,7 +35,7 @@ const plans = [
     quota_woofs: 450,
     features: [
       '≈ 450 Woofs créatifs / mois',
-      'Exemple : jusqu\'à 350 visuels ou 250 visuels + 10 vidéos courtes',
+      'Exemple : jusqu\'à 350 visuels ou 280 visuels + 28 vidéos courtes',
       '1 marque avec votre brand kit enrichi (palettes, ton de voix, assets récurrents)',
       'Flows complets images + carrousels + vidéos',
       'Export ZIP optimisé pour réutiliser vos contenus',
@@ -50,7 +50,7 @@ const plans = [
     quota_woofs: 1000,
     features: [
       '≈ 1000 Woofs créatifs / mois',
-      'Exemple : jusqu\'à 800 visuels ou 600 visuels + 20 vidéos courtes + 4 vidéos premium',
+      'Exemple : jusqu\'à 800 visuels ou 650 visuels + 58 vidéos courtes',
       '1 marque avec votre brand kit complet (templates, presets, visuels piliers…)',
       'Export Canva + packs ZIP pour livrer vite à vos clients',
       'Bibliothèque longue durée + priorité de génération',
@@ -268,7 +268,7 @@ export default function Billing() {
                   <div>
                     <p className="font-semibold text-orange-700 dark:text-orange-300">Woofs ce mois</p>
                     <p className="text-xs text-orange-600/70 dark:text-orange-400/70">
-                      1 Woof = 1 image/slide • 10 Woofs = 1 vidéo standard • 50 Woofs = 1 vidéo premium
+                      1 Woof = 1 image/slide • 6 Woofs = 1 vidéo standard • 25 Woofs = 1 vidéo premium
                     </p>
                   </div>
                 </div>
