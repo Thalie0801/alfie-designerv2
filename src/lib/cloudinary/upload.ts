@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { getCloudName } from './config';
 
 export interface SignParams {
   folder?: string;
@@ -144,11 +145,7 @@ export async function uploadUnsigned(
   uploadPreset: string,
   folder?: string
 ): Promise<CloudinaryUploadResult> {
-  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-  
-  if (!cloudName) {
-    throw new Error('VITE_CLOUDINARY_CLOUD_NAME not configured');
-  }
+  const cloudName = getCloudName();
 
   const formData = new FormData();
   formData.append('file', file);

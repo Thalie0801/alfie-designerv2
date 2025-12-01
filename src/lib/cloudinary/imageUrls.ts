@@ -1,4 +1,5 @@
 import { cleanText } from './utils';
+import { getCloudName } from './config';
 
 export type SlideUrlOptions = {
   cloudName: string;
@@ -94,9 +95,7 @@ export function imageUrl(
     cloudName?: string;
   } = {}
 ): string {
-  const cloudName =
-    options.cloudName || (import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined);
-  if (!cloudName) throw new Error('cloudName missing');
+  const cloudName = options.cloudName || getCloudName();
 
   const parts: string[] = [];
   if (options.width && options.height) {

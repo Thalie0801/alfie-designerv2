@@ -1,4 +1,5 @@
 import { cleanText } from './utils';
+import { getCloudName } from './config';
 
 const enc = (t: string) => encodeURIComponent(t);
 
@@ -56,9 +57,7 @@ export function simpleVideoUrl(
     cloudName?: string;
   } = {}
 ): string {
-  const cloudName =
-    options.cloudName || (import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined);
-  if (!cloudName) throw new Error('cloudName missing');
+  const cloudName = options.cloudName || getCloudName();
 
   const parts: string[] = [];
   if (options.width && options.height) {

@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { uploadSigned } from '@/lib/cloudinary/upload';
 import { slideUrl } from '@/lib/cloudinary/imageUrls';
+import { getCloudName } from '@/lib/cloudinary/config';
 import { Loader2, Upload, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -81,7 +82,7 @@ export function CarouselBuilder({ brandId, campaignId, onSlideCreated }: Carouse
       toast.success('✅ Image de fond uploadée avec succès !');
       
       if (onSlideCreated) {
-        const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string || 'dkad5vdyo';
+        const cloudName = getCloudName();
         const url = slideUrl(result.public_id, { 
           title, 
           subtitle, 
@@ -115,7 +116,7 @@ export function CarouselBuilder({ brandId, campaignId, onSlideCreated }: Carouse
         subtitle,
         bulletPoints: bullets.filter(b => b.trim() !== ''),
         aspectRatio: '9:16',
-        cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string || 'dkad5vdyo',
+        cloudName: getCloudName(),
       })
     : null;
 
