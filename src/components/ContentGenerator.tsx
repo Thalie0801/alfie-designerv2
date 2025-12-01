@@ -241,7 +241,7 @@ export function ContentGenerator() {
               <div className="space-y-2">
                 <h3 className="font-semibold text-lg">Génération vidéo disponible dans le Studio</h3>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                  Utilise le <strong>Studio</strong> pour créer des vidéos standard 4s (10 Woofs) ou premium 8s (50 Woofs) à partir d'images.
+                  Utilise le <strong>Studio</strong> pour créer des vidéos standard 4s (6 Woofs) ou premium 8s (25 Woofs) à partir d'images.
                 </p>
                 <Button 
                   onClick={() => window.location.href = '/studio'}
