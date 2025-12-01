@@ -11,7 +11,7 @@ export type { AssetKind, Platform, Ratio, Goal, GeneratedTexts } from '@/lib/typ
 export type PackAssetKind = AssetKind;
 export type AssetFormat = "post" | "story" | "reel" | "short" | "pin";
 export type AssetGoal = "education" | "vente" | "lead" | "engagement";
-export type WoofCostType = "image" | "carousel_slide" | "animated_image" | "video_basic" | "video_premium";
+export type WoofCostType = "image" | "carousel_slide" | "video_basic" | "video_premium";
 
 // PackAsset is now just UnifiedAlfieIntent with additional legacy fields
 export interface PackAsset extends UnifiedAlfieIntent {
@@ -23,7 +23,6 @@ export interface PackAsset extends UnifiedAlfieIntent {
 export const WOOF_COST_MAP: Record<AssetKind, number | 'perSlide'> = {
   image: 1,
   carousel: 'perSlide', // 1 par slide
-  animated_image: 3,
   video_basic: 10,
   video_premium: 50,
 };

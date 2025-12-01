@@ -20,7 +20,7 @@ interface BrandKit {
 
 interface AssetBrief {
   id: string;
-  kind: "image" | "carousel" | "animated_image" | "video_basic" | "video_premium";
+  kind: "image" | "carousel" | "video_basic" | "video_premium";
   title: string;
   goal: string;
   tone: string;
@@ -311,7 +311,7 @@ Deno.serve(async (req) => {
         } else if (asset.kind.includes("video")) {
           prompt = buildVideoPrompt(asset, brandKit, brief, useBrandKit);
         } else {
-          // image, animated_image
+          // image only
           prompt = buildImagePrompt(asset, brandKit, brief, useBrandKit);
         }
 

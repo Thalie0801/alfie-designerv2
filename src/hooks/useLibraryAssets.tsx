@@ -142,11 +142,10 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
         .eq('user_id', userId);
 
       if (type === 'images') {
-        // Images = type 'image' uniquement, PAS les carousel_slide, PAS les animated_image
+        // Images = type 'image' uniquement, PAS les carousel_slide
         query = query
           .eq('type', 'image')
-          .is('metadata->carousel_id', null)
-          .is('metadata->isAnimatedVideo', null);
+          .is('metadata->carousel_id', null);
       } else {
         // Vidéos: toutes les vidéos (type='video'), incluant Replicate AI
         const { data: videoData, error: videoError } = await supabase
@@ -296,30 +295,6 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
     }
   };
 
-  // Helper pour normaliser les URLs Cloudinary (ajouter format si manquant)
-  const normalizeImageUrl = (url: string | undefined): string => {
-    if (!url || !url.startsWith("https://res.cloudinary.com")) return url || "";
-    
-    // Si l'URL a f_mp4 (vidéo), la convertir en image
-    if (url.includes("f_mp4")) {
-      url = url.replace("f_mp4", "f_auto,q_auto");
-    }
-    
-    // Si pas de format du tout, l'ajouter
-    if (
-      url.includes("/image/upload/") &&
-      !url.includes("f_auto") &&
-      !url.includes("f_jpg") &&
-      !url.includes("f_png") &&
-      !url.includes("f_webp")
-    ) {
-      // Insérer après /image/upload/
-      url = url.replace("/image/upload/", "/image/upload/f_auto,q_auto/");
-    }
-    
-    return url;
-  };
-
   const downloadAsset = async (assetId: string) => {
     const asset = assets.find(a => a.id === assetId);
     if (!asset) {
@@ -352,16 +327,8 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
       console.log('[Download] Output URL:', outputUrl ? `${outputUrl.substring(0, 100)}...` : 'null');
       console.log('[Download] Output URL type:', outputUrl?.startsWith('data:') ? 'base64' : outputUrl?.startsWith('http') ? 'http' : 'unknown');
       
-      // ✅ FALLBACK KEN BURNS : Si image Ken Burns, télécharger directement l'image source normalisée
       let url = outputUrl;
       let filename = `${asset.type}-${new Date().toISOString().slice(0, 10)}-${asset.id.slice(0, 8)}`;
-      
-      if ((fullAsset?.metadata as any)?.animationType === 'ken_burns') {
-        console.log('[Download] Ken Burns CSS animation detected - downloading normalized source image');
-        const rawUrl = fullAsset?.thumbnail_url || fullAsset?.output_url || outputUrl;
-        url = normalizeImageUrl(rawUrl);
-        filename = `animated-image-${new Date().toISOString().slice(0, 10)}-${asset.id.slice(0, 8)}`;
-      }
 
       if (!url) {
         console.warn('[Download] No output_url or thumbnail_url found in DB');
@@ -413,8 +380,8 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
       const a = document.createElement('a');
       a.href = objectUrl;
       
-      // Extension PNG pour Ken Burns (image) ou type d'origine
-      const extension = (fullAsset?.metadata as any)?.animationType === 'ken_burns' ? 'png' : asset.type === 'image' ? 'png' : 'mp4';
+      // Extension selon le type
+      const extension = asset.type === 'image' ? 'png' : 'mp4';
       a.download = `${filename}.${extension}`;
       
       document.body.appendChild(a);
