@@ -311,7 +311,7 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
       // Load the full output_url from database (not in initial query to avoid heavy load)
       const { data: fullAsset, error } = await supabase
         .from('media_generations')
-        .select('output_url, type, status')
+        .select('output_url, thumbnail_url, type, status, metadata')
         .eq('id', assetId)
         .single();
       
@@ -327,14 +327,36 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
       console.log('[Download] Output URL:', outputUrl ? `${outputUrl.substring(0, 100)}...` : 'null');
       console.log('[Download] Output URL type:', outputUrl?.startsWith('data:') ? 'base64' : outputUrl?.startsWith('http') ? 'http' : 'unknown');
       
-      if (!outputUrl) {
-        console.warn('[Download] No output_url found in DB');
+      // ✅ FALLBACK KEN BURNS : Si vidéo Ken Burns échoue, télécharger l'image source
+      let url = outputUrl;
+      let filename = `${asset.type}-${new Date().toISOString().slice(0, 10)}-${asset.id.slice(0, 8)}`;
+      
+      if (asset.type === 'video' && (fullAsset?.metadata as any)?.animationType === 'ken_burns') {
+        console.log('[Download] Ken Burns video detected, testing URL...');
+        try {
+          const testResp = await fetch(outputUrl, { method: 'HEAD' });
+          if (!testResp.ok) {
+            console.warn('[Download] Ken Burns video URL failed, falling back to source image');
+            url = fullAsset?.thumbnail_url || outputUrl;
+            filename = `animated-image-${new Date().toISOString().slice(0, 10)}-${asset.id.slice(0, 8)}`;
+            toast.info('Téléchargement de l\'image source (animation indisponible)');
+          }
+        } catch (err) {
+          console.warn('[Download] Ken Burns HEAD test failed, falling back to source image:', err);
+          url = fullAsset?.thumbnail_url || outputUrl;
+          filename = `animated-image-${new Date().toISOString().slice(0, 10)}-${asset.id.slice(0, 8)}`;
+          toast.info('Téléchargement de l\'image source (animation indisponible)');
+        }
+      }
+
+      if (!url) {
+        console.warn('[Download] No output_url or thumbnail_url found in DB');
         toast.info(asset.type === 'video' ? 'Vidéo encore en génération… réessayez dans quelques minutes.' : "Fichier indisponible");
         return;
       }
 
       const SUPABASE_STORAGE_MARKER = '/storage/v1/object/public/media-generations/';
-      if (outputUrl.includes(SUPABASE_STORAGE_MARKER)) {
+      if (url.includes(SUPABASE_STORAGE_MARKER)) {
         const [, pathPart] = outputUrl.split(SUPABASE_STORAGE_MARKER);
         if (pathPart) {
           const { data: signed, error: signedError } = await supabase.storage
@@ -354,9 +376,9 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
       let blob: Blob;
       
       // Si c'est une image base64, la convertir en blob
-      if (outputUrl.startsWith('data:')) {
-        const base64Data = outputUrl.split(',')[1];
-        const mimeType = outputUrl.match(/data:([^;]+);/)?.[1] || 'image/png';
+      if (url.startsWith('data:')) {
+        const base64Data = url.split(',')[1];
+        const mimeType = url.match(/data:([^;]+);/)?.[1] || 'image/png';
         const byteString = atob(base64Data);
         const arrayBuffer = new ArrayBuffer(byteString.length);
         const uint8Array = new Uint8Array(arrayBuffer);
@@ -368,23 +390,22 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
         blob = new Blob([arrayBuffer], { type: mimeType });
       } else {
         // Sinon, télécharger depuis l'URL
-        const response = await fetch(outputUrl);
+        const response = await fetch(url);
         if (!response.ok) throw new Error('Erreur lors du téléchargement');
         blob = await response.blob();
       }
       
-      const url = window.URL.createObjectURL(blob);
+      const objectUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
+      a.href = objectUrl;
       
-      // Extension basée sur le type
-      const extension = asset.type === 'image' ? 'png' : 'mp4';
-      const timestamp = new Date().toISOString().slice(0, 10);
-      a.download = `${asset.type}-${timestamp}-${asset.id.slice(0, 8)}.${extension}`;
+      // Extension basée sur le type ou si fallback Ken Burns → png
+      const extension = url.includes('image/upload') || asset.type === 'image' ? 'png' : 'mp4';
+      a.download = `${filename}.${extension}`;
       
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(objectUrl);
       document.body.removeChild(a);
       
       toast.success('Téléchargement démarré');
