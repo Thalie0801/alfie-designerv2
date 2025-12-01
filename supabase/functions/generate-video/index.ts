@@ -821,9 +821,52 @@ Deno.serve(async (req) => {
         }, { status: 500 });
       }
 
-      console.log(`[generate-video] ✅ VEO 3 video ready: ${videoUri}`);
+      console.log(`[generate-video] ✅ VEO 3 video ready (GCS): ${videoUri}`);
 
-      // 6. Save to media_generations for library
+      // 6. Transférer la vidéo GCS → Cloudinary pour URL publique
+      let cloudinaryUrl = videoUri; // Fallback si le transfert échoue
+      let cloudinaryThumbnail = videoUri;
+      
+      try {
+        console.log('[generate-video] Starting VEO 3 → Cloudinary transfer...');
+        
+        // Convertir gs://bucket/path → https://storage.googleapis.com/bucket/path
+        const httpUrl = videoUri.replace('gs://', 'https://storage.googleapis.com/');
+        console.log(`[generate-video] GCS HTTP URL: ${httpUrl}`);
+        
+        // Uploader vers Cloudinary via edge function
+        const cloudinaryResp = await fetch(`${SUPABASE_URL}/functions/v1/cloudinary`, {
+          method: 'POST',
+          headers: {
+            'Authorization': req.headers.get('Authorization') || '',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            action: 'upload',
+            params: {
+              url: httpUrl,
+              folder: `alfie/veo3/${operationName}`,
+              resource_type: 'video',
+              public_id: `veo3_${Date.now()}`
+            }
+          })
+        });
+
+        if (cloudinaryResp.ok) {
+          const cloudinaryData = await cloudinaryResp.json();
+          cloudinaryUrl = cloudinaryData.secure_url || cloudinaryUrl;
+          cloudinaryThumbnail = cloudinaryData.secure_url?.replace(/\.[^.]+$/, '.jpg') || cloudinaryUrl;
+          console.log(`[generate-video] ✅ Video uploaded to Cloudinary: ${cloudinaryUrl}`);
+        } else {
+          const errorText = await cloudinaryResp.text().catch(() => 'unknown error');
+          console.warn(`[generate-video] Cloudinary upload failed (${cloudinaryResp.status}), keeping GCS URL:`, errorText);
+        }
+      } catch (transferError) {
+        console.error('[generate-video] VEO 3 → Cloudinary transfer error:', transferError);
+        console.log('[generate-video] Falling back to GCS URL');
+      }
+
+      // 7. Save to media_generations for library
       const authHeader = req.headers.get("Authorization")?.replace("Bearer ", "").trim();
       if (authHeader && operationName) {
         try {
@@ -852,8 +895,8 @@ Deno.serve(async (req) => {
                   engine: 'veo_3_1',
                   status: 'completed',
                   prompt: prompt.substring(0, 500),
-                  output_url: videoUri,
-                  thumbnail_url: videoUri,
+                  output_url: cloudinaryUrl,
+                  thumbnail_url: cloudinaryThumbnail,
                   job_id: operationName,
                   metadata: {
                     provider: 'veo3',
@@ -862,7 +905,9 @@ Deno.serve(async (req) => {
                     aspectRatio: veo3AspectRatio,
                     duration: durationSeconds,
                     generatedAt: new Date().toISOString(),
-                    operationName
+                    operationName,
+                    originalGcsUrl: videoUri,
+                    cloudinaryTransfer: cloudinaryUrl !== videoUri
                   }
                 });
               console.log(`[generate-video] ✅ VEO 3 video entry created for operation ${operationName}`);
@@ -880,15 +925,17 @@ Deno.serve(async (req) => {
         providerEngine: "veo3",
         jobId: operationName,
         status: "succeeded",
-        output: videoUri,
-        videoUrl: videoUri,
-        url: videoUri,
+        output: cloudinaryUrl,
+        videoUrl: cloudinaryUrl,
+        url: cloudinaryUrl,
         metadata: {
           provider: "veo3",
           tier: "premium",
           aspectRatio: veo3AspectRatio,
           duration: durationSeconds,
-          outputUrl: videoUri
+          outputUrl: cloudinaryUrl,
+          originalGcsUrl: videoUri,
+          cloudinaryTransfer: cloudinaryUrl !== videoUri
         }
       });
     }
