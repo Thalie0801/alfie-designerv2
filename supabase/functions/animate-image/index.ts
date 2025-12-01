@@ -1,7 +1,7 @@
 /**
- * animate-image - Applique un effet Ken Burns (Cloudinary) sur une image
+ * animate-image - Prépare une image pour animation CSS Ken Burns
  * Coût : 3 Woofs
- * Deployed: 2025-01-30 - Force re-deploy to fix library_assets type
+ * Note : Ne génère plus de vidéo Cloudinary - l'animation est gérée en CSS côté client
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
 
   try {
     // Version marker for debugging
-    console.log("[animate-image] 🚀 NEW VERSION DEPLOYED - v2.0 - KenBurns fix");
+    console.log("[animate-image] 🚀 CSS KEN BURNS VERSION - v3.0 - No Cloudinary video");
     
     // 1️⃣ Vérifier si c'est un appel interne via x-internal-secret
     const internalSecret = req.headers.get("x-internal-secret") || req.headers.get("X-Internal-Secret");
@@ -154,7 +154,6 @@ Deno.serve(async (req) => {
           status: verifyResponse.status,
           statusText: verifyResponse.statusText,
         });
-        console.error("[animate-image] ❌ HEAD request failed for:", sourceImageUrl);
         return jsonResponse({
           error: "Source image not found on Cloudinary",
           imagePublicId,
@@ -174,101 +173,32 @@ Deno.serve(async (req) => {
       }, { status: 500 });
     }
 
-    // Générer l'URL Cloudinary avec effet Ken Burns
-    const ASPECT_DIM: Record<string, string> = {
-      '1:1':  'w_1080,h_1080',
-      '16:9': 'w_1920,h_1080',
-      '9:16': 'w_1080,h_1920',
-      '4:3':  'w_1440,h_1080',
-      '3:4':  'w_1080,h_1440',
-      '4:5':  'w_1080,h_1350',
-    };
-
-    const dim = ASPECT_DIM[aspect] || ASPECT_DIM['4:5'];
-    const kenBurns = `e_zoompan:d_${duration}:z_20,g_center`;
-
-    const overlays: string[] = [];
-    if (title) {
-      const cleanTitle = title.substring(0, 80);
-      overlays.push(`l_text:Arial_70_bold:${encodeURIComponent(cleanTitle)},co_rgb:FFFFFF,g_north,y_200`);
-    }
-    if (subtitle) {
-      const cleanSubtitle = subtitle.substring(0, 100);
-      overlays.push(`l_text:Arial_44:${encodeURIComponent(cleanSubtitle)},co_rgb:E5E7EB,g_center,y_50`);
-    }
-
-    const videoUrl = [
-      `https://res.cloudinary.com/${cloudName}/image/upload`,  // ✅ image/upload même pour MP4
-      `/${dim},c_fill,f_mp4,${kenBurns}`,
-      overlays.length ? `/${overlays.join('/')}` : '',
-      `/${imagePublicId}`  // ✅ f_mp4 gère le format, pas d'extension manuelle nécessaire
-    ].join('');
-
-    console.log("[animate-image] sourcePublicId:", imagePublicId);
-    console.log("[animate-image] animationUrl:", videoUrl);
-
-    // 🔍 POST-TRANSFORMATION VERIFICATION - Log seulement, ne bloque pas
-    console.log("[animate-image] Verifying Ken Burns transformation:", videoUrl);
-    try {
-      const verifyVideoResponse = await fetch(videoUrl, { method: "HEAD" });
-      if (!verifyVideoResponse.ok) {
-        // ⚠️ On log mais on ne bloque pas - HEAD peut donner faux négatifs sur transformations
-        console.warn("[animate-image] ⚠️ Ken Burns HEAD returned non-OK status (may be false negative):", {
-          videoUrl,
-          status: verifyVideoResponse.status,
-          statusText: verifyVideoResponse.statusText
-        });
-      } else {
-        console.log("[animate-image] ✅ Ken Burns transformation verified");
-      }
-    } catch (err) {
-      console.warn("[animate-image] ⚠️ Error verifying Ken Burns transformation (HEAD):", String(err));
-      // On ne bloque pas - HEAD sur transformation n'est pas fiable
-    }
+    // ✅ SIMPLIFICATION : Plus de génération vidéo Cloudinary
+    // L'animation Ken Burns est gérée en CSS côté client (animate-ken-burns)
+    // On stocke juste l'image source avec metadata pour détection frontend
+    
+    console.log("[animate-image] ✅ CSS Ken Burns - storing image with metadata");
 
     // 4️⃣ Utiliser adminClient pour les sauvegardes DB quand appel interne
     const dbClient = isInternalCall ? adminClient : createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
       global: { headers: { Authorization: req.headers.get("Authorization") || "" } }
     });
 
-    // ✅ Suppression de la double insertion dans media_generations
-    // alfie-job-worker gère déjà cette insertion - on garde uniquement library_assets ici
-
-    // Sauvegarder dans library_assets (type=image car constraint accepte seulement image/carousel_slide)
-    if (orderId) {
-      const { error: libError } = await dbClient
-        .from('library_assets')
-        .insert({
-          user_id: userId,
-          brand_id: brandId,
-          order_id: orderId,
-          type: 'image', // ✅ Type autorisé dans library_assets constraint
-          cloudinary_url: videoUrl,
-          format: aspect,
-          tags: ["animated_image", "ken_burns", "alfie", "video"],
-          metadata: {
-            sourceImagePublicId: imagePublicId,
-            duration,
-            aspect,
-            title,
-            subtitle,
-            animationType: 'ken_burns',
-            isAnimatedVideo: true // Flag pour différencier des images statiques
-          },
-        });
-
-      if (libError) {
-        console.error("[animate-image] Failed to save to library_assets:", libError);
-      }
-    }
+    // ✅ Plus d'insertion ici - alfie-job-worker gère tout via media_generations
 
     return jsonResponse({
       success: true,
-      videoUrl,
-      thumbnailUrl: `https://res.cloudinary.com/${cloudName}/image/upload/${imagePublicId}`,
+      imageUrl: sourceImageUrl, // ✅ Retourner l'image source, pas une vidéo
+      thumbnailUrl: sourceImageUrl,
       duration,
+      aspect,
       woofsCost: skipWoofs ? 0 : WOOF_COSTS.animated_image,
-      remainingWoofs
+      remainingWoofs,
+      metadata: {
+        animationType: 'ken_burns',
+        isAnimatedVideo: true,
+        sourceImagePublicId: imagePublicId
+      }
     });
 
   } catch (error: any) {

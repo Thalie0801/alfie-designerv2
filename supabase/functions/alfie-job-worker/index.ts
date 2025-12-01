@@ -1412,34 +1412,34 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
   if (animateError) throw new Error(animateError || "Image animation failed");
 
   console.log("[processAnimateImage] Received from animate-image:", {
-    videoUrl: animatePayload?.videoUrl,
+    imageUrl: animatePayload?.imageUrl,
     success: !!animatePayload?.success,
     raw: animatePayload,
   });
 
-  const videoUrl = animatePayload?.videoUrl || animatePayload?.data?.videoUrl;
-  if (!videoUrl) throw new Error("Missing videoUrl from animate-image response");
+  const imageUrl = animatePayload?.imageUrl || animatePayload?.data?.imageUrl;
+  if (!imageUrl) throw new Error("Missing imageUrl from animate-image response");
 
   // ✅ Valider que c'est une vraie URL Cloudinary complète
-  if (!videoUrl || !videoUrl.startsWith('https://res.cloudinary.com')) {
-    console.error("[processAnimateImage] ❌ Invalid videoUrl format - expected full Cloudinary URL", { 
-      videoUrl,
-      startsWithHttp: videoUrl?.startsWith('http'),
-      startsWithCloudinary: videoUrl?.startsWith('https://res.cloudinary.com')
+  if (!imageUrl || !imageUrl.startsWith('https://res.cloudinary.com')) {
+    console.error("[processAnimateImage] ❌ Invalid imageUrl format - expected full Cloudinary URL", { 
+      imageUrl,
+      startsWithHttp: imageUrl?.startsWith('http'),
+      startsWithCloudinary: imageUrl?.startsWith('https://res.cloudinary.com')
     });
-    throw new Error("Invalid video URL for animated image - expected full Cloudinary URL");
+    throw new Error("Invalid image URL for animated image - expected full Cloudinary URL");
   }
 
-  console.log("✅ [processAnimateImage] Animated image:", videoUrl);
+  console.log("✅ [processAnimateImage] Animated image (CSS):", imageUrl);
 
-  // ✅ Sauvegarder dans media_generations
+  // ✅ Sauvegarder dans media_generations avec type='image' et metadata.animationType='ken_burns'
   const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
     user_id: userId,
     brand_id: brandId,
-    type: "video",
+    type: "image", // ✅ Type 'image' avec metadata.animationType pour détection CSS Ken Burns
     status: "completed",
-    output_url: videoUrl,
-    thumbnail_url: `https://res.cloudinary.com/${cloudName}/image/upload/${imagePublicId}`,  // Pas d'extension .jpg
+    output_url: imageUrl,
+    thumbnail_url: imageUrl,
     metadata: {
       orderId,
       sourceImagePublicId: imagePublicId,
@@ -1447,23 +1447,22 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
       duration: duration,
       title,
       subtitle,
-      generator: "cloudinary_kenburns",
-      animationType: "ken_burns",
+      generator: "css_kenburns",
+      animationType: "ken_burns", // ✅ Flag critique pour frontend
+      isAnimatedVideo: true,
     },
   });
   if (mediaErr) {
     console.error("[processAnimateImage] Failed to save to media_generations:", mediaErr);
   }
 
-  // ✅ library_assets insert supprimé - media_generations est la seule source
-  // Le frontend lit depuis media_generations via useLibraryAssets
-  console.log("[processAnimateImage] ✅ Animated video saved in media_generations", {
+  console.log("[processAnimateImage] ✅ CSS Ken Burns image saved in media_generations", {
     orderId,
-    videoUrl,
+    imageUrl,
     imagePublicId,
   });
 
-  return { videoUrl };
+  return { imageUrl };
 }
 
 // ========== CASCADE JOB CREATION ==========
