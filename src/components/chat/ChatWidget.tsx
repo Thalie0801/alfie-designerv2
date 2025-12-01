@@ -522,9 +522,9 @@ export default function ChatWidget() {
         node: assistantCard(
           <div className="space-y-2">
             {paragraphs}
-            {pack && activeBrandId && (
-              <PackPreviewCard pack={pack} onOpenDetail={() => setShowPackModal(true)} />
-            )}
+        {pendingPack && activeBrandId && (
+          <PackPreviewCard pack={pendingPack} onOpenDetail={() => setShowPackModal(true)} />
+        )}
           </div>,
           false, // Ne pas afficher "Pré-remplir Studio" quand il y a un pack (le pack a sa propre action)
         ),
