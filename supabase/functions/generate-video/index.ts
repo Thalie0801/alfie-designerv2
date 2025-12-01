@@ -669,7 +669,8 @@ Deno.serve(async (req) => {
     // ✅ VEO 3 FAST premium video generation
     if (providerApi === "veo3") {
       const projectId = Deno.env.get("VERTEX_PROJECT_ID");
-      const location = Deno.env.get("VERTEX_LOCATION") || "europe-west9";
+      // ✅ CRITICAL: VEO 3 is ONLY available in us-central1, force it
+      const location = "us-central1";
       const serviceAccountJson = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
 
       if (!projectId || !serviceAccountJson) {
