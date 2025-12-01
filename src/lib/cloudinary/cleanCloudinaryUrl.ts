@@ -5,10 +5,10 @@
 export function cleanCloudinaryUrl(url: string | undefined | null): string | null {
   if (!url) return null;
   
-  // ✅ Filtrer les URLs invalides dès le départ
+  // ✅ Si ce n'est pas une URL Cloudinary, la retourner telle quelle
+  // (URLs Replicate, S3, etc. sont valides et doivent être conservées)
   if (!url.startsWith('https://res.cloudinary.com')) {
-    console.warn('[cleanCloudinaryUrl] URL invalide détectée:', url);
-    return null;
+    return url;
   }
   
   // Transformations problématiques à supprimer
