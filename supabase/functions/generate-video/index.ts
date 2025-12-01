@@ -731,6 +731,12 @@ Deno.serve(async (req) => {
 
       console.log(`[generate-video] VEO 3 operation started: ${operationName}`);
 
+      // Extraire la région depuis l'operationName pour le polling
+      // Format: projects/{project}/locations/{location}/publishers/...
+      const locationMatch = operationName.match(/locations\/([^\/]+)\//);
+      const operationLocation = locationMatch ? locationMatch[1] : location;
+      console.log(`[generate-video] VEO 3 operation location: ${operationLocation}`);
+
       // 4. Polling de l'opération (VEO 3 FAST est rapide: 30-60 secondes)
       const maxWaitMs = 300_000; // 5 minutes max
       const pollIntervalMs = 10000; // Vérifier toutes les 10 secondes
@@ -743,7 +749,7 @@ Deno.serve(async (req) => {
         await new Promise(r => setTimeout(r, pollIntervalMs));
         
         const statusResp = await fetch(
-          `https://${location}-aiplatform.googleapis.com/v1/${operationName}`,
+          `https://${operationLocation}-aiplatform.googleapis.com/v1/${operationName}`,
           { headers: { Authorization: `Bearer ${accessToken}` } }
         );
 
