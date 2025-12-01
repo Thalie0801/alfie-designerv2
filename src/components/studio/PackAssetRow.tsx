@@ -28,8 +28,8 @@ const goalDescriptions: Record<string, string> = {
 const assetKindLabel: Record<string, string> = {
   image: "Image",
   carousel: "Carrousel",
-  video_basic: "🖼️ → 🎬 Vidéo",
-  video_premium: "Vidéo premium (Veo 3.1)",
+  video_basic: "🎬 Vidéo standard (4s)",
+  video_premium: "✨ Vidéo premium (8s)",
 };
 
 const platformEmoji: Record<string, string> = {
