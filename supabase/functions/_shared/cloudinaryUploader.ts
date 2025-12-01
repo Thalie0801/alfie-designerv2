@@ -23,6 +23,13 @@ export async function uploadFromUrlToCloudinary(
     context?: Record<string, string>;
   }
 ): Promise<CloudinaryUploadResult> {
+  // ✅ NOUVEAU : Détecter le base64 et rediriger vers uploadToCloudinary
+  const isDataUri = /^data:image\/[a-zA-Z0-9+.-]+;base64,/.test(imageUrl);
+  if (isDataUri) {
+    console.log('[Cloudinary] Detected base64 image, switching to direct upload');
+    return uploadToCloudinary(imageUrl, options);
+  }
+
   const cloudName = env('CLOUDINARY_CLOUD_NAME');
   const apiKey = env('CLOUDINARY_API_KEY');
   const apiSecret = env('CLOUDINARY_API_SECRET');
@@ -80,6 +87,12 @@ export async function uploadFromUrlToCloudinary(
   }
 
   const result = await response.json();
+  
+  // ✅ NOUVEAU : Vérifier que secure_url existe
+  if (!result.secure_url) {
+    console.error('[Cloudinary] No secure_url returned from upload');
+    throw new Error('Cloudinary upload failed: no secure_url returned');
+  }
   
   return {
     publicId: result.public_id,

@@ -837,9 +837,8 @@ ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
       });
 
       // 2) upload cloudinary from URL
-      console.log("[job-worker] uploaded image engine result, pushing to Cloudinary", {
-        imageUrl,
-      });
+      console.log("[processRenderImages] ⬆️  Uploading to Cloudinary from:", imageUrl.substring(0, 100));
+      
       const cloud = await uploadFromUrlToCloudinary(imageUrl, {
         folder: `alfie/${img.brandId ?? payload.brandId}/orders/${orderId}`,
         publicId: `image_${results.length + 1}`,
@@ -859,7 +858,20 @@ ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
           type: assetType,
         },
       });
-      console.log("[job-worker] uploaded image to Cloudinary publicId=" + cloud.publicId);
+      
+      console.log("[processRenderImages] ✅ Uploaded to Cloudinary:", { publicId: cloud.publicId, url: cloud.secureUrl });
+      
+      // ✅ NOUVEAU : Vérification HEAD que le fichier existe
+      const verifyResponse = await fetch(cloud.secureUrl, { method: 'HEAD' });
+      if (!verifyResponse.ok) {
+        console.error('[processRenderImages] ⚠️  Cloudinary verification failed:', {
+          status: verifyResponse.status,
+          url: cloud.secureUrl,
+        });
+        throw new Error(`Cloudinary upload verification failed: ${verifyResponse.status}`);
+      }
+      
+      console.log("[processRenderImages] ✅ File verified on Cloudinary");
 
       // 3) persist media_generations (best-effort)
       await supabaseAdmin.from("media_generations").insert({
