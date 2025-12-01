@@ -37,28 +37,38 @@ function safeTimeAgo(dateISO?: string | null) {
   return formatDistanceToNow(d, { addSuffix: true, locale: fr });
 }
 
-// Helper pour normaliser les URLs Cloudinary (ajouter format si manquant)
+/**
+ * Normalize Cloudinary image URL to ensure proper format for display
+ * Removes video transformations and converts to image format
+ */
 function normalizeImageUrl(url: string | undefined): string {
   if (!url || !url.startsWith("https://res.cloudinary.com")) return "";
   
-  // Si l'URL a f_mp4 (vidéo), la convertir en image
-  if (url.includes("f_mp4")) {
-    url = url.replace("f_mp4", "f_auto,q_auto");
+  let normalized = url;
+  
+  // 1. Remove problematic video transformations
+  normalized = normalized.replace(/e_zoompan:[^,\/]+,?/g, ""); // Remove e_zoompan:d_X:z_X
+  normalized = normalized.replace(/f_mp4,?/g, ""); // Remove f_mp4
+  normalized = normalized.replace(/,{2,}/g, ","); // Clean double commas
+  normalized = normalized.replace(/,\//g, "/"); // Clean ,/ to /
+  
+  // 2. Convert /video/upload/ to /image/upload/ if present
+  if (normalized.includes("/video/upload/")) {
+    normalized = normalized.replace("/video/upload/", "/image/upload/");
   }
   
-  // Si pas de format du tout, l'ajouter
+  // 3. Add auto format if no format present
   if (
-    url.includes("/image/upload/") &&
-    !url.includes("f_auto") &&
-    !url.includes("f_jpg") &&
-    !url.includes("f_png") &&
-    !url.includes("f_webp")
+    normalized.includes("/image/upload/") &&
+    !normalized.includes("f_auto") &&
+    !normalized.includes("f_jpg") &&
+    !normalized.includes("f_png") &&
+    !normalized.includes("f_webp")
   ) {
-    // Insérer après /image/upload/
-    url = url.replace("/image/upload/", "/image/upload/f_auto,q_auto/");
+    normalized = normalized.replace("/image/upload/", "/image/upload/f_auto,q_auto/");
   }
   
-  return url;
+  return normalized;
 }
 
 export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, daysUntilExpiry }: AssetCardProps) {
@@ -132,6 +142,30 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
 
   // ✅ Détection Ken Burns animé via metadata (fonctionne même si type='image')
   const isKenBurns = (asset.metadata as any)?.animationType === "ken_burns";
+
+  /**
+   * Get Ken Burns image URL with intelligent fallback
+   * Priority: normalized thumbnail_url → normalized output_url → construct from sourceImagePublicId
+   */
+  const getKenBurnsImageUrl = (): string => {
+    const metadata = asset.metadata as any;
+    const cloudName = "dcuvvilto";
+    
+    // 1. Try normalized thumbnail_url
+    const normalizedThumb = normalizeImageUrl(asset.thumbnail_url);
+    if (normalizedThumb) return normalizedThumb;
+    
+    // 2. Try normalized output_url
+    const normalizedOutput = normalizeImageUrl(asset.output_url);
+    if (normalizedOutput) return normalizedOutput;
+    
+    // 3. Construct from sourceImagePublicId as last resort
+    if (metadata?.sourceImagePublicId) {
+      return `https://res.cloudinary.com/${cloudName}/image/upload/f_auto,q_auto/${metadata.sourceImagePublicId}`;
+    }
+    
+    return "";
+  };
 
   return (
     <Card className={`group hover:shadow-lg transition-all ${selected ? "ring-2 ring-primary" : ""}`}>
