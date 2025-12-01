@@ -798,8 +798,38 @@ async function generateGcsSignedUrl(
       // 3. Appeler VEO 3 API (long-running operation)
       const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${VEO3_MODEL}:predictLongRunning`;
 
+      // ✅ Construire l'instance avec image de référence si fournie
+      let instance: any = { prompt };
+      
+      // Si une image de référence est fournie, la télécharger et l'encoder en base64
+      if (imageUrl) {
+        try {
+          console.log(`[generate-video] Downloading reference image: ${imageUrl}`);
+          const imageResponse = await fetch(imageUrl);
+          if (!imageResponse.ok) {
+            console.warn(`[generate-video] Failed to download reference image: ${imageResponse.status}`);
+          } else {
+            const imageBuffer = await imageResponse.arrayBuffer();
+            const imageBase64 = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+            
+            // Détecter le MIME type depuis l'URL ou Content-Type
+            const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+            const mimeType = contentType.split(';')[0].trim();
+            
+            instance.referenceImage = {
+              bytesBase64Encoded: imageBase64,
+              mimeType: mimeType
+            };
+            
+            console.log(`[generate-video] ✅ Reference image added to VEO 3 payload (${mimeType})`);
+          }
+        } catch (err) {
+          console.error(`[generate-video] Error processing reference image:`, err);
+        }
+      }
+
       const veoPayload = {
-        instances: [{ prompt }],
+        instances: [instance],
         parameters: {
           aspectRatio: veo3AspectRatio,
           durationSeconds,
