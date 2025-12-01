@@ -25,7 +25,7 @@ Quand l'utilisateur est prêt à générer un pack de visuels, tu peux proposer 
   "assets": [
     {
       "id": "asset_1",
-      "kind": "image" | "carousel" | "animated_image" | "video_basic" | "video_premium",
+      "kind": "image" | "carousel" | "video_basic" | "video_premium",
       "count": 1,
       "platform": "instagram",
       "format": "post",
@@ -56,7 +56,7 @@ Quand l'utilisateur est prêt à générer un pack de visuels, tu peux proposer 
   "assets": [
     {
       "id": "asset_1",
-      "kind": "image" | "carousel" | "animated_image" | "video_basic" | "video_premium",
+      "kind": "image" | "carousel" | "video_basic" | "video_premium",
       "count": 1,
       "platform": "instagram",
       "format": "post",
@@ -148,27 +148,13 @@ Format de réponse OBLIGATOIRE pour les packs :
       "tone": "authentique, rassurant",
       "prompt": "Visuel avec témoignage/avant-après sur [bénéfice du brief]",
       "woofCostType": "image"
-    },
-    {
-      "id": "asset_4",
-      "kind": "animated_image",
-      "count": 1,
-      "platform": "instagram",
-      "format": "reel",
-      "ratio": "9:16",
-      "durationSeconds": 3,
-      "title": "Image animée : produit en action",
-      "goal": "engagement",
-      "tone": "dynamique, élégant",
-      "prompt": "Image du produit/service en situation [contexte du brief] - l'effet Ken Burns sera appliqué",
-      "woofCostType": "animated_image"
     }
   ]
 }
 </alfie-pack>
 
-Types disponibles : "image", "carousel", "animated_image", "video_basic", "video_premium"
-WoofCostType : "image", "carousel_slide", "animated_image", "video_basic", "video_premium"`,
+Types disponibles : "image", "carousel", "video_basic", "video_premium"
+WoofCostType : "image", "carousel_slide", "video_basic", "video_premium"`,
 } as const;
 
 /**
@@ -251,16 +237,14 @@ Le secteur d'activité est fourni pour contexte minimal, mais reste neutre dans 
     enrichedPrompt += `\n\nCOUTS PAR TYPE DE VISUEL :`;
     enrichedPrompt += `\n- Image : 1 Woof`;
     enrichedPrompt += `\n- Carrousel : 1 Woof par slide (ex: 5 slides = 5 Woofs)`;
-    enrichedPrompt += `\n- Image animee (Ken Burns via Cloudinary, effet zoom/pan elegant) : 3 Woofs`;
-    enrichedPrompt += `\n- Video standard (IA generative Replicate/Kling) : 10 Woofs`;
+    enrichedPrompt += `\n- Video standard (IA generative Replicate) : 10 Woofs`;
     enrichedPrompt += `\n- Video premium (IA Vertex AI Veo 3.1, qualite cinema) : 50 Woofs`;
     enrichedPrompt += `\n\nRECOMMANDATIONS BUDGET-INTELLIGENTES :`;
-    enrichedPrompt += `\n- Budget < 10 Woofs : Mise en avant images (1 Woof) et images animees (3 Woofs). Les images animees Ken Burns sont une excellente option pour ajouter du mouvement sans exploser le budget.`;
-    enrichedPrompt += `\n- Budget 10-49 Woofs : Tu peux proposer carrousels (5-7 slides) + images animees + video standard si justifie.`;
+    enrichedPrompt += `\n- Budget < 10 Woofs : Mise en avant images (1 Woof) et carrousels.`;
+    enrichedPrompt += `\n- Budget 10-49 Woofs : Tu peux proposer carrousels (5-7 slides) + video standard si justifie.`;
     enrichedPrompt += `\n- Budget >= 50 Woofs : Tous les formats possibles, y compris video premium Veo 3.1.`;
     enrichedPrompt += `\n\nEXPLIQUE LES DIFFERENCES quand tu proposes des options :`;
-    enrichedPrompt += `\n- "Image animee" = effet Ken Burns (zoom/pan elegant sur image fixe, 3 Woofs) - ideal pour donner vie a une image sans cout eleve`;
-    enrichedPrompt += `\n- "Video standard" = IA generative complete (10 Woofs) - creation video a partir de zero`;
+    enrichedPrompt += `\n- "Video standard" = IA generative complete Replicate (10 Woofs) - creation video a partir de zero`;
     enrichedPrompt += `\n- "Video premium" = qualite cinematique Veo 3.1 (50 Woofs) - top qualite pour campagnes premium`;
   }
 

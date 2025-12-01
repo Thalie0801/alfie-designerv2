@@ -3,7 +3,7 @@
  * Single source of truth for all content generation intents
  */
 
-export type AssetKind = 'image' | 'carousel' | 'animated_image' | 'video_basic' | 'video_premium';
+export type AssetKind = 'image' | 'carousel' | 'video_basic' | 'video_premium';
 export type Platform = 'instagram' | 'linkedin' | 'tiktok' | 'youtube' | 'facebook' | 'pinterest' | 'generic';
 export type Ratio = '1:1' | '4:5' | '9:16' | '16:9';
 export type Goal = 'education' | 'vente' | 'lead' | 'engagement' | 'notoriete';
@@ -27,7 +27,6 @@ export interface UnifiedAlfieIntent {
   prompt: string;
   durationSeconds?: number; // vidéos uniquement
   referenceImageUrl?: string;
-  animationPrompt?: string; // Description de l'animation (pour animated_image)
   generatedTexts?: GeneratedTexts;
   useBrandKit?: boolean;
   campaign?: string;

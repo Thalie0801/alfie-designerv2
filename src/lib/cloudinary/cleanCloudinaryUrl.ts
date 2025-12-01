@@ -13,7 +13,6 @@ export function cleanCloudinaryUrl(url: string | undefined | null): string | nul
   
   // Transformations problématiques à supprimer
   const problematicTransforms = [
-    /,?e_zoompan:[^/,]+/gi,
     /,?e_loop:[^/,]+/gi,
     /,?e_reverse/gi,
     /,?du_\d+/gi

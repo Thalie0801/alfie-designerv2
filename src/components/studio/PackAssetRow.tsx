@@ -28,7 +28,6 @@ const goalDescriptions: Record<string, string> = {
 const assetKindLabel: Record<string, string> = {
   image: "Image",
   carousel: "Carrousel",
-  animated_image: "Animation IA (10 Woofs)",
   video_basic: "Vidéo standard",
   video_premium: "Vidéo premium (Veo 3.1)",
 };
@@ -147,24 +146,6 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
               <span className="text-muted-foreground">{asset.tone}</span>
             </div>
 
-            {/* Description de l'animation IA - toujours visible */}
-            {asset.kind === "animated_image" && (
-              <div className="mt-3 space-y-2">
-                <div>
-                  <p className="text-sm font-medium">🎬 Description de l'animation</p>
-                  <p className="text-xs text-muted-foreground">Décris le mouvement souhaité pour Replicate</p>
-                </div>
-                <textarea
-                  className="w-full min-h-[60px] p-2 text-sm rounded-md border bg-background"
-                  value={asset.animationPrompt || ""}
-                  onChange={(e) => {
-                    const updatedAsset = { ...asset, animationPrompt: e.target.value };
-                    onEdit(updatedAsset);
-                  }}
-                  placeholder="Ex: Alfie court joyeusement, le personnage danse, zoom avant dynamique..."
-                />
-              </div>
-            )}
           </div>
 
           <div className="flex items-center gap-1">
