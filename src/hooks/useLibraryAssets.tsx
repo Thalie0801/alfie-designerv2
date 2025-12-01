@@ -148,7 +148,7 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
           .is('metadata->carousel_id', null)
           .is('metadata->isAnimatedVideo', null);
       } else {
-        // Vidéos: requête unique depuis media_generations pour TOUTES les vidéos
+        // Vidéos: 1) Vidéos standards (type='video')
         const { data: videoData, error: videoError } = await supabase
           .from('media_generations')
           .select('id, type, status, output_url, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes')
@@ -161,7 +161,22 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
           console.error('[LibraryAssets] Video query error:', videoError);
         }
 
+        // Vidéos: 2) Animations Ken Burns (type='image' avec isAnimatedVideo=true)
+        const { data: kenBurnsData, error: kenBurnsError } = await supabase
+          .from('media_generations')
+          .select('id, type, status, output_url, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes')
+          .eq('user_id', userId)
+          .eq('type', 'image')
+          .eq('metadata->isAnimatedVideo', true)
+          .order('created_at', { ascending: false })
+          .limit(30);
+
+        if (kenBurnsError) {
+          console.error('[LibraryAssets] Ken Burns query error:', kenBurnsError);
+        }
+
         console.log('[LibraryAssets] Videos loaded:', videoData?.length || 0);
+        console.log('[LibraryAssets] Ken Burns loaded:', kenBurnsData?.length || 0);
         console.log('[LibraryAssets] Video URLs sample:', videoData?.slice(0, 3).map(v => ({
           id: v.id,
           url: v.output_url?.substring(0, 60) + '...',
@@ -179,13 +194,17 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
             }))
         );
 
-        const combinedData = (videoData || []).sort((a, b) => {
+        // Combiner les vidéos standards et les animations Ken Burns
+        const allVideoAssets = [...(videoData || []), ...(kenBurnsData || [])];
+        
+        // Trier par date décroissante
+        const combinedData = allVideoAssets.sort((a, b) => {
           const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
           const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
           return dateB - dateA;
         });
 
-        console.log(`[LibraryAssets] Loaded ${videoData?.length || 0} videos (all types)`);
+        console.log(`[LibraryAssets] Loaded ${videoData?.length || 0} videos + ${kenBurnsData?.length || 0} Ken Burns animations = ${combinedData.length} total`);
         
         const mappedAssets = combinedData
           .map(asset => {
