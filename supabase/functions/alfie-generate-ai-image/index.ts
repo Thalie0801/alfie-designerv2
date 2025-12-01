@@ -389,8 +389,6 @@ Deno.serve(async (req) => {
       const insertPayload = {
         user_id: userId,
         brand_id: brandIdForMetadata,
-        order_id: orderId ?? null,
-        order_item_id: orderItemId,
         type: "image" as const,
         status: "completed" as const,
         // On log uniquement un résumé court pour conformité
