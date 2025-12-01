@@ -17,7 +17,6 @@ import { toast } from "sonner";
 import { AssetEditDialog } from "@/components/studio/AssetEditDialog";
 import type { PackAsset } from "@/types/alfiePack";
 
-type CoachMode = "strategy" | "da" | "maker";
 type ChatMessage = { role: "user" | "assistant"; node: ReactNode };
 type AssistantReply = ChatMessage;
 
@@ -27,7 +26,6 @@ export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
-  const [modeCoach, setModeCoach] = useState<CoachMode>("strategy");
   const [seed, setSeed] = useState(0);
   const [pendingPack, setPendingPack] = useState<AlfiePack | null>(null);
   const [showPackModal, setShowPackModal] = useState(false);
@@ -64,8 +62,6 @@ export default function ChatWidget() {
         localStorage.getItem("alfie_chat") === "off")) ||
     false;
   if (disabled) return null;
-
-  const coachModes: CoachMode[] = ["strategy", "da", "maker"];
 
   const chip = (label: string, onClick: () => void) => (
     <button
@@ -246,33 +242,24 @@ export default function ChatWidget() {
 
     const formatLabel = format === "carousel" ? "Carrousel" : format === "video" ? "Vidéo" : "Visuel";
 
-    const header =
-      modeCoach === "strategy" ? (
-        <p className="text-sm">
-          <strong>{formatLabel}</strong> — ratio <strong>{ratio}</strong>
-          {platform ? (
-            <>
-              {" "}
-              — <strong>{platform}</strong>
-            </>
-          ) : null}
-          {tone ? (
-            <>
-              {" "}
-              — ton <strong>{tone}</strong>
-            </>
-          ) : null}
-          .
-        </p>
-      ) : modeCoach === "da" ? (
-        <p className="text-sm">
-          <strong>Direction créative</strong> pour « {topic || "ton sujet"} »
-        </p>
-      ) : (
-        <p className="text-sm">
-          <strong>Prêt à produire</strong> — je te pré-remplis Studio.
-        </p>
-      );
+    const header = (
+      <p className="text-sm">
+        <strong>{formatLabel}</strong> — ratio <strong>{ratio}</strong>
+        {platform ? (
+          <>
+            {" "}
+            — <strong>{platform}</strong>
+          </>
+        ) : null}
+        {tone ? (
+          <>
+            {" "}
+            — ton <strong>{tone}</strong>
+          </>
+        ) : null}
+        .
+      </p>
+    );
 
     let body: ReactNode;
     const collectedIdeas: string[] = [];
@@ -396,12 +383,6 @@ export default function ChatWidget() {
     return packs;
   }
 
-  // Mapping des personas pour alfie-chat-widget
-  const personaMap = {
-    strategy: "coach",
-    da: "da_junior",
-    maker: "realisateur_studio",
-  } as const;
 
   async function replyContentWithAI(raw: string): Promise<AssistantReply> {
     const { intent, mergedBrief } = applyIntent(raw);
@@ -448,7 +429,7 @@ export default function ChatWidget() {
       const response = await supabase.functions.invoke("alfie-chat-widget", {
         body: {
           brandId: activeBrandId,
-          persona: personaMap[modeCoach],
+          persona: "assistant",
           messages: chatHistory,
           lang: "fr",
           woofsRemaining,
@@ -713,14 +694,6 @@ export default function ChatWidget() {
     setShowIntentPanel(false);
   }
 
-  // Fonction pour changer de mode et réinitialiser
-  function handleModeChange(mode: CoachMode) {
-    console.log(`🎨 Changing mode from ${modeCoach} to ${mode}`);
-    setModeCoach(mode);
-    resetConversation();
-    console.log("✓ Conversation reset complete");
-  }
-
   const portalTarget = typeof document !== "undefined" ? document.body : null;
   if (!portalTarget) return null;
 
@@ -802,7 +775,7 @@ export default function ChatWidget() {
             }}
           >
             <div className="font-medium" style={{ color: BRAND.text }}>
-              Alfie Chat (coach & DA)
+              Alfie Chat
             </div>
             <div className="flex items-center gap-2">
               {msgs.length > 0 && (
@@ -827,30 +800,10 @@ export default function ChatWidget() {
             </div>
           </div>
 
-          <div className="px-3 py-2 flex gap-2">
-            {coachModes.map((m) => (
-              <button
-                key={m}
-                onClick={() => handleModeChange(m)}
-                className={`px-3 py-1 rounded-full text-xs border transition-all duration-200 ${modeCoach === m ? "font-semibold scale-105" : "hover:scale-102"}`}
-                style={{
-                  borderColor: BRAND.grayBorder,
-                  background: modeCoach === m ? `${BRAND.mint}33` : "white",
-                }}
-              >
-                {m === "strategy" ? "Coach Stratégie" : m === "da" ? "DA junior" : "Réalisateur Studio"}
-              </button>
-            ))}
-          </div>
-
           <div className="flex-1 overflow-auto p-3 space-y-2" style={{ color: BRAND.ink }}>
             {msgs.length === 0 ? (
               <p className="text-sm">
-                {modeCoach === "strategy"
-                  ? "Je suis ton Coach Stratégie. Dis-moi ce que tu veux créer et on définit ensemble la meilleure approche 💡"
-                  : modeCoach === "da"
-                  ? "Je suis ton DA junior. Décris-moi ton projet et je t'aide à trouver la direction créative idéale 🎨"
-                  : "Je suis ton Réalisateur Studio. Dis-moi ton objectif et je te prépare un pack complet prêt à lancer 🎬"}
+                Salut ! Je suis Alfie, ton assistant. Dis-moi ce que tu veux créer : carrousel, images, vidéos… ou pose-moi une question stratégie, je suis là pour t'aider 🐾
               </p>
             ) : (
               msgs.map((m, i) => (
