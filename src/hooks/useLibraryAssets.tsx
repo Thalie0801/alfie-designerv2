@@ -188,10 +188,14 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
         console.log(`[LibraryAssets] Loaded ${videoData?.length || 0} videos (all types)`);
         
         const mappedAssets = combinedData.map(asset => {
+          // ✅ Validate that URLs start with http to prevent relative path 404s
+          const cleanedUrl = cleanCloudinaryUrl(asset.output_url);
+          const cleanedThumb = cleanCloudinaryUrl(asset.thumbnail_url);
+          
           return {
             ...asset,
-            output_url: cleanCloudinaryUrl(asset.output_url) || asset.output_url || '',
-            thumbnail_url: cleanCloudinaryUrl(asset.thumbnail_url) || asset.thumbnail_url,
+            output_url: cleanedUrl || asset.output_url || '',
+            thumbnail_url: cleanedThumb?.startsWith('http') ? cleanedThumb : undefined,
           };
         }) as LibraryAsset[];
         
@@ -214,10 +218,14 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
       
       // Map data with actual output_url from database
       const mappedAssets = (data || []).map(asset => {
+        // ✅ Validate that URLs start with http to prevent relative path 404s
+        const cleanedUrl = cleanCloudinaryUrl(asset.output_url);
+        const cleanedThumb = cleanCloudinaryUrl(asset.thumbnail_url);
+        
         return {
           ...asset,
-          output_url: cleanCloudinaryUrl(asset.output_url) || asset.output_url || '',
-          thumbnail_url: cleanCloudinaryUrl(asset.thumbnail_url) || asset.thumbnail_url,
+          output_url: cleanedUrl || asset.output_url || '',
+          thumbnail_url: cleanedThumb?.startsWith('http') ? cleanedThumb : undefined,
         };
       }) as LibraryAsset[];
       
