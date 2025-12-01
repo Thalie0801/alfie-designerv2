@@ -211,11 +211,11 @@ export function QuotaSummary({ activeBrandId }: QuotaSummaryProps) {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">• Vidéo standard (4s) :</span>
-              <span className="font-medium">10 Woofs</span>
+              <span className="font-medium">6 Woofs</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">• Vidéo premium (8s) :</span>
-              <span className="font-medium">50 Woofs</span>
+              <span className="font-medium">25 Woofs</span>
             </div>
           </div>
         </div>

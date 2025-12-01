@@ -85,7 +85,7 @@ export function WoofsPackDialog({
         <div className="p-3 rounded-lg bg-primary/5 text-sm">
           <p className="font-medium mb-1">💡 Rappel</p>
           <p className="text-muted-foreground">
-            Vidéos standard 4s = 10 Woofs · Vidéos premium 8s = 50 Woofs
+            Vidéos standard 4s = 6 Woofs · Vidéos premium 8s = 25 Woofs
           </p>
         </div>
 
