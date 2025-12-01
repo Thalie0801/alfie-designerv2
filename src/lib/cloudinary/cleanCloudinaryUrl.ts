@@ -5,8 +5,11 @@
 export function cleanCloudinaryUrl(url: string | undefined | null): string | null {
   if (!url) return null;
   
-  // Si ce n'est pas une URL Cloudinary, retourner tel quel
-  if (!url.includes('res.cloudinary.com')) return url;
+  // ✅ Filtrer les URLs invalides dès le départ
+  if (!url.startsWith('https://res.cloudinary.com')) {
+    console.warn('[cleanCloudinaryUrl] URL invalide détectée:', url);
+    return null;
+  }
   
   // Transformations problématiques à supprimer
   const problematicTransforms = [

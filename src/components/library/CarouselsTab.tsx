@@ -342,10 +342,14 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
               const src = (() => {
                 if (!canOverlay || !cloudName) return base;
                 try {
+                  // ✅ Sanitizer les bullets pour éviter les caractères Unicode problématiques (• → -)
+                  const sanitizedBullets = (slide.text_json?.bullets || [])
+                    .map(b => b.replace(/^[•\-–—]\s*/g, '').trim());
+                  
                   return slideUrl(slide.cloudinary_public_id as string, {
                     title: slide.text_json?.title,
                     subtitle: slide.text_json?.subtitle,
-                    bulletPoints: slide.text_json?.bullets || [],
+                    bulletPoints: sanitizedBullets,
                     aspectRatio: (slide.format || "4:5") as Aspect,
                     cloudName,
                   });
