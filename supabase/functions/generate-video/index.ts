@@ -760,19 +760,27 @@ Deno.serve(async (req) => {
       while (!isDone && (Date.now() - startTime) < maxWaitMs) {
         await new Promise(r => setTimeout(r, pollIntervalMs));
         
-        const pollUrl = `https://${operationLocation}-aiplatform.googleapis.com/v1/${operationName}`;
-        console.log(`[generate-video] VEO 3 poll URL: ${pollUrl}`);
+        // ✅ VEO 3 requires POST to fetchPredictOperation endpoint
+        const modelEndpoint = `projects/${projectId}/locations/${location}/publishers/google/models/${VEO3_MODEL}`;
+        const fetchOperationUrl = `https://${location}-aiplatform.googleapis.com/v1/${modelEndpoint}:fetchPredictOperation`;
         
-        const statusResp = await fetch(pollUrl, {
-          headers: { Authorization: `Bearer ${accessToken}` }
+        console.log(`[generate-video] VEO 3 fetchPredictOperation URL: ${fetchOperationUrl}`);
+        
+        const statusResp = await fetch(fetchOperationUrl, {
+          method: "POST",
+          headers: { 
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ operationName })
         });
 
         console.log(`[generate-video] VEO 3 poll status: ${statusResp.status}`);
         if (!statusResp.ok) {
           const errorBody = await statusResp.text().catch(() => 'unable to read body');
           console.warn(`[generate-video] VEO 3 poll failed: ${statusResp.status}`, {
-            url: pollUrl,
-            location: operationLocation,
+            url: fetchOperationUrl,
+            location,
             operationName: operationName.slice(0, 50),
             errorBody: errorBody.slice(0, 200)
           });
