@@ -192,6 +192,27 @@ SEULS CES MESSAGES DÉCLENCHENT LA GÉNÉRATION :
 7. PRIORITÉ AU BRIEF : Si un brief de campagne est fourni avec platform, format, ratio, topic, etc., 
    utilise ces valeurs DIRECTEMENT dans le pack généré. Ne les ignore pas et ne demande pas de les confirmer.
 
+⚠️ RÈGLE CRITIQUE POUR LE JSON DU PACK :
+
+Le champ "generatedTexts.slides" DOIT contenir les VRAIS textes que tu proposes dans ta réponse.
+Ce sont ces textes qui seront affichés dans le popup de confirmation avant génération !
+
+Structure obligatoire pour les carrousels :
+"generatedTexts": {
+  "slides": [
+    { "title": "Texte exact de la slide 1" },
+    { "title": "Texte exact de la slide 2" },
+    ...
+  ]
+}
+
+❌ INTERDIT : 
+- "prompt": "Carrousel sur les erreurs avec 5 slides..."
+- generatedTexts vide ou absent
+
+✅ CORRECT : 
+- "generatedTexts": { "slides": [{ "title": "Tu fais ces erreurs ?" }, { "title": "Erreur #1 - Tu postes sans stratégie" }, ...] }
+
 Exemple de réponse complète :
 
 "Super ! Je te prépare un carrousel sur l'organisation de ton business. Voici ce que je te propose :
@@ -218,7 +239,17 @@ Structure :
     "title": "Organisation de ton business",
     "goal": "education",
     "tone": "professionnel",
-    "prompt": "Carrousel sur l'organisation business avec 6 slides : Slide 1 (accroche): Comment tu te sens face à ta to-do débordante. Slides 2-5: 4 astuces concrètes pour mieux organiser ta semaine (time blocking, priorisation Eisenhower, batch working, routine du soir). Slide 6: Appel à l'action pour passer à l'action dès aujourd'hui.",
+    "prompt": "Carrousel sur l'organisation business avec 6 slides structurées",
+    "generatedTexts": {
+      "slides": [
+        { "title": "Tu perds des heures à chercher tes fichiers ? 😱" },
+        { "title": "Astuce #1 - Crée 3 dossiers : Clients, Projets, Admin" },
+        { "title": "Astuce #2 - Nomme tes fichiers avec la date en premier (2024-01-15_facture)" },
+        { "title": "Astuce #3 - Planifie 15 min de rangement chaque vendredi" },
+        { "title": "Astuce #4 - Utilise un outil de gestion de projet" },
+        { "title": "Résultat ? Tu retrouves tout en 10 secondes ! 🎯" }
+      ]
+    },
     "useBrandKit": true,
     "campaign": "Organisation business"
   }]
