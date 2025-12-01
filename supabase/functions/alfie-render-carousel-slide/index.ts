@@ -89,16 +89,24 @@ function buildImagePrompt(globalStyle: string, prompt: string, useBrandKit: bool
   // ✅ Le thème utilisateur est TOUJOURS prioritaire
   const themeContent = prompt && prompt.trim().length > 0 
     ? prompt 
-    : "Professional background visual";
+    : "Professional abstract background";
   
   // Le style est un AJOUT, pas un remplacement
   const styleHint = useBrandKit && globalStyle 
     ? globalStyle 
     : "Professional, modern, clean design";
   
-  return `${themeContent}. ${styleHint}. 
-Background only. No text, no typography, no letters, no logos, no watermark. 
-High quality, detailed, natural light, soft shadows.`;
+  // ✅ Prompt TRÈS explicite pour éviter les collages/grilles
+  return `Generate ONE SINGLE seamless background image for: ${themeContent}.
+Style: ${styleHint}.
+
+CRITICAL REQUIREMENTS:
+- Create exactly ONE image, NOT a collage, NOT a grid, NOT multiple panels
+- This is a background image only - NO text, NO typography, NO letters, NO numbers, NO words
+- NO logos, NO watermarks, NO icons, NO UI elements
+- Seamless, clean, abstract or lifestyle background suitable for overlaying text later
+- High quality, detailed, natural light, soft shadows
+- Fill the entire canvas with a single cohesive visual`;
 }
 
 async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, ms = 30000) {
