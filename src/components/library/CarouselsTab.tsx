@@ -248,7 +248,24 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
 
   // Ouverture individuelle (throttle simple pour éviter les bloqueurs)
   const openIndividually = useCallback((arr: CarouselSlide[]) => {
-    const urls = arr.map((s) => s.cloudinary_url).filter(Boolean);
+    // ✅ Utiliser slideUrl avec overlays au lieu de URL brute
+    const urls = arr.map((slide) => {
+      const canOverlay = Boolean(slide.cloudinary_public_id && slide.text_json);
+      if (canOverlay) {
+        const cloudName = resolveCloudName(slide);
+        const sanitizedBullets = (slide.text_json?.bullets || [])
+          .map(b => b.replace(/^[•\-–—]\s*/g, '').trim());
+        return slideUrl(slide.cloudinary_public_id as string, {
+          title: slide.text_json?.title,
+          subtitle: slide.text_json?.subtitle,
+          bulletPoints: sanitizedBullets,
+          aspectRatio: (slide.format || "4:5") as Aspect,
+          cloudName,
+        });
+      }
+      return slide.cloudinary_url;
+    }).filter(Boolean);
+    
     if (!urls.length) return;
     let i = 0;
     const step = () => {
@@ -379,8 +396,8 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
                     <Button
                       size="sm"
-                      onClick={() => window.open(base, "_blank")}
-                      aria-label="Ouvrir la slide dans un nouvel onglet"
+                      onClick={() => window.open(src, "_blank")}
+                      aria-label="Télécharger la slide avec texte"
                     >
                       <Download className="h-4 w-4" />
                     </Button>
