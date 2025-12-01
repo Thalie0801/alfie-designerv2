@@ -749,13 +749,22 @@ Deno.serve(async (req) => {
       while (!isDone && (Date.now() - startTime) < maxWaitMs) {
         await new Promise(r => setTimeout(r, pollIntervalMs));
         
-        const statusResp = await fetch(
-          `https://${operationLocation}-aiplatform.googleapis.com/v1/${operationName}`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
+        const pollUrl = `https://${operationLocation}-aiplatform.googleapis.com/v1/${operationName}`;
+        console.log(`[generate-video] VEO 3 poll URL: ${pollUrl}`);
+        
+        const statusResp = await fetch(pollUrl, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
 
+        console.log(`[generate-video] VEO 3 poll status: ${statusResp.status}`);
         if (!statusResp.ok) {
-          console.warn(`[generate-video] VEO 3 poll failed: ${statusResp.status}`);
+          const errorBody = await statusResp.text().catch(() => 'unable to read body');
+          console.warn(`[generate-video] VEO 3 poll failed: ${statusResp.status}`, {
+            url: pollUrl,
+            location: operationLocation,
+            operationName: operationName.slice(0, 50),
+            errorBody: errorBody.slice(0, 200)
+          });
           continue;
         }
 
