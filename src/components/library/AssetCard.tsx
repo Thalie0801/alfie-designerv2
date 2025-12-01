@@ -37,6 +37,30 @@ function safeTimeAgo(dateISO?: string | null) {
   return formatDistanceToNow(d, { addSuffix: true, locale: fr });
 }
 
+// Helper pour normaliser les URLs Cloudinary (ajouter format si manquant)
+function normalizeImageUrl(url: string | undefined): string {
+  if (!url || !url.startsWith("https://res.cloudinary.com")) return "";
+  
+  // Si l'URL a f_mp4 (vidéo), la convertir en image
+  if (url.includes("f_mp4")) {
+    url = url.replace("f_mp4", "f_auto,q_auto");
+  }
+  
+  // Si pas de format du tout, l'ajouter
+  if (
+    url.includes("/image/upload/") &&
+    !url.includes("f_auto") &&
+    !url.includes("f_jpg") &&
+    !url.includes("f_png") &&
+    !url.includes("f_webp")
+  ) {
+    // Insérer après /image/upload/
+    url = url.replace("/image/upload/", "/image/upload/f_auto,q_auto/");
+  }
+  
+  return url;
+}
+
 export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, daysUntilExpiry }: AssetCardProps) {
   const [imageError, setImageError] = useState(false);
   const [videoError, setVideoError] = useState(false);
@@ -143,13 +167,20 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
           {/* ✅ KEN BURNS : Rendu direct comme image animée CSS */}
           {isKenBurns ? (
             <div className="relative w-full h-full overflow-hidden">
-              <img
-                src={asset.thumbnail_url || asset.output_url}
-                alt="Animation Ken Burns"
-                className="w-full h-full object-cover animate-ken-burns"
-                onError={handleImageError}
-                loading="lazy"
-              />
+              {imageError ? (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-purple-500/10 to-pink-500/10">
+                  <AlertCircle className="h-12 w-12 text-muted-foreground mb-2" />
+                  <p className="text-xs text-muted-foreground">Image non disponible</p>
+                </div>
+              ) : (
+                <img
+                  src={normalizeImageUrl(asset.thumbnail_url) || normalizeImageUrl(asset.output_url)}
+                  alt="Animation Ken Burns"
+                  className="w-full h-full object-cover animate-ken-burns"
+                  onError={handleImageError}
+                  loading="lazy"
+                />
+              )}
               <Badge className="absolute bottom-2 right-2 bg-purple-600 text-white text-xs">
                 Animation CSS
               </Badge>
