@@ -9,8 +9,6 @@ import { useLibraryAssets } from '@/hooks/useLibraryAssets';
 import { AssetCard } from '@/components/library/AssetCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/lib/supabase';
-import { toast } from 'sonner';
 import { AccessGuard } from '@/components/AccessGuard';
 import { CarouselsTab } from '@/components/library/CarouselsTab';
 
@@ -101,64 +99,6 @@ export default function Library() {
     return days;
   };
 
-  const handleDebugGenerate = async () => {
-    if (!user?.id) {
-      toast.error('Vous devez être connecté.');
-      return;
-    }
-    
-    // Get active brand
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('active_brand_id')
-      .eq('id', user.id)
-      .single();
-    
-    if (!profile?.active_brand_id) {
-      toast.error('No active brand. Please select a brand first.');
-      return;
-    }
-    
-    const prompt = 'Golden retriever in a playful Halloween scene, cinematic';
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-video', {
-        body: { prompt, aspectRatio: '9:16' },
-      });
-      if (error || data?.error) {
-        const msg = (error as any)?.message || data?.error || 'Erreur inconnue';
-        toast.error(`Échec génération: ${msg}`);
-        return;
-      }
-      const predictionId = data?.id as string | undefined;
-      const provider = data?.provider as 'sora' | 'seededance' | 'kling' | undefined;
-      const jobId = data?.jobId as string | undefined;
-      const jobShortId = data?.jobShortId as string | undefined;
-
-      if (!predictionId || !provider || !jobId) {
-        toast.error('Réponse invalide du backend (identifiants manquants)');
-        return;
-      }
-      await supabase
-        .from('media_generations')
-        .insert({
-          user_id: user.id,
-          brand_id: profile.active_brand_id,
-          type: 'video',
-          engine: provider,
-          status: 'processing',
-          prompt,
-          woofs: 1,
-          output_url: '',
-          job_id: null,
-          metadata: { predictionId, provider, jobId, jobShortId }
-        } as any);
-      toast.success(`Génération vidéo lancée (${provider})`);
-    } catch (e: any) {
-      console.error('Debug generate error:', e);
-      toast.error(e.message || 'Erreur lors du lancement');
-    }
-  };
-
   return (
     <AccessGuard>
       <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
@@ -181,58 +121,65 @@ export default function Library() {
         </TabsList>
 
         {/* Toolbar */}
-        <div className="flex items-center gap-2 sm:gap-3 mt-4 flex-wrap">
-          <div className="flex-1 min-w-[150px] sm:min-w-[200px]">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-4">
+          <div className="w-full sm:flex-1 sm:min-w-[200px]">
             <div className="relative">
-              <Search className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input 
                 placeholder="Rechercher..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 sm:pl-10 text-sm"
+                className="pl-10 text-sm"
               />
             </div>
           </div>
 
-          <Button 
-            size="sm" 
-            variant="outline"
-            onClick={() => {
-              setSelectedAssets([]);
-              refetch();
-            }}
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Actualiser
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => {
+                setSelectedAssets([]);
+                refetch();
+              }}
+              className="touch-target"
+            >
+              <RefreshCw className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Actualiser</span>
+            </Button>
 
-          {activeTab === 'videos' && (
-            <>
+            {filteredAssets.length > 0 && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={handleSelectAll}
+                className="touch-target"
+              >
+                {selectedAssets.length === filteredAssets.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+              </Button>
+            )}
+
+            {activeTab === 'videos' && (
               <Button 
                 size="sm" 
                 variant="outline"
                 onClick={cleanupProcessingVideos}
+                className="touch-target"
               >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Nettoyer les vidéos bloquées
+                <Trash2 className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Nettoyer</span>
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleDebugGenerate}
-              >
-                Génération vidéo (debug)
-              </Button>
-            </>
-          )}
+            )}
+          </div>
 
           {selectedAssets.length > 0 && (
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary">{selectedAssets.length} sélectionné(s)</Badge>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Badge variant="secondary" className="flex-shrink-0">{selectedAssets.length} sélectionné(s)</Badge>
               <Button 
                 size="sm" 
                 variant="outline"
                 onClick={handleDownloadSelected}
+                className="flex-1 sm:flex-initial touch-target"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Télécharger
@@ -241,28 +188,19 @@ export default function Library() {
                 size="sm" 
                 variant="destructive"
                 onClick={handleDeleteSelected}
+                className="flex-1 sm:flex-initial touch-target"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Supprimer
               </Button>
             </div>
           )}
-
-          {filteredAssets.length > 0 && (
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={handleSelectAll}
-            >
-              {selectedAssets.length === filteredAssets.length ? 'Désélectionner tout' : 'Tout sélectionner'}
-            </Button>
-          )}
         </div>
 
         {/* Images Tab */}
         <TabsContent value="images" className="mt-6">
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {[...Array(8)].map((_, i) => (
                 <Skeleton key={i} className="h-64 rounded-lg" />
               ))}
@@ -274,7 +212,7 @@ export default function Library() {
               <p className="text-sm">Générez depuis le chat, elles arrivent ici automatiquement.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {filteredAssets.map(asset => (
                 <AssetCard
                   key={asset.id}
@@ -293,7 +231,7 @@ export default function Library() {
         {/* Videos Tab */}
         <TabsContent value="videos" className="mt-6">
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {[...Array(6)].map((_, i) => (
                 <Skeleton key={i} className="h-80 rounded-lg" />
               ))}
@@ -305,7 +243,7 @@ export default function Library() {
               <p className="text-sm">Générez depuis le chat, elles arrivent ici automatiquement.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {filteredAssets.map(asset => (
                 <AssetCard
                   key={asset.id}

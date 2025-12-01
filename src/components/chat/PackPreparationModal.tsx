@@ -248,8 +248,8 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-background rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-background rounded-t-2xl sm:rounded-lg shadow-xl w-full sm:max-w-2xl h-[92vh] sm:h-auto sm:max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <div>
@@ -352,26 +352,26 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-2 p-4 border-t">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 border-t safe-bottom">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors"
+            className="order-3 sm:order-1 px-4 py-3 sm:py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors touch-target"
             disabled={isGenerating}
           >
             Retour au Studio
           </button>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 sm:ml-auto">
             <button
               onClick={handleEditInStudio}
               disabled={isGenerating}
-              className="px-4 py-2 text-sm font-medium border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
+              className="order-1 px-4 py-3 sm:py-2 text-sm font-medium border rounded-lg hover:bg-muted transition-colors disabled:opacity-50 touch-target"
             >
               ✏️ Éditer dans le Studio
             </button>
             <button
               onClick={handleGenerate}
               disabled={isGenerating || selectedAssetIds.size === 0}
-              className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="order-2 px-4 py-3 sm:py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-target"
             >
               {isGenerating ? "Alfie prépare tes visuels..." : "Créer ce pack avec Alfie"}
             </button>

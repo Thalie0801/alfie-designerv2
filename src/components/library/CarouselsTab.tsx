@@ -242,31 +242,30 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     <div className="space-y-8">
       {grouped.map(({ key, slides: carouselSlides, title }) => (
         <div key={key} className="border rounded-lg p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-semibold">{title}</h3>
               <Badge variant="secondary">{carouselSlides.length} slides</Badge>
               {carouselSlides[0]?.format && <Badge variant="outline">{carouselSlides[0].format}</Badge>}
             </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleDownloadZip(key, carouselSlides)}
-                disabled={downloadingZip === key}
-                aria-label="Télécharger en ZIP"
-              >
-                {downloadingZip === key ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <FileArchive className="h-4 w-4 mr-2" />
-                )}
-                ZIP
-              </Button>
-            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleDownloadZip(key, carouselSlides)}
+              disabled={downloadingZip === key}
+              aria-label="Télécharger en ZIP"
+              className="touch-target w-full sm:w-auto"
+            >
+              {downloadingZip === key ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <FileArchive className="h-4 w-4 mr-2" />
+              )}
+              ZIP
+            </Button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {carouselSlides.map((slide) => {
               const aspect = aspectClassFor(slide.format);
               const base = slide.cloudinary_url ?? "";

@@ -800,7 +800,7 @@ export default function ChatWidget() {
 
       {open && (
         <div
-          className="fixed bottom-2 right-2 left-2 sm:bottom-6 sm:right-6 sm:left-auto w-auto sm:w-[400px] h-[calc(100vh-120px)] sm:h-[580px] max-h-[90vh] rounded-2xl shadow-2xl border flex flex-col z-[9999]"
+          className="fixed bottom-2 right-2 left-2 sm:bottom-6 sm:right-6 sm:left-auto w-auto sm:w-[400px] h-[calc(100vh-env(safe-area-inset-bottom)-120px)] sm:h-[580px] max-h-[90vh] rounded-2xl shadow-2xl border flex flex-col z-[9999] safe-bottom"
           style={{
             background: BRAND.light,
             borderColor: BRAND.grayBorder,

@@ -18,10 +18,22 @@ export interface SidebarProviderProps {
 }
 
 export function SidebarProvider({ children, defaultOpen = true }: SidebarProviderProps) {
-  const [open, setOpen] = React.useState(defaultOpen);
+  const [isMobile, setIsMobile] = React.useState(false);
+  
+  React.useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
+  const [open, setOpen] = React.useState(isMobile ? false : defaultOpen);
 
-  // Ici on pourrait détecter le mobile avec matchMedia, mais on garde simple
-  const value = React.useMemo(() => ({ open, setOpen, isMobile: false }), [open]);
+  React.useEffect(() => {
+    setOpen(isMobile ? false : defaultOpen);
+  }, [isMobile, defaultOpen]);
+
+  const value = React.useMemo(() => ({ open, setOpen, isMobile }), [open, isMobile]);
 
   return <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>;
 }
@@ -71,20 +83,30 @@ export interface SidebarProps extends React.HTMLAttributes<HTMLElement> {}
 
 export const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({ className, ...props }, ref) => {
   const { open, isMobile } = useSidebar();
-  // Ici tu peux adapter le comportement mobile si besoin
-  const hiddenOnMobile = isMobile && !open;
 
   return (
-    <aside
-      ref={ref}
-      data-sidebar-open={open ? "true" : "false"}
-      className={cn(
-        "flex flex-col bg-sidebar text-sidebar-foreground w-64 shrink-0 transition-transform duration-200",
-        hiddenOnMobile && "-translate-x-full",
-        className,
+    <>
+      {isMobile && open && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40"
+          onClick={() => {
+            const ctx = React.useContext(SidebarContext);
+            ctx?.setOpen(false);
+          }}
+        />
       )}
-      {...props}
-    />
+      <aside
+        ref={ref}
+        data-sidebar-open={open ? "true" : "false"}
+        className={cn(
+          "flex flex-col bg-sidebar text-sidebar-foreground w-64 shrink-0 transition-transform duration-300",
+          isMobile ? "fixed left-0 top-0 bottom-0 z-50" : "relative",
+          isMobile && !open && "-translate-x-full",
+          className,
+        )}
+        {...props}
+      />
+    </>
   );
 });
 Sidebar.displayName = "Sidebar";
