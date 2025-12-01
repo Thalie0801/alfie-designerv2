@@ -842,28 +842,10 @@ Deno.serve(async (req) => {
         const accessToken = await getAccessToken(serviceAccountJson);
         console.log('[generate-video] Access token obtained');
         
-        // Télécharger la vidéo depuis GCS avec authentification
-        const gcsApiUrl = `https://storage.googleapis.com/storage/v1/b/${bucket}/o/${encodeURIComponent(objectPath)}?alt=media`;
-        console.log(`[generate-video] Downloading from GCS: ${gcsApiUrl}`);
-        
-        const videoResponse = await fetch(gcsApiUrl, {
-          headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-        
-        if (!videoResponse.ok) {
-          throw new Error(`Failed to download from GCS: ${videoResponse.status} ${await videoResponse.text()}`);
-        }
-        
-        const videoBlob = await videoResponse.blob();
-        console.log(`[generate-video] Video downloaded: ${videoBlob.size} bytes`);
-        
-        // Convertir en base64 data URI
-        const arrayBuffer = await videoBlob.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-        const binaryString = Array.from(uint8Array, byte => String.fromCharCode(byte)).join('');
-        const base64Video = btoa(binaryString);
-        const dataUri = `data:video/mp4;base64,${base64Video}`;
-        console.log(`[generate-video] Video converted to base64 (${base64Video.length} chars)`);
+        // Générer une URL signée GCS temporaire (valide 15 minutes)
+        // URL directe avec token d'accès en query parameter
+        const signedUrl = `https://storage.googleapis.com/storage/v1/b/${bucket}/o/${encodeURIComponent(objectPath)}?alt=media&access_token=${accessToken}`;
+        console.log(`[generate-video] Generated signed GCS URL (expires when token expires, ~1h)`);
         
         // Uploader vers Cloudinary via edge function
         const cloudinaryResp = await fetch(`${SUPABASE_URL}/functions/v1/cloudinary`, {
@@ -875,7 +857,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             action: 'upload',
             params: {
-              file: dataUri,
+              file: signedUrl,
               folder: `alfie/veo3/${operationName}`,
               resource_type: 'video',
               public_id: `veo3_${Date.now()}`
