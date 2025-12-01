@@ -148,9 +148,9 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         version: "4bce7c1730a5fc582699fb7e630c2e39c3dd4ddb11ca87fa3b7f0fc52537dd09",
         input: {
-          image: imageUrl,
+          first_frame_image: imageUrl,
           prompt: animationPrompt,
-          num_inference_steps: 50,
+          prompt_optimizer: true,
         }
       })
     });
