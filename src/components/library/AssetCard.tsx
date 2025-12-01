@@ -106,9 +106,8 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
 
   const videoSrc = asset.type === "video" ? getVideoSrc() : "";
 
-  // ✅ Détection Ken Burns animé pour fallback CSS
-  const isKenBurnsVideo = asset.type === "video" && 
-    (asset.metadata as any)?.animationType === "ken_burns";
+  // ✅ Détection Ken Burns animé via metadata (fonctionne même si type='image')
+  const isKenBurns = (asset.metadata as any)?.animationType === "ken_burns";
 
   return (
     <Card className={`group hover:shadow-lg transition-all ${selected ? "ring-2 ring-primary" : ""}`}>
@@ -140,22 +139,24 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
         </div>
 
         {/* Preview */}
-        <div className="relative aspect-video bg-muted overflow-hidden rounded-t-lg">
-          {asset.type === "video" ? (
+        <div className="relative aspect-[4/5] bg-muted overflow-hidden rounded-t-lg">
+          {/* ✅ KEN BURNS : Rendu direct comme image animée CSS */}
+          {isKenBurns ? (
+            <div className="relative w-full h-full overflow-hidden">
+              <img
+                src={asset.thumbnail_url || asset.output_url}
+                alt="Animation Ken Burns"
+                className="w-full h-full object-cover animate-ken-burns"
+                onError={handleImageError}
+                loading="lazy"
+              />
+              <Badge className="absolute bottom-2 right-2 bg-purple-600 text-white text-xs">
+                Animation CSS
+              </Badge>
+            </div>
+          ) : asset.type === "video" ? (
             <>
-              {/* ✅ FALLBACK CSS KEN BURNS : Si vidéo Ken Burns échoue, afficher image source animée */}
-              {isKenBurnsVideo && videoError && asset.thumbnail_url ? (
-                <div className="relative w-full h-full overflow-hidden">
-                  <img
-                    src={asset.thumbnail_url}
-                    alt="Animation Ken Burns"
-                    className="w-full h-full object-cover animate-ken-burns"
-                  />
-                  <Badge className="absolute bottom-2 left-2 bg-purple-600 text-white">
-                    Animation CSS
-                  </Badge>
-                </div>
-              ) : videoSrc && !videoError ? (
+              {videoSrc && !videoError ? (
                 <video
                   src={videoSrc}
                   className="w-full h-full object-cover"

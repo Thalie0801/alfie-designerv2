@@ -327,26 +327,14 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
       console.log('[Download] Output URL:', outputUrl ? `${outputUrl.substring(0, 100)}...` : 'null');
       console.log('[Download] Output URL type:', outputUrl?.startsWith('data:') ? 'base64' : outputUrl?.startsWith('http') ? 'http' : 'unknown');
       
-      // ✅ FALLBACK KEN BURNS : Si vidéo Ken Burns échoue, télécharger l'image source
+      // ✅ FALLBACK KEN BURNS : Si image Ken Burns, télécharger directement l'image source
       let url = outputUrl;
       let filename = `${asset.type}-${new Date().toISOString().slice(0, 10)}-${asset.id.slice(0, 8)}`;
       
-      if (asset.type === 'video' && (fullAsset?.metadata as any)?.animationType === 'ken_burns') {
-        console.log('[Download] Ken Burns video detected, testing URL...');
-        try {
-          const testResp = await fetch(outputUrl, { method: 'HEAD' });
-          if (!testResp.ok) {
-            console.warn('[Download] Ken Burns video URL failed, falling back to source image');
-            url = fullAsset?.thumbnail_url || outputUrl;
-            filename = `animated-image-${new Date().toISOString().slice(0, 10)}-${asset.id.slice(0, 8)}`;
-            toast.info('Téléchargement de l\'image source (animation indisponible)');
-          }
-        } catch (err) {
-          console.warn('[Download] Ken Burns HEAD test failed, falling back to source image:', err);
-          url = fullAsset?.thumbnail_url || outputUrl;
-          filename = `animated-image-${new Date().toISOString().slice(0, 10)}-${asset.id.slice(0, 8)}`;
-          toast.info('Téléchargement de l\'image source (animation indisponible)');
-        }
+      if ((fullAsset?.metadata as any)?.animationType === 'ken_burns') {
+        console.log('[Download] Ken Burns CSS animation detected - downloading source image');
+        url = fullAsset?.thumbnail_url || fullAsset?.output_url || outputUrl;
+        filename = `animated-image-${new Date().toISOString().slice(0, 10)}-${asset.id.slice(0, 8)}`;
       }
 
       if (!url) {
@@ -399,8 +387,8 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
       const a = document.createElement('a');
       a.href = objectUrl;
       
-      // Extension basée sur le type ou si fallback Ken Burns → png
-      const extension = url.includes('image/upload') || asset.type === 'image' ? 'png' : 'mp4';
+      // Extension PNG pour Ken Burns (image) ou type d'origine
+      const extension = (fullAsset?.metadata as any)?.animationType === 'ken_burns' ? 'png' : asset.type === 'image' ? 'png' : 'mp4';
       a.download = `${filename}.${extension}`;
       
       document.body.appendChild(a);
