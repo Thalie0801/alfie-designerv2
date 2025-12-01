@@ -84,13 +84,13 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                   newKind === "video_basic" ? "video_basic" :
                   "video_premium";
                 
-                const defaultDuration = newKind === "video_basic" ? 4 : newKind === "video_premium" ? 8 : undefined;
+                const fixedDuration = newKind === "video_basic" ? 4 : newKind === "video_premium" ? 8 : undefined;
                 setFormData({ 
                   ...formData, 
                   kind: newKind,
                   woofCostType: newWoofCostType,
                   count: newKind === "carousel" ? (formData.count || 5) : 1,
-                  durationSeconds: newKind.includes("video") ? (formData.durationSeconds || defaultDuration) : undefined
+                  durationSeconds: fixedDuration
                 });
               }}
             >
@@ -100,8 +100,8 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
               <SelectContent>
                 <SelectItem value="image">🖼️ Image</SelectItem>
                 <SelectItem value="carousel">📊 Carrousel</SelectItem>
-                <SelectItem value="video_basic">🎥 Vidéo standard</SelectItem>
-                <SelectItem value="video_premium">✨ Vidéo premium (Veo 3.1)</SelectItem>
+                <SelectItem value="video_basic">🎬 Vidéo standard (4s)</SelectItem>
+                <SelectItem value="video_premium">✨ Vidéo premium (8s)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -215,18 +215,16 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
             </div>
           )}
 
-          {/* Duration (pour vidéos uniquement) */}
+          {/* Duration (pour vidéos uniquement) - FIXE */}
           {formData.kind.includes("video") && (
             <div className="space-y-2">
-              <Label htmlFor="duration">Durée (secondes)</Label>
-              <Input
-                id="duration"
-                type="number"
-                min={4}
-                max={60}
-                value={formData.durationSeconds || (formData.kind === "video_basic" ? 4 : 8)}
-                onChange={(e) => setFormData({ ...formData, durationSeconds: parseInt(e.target.value) || (formData.kind === "video_basic" ? 4 : 8) })}
-              />
+              <Label>Durée</Label>
+              <div className="text-sm text-muted-foreground bg-muted/30 px-3 py-2 rounded-md border">
+                {formData.kind === "video_basic" ? "4 secondes (fixe)" : "8 secondes (fixe)"}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                La durée est fixe pour garantir la qualité de génération.
+              </p>
             </div>
           )}
 
