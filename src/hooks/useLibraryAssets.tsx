@@ -393,12 +393,21 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
         blob = await response.blob();
       }
       
+      // ✅ Détecter le type MIME réel du fichier (au lieu de se fier aveuglément à asset.type)
+      const mimeType = blob.type;
+      console.log('[Download] Detected MIME type:', mimeType);
+      
+      // Mapper le MIME type vers l'extension correcte
+      let extension = 'bin'; // fallback
+      if (mimeType.startsWith('image/')) {
+        extension = mimeType.split('/')[1] || 'png';
+      } else if (mimeType.startsWith('video/')) {
+        extension = mimeType.split('/')[1] || 'mp4';
+      }
+      
       const objectUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = objectUrl;
-      
-      // Extension selon le type
-      const extension = asset.type === 'image' ? 'png' : 'mp4';
       a.download = `${filename}.${extension}`;
       
       document.body.appendChild(a);
