@@ -886,7 +886,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
     const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : null;
     const videoPrompt = buildFinalPrompt(payload, useBrandKit, brandMini);
 
-    // ✅ Appeler generate-video avec provider "veo3"
+    // ✅ Appeler generate-video avec provider "veo3" et timeout 6 minutes
     const veoResult = await callFn<any>("generate-video", {
       prompt: videoPrompt,
       aspectRatio: aspectRatio || "9:16",
@@ -895,7 +895,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       userId,
       brandId,
       orderId,
-    });
+    }, 360_000); // ✅ 6 minutes timeout pour VEO 3
 
     const videoUrl = veoResult?.videoUrl || veoResult?.output || veoResult?.url;
     if (!videoUrl) throw new Error("VEO 3 FAST failed to generate video");
@@ -910,7 +910,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       user_id: userId,
       brand_id: brandId,
       type: "video",
-      engine: "veo3",
+      engine: "veo_3_1",
       status: "completed",
       output_url: videoUrl,
       thumbnail_url: thumbnailUrl,
