@@ -688,7 +688,7 @@ Deno.serve(async (req) => {
       // 2. Configuration VEO 3
       const VEO3_MODEL = "veo-3.0-fast-generate-001";
       const veo3AspectRatio = aspectRatio === "4:5" ? "9:16" : aspectRatio; // VEO supporte 9:16 ou 16:9
-      const durationSeconds = 10; // Vidéos premium : 10 secondes max
+      const durationSeconds = 8; // Vidéos premium : 8 secondes max (VEO 3 supporte 4, 6, ou 8)
       
       // 3. Appeler VEO 3 API (long-running operation)
       const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${VEO3_MODEL}:predictLongRunning`;
@@ -699,7 +699,7 @@ Deno.serve(async (req) => {
           aspectRatio: veo3AspectRatio,
           durationSeconds,
           generateAudio: true,
-          outputStorageUri: orderId ? `gs://alfie-designer-videos/veo3/${orderId}/` : "gs://alfie-designer-videos/veo3/"
+          storageUri: orderId ? `gs://alfie-designer-videos/veo3/${orderId}/` : "gs://alfie-designer-videos/veo3/"
         }
       };
 
@@ -790,10 +790,11 @@ Deno.serve(async (req) => {
         }, { status: 504 });
       }
 
-      // 5. Extraire l'URL vidéo (format correct VEO 3)
+      // 5. Extraire l'URL vidéo (tous les formats VEO 3)
       const videoUri = 
-        result?.response?.generatedVideos?.[0]?.video?.uri ||   // Format VEO 3
-        result?.response?.generatedSamples?.[0]?.video?.uri;    // Fallback ancien format
+        result?.response?.generatedVideos?.[0]?.video?.uri ||   // Format SDK
+        result?.response?.videos?.[0]?.gcsUri ||                // Format REST API doc
+        result?.response?.generatedSamples?.[0]?.video?.uri;    // Fallback legacy
       
       if (!videoUri || typeof videoUri !== "string") {
         console.error(`[generate-video] No valid VEO 3 video URI. Full result:`, JSON.stringify(result, null, 2));
