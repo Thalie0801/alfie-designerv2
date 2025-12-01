@@ -191,7 +191,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
           ? `Carrousel ${arr[0].carousel_id}`
           : "Carrousel",
     }));
-  }, [slides]);
+  }, []);
 
   const handleDownloadZip = useCallback(async (carouselKey: string, carouselSlides: CarouselSlide[]) => {
     if (!carouselSlides.length) return;
@@ -216,38 +216,6 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     } finally {
       setDownloadingZip(null);
     }
-  }, []);
-
-  // Ouverture individuelle (throttle simple pour éviter les bloqueurs)
-  const openIndividually = useCallback((arr: CarouselSlide[]) => {
-    // ✅ Utiliser slideUrl avec overlays au lieu de URL brute
-    const urls = arr.map((slide) => {
-      const canOverlay = Boolean(slide.cloudinary_public_id && slide.text_json);
-      if (canOverlay) {
-        const cloudName = resolveCloudName(slide);
-        const sanitizedBullets = (slide.text_json?.bullets || [])
-          .map(b => b.replace(/^[•\-–—]\s*/g, '').trim());
-        return slideUrl(slide.cloudinary_public_id as string, {
-          title: slide.text_json?.title,
-          subtitle: slide.text_json?.subtitle,
-          bulletPoints: sanitizedBullets,
-          aspectRatio: (slide.format || "4:5") as Aspect,
-          cloudName,
-        });
-      }
-      return slide.cloudinary_url;
-    }).filter(Boolean);
-    
-    if (!urls.length) return;
-    let i = 0;
-    const step = () => {
-      const url = urls[i++];
-      if (url) {
-        window.open(url, "_blank");
-        setTimeout(step, 180); // léger délai
-      }
-    };
-    step();
   }, []);
 
   if (loading) {
@@ -294,15 +262,6 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                   <FileArchive className="h-4 w-4 mr-2" />
                 )}
                 ZIP
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => openIndividually(carouselSlides)}
-                aria-label="Télécharger individuellement"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Individual
               </Button>
             </div>
           </div>
