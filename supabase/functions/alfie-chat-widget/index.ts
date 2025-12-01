@@ -211,21 +211,31 @@ SEULS CES MESSAGES DÉCLENCHENT LA GÉNÉRATION :
 Le champ "generatedTexts.slides" DOIT contenir les VRAIS textes que tu proposes dans ta réponse.
 Ce sont ces textes qui seront affichés dans le popup de confirmation avant génération !
 
+⚠️ RÈGLE ULTRA-STRICTE POUR LES CARROUSELS :
+- Si l'utilisatrice demande un carrousel SANS préciser le nombre : génère 5 slides
+- Si elle précise "5 slides" : génère EXACTEMENT 5 slides
+- Si elle précise "6 slides" : génère EXACTEMENT 6 slides
+- TOUTES les slides doivent avoir un texte unique et pertinent
+- JAMAIS de slides vides, JAMAIS de slides manquantes
+
 Structure obligatoire pour les carrousels :
 "generatedTexts": {
   "slides": [
     { "title": "Texte exact de la slide 1" },
     { "title": "Texte exact de la slide 2" },
-    ...
+    { "title": "Texte exact de la slide 3" },
+    { "title": "Texte exact de la slide 4" },
+    { "title": "Texte exact de la slide 5" }
   ]
 }
 
 ❌ INTERDIT : 
 - "prompt": "Carrousel sur les erreurs avec 5 slides..."
 - generatedTexts vide ou absent
+- Seulement 3 slides alors que 5 sont demandées
 
 ✅ CORRECT : 
-- "generatedTexts": { "slides": [{ "title": "Tu fais ces erreurs ?" }, { "title": "Erreur #1 - Tu postes sans stratégie" }, ...] }
+- "generatedTexts": { "slides": [{ "title": "Tu fais ces erreurs ?" }, { "title": "Erreur #1 - Tu postes sans stratégie" }, { "title": "Erreur #2 - Tu copies tes concurrents" }, { "title": "Erreur #3 - Tu négliges ta bio" }, { "title": "La solution : une vraie stratégie" }] }
 
 Exemple de réponse complète :
 
