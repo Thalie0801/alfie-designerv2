@@ -509,8 +509,83 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: detail }, { status: 500 });
       }
 
-      const id = data.id ?? data.prediction?.id ?? null;
-      const status: string = data.status ?? "processing";
+      const predictionId = data.id ?? data.prediction?.id ?? null;
+      if (!predictionId) {
+        return jsonResponse({ error: "No prediction ID returned from Replicate" }, { status: 500 });
+      }
+
+      // ✅ Polling: attendre que la vidéo soit prête
+      let currentStatus: string = data.status ?? "processing";
+      let output: any = data.output ?? null;
+      
+      const maxWaitMs = 300_000; // 5 minutes max
+      const pollIntervalMs = 5000; // Vérifier toutes les 5 secondes
+      const startTime = Date.now();
+
+      console.log(`[generate-video] Starting polling for prediction ${predictionId}`);
+
+      while (["starting", "processing"].includes(currentStatus) && (Date.now() - startTime) < maxWaitMs) {
+        await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+        
+        const pollResp = await fetch(`${REPLICATE_API}/${predictionId}`, {
+          headers: {
+            Authorization: `Token ${REPLICATE_TOKEN}`,
+            "Content-Type": "application/json"
+          }
+        });
+        
+        if (pollResp.ok) {
+          const pollData = await pollResp.json();
+          currentStatus = pollData.status ?? "processing";
+          output = pollData.output ?? null;
+          
+          console.log(`[generate-video] Poll status: ${currentStatus}, has output: ${!!output}`);
+          
+          if (currentStatus === "succeeded" && output) {
+            console.log(`[generate-video] ✅ Video ready after ${Math.round((Date.now() - startTime) / 1000)}s`);
+            break;
+          }
+          
+          if (currentStatus === "failed" || currentStatus === "canceled") {
+            const errorMsg = pollData.error || `Generation ${currentStatus}`;
+            console.error(`[generate-video] Generation failed:`, errorMsg);
+            return jsonResponse({ 
+              error: errorMsg,
+              status: currentStatus,
+              predictionId
+            }, { status: 500 });
+          }
+        } else {
+          console.warn(`[generate-video] Poll request failed with status ${pollResp.status}`);
+        }
+      }
+
+      // Timeout si toujours en processing
+      if (["starting", "processing"].includes(currentStatus)) {
+        console.warn(`[generate-video] Timeout after ${maxWaitMs / 1000}s, status: ${currentStatus}`);
+        return jsonResponse({
+          error: "Video generation timeout. Please try again.",
+          status: currentStatus,
+          predictionId
+        }, { status: 504 });
+      }
+
+      // Extraire l'URL de sortie
+      const outputUrl = Array.isArray(output) ? output[0] : output;
+      
+      if (!outputUrl || typeof outputUrl !== "string") {
+        console.error(`[generate-video] No valid output URL:`, output);
+        return jsonResponse({
+          error: "No video URL in output",
+          status: currentStatus,
+          predictionId
+        }, { status: 500 });
+      }
+
+      console.log(`[generate-video] Final output URL:`, outputUrl);
+      
+      const id = predictionId;
+      const status: string = currentStatus;
 
       // Save to media_generations for library
       const authHeader = req.headers.get("Authorization")?.replace("Bearer ", "").trim();
@@ -539,20 +614,25 @@ Deno.serve(async (req) => {
                   brand_id: brandId!,
                   type: 'video',
                   engine: providerEngine || 'seededance',
-                  status: 'processing',
+                  status: 'completed', // ✅ Status completed car polling a attendu
                   prompt: prompt.substring(0, 500),
-                  output_url: '',
-                  thumbnail_url: '',
+                  output_url: outputUrl, // ✅ URL réelle après polling
+                  thumbnail_url: outputUrl, // Utiliser la même URL comme thumbnail
                   job_id: id,
                   metadata: {
                     provider: providerDisplay,
                     providerInternal: providerApi,
                     predictionId: id,
                     aspectRatio,
-                    generatedAt: new Date().toISOString()
+                    generatedAt: new Date().toISOString(),
+                    tier: 'standard',
+                    source: imageUrl ? 'image' : 'text',
+                    duration: 3,
+                    fps: VIDEO_CONFIG.fps,
+                    resolution: `${VIDEO_CONFIG.width}x${VIDEO_CONFIG.height}`
                   }
                 });
-              console.log(`[generate-video] Video entry created for job ${id}`);
+              console.log(`[generate-video] ✅ Video entry created for job ${id} with URL:`, outputUrl);
             }
           }
         } catch (insertError) {
@@ -568,10 +648,14 @@ Deno.serve(async (req) => {
         jobId: id,
         jobShortId: id ? String(id).slice(0, 8) : null,
         status,
+        output: outputUrl,
+        videoUrl: outputUrl,
+        url: outputUrl,
         metadata: {
           provider: providerDisplay,
           providerInternal: providerApi,
-          modelVersion: REPLICATE_MODEL_VERSION
+          modelVersion: REPLICATE_MODEL_VERSION,
+          outputUrl: outputUrl
         }
       });
     }
