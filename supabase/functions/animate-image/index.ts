@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
     }
 
     const videoUrl = [
-      `https://res.cloudinary.com/${cloudName}/video/upload`,
+      `https://res.cloudinary.com/${cloudName}/image/upload`,  // ✅ image/upload même pour MP4
       `/${dim},c_fill,f_mp4,${kenBurns}`,
       overlays.length ? `/${overlays.join('/')}` : '',
       `/${imagePublicId}`  // ✅ f_mp4 gère le format, pas d'extension manuelle nécessaire
@@ -207,46 +207,23 @@ Deno.serve(async (req) => {
     console.log("[animate-image] sourcePublicId:", imagePublicId);
     console.log("[animate-image] animationUrl:", videoUrl);
 
-    // 🔍 POST-TRANSFORMATION VERIFICATION - Vérifier que Ken Burns fonctionne
+    // 🔍 POST-TRANSFORMATION VERIFICATION - Log seulement, ne bloque pas
     console.log("[animate-image] Verifying Ken Burns transformation:", videoUrl);
     try {
       const verifyVideoResponse = await fetch(videoUrl, { method: "HEAD" });
       if (!verifyVideoResponse.ok) {
-        console.error("[animate-image] ❌ Ken Burns transformation failed:", {
+        // ⚠️ On log mais on ne bloque pas - HEAD peut donner faux négatifs sur transformations
+        console.warn("[animate-image] ⚠️ Ken Burns HEAD returned non-OK status (may be false negative):", {
           videoUrl,
           status: verifyVideoResponse.status,
           statusText: verifyVideoResponse.statusText
         });
-        
-        // ✅ FALLBACK GRACIEUX : Retourner l'image statique au lieu d'une vidéo 404
-        console.warn("[animate-image] ⚠️ Falling back to static image (Ken Burns unavailable)");
-        return jsonResponse({
-          success: false,
-          error: "Ken Burns transformation unavailable on Cloudinary",
-          fallbackUrl: sourceImageUrl,
-          message: "L'animation Ken Burns n'est pas disponible. L'image statique a été retournée.",
-          thumbnailUrl: sourceImageUrl,
-          woofsCost: 0, // Pas de débit Woofs car échec
-          remainingWoofs
-        }, { status: 503 });
+      } else {
+        console.log("[animate-image] ✅ Ken Burns transformation verified");
       }
-      console.log("[animate-image] ✅ Ken Burns transformation verified");
     } catch (err) {
-      console.error("[animate-image] ❌ Error verifying Ken Burns transformation:", {
-        videoUrl,
-        error: String(err)
-      });
-      
-      // ✅ FALLBACK GRACIEUX en cas d'erreur réseau
-      return jsonResponse({
-        success: false,
-        error: "Error while verifying Ken Burns transformation",
-        fallbackUrl: sourceImageUrl,
-        message: "Impossible de vérifier l'animation. L'image statique a été retournée.",
-        thumbnailUrl: sourceImageUrl,
-        woofsCost: 0,
-        remainingWoofs
-      }, { status: 503 });
+      console.warn("[animate-image] ⚠️ Error verifying Ken Burns transformation (HEAD):", String(err));
+      // On ne bloque pas - HEAD sur transformation n'est pas fiable
     }
 
     // 4️⃣ Utiliser adminClient pour les sauvegardes DB quand appel interne

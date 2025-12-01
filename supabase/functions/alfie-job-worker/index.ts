@@ -1439,7 +1439,7 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
     type: "video",
     status: "completed",
     output_url: videoUrl,
-    thumbnail_url: `https://res.cloudinary.com/${cloudName}/image/upload/${imagePublicId}.jpg`,
+    thumbnail_url: `https://res.cloudinary.com/${cloudName}/image/upload/${imagePublicId}`,  // Pas d'extension .jpg
     metadata: {
       orderId,
       sourceImagePublicId: imagePublicId,
@@ -1455,32 +1455,9 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
     console.error("[processAnimateImage] Failed to save to media_generations:", mediaErr);
   }
 
-  // ✅ Sauvegarder dans library_assets
-  const { error: libErr } = await supabaseAdmin.from("library_assets").insert({
-    user_id: userId,
-    brand_id: brandId,
-    order_id: orderId,
-    type: "video",
-    format: aspect,
-    cloudinary_url: videoUrl,
-    cloudinary_public_id: imagePublicId,
-    tags: ["video", "alfie", "animated_image", "kenburns"],
-    metadata: {
-      sourceImagePublicId: imagePublicId,
-      duration,
-      aspect,
-      title,
-      subtitle,
-      animationType: "ken_burns",
-      generator: "cloudinary_kenburns",
-    },
-  } as any);
-  
-  if (libErr) {
-    console.error("[processAnimateImage] Failed to save to library_assets:", libErr);
-  }
-
-  console.log("[processAnimateImage] Saved animated video asset in library_assets", {
+  // ✅ library_assets insert supprimé - media_generations est la seule source
+  // Le frontend lit depuis media_generations via useLibraryAssets
+  console.log("[processAnimateImage] ✅ Animated video saved in media_generations", {
     orderId,
     videoUrl,
     imagePublicId,
