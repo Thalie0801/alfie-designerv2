@@ -194,6 +194,14 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
             const cleanedUrl = cleanCloudinaryUrl(asset.output_url);
             const cleanedThumb = cleanCloudinaryUrl(asset.thumbnail_url);
             
+            // Debug logging pour tracer le nettoyage d'URLs
+            if (asset.output_url && cleanedUrl !== asset.output_url) {
+              console.log('[LibraryAssets] URL cleaned:', {
+                original: asset.output_url.substring(0, 60),
+                cleaned: cleanedUrl?.substring(0, 60)
+              });
+            }
+            
             return {
               ...asset,
               output_url: cleanedUrl?.startsWith('http') ? cleanedUrl : '',
@@ -225,6 +233,14 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
           // ✅ Validate that URLs start with http to prevent relative path 404s
           const cleanedUrl = cleanCloudinaryUrl(asset.output_url);
           const cleanedThumb = cleanCloudinaryUrl(asset.thumbnail_url);
+          
+          // Debug logging pour tracer le nettoyage d'URLs
+          if (asset.output_url && cleanedUrl !== asset.output_url) {
+            console.log('[LibraryAssets] URL cleaned:', {
+              original: asset.output_url.substring(0, 60),
+              cleaned: cleanedUrl?.substring(0, 60)
+            });
+          }
           
           return {
             ...asset,
