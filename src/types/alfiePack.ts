@@ -23,8 +23,8 @@ export interface PackAsset extends UnifiedAlfieIntent {
 export const WOOF_COST_MAP: Record<AssetKind, number | 'perSlide'> = {
   image: 1,
   carousel: 'perSlide', // 1 par slide
-  video_basic: 10,
-  video_premium: 50,
+  video_basic: 6,
+  video_premium: 25,
 };
 
 export function getWoofCost(asset: UnifiedAlfieIntent | PackAsset): number {

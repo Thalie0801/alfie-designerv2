@@ -11,8 +11,8 @@
 export const WOOF_COSTS = {
   image: 1,
   carousel_slide: 1,
-  video_basic: 10,
-  video_premium: 50,
+  video_basic: 6,
+  video_premium: 25,
 } as const;
 
 export const PLAN_WOOFS = {
