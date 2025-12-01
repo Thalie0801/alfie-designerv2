@@ -2,6 +2,7 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { uploadFromUrlToCloudinary } from "../_shared/cloudinaryUploader.ts";
 import { consumeBrandQuotas } from "../_shared/quota.ts";
+import { WOOF_COSTS } from "../_shared/woofsCosts.ts";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, INTERNAL_FN_SECRET } from "../_shared/env.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";
@@ -1393,80 +1394,75 @@ async function processAnimateImage(payload: any, jobMeta?: { user_id?: string; o
     }
   }
 
-  // Maintenant animer l'image avec l'effet Ken Burns
+  // Construire l'URL de l'image source pour Replicate
+  const sourceImageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/f_auto,q_auto/${imagePublicId}`;
+  
+  // Animation prompt (par défaut ou depuis payload)
+  const animationPrompt = payload.animationPrompt || "Smooth zoom in with subtle camera movement, cinematic";
+  
+  // Appeler Replicate pour générer la vidéo IA
   const animateResult = await callFn<any>("animate-image", {
     userId,
     brandId,
     orderId,
-    imagePublicId,
-    cloudName,
-    title,
-    subtitle,
+    imageUrl: sourceImageUrl,
+    animationPrompt,
     duration,
-    aspect,
     skipWoofs: true, // ✅ Woofs déjà consommés lors de la création du pack
   });
 
   const animatePayload = unwrapResult<any>(animateResult);
   const animateError = extractError(animateResult) ?? extractError(animatePayload);
-  if (animateError) throw new Error(animateError || "Image animation failed");
+  if (animateError) throw new Error(animateError || "AI video animation failed");
 
   console.log("[processAnimateImage] Received from animate-image:", {
-    imageUrl: animatePayload?.imageUrl,
+    videoUrl: animatePayload?.videoUrl,
     success: !!animatePayload?.success,
-    raw: animatePayload,
   });
 
-  const imageUrl = animatePayload?.imageUrl || animatePayload?.data?.imageUrl;
-  if (!imageUrl) throw new Error("Missing imageUrl from animate-image response");
+  const videoUrl = animatePayload?.videoUrl || animatePayload?.data?.videoUrl;
+  if (!videoUrl) throw new Error("Missing videoUrl from animate-image response");
 
-  // ✅ Valider que c'est une vraie URL Cloudinary complète
-  if (!imageUrl || !imageUrl.startsWith('https://res.cloudinary.com')) {
-    console.error("[processAnimateImage] ❌ Invalid imageUrl format - expected full Cloudinary URL", { 
-      imageUrl,
-      startsWithHttp: imageUrl?.startsWith('http'),
-      startsWithCloudinary: imageUrl?.startsWith('https://res.cloudinary.com')
-    });
-    throw new Error("Invalid image URL for animated image - expected full Cloudinary URL");
+  // ✅ Valider que c'est une vraie URL vidéo
+  if (!videoUrl || !videoUrl.startsWith('http')) {
+    console.error("[processAnimateImage] ❌ Invalid videoUrl format", { videoUrl });
+    throw new Error("Invalid video URL for animated image");
   }
 
-  console.log("✅ [processAnimateImage] Animated image (CSS):", imageUrl);
+  console.log("✅ [processAnimateImage] AI animated video generated:", videoUrl);
 
-  // ✅ Sauvegarder dans media_generations avec type='image' et metadata.animationType='ken_burns'
-  // ✅ URLs avec format explicite pour garantir affichage navigateur
-  const sourceImagePublicId = animatePayload?.metadata?.sourceImagePublicId || imagePublicId;
-  const formattedImageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/f_auto,q_auto/${sourceImagePublicId}`;
-  
+  // ✅ Sauvegarder dans media_generations avec type='video'
   const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
     user_id: userId,
     brand_id: brandId,
-    type: "image", // ✅ Type 'image' avec metadata.animationType pour détection CSS Ken Burns
+    type: "video",
     status: "completed",
-    output_url: formattedImageUrl,
-    thumbnail_url: formattedImageUrl,
+    engine: "minimax/video-01-live",
+    output_url: videoUrl,
+    thumbnail_url: sourceImageUrl,
+    duration_seconds: duration,
+    cost_woofs: WOOF_COSTS.video_basic,
     metadata: {
       orderId,
-      sourceImagePublicId: sourceImagePublicId,
+      sourceImageUrl: sourceImageUrl,
+      animationPrompt,
       aspectRatio: aspect,
-      duration: duration,
       title,
       subtitle,
-      generator: "css_kenburns",
-      animationType: "ken_burns", // ✅ Flag critique pour frontend
-      isAnimatedVideo: true,
+      generator: "replicate_ai",
+      animationType: "replicate_ai",
     },
   });
   if (mediaErr) {
     console.error("[processAnimateImage] Failed to save to media_generations:", mediaErr);
   }
 
-  console.log("[processAnimateImage] ✅ CSS Ken Burns image saved in media_generations", {
+  console.log("[processAnimateImage] ✅ Replicate AI video saved in media_generations", {
     orderId,
-    imageUrl,
-    imagePublicId,
+    videoUrl,
   });
 
-  return { imageUrl };
+  return { videoUrl };
 }
 
 // ========== CASCADE JOB CREATION ==========
