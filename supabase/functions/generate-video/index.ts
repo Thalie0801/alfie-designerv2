@@ -844,7 +844,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             action: 'upload',
             params: {
-              url: httpUrl,
+              file: httpUrl,
               folder: `alfie/veo3/${operationName}`,
               resource_type: 'video',
               public_id: `veo3_${Date.now()}`
