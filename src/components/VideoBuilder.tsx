@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { uploadAsset } from '@/lib/cloudinary/uploadAsset';
 import { videoUrl } from '@/lib/cloudinary/videoUrls';
 import { reelFromImageUrl } from '@/lib/cloudinary/videoFromImageUrl';
-import { extractCloudNameFromUrl } from '@/lib/cloudinary/utils';
+import { getCloudName } from '@/lib/cloudinary/config';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,12 +49,9 @@ export default function VideoBuilder({
     }
   }
 
-  const cloudName =
-    extractCloudNameFromUrl(bgImageUrl) ||
-    (import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined);
+  const cloudName = getCloudName(bgImageUrl);
 
   const preview = useMemo(() => {
-    if (!cloudName) return '';
     if (mode === 'upload' && publicId) {
       return videoUrl(publicId, {
         cloudName,
@@ -138,18 +135,6 @@ export default function VideoBuilder({
             playsInline
             className="w-full max-w-[270px] mx-auto rounded border aspect-[9/16] object-cover"
           />
-        </div>
-      )}
-
-      {!cloudName && (
-        <div className="p-4 border border-destructive/50 rounded-lg bg-destructive/10">
-          <p className="text-sm text-destructive font-medium">
-            ⚠️ Configuration manquante
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            La variable d'environnement VITE_CLOUDINARY_CLOUD_NAME n'est pas configurée.
-            Contactez l'administrateur.
-          </p>
         </div>
       )}
     </div>

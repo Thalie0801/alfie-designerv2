@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { slideUrl } from "@/lib/cloudinary/imageUrls";
-import { extractCloudNameFromUrl } from "@/lib/cloudinary/utils";
+import { getCloudName } from "@/lib/cloudinary/config";
 import { generateCarouselVideoFromLibrary } from "@/lib/cloudinary/carouselToVideo";
 import { cn } from "@/lib/utils";
 
@@ -36,11 +36,8 @@ interface CarouselSlide {
   brand_id?: string;
 }
 
-function resolveCloudName(slide: CarouselSlide): string | undefined {
-  const fromUrl = extractCloudNameFromUrl(slide.cloudinary_url);
-  const fromMeta = extractCloudNameFromUrl(slide.metadata?.cloudinary_base_url || "");
-  const fromEnv = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined;
-  return fromUrl || fromMeta || fromEnv;
+function resolveCloudName(slide: CarouselSlide): string {
+  return getCloudName(slide.cloudinary_url || slide.metadata?.cloudinary_base_url);
 }
 
 type Aspect = "4:5" | "1:1" | "9:16" | "16:9";

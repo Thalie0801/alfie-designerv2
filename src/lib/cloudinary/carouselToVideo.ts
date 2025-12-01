@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
-import { spliceVideoUrl, extractCloudNameFromUrl } from './videoSimple';
+import { spliceVideoUrl } from './videoSimple';
+import { getCloudName } from './config';
 
 type Aspect = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '4:5';
 
@@ -42,11 +43,7 @@ export async function generateCarouselVideoFromLibrary(params: CarouselVideoPara
 
   // Extraire cloudName
   const firstSlideUrl = slides[0]?.cloudinary_url;
-  const cloudName = extractCloudNameFromUrl(firstSlideUrl) || import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-  
-  if (!cloudName) {
-    throw new Error('cloudName manquant. Configurez VITE_CLOUDINARY_CLOUD_NAME');
-  }
+  const cloudName = getCloudName(firstSlideUrl);
 
   // Construire les items
   const items = slides
@@ -107,11 +104,7 @@ export async function generateCarouselVideoFromJobSet(params: CarouselVideoParam
   const firstAssetUrl = typeof assets[0]?.meta === 'object' && assets[0]?.meta !== null 
     ? (assets[0].meta as any)?.cloudinary_url 
     : undefined;
-  const cloudName = extractCloudNameFromUrl(firstAssetUrl) || import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-
-  if (!cloudName) {
-    throw new Error('cloudName manquant. Configurez VITE_CLOUDINARY_CLOUD_NAME');
-  }
+  const cloudName = getCloudName(firstAssetUrl);
 
   return spliceVideoUrl({
     cloudName,
