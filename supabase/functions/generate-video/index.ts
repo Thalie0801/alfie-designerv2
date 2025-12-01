@@ -12,10 +12,10 @@ const DEFAULT_FFMPEG_BACKEND_URL = "https://alfie-ffmpeg-backend.onrender.com";
 
 // ✅ Configuration optimisée pour vidéos image-to-video
 const VIDEO_CONFIG = {
-  fps: 8,
-  num_frames: 25, // ~3 secondes à 8fps
+  fps: 10,
+  num_frames: 50, // 5 secondes à 10fps
   motion_bucket_id: 40, // Mouvement léger (0-255)
-  noise_aug_strength: 0.02, // Stabilité visuelle
+  noise_aug_strength: 0.5, // Stabilité visuelle (0.4-0.6 recommandé)
   width: 720,
   height: 1280, // Format vertical
 };
@@ -686,7 +686,7 @@ Deno.serve(async (req) => {
       // 2. Configuration VEO 3
       const VEO3_MODEL = "veo-3.0-fast-generate-001";
       const veo3AspectRatio = aspectRatio === "4:5" ? "9:16" : aspectRatio; // VEO supporte 9:16 ou 16:9
-      const durationSeconds = 8; // 4, 6, ou 8 secondes
+      const durationSeconds = 10; // Vidéos premium : 10 secondes max
       
       // 3. Appeler VEO 3 API (long-running operation)
       const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${VEO3_MODEL}:predictLongRunning`;
