@@ -33,7 +33,7 @@ import { Separator } from "@/components/ui/separator";
 import alfieMain from "@/assets/alfie-main.png";
 
 export function AppSidebar() {
-  const { open, isMobile } = useSidebar();
+  const { open, isMobile, setOpen } = useSidebar();
   const location = useLocation();
   const { user, profile, isAdmin, signOut } = useAuth();
 
@@ -72,7 +72,7 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar className="z-30 border-r border-border bg-card">
+    <Sidebar className="z-30 border-r border-border bg-card overflow-y-auto">
       <SidebarContent>
         {/* Logo */}
         <div className="p-4 flex items-center gap-3">
@@ -97,9 +97,15 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     asChild
                     isActive={location.pathname === item.path}
-                    className="min-h-[44px] touch-target"
+                    className="min-h-[48px] touch-target"
                   >
-                    <NavLink to={item.path} end className={getNavCls} data-sidebar-id={item.tourId}>
+                    <NavLink 
+                      to={item.path} 
+                      end 
+                      className={getNavCls} 
+                      data-sidebar-id={item.tourId}
+                      onClick={() => isMobile && setOpen(false)}
+                    >
                       <item.icon className={cn(open && !isMobile ? "mr-2" : "mx-auto")} size={isMobile ? 22 : 20} />
                       {(open || isMobile) && (
                         <div className="flex items-center gap-2 flex-1">

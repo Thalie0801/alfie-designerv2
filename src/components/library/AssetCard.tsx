@@ -232,20 +232,20 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
         <Button
           size="sm"
           variant="outline"
-          className="flex-1"
+          className="flex-1 touch-target min-h-[44px]"
           onClick={onDownload}
           disabled={asset.type === "video" && !asset.output_url}
           title={asset.type === "video" && !asset.output_url ? "Vidéo en cours de génération" : "Télécharger"}
           aria-disabled={(asset.type === "video" && !asset.output_url) || undefined}
         >
           <Download className="h-4 w-4 mr-2" />
-          {asset.type === "video" && !asset.output_url ? "En génération…" : "Télécharger"}
+          <span className="hidden sm:inline">{asset.type === "video" && !asset.output_url ? "En génération…" : "Télécharger"}</span>
         </Button>
         <Button
           size="sm"
           variant="ghost"
           onClick={onDelete}
-          className="text-destructive hover:text-destructive"
+          className="text-destructive hover:text-destructive touch-target min-w-[44px] min-h-[44px]"
           title="Supprimer"
           aria-label="Supprimer"
         >

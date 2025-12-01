@@ -142,14 +142,16 @@ export default function BrandKit() {
   return (
     <div className="container max-w-4xl py-8 space-y-6">
       {/* Header with brand selector */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Mon Brand Kit</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold">Mon Brand Kit</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
             Configure les couleurs, polices et ton de ta marque
           </p>
         </div>
-        <BrandSelector />
+        <div className="w-full sm:w-auto">
+          <BrandSelector />
+        </div>
       </div>
 
       <Card>

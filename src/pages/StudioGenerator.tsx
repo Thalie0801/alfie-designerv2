@@ -562,7 +562,7 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
             </p>
           </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 pb-20 sm:pb-0">
           {/* Colonne 1 : Brief global */}
           <div className="lg:col-span-3 space-y-4">
             {/* Card Brief de campagne */}
@@ -778,8 +778,8 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
             )}
           </div>
 
-          {/* Colonne 3 : Récap Woofs */}
-          <div className="lg:col-span-3">
+          {/* Colonne 3 : Récap Woofs - Sticky bottom mobile */}
+          <div className="lg:col-span-3 fixed bottom-0 left-0 right-0 p-3 bg-background border-t lg:relative lg:p-0 lg:border-0 z-30">
             <PackSummarySidebar
               data-tour-id="studio-woofs-recap"
               pack={pack}

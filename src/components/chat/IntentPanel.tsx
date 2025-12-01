@@ -50,8 +50,8 @@ export function IntentPanel({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-background rounded-lg shadow-xl max-w-2xl w-full max-h-[85vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-background rounded-t-2xl sm:rounded-lg shadow-xl w-full sm:max-w-2xl h-[92vh] sm:h-auto sm:max-h-[85vh] flex flex-col">
         {/* Header */}
         <div className="p-4 border-b">
           <h2 className="text-lg font-semibold">Récapitulatif de ta commande</h2>
@@ -133,15 +133,21 @@ export function IntentPanel({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t flex items-center justify-between">
-          <Button variant="ghost" onClick={onClose} disabled={isLoading}>
+        <div className="p-4 border-t flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 safe-bottom">
+          <Button 
+            variant="ghost" 
+            onClick={onClose} 
+            disabled={isLoading}
+            className="order-2 sm:order-1 touch-target"
+          >
             Annuler
           </Button>
-          <div className="flex items-center gap-4">
-            <span className="font-bold">{totalWoofs} Woofs</span>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 order-1 sm:order-2">
+            <span className="font-bold text-center sm:text-left">{totalWoofs} Woofs</span>
             <Button
               onClick={handleConfirm}
               disabled={selectedIds.size === 0 || isLoading}
+              className="touch-target"
             >
               {isLoading ? 'Génération...' : `Lancer (${selectedIds.size} assets)`}
             </Button>

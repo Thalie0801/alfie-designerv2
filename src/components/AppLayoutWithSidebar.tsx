@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/hooks/useAuth";
 import { AppSidebar } from "@/components/AppSidebar";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface AppLayoutWithSidebarProps {
   children: ReactNode;
@@ -40,6 +41,29 @@ const SubscriptionExpiredModal = ({ open, onRenew }: SubscriptionExpiredModalPro
   );
 };
 
+function LayoutContent({ children }: { children: ReactNode }) {
+  const isMobile = useIsMobile();
+  
+  return (
+    <div className="min-h-screen flex flex-col w-full bg-background text-foreground">
+      {isMobile && (
+        <header className="sticky top-0 z-40 h-14 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center px-4 gap-3">
+          <SidebarTrigger />
+          <span className="font-semibold text-lg">Alfie Designer</span>
+        </header>
+      )}
+      
+      <div className="flex flex-1 w-full">
+        <AppSidebar />
+        
+        <main className="flex-1 p-3 sm:p-4 lg:p-6 max-w-7xl w-full mx-auto">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
+
 export function AppLayoutWithSidebar({ children }: AppLayoutWithSidebarProps) {
   const { subscriptionExpired, isAdmin } = useAuth();
   const navigate = useNavigate();
@@ -60,16 +84,7 @@ export function AppLayoutWithSidebar({ children }: AppLayoutWithSidebarProps) {
     <>
       <SubscriptionExpiredModal open={showExpiredModal} onRenew={handleRenew} />
       <SidebarProvider defaultOpen={true}>
-        <div className="min-h-screen flex w-full bg-background text-foreground">
-          <AppSidebar />
-
-          <div className="flex-1 flex flex-col min-w-0">
-            {/* Contenu principal */}
-            <main className="flex-1 p-2 sm:p-3 lg:p-6 max-w-7xl w-full mx-auto">
-              {children}
-            </main>
-          </div>
-        </div>
+        <LayoutContent>{children}</LayoutContent>
       </SidebarProvider>
     </>
   );
