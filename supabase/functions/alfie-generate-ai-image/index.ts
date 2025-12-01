@@ -298,7 +298,7 @@ Deno.serve(async (req) => {
       if (!generatedImageUrl) throw new Error("No image generated");
     }
 
-    // --- TOUJOURS uploader sur Cloudinary (requis pour Ken Burns) ---
+    // --- Upload sur Cloudinary pour stockage permanent ---
     let cloudinaryPublicId: string | null = null;
     
     if (generatedImageUrl) {
@@ -324,10 +324,10 @@ Deno.serve(async (req) => {
                   ? `alfie/${brandId}/orders/${orderId}` 
                   : `alfie/${brandId}/images`,
                 public_id: orderId 
-                  ? `animated_base_${Date.now()}`
+                  ? `img_${Date.now()}`
                   : `img_${Date.now()}_${Math.random().toString(36).substring(7)}`,
                 resource_type: "image",
-                tags: [userId, 'generated', 'animated_base'].filter(Boolean),
+                tags: [userId, 'generated', 'alfie'].filter(Boolean),
               },
             },
           });
@@ -337,7 +337,7 @@ Deno.serve(async (req) => {
           }
 
           // ✅ Le SDK Cloudinary retourne TOUJOURS le public_id complet avec folder
-          cloudinaryPublicId = cloudinaryResult.public_id;  // ← "alfie/.../animated_base_1234"
+          cloudinaryPublicId = cloudinaryResult.public_id;  // ← "alfie/.../img_1234"
           generatedImageUrl = cloudinaryResult.secure_url;  // ← URL complète
           
           // Logs détaillés du résultat d'upload
@@ -346,7 +346,7 @@ Deno.serve(async (req) => {
             public_id: cloudinaryResult.public_id,
             publicId_includes_folder: cloudinaryResult.public_id?.includes('/'),
             publicId_starts_with_alfie: cloudinaryResult.public_id?.startsWith('alfie/'),
-            expected_format: `alfie/${brandId}/orders/${orderId}/animated_base_...`,
+            expected_format: `alfie/${brandId}/orders/${orderId}/img_...`,
           });
           
           console.log('[alfie-generate-ai-image] Full publicId from Cloudinary SDK:', cloudinaryResult.public_id);
