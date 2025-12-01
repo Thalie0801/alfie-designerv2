@@ -952,10 +952,33 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
   const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : null;
   const videoPrompt = buildFinalPrompt(payload, useBrandKit, brandMini);
 
+  // ✅ FALLBACK : Générer une image si aucune n'est fournie
+  let sourceImageUrl = payload.referenceImageUrl || payload.sourceImageUrl || payload.imageUrl;
+
+  if (!sourceImageUrl) {
+    console.log("[processGenerateVideo] No source image provided, generating one...");
+    
+    const imageResult = await callFn<any>("alfie-generate-ai-image", {
+      prompt: videoPrompt,
+      brandId,
+      userId,
+      orderId,
+      aspectRatio: aspectRatio || "9:16",
+    });
+    
+    sourceImageUrl = imageResult?.output_url || imageResult?.url;
+    
+    if (!sourceImageUrl) {
+      throw new Error("Failed to generate source image for video");
+    }
+    
+    console.log("[processGenerateVideo] ✅ Generated source image:", sourceImageUrl);
+  }
+
   // Appeler generate-video avec provider "replicate"
   const videoResult = await callFn<any>("generate-video", {
     prompt: videoPrompt,
-    imageUrl: payload.referenceImageUrl || payload.sourceImageUrl || payload.imageUrl, // ✅ Priorité: referenceImageUrl (frontend) > sourceImageUrl (legacy) > imageUrl (fallback)
+    imageUrl: sourceImageUrl, // ✅ Toujours défini (soit fourni, soit généré)
     aspectRatio: aspectRatio || "9:16",
     userId,
     brandId,
