@@ -196,8 +196,8 @@ export function QuotaBar({ activeBrandId }: QuotaBarProps) {
               <p className="text-xs font-semibold text-muted-foreground">Coûts en Woofs :</p>
               <ul className="text-xs text-muted-foreground space-y-1">
                 <li>• Image / Slide de carrousel : <strong>1 Woof</strong></li>
-                <li>• Vidéo animée standard : <strong>10 Woofs</strong></li>
-                <li>• Vidéo premium (Veo 3.1) : <strong>50 Woofs</strong></li>
+                <li>• Vidéo animée standard : <strong>6 Woofs</strong></li>
+                <li>• Vidéo premium (Veo 3.1) : <strong>25 Woofs</strong></li>
               </ul>
               <p className="text-xs text-muted-foreground mt-2">
                 Les quotas se réinitialisent le 1er de chaque mois.
