@@ -28,7 +28,7 @@ const goalDescriptions: Record<string, string> = {
 const assetKindLabel: Record<string, string> = {
   image: "Image",
   carousel: "Carrousel",
-  video_basic: "Vidéo standard",
+  video_basic: "🖼️ → 🎬 Vidéo",
   video_premium: "Vidéo premium (Veo 3.1)",
 };
 
@@ -140,6 +140,12 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
                 </>
               )}
             </div>
+
+            {asset.kind === "video_basic" && (
+              <span className="text-xs text-blue-600 font-medium">
+                📸 Génération depuis image source
+              </span>
+            )}
 
             <div className="flex items-center gap-2 text-xs">
               <Badge variant="outline">{asset.goal}</Badge>
