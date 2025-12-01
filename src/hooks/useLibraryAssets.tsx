@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { cleanCloudinaryUrl, getBestAvailableUrl } from '@/lib/cloudinary/cleanCloudinaryUrl';
+import { cleanCloudinaryUrl } from '@/lib/cloudinary/cleanCloudinaryUrl';
 
 const MEDIA_URL_KEYS = [
   'videoUrl',
@@ -188,14 +188,10 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
         console.log(`[LibraryAssets] Loaded ${videoData?.length || 0} videos (all types)`);
         
         const mappedAssets = combinedData.map(asset => {
-          const cleanedOutput = cleanCloudinaryUrl(asset.output_url);
-          const cleanedThumbnail = cleanCloudinaryUrl(asset.thumbnail_url);
-          const bestUrl = getBestAvailableUrl(cleanedOutput, cleanedThumbnail);
-          
           return {
             ...asset,
-            output_url: bestUrl || '',
-            thumbnail_url: cleanedThumbnail || undefined,
+            output_url: cleanCloudinaryUrl(asset.output_url) || asset.output_url || '',
+            thumbnail_url: cleanCloudinaryUrl(asset.thumbnail_url) || asset.thumbnail_url,
           };
         }) as LibraryAsset[];
         
@@ -218,14 +214,10 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
       
       // Map data with actual output_url from database
       const mappedAssets = (data || []).map(asset => {
-        const cleanedOutput = cleanCloudinaryUrl(asset.output_url);
-        const cleanedThumbnail = cleanCloudinaryUrl(asset.thumbnail_url);
-        const bestUrl = getBestAvailableUrl(cleanedOutput, cleanedThumbnail);
-        
         return {
           ...asset,
-          output_url: bestUrl || '',
-          thumbnail_url: cleanedThumbnail || undefined,
+          output_url: cleanCloudinaryUrl(asset.output_url) || asset.output_url || '',
+          thumbnail_url: cleanCloudinaryUrl(asset.thumbnail_url) || asset.thumbnail_url,
         };
       }) as LibraryAsset[];
       
