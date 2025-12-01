@@ -327,7 +327,8 @@ async function generateGcsSignedUrl(
   bucket: string,
   objectPath: string, 
   serviceAccountJson: any,
-  expiresInSeconds = 900
+  expiresInSeconds = 900,
+  method: 'GET' | 'PUT' = 'GET'
 ): Promise<string> {
   const now = new Date();
   const datestamp = now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
@@ -348,7 +349,7 @@ async function generateGcsSignedUrl(
   ].sort().join('&');
   
   const canonicalRequest = [
-    'GET',
+    method,
     canonicalUri,
     canonicalQueryString,
     `host:${host}`,
@@ -801,30 +802,37 @@ async function generateGcsSignedUrl(
       // ✅ Construire l'instance avec image de référence si fournie
       let instance: any = { prompt };
       
-      // Si une image de référence est fournie, la télécharger et l'encoder en base64
+      // Si une image de référence est fournie, l'uploader vers GCS et utiliser gcsUri
       if (imageUrl) {
         try {
-          console.log(`[generate-video] Downloading reference image: ${imageUrl}`);
+          console.log(`[generate-video] Uploading reference image to GCS: ${imageUrl}`);
+          
+          const refImagePath = `references/ref_${Date.now()}.jpg`;
+          const parsedServiceAccount = JSON.parse(serviceAccountJson);
+          const uploadUrl = await generateGcsSignedUrl(videosBucket, refImagePath, parsedServiceAccount, 900, 'PUT');
+          
+          // Fetch l'image source et stream directement vers GCS (zéro mémoire locale)
           const imageResponse = await fetch(imageUrl);
           if (!imageResponse.ok) {
-            console.warn(`[generate-video] Failed to download reference image: ${imageResponse.status}`);
+            console.warn(`[generate-video] Failed to fetch reference image: ${imageResponse.status}`);
           } else {
-            const imageBuffer = await imageResponse.arrayBuffer();
-            const imageBase64 = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+            const uploadResponse = await fetch(uploadUrl, {
+              method: 'PUT',
+              body: imageResponse.body,
+              headers: { 'Content-Type': 'image/jpeg' }
+            });
             
-            // Détecter le MIME type depuis l'URL ou Content-Type
-            const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
-            const mimeType = contentType.split(';')[0].trim();
-            
-            instance.referenceImage = {
-              bytesBase64Encoded: imageBase64,
-              mimeType: mimeType
-            };
-            
-            console.log(`[generate-video] ✅ Reference image added to VEO 3 payload (${mimeType})`);
+            if (!uploadResponse.ok) {
+              console.warn(`[generate-video] Failed to upload reference image to GCS: ${uploadResponse.status}`);
+            } else {
+              instance.image = {
+                gcsUri: `gs://${videosBucket}/${refImagePath}`
+              };
+              console.log(`[generate-video] ✅ Reference image uploaded to GCS: gs://${videosBucket}/${refImagePath}`);
+            }
           }
         } catch (err) {
-          console.error(`[generate-video] Error processing reference image:`, err);
+          console.error(`[generate-video] Error uploading reference image to GCS:`, err);
         }
       }
 
