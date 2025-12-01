@@ -1019,19 +1019,36 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   const carousel_id = payload.carousel_id || crypto.randomUUID();
   const totalSlides = payload.count || 5;
   
-  // ✅ Phase 3: Fallback si pas de textes générés
+  // ✅ Phase 3: Fallback si pas de textes générés - basé sur le brief
   let slides = payload.generatedTexts?.slides;
   
   if (!slides || !Array.isArray(slides) || slides.length === 0) {
-    console.warn("[processRenderCarousels] ⚠️ No generated texts, using fallback...");
+    console.warn("[processRenderCarousels] ⚠️ No generated texts, using brief-based fallback...");
     
-    // Fallback générique
-    slides = Array.from({ length: totalSlides }, (_, i) => ({
-      title: i === 0 ? "Découvrez" : i === totalSlides - 1 ? "Passez à l'action" : `Point ${i}`,
-      subtitle: "Contenu professionnel adapté à votre audience",
-    }));
+    // ✅ Fallback basé sur le brief au lieu de textes génériques
+    const topic = payload.brief?.topic || payload.topic || "Votre sujet";
+    const cta = payload.brief?.cta || "En savoir plus";
     
-    console.log("[processRenderCarousels] ✅ Generated fallback slides:", slides.length);
+    slides = Array.from({ length: totalSlides }, (_, i) => {
+      if (i === 0) {
+        return {
+          title: topic,
+          subtitle: "Introduction au sujet",
+        };
+      } else if (i === totalSlides - 1) {
+        return {
+          title: cta,
+          subtitle: "Contactez-nous",
+        };
+      } else {
+        return {
+          title: `Point clé ${i}`,
+          subtitle: `${topic} - aspect ${i}`,
+        };
+      }
+    });
+    
+    console.log("[processRenderCarousels] ✅ Generated brief-based fallback slides:", slides.length);
   }
   if (!Array.isArray(slides) || slides.length === 0) {
     throw new Error("Generated texts must contain an array of slides");
@@ -1056,42 +1073,59 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   // ✅ Extraire le contenu utilisateur (thème)
   const contentPrompt = buildContentPrompt(payload);
 
-  // Générer toutes les slides en parallèle
+  // Générer toutes les slides en parallèle avec retry automatique
   const slidePromises = slides.map(async (slide: any, index: number) => {
     console.log(`[processRenderCarousels] 📄 Slide ${index + 1}/${slides.length}:`, {
       title: slide.title?.slice(0, 50),
     });
 
-    try {
-      const slideResult = await callFn("alfie-render-carousel-slide", {
-        userId: jobMeta?.user_id || payload.userId,
-        prompt: contentPrompt, // ✅ Le thème est TOUJOURS là
-        globalStyle,
-        slideContent: {
-          title: slide.title || "",
-          subtitle: slide.subtitle || "",
-          bullets: slide.bullets || [],
-          alt: `Slide ${index + 1} of ${slides.length}`,
-        },
-        brandId: payload.brandId,
-        orderId: jobMeta?.order_id || payload.orderId,
-        orderItemId: payload.orderItemId || null,
-        carouselId: carousel_id,
-        slideIndex: index,
-        totalSlides: slides.length,
-        aspectRatio,
-        textVersion: 1,
-        renderVersion: 1,
-        campaign: payload.campaign || payload.brief?.campaign || "carousel",
-        language: "FR",
-        useBrandKit, // ✅ Propagation de useBrandKit
-      });
+    const maxRetries = 2;
+    let lastError: any = null;
 
-      return { success: true, slideIndex: index, result: slideResult };
-    } catch (error: any) {
-      console.error(`[processRenderCarousels] ❌ Failed slide ${index + 1}:`, error.message);
-      return { success: false, slideIndex: index, error: error.message };
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          console.log(`[processRenderCarousels] 🔄 Retry ${attempt}/${maxRetries} for slide ${index + 1}`);
+        }
+
+        const slideResult = await callFn("alfie-render-carousel-slide", {
+          userId: jobMeta?.user_id || payload.userId,
+          prompt: contentPrompt, // ✅ Le thème est TOUJOURS là
+          globalStyle,
+          slideContent: {
+            title: slide.title || "",
+            subtitle: slide.subtitle || "",
+            bullets: slide.bullets || [],
+            alt: `Slide ${index + 1} of ${slides.length}`,
+          },
+          brandId: payload.brandId,
+          orderId: jobMeta?.order_id || payload.orderId,
+          orderItemId: payload.orderItemId || null,
+          carouselId: carousel_id,
+          slideIndex: index,
+          totalSlides: slides.length,
+          aspectRatio,
+          textVersion: 1,
+          renderVersion: 1,
+          campaign: payload.campaign || payload.brief?.campaign || "carousel",
+          language: "FR",
+          useBrandKit, // ✅ Propagation de useBrandKit
+        });
+
+        return { success: true, slideIndex: index, result: slideResult };
+      } catch (error: any) {
+        lastError = error;
+        console.error(`[processRenderCarousels] ❌ Attempt ${attempt + 1} failed for slide ${index + 1}:`, error.message);
+        
+        // Si on a encore des retries, attendre un peu avant de réessayer
+        if (attempt < maxRetries) {
+          await sleep(1000 * (attempt + 1)); // Backoff progressif
+        }
+      }
     }
+
+    // Si on arrive ici, tous les retries ont échoué
+    return { success: false, slideIndex: index, error: lastError?.message || "Unknown error after retries" };
   });
 
   const results = await Promise.all(slidePromises);

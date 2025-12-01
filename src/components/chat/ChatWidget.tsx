@@ -14,6 +14,8 @@ import { IntentPanel } from "./IntentPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { sendPackToGenerator, InsufficientWoofsError } from "@/services/generatorFromChat";
 import { toast } from "sonner";
+import { AssetEditDialog } from "@/components/studio/AssetEditDialog";
+import type { PackAsset } from "@/types/alfiePack";
 
 type CoachMode = "strategy" | "da" | "maker";
 type ChatMessage = { role: "user" | "assistant"; node: ReactNode };
@@ -31,6 +33,7 @@ export default function ChatWidget() {
   const [showPackModal, setShowPackModal] = useState(false);
   const [showIntentPanel, setShowIntentPanel] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [editingAsset, setEditingAsset] = useState<any | null>(null);
 
   const brief = useBrief();
   const { profile } = useAuth();
@@ -656,6 +659,23 @@ export default function ChatWidget() {
         </button>
       )}
 
+      {/* AssetEditDialog pour éditer les assets */}
+      {editingAsset && (
+        <AssetEditDialog
+          asset={editingAsset as PackAsset}
+          isOpen={true}
+          onClose={() => setEditingAsset(null)}
+          onSave={(updated) => {
+            setPendingPack(prev => prev ? {
+              ...prev,
+              assets: prev.assets.map(a => a.id === updated.id ? updated : a)
+            } : null);
+            setEditingAsset(null);
+            toast.success("Asset modifié avec succès");
+          }}
+        />
+      )}
+
       {/* IntentPanel pour mode contrôlé (plusieurs assets) */}
       {showIntentPanel && pendingPack && (
         <IntentPanel
@@ -663,8 +683,7 @@ export default function ChatWidget() {
           onConfirm={handleConfirmGeneration}
           isLoading={isGenerating}
           onEdit={(intent) => {
-            console.log("Edit intent:", intent);
-            // TODO: Ouvrir AssetEditDialog
+            setEditingAsset(intent);
           }}
           onRemove={(id) => {
             setPendingPack(prev => prev ? {
