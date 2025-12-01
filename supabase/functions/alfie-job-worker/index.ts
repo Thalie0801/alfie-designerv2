@@ -955,7 +955,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
   // Appeler generate-video avec provider "replicate"
   const videoResult = await callFn<any>("generate-video", {
     prompt: videoPrompt,
-    imageUrl: payload.sourceImageUrl, // Image source si fournie
+    imageUrl: payload.referenceImageUrl || payload.sourceImageUrl || payload.imageUrl, // ✅ Priorité: referenceImageUrl (frontend) > sourceImageUrl (legacy) > imageUrl (fallback)
     aspectRatio: aspectRatio || "9:16",
     userId,
     brandId,
