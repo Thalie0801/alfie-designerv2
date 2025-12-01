@@ -27,6 +27,7 @@ export interface UnifiedAlfieIntent {
   prompt: string;
   durationSeconds?: number; // vidéos uniquement
   referenceImageUrl?: string;
+  animationPrompt?: string; // Description de l'animation (pour animated_image)
   generatedTexts?: GeneratedTexts;
   useBrandKit?: boolean;
   campaign?: string;

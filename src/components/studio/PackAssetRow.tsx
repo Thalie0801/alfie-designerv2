@@ -28,7 +28,7 @@ const goalDescriptions: Record<string, string> = {
 const assetKindLabel: Record<string, string> = {
   image: "Image",
   carousel: "Carrousel",
-  animated_image: "Image animée",
+  animated_image: "Animation IA (10 Woofs)",
   video_basic: "Vidéo standard",
   video_premium: "Vidéo premium (Veo 3.1)",
 };
@@ -264,6 +264,25 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
               </div>
             )}
           </div>
+
+          {/* Section prompt d'animation (pour animated_image uniquement) */}
+          {asset.kind === "animated_image" && (
+            <div className="space-y-2 border-t pt-3">
+              <div>
+                <p className="text-sm font-medium">Description de l'animation IA</p>
+                <p className="text-xs text-muted-foreground">Décris le mouvement souhaité (ex: "zoom avant avec mouvement fluide", "panoramique lent", etc.)</p>
+              </div>
+              <textarea
+                className="w-full min-h-[60px] p-2 text-sm rounded-md border bg-background"
+                value={asset.animationPrompt || "Smooth zoom in with subtle camera movement, cinematic"}
+                onChange={(e) => {
+                  const updatedAsset = { ...asset, animationPrompt: e.target.value };
+                  onEdit(updatedAsset);
+                }}
+                placeholder="Décris l'animation souhaitée..."
+              />
+            </div>
+          )}
 
           <Button 
             variant="outline" 

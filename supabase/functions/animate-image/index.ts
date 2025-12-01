@@ -1,7 +1,6 @@
 /**
- * animate-image - Prépare une image pour animation CSS Ken Burns
- * Coût : 3 Woofs
- * Note : Ne génère plus de vidéo Cloudinary - l'animation est gérée en CSS côté client
+ * animate-image - Génère une vraie vidéo animée via Replicate minimax/video-01-live
+ * Coût : 10 Woofs (video_basic)
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
@@ -20,8 +19,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Version marker for debugging
-    console.log("[animate-image] 🚀 CSS KEN BURNS VERSION - v3.0 - No Cloudinary video");
+    console.log("[animate-image] 🚀 REPLICATE AI VIDEO VERSION - v4.0");
     
     // 1️⃣ Vérifier si c'est un appel interne via x-internal-secret
     const internalSecret = req.headers.get("x-internal-secret") || req.headers.get("X-Internal-Secret");
@@ -36,7 +34,6 @@ Deno.serve(async (req) => {
     let skipWoofs = false;
 
     if (isInternalCall) {
-      // Appel interne - récupérer userId depuis le body
       userId = body.userId;
       skipWoofs = body.skipWoofs === true;
       if (!userId) {
@@ -44,7 +41,6 @@ Deno.serve(async (req) => {
       }
       console.log(`[animate-image] ✅ Internal call for user: ${userId}`);
     } else {
-      // Auth JWT standard
       const authHeader = req.headers.get("Authorization");
       if (!authHeader) {
         return jsonResponse({ error: "Missing Authorization header" }, { status: 401 });
@@ -68,53 +64,47 @@ Deno.serve(async (req) => {
       userId = user.id;
       console.log(`[animate-image] ✅ Authenticated user: ${userId}`);
     }
-    const imagePublicId = typeof body?.imagePublicId === "string" ? body.imagePublicId : undefined;
-    const cloudName = typeof body?.cloudName === "string" ? body.cloudName : Deno.env.get("CLOUDINARY_CLOUD_NAME");
+
+    const imageUrl = typeof body?.imageUrl === "string" ? body.imageUrl : undefined;
+    const animationPrompt = typeof body?.animationPrompt === "string" ? body.animationPrompt : "Smooth zoom in with subtle pan movement";
     const brandId = typeof body?.brandId === "string" ? body.brandId : undefined;
     const orderId = typeof body?.orderId === "string" ? body.orderId : undefined;
-    const title = typeof body?.title === "string" ? body.title : undefined;
-    const subtitle = typeof body?.subtitle === "string" ? body.subtitle : undefined;
-    const duration = typeof body?.duration === "number" ? body.duration : 3;
-    const aspect = typeof body?.aspect === "string" ? body.aspect : "4:5";
+    const duration = typeof body?.duration === "number" ? body.duration : 5;
 
-    // Logs d'entrée détaillés
     console.log("[animate-image] Input parameters:", {
-      imagePublicId,
-      imagePublicIdFormat: imagePublicId?.includes('/') ? 'WITH_FOLDER' : 'NO_FOLDER',
-      imagePublicIdStartsWithAlfie: imagePublicId?.startsWith('alfie/'),
-      cloudName,
+      imageUrl: imageUrl?.substring(0, 60) + '...',
+      animationPrompt,
       brandId,
       orderId,
       duration,
-      aspect,
     });
 
-    if (!imagePublicId || !cloudName) {
-      return jsonResponse({ error: "Missing imagePublicId or cloudName" }, { status: 400 });
+    if (!imageUrl) {
+      return jsonResponse({ error: "Missing imageUrl" }, { status: 400 });
     }
 
     if (!brandId) {
       return jsonResponse({ error: "Missing brandId" }, { status: 400 });
     }
 
-    // 3️⃣ Conditionner la consommation de Woofs
+    // 3️⃣ Consommer les Woofs (video_basic = 10 Woofs)
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY!);
     let remainingWoofs = 0;
 
     if (!skipWoofs) {
-      console.log(`[animate-image] Checking ${WOOF_COSTS.animated_image} Woofs for brand ${brandId}`);
+      console.log(`[animate-image] Checking ${WOOF_COSTS.video_basic} Woofs for brand ${brandId}`);
       
       const { data: woofsData, error: woofsError } = await adminClient.functions.invoke(
         "woofs-check-consume",
         {
           body: {
             brand_id: brandId,
-            cost_woofs: WOOF_COSTS.animated_image,
-            reason: "animated_image",
+            cost_woofs: WOOF_COSTS.video_basic,
+            reason: "ai_video_animation",
             metadata: { 
-              imagePublicId,
-              duration,
-              aspect
+              imageUrl,
+              animationPrompt,
+              duration
             },
           },
         }
@@ -126,9 +116,9 @@ Deno.serve(async (req) => {
           console.error("[animate-image] Insufficient Woofs:", woofsData?.error);
           return jsonResponse({ 
             error: "INSUFFICIENT_WOOFS",
-            message: woofsData?.error?.message || "Tu n'as plus assez de Woofs pour cette animation.",
+            message: woofsData?.error?.message || "Tu n'as plus assez de Woofs pour cette animation IA.",
             remaining: woofsData?.error?.remaining || 0,
-            required: WOOF_COSTS.animated_image
+            required: WOOF_COSTS.video_basic
           }, { status: 402 });
         }
         console.error("[animate-image] Woofs consumption failed:", woofsError);
@@ -136,69 +126,106 @@ Deno.serve(async (req) => {
       }
 
       remainingWoofs = woofsData.data.remaining_woofs;
-      console.log(`[animate-image] ✅ Consumed ${WOOF_COSTS.animated_image} Woofs, remaining: ${remainingWoofs}`);
+      console.log(`[animate-image] ✅ Consumed ${WOOF_COSTS.video_basic} Woofs, remaining: ${remainingWoofs}`);
     } else {
       console.log(`[animate-image] ⏭️ Skipping Woofs consumption (already consumed by pack)`);
     }
 
-    // Vérifier que l'image source existe sur Cloudinary
-    // ✅ URL avec format explicite pour garantir affichage navigateur
-    const sourceImageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/f_auto,q_auto/${imagePublicId}`;
-    console.log("[animate-image] Verifying source image:", sourceImageUrl);
+    // 4️⃣ Appeler Replicate minimax/video-01-live
+    const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
+    if (!REPLICATE_API_TOKEN) {
+      throw new Error("REPLICATE_API_TOKEN not configured");
+    }
 
-    try {
-      const verifyResponse = await fetch(sourceImageUrl, { method: "HEAD" });
-      if (!verifyResponse.ok) {
-        console.error("[animate-image] ❌ Source image does not exist on Cloudinary:", {
-          imagePublicId,
-          sourceImageUrl,
-          status: verifyResponse.status,
-          statusText: verifyResponse.statusText,
-        });
-        return jsonResponse({
-          error: "Source image not found on Cloudinary",
-          imagePublicId,
-          sourceImageUrl,
-          status: verifyResponse.status,
-        }, { status: 404 });
-      }
-      console.log("[animate-image] ✅ Source image verified");
-    } catch (err) {
-      console.error("[animate-image] ❌ Error verifying source image:", {
-        imagePublicId,
-        error: String(err),
-      });
-      return jsonResponse({
-        error: "Error while verifying source image",
-        imagePublicId,
+    console.log("[animate-image] 🎬 Calling Replicate minimax/video-01-live...");
+
+    const replicateResponse = await fetch("https://api.replicate.com/v1/predictions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${REPLICATE_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        version: "47bdc14703c7b1c289c75da32c99e2f28dfdb0b8d5e042cebafa0b1b8e5d8be3",
+        input: {
+          image: imageUrl,
+          prompt: animationPrompt,
+          num_inference_steps: 50,
+        }
+      })
+    });
+
+    if (!replicateResponse.ok) {
+      const errorText = await replicateResponse.text();
+      console.error("[animate-image] Replicate API error:", errorText);
+      return jsonResponse({ 
+        error: "Replicate API failed", 
+        details: errorText 
       }, { status: 500 });
     }
 
-    // ✅ SIMPLIFICATION : Plus de génération vidéo Cloudinary
-    // L'animation Ken Burns est gérée en CSS côté client (animate-ken-burns)
-    // On stocke juste l'image source avec metadata pour détection frontend
-    
-    console.log("[animate-image] ✅ CSS Ken Burns - storing image with metadata");
+    const prediction = await replicateResponse.json();
+    console.log("[animate-image] Replicate prediction started:", prediction.id);
 
-    // 4️⃣ Utiliser adminClient pour les sauvegardes DB quand appel interne
-    const dbClient = isInternalCall ? adminClient : createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
-      global: { headers: { Authorization: req.headers.get("Authorization") || "" } }
-    });
+    // 5️⃣ Polling pour attendre la vidéo générée
+    let videoUrl = null;
+    let pollCount = 0;
+    const maxPolls = 60; // 5 minutes max (5s * 60)
 
-    // ✅ Plus d'insertion ici - alfie-job-worker gère tout via media_generations
+    while (pollCount < maxPolls) {
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Attendre 5s
+      
+      const statusResponse = await fetch(
+        `https://api.replicate.com/v1/predictions/${prediction.id}`,
+        {
+          headers: {
+            "Authorization": `Bearer ${REPLICATE_API_TOKEN}`,
+          }
+        }
+      );
+
+      if (!statusResponse.ok) {
+        console.error("[animate-image] Status check failed");
+        break;
+      }
+
+      const status = await statusResponse.json();
+      console.log(`[animate-image] Poll ${pollCount + 1}: ${status.status}`);
+
+      if (status.status === "succeeded") {
+        videoUrl = status.output;
+        console.log("[animate-image] ✅ Video generated:", videoUrl);
+        break;
+      } else if (status.status === "failed") {
+        console.error("[animate-image] Generation failed:", status.error);
+        return jsonResponse({
+          error: "Video generation failed",
+          details: status.error
+        }, { status: 500 });
+      }
+
+      pollCount++;
+    }
+
+    if (!videoUrl) {
+      return jsonResponse({
+        error: "Video generation timeout",
+        message: "La génération a pris trop de temps (5 min max)"
+      }, { status: 408 });
+    }
 
     return jsonResponse({
       success: true,
-      imageUrl: sourceImageUrl, // ✅ Retourner l'image source, pas une vidéo
-      thumbnailUrl: sourceImageUrl,
+      videoUrl,
+      thumbnailUrl: imageUrl,
       duration,
-      aspect,
-      woofsCost: skipWoofs ? 0 : WOOF_COSTS.animated_image,
+      woofsCost: skipWoofs ? 0 : WOOF_COSTS.video_basic,
       remainingWoofs,
       metadata: {
-        animationType: 'ken_burns',
-        isAnimatedVideo: true,
-        sourceImagePublicId: imagePublicId
+        animationType: 'replicate_ai',
+        engine: 'minimax/video-01-live',
+        animationPrompt,
+        predictionId: prediction.id,
       }
     });
 

@@ -37,40 +37,6 @@ function safeTimeAgo(dateISO?: string | null) {
   return formatDistanceToNow(d, { addSuffix: true, locale: fr });
 }
 
-/**
- * Normalize Cloudinary image URL to ensure proper format for display
- * Removes video transformations and converts to image format
- */
-function normalizeImageUrl(url: string | undefined): string {
-  if (!url || !url.startsWith("https://res.cloudinary.com")) return "";
-  
-  let normalized = url;
-  
-  // 1. Remove problematic video transformations
-  normalized = normalized.replace(/e_zoompan:[^,\/]+,?/g, ""); // Remove e_zoompan:d_X:z_X
-  normalized = normalized.replace(/f_mp4,?/g, ""); // Remove f_mp4
-  normalized = normalized.replace(/,{2,}/g, ","); // Clean double commas
-  normalized = normalized.replace(/,\//g, "/"); // Clean ,/ to /
-  
-  // 2. Convert /video/upload/ to /image/upload/ if present
-  if (normalized.includes("/video/upload/")) {
-    normalized = normalized.replace("/video/upload/", "/image/upload/");
-  }
-  
-  // 3. Add auto format if no format present
-  if (
-    normalized.includes("/image/upload/") &&
-    !normalized.includes("f_auto") &&
-    !normalized.includes("f_jpg") &&
-    !normalized.includes("f_png") &&
-    !normalized.includes("f_webp")
-  ) {
-    normalized = normalized.replace("/image/upload/", "/image/upload/f_auto,q_auto/");
-  }
-  
-  return normalized;
-}
-
 export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, daysUntilExpiry }: AssetCardProps) {
   const [imageError, setImageError] = useState(false);
   const [videoError, setVideoError] = useState(false);
@@ -140,32 +106,8 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
 
   const videoSrc = asset.type === "video" ? getVideoSrc() : "";
 
-  // ✅ Détection Ken Burns animé via metadata (fonctionne même si type='image')
-  const isKenBurns = (asset.metadata as any)?.animationType === "ken_burns";
-
-  /**
-   * Get Ken Burns image URL with intelligent fallback
-   * Priority: normalized thumbnail_url → normalized output_url → construct from sourceImagePublicId
-   */
-  const getKenBurnsImageUrl = (): string => {
-    const metadata = asset.metadata as any;
-    const cloudName = "dcuvvilto";
-    
-    // 1. Try normalized thumbnail_url
-    const normalizedThumb = normalizeImageUrl(asset.thumbnail_url);
-    if (normalizedThumb) return normalizedThumb;
-    
-    // 2. Try normalized output_url
-    const normalizedOutput = normalizeImageUrl(asset.output_url);
-    if (normalizedOutput) return normalizedOutput;
-    
-    // 3. Construct from sourceImagePublicId as last resort
-    if (metadata?.sourceImagePublicId) {
-      return `https://res.cloudinary.com/${cloudName}/image/upload/f_auto,q_auto/${metadata.sourceImagePublicId}`;
-    }
-    
-    return "";
-  };
+  // ✅ Détection vidéo Replicate IA
+  const isReplicateVideo = videoSrc.includes("replicate.delivery") || (asset.metadata as any)?.animationType === "replicate_ai";
 
   return (
     <Card className={`group hover:shadow-lg transition-all ${selected ? "ring-2 ring-primary" : ""}`}>
@@ -198,28 +140,8 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
 
         {/* Preview */}
         <div className="relative aspect-[4/5] bg-muted overflow-hidden rounded-t-lg">
-          {/* ✅ KEN BURNS : Rendu direct comme image animée CSS */}
-          {isKenBurns ? (
-            <div className="relative w-full h-full overflow-hidden">
-              {imageError ? (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-purple-500/10 to-pink-500/10">
-                  <AlertCircle className="h-12 w-12 text-muted-foreground mb-2" />
-                  <p className="text-xs text-muted-foreground">Image non disponible</p>
-                </div>
-            ) : (
-              <img
-                src={getKenBurnsImageUrl()}
-                alt="Animation Ken Burns"
-                className="w-full h-full object-cover animate-ken-burns"
-                onError={handleImageError}
-                loading="lazy"
-              />
-            )}
-              <Badge className="absolute bottom-2 right-2 bg-purple-600 text-white text-xs">
-                Animation CSS
-              </Badge>
-            </div>
-          ) : asset.type === "video" ? (
+          {/* ✅ VIDÉO (Replicate AI ou autres) */}
+          {asset.type === "video" ? (
             <>
               {videoSrc && !videoError ? (
                 <video
@@ -239,9 +161,9 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
                   <PlayCircle className="h-16 w-16 text-muted-foreground mb-2" />
                   <p className="text-xs text-muted-foreground text-center px-4">
                     {asset.status === "processing" 
-                      ? "⏳ Génération en cours…" 
+                      ? "⏳ Génération IA en cours…" 
                       : videoError 
-                      ? "Aperçu indisponible (URL vidéo invalide)"
+                      ? "Aperçu indisponible"
                       : "Aperçu indisponible"}
                   </p>
                 </div>
@@ -253,6 +175,11 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
                     {duration}
                   </Badge>
                 </div>
+              )}
+              {isReplicateVideo && (
+                <Badge className="absolute bottom-2 right-2 bg-purple-600 text-white text-xs">
+                  🤖 Animation IA
+                </Badge>
               )}
             </>
           ) : (
