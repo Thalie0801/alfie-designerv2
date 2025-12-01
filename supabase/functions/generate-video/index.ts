@@ -274,9 +274,105 @@ Deno.serve(async (req) => {
       brandId = profile?.active_brand_id || null;
     }
 
-    if (!isStatusCheck && (!prompt || typeof prompt !== "string")) {
-      return jsonResponse({ error: "Missing prompt" }, { status: 400 });
-    }
+/**
+ * Helper: Generate SHA-256 hex hash
+ */
+async function sha256Hex(message: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(message);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * Helper: Sign message with RSA-SHA256 using private key
+ */
+async function rsaSha256Sign(privateKeyPem: string, message: string): Promise<string> {
+  // Import PEM private key
+  const pemContents = privateKeyPem
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace(/\s/g, '');
+  
+  const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
+  
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8',
+    binaryKey,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  
+  // Sign the message
+  const encoder = new TextEncoder();
+  const signature = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    cryptoKey,
+    encoder.encode(message)
+  );
+  
+  // Convert to hex
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * Helper: Generate GCS V4 signed URL (15 minutes validity)
+ */
+async function generateGcsSignedUrl(
+  bucket: string,
+  objectPath: string, 
+  serviceAccountJson: any,
+  expiresInSeconds = 900
+): Promise<string> {
+  const now = new Date();
+  const datestamp = now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const dateOnly = datestamp.substring(0, 8);
+  
+  const credentialScope = `${dateOnly}/auto/storage/goog4_request`;
+  const credential = `${serviceAccountJson.client_email}/${credentialScope}`;
+  
+  // Canonical request components
+  const host = 'storage.googleapis.com';
+  const canonicalUri = `/${bucket}/${objectPath}`;
+  const canonicalQueryString = [
+    `X-Goog-Algorithm=GOOG4-RSA-SHA256`,
+    `X-Goog-Credential=${encodeURIComponent(credential)}`,
+    `X-Goog-Date=${datestamp}`,
+    `X-Goog-Expires=${expiresInSeconds}`,
+    `X-Goog-SignedHeaders=host`
+  ].sort().join('&');
+  
+  const canonicalRequest = [
+    'GET',
+    canonicalUri,
+    canonicalQueryString,
+    `host:${host}`,
+    '',
+    'host',
+    'UNSIGNED-PAYLOAD'
+  ].join('\n');
+  
+  // String to sign
+  const hashedRequest = await sha256Hex(canonicalRequest);
+  const stringToSign = [
+    'GOOG4-RSA-SHA256',
+    datestamp,
+    credentialScope,
+    hashedRequest
+  ].join('\n');
+  
+  // Sign with RSA-SHA256 using service account private key
+  const signature = await rsaSha256Sign(serviceAccountJson.private_key, stringToSign);
+  
+  return `https://${host}${canonicalUri}?${canonicalQueryString}&X-Goog-Signature=${signature}`;
+}
+
+// ... keep existing code
 
     // ✅ VALIDATION BACKEND : Replicate image-to-video requiert une image source
     if (!isStatusCheck && normalizedProvider === "replicate" && !imageUrl) {
@@ -835,17 +931,13 @@ Deno.serve(async (req) => {
         if (!gcsMatch) {
           throw new Error(`Invalid GCS URI format: ${videoUri}`);
         }
+        // Extraire bucket et path du gs:// URI
         const [, bucket, objectPath] = gcsMatch;
         console.log(`[generate-video] GCS bucket: ${bucket}, path: ${objectPath}`);
         
-        // Obtenir le token d'accès pour GCS
-        const accessToken = await getAccessToken(serviceAccountJson);
-        console.log('[generate-video] Access token obtained');
-        
-        // Générer une URL signée GCS temporaire (valide 15 minutes)
-        // URL directe avec token d'accès en query parameter
-        const signedUrl = `https://storage.googleapis.com/storage/v1/b/${bucket}/o/${encodeURIComponent(objectPath)}?alt=media&access_token=${accessToken}`;
-        console.log(`[generate-video] Generated signed GCS URL (expires when token expires, ~1h)`);
+        // Générer une URL signée V4 GCS (valide 15 minutes)
+        const signedUrl = await generateGcsSignedUrl(bucket, objectPath, serviceAccountJson, 900);
+        console.log(`[generate-video] Generated V4 signed GCS URL (expires in 15 min)`);
         
         // Uploader vers Cloudinary via edge function
         const cloudinaryResp = await fetch(`${SUPABASE_URL}/functions/v1/cloudinary`, {
