@@ -22,6 +22,27 @@ type AssistantReply = ChatMessage;
 
 type ContentIntent = ReturnType<typeof detectContentIntent>;
 
+/**
+ * Enrichit un pack avec woofCostType pour éviter NaN dans les calculs
+ */
+function enrichPackWithWoofCostType(pack: AlfiePack): AlfiePack {
+  return {
+    ...pack,
+    assets: pack.assets.map(asset => ({
+      ...asset,
+      woofCostType: asset.kind === 'carousel' 
+        ? 'carousel_slide' 
+        : asset.kind === 'image'
+        ? 'image'
+        : asset.kind === 'video_basic'
+        ? 'video_basic'
+        : asset.kind === 'video_premium'
+        ? 'video_premium'
+        : 'image', // fallback
+    })),
+  };
+}
+
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -471,10 +492,13 @@ export default function ChatWidget() {
 
       if (finalPack) {
         console.log("Pack détecté:", finalPack);
-        setPendingPack(finalPack);
+        
+        // ✅ Auto-enrichir avec woofCostType pour éviter NaN
+        const enrichedPack = enrichPackWithWoofCostType(finalPack);
+        setPendingPack(enrichedPack);
         
         // ✅ Mode contrôlé : ouvrir IntentPanel pour plusieurs assets
-        if (finalPack.assets.length > 1) {
+        if (enrichedPack.assets.length > 1) {
           setShowIntentPanel(true);
         }
       }
