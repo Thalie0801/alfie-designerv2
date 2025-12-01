@@ -2500,7 +2500,7 @@ export type Database = {
       asset_engine: "nano" | "sora" | "veo3"
       brand_plan: "starter" | "pro" | "studio"
       plan_type: "starter" | "pro" | "studio"
-      video_engine: "sora" | "seededance" | "kling"
+      video_engine: "sora" | "seededance" | "kling" | "replicate" | "veo_3_1"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2632,7 +2632,7 @@ export const Constants = {
       asset_engine: ["nano", "sora", "veo3"],
       brand_plan: ["starter", "pro", "studio"],
       plan_type: ["starter", "pro", "studio"],
-      video_engine: ["sora", "seededance", "kling"],
+      video_engine: ["sora", "seededance", "kling", "replicate", "veo_3_1"],
     },
   },
 } as const
