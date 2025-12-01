@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { WOOF_COSTS } from "../_shared/woofsCosts.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { getAccessToken } from "../_shared/vertexAuth.ts";
 const REPLICATE_API = "https://api.replicate.com/v1/predictions";
 // ✅ Image-to-video optimisé : Stable Video Diffusion
 const DEFAULT_REPLICATE_MODEL = "stability-ai/stable-video-diffusion:3f0457e4619daac51203dedb472816fd4af51f3149fa7a9e0b5ffcf1b8172438";
@@ -181,6 +182,11 @@ const resolveProvider = (raw?: string): ProviderResolution => {
     return { display: "animate", api: "animate" };
   }
 
+  // ✅ VEO 3 FAST pour vidéos premium
+  if (normalized === "veo3" || normalized === "veo_3_1" || normalized === "veo") {
+    return { display: "veo3", api: "veo3" };
+  }
+
   return { display: normalized, api: normalized };
 };
 
@@ -282,7 +288,7 @@ Deno.serve(async (req) => {
 
     // Vérifier et consommer les Woofs pour les nouvelles générations (pas pour les status checks)
     if (!isStatusCheck && brandId) {
-      const isPremium = providerEngine === "sora" || provider === "veo" || provider === "premium";
+      const isPremium = providerEngine === "sora" || provider === "veo" || provider === "veo3" || provider === "premium";
       const woofsCost = isPremium ? WOOF_COSTS.video_premium : WOOF_COSTS.video_basic;
       
       console.log(`[generate-video] Checking ${woofsCost} Woofs for ${isPremium ? 'premium' : 'basic'} video (brand ${brandId})`);
@@ -656,6 +662,195 @@ Deno.serve(async (req) => {
           providerInternal: providerApi,
           modelVersion: REPLICATE_MODEL_VERSION,
           outputUrl: outputUrl
+        }
+      });
+    }
+
+    // ✅ VEO 3 FAST premium video generation
+    if (providerApi === "veo3") {
+      const projectId = Deno.env.get("VERTEX_PROJECT_ID");
+      const location = Deno.env.get("VERTEX_LOCATION") || "europe-west9";
+      const serviceAccountJson = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
+
+      if (!projectId || !serviceAccountJson) {
+        return jsonResponse({ 
+          error: "Vertex AI VEO 3 not configured. Missing VERTEX_PROJECT_ID or GOOGLE_SERVICE_ACCOUNT_JSON." 
+        }, { status: 500 });
+      }
+
+      console.log("[generate-video] 🎬 Using VEO 3 FAST for premium video");
+
+      // 1. Générer access token via Service Account
+      const accessToken = await getAccessToken(serviceAccountJson);
+
+      // 2. Configuration VEO 3
+      const VEO3_MODEL = "veo-3.0-fast-generate-001";
+      const veo3AspectRatio = aspectRatio === "4:5" ? "9:16" : aspectRatio; // VEO supporte 9:16 ou 16:9
+      const durationSeconds = 8; // 4, 6, ou 8 secondes
+      
+      // 3. Appeler VEO 3 API (long-running operation)
+      const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${VEO3_MODEL}:predictLongRunning`;
+
+      const veoPayload = {
+        instances: [{ prompt }],
+        parameters: {
+          aspectRatio: veo3AspectRatio,
+          durationSeconds,
+          resolution: "1080P",
+          generateAudio: true,
+        }
+      };
+
+      console.log("[generate-video] VEO 3 payload:", JSON.stringify(veoPayload, null, 2));
+
+      const veoResponse = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(veoPayload)
+      });
+
+      if (!veoResponse.ok) {
+        const errorText = await veoResponse.text();
+        console.error("[generate-video] VEO 3 error:", errorText);
+        return jsonResponse({ 
+          error: `VEO 3 API error: ${veoResponse.status}`,
+          details: errorText 
+        }, { status: 500 });
+      }
+
+      const operation = await veoResponse.json();
+      const operationName = operation.name;
+      
+      if (!operationName) {
+        return jsonResponse({ 
+          error: "No operation name returned from VEO 3" 
+        }, { status: 500 });
+      }
+
+      console.log(`[generate-video] VEO 3 operation started: ${operationName}`);
+
+      // 4. Polling de l'opération (VEO 3 FAST est rapide: 30-60 secondes)
+      const maxWaitMs = 300_000; // 5 minutes max
+      const pollIntervalMs = 10000; // Vérifier toutes les 10 secondes
+      const startTime = Date.now();
+      
+      let result: any = null;
+      let isDone = false;
+
+      while (!isDone && (Date.now() - startTime) < maxWaitMs) {
+        await new Promise(r => setTimeout(r, pollIntervalMs));
+        
+        const statusResp = await fetch(
+          `https://${location}-aiplatform.googleapis.com/v1/${operationName}`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+
+        if (!statusResp.ok) {
+          console.warn(`[generate-video] VEO 3 poll failed: ${statusResp.status}`);
+          continue;
+        }
+
+        result = await statusResp.json();
+        isDone = result.done === true;
+
+        console.log(`[generate-video] VEO 3 poll: done=${isDone}, elapsed=${Math.round((Date.now() - startTime) / 1000)}s`);
+        
+        if (isDone) break;
+      }
+
+      // Timeout si toujours en processing
+      if (!isDone) {
+        console.warn(`[generate-video] VEO 3 timeout after ${maxWaitMs / 1000}s`);
+        return jsonResponse({
+          error: "VEO 3 generation timeout. Please try again.",
+          operationName
+        }, { status: 504 });
+      }
+
+      // 5. Extraire l'URL vidéo
+      const videoUri = result?.response?.generatedSamples?.[0]?.video?.uri;
+      
+      if (!videoUri || typeof videoUri !== "string") {
+        console.error(`[generate-video] No valid VEO 3 video URI:`, result);
+        return jsonResponse({
+          error: "No video URI in VEO 3 response",
+          response: result?.response
+        }, { status: 500 });
+      }
+
+      console.log(`[generate-video] ✅ VEO 3 video ready: ${videoUri}`);
+
+      // 6. Save to media_generations for library
+      const authHeader = req.headers.get("Authorization")?.replace("Bearer ", "").trim();
+      if (authHeader && operationName) {
+        try {
+          if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+            const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+            const { data: { user } } = await supabase.auth.getUser(authHeader);
+            
+            if (user) {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('active_brand_id')
+                .eq('id', user.id)
+                .maybeSingle();
+
+              const brandId = profile?.active_brand_id;
+              if (!brandId) {
+                console.warn('[generate-video] No active brand for user', user.id);
+              }
+              
+              await supabase
+                .from('media_generations')
+                .insert({
+                  user_id: user.id,
+                  brand_id: brandId!,
+                  type: 'video',
+                  engine: 'veo3',
+                  status: 'completed',
+                  prompt: prompt.substring(0, 500),
+                  output_url: videoUri,
+                  thumbnail_url: videoUri,
+                  job_id: operationName,
+                  metadata: {
+                    provider: 'veo3',
+                    tier: 'premium',
+                    source: 'text',
+                    aspectRatio: veo3AspectRatio,
+                    duration: durationSeconds,
+                    resolution: '1080P',
+                    generatedAt: new Date().toISOString(),
+                    operationName
+                  }
+                });
+              console.log(`[generate-video] ✅ VEO 3 video entry created for operation ${operationName}`);
+            }
+          }
+        } catch (insertError) {
+          console.error('[generate-video] Failed to create media_generations entry:', insertError);
+        }
+      }
+
+      return jsonResponse({
+        id: operationName,
+        provider: providerDisplay,
+        providerInternal: providerApi,
+        providerEngine: "veo3",
+        jobId: operationName,
+        status: "succeeded",
+        output: videoUri,
+        videoUrl: videoUri,
+        url: videoUri,
+        metadata: {
+          provider: "veo3",
+          tier: "premium",
+          aspectRatio: veo3AspectRatio,
+          duration: durationSeconds,
+          resolution: "1080P",
+          outputUrl: videoUri
         }
       });
     }

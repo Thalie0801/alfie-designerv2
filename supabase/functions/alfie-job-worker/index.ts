@@ -880,38 +880,37 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
 
   // ✅ Support VEO 3.1 pour vidéos premium
   if (engine === "veo_3_1") {
-    console.log("[processGenerateVideo] Using VEO 3.1 engine for premium video");
+    console.log("[processGenerateVideo] Using VEO 3 FAST engine for premium video");
     
     // ✅ Utiliser buildFinalPrompt pour préserver le thème
     const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : null;
     const videoPrompt = buildFinalPrompt(payload, useBrandKit, brandMini);
 
-    // Appeler Vertex AI VEO 3.1
+    // ✅ Appeler generate-video avec provider "veo3"
     const veoResult = await callFn<any>("generate-video", {
       prompt: videoPrompt,
-      aspectRatio: aspectRatio || "4:5",
+      aspectRatio: aspectRatio || "9:16",
       duration: durationSec,
-      engine: "veo_3_1",
+      provider: "veo3", // ✅ Explicite: VEO 3 FAST
       userId,
       brandId,
       orderId,
     });
 
-    const videoUrl = veoResult?.video_url || veoResult?.url;
-    if (!videoUrl) throw new Error("VEO 3.1 failed to generate video");
+    const videoUrl = veoResult?.videoUrl || veoResult?.output || veoResult?.url;
+    if (!videoUrl) throw new Error("VEO 3 FAST failed to generate video");
 
-    console.log("[processGenerateVideo] ✅ VEO 3.1 video created:", videoUrl);
+    console.log("[processGenerateVideo] ✅ VEO 3 FAST video created:", videoUrl);
 
-    // Générer thumbnail pour VEO 3.1 (extraire une frame ou utiliser placeholder)
-    const thumbnailUrl = veoResult?.thumbnail_url || 
-      `https://res.cloudinary.com/${cloudName}/video/upload/so_0,w_400,h_400,c_fill,f_jpg/${veoResult?.public_id || 'video_placeholder'}.jpg`;
+    // Thumbnail = video URL (VEO 3 génère des vidéos avec couverture)
+    const thumbnailUrl = veoResult?.thumbnail_url || videoUrl;
 
     // Sauvegarder
     const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
       user_id: userId,
       brand_id: brandId,
       type: "video",
-      engine: "veo_3_1",
+      engine: "veo3",
       status: "completed",
       output_url: videoUrl,
       thumbnail_url: thumbnailUrl,
@@ -919,13 +918,15 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
         prompt: videoPrompt,
         aspectRatio,
         duration: durationSec,
-        generator: "veo_3_1",
+        generator: "veo_3_fast",
+        tier: "premium",
+        resolution: "1080P",
         orderId,
       },
     });
     if (mediaErr) throw new Error(mediaErr.message);
 
-    console.log("[processGenerateVideo] ✅ VEO 3.1 video saved to media_generations");
+    console.log("[processGenerateVideo] ✅ VEO 3 FAST video saved to media_generations");
     return { videoUrl };
   }
 
