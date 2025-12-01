@@ -822,74 +822,10 @@ ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
       const imageUrl = extractImageUrl(imagePayload) ?? extractImageUrl(imageResult);
       if (!imageUrl) throw new Error("No image URL returned");
 
-      console.log("[processRenderImages] engine returned imageUrl", imageUrl);
-      console.log("[processRenderImages] engine responded", {
-        imageUrl,
-        orderId,
-        brandId: img.brandId ?? payload.brandId,
-      });
-
-      // 2) upload cloudinary from URL
-      console.log("[processRenderImages] ⬆️  Uploading to Cloudinary from:", imageUrl.substring(0, 100));
+      console.log("[processRenderImages] ✅ Image génération complete:", imageUrl);
       
-      const cloud = await uploadFromUrlToCloudinary(imageUrl, {
-        folder: `alfie/${img.brandId ?? payload.brandId}/orders/${orderId}`,
-        publicId: `image_${results.length + 1}`,
-        tags: [
-          "ai-generated",
-          "alfie",
-          `brand:${img.brandId ?? payload.brandId}`,
-          `order:${orderId}`,
-          `type:${assetType}`,
-          `ratio:${aspectRatio}`,
-        ],
-        context: {
-          order_id: String(orderId),
-          order_item_id: String(payload.orderItemId ?? ""),
-          brand_id: String(img.brandId ?? payload.brandId ?? ""),
-          aspect_ratio: aspectRatio,
-          type: assetType,
-        },
-      });
-      
-      console.log("[processRenderImages] ✅ Uploaded to Cloudinary:", { publicId: cloud.publicId, url: cloud.secureUrl });
-      
-      // ✅ NOUVEAU : Vérification HEAD que le fichier existe
-      const verifyResponse = await fetch(cloud.secureUrl, { method: 'HEAD' });
-      if (!verifyResponse.ok) {
-        console.error('[processRenderImages] ⚠️  Cloudinary verification failed:', {
-          status: verifyResponse.status,
-          url: cloud.secureUrl,
-        });
-        throw new Error(`Cloudinary upload verification failed: ${verifyResponse.status}`);
-      }
-      
-      console.log("[processRenderImages] ✅ File verified on Cloudinary");
-
-      // 3) persist media_generations (best-effort)
-      await supabaseAdmin.from("media_generations").insert({
-        user_id: userId,
-        brand_id: img.brandId ?? null,
-        type: "image",
-        status: "completed",
-        output_url: cloud.secureUrl,
-        thumbnail_url: cloud.secureUrl,
-        prompt: img.prompt,
-        metadata: {
-          orderId,
-          orderItemId: payload.orderItemId ?? null,
-          aspectRatio,
-          resolution: img.resolution,
-          source: "worker",
-          cloudinary_public_id: cloud.publicId,
-          width: cloud.width,
-          height: cloud.height,
-          ratio: aspectRatio,
-          kind: resolvedKind ?? "image",
-          slide_index: slideIndex,
-          brief: briefText,
-        },
-      });
+      // ✅ alfie-generate-ai-image a DÉJÀ uploadé sur Cloudinary et inséré dans media_generations
+      // On ne fait PLUS de double insertion ici
 
       // 4) idempotent library_assets
       const { data: existing } = await supabaseAdmin
