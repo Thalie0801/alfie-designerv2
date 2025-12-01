@@ -162,7 +162,7 @@ export function CreateHeader({ onClearChat }: CreateHeaderProps) {
                         <div className="text-xs text-slate-500 space-y-1">
                           <p>💡 Coûts en Woofs :</p>
                           <p>• Image = 1 Woof · Slide carrousel = 1 Woof</p>
-                          <p>• Vidéo standard = 6 Woofs · Vidéo premium = 25 Woofs</p>
+                          <p>• Vidéo standard (4s) = 10 Woofs · Vidéo premium (8s) = 50 Woofs</p>
                         </div>
                       </div>
                     </div>
