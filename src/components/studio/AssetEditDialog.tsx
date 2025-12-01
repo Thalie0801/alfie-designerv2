@@ -84,12 +84,13 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                   newKind === "video_basic" ? "video_basic" :
                   "video_premium";
                 
+                const defaultDuration = newKind === "video_basic" ? 4 : newKind === "video_premium" ? 8 : undefined;
                 setFormData({ 
                   ...formData, 
                   kind: newKind,
                   woofCostType: newWoofCostType,
                   count: newKind === "carousel" ? (formData.count || 5) : 1,
-                  durationSeconds: newKind.includes("video") ? (formData.durationSeconds || 10) : undefined
+                  durationSeconds: newKind.includes("video") ? (formData.durationSeconds || defaultDuration) : undefined
                 });
               }}
             >
@@ -221,10 +222,10 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
               <Input
                 id="duration"
                 type="number"
-                min={5}
+                min={4}
                 max={60}
-                value={formData.durationSeconds || 10}
-                onChange={(e) => setFormData({ ...formData, durationSeconds: parseInt(e.target.value) || 10 })}
+                value={formData.durationSeconds || (formData.kind === "video_basic" ? 4 : 8)}
+                onChange={(e) => setFormData({ ...formData, durationSeconds: parseInt(e.target.value) || (formData.kind === "video_basic" ? 4 : 8) })}
               />
             </div>
           )}
