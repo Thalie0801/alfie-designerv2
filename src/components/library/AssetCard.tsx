@@ -172,15 +172,15 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
                   <AlertCircle className="h-12 w-12 text-muted-foreground mb-2" />
                   <p className="text-xs text-muted-foreground">Image non disponible</p>
                 </div>
-              ) : (
-                <img
-                  src={normalizeImageUrl(asset.thumbnail_url) || normalizeImageUrl(asset.output_url)}
-                  alt="Animation Ken Burns"
-                  className="w-full h-full object-cover animate-ken-burns"
-                  onError={handleImageError}
-                  loading="lazy"
-                />
-              )}
+            ) : (
+              <img
+                src={getKenBurnsImageUrl()}
+                alt="Animation Ken Burns"
+                className="w-full h-full object-cover animate-ken-burns"
+                onError={handleImageError}
+                loading="lazy"
+              />
+            )}
               <Badge className="absolute bottom-2 right-2 bg-purple-600 text-white text-xs">
                 Animation CSS
               </Badge>
