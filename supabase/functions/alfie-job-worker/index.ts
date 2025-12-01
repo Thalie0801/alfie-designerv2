@@ -825,70 +825,9 @@ ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
       console.log("[processRenderImages] ✅ Image génération complete:", imageUrl);
       
       // ✅ alfie-generate-ai-image a DÉJÀ uploadé sur Cloudinary et inséré dans media_generations
-      // On ne fait PLUS de double insertion ici
-
-      // 4) idempotent library_assets
-      const { data: existing } = await supabaseAdmin
-        .from("library_assets")
-        .select("id")
-        .eq("order_id", orderId)
-        .eq("cloudinary_public_id", cloud.publicId)
-        .maybeSingle();
-
-      if (!existing) {
-        console.log("💾 inserting library_asset", {
-          userId,
-          orderId,
-          publicId: cloud.publicId,
-        });
-        const { data: assetRows, error: libErr } = await supabaseAdmin
-          .from("library_assets")
-          .insert({
-            user_id: userId,
-            brand_id: img.brandId ?? payload.brandId ?? null,
-            order_id: orderId,
-            order_item_id: payload.orderItemId ?? null,
-            type: assetType as any,
-            cloudinary_url: cloud.secureUrl,
-            cloudinary_public_id: cloud.publicId,
-            carousel_id: carousel_id || null, // Lier au carrousel si applicable
-            slide_index: resolvedKind === "carousel" ? slideIndex : null,
-            format: aspectRatio, // ✅ Store correct aspect ratio format
-            tags: ["ai-generated", "alfie", `order:${orderId}`],
-            text_json: payload.generatedTexts?.slides?.[slideIndex!] || payload.generatedTexts?.text || null, // Sauvegarder les textes générés
-            metadata: {
-              orderId,
-              orderItemId: payload.orderItemId ?? null,
-              aspectRatio,
-              resolution: img.resolution,
-              source: "alfie-job-worker",
-              cloudinary_public_id: cloud.publicId,
-              width: cloud.width,
-              height: cloud.height,
-              ratio: aspectRatio,
-              brief: briefText,
-              kind: resolvedKind ?? "image",
-              slide_index: slideIndex,
-            },
-          })
-          .select("id")
-          .single();
-        if (libErr) {
-          console.error("❌ library_asset insert failed", libErr);
-          throw new Error(`Failed to save to library: ${libErr.message}`);
-        }
-        console.log("[processRenderImages] Completed job", {
-          jobId,
-          assetId: assetRows?.id,
-          cloudinaryPublicId: cloud.publicId,
-          orderId,
-        });
-      } else {
-        console.log("ℹ️ library_asset already exists", existing.id);
-      }
-
-      console.log(`[job-worker] uploaded image to Cloudinary publicId=${cloud.publicId}`);
-      results.push({ url: cloud.secureUrl, aspectRatio, resolution: img.resolution, slideIndex });
+      // library_assets est legacy, media_generations est la source unique de vérité
+      
+      results.push({ url: imageUrl, aspectRatio, resolution: img.resolution, slideIndex });
     } catch (e) {
       console.error("❌ image_failed", e);
       if (isHttp429(e)) {
