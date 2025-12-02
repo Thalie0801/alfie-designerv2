@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.admin-process-affiliate-payout]
 verify_jwt = true
+
+[functions.alfie-vision]
+verify_jwt = true
