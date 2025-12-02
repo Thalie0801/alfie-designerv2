@@ -194,7 +194,6 @@ SEULS CES MESSAGES DÉCLENCHENT LA GÉNÉRATION :
    - prompt: description visuelle détaillée de l'image
    
 4. Pour les VIDÉOS :
-   - kind: "video_basic" (vidéo standard 4s, 6 Woofs)
    - kind: "video_premium" (vidéo premium 8s, 25 Woofs)
    - count: 1
    - prompt: scénario du mouvement et du message
@@ -368,15 +367,11 @@ Le secteur d'activité est fourni pour contexte minimal, mais reste neutre dans 
     enrichedPrompt += `\n\nCOUTS PAR TYPE DE VISUEL :`;
     enrichedPrompt += `\n- Image : 1 Woof`;
     enrichedPrompt += `\n- Carrousel : 1 Woof par slide (ex: 5 slides = 5 Woofs)`;
-    enrichedPrompt += `\n- Video standard (IA generative Replicate) : 10 Woofs`;
-    enrichedPrompt += `\n- Video premium (IA Vertex AI Veo 3.1, qualite cinema) : 50 Woofs`;
+    enrichedPrompt += `\n- Video premium (IA Vertex AI Veo 3.1, qualite cinema) : 25 Woofs`;
     enrichedPrompt += `\n\nRECOMMANDATIONS BUDGET-INTELLIGENTES :`;
-    enrichedPrompt += `\n- Budget < 10 Woofs : Mise en avant images (1 Woof) et carrousels.`;
-    enrichedPrompt += `\n- Budget 10-49 Woofs : Tu peux proposer carrousels (5-7 slides) + video standard si justifie.`;
-    enrichedPrompt += `\n- Budget >= 50 Woofs : Tous les formats possibles, y compris video premium Veo 3.1.`;
-    enrichedPrompt += `\n\nEXPLIQUE LES DIFFERENCES quand tu proposes des options :`;
-    enrichedPrompt += `\n- "Video standard" = IA generative complete Replicate (10 Woofs) - creation video a partir de zero`;
-    enrichedPrompt += `\n- "Video premium" = qualite cinematique Veo 3.1 (50 Woofs) - top qualite pour campagnes premium`;
+    enrichedPrompt += `\n- Budget < 25 Woofs : Mise en avant images (1 Woof) et carrousels (1 Woof/slide).`;
+    enrichedPrompt += `\n- Budget >= 25 Woofs : Tu peux proposer vidéo premium IA Veo 3.1 (25 Woofs) pour campagnes impactantes.`;
+    enrichedPrompt += `\n\nIMPORTANT : La vidéo premium Veo 3.1 (25 Woofs) offre une qualité cinématique professionnelle - à utiliser pour maximiser l'impact.`;
   }
 
   // Ajouter le brief au contexte si fourni
