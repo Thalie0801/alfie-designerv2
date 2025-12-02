@@ -37,8 +37,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return profileData;
   };
 
-  const refreshProfile = async () => {
-    if (!session?.user) return;
+  const refreshProfile = async (sessionOverride?: Session | null) => {
+    // Utiliser la session passée en paramètre OU le state (fix race condition)
+    const targetSession = sessionOverride ?? session;
+    if (!targetSession?.user) {
+      console.debug('[Auth] refreshProfile: no session available');
+      return;
+    }
+
+    const userId = targetSession.user.id;
+    console.debug('[Auth] refreshProfile: starting for user', userId);
 
     // ============================================================================
     // ÉTAPE 1: Charger le profil d'abord (source de vérité DB) - NON BLOQUANT
@@ -46,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('id', userId)
       .single();
 
     if (profileError) {
@@ -75,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: rolesData } = await supabase
       .from('user_roles')
       .select('role')
-      .eq('user_id', session.user.id);
+      .eq('user_id', userId);
 
     if (rolesData) {
       setRoles(rolesData.map(r => r.role));
@@ -119,10 +127,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
-        // Defer profile fetch with setTimeout
+        // Defer profile fetch with setTimeout - PASSER currentSession directement
         if (currentSession?.user) {
           setTimeout(() => {
-            refreshProfile();
+            refreshProfile(currentSession);
           }, 0);
         } else {
           setProfile(null);
@@ -141,7 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         if (currentSession?.user) {
           setTimeout(() => {
-            refreshProfile().then(() => setLoading(false));
+            refreshProfile(currentSession).then(() => setLoading(false));
           }, 0);
         } else {
           setLoading(false);
@@ -247,9 +255,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     });
 
-    if (!error && data.user) {
-      // Force profile refresh after signup
-      await refreshProfile();
+    if (!error && data.user && data.session) {
+      // Force profile refresh after signup - passer la session directement
+      await refreshProfile(data.session);
     }
 
     return { error };
