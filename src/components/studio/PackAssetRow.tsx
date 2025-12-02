@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { PackAsset } from "@/types/alfiePack";
 import { WOOF_COSTS } from "@/config/woofs";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,6 +46,11 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
   const [uploading, setUploading] = useState(false);
   const [referenceImage, setReferenceImage] = useState(asset.referenceImageUrl || "");
   const [showEditDialog, setShowEditDialog] = useState(false);
+
+  // Resynchroniser l'état local si le prop asset change
+  useEffect(() => {
+    setReferenceImage(asset.referenceImageUrl || "");
+  }, [asset.referenceImageUrl]);
 
   const woofCost = WOOF_COSTS[asset.woofCostType];
   const totalCost = asset.kind === "carousel" ? woofCost * asset.count : woofCost;
@@ -220,9 +225,13 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
           <div className="space-y-2 border-t pt-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium">Image source</p>
+                <p className="text-sm font-medium">
+                  Image source {asset.kind === "video_premium" && <span className="text-red-500">*</span>}
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  Alfie s'en sert comme inspiration visuelle pour la création.
+                  {asset.kind === "video_premium" 
+                    ? "L'image sera animée par l'IA. Obligatoire pour générer la vidéo."
+                    : "Alfie s'en sert comme inspiration visuelle pour la création."}
                 </p>
               </div>
             </div>
