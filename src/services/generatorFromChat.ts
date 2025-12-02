@@ -221,7 +221,7 @@ async function createAssetJob(
       campaign: packTitle, // Nom de la campagne pour organisation Cloudinary
       useBrandKit, // ✅ Contrôle si le Brand Kit doit être appliqué
       visualStyle: asset.visualStyle || 'photorealistic', // ✅ Style visuel
-      withAudio: asset.withAudio, // ✅ Audio pour vidéos
+      withAudio: false, // ✅ Toujours sans audio - sera ajouté via Canva plus tard
       engine: videoEngine, // ✅ AJOUT: engine pour vidéos
       durationSeconds: asset.durationSeconds || 5,
       aspectRatio: asset.ratio || "4:5",

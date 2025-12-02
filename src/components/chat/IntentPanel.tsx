@@ -4,7 +4,7 @@
  */
 
 import { useState, useRef } from 'react';
-import { Edit2, Trash2, ChevronDown, ChevronUp, Upload, Palette, Volume2, VolumeX } from 'lucide-react';
+import { Edit2, Trash2, ChevronDown, ChevronUp, Upload, Palette } from 'lucide-react';
 import type { UnifiedAlfieIntent, VisualStyle } from '@/lib/types/alfie';
 import { getWoofCost } from '@/types/alfiePack';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,7 @@ const VISUAL_STYLE_OPTIONS: { value: VisualStyle; label: string }[] = [
 
 interface IntentPanelProps {
   intents: UnifiedAlfieIntent[];
-  onConfirm: (selectedIds: string[], options: { useBrandKit: boolean; withAudio: boolean }) => Promise<void>;
+  onConfirm: (selectedIds: string[], options: { useBrandKit: boolean }) => Promise<void>;
   onEdit: (intent: UnifiedAlfieIntent) => void;
   onRemove: (intentId: string) => void;
   onClose: () => void;
@@ -50,7 +50,6 @@ export function IntentPanel({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [uploadingForId, setUploadingForId] = useState<string | null>(null);
   const [useBrandKit, setUseBrandKit] = useState(true);
-  const [withAudio, setWithAudio] = useState(true);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const toggleSelect = (id: string) => {
@@ -66,8 +65,6 @@ export function IntentPanel({
     .filter((i) => selectedIds.has(i.id))
     .reduce((sum, i) => sum + getWoofCost(i), 0);
 
-  const hasVideoIntents = intents.some(i => i.kind === 'video_premium');
-
   const handleConfirm = async () => {
     const selectedIntents = intents.filter(i => selectedIds.has(i.id));
     const videosWithoutImage = selectedIntents.filter(
@@ -79,7 +76,7 @@ export function IntentPanel({
       toast.warning(`📸 Recommandé : ajoute une image source pour de meilleurs résultats (${videosWithoutImage.map(v => v.title).join(', ')})`);
     }
     
-    await onConfirm(Array.from(selectedIds), { useBrandKit, withAudio });
+    await onConfirm(Array.from(selectedIds), { useBrandKit });
   };
 
   const handleImageUpload = async (intentId: string, file: File) => {
@@ -155,22 +152,6 @@ export function IntentPanel({
               Les visuels seront générés avec un style neutre et professionnel.
             </p>
           )}
-
-          {hasVideoIntents && (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {withAudio ? <Volume2 className="w-4 h-4 text-muted-foreground" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}
-                <Label htmlFor="withAudio" className="text-sm font-medium">
-                  Générer avec audio
-                </Label>
-              </div>
-              <Switch
-                id="withAudio"
-                checked={withAudio}
-                onCheckedChange={setWithAudio}
-              />
-            </div>
-          )}
         </div>
 
         {/* Liste des intents */}
@@ -220,11 +201,11 @@ export function IntentPanel({
                     </Select>
                   </div>
 
-                  {/* Video script - PROMINENT display */}
+                  {/* Video script - For reference (will be used with Canva later) */}
                   {isVideoIntent(intent.kind) && intent.generatedTexts?.video && (
                     <div className="mt-3 p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
                       <div className="font-medium text-sm mb-2 text-purple-700 dark:text-purple-300">
-                        🎬 Script vidéo
+                        🎬 Script vidéo <span className="font-normal text-xs">(pour montage Canva)</span>
                       </div>
                       {intent.generatedTexts.video.hook && (
                         <div className="text-sm mb-1">
@@ -244,6 +225,9 @@ export function IntentPanel({
                           <span className="text-foreground">{intent.generatedTexts.video.cta}</span>
                         </div>
                       )}
+                      <p className="text-xs text-muted-foreground mt-2 italic">
+                        💡 La vidéo sera générée sans texte ni audio. Ce script sera exporté séparément pour Canva.
+                      </p>
                     </div>
                   )}
 

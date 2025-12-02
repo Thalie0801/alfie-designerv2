@@ -933,9 +933,10 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
 
   const durationSec = duration || payload.durationSeconds || 5;
   const useBrandKit = resolveUseBrandKit(payload, jobMeta);
-  const withAudio = payload.withAudio !== false; // true par défaut
+  // ✅ Vidéos TOUJOURS sans audio (sera ajouté via Canva plus tard)
+  const withAudio = false;
   
-  // ✅ Extraire le script vidéo s'il existe
+  // ✅ Extraire le script vidéo s'il existe (pour stockage metadata uniquement)
   const videoScript = generatedTexts?.video || null;
   console.log("[processGenerateVideo] Engine:", engine, "| useBrandKit:", useBrandKit, "| withAudio:", withAudio, "| hasScript:", !!videoScript, "| hasImage:", !!referenceImageUrl);
 
@@ -943,28 +944,15 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
   if (engine === "veo_3_1") {
     console.log("[processGenerateVideo] Using VEO 3 FAST engine for premium video");
     
-    // ✅ Utiliser buildFinalPrompt pour préserver le thème
+    // ✅ Utiliser buildFinalPrompt pour préserver le thème (sans script dans le prompt - vidéo brute)
     const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : null;
-    let videoPrompt = buildFinalPrompt(payload, useBrandKit, brandMini);
-    
-    // ✅ Intégrer le script vidéo (hook, script, cta) dans le prompt pour VEO 3.1
-    if (videoScript) {
-      const scriptParts: string[] = [];
-      if (videoScript.hook) scriptParts.push(`HOOK: ${videoScript.hook}`);
-      if (videoScript.script) scriptParts.push(`SCRIPT: ${videoScript.script}`);
-      if (videoScript.cta) scriptParts.push(`CTA: ${videoScript.cta}`);
-      
-      if (scriptParts.length > 0) {
-        videoPrompt = `${scriptParts.join(". ")}. ${videoPrompt}`;
-        console.log("[processGenerateVideo] ✅ Video script integrated into prompt");
-      }
-    }
+    const videoPrompt = buildFinalPrompt(payload, useBrandKit, brandMini);
 
     // ✅ Appeler generate-video avec provider "veo3" et timeout 6 minutes
     const veoResult = await callFn<any>("generate-video", {
       prompt: videoPrompt,
       aspectRatio: aspectRatio || "9:16",
-      withAudio, // ✅ Propagation du paramètre audio
+      withAudio: false, // ✅ TOUJOURS sans audio
       duration: durationSec,
       provider: "veo3", // ✅ Explicite: VEO 3 FAST
       userId,
