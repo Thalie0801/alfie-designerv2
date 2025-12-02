@@ -113,11 +113,14 @@ export default function Billing() {
         body: { brand_id: profile.active_brand_id },
       });
 
-      if (!error && data?.ok) {
+      console.log("[Billing] get-quota response:", { data, error });
+
+      // get-quota retourne directement les champs (pas wrappés dans data.data)
+      if (!error && data) {
         setWoofsData({
-          used: safeWoofs(data.data.woofs_used),
-          quota: safeWoofs(data.data.woofs_quota),
-          remaining: safeWoofs(data.data.woofs_remaining),
+          used: safeWoofs(data.woofs_used),
+          quota: safeWoofs(data.woofs_quota),
+          remaining: safeWoofs(data.woofs_remaining),
         });
       }
     } catch (err) {
