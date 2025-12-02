@@ -32,39 +32,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const ensureActiveSubscription = async (currentUser: User | null) => {
-    if (!currentUser?.email) {
-      console.debug('[Auth] ensureActiveSubscription: no user email');
-      return false;
-    }
-
-    // Vérifier si l'utilisateur a un rôle VIP ou Admin via la DB
-    const { data: rolesData } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', currentUser.id);
-    
-    const userRoles = (rolesData || []).map(r => r.role);
-    const isVipOrAdmin = userRoles.includes('vip') || userRoles.includes('admin');
-
-    if (isVipOrAdmin) {
-      console.debug('[Auth] ensureActiveSubscription: user has VIP/Admin role from database', { roles: userRoles });
-      return true;
-    }
-
-    const hasSubscription = await hasActiveSubscriptionByEmail(currentUser.email, {
-      userId: currentUser.id,
-    });
-
-    if (!hasSubscription) {
-      console.debug('[Auth] ensureActiveSubscription: no active subscription for', currentUser.email);
-    } else {
-      console.debug('[Auth] ensureActiveSubscription: user has active subscription');
-    }
-
-    return hasSubscription;
-  };
-
   const ensureStudioPlanForTestAccount = async (profileData: any) => {
     // Removed hardcoded test account logic for security
     return profileData;
@@ -73,21 +40,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshProfile = async () => {
     if (!session?.user) return;
 
-    const allowed = await ensureActiveSubscription(session.user);
-    if (!allowed) {
-      console.debug('[Auth] refreshProfile: access not allowed, clearing profile');
-      // NE PAS déconnecter - laisser l'app gérer l'accès
-      setProfile(null);
-      setSubscription(null);
-      setRoles([]);
-      return;
-    }
-
-    const { data: profileData } = await supabase
+    // ============================================================================
+    // ÉTAPE 1: Charger le profil d'abord (source de vérité DB) - NON BLOQUANT
+    // ============================================================================
+    const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', session.user.id)
       .single();
+
+    if (profileError) {
+      console.warn('[Auth] refreshProfile: failed to load profile', profileError);
+    }
 
     if (profileData) {
       const ensuredProfile = await ensureStudioPlanForTestAccount(profileData);
@@ -98,17 +62,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const grantedByAdmin = ensuredProfile.granted_by_admin ?? false;
       document.cookie = `plan=${plan}; Max-Age=${60*60*12}; Path=/; SameSite=Lax`;
       document.cookie = `granted_by_admin=${grantedByAdmin}; Max-Age=${60*60*12}; Path=/; SameSite=Lax`;
-      console.debug('[Auth] refreshProfile: cookies set', { plan, grantedByAdmin });
+      console.debug('[Auth] refreshProfile: profile loaded', { 
+        plan, 
+        status: ensuredProfile.status,
+        grantedByAdmin 
+      });
     }
 
+    // ============================================================================
+    // ÉTAPE 2: Charger les rôles (en parallèle, non bloquant)
+    // ============================================================================
     const { data: rolesData } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', session.user.id);
 
-    if (rolesData) setRoles(rolesData.map(r => r.role));
+    if (rolesData) {
+      setRoles(rolesData.map(r => r.role));
+      console.debug('[Auth] refreshProfile: roles loaded', rolesData.map(r => r.role));
+    }
 
-    // Récupérer l'état d'abonnement via la fonction edge
+    // ============================================================================
+    // ÉTAPE 3: Vérifier subscription Stripe (complément, NON BLOQUANT)
+    // ============================================================================
     try {
       const { data, error } = await supabase.functions.invoke('check-subscription');
       if (!error && data) {
@@ -118,9 +94,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           current_period_end: data.current_period_end ?? null,
         } as any);
       } else {
+        // Ne PAS bloquer si check-subscription échoue - le profil DB suffit
+        console.debug('[Auth] refreshProfile: check-subscription returned no data, using profile as fallback');
         setSubscription(null);
       }
-    } catch {
+    } catch (err) {
+      // Ne PAS bloquer si check-subscription timeout - le profil DB suffit
+      console.debug('[Auth] refreshProfile: check-subscription failed, using profile as fallback', err);
       setSubscription(null);
     }
   };
