@@ -137,10 +137,18 @@ export default function ChatWidget() {
     );
   }
 
-  // Fonction pour détecter un message de confirmation
+  // Fonction pour détecter un message de confirmation (vs nouvelle demande de contenu)
   function isConfirmationMessage(raw: string): boolean {
     const text = raw.toLowerCase().trim();
-    return /^(ok|oui|c'est bon|on y va|lance|parfait|go|génère|crée|d'accord|da)/i.test(text);
+    
+    // Si le message contient une demande de contenu, ce n'est PAS une confirmation
+    const contentKeywords = /(vidéo|video|carrousel|carousel|image|visuel|slides?|reel|story|post|créer?|génère)/;
+    if (contentKeywords.test(text) && text.length > 15) {
+      return false; // Nouvelle demande, pas une simple confirmation
+    }
+    
+    // Confirmation simple : "ok", "oui", "lance", etc. (courts et sans demande de contenu)
+    return /^(ok|oui|c'est bon|on y va|lance|parfait|go|d'accord|da)[\s!.,]*$/i.test(text);
   }
 
   const assistantCard = (content: ReactNode, showPrefillButton: boolean = false) => (
