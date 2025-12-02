@@ -8,6 +8,16 @@ export type Platform = 'instagram' | 'linkedin' | 'tiktok' | 'youtube' | 'facebo
 export type Ratio = '1:1' | '4:5' | '9:16' | '16:9';
 export type Goal = 'education' | 'vente' | 'lead' | 'engagement' | 'notoriete';
 
+// Visual styles for image generation
+export type VisualStyle = 
+  | 'photorealistic' 
+  | 'cinematic_photorealistic'
+  | '3d_pixar_style'
+  | 'flat_illustration'
+  | 'minimalist_vector'
+  | 'digital_painting'
+  | 'comic_book';
+
 export interface GeneratedTexts {
   slides?: Array<{ title: string; subtitle?: string; bullets?: string[] }>;
   text?: { title: string; body: string; cta?: string };
@@ -30,6 +40,7 @@ export interface UnifiedAlfieIntent {
   generatedTexts?: GeneratedTexts;
   useBrandKit?: boolean;
   withAudio?: boolean; // vidéos uniquement - générer avec audio (défaut: true)
+  visualStyle?: VisualStyle; // Style visuel pour la génération d'images
   campaign?: string;
   copyBrief?: string; // Brief libre optionnel
 }

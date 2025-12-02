@@ -602,11 +602,14 @@ export default function ChatWidget() {
   }
 
   // Fonction pour confirmer génération depuis IntentPanel
-  async function handleConfirmGeneration(selectedIds: string[]) {
+  async function handleConfirmGeneration(selectedIds: string[], options?: { useBrandKit?: boolean; withAudio?: boolean }) {
     if (!pendingPack || !profile?.active_brand_id || !profile?.id) {
       toast.error("Données manquantes pour lancer la génération");
       return;
     }
+    
+    const useBrandKit = options?.useBrandKit ?? true;
+    const withAudio = options?.withAudio ?? true;
 
     const selectedAssets = pendingPack.assets.filter(a => selectedIds.includes(a.id));
 
@@ -667,12 +670,21 @@ export default function ChatWidget() {
       // ✅ ÉTAPE 3 : Envoyer le pack AVEC les textes générés
       const packWithTexts = { ...pendingPack, assets: assetsWithTexts };
       
+      // Mettre à jour les assets avec visualStyle et withAudio
+      const finalPack = {
+        ...packWithTexts,
+        assets: packWithTexts.assets.map(a => ({
+          ...a,
+          withAudio: a.kind === 'video_premium' ? withAudio : undefined,
+        }))
+      };
+      
       await sendPackToGenerator({
         brandId: profile.active_brand_id,
-        pack: packWithTexts,
+        pack: finalPack,
         userId: profile.id,
         selectedAssetIds: selectedIds,
-        useBrandKit: true,
+        useBrandKit,
       });
       
       toast.success(`${selectedIds.length} asset(s) en cours de génération !`);

@@ -4,17 +4,30 @@
  */
 
 import { useState, useRef } from 'react';
-import { Edit2, Trash2, ChevronDown, ChevronUp, Upload } from 'lucide-react';
-import type { UnifiedAlfieIntent } from '@/lib/types/alfie';
+import { Edit2, Trash2, ChevronDown, ChevronUp, Upload, Palette, Volume2, VolumeX } from 'lucide-react';
+import type { UnifiedAlfieIntent, VisualStyle } from '@/lib/types/alfie';
 import { getWoofCost } from '@/types/alfiePack';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+const VISUAL_STYLE_OPTIONS: { value: VisualStyle; label: string }[] = [
+  { value: "photorealistic", label: "📷 Photoréaliste" },
+  { value: "cinematic_photorealistic", label: "🎬 Cinématique" },
+  { value: "3d_pixar_style", label: "🎨 3D Pixar" },
+  { value: "flat_illustration", label: "✏️ Illustration flat" },
+  { value: "minimalist_vector", label: "⚪ Minimaliste" },
+  { value: "digital_painting", label: "🖌️ Peinture digitale" },
+  { value: "comic_book", label: "💥 Comic book" },
+];
+
 interface IntentPanelProps {
   intents: UnifiedAlfieIntent[];
-  onConfirm: (selectedIds: string[]) => Promise<void>;
+  onConfirm: (selectedIds: string[], options: { useBrandKit: boolean; withAudio: boolean }) => Promise<void>;
   onEdit: (intent: UnifiedAlfieIntent) => void;
   onRemove: (intentId: string) => void;
   onClose: () => void;
@@ -36,6 +49,8 @@ export function IntentPanel({
   );
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [uploadingForId, setUploadingForId] = useState<string | null>(null);
+  const [useBrandKit, setUseBrandKit] = useState(true);
+  const [withAudio, setWithAudio] = useState(true);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const toggleSelect = (id: string) => {
@@ -51,8 +66,9 @@ export function IntentPanel({
     .filter((i) => selectedIds.has(i.id))
     .reduce((sum, i) => sum + getWoofCost(i), 0);
 
+  const hasVideoIntents = intents.some(i => i.kind === 'video_premium');
+
   const handleConfirm = async () => {
-    // Vérifier que les vidéos ont une image
     const selectedIntents = intents.filter(i => selectedIds.has(i.id));
     const videosWithoutImage = selectedIntents.filter(
       i => i.kind === 'video_premium' && !i.referenceImageUrl
@@ -63,7 +79,7 @@ export function IntentPanel({
       return;
     }
     
-    await onConfirm(Array.from(selectedIds));
+    await onConfirm(Array.from(selectedIds), { useBrandKit, withAudio });
   };
 
   const handleImageUpload = async (intentId: string, file: File) => {
@@ -100,6 +116,12 @@ export function IntentPanel({
     }
   };
 
+  const handleStyleChange = (intentId: string, style: VisualStyle) => {
+    if (onUpdateIntent) {
+      onUpdateIntent(intentId, { visualStyle: style });
+    }
+  };
+
   const isVideoIntent = (kind: string) => kind === 'video_premium' || kind === 'video_basic';
 
   return (
@@ -111,6 +133,44 @@ export function IntentPanel({
           <p className="text-sm text-muted-foreground">
             {intents.length} asset(s) · {totalWoofs} Woofs au total
           </p>
+        </div>
+
+        {/* Global options */}
+        <div className="px-4 py-3 border-b bg-muted/30 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Palette className="w-4 h-4 text-muted-foreground" />
+              <Label htmlFor="useBrandKit" className="text-sm font-medium">
+                Utiliser le Brand Kit
+              </Label>
+            </div>
+            <Switch
+              id="useBrandKit"
+              checked={useBrandKit}
+              onCheckedChange={setUseBrandKit}
+            />
+          </div>
+          {!useBrandKit && (
+            <p className="text-xs text-muted-foreground pl-6">
+              Les visuels seront générés avec un style neutre et professionnel.
+            </p>
+          )}
+
+          {hasVideoIntents && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {withAudio ? <Volume2 className="w-4 h-4 text-muted-foreground" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}
+                <Label htmlFor="withAudio" className="text-sm font-medium">
+                  Générer avec audio
+                </Label>
+              </div>
+              <Switch
+                id="withAudio"
+                checked={withAudio}
+                onCheckedChange={setWithAudio}
+              />
+            </div>
+          )}
         </div>
 
         {/* Liste des intents */}
@@ -132,7 +192,7 @@ export function IntentPanel({
                   className="mt-1"
                 />
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="font-medium">{intent.title}</span>
                     <Badge variant="outline">{intent.kind}</Badge>
                     <Badge variant="secondary">{intent.platform}</Badge>
@@ -140,6 +200,52 @@ export function IntentPanel({
                   <p className="text-sm text-muted-foreground line-clamp-2">
                     {intent.prompt}
                   </p>
+
+                  {/* Style selector */}
+                  <div className="mt-2">
+                    <Select
+                      value={intent.visualStyle || "photorealistic"}
+                      onValueChange={(value) => handleStyleChange(intent.id, value as VisualStyle)}
+                    >
+                      <SelectTrigger className="h-8 text-xs w-48">
+                        <SelectValue placeholder="Style visuel" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {VISUAL_STYLE_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Video script - PROMINENT display */}
+                  {isVideoIntent(intent.kind) && intent.generatedTexts?.video && (
+                    <div className="mt-3 p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <div className="font-medium text-sm mb-2 text-purple-700 dark:text-purple-300">
+                        🎬 Script vidéo
+                      </div>
+                      {intent.generatedTexts.video.hook && (
+                        <div className="text-sm mb-1">
+                          <span className="font-medium text-purple-600 dark:text-purple-400">Hook:</span>{' '}
+                          <span className="text-foreground">{intent.generatedTexts.video.hook}</span>
+                        </div>
+                      )}
+                      {intent.generatedTexts.video.script && (
+                        <div className="text-sm mb-1">
+                          <span className="font-medium text-purple-600 dark:text-purple-400">Script:</span>{' '}
+                          <span className="text-foreground">{intent.generatedTexts.video.script}</span>
+                        </div>
+                      )}
+                      {intent.generatedTexts.video.cta && (
+                        <div className="text-sm">
+                          <span className="font-medium text-purple-600 dark:text-purple-400">CTA:</span>{' '}
+                          <span className="text-foreground">{intent.generatedTexts.video.cta}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Upload image pour vidéos */}
                   {isVideoIntent(intent.kind) && (
@@ -189,7 +295,8 @@ export function IntentPanel({
                     </div>
                   )}
 
-                  {expanded.has(intent.id) && intent.generatedTexts && (
+                  {/* Expanded details for non-video */}
+                  {expanded.has(intent.id) && intent.generatedTexts && !isVideoIntent(intent.kind) && (
                     <div className="mt-2 p-2 bg-muted/50 rounded text-xs space-y-2">
                       {intent.generatedTexts.text && (
                         <div>
@@ -204,21 +311,6 @@ export function IntentPanel({
                           ))}
                         </div>
                       )}
-                      {/* Afficher le script vidéo */}
-                      {intent.generatedTexts.video && (
-                        <div className="border-t pt-2 mt-2">
-                          <strong>🎬 Script vidéo :</strong>
-                          {intent.generatedTexts.video.hook && (
-                            <p><span className="text-muted-foreground">Hook:</span> {intent.generatedTexts.video.hook}</p>
-                          )}
-                          {intent.generatedTexts.video.script && (
-                            <p><span className="text-muted-foreground">Script:</span> {intent.generatedTexts.video.script}</p>
-                          )}
-                          {intent.generatedTexts.video.cta && (
-                            <p><span className="text-muted-foreground">CTA:</span> {intent.generatedTexts.video.cta}</p>
-                          )}
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -231,17 +323,19 @@ export function IntentPanel({
                     <button onClick={() => onRemove(intent.id)} className="p-1 hover:bg-muted rounded">
                       <Trash2 className="w-4 h-4" />
                     </button>
-                    <button
-                      onClick={() => setExpanded((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(intent.id)) next.delete(intent.id);
-                        else next.add(intent.id);
-                        return next;
-                      })}
-                      className="p-1 hover:bg-muted rounded"
-                    >
-                      {expanded.has(intent.id) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </button>
+                    {!isVideoIntent(intent.kind) && intent.generatedTexts && (
+                      <button
+                        onClick={() => setExpanded((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(intent.id)) next.delete(intent.id);
+                          else next.add(intent.id);
+                          return next;
+                        })}
+                        className="p-1 hover:bg-muted rounded"
+                      >
+                        {expanded.has(intent.id) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

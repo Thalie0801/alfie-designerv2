@@ -220,6 +220,8 @@ async function createAssetJob(
       generatedTexts: asset.generatedTexts, // ✅ CRITIQUE : Textes générés (slides pour carrousels, textes pour images)
       campaign: packTitle, // Nom de la campagne pour organisation Cloudinary
       useBrandKit, // ✅ Contrôle si le Brand Kit doit être appliqué
+      visualStyle: asset.visualStyle || 'photorealistic', // ✅ Style visuel
+      withAudio: asset.withAudio, // ✅ Audio pour vidéos
       engine: videoEngine, // ✅ AJOUT: engine pour vidéos
       durationSeconds: asset.durationSeconds || 5,
       aspectRatio: asset.ratio || "4:5",

@@ -169,6 +169,22 @@ function deepGet(obj: any, key: string): any {
 }
 
 /**
+ * Map visualStyle to prompt prefix
+ */
+function getStylePromptPrefix(visualStyle?: string): string {
+  const styles: Record<string, string> = {
+    'photorealistic': 'Photorealistic, ultra realistic, professional photography style',
+    'cinematic_photorealistic': 'Cinematic photorealistic, movie still, dramatic lighting, film grain',
+    '3d_pixar_style': '3D Pixar-inspired render, adorable cartoon style, soft lighting, clean shadows',
+    'flat_illustration': 'Flat illustration style, vector-like, minimalist, clean lines, modern',
+    'minimalist_vector': 'Minimalist vector design, simple shapes, clean, modern, professional',
+    'digital_painting': 'Digital painting, artistic, painterly brush strokes, vibrant colors',
+    'comic_book': 'Comic book style, bold outlines, pop art colors, dynamic composition',
+  };
+  return styles[visualStyle || 'photorealistic'] || styles['photorealistic'];
+}
+
+/**
  * Convertit un code hex en description de couleur lisible
  * Évite d'afficher des codes comme "#FF6B6B" sur les images
  */
@@ -239,12 +255,19 @@ function buildContentPrompt(payload: any): string {
 }
 
 /**
- * Construit le suffixe de STYLE selon useBrandKit
+ * Construit le suffixe de STYLE selon useBrandKit et visualStyle
  * Le style est AJOUTÉ au contenu, jamais substitué
  */
-function buildStyleSuffix(useBrandKit: boolean, brand?: { niche?: string; palette?: string[]; voice?: string }): string {
+function buildStyleSuffix(
+  useBrandKit: boolean, 
+  brand?: { niche?: string; palette?: string[]; voice?: string; name?: string },
+  visualStyle?: string
+): string {
+  // Get style prefix based on visualStyle
+  const stylePrefix = getStylePromptPrefix(visualStyle);
+  
   if (useBrandKit && brand) {
-    const parts = [];
+    const parts = [stylePrefix];
     if (brand.niche) parts.push(`Industry: ${brand.niche}`);
     if (brand.palette?.length) {
       // ✅ Convertir hex en descriptions de couleurs
@@ -252,20 +275,18 @@ function buildStyleSuffix(useBrandKit: boolean, brand?: { niche?: string; palett
       parts.push(`Color palette with ${colorNames.join(", ")}`);
     }
     if (brand.voice) parts.push(`Tone: ${brand.voice}`);
-    return parts.length > 0 
-      ? parts.join(". ") + ". High quality, professional."
-      : "Branded style. High quality, professional.";
+    return parts.join(". ") + ". High quality, professional.";
   }
   
-  return "Professional, modern, clean design with neutral color palette. High quality.";
+  return `${stylePrefix}. Professional, modern, clean design with neutral color palette. High quality.`;
 }
 
 /**
  * Combine contenu utilisateur + style pour le prompt final
  */
-function buildFinalPrompt(payload: any, useBrandKit: boolean, brand?: any): string {
+function buildFinalPrompt(payload: any, useBrandKit: boolean, brand?: any, visualStyle?: string): string {
   const content = buildContentPrompt(payload);
-  const style = buildStyleSuffix(useBrandKit, brand);
+  const style = buildStyleSuffix(useBrandKit, brand, visualStyle);
   return `${content}. ${style}`;
 }
 
@@ -748,9 +769,10 @@ async function processRenderImages(
     const ratioToUse = ratioFromPayload || "4:5";
     const { w, h } = AR_MAP[ratioToUse] || AR_MAP["4:5"];
     
-    // ✅ Utiliser buildFinalPrompt pour préserver le thème
+    // ✅ Utiliser buildFinalPrompt avec visualStyle pour préserver le thème
     const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : undefined;
-    const basePrompt = buildFinalPrompt(payload, useBrandKit, brandMini);
+    const visualStyle = payload.visualStyle || "photorealistic";
+    const basePrompt = buildFinalPrompt(payload, useBrandKit, brandMini, visualStyle);
 
     imagesToRender = Array.from({ length: imagesCount }).map((_, index) => ({
       prompt: `${basePrompt}. ${resolvedKind === "carousel" ? `Carousel slide ${index + 1}.` : ""} Format ${ratioToUse}.`,
@@ -769,6 +791,9 @@ async function processRenderImages(
       .eq("id", brandIdLocal)
       .single();
 
+    const visualStyle = payload.visualStyle || "photorealistic";
+    const stylePrefix = getStylePromptPrefix(visualStyle);
+
     imagesToRender = (briefs || [payload.brief]).map((brief: any, i: number) => {
       const aspectRatio = (brief?.format?.split(" ")?.[0] as string) || "1:1";
       const { w, h } = AR_MAP[aspectRatio] || AR_MAP["1:1"];
@@ -777,8 +802,8 @@ async function processRenderImages(
       const userContent = brief?.content || brief?.topic || payload.prompt || "Marketing visual";
       
       const prompt = useBrandKit && brand
-        ? `${userContent}. Style: ${brief?.style || "realistic"}. Context: ${brief?.objective || "social media"}. Brand: ${brand?.niche || ""}, tone: ${brand?.voice || "professional"}. Colors: ${brand?.palette?.slice(0, 3).join(", ") || "modern"}.`
-        : `${userContent}. Style: ${brief?.style || "realistic"}. Context: ${brief?.objective || "social media"}. Professional, modern design with neutral colors.`;
+        ? `${stylePrefix}. ${userContent}. Context: ${brief?.objective || "social media"}. Brand: ${brand?.niche || ""}, tone: ${brand?.voice || "professional"}.`
+        : `${stylePrefix}. ${userContent}. Context: ${brief?.objective || "social media"}. Professional, modern design.`;
 
       return {
         prompt,
