@@ -1,5 +1,8 @@
 project_id = "gbuvtzqqzyiytypenzae"
 
+[functions.admin-create-woofs-products]
+verify_jwt = true
+
 [functions.alfie-chat-widget]
 verify_jwt = true
 
