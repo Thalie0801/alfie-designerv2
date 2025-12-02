@@ -285,15 +285,17 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
             </p>
           </div>
 
-          {/* Image de référence - uniquement pour images et carrousels */}
-          {(formData.kind === "image" || formData.kind === "carousel") && (
+          {/* Image de référence - pour images, carrousels et vidéos premium */}
+          {(formData.kind === "image" || formData.kind === "carousel" || formData.kind === "video_premium") && (
             <div className="space-y-2 border rounded-lg p-3">
               <div>
                 <Label className="flex items-center gap-1">
-                  Image source (optionnelle)
+                  Image source {formData.kind === "video_premium" ? <span className="text-red-500">*</span> : "(optionnelle)"}
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  Alfie s'en sert comme inspiration visuelle.
+                  {formData.kind === "video_premium" 
+                    ? "L'image sera animée par l'IA pour créer ta vidéo. Obligatoire."
+                    : "Alfie s'en sert comme inspiration visuelle."}
                 </p>
               </div>
 
