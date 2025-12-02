@@ -6,6 +6,7 @@ import { useBrandKit } from "@/hooks/useBrandKit";
 import { useActivityStats } from "@/hooks/useActivityStats";
 import { BrandDialog } from "@/components/BrandDialog";
 import { BrandUpgradeDialog } from "@/components/BrandUpgradeDialog";
+import { WoofsPackDialog } from "@/components/WoofsPackDialog";
 import { BrandTier } from "@/hooks/useBrandManagement";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -115,31 +116,36 @@ function AlertBannerInner({ brand }: { brand: Brand }) {
     return (
       <Alert variant="destructive" className="mb-4">
         <AlertCircle className="h-4 w-4" />
-        <AlertDescription className="flex items-center justify-between flex-wrap gap-3">
-          <span>
-            {WARN_EMOJI}{" "}
-            {usage.anyOver ? (
-              <>Dépassement de quota détecté ({usage.mostCritical.key}).</>
-            ) : (
-              <>Plus que 10% de tes quotas disponibles ce mois !</>
-            )}{" "}
-            <span className="text-xs text-muted-foreground">
-              {usage.mostCritical.quota > 0 ? (
-                <>
-                  ({human(usage.mostCritical.used ?? 0)} / {human(usage.mostCritical.quota ?? 0)} · {pct}%) —{" "}
-                  {human(remaining)} restant(s)
-                </>
+        <AlertDescription className="flex flex-col gap-3">
+          <div className="flex items-start justify-between flex-wrap gap-3">
+            <span>
+              {WARN_EMOJI}{" "}
+              {usage.anyOver ? (
+                <>Dépassement de quota détecté ({usage.mostCritical.key}).</>
               ) : (
-                <>Aucun quota défini pour {usage.mostCritical.key.toLowerCase()}</>
-              )}
+                <>Plus que 10% de tes quotas disponibles ce mois !</>
+              )}{" "}
+              <span className="text-xs text-muted-foreground block mt-1">
+                {usage.mostCritical.quota > 0 ? (
+                  <>
+                    ({human(usage.mostCritical.used ?? 0)} / {human(usage.mostCritical.quota ?? 0)} · {pct}%) —{" "}
+                    {human(remaining)} restant(s)
+                  </>
+                ) : (
+                  <>Aucun quota défini pour {usage.mostCritical.key.toLowerCase()}</>
+                )}
+              </span>
             </span>
-          </span>
-
-          <BrandUpgradeDialog
-            brandId={brandId}
-            brandName={name}
-            currentTier={(plan as BrandTier) || "starter"}
-          />
+          </div>
+          
+          <div className="flex items-center gap-2 flex-wrap">
+            <WoofsPackDialog brandId={brandId} brandName={name} />
+            <BrandUpgradeDialog
+              brandId={brandId}
+              brandName={name}
+              currentTier={(plan as BrandTier) || "starter"}
+            />
+          </div>
         </AlertDescription>
       </Alert>
     );

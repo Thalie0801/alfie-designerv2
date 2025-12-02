@@ -9,9 +9,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Zap } from 'lucide-react';
-import { useBrandManagement } from '@/hooks/useBrandManagement';
-import { SYSTEM_CONFIG } from '@/config/systemConfig';
+import { Zap, Sparkles } from 'lucide-react';
+import { useWoofsPack, WOOFS_PACKS } from '@/hooks/useWoofsPack';
 
 interface WoofsPackDialogProps {
   brandId: string;
@@ -27,66 +26,85 @@ export function WoofsPackDialog({
   trigger 
 }: WoofsPackDialogProps) {
   const [open, setOpen] = useState(false);
-  const { addWoofsPack, loading } = useBrandManagement();
+  const { purchaseWoofsPack, loading } = useWoofsPack();
 
-  const handleAddPack = async (packSize: 50 | 100) => {
-    const success = await addWoofsPack(brandId, packSize);
+  const handlePurchase = async (packSize: 50 | 100 | 250 | 500) => {
+    const success = await purchaseWoofsPack(brandId, packSize);
     if (success) {
       setOpen(false);
       onSuccess?.();
     }
   };
 
-  const packSizes = SYSTEM_CONFIG.PACK_WOOFS_SIZES as [50, 100];
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
-          <Button variant="outline" size="sm">
-            <Zap className="w-4 h-4 mr-2" />
-            Pack Woofs
+          <Button variant="default" size="sm" className="gap-2">
+            <Zap className="w-4 h-4" />
+            Acheter des Woofs
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Ajouter un Pack Woofs</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            Acheter un Pack Woofs
+          </DialogTitle>
           <DialogDescription>
-            Augmente tes Woofs pour générer plus de vidéos sur {brandName}.
+            Augmente ton quota de Woofs pour continuer à créer du contenu sur <strong>{brandName}</strong>.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 py-4">
-          {packSizes.map((size) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 py-4">
+          {WOOFS_PACKS.map((pack) => (
             <div
-              key={size}
-              className="flex items-center justify-between p-4 rounded-lg border-2 hover:border-primary/50 transition-colors"
+              key={pack.size}
+              className="relative flex flex-col p-4 rounded-lg border-2 hover:border-primary/50 transition-all hover:shadow-md"
             >
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <Zap className="w-5 h-5 text-primary" />
-                  <span className="font-semibold text-lg">+{size} Woofs</span>
+              {pack.size === 250 && (
+                <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs font-bold px-2 py-1 rounded-full">
+                  Populaire
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {size === 50 ? 'Pack Standard' : 'Pack Pro'}
-                </p>
+              )}
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="w-5 h-5 text-primary" />
+                <span className="font-bold text-xl">+{pack.size} Woofs</span>
               </div>
-              <Button
-                onClick={() => handleAddPack(size)}
-                disabled={loading}
-              >
-                {loading ? 'Ajout...' : 'Ajouter'}
-              </Button>
+              <p className="text-sm text-muted-foreground mb-3 flex-grow">
+                {pack.description}
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-2xl">{pack.price}€</span>
+                <Button
+                  onClick={() => handlePurchase(pack.size)}
+                  disabled={loading}
+                  size="sm"
+                >
+                  {loading ? 'Chargement...' : 'Acheter'}
+                </Button>
+              </div>
+              {pack.size > 50 && (
+                <p className="text-xs text-primary mt-2 font-medium">
+                  Économie par rapport au pack de 50
+                </p>
+              )}
             </div>
           ))}
         </div>
 
         <div className="p-3 rounded-lg bg-primary/5 text-sm">
-          <p className="font-medium mb-1">💡 Rappel</p>
-          <p className="text-muted-foreground">
-            1 Woof = 1 image/slide · 25 Woofs = 1 asset vidéo (6s)
+          <p className="font-medium mb-1 flex items-center gap-1">
+            <Sparkles className="w-4 h-4" />
+            Comment ça marche ?
           </p>
+          <ul className="text-muted-foreground space-y-1 ml-5 list-disc">
+            <li>Les Woofs sont ajoutés immédiatement à ton quota mensuel</li>
+            <li>1 Woof = 1 image ou 1 slide de carrousel</li>
+            <li>25 Woofs = 1 vidéo premium (6s)</li>
+            <li>Valables uniquement pour la marque <strong>{brandName}</strong></li>
+          </ul>
         </div>
 
         <DialogFooter>
