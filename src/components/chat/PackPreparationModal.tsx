@@ -126,19 +126,19 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
       return;
     }
 
-    // ✅ Vérifier que les vidéos ont une image de référence
+    // ✅ Vérifier que les vidéos ont une image de référence (recommandé mais pas obligatoire)
     const selectedAssets = pack.assets.filter((a) => selectedAssetIds.has(a.id));
     const videosWithoutImage = selectedAssets.filter(
       (a) => a.kind === "video_premium" && !a.referenceImageUrl
     );
 
     if (videosWithoutImage.length > 0) {
-      const videoNames = videosWithoutImage.map((v) => v.title).join(", ");
-      toast.error(
-        `📸 Ajoute une image source pour tes vidéos avant de générer : ${videoNames}`,
-        { duration: 5000 }
+      // ✅ Simple warning, pas bloquant
+      toast.warning(
+        `📸 Recommandé : ajoute une image source pour de meilleures vidéos`,
+        { duration: 4000 }
       );
-      return;
+      // Continue quand même
     }
 
     setIsGenerating(true);
