@@ -12,8 +12,8 @@ export type VisualStyle =
   | 'digital_painting'
   | 'comic_book';
 
-export type VisionTarget = 'gemini_image' | 'replicate' | 'veo_3_1';
-export type VisionKind = 'image' | 'carousel' | 'video_standard' | 'video_premium';
+export type VisionTarget = 'gemini_image' | 'veo_3_1';
+export type VisionKind = 'image' | 'carousel' | 'video_premium';
 export type TextSource = 'ai' | 'user';
 
 export interface TextLayout {
@@ -21,7 +21,7 @@ export interface TextLayout {
   has_body: boolean;
   has_cta: boolean;
   has_subtitles?: boolean;
-  layout_hint: string;
+  layout_hint?: string;
   safe_zones?: Array<{
     id: string;
     zone_hint: string;
@@ -36,8 +36,16 @@ export interface ImageSpec {
   image_size: string;
   count: number;
   style: VisualStyle;
-  text_layout: TextLayout;
-  text_source: TextSource;
+  text_layout?: TextLayout;
+  text_source?: TextSource;
+}
+
+export interface BaseImageSpec {
+  prompt: string;
+  negative_prompt: string;
+  aspect_ratio: string;
+  image_size: string;
+  style: VisualStyle;
 }
 
 export interface CarouselSlide {
@@ -48,11 +56,10 @@ export interface CarouselSlide {
   text_source: TextSource;
 }
 
-export interface VideoBeat {
-  id: string;
-  time_range: [number, number];
-  description: string;
-  camera?: string;
+export interface VideoAnimation {
+  one_liner: string;
+  camera_motion: string;
+  element_motion: string[];
 }
 
 export interface VideoSpec {
@@ -60,10 +67,7 @@ export interface VideoSpec {
   duration_seconds: number;
   aspect_ratio: string;
   style: VisualStyle;
-  scenario: {
-    one_liner: string;
-    beats: VideoBeat[];
-  };
+  animation: VideoAnimation;
   visual_prompt: string;
   negative_prompt: string;
   text_layout: TextLayout;
@@ -85,6 +89,7 @@ export interface VisionOutput {
   meta: VisionMeta;
   images?: ImageSpec[];
   slides?: CarouselSlide[];
+  base_image?: BaseImageSpec;
   video?: VideoSpec;
   overlays?: Array<{
     id: string;
@@ -95,7 +100,7 @@ export interface VisionOutput {
 
 export interface VisionRequest {
   intent: {
-    kind: 'image' | 'carousel' | 'video_standard' | 'video_premium';
+    kind: 'image' | 'carousel' | 'video_premium';
     platform: string;
     ratio?: string;
     goal?: string;

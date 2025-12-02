@@ -6,7 +6,7 @@ import { validateVisionOutput, type VisionOutput } from "../_shared/visionTypes.
 
 interface VisionRequest {
   intent: {
-    kind: 'image' | 'carousel' | 'video_standard' | 'video_premium';
+    kind: 'image' | 'carousel' | 'video_premium';
     platform: string;
     ratio?: string;
     goal?: string;
@@ -74,6 +74,17 @@ Deno.serve(async (req) => {
     // Validation des entrées
     if (!body.intent || !body.intent.kind || !body.intent.prompt) {
       return new Response(JSON.stringify({ error: 'Missing required fields: intent.kind and intent.prompt' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Vérifier que le kind est supporté (plus de video_standard)
+    const supportedKinds = ['image', 'carousel', 'video_premium'];
+    if (!supportedKinds.includes(body.intent.kind)) {
+      return new Response(JSON.stringify({ 
+        error: `Invalid intent.kind: ${body.intent.kind}. Supported values: ${supportedKinds.join(', ')}` 
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
