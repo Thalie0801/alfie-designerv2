@@ -85,25 +85,45 @@ function normalizeAspectRatio(ar: string | undefined): { ar: string; size: GenSi
   return { ar: ratio, size: AR_MAP[ratio] };
 }
 
-function buildImagePrompt(globalStyle: string, prompt: string, useBrandKit: boolean = true) {
-  // ✅ Le thème utilisateur est TOUJOURS prioritaire
-  const themeContent = prompt && prompt.trim().length > 0 
-    ? prompt 
-    : "Professional marketing visual";
+function getSlideRole(index: number, total: number): string {
+  if (index === 0) return "HOOK/INTRODUCTION";
+  if (index === total - 1) return "CALL-TO-ACTION/CONCLUSION";
+  if (index === 1) return "PROBLEM/CONTEXT";
+  if (index === total - 2) return "SOLUTION/BENEFIT";
+  return "KEY POINT/INSIGHT";
+}
+
+function buildImagePrompt(
+  globalStyle: string, 
+  prompt: string, 
+  useBrandKit: boolean,
+  slideContent: { title: string; subtitle?: string; alt: string },
+  slideIndex: number,
+  totalSlides: number
+): string {
+  // Thème global de la campagne
+  const globalTheme = prompt?.trim() || "Professional marketing";
   
-  // Le style est un AJOUT, pas un remplacement
+  // Contexte spécifique de la slide basé sur sa position
+  const slideRole = getSlideRole(slideIndex, totalSlides);
+  
+  // Contenu textuel de cette slide pour guider l'image
+  const slideContext = slideContent.alt || slideContent.title;
+  
   const styleHint = useBrandKit && globalStyle 
     ? globalStyle 
     : "Professional, modern, clean design";
   
-  // ✅ NOUVEAU PROMPT : scène avec point focal + zone propre pour texte
-  return `Generate ONE SINGLE scene illustration for: ${themeContent}.
+  return `Generate ONE SINGLE scene illustration.
+
+CAMPAIGN THEME: ${globalTheme}
+SLIDE CONTEXT: This is a ${slideRole} slide. The text overlay will say: "${slideContext}"
 
 COMPOSITION REQUIREMENTS:
-- Create a clear focal point with a subject or visual anchor
-- Leave a clean, simple area (solid color, soft gradient, or minimal texture) for text overlay
-- The background behind the text area must NOT be busy or cluttered
-- This is NOT a seamless pattern, NOT a wallpaper, NOT a tiled texture
+- Create a visual that supports and reinforces the message: "${slideContent.title}"
+- Include a clear focal point related to the slide's message
+- Leave a clean area (solid color, soft gradient) for text overlay
+- The image should visually represent the concept of: ${slideContext}
 
 VISUAL STYLE:
 ${styleHint}
@@ -112,9 +132,8 @@ STRICT PROHIBITIONS:
 - NO text, NO typography, NO letters, NO numbers, NO words
 - NO logos, NO watermarks, NO icons, NO UI elements
 - NO seamless patterns, NO repeated motifs, NO wallpaper designs
-- NO collages, NO grids, NO multiple panels
 
-OUTPUT: High quality, detailed image with natural light, soft shadows, professional composition.`;
+OUTPUT: High quality image that visually complements the message "${slideContent.title}".`;
 }
 
 async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, ms = 30000) {
@@ -298,7 +317,14 @@ Deno.serve(async (req) => {
     // STEP 2/4 — Générer background (Lovable AI)
     // =========================================
     console.log(`[render-slide] ${logCtx} 2/4 Generate background via Lovable AI`);
-    const enrichedPrompt = buildImagePrompt(globalStyle, prompt, useBrandKit); // ✅ Propagation de useBrandKit
+    const enrichedPrompt = buildImagePrompt(
+      globalStyle, 
+      prompt, 
+      useBrandKit,
+      { title: normTitle, subtitle: normSubtitle, alt: slideContent.alt },
+      slideIndex,
+      totalSlides
+    );
 
     const aiRes = await fetchWithRetries(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
