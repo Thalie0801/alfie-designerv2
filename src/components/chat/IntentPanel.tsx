@@ -74,9 +74,9 @@ export function IntentPanel({
       i => i.kind === 'video_premium' && !i.referenceImageUrl
     );
     
+    // ✅ Recommandé mais pas bloquant
     if (videosWithoutImage.length > 0) {
-      toast.error(`📸 Ajoute une image source pour tes vidéos : ${videosWithoutImage.map(v => v.title).join(', ')}`);
-      return;
+      toast.warning(`📸 Recommandé : ajoute une image source pour de meilleurs résultats (${videosWithoutImage.map(v => v.title).join(', ')})`);
     }
     
     await onConfirm(Array.from(selectedIds), { useBrandKit, withAudio });
@@ -275,9 +275,9 @@ export function IntentPanel({
                           {uploadingForId === intent.id ? (
                             <span>Upload en cours...</span>
                           ) : (
-                            <>
+                          <>
                               <Upload className="w-4 h-4" />
-                              <span>📸 Ajoute une image source (obligatoire)</span>
+                              <span>📸 Ajoute une image source (recommandé)</span>
                             </>
                           )}
                         </button>

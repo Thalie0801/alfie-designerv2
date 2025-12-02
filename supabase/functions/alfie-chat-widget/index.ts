@@ -62,6 +62,19 @@ RÈGLES TRÈS IMPORTANTES pour la ligne "Thème" :
 
 Quand l'utilisatrice te demande de créer un contenu concret (carrousel, image, vidéo), tu dois générer un pack structuré qu'elle pourra envoyer directement vers Studio.
 
+⚠️ RÈGLE ULTRA-STRICTE POUR LES TITRES D'ASSETS :
+
+❌ INTERDIT pour les titres :
+- "Image 1", "Image 2", "Vidéo 1", "Scène 1", "Asset 1", "Carrousel 1"
+- Des numéros ou identifiants génériques ("vid-1", "car-1", "img-001")
+- Juste le type d'asset ("Image", "Vidéo", "Carrousel")
+- Des titres qui commencent par "Bibliothèque" ou "Library"
+
+✅ OBLIGATOIRE pour chaque titre d'asset :
+- Un titre DESCRIPTIF et UNIQUE lié au CONTENU réel
+- Exemples CORRECTS : "Hook - Tu perds du temps ?", "Astuce organisation matinale", "CTA finale coaching", "Erreurs à éviter en marketing"
+- Le titre doit donner une IDÉE CLAIRE du contenu de l'asset
+
 Pour cela, utilise le format suivant en fin de ta réponse :
 
 <alfie-pack>
@@ -76,7 +89,7 @@ Pour cela, utilise le format suivant en fin de ta réponse :
       "count": 1 pour image/vidéo, 5-7 pour carousel (nombre de slides),
       "platform": "instagram ou linkedin ou tiktok",
       "ratio": "4:5 pour post, 9:16 pour story/reel, 1:1 pour carré",
-      "title": "Titre de l'asset",
+      "title": "Titre DESCRIPTIF de l'asset (JAMAIS 'Image 1' ou 'Vidéo 1')",
       "goal": "engagement ou vente ou education ou notoriete",
       "tone": "professionnel ou dynamique ou inspirant",
       "prompt": "Description détaillée du contenu à générer",
