@@ -1,7 +1,6 @@
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { requireEnv } from "../_shared/env.ts";
-import { CheckoutSchema, validateInput } from "../_shared/validation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,7 +8,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const PRICE_IDS = {
+// Prix pour les abonnements
+const SUBSCRIPTION_PRICE_IDS = {
   monthly: {
     starter: "price_1SGDCEQvcbGhgt8SB4SyubJd",
     pro: "price_1SGDDFQvcbGhgt8Sxc5AD69b",
@@ -71,34 +71,23 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-
-    const validation = validateInput(CheckoutSchema, body);
-    if (!validation.success) {
-      return jsonResponse({ ok: false, error: validation.error }, 400);
-    }
-
-    const { plan, billing_period, brand_name, affiliate_ref } = validation.data;
-
-    console.log("[create-checkout] Creating checkout for authenticated user", { 
+    
+    // Déterminer le mode: subscription (défaut) ou payment (one-off)
+    const mode = body.mode === 'payment' ? 'payment' : 'subscription';
+    
+    console.log("[create-checkout] Creating checkout", { 
       email: user.email, 
       userId: user.id,
-      plan, 
-      billing_period 
+      mode,
+      plan: body.plan,
+      price_id: body.price_id,
+      purchase_type: body.purchase_type,
     });
 
     const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeSecret) {
       console.error("[create-checkout] STRIPE_SECRET_KEY missing");
       return jsonResponse({ ok: false, error: "STRIPE_SECRET_KEY missing" }, 500);
-    }
-
-    const billingType = billing_period === "annual" ? "annual" : "monthly";
-    const planType = plan as keyof typeof PRICE_IDS["monthly"];
-    const priceId = PRICE_IDS[billingType][planType];
-
-    if (!priceId) {
-      console.error("[create-checkout] Invalid plan or billing period", { plan, billing_period });
-      return jsonResponse({ ok: false, error: "Invalid plan selection" }, 400);
     }
 
     const stripe = new Stripe(stripeSecret, {
@@ -111,6 +100,73 @@ Deno.serve(async (req) => {
       req.headers.get("origin") ||
       "http://localhost:3000";
 
+    let priceId: string;
+    let metadata: Record<string, string> = {
+      supabase_user_id: user.id,
+      source: "billing-page",
+    };
+
+    // ===== MODE PAYMENT (Achat one-off, ex: Woofs packs) =====
+    if (mode === 'payment') {
+      priceId = body.price_id;
+      
+      if (!priceId) {
+        return jsonResponse({ ok: false, error: "price_id requis pour mode payment" }, 400);
+      }
+
+      // Ajouter les metadata spécifiques au type d'achat
+      metadata.purchase_type = body.purchase_type || 'one_off';
+      metadata.affiliate_ref = body.affiliate_ref || '';
+      
+      // Ajouter les metadata additionnelles (brand_id, woofs_pack_size, etc.)
+      if (body.metadata) {
+        Object.entries(body.metadata).forEach(([key, value]) => {
+          metadata[key] = String(value);
+        });
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        customer_email: user.email,
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        metadata,
+        allow_promotion_codes: true,
+        success_url: `${frontendUrl}/dashboard?payment=success&session_id={CHECKOUT_SESSION_ID}&type=${body.purchase_type || 'one_off'}`,
+        cancel_url: `${frontendUrl}/billing?payment=cancelled`,
+      });
+
+      return jsonResponse({ ok: true, url: session.url });
+    }
+
+    // ===== MODE SUBSCRIPTION (Abonnement mensuel/annuel) =====
+    const { plan, billing_period, brand_name, affiliate_ref } = body;
+
+    if (!plan) {
+      return jsonResponse({ ok: false, error: "plan requis pour mode subscription" }, 400);
+    }
+
+    const billingType = billing_period === "annual" ? "annual" : "monthly";
+    const planType = plan as keyof typeof SUBSCRIPTION_PRICE_IDS["monthly"];
+    priceId = SUBSCRIPTION_PRICE_IDS[billingType][planType];
+
+    if (!priceId) {
+      console.error("[create-checkout] Invalid plan or billing period", { plan, billing_period });
+      return jsonResponse({ ok: false, error: "Invalid plan selection" }, 400);
+    }
+
+    metadata = {
+      ...metadata,
+      plan,
+      billing_period: billingType,
+      brand_name: brand_name || "",
+      affiliate_ref: affiliate_ref || "",
+    };
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer_email: user.email,
@@ -120,14 +176,7 @@ Deno.serve(async (req) => {
           quantity: 1,
         },
       ],
-      metadata: {
-        plan,
-        billing_period,
-        brand_name: brand_name || "",
-        affiliate_ref: affiliate_ref || "",
-        supabase_user_id: user.id,
-        source: "billing-page",
-      },
+      metadata,
       allow_promotion_codes: true,
       success_url: `${frontendUrl}/dashboard?payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${frontendUrl}/billing?payment=cancelled`,
