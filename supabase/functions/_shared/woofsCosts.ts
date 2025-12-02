@@ -4,14 +4,12 @@
  * Système unifié : toutes les générations consomment des Woofs (🐶)
  * - 1 image = 1 Woof
  * - 1 slide de carrousel = 1 Woof
- * - 1 vidéo animée standard = 6 Woofs
- * - 1 vidéo premium (Veo 3.1) = 25 Woofs
+ * - 1 asset vidéo (6s, Veo 3.1) = 25 Woofs
  */
 
 export const WOOF_COSTS = {
   image: 1,
   carousel_slide: 1,
-  video_basic: 6,
   video_premium: 25,
 } as const;
 

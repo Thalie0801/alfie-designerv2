@@ -365,7 +365,7 @@ Règles pour la vidéo premium :
 
 Durée :
 - duration_seconds :
-  • 3 à 8 secondes recommandées par défaut pour ce type de clip animé court.
+  • 3 à 6 secondes recommandées par défaut pour ce type de clip animé court.
 
 Caméra :
 - camera_motion doit décrire une caméra SIMPLE et STABLE :
