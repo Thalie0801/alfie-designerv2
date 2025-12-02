@@ -11,6 +11,8 @@ interface WoofsPack {
   price: number;
   stripePriceId: string;
   description: string;
+  actualWoofs: number; // Woofs réellement crédités
+  bonus?: number; // Bonus affiché (optionnel)
 }
 
 export const WOOFS_PACKS: WoofsPack[] = [
@@ -18,25 +20,30 @@ export const WOOFS_PACKS: WoofsPack[] = [
     size: 50,
     price: 10,
     stripePriceId: 'price_woofs_pack_50',
-    description: 'Pack Starter - 50 Woofs',
+    description: 'Pack Starter',
+    actualWoofs: 50,
   },
   {
     size: 100,
     price: 19,
     stripePriceId: 'price_woofs_pack_100',
-    description: 'Pack Pro - 100 Woofs (-5%)',
+    description: 'Pack Pro',
+    actualWoofs: 100,
   },
   {
     size: 250,
     price: 45,
     stripePriceId: 'price_woofs_pack_250',
-    description: 'Pack Studio - 250 Woofs (-10%)',
+    description: 'Pack Studio',
+    actualWoofs: 250,
   },
   {
     size: 500,
     price: 85,
     stripePriceId: 'price_woofs_pack_500',
-    description: 'Pack Max - 500 Woofs (-15%)',
+    description: 'Pack Max',
+    actualWoofs: 600,
+    bonus: 100,
   },
 ];
 
