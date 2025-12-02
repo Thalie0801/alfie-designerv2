@@ -52,6 +52,16 @@ const RATIO_OPTIONS = [
   { value: "16:9", label: "16:9 (Paysage)" },
 ];
 
+const VISUAL_STYLE_OPTIONS = [
+  { value: "photorealistic", label: "📷 Photoréaliste" },
+  { value: "cinematic_photorealistic", label: "🎬 Cinématique" },
+  { value: "3d_pixar_style", label: "🎨 3D Pixar" },
+  { value: "flat_illustration", label: "✏️ Illustration flat" },
+  { value: "minimalist_vector", label: "⚪ Vecteur minimaliste" },
+  { value: "digital_painting", label: "🖌️ Peinture digitale" },
+  { value: "comic_book", label: "💥 Comic book" },
+];
+
 export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDialogProps) {
   const [formData, setFormData] = useState<PackAsset>({ ...asset });
   const [uploading, setUploading] = useState(false);
@@ -240,6 +250,29 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Visual Style */}
+          <div className="space-y-2">
+            <Label htmlFor="visualStyle">Style visuel</Label>
+            <Select
+              value={formData.visualStyle || "photorealistic"}
+              onValueChange={(value) => setFormData({ ...formData, visualStyle: value as any })}
+            >
+              <SelectTrigger id="visualStyle">
+                <SelectValue placeholder="Choisir un style" />
+              </SelectTrigger>
+              <SelectContent>
+                {VISUAL_STYLE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Le style visuel influence l'esthétique des images générées.
+            </p>
           </div>
 
           {/* Count (pour carrousels) */}
