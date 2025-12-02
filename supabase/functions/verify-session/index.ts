@@ -211,6 +211,46 @@ async function createBrandIfNeeded(userId: string, brandName?: string | null, su
   }
 }
 
+async function handleWoofsPack(brandId: string, woofsAmount: number) {
+  const supabase = getSupabaseClient();
+
+  console.log("[verify-session] Adding Woofs pack to brand", { brandId, woofsAmount });
+
+  // Récupérer le quota actuel
+  const { data: brand, error: fetchError } = await supabase
+    .from("brands")
+    .select("quota_woofs")
+    .eq("id", brandId)
+    .single();
+
+  if (fetchError) {
+    console.error("[verify-session] Error fetching brand", fetchError);
+    throw new Error(`Failed to fetch brand: ${fetchError.message}`);
+  }
+
+  const currentQuota = (brand as any)?.quota_woofs || 0;
+  const newQuota = currentQuota + woofsAmount;
+
+  // Mettre à jour le quota en utilisant une approche différente
+  // On utilise from().upsert() au lieu de from().update()
+  const { error: upsertError } = await supabase
+    .from("brands")
+    .upsert(
+      {
+        id: brandId,
+        quota_woofs: newQuota,
+      } as any,
+      { onConflict: "id", ignoreDuplicates: false }
+    );
+
+  if (upsertError) {
+    console.error("[verify-session] Error updating brand quota", upsertError);
+    throw new Error(`Failed to update brand quota: ${upsertError.message}`);
+  }
+
+  console.log("[verify-session] Successfully added Woofs pack", { brandId, newQuota });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -241,6 +281,25 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: false, error: "Payment not completed" }, 400);
     }
 
+    const purchaseType = session.metadata?.purchase_type as string | undefined;
+
+    // ✅ NOUVEAU : Gérer l'achat de packs Woofs
+    if (purchaseType === "woofs_pack") {
+      const brandId = session.metadata?.brand_id as string | undefined;
+      const woofsPackSize = session.metadata?.woofs_pack_size as string | undefined;
+
+      if (!brandId || !woofsPackSize) {
+        throw new Error("Missing brand_id or woofs_pack_size in metadata");
+      }
+
+      const woofsAmount = parseInt(woofsPackSize, 10);
+      
+      await handleWoofsPack(brandId, woofsAmount);
+
+      return jsonResponse({ ok: true, brandId, woofsAdded: woofsAmount });
+    }
+
+    // Flux standard : abonnement
     const email = (session.customer_details?.email || session.metadata?.email) as string | undefined;
     const plan = session.metadata?.plan as keyof typeof PLAN_CONFIG | undefined;
     const affiliateRef = session.metadata?.affiliate_ref as string | undefined;
