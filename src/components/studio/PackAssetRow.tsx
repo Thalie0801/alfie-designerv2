@@ -226,11 +226,11 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">
-                  Image source {asset.kind === "video_premium" && <span className="text-red-500">*</span>}
+                  Image source {asset.kind === "video_premium" && "(recommandée)"}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {asset.kind === "video_premium" 
-                    ? "L'image sera animée par l'IA. Obligatoire pour générer la vidéo."
+                    ? "L'image sera animée par l'IA. Recommandée pour de meilleurs résultats."
                     : "Alfie s'en sert comme inspiration visuelle pour la création."}
                 </p>
               </div>

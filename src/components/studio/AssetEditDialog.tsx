@@ -323,11 +323,11 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
             <div className="space-y-2 border rounded-lg p-3">
               <div>
                 <Label className="flex items-center gap-1">
-                  Image source {formData.kind === "video_premium" ? <span className="text-red-500">*</span> : "(optionnelle)"}
+                  Image source {formData.kind === "video_premium" ? "(recommandée)" : "(optionnelle)"}
                 </Label>
                 <p className="text-xs text-muted-foreground">
                   {formData.kind === "video_premium" 
-                    ? "L'image sera animée par l'IA pour créer ta vidéo. Obligatoire."
+                    ? "L'image sera animée par l'IA pour créer ta vidéo. Recommandée pour de meilleurs résultats."
                     : "Alfie s'en sert comme inspiration visuelle."}
                 </p>
               </div>
