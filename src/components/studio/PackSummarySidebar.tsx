@@ -15,6 +15,7 @@ interface PackSummarySidebarProps {
   onLaunch: () => void;
   isLaunching: boolean;
   "data-tour-id"?: string;
+  hideMobileButton?: boolean;
 }
 
 export function PackSummarySidebar({
@@ -24,6 +25,7 @@ export function PackSummarySidebar({
   onLaunch,
   isLaunching,
   "data-tour-id": dataTourId,
+  hideMobileButton = false,
 }: PackSummarySidebarProps) {
   const totalCost = safeWoofs(calculatePackWoofCost(pack));
   const available = safeWoofs(woofsAvailable);
@@ -125,12 +127,12 @@ export function PackSummarySidebar({
         </Card>
       )}
 
-      {/* Bouton lancer */}
+      {/* Bouton lancer - caché sur mobile si hideMobileButton */}
       <Button
         data-tour-id="studio-launch"
         onClick={onLaunch}
         disabled={!hasAssets || isLaunching}
-        className="w-full"
+        className={`w-full ${hideMobileButton ? 'hidden lg:flex' : ''}`}
         size="lg"
       >
         {isLaunching ? (

@@ -854,8 +854,8 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
             )}
           </div>
 
-          {/* Colonne 3 : Récap Woofs - Sticky bottom mobile */}
-          <div className="lg:col-span-3 fixed bottom-0 left-0 right-0 p-3 bg-background border-t lg:relative lg:p-0 lg:border-0 z-30">
+          {/* Colonne 3 : Récap Woofs - Scrollable sur mobile */}
+          <div className="lg:col-span-3">
             <PackSummarySidebar
               data-tour-id="studio-woofs-recap"
               pack={pack}
@@ -863,13 +863,36 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
               woofsQuota={woofsQuota}
               onLaunch={launchGeneration}
               isLaunching={isLaunching}
+              hideMobileButton
             />
           </div>
         </div>
       </div>
       
+      {/* Footer sticky mobile - juste le bouton */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 p-3 bg-background border-t z-30">
+        <Button
+          onClick={launchGeneration}
+          disabled={pack.assets.length === 0 || isLaunching}
+          className="w-full"
+          size="lg"
+        >
+          {isLaunching ? (
+            <>
+              <Sparkles className="mr-2 h-4 w-4 animate-spin" />
+              Alfie prépare tes visuels...
+            </>
+          ) : (
+            <>
+              <Sparkles className="mr-2 h-4 w-4" />
+              Créer mes visuels ({calculatePackWoofCost(pack)} 🐾)
+            </>
+          )}
+        </Button>
+      </div>
+      
       {/* Help Launcher Button */}
-      <div className="fixed bottom-20 right-4 z-50">
+      <div className="fixed bottom-20 right-4 z-50 lg:bottom-4">
         <HelpLauncher />
       </div>
     </div>
