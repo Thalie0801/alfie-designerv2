@@ -35,11 +35,7 @@ function enrichPackWithWoofCostType(pack: AlfiePack): AlfiePack {
         ? 'carousel_slide' 
         : asset.kind === 'image'
         ? 'image'
-        : asset.kind === 'video_basic'
-        ? 'video_basic'
-        : asset.kind === 'video_premium'
-        ? 'video_premium'
-        : 'image', // fallback
+        : 'video_premium', // Only video_premium now
     })),
   };
 }
@@ -604,19 +600,9 @@ export default function ChatWidget() {
       return;
     }
 
-    // Validation des vidéos sans image source
     const selectedAssets = pendingPack.assets.filter(a => selectedIds.includes(a.id));
-    const videosWithoutImage = selectedAssets.filter(
-      a => a.kind === "video_basic" && !a.referenceImageUrl
-    );
 
-    if (videosWithoutImage.length > 0) {
-      toast.error(
-        `${videosWithoutImage.length} vidéo(s) sans image source. ` +
-        `Ajoute une image de référence pour créer l'animation.`
-      );
-      return;
-    }
+    // Plus de validation nécessaire pour video_basic (supprimé)
 
     setIsGenerating(true);
     try {

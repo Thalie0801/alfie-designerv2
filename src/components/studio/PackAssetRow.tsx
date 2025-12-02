@@ -28,7 +28,6 @@ const goalDescriptions: Record<string, string> = {
 const assetKindLabel: Record<string, string> = {
   image: "Image",
   carousel: "Carrousel",
-  video_basic: "🎬 Vidéo standard (4s)",
   video_premium: "✨ Vidéo premium (8s)",
 };
 
@@ -141,11 +140,6 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
               )}
             </div>
 
-            {asset.kind === "video_basic" && (
-              <span className="text-xs text-blue-600 font-medium">
-                📸 Génération depuis image source
-              </span>
-            )}
 
             <div className="flex items-center gap-2 text-xs">
               <Badge variant="outline">{asset.goal}</Badge>
@@ -222,17 +216,13 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
             <p>{asset.prompt}</p>
           </div>
 
-          {/* Section image de référence - OBLIGATOIRE pour video_basic */}
+          {/* Section image de référence */}
           <div className="space-y-2 border-t pt-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium">
-                  Image source {asset.kind === "video_basic" && <span className="text-red-500">*</span>}
-                </p>
+                <p className="text-sm font-medium">Image source</p>
                 <p className="text-xs text-muted-foreground">
-                  {asset.kind === "video_basic" 
-                    ? "⚠️ Obligatoire : Alfie anime cette image pour créer ta vidéo."
-                    : "Alfie s'en sert comme inspiration visuelle pour la création."}
+                  Alfie s'en sert comme inspiration visuelle pour la création.
                 </p>
               </div>
             </div>

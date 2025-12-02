@@ -56,7 +56,7 @@ export async function getQuotaStatus(brandId: string): Promise<QuotaStatus | nul
  */
 export async function consumeQuota(
   brandId: string,
-  type: 'image' | 'carousel_slide' | 'video_basic' | 'video_premium',
+  type: 'image' | 'carousel_slide' | 'video_premium',
   metadata?: Record<string, any>
 ): Promise<boolean> {
   try {
@@ -103,31 +103,21 @@ export async function canGenerateVisual(brandId: string): Promise<{ canGenerate:
 }
 
 /**
- * Vérifie si une marque peut générer une vidéo (avec coût Woofs)
+ * Vérifie si une marque peut générer une vidéo premium (Veo 3.1)
  */
 export async function canGenerateVideo(
-  brandId: string,
-  isPremium: boolean = false
-): Promise<{ canGenerate: boolean; reason?: string; fallbackMessage?: string }> {
+  brandId: string
+): Promise<{ canGenerate: boolean; reason?: string }> {
   const status = await getQuotaStatus(brandId);
   
   if (!status) {
     return { canGenerate: false, reason: 'Impossible de récupérer les quotas de la marque' };
   }
 
-  const cost = isPremium ? WOOF_COSTS.video_premium : WOOF_COSTS.video_basic;
+  const cost = WOOF_COSTS.video_premium;
   const resetDate = new Date(status.resetsOn || '').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 
   if (!status.woofs.canGenerate(cost)) {
-    // Si vidéo premium demandée mais pas assez de Woofs, suggérer basique
-    if (isPremium && status.woofs.canGenerate(WOOF_COSTS.video_basic)) {
-      return { 
-        canGenerate: false, 
-        reason: `Vidéo premium consomme ${cost} Woofs, budget insuffisant pour ${status.brandName}. Utilisez une vidéo standard (${WOOF_COSTS.video_basic} Woofs) ou ajoutez un Pack Woofs.`,
-        fallbackMessage: `Il vous reste ${status.woofs.remaining} Woofs. Vidéo premium nécessite ${cost} Woofs, mais vidéo standard n'en utilise que ${WOOF_COSTS.video_basic}.`
-      };
-    }
-    
     return { 
       canGenerate: false, 
       reason: `Woofs insuffisants pour ${status.brandName} (${status.woofs.remaining} restants, ${cost} requis). Ajoutez un Pack Woofs ou patientez jusqu'au ${resetDate}.` 

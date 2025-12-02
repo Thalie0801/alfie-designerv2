@@ -11,8 +11,7 @@
 export const WOOF_COSTS = {
   image: 1,
   carousel_slide: 1,
-  video_basic: 6,      // Vidéo standard 4s (Replicate)
-  video_premium: 25,   // Vidéo premium 8s (Veo 3 FAST)
+  video_premium: 25,
 } as const;
 
 export const PLAN_WOOFS = {
@@ -57,9 +56,9 @@ export function calculatePackWoofCost(
 // Legacy function - now returns fixed cost of 6 Woofs for standard videos
 export const WOOF_SECONDS = 12;
 
-export function woofsForVideo(_durationSec?: number) {
-  // All standard videos now cost 6 Woofs regardless of duration
-  return WOOF_COSTS.video_basic;
+export function woofsForVideo() {
+  // All videos now cost 25 Woofs (premium only)
+  return WOOF_COSTS.video_premium;
 }
 
 /**

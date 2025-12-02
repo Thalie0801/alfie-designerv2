@@ -161,8 +161,7 @@ export function CreateHeader({ onClearChat }: CreateHeaderProps) {
                         <Progress value={clampPct(woofs.percentage)} />
                         <div className="text-xs text-slate-500 space-y-1">
                           <p>💡 Coûts en Woofs :</p>
-                          <p>• Image = 1 Woof · Slide carrousel = 1 Woof</p>
-                          <p>• Vidéo standard (4s) = 6 Woofs · Vidéo premium (8s) = 25 Woofs</p>
+                          <p>• 1 Woof = 1 image/slide · 25 Woofs = 1 vidéo premium</p>
                         </div>
                       </div>
                     </div>

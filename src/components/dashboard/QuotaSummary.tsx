@@ -204,19 +204,8 @@ export function QuotaSummary({ activeBrandId }: QuotaSummaryProps) {
         {/* Info coûts */}
         <div className="pt-4 border-t space-y-2">
           <p className="text-xs font-semibold text-muted-foreground">Coûts en Woofs :</p>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground">• Image/Slide :</span>
-              <span className="font-medium">1 Woof</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground">• Vidéo standard (4s) :</span>
-              <span className="font-medium">6 Woofs</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground">• Vidéo premium (8s) :</span>
-              <span className="font-medium">25 Woofs</span>
-            </div>
+          <div className="text-xs text-muted-foreground">
+            1 Woof = 1 image/slide · 25 Woofs = 1 vidéo premium
           </div>
         </div>
 

@@ -116,7 +116,7 @@ const PRESET_PACKS = {
   },
   promo: {
     title: "Pack promo express",
-    summary: "Kit complet pour une promo flash",
+    summary: "Images pour une promo flash",
     assets: [
       {
         id: "promo_1",
@@ -135,17 +135,16 @@ const PRESET_PACKS = {
       {
         id: "promo_2",
         brandId: "",
-        kind: "video_basic" as const,
+        kind: "image" as const,
         count: 1,
         platform: "instagram" as const,
-        format: "reel" as const,
+        format: "story" as const,
         ratio: "9:16" as const,
-        durationSeconds: 4,
-        title: "Reel promo dynamique",
+        title: "Story promo dynamique",
         goal: "vente" as const,
         tone: "dynamique, percutant",
-        prompt: "Vidéo courte pour promo avec timer urgence",
-        woofCostType: "video_basic" as const,
+        prompt: "Story verticale pour promo avec timer urgence",
+        woofCostType: "image" as const,
       },
     ],
   },
@@ -458,18 +457,6 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
       return;
     }
 
-    // ✅ VALIDATION: Vérifier que les video_basic ont une image de référence
-    const videoBasicWithoutImage = pack.assets.filter(
-      a => a.kind === "video_basic" && !a.referenceImageUrl
-    );
-
-    if (videoBasicWithoutImage.length > 0) {
-      toast.error(
-        `${videoBasicWithoutImage.length} vidéo(s) sans image source. ` +
-        `Le générateur vidéo a besoin d'une image pour créer l'animation.`
-      );
-      return;
-    }
 
     // Calculer le coût pour afficher dans la confirmation
     const totalCost = calculatePackWoofCost(pack);
@@ -730,9 +717,6 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => addAsset({ kind: "carousel", count: 5, woofCostType: "carousel_slide" })}>
                       📊 Carrousel
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => addAsset({ kind: "video_basic", durationSeconds: 4, woofCostType: "video_basic" })}>
-                      🎬 Vidéo standard (4s)
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => addAsset({ kind: "video_premium", durationSeconds: 8, woofCostType: "video_premium" })}>
                       ✨ Vidéo premium (8s)

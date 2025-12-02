@@ -37,7 +37,6 @@ export function PackSummarySidebar({
   // Compter par type
   const imageCount = pack.assets.filter((a) => a.kind === "image").length;
   const carouselCount = pack.assets.filter((a) => a.kind === "carousel").length;
-  const videoBasicCount = pack.assets.filter((a) => a.kind === "video_basic").length;
   const videoPremiumCount = pack.assets.filter((a) => a.kind === "video_premium").length;
 
   return (
@@ -107,14 +106,6 @@ export function PackSummarySidebar({
                     .filter((a) => a.kind === "carousel")
                     .reduce((sum, a) => sum + a.count, 0)}{" "}
                   slides
-                </Badge>
-              </div>
-            )}
-            {videoBasicCount > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Vidéos standard</span>
-                <Badge variant="outline">
-                  {videoBasicCount} × {WOOF_COSTS.video_basic} 🐾
                 </Badge>
               </div>
             )}

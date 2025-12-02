@@ -125,10 +125,9 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                 const newWoofCostType = 
                   newKind === "image" ? "image" :
                   newKind === "carousel" ? "carousel_slide" :
-                  newKind === "video_basic" ? "video_basic" :
                   "video_premium";
                 
-                const fixedDuration = newKind === "video_basic" ? 4 : newKind === "video_premium" ? 8 : undefined;
+                const fixedDuration = newKind === "video_premium" ? 8 : undefined;
                 setFormData({ 
                   ...formData, 
                   kind: newKind,
@@ -144,7 +143,6 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
               <SelectContent>
                 <SelectItem value="image">🖼️ Image</SelectItem>
                 <SelectItem value="carousel">📊 Carrousel</SelectItem>
-                <SelectItem value="video_basic">🎬 Vidéo standard (4s)</SelectItem>
                 <SelectItem value="video_premium">✨ Vidéo premium (8s)</SelectItem>
               </SelectContent>
             </Select>
@@ -260,11 +258,11 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
           )}
 
           {/* Duration (pour vidéos uniquement) - FIXE */}
-          {formData.kind.includes("video") && (
+          {formData.kind === "video_premium" && (
             <div className="space-y-2">
               <Label>Durée</Label>
               <div className="text-sm text-muted-foreground bg-muted/30 px-3 py-2 rounded-md border">
-                {formData.kind === "video_basic" ? "4 secondes (fixe)" : "8 secondes (fixe)"}
+                8 secondes (fixe)
               </div>
               <p className="text-xs text-muted-foreground">
                 La durée est fixe pour garantir la qualité de génération.
@@ -288,7 +286,7 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
           </div>
 
           {/* Image de référence - uniquement pour images et carrousels */}
-          {formData.kind !== "video_basic" && formData.kind !== "video_premium" && (
+          {(formData.kind === "image" || formData.kind === "carousel") && (
             <div className="space-y-2 border rounded-lg p-3">
               <div>
                 <Label className="flex items-center gap-1">
