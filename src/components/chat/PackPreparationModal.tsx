@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { X, Image, Film, Grid3x3, AlertCircle } from "lucide-react";
+import { X, Image, Film, Grid3x3, AlertCircle, Volume2, VolumeX } from "lucide-react";
 import type { AlfiePack, PackAsset } from "@/types/alfiePack";
 import { calculatePackWoofCost, safeWoofs } from "@/lib/woofs";
 import { getWoofCost } from "@/types/alfiePack";
@@ -52,8 +52,24 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
   );
   const [isGenerating, setIsGenerating] = useState(false);
   const [useBrandKit, setUseBrandKit] = useState(true); // ✅ Phase 2: Toggle Brand Kit
+  const [audioSettings, setAudioSettings] = useState<Record<string, boolean>>(() => {
+    // Par défaut, audio activé pour toutes les vidéos
+    const initial: Record<string, boolean> = {};
+    pack.assets.filter(a => a.kind === 'video_premium').forEach(a => {
+      initial[a.id] = true;
+    });
+    return initial;
+  });
   const { profile } = useAuth();
   const navigate = useNavigate();
+  
+  // Toggle audio pour une vidéo spécifique
+  const toggleAudio = (assetId: string) => {
+    setAudioSettings(prev => ({
+      ...prev,
+      [assetId]: !prev[assetId]
+    }));
+  };
 
   // Calculer le coût dynamique selon la sélection
   const totalWoofs = useMemo(
@@ -183,6 +199,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         assetsWithTexts = pack.assets.map((asset) => ({
           ...asset,
           useBrandKit, // ✅ Propager useBrandKit du toggle
+          withAudio: asset.kind === 'video_premium' ? audioSettings[asset.id] : undefined, // ✅ Propager audio setting
         }));
       } else if (textsError || !textsData?.texts) {
         console.warn("[PackPreparationModal] Text generation failed, using fallback texts:", textsError);
@@ -191,6 +208,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         assetsWithTexts = pack.assets.map((asset) => ({
           ...asset,
           useBrandKit, // ✅ Propager useBrandKit du toggle
+          withAudio: asset.kind === 'video_premium' ? audioSettings[asset.id] : undefined, // ✅ Propager audio setting
           generatedTexts: generateFallbackTexts(asset, pack.title),
         }));
         
@@ -200,6 +218,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         assetsWithTexts = pack.assets.map((asset) => ({
           ...asset,
           useBrandKit, // ✅ Propager useBrandKit du toggle
+          withAudio: asset.kind === 'video_premium' ? audioSettings[asset.id] : undefined, // ✅ Propager audio setting
           generatedTexts: textsData.texts?.[asset.id] || generateFallbackTexts(asset, pack.title),
         }));
       }
@@ -332,6 +351,29 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
                         : asset.prompt
                       }
                     </p>
+                    
+                    {/* ✅ Toggle audio pour les vidéos */}
+                    {asset.kind === 'video_premium' && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleAudio(asset.id);
+                        }}
+                        className={`flex items-center gap-1.5 mt-2 px-2 py-1 rounded text-xs transition-colors ${
+                          audioSettings[asset.id] 
+                            ? 'bg-primary/20 text-primary' 
+                            : 'bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        {audioSettings[asset.id] ? (
+                          <><Volume2 className="w-3 h-3" /> Avec son</>
+                        ) : (
+                          <><VolumeX className="w-3 h-3" /> Sans son</>
+                        )}
+                      </button>
+                    )}
                   </div>
                   <div className="text-xs font-medium px-2 py-1 bg-primary/20 rounded-full">
                     {cost} Woofs
