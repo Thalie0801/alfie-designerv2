@@ -9,6 +9,9 @@ import type { PackAsset } from "@/types/alfiePack";
 import { Badge } from "@/components/ui/badge";
 import { WOOF_COSTS } from "@/config/woofs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Upload, X as XIcon, AlertCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface AssetEditDialogProps {
   asset: PackAsset;
@@ -51,10 +54,51 @@ const RATIO_OPTIONS = [
 
 export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDialogProps) {
   const [formData, setFormData] = useState<PackAsset>({ ...asset });
+  const [uploading, setUploading] = useState(false);
 
   const handleSave = () => {
     onSave(formData);
     onClose();
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Seules les images sont acceptées");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("L'image ne doit pas dépasser 5 MB");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+      const { data, error } = await supabase.storage
+        .from("chat-uploads")
+        .upload(`references/${fileName}`, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (error) throw error;
+
+      const { data: urlData } = supabase.storage
+        .from("chat-uploads")
+        .getPublicUrl(data.path);
+
+      setFormData({ ...formData, referenceImageUrl: urlData.publicUrl });
+      toast.success("Image de référence ajoutée !");
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error("Erreur lors de l'upload");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const woofCost = WOOF_COSTS[formData.woofCostType];
@@ -241,6 +285,68 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
             <p className="text-xs text-muted-foreground">
               Plus ton prompt est précis, meilleures seront les générations d'Alfie.
             </p>
+          </div>
+
+          {/* Image de référence - OBLIGATOIRE pour video_basic */}
+          <div className="space-y-2 border rounded-lg p-3">
+            <div>
+              <Label className="flex items-center gap-1">
+                Image source 
+                {formData.kind === "video_basic" && <span className="text-red-500">*</span>}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {formData.kind === "video_basic" 
+                  ? "⚠️ Obligatoire : Alfie anime cette image pour créer ta vidéo."
+                  : "Optionnel : Alfie s'en sert comme inspiration visuelle."}
+              </p>
+            </div>
+
+            {formData.referenceImageUrl ? (
+              <div className="relative">
+                <img
+                  src={formData.referenceImageUrl}
+                  alt="Image de référence"
+                  className="w-full h-40 object-cover rounded-lg border"
+                />
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="absolute top-2 right-2"
+                  onClick={() => setFormData({ ...formData, referenceImageUrl: undefined })}
+                >
+                  <XIcon className="h-4 w-4 mr-1" />
+                  Retirer
+                </Button>
+              </div>
+            ) : (
+              <div className="relative">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  disabled={uploading}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full pointer-events-none"
+                  disabled={uploading}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {uploading ? "Upload en cours..." : "Ajouter une image source"}
+                </Button>
+              </div>
+            )}
+
+            {formData.kind === "video_basic" && !formData.referenceImageUrl && (
+              <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
+                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
+                <p className="text-xs text-red-900 dark:text-red-100">
+                  <strong>Image obligatoire</strong> : Les vidéos standard sont générées à partir d'une image source.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Generated texts section */}
