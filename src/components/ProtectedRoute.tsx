@@ -32,6 +32,15 @@ export function ProtectedRoute({
 
   // Vérifier si l'utilisateur a un plan actif
   const hasActivePlan = profile?.status === 'active' && profile?.plan && profile.plan !== 'none';
+  
+  console.log('[ProtectedRoute] Plan check:', {
+    email: user?.email,
+    status: profile?.status,
+    plan: profile?.plan,
+    hasActivePlan,
+    isWhitelisted,
+    requireActivePlan,
+  });
 
   useEffect(() => {
     if (requireAdmin && user && !effectiveIsAdmin && !checkingAdmin) {

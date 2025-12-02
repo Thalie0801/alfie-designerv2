@@ -80,7 +80,7 @@ const AppRoutes = () => {
         <Route
           path="/studio"
           element={
-            <ProtectedRoute requireActivePlan={false}>
+            <ProtectedRoute>
               <AppLayoutWithSidebar>
                 <StudioGenerator />
               </AppLayoutWithSidebar>
