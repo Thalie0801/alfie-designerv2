@@ -17,7 +17,23 @@ function dims(ar: SlideUrlOptions['aspectRatio']) {
   return { w: 1080, h: 1350 }; // 4:5
 }
 
-const enc = (t: string) => encodeURIComponent(t);
+/**
+ * Encode text for Cloudinary overlay - double-encode special delimiters
+ * Cloudinary uses , and / as delimiters in transformation URLs
+ */
+const enc = (t: string) => {
+  // First pass: standard URL encoding
+  let encoded = encodeURIComponent(t);
+  
+  // Double-encode Cloudinary delimiters:
+  // - %2C (comma) → %252C (Cloudinary interprets %2C as delimiter)
+  // - %2F (slash) → %252F (same issue)
+  encoded = encoded
+    .replace(/%2C/g, '%252C')  // Double-encode comma
+    .replace(/%2F/g, '%252F'); // Double-encode slash
+  
+  return encoded;
+};
 
 /**
  * Générer une URL Cloudinary avec overlays texte
