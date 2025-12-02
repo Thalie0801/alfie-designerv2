@@ -322,8 +322,13 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
                       <span>{asset.goal}</span>
                     </div>
                     <p className="text-xs text-muted-foreground line-clamp-2">
-                      {asset.generatedTexts?.slides 
-                        ? asset.generatedTexts.slides.map((s, i) => `Slide ${i+1}: ${s.title}`).join(' • ')
+                      {/* ✅ Afficher les textes selon le type d'asset */}
+                      {asset.kind === 'carousel' && asset.generatedTexts?.slides 
+                        ? `Carrousel ${asset.generatedTexts.slides.length} slides : ${asset.generatedTexts.slides.slice(0, 2).map(s => s.title).join(' • ')}...`
+                        : asset.kind.includes('video') && asset.generatedTexts?.video
+                        ? `🎬 ${asset.generatedTexts.video.hook || 'Script vidéo'}`
+                        : asset.kind === 'image' && asset.generatedTexts?.text
+                        ? asset.generatedTexts.text.title
                         : asset.prompt
                       }
                     </p>

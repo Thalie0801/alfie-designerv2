@@ -809,28 +809,57 @@ async function generateGcsSignedUrl(
         try {
           console.log(`[generate-video] Uploading reference image to GCS: ${imageUrl}`);
           
-          const refImagePath = `references/ref_${Date.now()}.jpg`;
+          // ✅ Détecter le type MIME depuis l'URL
+          const urlLower = imageUrl.toLowerCase();
+          let extension = 'png'; // Default
+          let mimeType = 'image/png';
+          
+          if (urlLower.includes('.jpg') || urlLower.includes('.jpeg')) {
+            extension = 'jpg';
+            mimeType = 'image/jpeg';
+          } else if (urlLower.includes('.webp')) {
+            extension = 'webp';
+            mimeType = 'image/webp';
+          } else if (urlLower.includes('.gif')) {
+            extension = 'gif';
+            mimeType = 'image/gif';
+          }
+          
+          // Pour les URLs Supabase storage, vérifier le nom de fichier
+          const fileNameMatch = imageUrl.match(/\/([^\/]+)\.(png|jpg|jpeg|webp|gif)(\?|$)/i);
+          if (fileNameMatch) {
+            const ext = fileNameMatch[2].toLowerCase();
+            extension = ext === 'jpeg' ? 'jpg' : ext;
+            mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+          }
+
+          const refImagePath = `references/ref_${Date.now()}.${extension}`;
           const parsedServiceAccount = JSON.parse(serviceAccountJson);
           const uploadUrl = await generateGcsSignedUrl(videosBucket, refImagePath, parsedServiceAccount, 900, 'PUT');
           
-          // Fetch l'image source et stream directement vers GCS (zéro mémoire locale)
+          // Fetch l'image source et stream directement vers GCS
           const imageResponse = await fetch(imageUrl);
           if (!imageResponse.ok) {
             console.warn(`[generate-video] Failed to fetch reference image: ${imageResponse.status}`);
           } else {
+            // ✅ Utiliser le Content-Type de la réponse si disponible
+            const actualMimeType = imageResponse.headers.get('content-type') || mimeType;
+            console.log(`[generate-video] Image MIME type detected: ${actualMimeType}`);
+            
             const uploadResponse = await fetch(uploadUrl, {
               method: 'PUT',
               body: imageResponse.body,
-              headers: { 'Content-Type': 'image/jpeg' }
+              headers: { 'Content-Type': actualMimeType }
             });
             
             if (!uploadResponse.ok) {
               console.warn(`[generate-video] Failed to upload reference image to GCS: ${uploadResponse.status}`);
             } else {
               instance.image = {
-                gcsUri: `gs://${videosBucket}/${refImagePath}`
+                gcsUri: `gs://${videosBucket}/${refImagePath}`,
+                mimeType: actualMimeType
               };
-              console.log(`[generate-video] ✅ Reference image uploaded to GCS: gs://${videosBucket}/${refImagePath}`);
+              console.log(`[generate-video] ✅ Reference image uploaded to GCS: gs://${videosBucket}/${refImagePath} (${actualMimeType})`);
             }
           }
         } catch (err) {
