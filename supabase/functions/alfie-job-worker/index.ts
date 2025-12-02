@@ -214,6 +214,11 @@ function resolveUseBrandKit(payload: any, jobMeta?: { use_brand_kit?: boolean })
  */
 function buildContentPrompt(payload: any): string {
   const sources = [
+    // ✅ PRIORITÉ 1 : Script vidéo complet (hook + script + cta)
+    payload.generatedTexts?.video ? 
+      [payload.generatedTexts.video.hook, payload.generatedTexts.video.script, payload.generatedTexts.video.cta]
+        .filter(Boolean).join(" ") 
+      : undefined,
     payload.prompt,
     payload.brief?.topic,
     payload.brief?.content,
@@ -894,7 +899,7 @@ ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
 async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; order_id?: string; job_id?: string; use_brand_kit?: boolean }) {
   console.log("🎥 [processGenerateVideo]", payload?.orderId);
 
-  const { userId, brandId, orderId, aspectRatio, duration, prompt, engine } = payload;
+  const { userId, brandId, orderId, aspectRatio, duration, prompt, engine, referenceImageUrl } = payload;
   const cloudName = Deno.env.get("CLOUDINARY_CLOUD_NAME");
 
   if (!cloudName) {
@@ -923,6 +928,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       userId,
       brandId,
       orderId,
+      imageUrl: referenceImageUrl, // ✅ AJOUT: Image de référence pour animation
     }, 360_000); // ✅ 6 minutes timeout pour VEO 3
 
     const videoUrl = veoResult?.videoUrl || veoResult?.output || veoResult?.url;
