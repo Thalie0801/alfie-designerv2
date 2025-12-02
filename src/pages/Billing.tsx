@@ -314,20 +314,44 @@ export default function Billing() {
               {WOOFS_PACKS.map((pack) => (
                 <div
                   key={pack.size}
-                  className="p-4 rounded-lg border-2 border-orange-200 dark:border-orange-700 hover:border-orange-400 dark:hover:border-orange-500 transition-colors bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20"
+                  className={cn(
+                    "relative p-4 rounded-lg border-2 transition-colors bg-gradient-to-br",
+                    pack.bonus 
+                      ? "border-emerald-400 dark:border-emerald-600 hover:border-emerald-500 from-emerald-50 to-green-50 dark:from-emerald-900/30 dark:to-green-900/30" 
+                      : "border-orange-200 dark:border-orange-700 hover:border-orange-400 dark:hover:border-orange-500 from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20"
+                  )}
                 >
+                  {pack.bonus && (
+                    <Badge className="absolute -top-2 -right-2 bg-gradient-to-r from-emerald-500 to-green-500 text-white text-xs px-2 py-0.5 shadow-md">
+                      +{pack.bonus} GRATUITS
+                    </Badge>
+                  )}
                   <div className="text-center space-y-2">
-                    <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">
+                    <div className={cn(
+                      "text-3xl font-bold",
+                      pack.bonus ? "text-emerald-600 dark:text-emerald-400" : "text-orange-600 dark:text-orange-400"
+                    )}>
                       {pack.size}
                     </div>
-                    <div className="text-sm text-muted-foreground">Woofs</div>
+                    <div className="text-sm text-muted-foreground">
+                      {pack.bonus ? (
+                        <span className="font-medium text-emerald-600 dark:text-emerald-400">= {pack.actualWoofs} Woofs</span>
+                      ) : (
+                        "Woofs"
+                      )}
+                    </div>
                     <div className="text-lg font-semibold text-foreground">
                       {pack.price}€
                     </div>
                     <Button
                       size="sm"
-                      variant="outline"
-                      className="w-full border-orange-300 hover:bg-orange-100 dark:border-orange-600 dark:hover:bg-orange-900/30"
+                      variant={pack.bonus ? "default" : "outline"}
+                      className={cn(
+                        "w-full",
+                        pack.bonus 
+                          ? "bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white" 
+                          : "border-orange-300 hover:bg-orange-100 dark:border-orange-600 dark:hover:bg-orange-900/30"
+                      )}
                       onClick={() => purchaseWoofsPack(activeBrandId, pack.size)}
                       disabled={woofsLoading}
                     >

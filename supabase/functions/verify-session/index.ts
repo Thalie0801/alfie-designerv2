@@ -239,10 +239,20 @@ async function createBrandIfNeeded(userId: string, brandName?: string | null, su
   }
 }
 
-async function handleWoofsPack(brandId: string, woofsAmount: number) {
+// Mapping des bonus Woofs (pack affiché → Woofs réellement crédités)
+const WOOFS_PACK_ACTUAL: Record<number, number> = {
+  50: 50,
+  100: 100,
+  250: 250,
+  500: 600, // +100 bonus gratuits
+};
+
+async function handleWoofsPack(brandId: string, woofsPackSize: number) {
   const supabase = getSupabaseClient();
 
-  console.log("[verify-session] Adding Woofs pack to brand", { brandId, woofsAmount });
+  // Appliquer le bonus si applicable
+  const actualWoofs = WOOFS_PACK_ACTUAL[woofsPackSize] ?? woofsPackSize;
+  console.log("[verify-session] Adding Woofs pack to brand", { brandId, woofsPackSize, actualWoofs });
 
   // Récupérer le quota actuel
   const { data: brand, error: fetchError } = await supabase
@@ -257,7 +267,7 @@ async function handleWoofsPack(brandId: string, woofsAmount: number) {
   }
 
   const currentQuota = (brand as any)?.quota_woofs || 0;
-  const newQuota = currentQuota + woofsAmount;
+  const newQuota = currentQuota + actualWoofs;
 
   // Mettre à jour le quota en utilisant une approche différente
   // On utilise from().upsert() au lieu de from().update()
@@ -276,7 +286,7 @@ async function handleWoofsPack(brandId: string, woofsAmount: number) {
     throw new Error(`Failed to update brand quota: ${upsertError.message}`);
   }
 
-  console.log("[verify-session] Successfully added Woofs pack", { brandId, newQuota });
+  console.log("[verify-session] Successfully added Woofs pack", { brandId, actualWoofs, newQuota });
 }
 
 Deno.serve(async (req) => {
@@ -322,11 +332,12 @@ Deno.serve(async (req) => {
         throw new Error("Missing brand_id or woofs_pack_size in metadata");
       }
 
-      const woofsAmount = parseInt(woofsPackSize, 10);
+      const baseWoofsSize = parseInt(woofsPackSize, 10);
+      const actualWoofs = WOOFS_PACK_ACTUAL[baseWoofsSize] ?? baseWoofsSize;
       const amount = session.amount_total ? session.amount_total / 100 : 0;
       
-      // Ajouter les Woofs à la marque
-      await handleWoofsPack(brandId, woofsAmount);
+      // Ajouter les Woofs à la marque (avec bonus si applicable)
+      await handleWoofsPack(brandId, baseWoofsSize);
 
       // Traiter l'affiliation si présente
       if (affiliateRef && supabaseUserId) {
@@ -340,7 +351,7 @@ Deno.serve(async (req) => {
         console.log("[verify-session] Affiliate conversion processed for Woofs pack", { affiliateRef, amount });
       }
 
-      return jsonResponse({ ok: true, brandId, woofsAdded: woofsAmount, affiliateProcessed: !!affiliateRef });
+      return jsonResponse({ ok: true, brandId, woofsAdded: actualWoofs, affiliateProcessed: !!affiliateRef });
     }
 
     // Flux standard : abonnement ou upgrade
