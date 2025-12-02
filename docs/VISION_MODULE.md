@@ -20,6 +20,8 @@ Le module VISION est le système centralisé de transformation d'intents utilisa
 
 Le module VISION génère un JSON structuré selon le type de contenu :
 
+**Types supportés :** `image`, `carousel`, `video_premium`
+
 ### 1. Image Simple (`kind: "image"`)
 
 ```json
@@ -79,36 +81,7 @@ Le module VISION génère un JSON structuré selon le type de contenu :
 }
 ```
 
-### 3. Vidéo Standard (`kind: "video_standard"`)
-
-```json
-{
-  "engine": "visual",
-  "kind": "video_standard",
-  "target": "replicate",
-  "video": {
-    "title": "Product Launch Video",
-    "duration_seconds": 8,
-    "aspect_ratio": "9:16",
-    "style": "3d_pixar_style",
-    "scenario": {
-      "one_liner": "Smooth product reveal with dynamic lighting",
-      "beats": [
-        {
-          "id": "beat_1",
-          "time_range": [0, 4],
-          "description": "Product rotating slowly in spotlight",
-          "camera": "slow zoom in"
-        }
-      ]
-    },
-    "visual_prompt": "3D rendered product on clean background...",
-    "negative_prompt": "low quality, blur, text artifacts"
-  }
-}
-```
-
-### 4. Vidéo Premium (`kind: "video_premium"`)
+### 3. Vidéo Premium (`kind: "video_premium"`)
 
 ```json
 {

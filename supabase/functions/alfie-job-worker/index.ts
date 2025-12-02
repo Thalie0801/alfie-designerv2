@@ -957,79 +957,8 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
     return { videoUrl };
   }
 
-  // ✅ Vidéo standard via Replicate (image-to-video)
-  console.log("[processGenerateVideo] Generating standard video via Replicate...");
-  
-  const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : null;
-  const videoPrompt = buildFinalPrompt(payload, useBrandKit, brandMini);
-
-  // ✅ FALLBACK : Générer une image si aucune n'est fournie
-  let sourceImageUrl = payload.referenceImageUrl || payload.sourceImageUrl || payload.imageUrl;
-
-  if (!sourceImageUrl) {
-    console.log("[processGenerateVideo] No source image provided, generating one...");
-    
-    const imageResult = await callFn<any>("alfie-generate-ai-image", {
-      prompt: videoPrompt,
-      brandId,
-      userId,
-      orderId,
-      aspectRatio: aspectRatio || "9:16",
-    });
-    
-    sourceImageUrl = imageResult?.output_url || imageResult?.url;
-    
-    if (!sourceImageUrl) {
-      throw new Error("Failed to generate source image for video");
-    }
-    
-    console.log("[processGenerateVideo] ✅ Generated source image:", sourceImageUrl);
-  }
-
-  // Appeler generate-video avec provider "replicate" et timeout étendu pour le polling
-  const videoResult = await callFn<any>("generate-video", {
-    prompt: videoPrompt,
-    imageUrl: sourceImageUrl, // ✅ Toujours défini (soit fourni, soit généré)
-    aspectRatio: aspectRatio || "9:16",
-    userId,
-    brandId,
-    orderId,
-    provider: "replicate",
-  }, 360_000); // 6 minutes pour laisser le temps au polling Replicate
-
-  const videoUrl = videoResult?.output || videoResult?.videoUrl || videoResult?.url;
-  if (!videoUrl) throw new Error("Replicate failed to generate video");
-
-  console.log("[processGenerateVideo] ✅ Replicate video created:", videoUrl);
-
-  // Thumbnail = image source ou capture
-  const thumbnailUrl = payload.sourceImageUrl || videoResult?.thumbnail_url || videoUrl;
-
-  // Sauvegarder dans media_generations
-  const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
-    user_id: userId,
-    brand_id: brandId,
-    type: "video",
-    engine: "replicate",
-    status: "completed",
-    output_url: videoUrl,
-    thumbnail_url: thumbnailUrl,
-    metadata: {
-      provider: "replicate",
-      tier: "standard",
-      source: payload.sourceImageUrl ? "image" : "text",
-      prompt: videoPrompt,
-      aspectRatio,
-      duration: durationSec,
-      fps: 8,
-      resolution: "720x1280",
-      orderId,
-    },
-  });
-  if (mediaErr) throw new Error(mediaErr.message);
-
-  console.log("[processGenerateVideo] ✅ Replicate video saved to media_generations");
-  return { videoUrl };
+  // Pas de fallback - uniquement Veo 3.1 premium
+  throw new Error("Only video_premium (Veo 3.1) is supported. video_basic has been removed.");
 }
 
 // ========================================
