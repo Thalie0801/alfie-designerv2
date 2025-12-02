@@ -480,6 +480,19 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
       return;
     }
 
+    // ✅ Vérifier que les vidéos ont une image de référence
+    const videosWithoutImage = pack.assets.filter(
+      (a) => a.kind === "video_premium" && !a.referenceImageUrl
+    );
+
+    if (videosWithoutImage.length > 0) {
+      const videoNames = videosWithoutImage.map((v) => v.title).join(", ");
+      toast.error(
+        `📸 Ajoute une image source pour tes vidéos avant de générer : ${videoNames}`,
+        { duration: 5000 }
+      );
+      return;
+    }
 
     // Calculer le coût pour afficher dans la confirmation
     const totalCost = calculatePackWoofCost(pack);
