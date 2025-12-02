@@ -11,8 +11,8 @@ export type VisualStyle =
   | 'digital_painting'
   | 'comic_book';
 
-export type VisionTarget = 'gemini_image' | 'replicate' | 'veo_3_1';
-export type VisionKind = 'image' | 'carousel' | 'video_standard' | 'video_premium';
+export type VisionTarget = 'gemini_image' | 'veo_3_1';
+export type VisionKind = 'image' | 'carousel' | 'video_premium';
 export type TextSource = 'ai' | 'user';
 
 export interface TextLayout {
@@ -20,7 +20,7 @@ export interface TextLayout {
   has_body: boolean;
   has_cta: boolean;
   has_subtitles?: boolean;
-  layout_hint: string;
+  layout_hint?: string;
   safe_zones?: Array<{
     id: string;
     zone_hint: string;
@@ -35,8 +35,16 @@ export interface ImageSpec {
   image_size: string;
   count: number;
   style: VisualStyle;
-  text_layout: TextLayout;
-  text_source: TextSource;
+  text_layout?: TextLayout;
+  text_source?: TextSource;
+}
+
+export interface BaseImageSpec {
+  prompt: string;
+  negative_prompt: string;
+  aspect_ratio: string;
+  image_size: string;
+  style: VisualStyle;
 }
 
 export interface CarouselSlide {
@@ -47,11 +55,10 @@ export interface CarouselSlide {
   text_source: TextSource;
 }
 
-export interface VideoBeat {
-  id: string;
-  time_range: [number, number];
-  description: string;
-  camera?: string;
+export interface VideoAnimation {
+  one_liner: string;
+  camera_motion: string;
+  element_motion: string[];
 }
 
 export interface VideoSpec {
@@ -59,10 +66,7 @@ export interface VideoSpec {
   duration_seconds: number;
   aspect_ratio: string;
   style: VisualStyle;
-  scenario: {
-    one_liner: string;
-    beats: VideoBeat[];
-  };
+  animation: VideoAnimation;
   visual_prompt: string;
   negative_prompt: string;
   text_layout: TextLayout;
@@ -84,6 +88,7 @@ export interface VisionOutput {
   meta: VisionMeta;
   images?: ImageSpec[];
   slides?: CarouselSlide[];
+  base_image?: BaseImageSpec;
   video?: VideoSpec;
   overlays?: Array<{
     id: string;
@@ -98,13 +103,15 @@ export interface VisionOutput {
 export function validateVisionOutput(output: any): output is VisionOutput {
   if (!output || typeof output !== 'object') return false;
   if (output.engine !== 'visual') return false;
-  if (!['image', 'carousel', 'video_standard', 'video_premium'].includes(output.kind)) return false;
-  if (!['gemini_image', 'replicate', 'veo_3_1'].includes(output.target)) return false;
+  if (!['image', 'carousel', 'video_premium'].includes(output.kind)) return false;
+  if (!['gemini_image', 'veo_3_1'].includes(output.target)) return false;
   
   // Validation selon le kind
   if (output.kind === 'image' && !Array.isArray(output.images)) return false;
   if (output.kind === 'carousel' && !Array.isArray(output.slides)) return false;
-  if ((output.kind === 'video_standard' || output.kind === 'video_premium') && !output.video) return false;
+  if (output.kind === 'video_premium') {
+    if (!output.base_image || !output.video) return false;
+  }
   
   return true;
 }
