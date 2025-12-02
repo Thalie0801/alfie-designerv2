@@ -82,17 +82,14 @@ SidebarTrigger.displayName = "SidebarTrigger";
 export interface SidebarProps extends React.HTMLAttributes<HTMLElement> {}
 
 export const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({ className, ...props }, ref) => {
-  const { open, isMobile } = useSidebar();
+  const { open, setOpen, isMobile } = useSidebar();
 
   return (
     <>
       {isMobile && open && (
         <div 
           className="fixed inset-0 bg-black/50 z-40"
-          onClick={() => {
-            const ctx = React.useContext(SidebarContext);
-            ctx?.setOpen(false);
-          }}
+          onClick={() => setOpen(false)}
         />
       )}
       <aside
