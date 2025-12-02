@@ -16,27 +16,27 @@ interface WoofsPack {
 export const WOOFS_PACKS: WoofsPack[] = [
   {
     size: 50,
-    price: 9,
+    price: 10,
     stripePriceId: 'price_woofs_pack_50',
     description: 'Pack Starter - 50 Woofs',
   },
   {
     size: 100,
-    price: 16,
+    price: 19,
     stripePriceId: 'price_woofs_pack_100',
-    description: 'Pack Pro - 100 Woofs (-11%)',
+    description: 'Pack Pro - 100 Woofs (-5%)',
   },
   {
     size: 250,
-    price: 35,
+    price: 45,
     stripePriceId: 'price_woofs_pack_250',
-    description: 'Pack Studio - 250 Woofs (-22%)',
+    description: 'Pack Studio - 250 Woofs (-10%)',
   },
   {
     size: 500,
-    price: 60,
+    price: 85,
     stripePriceId: 'price_woofs_pack_500',
-    description: 'Pack Enterprise - 500 Woofs (-33%)',
+    description: 'Pack Max - 500 Woofs (-15%)',
   },
 ];
 

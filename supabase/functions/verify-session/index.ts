@@ -137,32 +137,60 @@ async function insertPaymentSession(sessionId: string, email: string, plan: stri
   }
 }
 
-async function handleAffiliateConversion(affiliateRef: string | undefined | null, userId: string, plan: string, amount: number) {
+type ConversionType = "subscription" | "upgrade" | "woofs_pack";
+
+async function handleAffiliateConversion(
+  affiliateRef: string | undefined | null,
+  userId: string,
+  conversionType: ConversionType,
+  planOrSize: string,
+  amount: number
+) {
   if (!affiliateRef) return;
 
-  console.log("[verify-session] Processing affiliate conversion", { affiliateRef, userId, plan });
+  // Format plan field: "subscription:starter", "upgrade:pro", "woofs_pack:100"
+  const planLabel = `${conversionType}:${planOrSize}`;
+
+  console.log("[verify-session] Processing affiliate conversion", { affiliateRef, userId, planLabel, amount });
 
   const supabase = getSupabaseClient();
 
-  const { data: affiliateData, error: affiliateError } = await supabase
+  // Try to find affiliate by ID or slug
+  let affiliateId: string | null = null;
+  
+  // First try by ID
+  const { data: affiliateById } = await supabase
     .from("affiliates")
     .select("id")
     .eq("id", affiliateRef)
     .single();
 
-  if (!affiliateData || affiliateError) {
-    console.log("[verify-session] Affiliate not found", { affiliateError });
-    return;
+  if (affiliateById) {
+    affiliateId = (affiliateById as any).id;
+  } else {
+    // Try by slug
+    const { data: affiliateBySlug } = await supabase
+      .from("affiliates")
+      .select("id")
+      .eq("slug", affiliateRef)
+      .single();
+    
+    if (affiliateBySlug) {
+      affiliateId = (affiliateBySlug as any).id;
+    }
   }
 
-  const affiliateId = (affiliateData as any).id as string;
+  if (!affiliateId) {
+    console.log("[verify-session] Affiliate not found", { affiliateRef });
+    return;
+  }
 
   const { data: conversionData, error: conversionError } = await supabase
     .from("affiliate_conversions")
     .insert({
       affiliate_id: affiliateId,
       user_id: userId,
-      plan,
+      plan: planLabel,
       amount,
       status: "paid",
     } as any)
@@ -305,7 +333,8 @@ Deno.serve(async (req) => {
         await handleAffiliateConversion(
           affiliateRef,
           supabaseUserId,
-          `woofs_pack_${woofsPackSize}`,
+          "woofs_pack",
+          woofsPackSize,
           amount
         );
         console.log("[verify-session] Affiliate conversion processed for Woofs pack", { affiliateRef, amount });
@@ -314,13 +343,14 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true, brandId, woofsAdded: woofsAmount, affiliateProcessed: !!affiliateRef });
     }
 
-    // Flux standard : abonnement
+    // Flux standard : abonnement ou upgrade
     const email = (session.customer_details?.email || session.metadata?.email) as string | undefined;
     const plan = session.metadata?.plan as keyof typeof PLAN_CONFIG | undefined;
     const affiliateRef = session.metadata?.affiliate_ref as string | undefined;
     const brandName = session.metadata?.brand_name as string | undefined;
+    const upgradeFrom = session.metadata?.upgrade_from as string | undefined;
 
-    console.log("[verify-session] Processing session", { email, plan, session_id });
+    console.log("[verify-session] Processing session", { email, plan, session_id, upgradeFrom });
 
     if (!email) {
       throw new Error("Missing customer email on checkout session");
@@ -329,6 +359,9 @@ Deno.serve(async (req) => {
     if (!plan || !PLAN_CONFIG[plan]) {
       throw new Error(`Invalid plan on checkout session: ${plan}`);
     }
+
+    // Déterminer le type de conversion
+    const conversionType: ConversionType = upgradeFrom ? "upgrade" : "subscription";
 
     await insertPaymentSession(
       session.id,
@@ -349,6 +382,7 @@ Deno.serve(async (req) => {
     await handleAffiliateConversion(
       affiliateRef,
       userId,
+      conversionType,
       plan,
       session.amount_total ? session.amount_total / 100 : 0,
     );

@@ -11,9 +11,11 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { ArrowUpCircle, Zap } from 'lucide-react';
-import { BrandTier, useBrandManagement } from '@/hooks/useBrandManagement';
+import { BrandTier } from '@/hooks/useBrandManagement';
 import { SYSTEM_CONFIG } from '@/config/systemConfig';
-import { useStripeCheckout } from '@/hooks/useStripeCheckout';
+import { supabase } from '@/lib/supabase';
+import { useAffiliate } from '@/hooks/useAffiliate';
+import { toast } from 'sonner';
 
 interface BrandUpgradeDialogProps {
   brandId: string;
@@ -26,11 +28,13 @@ export function BrandUpgradeDialog({
   brandId, 
   brandName, 
   currentTier, 
-  onSuccess 
+  onSuccess: _onSuccess 
 }: BrandUpgradeDialogProps) {
   const [open, setOpen] = useState(false);
-  const { upgradeBrand, getUpgradeCost, loading } = useBrandManagement();
-  const { loading: checkoutLoading } = useStripeCheckout();
+  const [loading, setLoading] = useState(false);
+  const { getAffiliateRef } = useAffiliate();
+
+  // Note: onSuccess is available for future use when implementing post-upgrade actions
 
   const tiers: { tier: BrandTier; name: string }[] = [
     { tier: 'starter', name: 'Starter' },
@@ -40,12 +44,45 @@ export function BrandUpgradeDialog({
 
   const currentTierIndex = tiers.findIndex(t => t.tier === currentTier);
 
+  const getUpgradeCost = (from: BrandTier, to: BrandTier): number => {
+    const prices = SYSTEM_CONFIG.PRICING;
+    const fromPrice = prices[from.toUpperCase() as keyof typeof prices] || 0;
+    const toPrice = prices[to.toUpperCase() as keyof typeof prices] || 0;
+    return Math.max(0, toPrice - fromPrice);
+  };
+
   const handleUpgrade = async (newTier: BrandTier) => {
-    // TODO: Intégrer Stripe pour la facturation
-    const success = await upgradeBrand(brandId, newTier);
-    if (success) {
-      setOpen(false);
-      onSuccess?.();
+    setLoading(true);
+    try {
+      const affiliateRef = getAffiliateRef();
+      
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: {
+          mode: 'subscription',
+          plan: newTier,
+          billing_period: 'monthly',
+          affiliate_ref: affiliateRef || undefined,
+          metadata: {
+            upgrade_from: currentTier,
+            brand_id: brandId,
+          },
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Erreur lors de la création du paiement');
+      }
+
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('URL de paiement non reçue');
+      }
+    } catch (error: any) {
+      console.error('Upgrade error:', error);
+      toast.error('Erreur lors de l\'upgrade: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -111,9 +148,9 @@ export function BrandUpgradeDialog({
                     <Button
                       className="w-full"
                       onClick={() => handleUpgrade(tier.tier)}
-                      disabled={loading || checkoutLoading}
+                      disabled={loading}
                     >
-                      Upgrader
+                      {loading ? 'Redirection...' : 'Upgrader'}
                     </Button>
                   )}
                 </div>

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import { Copy, DollarSign, MousePointerClick, TrendingUp, Users, Award, Target, Crown, CreditCard } from 'lucide-react';
+import { Copy, DollarSign, MousePointerClick, TrendingUp, Users, Award, Target, Crown, CreditCard, Package, ArrowUp, UserPlus2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
@@ -16,6 +16,7 @@ export default function Affiliate() {
   const [payouts, setPayouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [commissions, setCommissions] = useState<any[]>([]);
+  const [conversions, setConversions] = useState<any[]>([]);
   const [directReferrals, setDirectReferrals] = useState<any[]>([]);
   const [requestingPayout, setRequestingPayout] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -139,6 +140,7 @@ export default function Affiliate() {
 
       setPayouts(pays.data ?? []);
       setCommissions(comms.data ?? []);
+      setConversions(conv.data ?? []);
       setDirectReferrals(refs.data ?? []);
 
       const level1 = (comms.data ?? [])
@@ -672,6 +674,73 @@ export default function Affiliate() {
               <p className="text-xs text-muted-foreground mt-1">Réseau de niveau 3</p>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Mes Conversions (Nouveaux abonnés, Upgrades, Packs Woofs) */}
+      <Card className="shadow-medium">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            Mes conversions ({conversions.length})
+          </CardTitle>
+          <CardDescription>Abonnements, upgrades et packs Woofs générés</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {conversions.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">
+              Aucune conversion pour le moment. Partagez votre lien pour commencer !
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {conversions.slice(0, 15).map((conversion) => {
+                const plan = conversion.plan || '';
+                let badge = { label: plan, icon: UserPlus2, color: 'bg-green-500', textColor: 'text-green-600' };
+                
+                if (plan.startsWith('woofs_pack:')) {
+                  const size = plan.split(':')[1];
+                  badge = { label: `Pack ${size} Woofs`, icon: Package, color: 'bg-orange-500', textColor: 'text-orange-600' };
+                } else if (plan.startsWith('upgrade:')) {
+                  const tier = plan.split(':')[1];
+                  badge = { label: `Upgrade ${tier}`, icon: ArrowUp, color: 'bg-blue-500', textColor: 'text-blue-600' };
+                } else if (plan.startsWith('subscription:')) {
+                  const tier = plan.split(':')[1];
+                  badge = { label: `Nouvel abonné ${tier}`, icon: UserPlus2, color: 'bg-green-500', textColor: 'text-green-600' };
+                }
+
+                const BadgeIcon = badge.icon;
+
+                return (
+                  <div
+                    key={conversion.id}
+                    className="flex items-center justify-between p-4 rounded-lg border hover:border-primary/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-full ${badge.color} flex items-center justify-center text-white`}>
+                        <BadgeIcon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <Badge className={badge.color}>{badge.label}</Badge>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {new Date(conversion.created_at).toLocaleDateString('fr-FR', { 
+                            day: 'numeric', 
+                            month: 'long', 
+                            year: 'numeric' 
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className={`font-bold text-lg ${badge.textColor}`}>
+                        {Number(conversion.amount || 0).toFixed(2)}€
+                      </span>
+                      <p className="text-xs text-muted-foreground">Transaction</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
 
