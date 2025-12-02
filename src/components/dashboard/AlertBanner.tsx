@@ -7,6 +7,7 @@ import { useActivityStats } from "@/hooks/useActivityStats";
 import { BrandDialog } from "@/components/BrandDialog";
 import { BrandUpgradeDialog } from "@/components/BrandUpgradeDialog";
 import { BrandTier } from "@/hooks/useBrandManagement";
+import { useAuth } from "@/hooks/useAuth";
 
 type Plan = BrandTier | "starter" | string;
 
@@ -66,6 +67,7 @@ export function AlertBanner() {
  */
 function AlertBannerInner({ brand }: { brand: Brand }) {
   const { id: brandId, name, palette, voice, canva_connected, plan } = brand;
+  const { isAdmin } = useAuth();
 
   // ✅ Toujours appelé, car ce composant n'est monté que si brand est défini
   const { stats } = useActivityStats(brandId);
@@ -101,8 +103,11 @@ function AlertBannerInner({ brand }: { brand: Brand }) {
   // Si les stats n'ont pas encore été chargées, on ne montre rien (évite le flicker)
   if (!stats) return null;
 
-  // 1) Quota critique (near or over)
-  if (usage.anyNear || usage.anyOver) {
+  // ✅ NOUVEAU : Ne pas afficher l'alerte de quota pour les admins (bypass illimité)
+  if (isAdmin) {
+    // Passer directement aux alertes Brand Kit/Canva (pas d'alerte quota)
+  } else if (usage.anyNear || usage.anyOver) {
+    // 1) Quota critique (near or over) pour les non-admins
     const pct = Math.round(percentSafe(usage.mostCritical.used, usage.mostCritical.quota));
     const remaining =
       usage.mostCritical.quota > 0 ? Math.max(0, usage.mostCritical.quota - (usage.mostCritical.used ?? 0)) : 0;
