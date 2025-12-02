@@ -718,8 +718,8 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
                     <DropdownMenuItem onClick={() => addAsset({ kind: "carousel", count: 5, woofCostType: "carousel_slide" })}>
                       📊 Carrousel
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => addAsset({ kind: "video_premium", durationSeconds: 8, woofCostType: "video_premium" })}>
-                      ✨ Vidéo premium (8s)
+                    <DropdownMenuItem onClick={() => addAsset({ kind: "video_premium", durationSeconds: 6, woofCostType: "video_premium" })}>
+                      ✨ Asset vidéo (6s)
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

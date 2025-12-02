@@ -127,7 +127,7 @@ const DASHBOARD_STEPS: TourStep[] = [
   {
     selector: '[data-tour-id="quotas"]',
     title: "🐶 Tes Woofs",
-    content: "Les Woofs sont la monnaie d'Alfie. 1 Woof = 1 image/slide, 25 Woofs = 1 vidéo premium. Ils se rechargent chaque mois.",
+    content: "Les Woofs sont la monnaie d'Alfie. 1 Woof = 1 image/slide, 25 Woofs = 1 asset vidéo (6s). Ils se rechargent chaque mois.",
     placement: "top",
   },
   {

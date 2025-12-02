@@ -127,7 +127,7 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                   newKind === "carousel" ? "carousel_slide" :
                   "video_premium";
                 
-                const fixedDuration = newKind === "video_premium" ? 8 : undefined;
+                const fixedDuration = newKind === "video_premium" ? 6 : undefined;
                 setFormData({ 
                   ...formData, 
                   kind: newKind,
@@ -143,7 +143,7 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
               <SelectContent>
                 <SelectItem value="image">🖼️ Image</SelectItem>
                 <SelectItem value="carousel">📊 Carrousel</SelectItem>
-                <SelectItem value="video_premium">✨ Vidéo premium (8s)</SelectItem>
+                <SelectItem value="video_premium">✨ Asset vidéo (6s)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -262,10 +262,10 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
             <div className="space-y-2">
               <Label>Durée</Label>
               <div className="text-sm text-muted-foreground bg-muted/30 px-3 py-2 rounded-md border">
-                8 secondes (fixe)
+                6 secondes (fixe)
               </div>
               <p className="text-xs text-muted-foreground">
-                La durée est fixe pour garantir la qualité de génération.
+                Les assets vidéo sont fixés à 6s. Pour une vidéo longue, ajoute plusieurs assets.
               </p>
             </div>
           )}

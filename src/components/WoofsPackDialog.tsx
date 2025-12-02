@@ -85,7 +85,7 @@ export function WoofsPackDialog({
         <div className="p-3 rounded-lg bg-primary/5 text-sm">
           <p className="font-medium mb-1">💡 Rappel</p>
           <p className="text-muted-foreground">
-            1 Woof = 1 image/slide · 25 Woofs = 1 vidéo premium
+            1 Woof = 1 image/slide · 25 Woofs = 1 asset vidéo (6s)
           </p>
         </div>
 

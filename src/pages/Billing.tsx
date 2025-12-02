@@ -268,7 +268,7 @@ export default function Billing() {
                   <div>
                     <p className="font-semibold text-orange-700 dark:text-orange-300">Woofs ce mois</p>
                     <p className="text-xs text-orange-600/70 dark:text-orange-400/70">
-                      1 Woof = 1 image/slide · 25 Woofs = 1 vidéo premium
+                      1 Woof = 1 image/slide · 25 Woofs = 1 asset vidéo (6s)
                     </p>
                   </div>
                 </div>

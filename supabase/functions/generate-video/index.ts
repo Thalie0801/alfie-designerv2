@@ -386,10 +386,10 @@ async function generateGcsSignedUrl(
 
     // Vérifier et consommer les Woofs pour les nouvelles générations (pas pour les status checks)
     if (!isStatusCheck && brandId) {
-      const isPremium = providerEngine === "sora" || provider === "veo" || provider === "veo3" || provider === "premium";
-      const woofsCost = isPremium ? WOOF_COSTS.video_premium : WOOF_COSTS.video_basic;
+      // Toutes les vidéos sont maintenant premium (Veo 3.1)
+      const woofsCost = WOOF_COSTS.video_premium;
       
-      console.log(`[generate-video] Checking ${woofsCost} Woofs for ${isPremium ? 'premium' : 'basic'} video (brand ${brandId})`);
+      console.log(`[generate-video] Checking ${woofsCost} Woofs for asset vidéo (brand ${brandId})`);
       
       const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY!);
       const INTERNAL_FN_SECRET = Deno.env.get("INTERNAL_FN_SECRET");
@@ -404,8 +404,8 @@ async function generateGcsSignedUrl(
             userId,  // ✅ Passer userId pour appel interne
             brand_id: brandId,
             cost_woofs: woofsCost,
-            reason: isPremium ? "video_premium" : "video_basic",
-            metadata: { 
+            reason: "video_premium",
+            metadata: {
               prompt: prompt?.substring(0, 100),
               provider: providerDisplay,
               engine: providerEngine

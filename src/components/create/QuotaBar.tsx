@@ -195,7 +195,7 @@ export function QuotaBar({ activeBrandId }: QuotaBarProps) {
             <div className="pt-3 border-t space-y-2">
               <p className="text-xs font-semibold text-muted-foreground">Coûts en Woofs :</p>
               <div className="text-xs text-muted-foreground">
-                1 Woof = 1 image/slide · 25 Woofs = 1 vidéo premium
+                1 Woof = 1 image/slide · 25 Woofs = 1 asset vidéo (6s)
               </div>
               <p className="text-xs text-muted-foreground mt-2">
                 Les quotas se réinitialisent le 1er de chaque mois.

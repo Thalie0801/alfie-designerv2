@@ -10,9 +10,9 @@ Alfie Designer propose un système de génération vidéo unifié basé sur **Ve
 
 **Engine :** Vertex AI Veo 3.1 FAST  
 **Modèle :** `veo-3.0-fast-generate-001`  
-**Coût :** 25 Woofs par vidéo  
-**Durée :** Jusqu'à 8 secondes  
-**Résolution :** 1080p avec audio automatique  
+**Coût :** 25 Woofs par asset vidéo  
+**Durée :** 6 secondes par asset  
+**Résolution :** 1080p avec audio automatique
 
 ## Configuration Vidéo
 
@@ -21,7 +21,7 @@ Alfie Designer propose un système de génération vidéo unifié basé sur **Ve
 ```typescript
 // Paramètres de génération
 {
-  durationSeconds: 4 | 6 | 8,  // Durée validée
+  durationSeconds: 6,          // Durée fixe par asset
   storageUri: string,          // GCS bucket de destination
   prompt: string,              // Description de la vidéo
   sourceImageUrl?: string      // Image de référence optionnelle
@@ -30,7 +30,7 @@ Alfie Designer propose un système de génération vidéo unifié basé sur **Ve
 
 ### Flux de Génération Vidéo Premium
 
-1. **Utilisateur** sélectionne "🎥 Vidéo premium (8s)" dans Studio
+1. **Utilisateur** sélectionne "🎥 Asset vidéo (6s)" dans Studio
 2. **alfie-job-worker** traite le job `video_premium`
 3. **generate-video** Edge Function appelle Vertex AI Veo 3.1
 4. **Polling** vérifie l'opération toutes les 10 secondes (max 5 minutes)
@@ -43,7 +43,7 @@ Alfie Designer propose un système de génération vidéo unifié basé sur **Ve
 {
   provider: "vertex_ai",
   tier: "premium",
-  duration: 8,
+  duration: 6,
   resolution: "1080p",
   model: "veo-3.0-fast-generate-001"
 }
@@ -59,7 +59,7 @@ Alfie Designer propose un système de génération vidéo unifié basé sur **Ve
 
 ### Frontend
 
-- **src/pages/StudioGenerator.tsx** : Option "🎥 Vidéo premium (8s)"
+- **src/pages/StudioGenerator.tsx** : Option "🎥 Asset vidéo (6s)"
 - **src/components/studio/PackAssetRow.tsx** : Label vidéo premium uniquement
 - **src/lib/types/alfie.ts** : `AssetKind = 'image' | 'carousel' | 'video_premium'`
 
@@ -71,12 +71,13 @@ Alfie Designer propose un système de génération vidéo unifié basé sur **Ve
 - Audio généré automatiquement
 
 ### Coûts
-- Tarification transparente : 25 Woofs par vidéo
-- Pas de confusion entre tiers standard/premium
+- Tarification transparente : 25 Woofs par asset vidéo (6s)
+- Pour vidéos longues : plusieurs assets (12s = 2 assets = 50 Woofs)
 
 ### UX
 - Workflow simplifié : une seule option vidéo
-- Expérience cohérente et prévisible
+- Durée fixe 6s par asset pour contrôle des coûts
+- Vidéos longues = combinaison de plusieurs assets
 - Qualité professionnelle garantie
 
 ## Fonctions Edge Dépréciées
@@ -110,7 +111,7 @@ Toutes les vidéos ont une structure cohérente :
 
 ## Étapes Futures (Optionnelles)
 
-- Durées configurables (4s, 6s, 8s) avec tarification différenciée
+- Assemblage automatique de plusieurs assets vidéo
 - Génération de variantes vidéo
 - Aperçus avant génération complète
 - Traitement par batch
