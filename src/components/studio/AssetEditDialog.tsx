@@ -9,7 +9,7 @@ import type { PackAsset } from "@/types/alfiePack";
 import { Badge } from "@/components/ui/badge";
 import { WOOF_COSTS } from "@/config/woofs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Upload, X as XIcon, AlertCircle } from "lucide-react";
+import { Upload, X as XIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -287,67 +287,57 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
             </p>
           </div>
 
-          {/* Image de référence - OBLIGATOIRE pour video_basic */}
-          <div className="space-y-2 border rounded-lg p-3">
-            <div>
-              <Label className="flex items-center gap-1">
-                Image source 
-                {formData.kind === "video_basic" && <span className="text-red-500">*</span>}
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                {formData.kind === "video_basic" 
-                  ? "⚠️ Obligatoire : Alfie anime cette image pour créer ta vidéo."
-                  : "Optionnel : Alfie s'en sert comme inspiration visuelle."}
-              </p>
-            </div>
-
-            {formData.referenceImageUrl ? (
-              <div className="relative">
-                <img
-                  src={formData.referenceImageUrl}
-                  alt="Image de référence"
-                  className="w-full h-40 object-cover rounded-lg border"
-                />
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  className="absolute top-2 right-2"
-                  onClick={() => setFormData({ ...formData, referenceImageUrl: undefined })}
-                >
-                  <XIcon className="h-4 w-4 mr-1" />
-                  Retirer
-                </Button>
-              </div>
-            ) : (
-              <div className="relative">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  disabled={uploading}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full pointer-events-none"
-                  disabled={uploading}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  {uploading ? "Upload en cours..." : "Ajouter une image source"}
-                </Button>
-              </div>
-            )}
-
-            {formData.kind === "video_basic" && !formData.referenceImageUrl && (
-              <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
-                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
-                <p className="text-xs text-red-900 dark:text-red-100">
-                  <strong>Image obligatoire</strong> : Les vidéos standard sont générées à partir d'une image source.
+          {/* Image de référence - uniquement pour images et carrousels */}
+          {formData.kind !== "video_basic" && formData.kind !== "video_premium" && (
+            <div className="space-y-2 border rounded-lg p-3">
+              <div>
+                <Label className="flex items-center gap-1">
+                  Image source (optionnelle)
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Alfie s'en sert comme inspiration visuelle.
                 </p>
               </div>
-            )}
-          </div>
+
+              {formData.referenceImageUrl ? (
+                <div className="relative">
+                  <img
+                    src={formData.referenceImageUrl}
+                    alt="Image de référence"
+                    className="w-full h-40 object-cover rounded-lg border"
+                  />
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="absolute top-2 right-2"
+                    onClick={() => setFormData({ ...formData, referenceImageUrl: undefined })}
+                  >
+                    <XIcon className="h-4 w-4 mr-1" />
+                    Retirer
+                  </Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={uploading}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full pointer-events-none"
+                    disabled={uploading}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    {uploading ? "Upload en cours..." : "Ajouter une image source"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Generated texts section */}
           {formData.generatedTexts && (
