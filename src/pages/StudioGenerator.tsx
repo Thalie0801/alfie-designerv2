@@ -30,6 +30,24 @@ import { TourProvider, HelpLauncher } from "@/components/tour/InteractiveTour";
 import { StudioTourAutoStart } from "@/components/tour/StudioTourAutoStart";
 import { STUDIO_STEPS } from "@/components/tour/StudioTourSteps";
 
+/**
+ * Enrichit un pack avec woofCostType basé sur le kind de chaque asset
+ */
+function enrichPackWithWoofCostType(pack: AlfiePack): AlfiePack {
+  return {
+    ...pack,
+    assets: pack.assets.map((asset) => ({
+      ...asset,
+      count: asset.kind === 'carousel' ? (asset.count || 5) : (asset.count || 1),
+      woofCostType: asset.kind === 'carousel' 
+        ? 'carousel_slide' 
+        : asset.kind === 'image'
+          ? 'image'
+          : 'video_premium',
+    })),
+  };
+}
+
 // Packs prédéfinis
 const PRESET_PACKS = {
   lancement: {
@@ -334,7 +352,7 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
         const packData = data?.pack;
         
         if (packData && packData.assets && packData.assets.length > 0) {
-          packStructure = packData;
+          packStructure = enrichPackWithWoofCostType(packData);
         } else {
           console.warn("No pack detected in response");
           setBriefGenerationError(
