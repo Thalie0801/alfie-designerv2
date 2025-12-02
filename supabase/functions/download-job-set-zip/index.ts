@@ -53,8 +53,21 @@ function cleanText(text: string, maxLen = 220): string {
   return cleaned.length > maxLen ? cleaned.slice(0, maxLen).trim() : cleaned.trim();
 }
 
+/**
+ * Encode text for Cloudinary overlay - double-encode special delimiters
+ * Cloudinary uses , and / as delimiters in transformation URLs
+ */
 function encodeCloudinaryText(text: string): string {
-  return encodeURIComponent(text).replace(/%20/g, '%20');
+  let encoded = encodeURIComponent(text);
+  
+  // Double-encode Cloudinary delimiters:
+  // - %2C (comma) → %252C (Cloudinary interprets %2C as delimiter)
+  // - %2F (slash) → %252F (same issue)
+  encoded = encoded
+    .replace(/%2C/g, '%252C')
+    .replace(/%2F/g, '%252F');
+  
+  return encoded;
 }
 
 function buildOverlayUrl(slide: any): string | null {
@@ -135,7 +148,7 @@ function buildOverlayUrl(slide: any): string | null {
       if (b.trim() !== '') {
         const bulletY = config.bulletStart + i * config.bulletStep;
         overlays.push(
-          `l_text:Arial_${config.bulletSize}:${encodeCloudinaryText('• ' + b)},co_rgb:FFFFFF,g_center,y_${bulletY},w_${Math.round(dims.w * 0.8)},c_fit`
+          `l_text:Arial_${config.bulletSize}:${encodeCloudinaryText('- ' + b)},co_rgb:FFFFFF,g_center,y_${bulletY},w_${Math.round(dims.w * 0.8)},c_fit`
         );
       }
     });
