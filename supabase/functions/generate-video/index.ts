@@ -385,7 +385,7 @@ async function generateGcsSignedUrl(
     }
 
     // Vérifier et consommer les Woofs pour les nouvelles générations (pas pour les status checks)
-    if (!isStatusCheck && brandId) {
+    if (!isStatusCheck && brandId && !isInternalCall) {
       // Toutes les vidéos sont maintenant premium (Veo 3.1)
       const woofsCost = WOOF_COSTS.video_premium;
       
@@ -430,6 +430,8 @@ async function generateGcsSignedUrl(
       }
 
       console.log(`[generate-video] ✅ Consumed ${woofsCost} Woofs, remaining: ${woofsData.data.remaining_woofs}`);
+    } else if (isInternalCall) {
+      console.log(`[generate-video] ⏭️ Skipping Woofs check for internal call (already consumed in pack flow)`);
     }
 
     if (isStatusCheck) {
