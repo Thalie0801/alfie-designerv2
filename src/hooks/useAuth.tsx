@@ -309,10 +309,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (subscription?.status ? ['active', 'trial', 'trialing'].includes(String(subscription.status).toLowerCase()) : false)
     )
   });
+  // Plans actifs valides
+  const ACTIVE_PLANS = ['starter', 'pro', 'studio', 'enterprise', 'admin'];
+  
   const hasActivePlan = Boolean(
     vipBypass ||
     computedAdmin ||
     profile?.granted_by_admin ||
+    // Vérification directe du profil (fallback si roles/subscription pas encore chargés)
+    (profile?.status === 'active' && profile?.plan && ACTIVE_PLANS.includes(profile.plan.toLowerCase())) ||
     (subscription?.status ? ['active', 'trial', 'trialing'].includes(String(subscription.status).toLowerCase()) : false)
   );
 
