@@ -275,14 +275,18 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
               const src = (() => {
                 if (!canOverlay || !cloudName) return base;
                 try {
-                  // ✅ Sanitizer les bullets pour éviter les caractères Unicode problématiques (• → -)
+                  // ✅ Sanitizer les bullets pour éviter les caractères Unicode problématiques
                   const sanitizedBullets = (slide.text_json?.bullets || [])
-                    .map(b => b.replace(/^[•\-–—]\s*/g, '').trim());
-                  
+                    .map(b => b.replace(/^[•\-–—]\s*/g, '').trim())
+                    .filter(b => b.length > 0); // ✅ Filtrer les bullets vides
+
+                  // ✅ Fallback pour titre si vraiment vide (cas limite)
+                  const displayTitle = slide.text_json?.title?.trim() || `Slide ${(slide.slide_index ?? 0) + 1}`;
+
                   return slideUrl(slide.cloudinary_public_id as string, {
-                    title: slide.text_json?.title,
+                    title: displayTitle,
                     subtitle: slide.text_json?.subtitle,
-                    bulletPoints: sanitizedBullets,
+                    bulletPoints: sanitizedBullets.length ? sanitizedBullets : undefined,
                     aspectRatio: (slide.format || "4:5") as Aspect,
                     cloudName,
                   });

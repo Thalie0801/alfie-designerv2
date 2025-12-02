@@ -89,24 +89,32 @@ function buildImagePrompt(globalStyle: string, prompt: string, useBrandKit: bool
   // ✅ Le thème utilisateur est TOUJOURS prioritaire
   const themeContent = prompt && prompt.trim().length > 0 
     ? prompt 
-    : "Professional abstract background";
+    : "Professional marketing visual";
   
   // Le style est un AJOUT, pas un remplacement
   const styleHint = useBrandKit && globalStyle 
     ? globalStyle 
     : "Professional, modern, clean design";
   
-  // ✅ Prompt TRÈS explicite pour éviter les collages/grilles
-  return `Generate ONE SINGLE seamless background image for: ${themeContent}.
-Style: ${styleHint}.
+  // ✅ NOUVEAU PROMPT : scène avec point focal + zone propre pour texte
+  return `Generate ONE SINGLE scene illustration for: ${themeContent}.
 
-CRITICAL REQUIREMENTS:
-- Create exactly ONE image, NOT a collage, NOT a grid, NOT multiple panels
-- This is a background image only - NO text, NO typography, NO letters, NO numbers, NO words
+COMPOSITION REQUIREMENTS:
+- Create a clear focal point with a subject or visual anchor
+- Leave a clean, simple area (solid color, soft gradient, or minimal texture) for text overlay
+- The background behind the text area must NOT be busy or cluttered
+- This is NOT a seamless pattern, NOT a wallpaper, NOT a tiled texture
+
+VISUAL STYLE:
+${styleHint}
+
+STRICT PROHIBITIONS:
+- NO text, NO typography, NO letters, NO numbers, NO words
 - NO logos, NO watermarks, NO icons, NO UI elements
-- Seamless, clean, abstract or lifestyle background suitable for overlaying text later
-- High quality, detailed, natural light, soft shadows
-- Fill the entire canvas with a single cohesive visual`;
+- NO seamless patterns, NO repeated motifs, NO wallpaper designs
+- NO collages, NO grids, NO multiple panels
+
+OUTPUT: High quality, detailed image with natural light, soft shadows, professional composition.`;
 }
 
 async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, ms = 30000) {
