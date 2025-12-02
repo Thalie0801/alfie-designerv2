@@ -976,37 +976,56 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   const carousel_id = payload.carousel_id || crypto.randomUUID();
   const totalSlides = payload.count || 5;
   
-  // ✅ Phase 3: Fallback si pas de textes générés - basé sur le brief
-  let slides = payload.generatedTexts?.slides;
-  
-  if (!slides || !Array.isArray(slides) || slides.length === 0) {
-    console.warn("[processRenderCarousels] ⚠️ No generated texts, using brief-based fallback...");
-    
-    // ✅ Fallback basé sur le brief au lieu de textes génériques
-    const topic = payload.brief?.topic || payload.topic || "Votre sujet";
-    const cta = payload.brief?.cta || "En savoir plus";
-    
-    slides = Array.from({ length: totalSlides }, (_, i) => {
-      if (i === 0) {
-        return {
-          title: topic,
-          subtitle: "Introduction au sujet",
-        };
-      } else if (i === totalSlides - 1) {
-        return {
-          title: cta,
-          subtitle: "Contactez-nous",
-        };
-      } else {
-        return {
-          title: `Point clé ${i}`,
-          subtitle: `${topic} - aspect ${i}`,
-        };
-      }
-    });
-    
-    console.log("[processRenderCarousels] ✅ Generated brief-based fallback slides:", slides.length);
-  }
+  // ✅ Phase 3: Fallback SLIDE PAR SLIDE (pas tout ou rien)
+  const aiSlides = payload.generatedTexts?.slides ?? [];
+  const topic = payload.brief?.topic || payload.topic || "Votre sujet";
+  const cta = payload.brief?.cta || "En savoir plus";
+
+  // Construire les slides de fallback basées sur le brief
+  const fallbackSlides = Array.from({ length: totalSlides }, (_, i) => {
+    if (i === 0) {
+      return {
+        title: topic,
+        subtitle: "Découvrez les points essentiels",
+        bullets: [],
+        alt: `Slide d'introduction : ${topic}`,
+      };
+    } else if (i === totalSlides - 1) {
+      return {
+        title: cta,
+        subtitle: "Passez à l'action",
+        bullets: [],
+        alt: `Slide finale : ${cta}`,
+      };
+    } else {
+      return {
+        title: `Point clé ${i}`,
+        subtitle: `${topic} - aspect ${i}`,
+        bullets: [`Détail important ${i}`],
+        alt: `Slide ${i + 1} sur ${topic}`,
+      };
+    }
+  });
+
+  // ✅ FUSION : si un champ manque dans aiSlides, on prend le fallback
+  const slides = Array.from({ length: totalSlides }, (_, index) => {
+    const ai = aiSlides[index] ?? {};
+    const fb = fallbackSlides[index];
+
+    const title = (ai.title && ai.title.trim()) ? ai.title : fb.title;
+    const subtitle = (ai.subtitle && ai.subtitle.trim()) ? ai.subtitle : fb.subtitle;
+    const bullets = (Array.isArray(ai.bullets) && ai.bullets.length > 0) 
+      ? ai.bullets 
+      : (fb.bullets ?? []);
+    const alt = ai.alt || fb.alt || title;
+
+    return { title, subtitle, bullets, alt };
+  });
+
+  console.log("[processRenderCarousels] ✅ Merged slides with fallback:", 
+    slides.map((s, i) => ({ index: i, hasTitle: !!s.title, hasSubtitle: !!s.subtitle }))
+  );
+
   if (!Array.isArray(slides) || slides.length === 0) {
     throw new Error("Generated texts must contain an array of slides");
   }
