@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -152,7 +153,7 @@ const PRESET_PACKS = {
 
 export function StudioGenerator() {
   const { user } = useAuth();
-  const { activeBrandId, activeBrand } = useBrandKit();
+  const { activeBrandId, activeBrand, loading: brandLoading } = useBrandKit();
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -533,14 +534,61 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
     }
   };
 
+  // Loading state
+  if (brandLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center gap-3 mb-8">
+            <Skeleton className="w-8 h-8 rounded-full" />
+            <Skeleton className="h-10 w-48" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <Skeleton className="lg:col-span-3 h-64" />
+            <Skeleton className="lg:col-span-6 h-96" />
+            <Skeleton className="lg:col-span-3 h-48" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // No brand selected state
   if (!activeBrandId) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Card className="p-6 text-center">
-          <p className="text-muted-foreground">
-            Sélectionne une marque pour utiliser le Studio
-          </p>
-        </Card>
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8">
+          {/* Header cohérent */}
+          <div className="mb-8 text-center">
+            <div className="flex items-center justify-center gap-3 mb-3">
+              <Sparkles className="w-8 h-8 text-alfie-pink" />
+              <h1 className="text-3xl md:text-4xl font-bold">Studio Alfie</h1>
+            </div>
+            <p className="text-muted-foreground">
+              Crée ton pack de visuels sur mesure 🎬
+            </p>
+          </div>
+
+          {/* Card améliorée */}
+          <Card className="max-w-md mx-auto p-8 text-center space-y-4">
+            <div className="w-16 h-16 mx-auto bg-alfie-mint/20 rounded-full flex items-center justify-center">
+              <Sparkles className="w-8 h-8 text-alfie-pink" />
+            </div>
+            <h2 className="text-xl font-semibold">
+              Presque prêt ! 🐶
+            </h2>
+            <p className="text-muted-foreground">
+              Sélectionne ou crée une marque pour commencer à générer tes visuels avec Alfie.
+            </p>
+            <Button 
+              onClick={() => navigate('/brand-kit')}
+              className="gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Configurer ma marque
+            </Button>
+          </Card>
+        </div>
       </div>
     );
   }
