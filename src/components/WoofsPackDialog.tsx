@@ -68,9 +68,17 @@ export function WoofsPackDialog({
                   Populaire
                 </div>
               )}
+              {pack.bonus && (
+                <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  +{pack.bonus} GRATUITS
+                </div>
+              )}
               <div className="flex items-center gap-2 mb-2">
                 <Zap className="w-5 h-5 text-primary" />
                 <span className="font-bold text-xl">+{pack.size} Woofs</span>
+                {pack.bonus && (
+                  <span className="text-green-500 font-bold text-sm">+{pack.bonus}</span>
+                )}
               </div>
               <p className="text-sm text-muted-foreground mb-3 flex-grow">
                 {pack.description}

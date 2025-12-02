@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/lib/supabase';
-import { Users, Activity, ArrowLeft, Sparkles, Plus, ExternalLink, Trash2, Edit2, Search, RefreshCw, TrendingUp, UserCheck, UserX, Award, Unlock } from 'lucide-react';
+import { Users, Activity, ArrowLeft, Sparkles, Plus, ExternalLink, Trash2, Edit2, Search, RefreshCw, TrendingUp, UserCheck, UserX, Award, Unlock, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { NewsManager } from '@/components/NewsManager';
 import { VideoDiagnostic } from '@/components/VideoDiagnostic';
@@ -41,6 +41,7 @@ export default function Admin() {
     name: '',
     max_redemptions: '',
   });
+  const [creatingWoofsProducts, setCreatingWoofsProducts] = useState(false);
 
   useEffect(() => {
     loadAdminData();
@@ -410,6 +411,29 @@ export default function Admin() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button 
+            onClick={async () => {
+              if (!confirm('Créer les 4 produits Woofs sur Stripe ?')) return;
+              setCreatingWoofsProducts(true);
+              try {
+                const { data, error } = await supabase.functions.invoke('admin-create-woofs-products');
+                if (error) throw error;
+                toast.success(data.message || 'Produits Woofs créés sur Stripe !');
+                console.log('[ADMIN] Woofs products created:', data.products);
+              } catch (err: any) {
+                console.error('Create woofs products error:', err);
+                toast.error(err.message || 'Erreur lors de la création des produits');
+              } finally {
+                setCreatingWoofsProducts(false);
+              }
+            }}
+            variant="outline"
+            className="gap-2 border-green-500 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950"
+            disabled={creatingWoofsProducts}
+          >
+            <Zap className="h-4 w-4" />
+            {creatingWoofsProducts ? 'Création...' : 'Créer Produits Woofs'}
+          </Button>
           <Button 
             onClick={handleResetStuckJobs} 
             variant="outline" 
