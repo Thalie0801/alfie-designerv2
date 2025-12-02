@@ -251,6 +251,7 @@ Deno.serve(async (req) => {
     const generationId = typeof body?.generationId === "string" ? body.generationId : undefined;
     const jobId = typeof body?.jobId === "string" ? body.jobId : undefined;
     const orderId = typeof body?.orderId === "string" ? body.orderId : undefined;
+    const withAudio = body?.withAudio !== false; // true par défaut
 
     const providerRaw = typeof body?.provider === "string" ? body.provider : undefined;
     const providerResolution = resolveProvider(providerRaw);
@@ -872,10 +873,12 @@ async function generateGcsSignedUrl(
         parameters: {
           aspectRatio: veo3AspectRatio,
           durationSeconds,
-          generateAudio: true,
+          generateAudio: withAudio, // ✅ Configurable via paramètre
           storageUri: orderId ? `gs://${videosBucket}/veo3/${orderId}/` : `gs://${videosBucket}/veo3/`
         }
       };
+      
+      console.log(`[generate-video] VEO 3 audio generation: ${withAudio ? 'ENABLED' : 'DISABLED'}`);
 
       console.log("[generate-video] VEO 3 payload:", JSON.stringify(veoPayload, null, 2));
 

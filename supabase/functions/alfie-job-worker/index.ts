@@ -908,8 +908,9 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
 
   const durationSec = duration || payload.durationSeconds || 5;
   const useBrandKit = resolveUseBrandKit(payload, jobMeta);
+  const withAudio = payload.withAudio !== false; // true par défaut
 
-  console.log("[processGenerateVideo] Engine:", engine, "| useBrandKit:", useBrandKit);
+  console.log("[processGenerateVideo] Engine:", engine, "| useBrandKit:", useBrandKit, "| withAudio:", withAudio);
 
   // ✅ Support VEO 3.1 pour vidéos premium
   if (engine === "veo_3_1") {
@@ -923,6 +924,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
     const veoResult = await callFn<any>("generate-video", {
       prompt: videoPrompt,
       aspectRatio: aspectRatio || "9:16",
+      withAudio, // ✅ Propagation du paramètre audio
       duration: durationSec,
       provider: "veo3", // ✅ Explicite: VEO 3 FAST
       userId,
