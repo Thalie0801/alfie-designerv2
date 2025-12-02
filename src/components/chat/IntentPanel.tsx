@@ -3,12 +3,14 @@
  * Displays a summary of generated intents for user review before generation
  */
 
-import { useState } from 'react';
-import { Edit2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Edit2, Trash2, ChevronDown, ChevronUp, Upload } from 'lucide-react';
 import type { UnifiedAlfieIntent } from '@/lib/types/alfie';
 import { getWoofCost } from '@/types/alfiePack';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface IntentPanelProps {
   intents: UnifiedAlfieIntent[];
@@ -16,6 +18,7 @@ interface IntentPanelProps {
   onEdit: (intent: UnifiedAlfieIntent) => void;
   onRemove: (intentId: string) => void;
   onClose: () => void;
+  onUpdateIntent?: (intentId: string, updates: Partial<UnifiedAlfieIntent>) => void;
   isLoading?: boolean;
 }
 
@@ -25,12 +28,15 @@ export function IntentPanel({
   onEdit,
   onRemove,
   onClose,
+  onUpdateIntent,
   isLoading,
 }: IntentPanelProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     new Set(intents.map((i) => i.id))
   );
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [uploadingForId, setUploadingForId] = useState<string | null>(null);
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -46,8 +52,55 @@ export function IntentPanel({
     .reduce((sum, i) => sum + getWoofCost(i), 0);
 
   const handleConfirm = async () => {
+    // Vérifier que les vidéos ont une image
+    const selectedIntents = intents.filter(i => selectedIds.has(i.id));
+    const videosWithoutImage = selectedIntents.filter(
+      i => i.kind === 'video_premium' && !i.referenceImageUrl
+    );
+    
+    if (videosWithoutImage.length > 0) {
+      toast.error(`📸 Ajoute une image source pour tes vidéos : ${videosWithoutImage.map(v => v.title).join(', ')}`);
+      return;
+    }
+    
     await onConfirm(Array.from(selectedIds));
   };
+
+  const handleImageUpload = async (intentId: string, file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Seules les images sont acceptées');
+      return;
+    }
+
+    setUploadingForId(intentId);
+    try {
+      const fileName = `${Date.now()}_${file.name}`;
+      const filePath = `video-refs/${intentId}/${fileName}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('chat-uploads')
+        .upload(filePath, file, { upsert: true });
+      
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat-uploads')
+        .getPublicUrl(filePath);
+
+      if (onUpdateIntent) {
+        onUpdateIntent(intentId, { referenceImageUrl: publicUrl });
+      }
+      
+      toast.success('Image ajoutée');
+    } catch (err) {
+      console.error('Upload error:', err);
+      toast.error('Erreur lors de l\'upload');
+    } finally {
+      setUploadingForId(null);
+    }
+  };
+
+  const isVideoIntent = (kind: string) => kind === 'video_premium' || kind === 'video_basic';
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
@@ -87,8 +140,57 @@ export function IntentPanel({
                   <p className="text-sm text-muted-foreground line-clamp-2">
                     {intent.prompt}
                   </p>
+
+                  {/* Upload image pour vidéos */}
+                  {isVideoIntent(intent.kind) && (
+                    <div className="mt-2">
+                      {intent.referenceImageUrl ? (
+                        <div className="flex items-center gap-2 p-2 bg-muted/50 rounded">
+                          <img 
+                            src={intent.referenceImageUrl} 
+                            alt="Image source" 
+                            className="w-12 h-12 object-cover rounded"
+                          />
+                          <span className="text-xs text-muted-foreground flex-1">Image source ajoutée</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => fileInputRefs.current[intent.id]?.click()}
+                          >
+                            Changer
+                          </Button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => fileInputRefs.current[intent.id]?.click()}
+                          disabled={uploadingForId === intent.id}
+                          className="flex items-center gap-2 p-2 border border-dashed border-orange-400 rounded bg-orange-50 dark:bg-orange-950/20 text-orange-600 text-xs hover:bg-orange-100 dark:hover:bg-orange-950/40 transition w-full"
+                        >
+                          {uploadingForId === intent.id ? (
+                            <span>Upload en cours...</span>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4" />
+                              <span>📸 Ajoute une image source (obligatoire)</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                      <input
+                        ref={(el) => { fileInputRefs.current[intent.id] = el; }}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(intent.id, file);
+                        }}
+                      />
+                    </div>
+                  )}
+
                   {expanded.has(intent.id) && intent.generatedTexts && (
-                    <div className="mt-2 p-2 bg-muted/50 rounded text-xs">
+                    <div className="mt-2 p-2 bg-muted/50 rounded text-xs space-y-2">
                       {intent.generatedTexts.text && (
                         <div>
                           <strong>{intent.generatedTexts.text.title}</strong>
@@ -100,6 +202,21 @@ export function IntentPanel({
                           {intent.generatedTexts.slides.map((s, i) => (
                             <div key={i}><strong>Slide {i+1}:</strong> {s.title}</div>
                           ))}
+                        </div>
+                      )}
+                      {/* Afficher le script vidéo */}
+                      {intent.generatedTexts.video && (
+                        <div className="border-t pt-2 mt-2">
+                          <strong>🎬 Script vidéo :</strong>
+                          {intent.generatedTexts.video.hook && (
+                            <p><span className="text-muted-foreground">Hook:</span> {intent.generatedTexts.video.hook}</p>
+                          )}
+                          {intent.generatedTexts.video.script && (
+                            <p><span className="text-muted-foreground">Script:</span> {intent.generatedTexts.video.script}</p>
+                          )}
+                          {intent.generatedTexts.video.cta && (
+                            <p><span className="text-muted-foreground">CTA:</span> {intent.generatedTexts.video.cta}</p>
+                          )}
                         </div>
                       )}
                     </div>

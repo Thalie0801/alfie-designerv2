@@ -779,6 +779,12 @@ export default function ChatWidget() {
               assets: prev.assets.filter(a => a.id !== id)
             } : null);
           }}
+          onUpdateIntent={(intentId, updates) => {
+            setPendingPack(prev => prev ? {
+              ...prev,
+              assets: prev.assets.map(a => a.id === intentId ? { ...a, ...updates } : a)
+            } : null);
+          }}
           onClose={() => setShowIntentPanel(false)}
         />
       )}

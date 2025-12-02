@@ -899,7 +899,7 @@ ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
 async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; order_id?: string; job_id?: string; use_brand_kit?: boolean }) {
   console.log("🎥 [processGenerateVideo]", payload?.orderId);
 
-  const { userId, brandId, orderId, aspectRatio, duration, prompt, engine, referenceImageUrl } = payload;
+  const { userId, brandId, orderId, aspectRatio, duration, prompt, engine, referenceImageUrl, generatedTexts } = payload;
   const cloudName = Deno.env.get("CLOUDINARY_CLOUD_NAME");
 
   if (!cloudName) {
@@ -909,8 +909,10 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
   const durationSec = duration || payload.durationSeconds || 5;
   const useBrandKit = resolveUseBrandKit(payload, jobMeta);
   const withAudio = payload.withAudio !== false; // true par défaut
-
-  console.log("[processGenerateVideo] Engine:", engine, "| useBrandKit:", useBrandKit, "| withAudio:", withAudio);
+  
+  // ✅ Extraire le script vidéo s'il existe
+  const videoScript = generatedTexts?.video || null;
+  console.log("[processGenerateVideo] Engine:", engine, "| useBrandKit:", useBrandKit, "| withAudio:", withAudio, "| hasScript:", !!videoScript, "| hasImage:", !!referenceImageUrl);
 
   // ✅ Support VEO 3.1 pour vidéos premium
   if (engine === "veo_3_1") {
@@ -930,7 +932,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       userId,
       brandId,
       orderId,
-      imageUrl: referenceImageUrl, // ✅ AJOUT: Image de référence pour animation
+      imageUrl: referenceImageUrl, // ✅ Image de référence pour animation
     }, 360_000); // ✅ 6 minutes timeout pour VEO 3
 
     const videoUrl = veoResult?.videoUrl || veoResult?.output || veoResult?.url;
@@ -941,7 +943,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
     // Thumbnail = video URL (VEO 3 génère des vidéos avec couverture)
     const thumbnailUrl = veoResult?.thumbnail_url || videoUrl;
 
-    // Sauvegarder
+    // Sauvegarder avec script vidéo dans metadata
     const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
       user_id: userId,
       brand_id: brandId,
@@ -957,6 +959,8 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
         generator: "veo_3_fast",
         tier: "premium",
         orderId,
+        referenceImageUrl, // ✅ Stocker l'URL de l'image source
+        script: videoScript, // ✅ Stocker le script vidéo (hook, script, cta)
       },
     });
     if (mediaErr) throw new Error(mediaErr.message);
