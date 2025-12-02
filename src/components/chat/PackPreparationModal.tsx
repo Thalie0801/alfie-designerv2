@@ -110,13 +110,27 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
       return;
     }
 
+    // ✅ Vérifier que les vidéos ont une image de référence
+    const selectedAssets = pack.assets.filter((a) => selectedAssetIds.has(a.id));
+    const videosWithoutImage = selectedAssets.filter(
+      (a) => a.kind === "video_premium" && !a.referenceImageUrl
+    );
+
+    if (videosWithoutImage.length > 0) {
+      const videoNames = videosWithoutImage.map((v) => v.title).join(", ");
+      toast.error(
+        `📸 Ajoute une image source pour tes vidéos avant de générer : ${videoNames}`,
+        { duration: 5000 }
+      );
+      return;
+    }
+
     setIsGenerating(true);
 
     try {
       // ✅ ÉTAPE 1 : Vérifier si les textes existent déjà dans le pack
-      const selectedAssets = pack.assets.filter((a) => selectedAssetIds.has(a.id));
       
-      const hasExistingTexts = pack.assets.some(a => 
+      const hasExistingTexts = pack.assets.some(a =>
         (a.generatedTexts?.slides?.length ?? 0) > 0 || 
         a.generatedTexts?.text?.title ||
         a.generatedTexts?.video?.hook
