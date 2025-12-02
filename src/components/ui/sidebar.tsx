@@ -17,21 +17,25 @@ export interface SidebarProviderProps {
   defaultOpen?: boolean;
 }
 
+// Détection mobile immédiate (pas dans useEffect pour éviter race condition)
+const getIsMobile = () => typeof window !== 'undefined' && window.innerWidth < 768;
+
 export function SidebarProvider({ children, defaultOpen = true }: SidebarProviderProps) {
-  const [isMobile, setIsMobile] = React.useState(false);
-  
-  React.useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-  
-  const [open, setOpen] = React.useState(isMobile ? false : defaultOpen);
+  const [isMobile, setIsMobile] = React.useState(getIsMobile);
+  const [open, setOpen] = React.useState(() => getIsMobile() ? false : defaultOpen);
 
   React.useEffect(() => {
-    setOpen(isMobile ? false : defaultOpen);
-  }, [isMobile, defaultOpen]);
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) {
+        setOpen(false);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const value = React.useMemo(() => ({ open, setOpen, isMobile }), [open, isMobile]);
 
@@ -90,6 +94,7 @@ export const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(({ className,
         <div 
           className="fixed inset-0 bg-black/50 z-40"
           onClick={() => setOpen(false)}
+          onTouchStart={() => setOpen(false)}
         />
       )}
       <aside
