@@ -106,9 +106,6 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
 
   const videoSrc = asset.type === "video" ? getVideoSrc() : "";
 
-  // ✅ Détection vidéo Replicate IA
-  const isReplicateVideo = videoSrc.includes("replicate.delivery") || (asset.metadata as any)?.animationType === "replicate_ai";
-
   return (
     <Card className={`group hover:shadow-lg transition-all ${selected ? "ring-2 ring-primary" : ""}`}>
       <CardContent className="p-0 relative">
@@ -130,9 +127,9 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
               Source
             </Badge>
           )}
-          {engine && (
-            <Badge variant="outline" className="bg-background/90 backdrop-blur text-[10px] uppercase tracking-wide">
-              {engine}
+          {asset.type === "video" && engine.toLowerCase().includes("veo") && (
+            <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px]">
+              Premium
             </Badge>
           )}
           {asset.woofs > 0 && <Badge className="bg-purple-500 text-white text-xs">{asset.woofs} 🐕</Badge>}
@@ -140,46 +137,55 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
 
         {/* Preview */}
         <div className="relative aspect-[4/5] bg-muted overflow-hidden rounded-t-lg">
-          {/* ✅ VIDÉO (Replicate AI ou autres) */}
+          {/* ✅ VIDÉO avec aperçu thumbnail + overlay play */}
           {asset.type === "video" ? (
             <>
-              {videoSrc && !videoError ? (
-                <video
-                  src={videoSrc}
-                  className="w-full h-full object-cover"
-                  poster={asset.thumbnail_url || undefined}
-                  preload="metadata"
-                  controls
-                  muted
-                  loop
-                  playsInline
-                  onError={handleVideoError}
-                  aria-label="Aperçu vidéo"
-                />
+              {(asset.thumbnail_url || videoSrc) && !videoError ? (
+                <div className="relative w-full h-full group/video">
+                  {/* Image thumbnail en arrière-plan */}
+                  {asset.thumbnail_url && (
+                    <img
+                      src={asset.thumbnail_url}
+                      alt="Aperçu vidéo"
+                      className="w-full h-full object-cover absolute inset-0"
+                    />
+                  )}
+                  {/* Vidéo qui se charge au hover */}
+                  {videoSrc && (
+                    <video
+                      src={videoSrc}
+                      className="w-full h-full object-cover relative z-10 opacity-0 group-hover/video:opacity-100 transition-opacity"
+                      poster={asset.thumbnail_url || undefined}
+                      preload="metadata"
+                      controls
+                      muted
+                      loop
+                      playsInline
+                      onError={handleVideoError}
+                      aria-label="Aperçu vidéo"
+                    />
+                  )}
+                  {/* Overlay play indicator */}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-100 group-hover/video:opacity-0 transition-opacity pointer-events-none z-20">
+                    <PlayCircle className="h-12 w-12 text-white drop-shadow-lg" />
+                  </div>
+                </div>
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 to-secondary/10">
                   <PlayCircle className="h-16 w-16 text-muted-foreground mb-2" />
                   <p className="text-xs text-muted-foreground text-center px-4">
-                    {asset.status === "processing" 
-                      ? "⏳ Génération IA en cours…" 
-                      : videoError 
-                      ? "Aperçu indisponible"
-                      : "Aperçu indisponible"}
+                    {asset.status === "processing" ? "⏳ Génération IA en cours…" : "Aperçu indisponible"}
                   </p>
                 </div>
               )}
+              {/* Badge durée */}
               {duration && (
-                <div className="absolute bottom-2 left-2">
+                <div className="absolute bottom-2 left-2 z-30">
                   <Badge className="bg-black/70 text-white text-xs">
                     <PlayCircle className="h-3 w-3 mr-1" />
                     {duration}
                   </Badge>
                 </div>
-              )}
-              {isReplicateVideo && (
-                <Badge className="absolute bottom-2 right-2 bg-purple-600 text-white text-xs">
-                  🤖 Animation IA
-                </Badge>
               )}
             </>
           ) : (
