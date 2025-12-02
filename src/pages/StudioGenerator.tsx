@@ -25,6 +25,7 @@ import { sendPackToGenerator, InsufficientWoofsError } from "@/services/generato
 import { supabase } from "@/integrations/supabase/client";
 import { calculatePackWoofCost } from "@/lib/woofs";
 import { useQueueMonitor } from "@/hooks/useQueueMonitor";
+import { useOrderCompletion } from "@/hooks/useOrderCompletion";
 import { QueueStatus } from "@/components/chat/QueueStatus";
 import { TourProvider, HelpLauncher } from "@/components/tour/InteractiveTour";
 import { StudioTourAutoStart } from "@/components/tour/StudioTourAutoStart";
@@ -176,6 +177,9 @@ export function StudioGenerator() {
   
   // Monitoring de la queue avec auto-kick du worker
   const { data: queueData } = useQueueMonitor(!!user?.id && !!activeBrandId);
+  
+  // Suivi de complétion des orders
+  const { trackOrders } = useOrderCompletion();
 
   const [campaignName, setCampaignName] = useState("");
   const [brief, setBrief] = useState("");
@@ -509,7 +513,7 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
     setIsLaunching(true);
 
     try {
-      await sendPackToGenerator({
+      const result = await sendPackToGenerator({
         brandId: activeBrandId,
         pack,
         userId: user.id,
@@ -518,6 +522,11 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
       });
 
       toast.success(`Super ! Alfie lance la génération de tes visuels 🐶`);
+      
+      // ✅ Démarrer le suivi de complétion
+      if (result.orderIds?.length) {
+        trackOrders(result.orderIds);
+      }
       
       // Recharger les Woofs
       const { data } = await supabase.functions.invoke("get-quota", {

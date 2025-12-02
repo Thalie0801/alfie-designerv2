@@ -13,6 +13,7 @@ import PackPreparationModal from "./PackPreparationModal";
 import { IntentPanel } from "./IntentPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { sendPackToGenerator, InsufficientWoofsError } from "@/services/generatorFromChat";
+import { useOrderCompletion } from "@/hooks/useOrderCompletion";
 import { toast } from "sonner";
 import { AssetEditDialog } from "@/components/studio/AssetEditDialog";
 import type { PackAsset } from "@/types/alfiePack";
@@ -55,6 +56,9 @@ export default function ChatWidget() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Suivi de complétion des orders
+  const { trackOrders } = useOrderCompletion();
 
   // Auto-scroll quand les messages changent
   useEffect(() => {
@@ -678,7 +682,7 @@ export default function ChatWidget() {
         }))
       };
       
-      await sendPackToGenerator({
+      const result = await sendPackToGenerator({
         brandId: profile.active_brand_id,
         pack: finalPack,
         userId: profile.id,
@@ -687,6 +691,11 @@ export default function ChatWidget() {
       });
       
       toast.success(`${selectedIds.length} asset(s) en cours de génération !`);
+      
+      // ✅ Démarrer le suivi de complétion
+      if (result.orderIds?.length) {
+        trackOrders(result.orderIds);
+      }
       setShowIntentPanel(false);
       setPendingPack(null);
     } catch (error) {
