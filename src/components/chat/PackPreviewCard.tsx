@@ -11,7 +11,7 @@ export default function PackPreviewCard({ pack, onOpenDetail }: PackPreviewCardP
   // Calculer les compteurs
   const imageCount = pack.assets.filter((a) => a.kind === "image").length;
   const carouselCount = pack.assets.filter((a) => a.kind === "carousel").length;
-  const videoCount = pack.assets.filter((a) => a.kind === "video_basic" || a.kind === "video_premium").length;
+  const videoCount = pack.assets.filter((a) => a.kind === "video_premium").length;
 
   // Calculer le coût total en Woofs
   const totalWoofs = calculatePackWoofCost(pack, pack.assets.map((a) => a.id));

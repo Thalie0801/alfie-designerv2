@@ -79,7 +79,6 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
     switch (asset.kind) {
       case "carousel":
         return <Grid3x3 className="w-4 h-4" />;
-      case "video_basic":
       case "video_premium":
         return <Film className="w-4 h-4" />;
       default:
@@ -92,8 +91,6 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
     switch (asset.kind) {
       case "carousel":
         return `Carrousel (${asset.count} slides)`;
-      case "video_basic":
-        return "Vidéo animée";
       case "video_premium":
         return "Vidéo premium (Veo 3.1)";
       default:
