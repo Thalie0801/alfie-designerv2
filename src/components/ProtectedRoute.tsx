@@ -25,6 +25,12 @@ export function ProtectedRoute({
   // ============================================================================
   const isWhitelisted = hasRole(roles, 'vip') || hasRole(roles, 'admin');
 
+  // Vérification directe du profil comme fallback (si roles pas encore chargés)
+  const ACTIVE_PLANS = ['starter', 'pro', 'studio', 'enterprise', 'admin'];
+  const hasDirectPlanAccess = profile?.status === 'active' && 
+                              profile?.plan && 
+                              ACTIVE_PLANS.includes(profile.plan.toLowerCase());
+
   // Flags effectifs pour la navigation (whitelist ou autorisé normalement)
   const effectiveIsAuthorized = isAuthorized || isWhitelisted;
   const effectiveIsAdmin = isAdmin; // Admin déjà calculé dans useAuth
@@ -68,17 +74,18 @@ export function ProtectedRoute({
   }
 
   // Priorité 2: Vérifier si un plan actif est requis
-  if (requireActivePlan && !hasActivePlan && !isWhitelisted) {
+  if (requireActivePlan && !hasActivePlan && !isWhitelisted && !hasDirectPlanAccess) {
     console.debug('[ProtectedRoute] No active plan, redirecting to /billing', {
       email: user?.email,
       plan: profile?.plan,
       status: profile?.status,
     });
     
-    // Afficher un toast pour expliquer le blocage
+    // Afficher un toast pour expliquer le blocage (ID unique pour éviter doublons)
     toast.error(
       'Abonnement requis',
       {
+        id: 'subscription-required',
         description: 'Pour accéder à la plateforme, tu dois avoir un abonnement actif. Choisis ton plan pour continuer avec Alfie 🐶',
         duration: 6000,
       }
@@ -88,18 +95,20 @@ export function ProtectedRoute({
   }
 
   // Priorité 3: Vérifier les accès généraux (abonnement/autorisation)
-  if (!hasAccess) {
+  if (!hasAccess && !hasDirectPlanAccess) {
     console.debug('[ProtectedRoute] Access denied, redirecting to /billing', {
       email: user?.email,
       effectiveIsAuthorized,
       allowPending,
       isWhitelisted,
+      hasDirectPlanAccess,
     });
     
-    // Afficher un toast pour expliquer le blocage
+    // Afficher un toast pour expliquer le blocage (ID unique pour éviter doublons)
     toast.error(
       'Abonnement requis',
       {
+        id: 'subscription-required',
         description: 'Pour accéder à la plateforme, tu dois avoir un abonnement actif. Choisis ton plan pour continuer avec Alfie 🐶',
         duration: 6000,
       }
