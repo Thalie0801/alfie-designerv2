@@ -17,7 +17,7 @@ export function ProtectedRoute({
   allowPending = false,
   requireActivePlan = true,
 }: ProtectedRouteProps) {
-  const { user, isAdmin, isAuthorized, roles, profile, loading, refreshProfile } = useAuth();
+  const { user, isAdmin, isAuthorized, hasActivePlan, roles, profile, loading, refreshProfile } = useAuth();
   const [checkingAdmin, setCheckingAdmin] = useState(false);
 
   // ============================================================================
@@ -29,9 +29,6 @@ export function ProtectedRoute({
   const effectiveIsAuthorized = isAuthorized || isWhitelisted;
   const effectiveIsAdmin = isAdmin; // Admin déjà calculé dans useAuth
   const hasAccess = effectiveIsAuthorized || allowPending;
-
-  // Vérifier si l'utilisateur a un plan actif
-  const hasActivePlan = profile?.status === 'active' && profile?.plan && profile.plan !== 'none';
   
   console.log('[ProtectedRoute] Plan check:', {
     email: user?.email,
