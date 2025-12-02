@@ -490,12 +490,11 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
     );
 
     if (videosWithoutImage.length > 0) {
-      const videoNames = videosWithoutImage.map((v) => v.title).join(", ");
-      toast.error(
-        `📸 Ajoute une image source pour tes vidéos avant de générer : ${videoNames}`,
-        { duration: 5000 }
+      toast.warning(
+        `📸 Recommandé : ajoute une image source pour de meilleurs résultats vidéo`,
+        { duration: 4000 }
       );
-      return;
+      // Continue sans bloquer - image recommandée mais pas obligatoire
     }
 
     // Calculer le coût pour afficher dans la confirmation
