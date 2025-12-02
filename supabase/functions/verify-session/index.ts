@@ -283,20 +283,35 @@ Deno.serve(async (req) => {
 
     const purchaseType = session.metadata?.purchase_type as string | undefined;
 
-    // ✅ NOUVEAU : Gérer l'achat de packs Woofs
+    // ✅ Gérer l'achat de packs Woofs avec affiliation
     if (purchaseType === "woofs_pack") {
       const brandId = session.metadata?.brand_id as string | undefined;
       const woofsPackSize = session.metadata?.woofs_pack_size as string | undefined;
+      const affiliateRef = session.metadata?.affiliate_ref as string | undefined;
+      const supabaseUserId = session.metadata?.supabase_user_id as string | undefined;
 
       if (!brandId || !woofsPackSize) {
         throw new Error("Missing brand_id or woofs_pack_size in metadata");
       }
 
       const woofsAmount = parseInt(woofsPackSize, 10);
+      const amount = session.amount_total ? session.amount_total / 100 : 0;
       
+      // Ajouter les Woofs à la marque
       await handleWoofsPack(brandId, woofsAmount);
 
-      return jsonResponse({ ok: true, brandId, woofsAdded: woofsAmount });
+      // Traiter l'affiliation si présente
+      if (affiliateRef && supabaseUserId) {
+        await handleAffiliateConversion(
+          affiliateRef,
+          supabaseUserId,
+          `woofs_pack_${woofsPackSize}`,
+          amount
+        );
+        console.log("[verify-session] Affiliate conversion processed for Woofs pack", { affiliateRef, amount });
+      }
+
+      return jsonResponse({ ok: true, brandId, woofsAdded: woofsAmount, affiliateProcessed: !!affiliateRef });
     }
 
     // Flux standard : abonnement

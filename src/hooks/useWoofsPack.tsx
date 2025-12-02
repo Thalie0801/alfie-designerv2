@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { useAffiliate } from '@/hooks/useAffiliate';
 
 export type WoofsPackSize = 50 | 100 | 250 | 500;
 
@@ -41,6 +42,7 @@ export const WOOFS_PACKS: WoofsPack[] = [
 
 export function useWoofsPack() {
   const { user } = useAuth();
+  const { getAffiliateRef } = useAffiliate();
   const [loading, setLoading] = useState(false);
 
   /**
@@ -60,18 +62,20 @@ export function useWoofsPack() {
 
     setLoading(true);
     try {
+      // Récupérer la référence affilié si présente
+      const affiliateRef = getAffiliateRef();
+
       // Créer une session Stripe checkout pour achat one-off
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
-          priceId: pack.stripePriceId,
           mode: 'payment', // One-off payment, not subscription
+          price_id: pack.stripePriceId,
+          purchase_type: 'woofs_pack',
+          affiliate_ref: affiliateRef || undefined,
           metadata: {
             brand_id: brandId,
             woofs_pack_size: packSize.toString(),
-            purchase_type: 'woofs_pack',
           },
-          successUrl: `${window.location.origin}/dashboard?woofs_pack_success=true`,
-          cancelUrl: `${window.location.origin}/dashboard?woofs_pack_cancelled=true`,
         },
       });
 
@@ -93,40 +97,8 @@ export function useWoofsPack() {
     }
   };
 
-  /**
-   * Ajouter les Woofs après paiement réussi (appelé par webhook Stripe)
-   * Cette fonction sera appelée par l'Edge Function après vérification du paiement
-   */
-  const addWoofsToQuota = async (brandId: string, woofsAmount: number) => {
-    try {
-      // Incrémenter le quota_woofs de la marque (quota total)
-      const { data: brand, error: brandError } = await supabase
-        .from('brands')
-        .select('quota_woofs')
-        .eq('id', brandId)
-        .single();
-
-      if (brandError) throw brandError;
-
-      const newQuota = (brand.quota_woofs || 0) + woofsAmount;
-
-      const { error: updateError } = await supabase
-        .from('brands')
-        .update({ quota_woofs: newQuota })
-        .eq('id', brandId);
-
-      if (updateError) throw updateError;
-
-      return true;
-    } catch (error: any) {
-      console.error('Error adding Woofs to quota:', error);
-      return false;
-    }
-  };
-
   return {
     purchaseWoofsPack,
-    addWoofsToQuota,
     loading,
     availablePacks: WOOFS_PACKS,
   };

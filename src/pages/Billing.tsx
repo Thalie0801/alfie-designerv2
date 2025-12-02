@@ -2,10 +2,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Check, Settings, Sparkles, Award, RefreshCw } from 'lucide-react';
+import { Check, Settings, Sparkles, Award, RefreshCw, Zap } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useStripeCheckout } from '@/hooks/useStripeCheckout';
 import { useCustomerPortal } from '@/hooks/useCustomerPortal';
+import { useWoofsPack, WOOFS_PACKS } from '@/hooks/useWoofsPack';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -83,12 +84,14 @@ export default function Billing() {
   const { profile, user, refreshProfile, isAdmin, loading: authLoading } = useAuth();
   const { createCheckout, loading } = useStripeCheckout();
   const { openCustomerPortal, loading: portalLoading } = useCustomerPortal();
+  const { purchaseWoofsPack, loading: woofsLoading } = useWoofsPack();
   const [searchParams] = useSearchParams();
   const preselectedPlan = searchParams.get('plan');
   const currentPlan = profile?.plan || null;
   const hasActivePlan = Boolean(profile?.status === 'active' || profile?.granted_by_admin);
   const isAmbassador = profile?.granted_by_admin;
   const hasStripeSubscription = profile?.stripe_subscription_id;
+  const activeBrandId = profile?.active_brand_id;
   
   const [woofsData, setWoofsData] = useState<{
     used: number;
@@ -290,6 +293,53 @@ export default function Billing() {
                 </div>
               </div>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Recharger Woofs - Section pour acheter des packs */}
+      {hasActivePlan && activeBrandId && (
+        <Card className="border-orange-200 dark:border-orange-800 shadow-medium">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
+              <Zap className="h-5 w-5" />
+              Recharger tes Woofs 🐶
+            </CardTitle>
+            <CardDescription>
+              Besoin de plus de crédits ? Achète un pack de Woofs supplémentaires.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {WOOFS_PACKS.map((pack) => (
+                <div
+                  key={pack.size}
+                  className="p-4 rounded-lg border-2 border-orange-200 dark:border-orange-700 hover:border-orange-400 dark:hover:border-orange-500 transition-colors bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20"
+                >
+                  <div className="text-center space-y-2">
+                    <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">
+                      {pack.size}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Woofs</div>
+                    <div className="text-lg font-semibold text-foreground">
+                      {pack.price}€
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full border-orange-300 hover:bg-orange-100 dark:border-orange-600 dark:hover:bg-orange-900/30"
+                      onClick={() => purchaseWoofsPack(activeBrandId, pack.size)}
+                      disabled={woofsLoading}
+                    >
+                      {woofsLoading ? 'Chargement...' : 'Acheter'}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-3 text-center">
+              Les Woofs achetés s'ajoutent à ton quota mensuel et n'expirent jamais.
+            </p>
           </CardContent>
         </Card>
       )}
