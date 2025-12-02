@@ -39,7 +39,6 @@ export interface UnifiedAlfieIntent {
   referenceImageUrl?: string;
   generatedTexts?: GeneratedTexts;
   useBrandKit?: boolean;
-  withAudio?: boolean; // vidéos uniquement - générer avec audio (défaut: true)
   visualStyle?: VisualStyle; // Style visuel pour la génération d'images
   campaign?: string;
   copyBrief?: string; // Brief libre optionnel
