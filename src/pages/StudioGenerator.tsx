@@ -279,7 +279,12 @@ export function StudioGenerator() {
   // Fonction pour générer un pack à partir du brief
   const handleGenerateFromBrief = async () => {
     if (!activeBrandId || !campaignName.trim()) {
-      toast.error("Veuillez remplir au moins le nom de campagne");
+      toast.error("Veuillez remplir le nom de campagne");
+      return;
+    }
+
+    if (!brief.trim()) {
+      toast.error("Décris ton projet ou objectif dans le brief avant de demander un pack à Alfie 🐶");
       return;
     }
 
