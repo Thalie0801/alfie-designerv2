@@ -7,6 +7,7 @@ import { Download, Trash2, PlayCircle, Image as ImageIcon, AlertCircle } from "l
 import { LibraryAsset } from "@/hooks/useLibraryAssets";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
+import { posterFromVideoUrl } from "@/lib/cloudinary/videoSimple";
 
 interface AssetCardProps {
   asset: LibraryAsset;
@@ -106,6 +107,25 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
 
   const videoSrc = asset.type === "video" ? getVideoSrc() : "";
 
+  // ✅ Générer un thumbnail à partir de l'URL vidéo Cloudinary
+  const getVideoThumbnail = (): string => {
+    // Pour les vidéos Cloudinary, générer un thumbnail dynamique
+    if (asset.output_url && asset.output_url.includes("res.cloudinary.com") && asset.output_url.includes("/video/upload/")) {
+      return posterFromVideoUrl(asset.output_url, 1);
+    }
+    // Pour les vidéos Replicate, pas de transformation possible
+    if (asset.output_url && asset.output_url.includes("replicate.delivery")) {
+      return "";
+    }
+    // Fallback : thumbnail_url si c'est une vraie image
+    if (asset.thumbnail_url && !asset.thumbnail_url.endsWith(".mp4")) {
+      return asset.thumbnail_url;
+    }
+    return "";
+  };
+
+  const videoThumbnail = asset.type === "video" ? getVideoThumbnail() : "";
+
   return (
     <Card className={`group hover:shadow-lg transition-all ${selected ? "ring-2 ring-primary" : ""}`}>
       <CardContent className="p-0 relative">
@@ -140,14 +160,15 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
           {/* ✅ VIDÉO avec aperçu thumbnail + overlay play */}
           {asset.type === "video" ? (
             <>
-              {(asset.thumbnail_url || videoSrc) && !videoError ? (
+              {(videoThumbnail || videoSrc) && !videoError ? (
                 <div className="relative w-full h-full group/video">
                   {/* Image thumbnail en arrière-plan */}
-                  {asset.thumbnail_url && (
+                  {videoThumbnail && (
                     <img
-                      src={asset.thumbnail_url}
+                      src={videoThumbnail}
                       alt="Aperçu vidéo"
                       className="w-full h-full object-cover absolute inset-0"
+                      onError={handleImageError}
                     />
                   )}
                   {/* Vidéo qui se charge au hover */}
@@ -155,7 +176,7 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
                     <video
                       src={videoSrc}
                       className="w-full h-full object-cover relative z-10 opacity-0 group-hover/video:opacity-100 transition-opacity"
-                      poster={asset.thumbnail_url || undefined}
+                      poster={videoThumbnail || undefined}
                       preload="metadata"
                       controls
                       muted
