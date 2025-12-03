@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { WOOF_COSTS } from "../_shared/woofsCosts.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { getAccessToken } from "../_shared/vertexAuth.ts";
+import { sanitizeVideoPrompt, isContentPolicyViolation, type SanitizeResult } from "../_shared/promptSanitizer.ts";
 const REPLICATE_API = "https://api.replicate.com/v1/predictions";
 // ✅ Image-to-video optimisé : Stable Video Diffusion
 const DEFAULT_REPLICATE_MODEL = "stability-ai/stable-video-diffusion:3f0457e4619daac51203dedb472816fd4af51f3149fa7a9e0b5ffcf1b8172438";
@@ -244,8 +245,28 @@ Deno.serve(async (req) => {
       console.log(`[generate-video] ✅ Authenticated user: ${userId}`);
     }
 
-    const prompt = typeof body?.prompt === "string" ? body.prompt : undefined;
+    const rawPrompt = typeof body?.prompt === "string" ? body.prompt : undefined;
     const aspectRatio = typeof body?.aspectRatio === "string" ? body.aspectRatio : "16:9";
+    
+    // ✅ Sanitize le prompt pour éviter les violations de politique VEO 3
+    let prompt = rawPrompt;
+    let sanitizeResult: SanitizeResult | null = null;
+    const providerRawForSanitize = typeof body?.provider === "string" ? body.provider.toLowerCase() : "replicate";
+    
+    if (rawPrompt && (providerRawForSanitize === "veo3" || providerRawForSanitize === "veo" || providerRawForSanitize === "veo_3_1")) {
+      sanitizeResult = sanitizeVideoPrompt(rawPrompt);
+      prompt = sanitizeResult.sanitizedPrompt;
+      
+      if (sanitizeResult.wasModified) {
+        console.log(`[generate-video] 🧹 Prompt sanitized for VEO 3:`, {
+          original: rawPrompt.substring(0, 100),
+          sanitized: prompt.substring(0, 100),
+          replacements: sanitizeResult.replacements.length,
+          trademarks: sanitizeResult.replacements.filter(r => r.reason === "trademark").length,
+          personRefs: sanitizeResult.replacements.filter(r => r.reason === "person_reference").length
+        });
+      }
+    }
     const imageUrl = typeof body?.imageUrl === "string" ? body.imageUrl : undefined;
     const publicBaseUrl = typeof body?.publicBaseUrl === "string" ? body.publicBaseUrl : undefined;
     const generationId = typeof body?.generationId === "string" ? body.generationId : undefined;
@@ -894,6 +915,21 @@ async function generateGcsSignedUrl(
       if (!veoResponse.ok) {
         const errorText = await veoResponse.text();
         console.error("[generate-video] VEO 3 error:", errorText);
+        
+        // ✅ Détecter les erreurs de politique de contenu
+        if (isContentPolicyViolation(errorText)) {
+          return jsonResponse({ 
+            error: "CONTENT_POLICY_VIOLATION",
+            message: "Ton prompt contient des éléments non autorisés (marques déposées, personnes réelles, etc.). Reformule avec des descriptions génériques.",
+            details: errorText,
+            suggestions: [
+              "Remplace les noms de marques par des descriptions (ex: 'cola' au lieu de 'Coca-Cola')",
+              "Évite les références à des photos de personnes",
+              "Utilise des descriptions génériques pour les produits"
+            ]
+          }, { status: 400 });
+        }
+        
         return jsonResponse({ 
           error: `VEO 3 API error: ${veoResponse.status}`,
           details: errorText 
