@@ -264,9 +264,9 @@ function buildVideoPrompt(payload: any, useBrandKit: boolean, brand?: any): stri
   
   // ✅ Nettoyer les références au texte
   visualPrompt = visualPrompt
-    .replace(/texte\s*(animé|:\s*|à l'écran|qui apparaît)/gi, '')
+    .replace(/texte\s*(anim|:\s*)/gi, '')
     .replace(/bouton\s*cta/gi, '')
-    .replace(/["«»"].*?["«»"](?=\s*(,|\.|\s|$))/g, '')
+    .replace(/"[^"]*"/g, '') // Retirer textes entre guillemets
     .replace(/\s+/g, ' ')
     .trim();
   
