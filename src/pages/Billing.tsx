@@ -302,14 +302,18 @@ export default function Billing() {
 
       {/* Recharger Woofs - Section pour acheter des packs */}
       {hasActivePlan && activeBrandId && (
-        <Card className="border-orange-200 dark:border-orange-800 shadow-medium">
+        <Card className="border-purple-200 dark:border-purple-800 shadow-medium">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
+            <CardTitle className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
               <Zap className="h-5 w-5" />
               Recharger tes Woofs 🐶
+              <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white gap-1 px-2 py-0.5 text-xs ml-2">
+                <Sparkles className="h-3 w-3" />
+                PREMIUM
+              </Badge>
             </CardTitle>
             <CardDescription>
-              Besoin de plus de crédits ? Achète un pack de Woofs supplémentaires.
+              Besoin de plus de crédits ? Les packs Woofs utilisent l'IA Premium (images & vidéos haute qualité).
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -321,7 +325,7 @@ export default function Billing() {
                     "relative p-4 rounded-lg border-2 transition-colors bg-gradient-to-br",
                     pack.bonus 
                       ? "border-emerald-400 dark:border-emerald-600 hover:border-emerald-500 from-emerald-50 to-green-50 dark:from-emerald-900/30 dark:to-green-900/30" 
-                      : "border-orange-200 dark:border-orange-700 hover:border-orange-400 dark:hover:border-orange-500 from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20"
+                      : "border-purple-200 dark:border-purple-700 hover:border-purple-400 dark:hover:border-purple-500 from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20"
                   )}
                 >
                   {pack.bonus && (
@@ -332,7 +336,7 @@ export default function Billing() {
                   <div className="text-center space-y-2">
                     <div className={cn(
                       "text-3xl font-bold",
-                      pack.bonus ? "text-emerald-600 dark:text-emerald-400" : "text-orange-600 dark:text-orange-400"
+                      pack.bonus ? "text-emerald-600 dark:text-emerald-400" : "text-purple-600 dark:text-purple-400"
                     )}>
                       {pack.size}
                     </div>
@@ -353,7 +357,7 @@ export default function Billing() {
                         "w-full",
                         pack.bonus 
                           ? "bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white" 
-                          : "border-orange-300 hover:bg-orange-100 dark:border-orange-600 dark:hover:bg-orange-900/30"
+                          : "border-purple-300 hover:bg-purple-100 dark:border-purple-600 dark:hover:bg-purple-900/30"
                       )}
                       onClick={() => purchaseWoofsPack(activeBrandId, pack.size)}
                       disabled={woofsLoading}
@@ -365,7 +369,7 @@ export default function Billing() {
               ))}
             </div>
             <p className="text-xs text-muted-foreground mt-3 text-center">
-              Les Woofs achetés s'ajoutent à ton quota mensuel et n'expirent jamais.
+              Les Woofs achetés utilisent l'IA Premium et n'expirent jamais.
             </p>
           </CardContent>
         </Card>

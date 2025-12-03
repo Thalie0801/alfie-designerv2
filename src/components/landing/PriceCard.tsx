@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { Check, Sparkles, Zap } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 
 export type BillingPlan = "starter" | "pro" | "studio" | "enterprise";
 export type BillingPeriod = "monthly" | "annual";
+export type AITier = "standard" | "premium";
 
 export interface PriceCardProps {
   title: string;
@@ -17,6 +18,7 @@ export interface PriceCardProps {
   features: string[];
   plan: BillingPlan;
   popular?: boolean;
+  aiTier?: AITier;
   onSelectPlan: (plan: BillingPlan) => void;
 }
 
@@ -30,8 +32,11 @@ export function PriceCard({
   features,
   plan,
   popular,
+  aiTier = "standard",
   onSelectPlan,
 }: PriceCardProps) {
+  const isPremium = aiTier === "premium";
+  
   return (
     <Card
       className={`relative border-border/50 bg-card/50 backdrop-blur-sm transition-all hover:shadow-2xl ${
@@ -45,6 +50,22 @@ export function PriceCard({
       )}
       <CardHeader className="pb-8 pt-8 text-center">
         <CardTitle className="mb-2 text-2xl">{title}</CardTitle>
+        
+        {/* Badge IA Standard / Premium */}
+        <div className="mb-3 flex justify-center">
+          {isPremium ? (
+            <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white gap-1 px-3 py-1">
+              <Sparkles className="h-3 w-3" />
+              IA PREMIUM
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="gap-1 px-3 py-1 bg-slate-200 text-slate-700">
+              <Zap className="h-3 w-3" />
+              IA Standard
+            </Badge>
+          )}
+        </div>
+        
         <div className="mb-2 flex items-baseline justify-center gap-1">
           <span className="text-5xl font-bold">{calculatePrice(monthlyPrice)}</span>
           <span className="text-muted-foreground">{getPriceLabel()}</span>
