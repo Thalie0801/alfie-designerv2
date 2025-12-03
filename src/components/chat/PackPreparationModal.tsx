@@ -225,13 +225,14 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
 
       const packWithTexts = { ...pack, assets: assetsWithTexts };
 
-      // ✅ ÉTAPE 3 : Envoyer le pack AVEC les textes
+      // ✅ ÉTAPE 3 : Envoyer le pack AVEC les textes et le plan utilisateur
       await sendPackToGenerator({
         brandId,
         pack: packWithTexts,
         userId: profile.id,
         selectedAssetIds: Array.from(selectedAssetIds),
-        useBrandKit, // ✅ Pass toggle value
+        useBrandKit,
+        userPlan: profile.plan || 'starter', // ✅ Plan utilisateur pour sélection du modèle IA
       });
 
       toast.success("C'est parti ! Alfie prépare ton pack de visuels 🎬");

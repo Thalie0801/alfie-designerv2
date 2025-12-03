@@ -463,7 +463,7 @@ export default function ChatWidget() {
         console.warn("Could not fetch Woofs quota:", quotaError);
       }
 
-      // Appeler alfie-chat-widget avec le contexte Woofs
+      // Appeler alfie-chat-widget avec le contexte Woofs et le plan utilisateur
       const response = await supabase.functions.invoke("alfie-chat-widget", {
         body: {
           brandId: activeBrandId,
@@ -472,6 +472,7 @@ export default function ChatWidget() {
           lang: "fr",
           woofsRemaining,
           brief: brief.state,
+          userPlan: profile?.plan || 'starter', // ✅ Plan utilisateur pour sélection du modèle IA
         },
       });
 
@@ -688,6 +689,7 @@ export default function ChatWidget() {
         userId: profile.id,
         selectedAssetIds: selectedIds,
         useBrandKit,
+        userPlan: profile.plan || 'starter', // ✅ Plan utilisateur pour sélection du modèle IA
       });
       
       toast.success(`${selectedIds.length} asset(s) en cours de génération !`);

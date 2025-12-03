@@ -868,9 +868,10 @@ ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
         requestId: payload.requestId ?? null,
         templateImageUrl: img.templateImageUrl ?? payload.sourceUrl ?? null,
         uploadedSourceUrl: payload.sourceUrl ?? null,
-        carousel_id, // Passer le carousel_id
-        slideIndex, // Passer l'index de slide
-        useBrandKit, // ✅ Utiliser la variable déjà résolue ligne 672
+        carousel_id,
+        slideIndex,
+        useBrandKit,
+        userPlan: payload.userPlan, // ✅ Plan utilisateur pour sélection du modèle IA
       });
 
       const imagePayload = unwrapResult<any>(imageResult);
