@@ -642,58 +642,109 @@ export default function Admin() {
               ) : affiliates.length === 0 ? (
                 <p className="text-center text-muted-foreground py-4">Aucun affilié</p>
               ) : (
-                <div className="space-y-2">
-                  {affiliates.map((affiliate) => (
-                    <div
-                      key={affiliate.id}
-                      className="flex items-center justify-between p-4 rounded-lg border hover:shadow-sm transition"
-                    >
-                      <div>
-                        <p className="font-medium">{affiliate.name}</p>
-                        <p className="text-sm text-muted-foreground">{affiliate.email}</p>
-                      </div>
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <Badge variant={affiliate.status === 'active' ? 'default' : 'secondary'}>
-                            {affiliate.status}
-                          </Badge>
-                          {affiliate.payout_method && (
-                            <span className="text-sm text-muted-foreground">
-                              {affiliate.payout_method}
-                            </span>
-                          )}
+                <>
+                  {/* Tableau de bord des rangs */}
+                  <div className="grid grid-cols-3 gap-4 mb-6">
+                    <Card className="p-4 text-center border-green-200 dark:border-green-800">
+                      <p className="text-2xl font-bold text-green-600">
+                        {affiliates.filter(a => !a.affiliate_status || a.affiliate_status === 'creator').length}
+                      </p>
+                      <p className="text-sm text-muted-foreground">🌱 Créateurs</p>
+                    </Card>
+                    <Card className="p-4 text-center border-blue-200 dark:border-blue-800">
+                      <p className="text-2xl font-bold text-blue-600">
+                        {affiliates.filter(a => a.affiliate_status === 'mentor').length}
+                      </p>
+                      <p className="text-sm text-muted-foreground">🎯 Mentors</p>
+                    </Card>
+                    <Card className="p-4 text-center border-purple-200 dark:border-purple-800">
+                      <p className="text-2xl font-bold text-purple-600">
+                        {affiliates.filter(a => a.affiliate_status === 'leader').length}
+                      </p>
+                      <p className="text-sm text-muted-foreground">👑 Leaders</p>
+                    </Card>
+                  </div>
+
+                  <div className="space-y-2">
+                    {affiliates.map((affiliate) => {
+                      const referrals = affiliate.active_direct_referrals || 0;
+                      const status = affiliate.affiliate_status || 'creator';
+                      
+                      return (
+                        <div
+                          key={affiliate.id}
+                          className="flex items-center justify-between p-4 rounded-lg border hover:shadow-sm transition"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{affiliate.name}</p>
+                              <Badge 
+                                variant="outline" 
+                                className={
+                                  status === 'leader' ? 'border-purple-500 text-purple-700 dark:text-purple-400' :
+                                  status === 'mentor' ? 'border-blue-500 text-blue-700 dark:text-blue-400' :
+                                  'border-green-500 text-green-700 dark:text-green-400'
+                                }
+                              >
+                                {status === 'leader' ? '👑 Leader' :
+                                 status === 'mentor' ? '🎯 Mentor' : '🌱 Créateur'}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">{affiliate.email}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {referrals} filleul{referrals > 1 ? 's' : ''} actif{referrals > 1 ? 's' : ''}
+                              {referrals === 2 && status === 'creator' && (
+                                <span className="ml-2 text-blue-600 dark:text-blue-400">• 1 de plus pour Mentor</span>
+                              )}
+                              {referrals === 4 && status === 'mentor' && (
+                                <span className="ml-2 text-purple-600 dark:text-purple-400">• 1 de plus pour Leader</span>
+                              )}
+                            </p>
+                          </div>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                            <div className="flex items-center gap-2">
+                              <Badge variant={affiliate.status === 'active' ? 'default' : 'secondary'}>
+                                {affiliate.status}
+                              </Badge>
+                              {affiliate.payout_method && (
+                                <span className="text-sm text-muted-foreground">
+                                  {affiliate.payout_method}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  handleToggleAffiliateStatus(
+                                    affiliate.id,
+                                    affiliate.status === 'active' ? 'inactive' : 'active'
+                                  )
+                                }
+                              >
+                                {affiliate.status === 'active' ? (
+                                  <UserX className="h-4 w-4 mr-2" />
+                                ) : (
+                                  <UserCheck className="h-4 w-4 mr-2" />
+                                )}
+                                {affiliate.status === 'active' ? 'Désactiver' : 'Activer'}
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleRemoveAffiliate(affiliate.id)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Purger
+                              </Button>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              handleToggleAffiliateStatus(
-                                affiliate.id,
-                                affiliate.status === 'active' ? 'inactive' : 'active'
-                              )
-                            }
-                          >
-                            {affiliate.status === 'active' ? (
-                              <UserX className="h-4 w-4 mr-2" />
-                            ) : (
-                              <UserCheck className="h-4 w-4 mr-2" />
-                            )}
-                            {affiliate.status === 'active' ? 'Désactiver' : 'Activer'}
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleRemoveAffiliate(affiliate.id)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Purger
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
