@@ -14,12 +14,13 @@ export default function Legal() {
           
           <div>
             <h3 className="text-xl font-semibold mb-3 text-foreground">Éditeur du site</h3>
-            <p>Staelens Nathalie – Entrepreneure individuelle</p>
+            <p>Buzztron - Staelens Nathalie EI</p>
             <p>Nom commercial : Alfie Designer</p>
-            <p>Adresse professionnelle : Rue roger Salengro 62000 Arras</p>
+            <p>Adresse : 34 Place du Général de Gaulle, Bureau 3, 59000 Lille</p>
+            <p>Tél : 07.45.26.30.64</p>
             <p>Email : contact@kronys.fr</p>
-            <p className="mt-2">Numéro SIREN / SIRET : En cours</p>
-            <p>TVA intracommunautaire : En cours</p>
+            <p className="mt-2">SIRET : 90432193200025</p>
+            <p>TVA intracommunautaire : Non assujettie (régime micro-entreprise)</p>
           </div>
 
           <div>
@@ -116,7 +117,7 @@ export default function Legal() {
               Les présentes CGU sont régies par le droit français.
             </p>
             <p>
-              En cas de litige, compétence exclusive des tribunaux de Paris (France).
+              En cas de litige, compétence exclusive des tribunaux de Lille (France).
             </p>
           </div>
         </section>

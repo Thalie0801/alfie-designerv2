@@ -19,9 +19,11 @@ export default function Privacy() {
 
           <div>
             <h2 className="text-2xl font-semibold mb-3 text-foreground">Responsable du traitement</h2>
-            <p>Staelens Nathalie EI</p>
-            <p>Adresse : Rue roger Salengro 62000 Arras</p>
-            <p>Email contact : contact@kronys.fr</p>
+            <p>Buzztron - Staelens Nathalie EI</p>
+            <p>Adresse : 34 Place du Général de Gaulle, Bureau 3, 59000 Lille</p>
+            <p>Tél : 07.45.26.30.64</p>
+            <p>Email : contact@kronys.fr</p>
+            <p>SIRET : 90432193200025</p>
           </div>
 
           <div>
@@ -88,7 +90,7 @@ export default function Privacy() {
               <li>Retirer votre consentement,</li>
               <li>Demander la portabilité de vos informations.</li>
             </ul>
-            <p className="mt-3">Envoyez toute demande à : contact@kronys.fr</p>
+            <p className="mt-3">Envoyez toute demande à : contact@kronys.fr ou par téléphone au 07.45.26.30.64</p>
           </div>
 
           <div>
