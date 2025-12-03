@@ -108,7 +108,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
       case "carousel":
         return `Carrousel (${asset.count} slides)`;
       case "video_premium":
-        return "Asset vidéo (Veo 3.1, 6s)";
+        return "Vidéo courte (6s)";
       default:
         return "Visuel";
     }
