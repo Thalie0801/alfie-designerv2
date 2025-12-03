@@ -221,27 +221,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string, fullName: string) => {
     const redirectUrl = `${window.location.origin}/`;
 
-    // Vérifier qu'une session de paiement validée existe pour cet email
-    const {
-      data: paymentSession,
-      error: paymentError,
-    } = await supabase
-      .from('payment_sessions')
-      .select('*')
-      .eq('email', email)
-      .eq('verified', true)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (paymentError || !paymentSession) {
-      return {
-        error:
-          paymentError ??
-          new Error('Aucun paiement validé trouvé. Veuillez choisir un plan.'),
-      };
-    }
-
+    // ✅ Nouveau flux: inscription AVANT paiement
+    // L'utilisateur sera redirigé vers /billing après inscription
     const { error, data } = await supabase.auth.signUp({
       email,
       password,
@@ -249,14 +230,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         emailRedirectTo: redirectUrl,
         data: {
           full_name: fullName,
-          plan: paymentSession.plan,
-          payment_session_id: paymentSession.id,
         },
       },
     });
 
     if (!error && data.user && data.session) {
-      // Force profile refresh after signup - passer la session directement
+      // Force profile refresh after signup
       await refreshProfile(data.session);
     }
 
