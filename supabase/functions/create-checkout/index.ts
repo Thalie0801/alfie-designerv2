@@ -178,7 +178,7 @@ Deno.serve(async (req) => {
       ],
       metadata,
       allow_promotion_codes: true,
-      success_url: `${frontendUrl}/dashboard?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${frontendUrl}/billing?payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${frontendUrl}/billing?payment=cancelled`,
     });
 
