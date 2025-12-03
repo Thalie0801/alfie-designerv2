@@ -599,6 +599,8 @@ export type Database = {
       }
       brands: {
         Row: {
+          adjectives: string[] | null
+          avoid_in_visuals: string | null
           canva_access_token: string | null
           canva_connected: boolean | null
           canva_refresh_token: string | null
@@ -609,23 +611,32 @@ export type Database = {
           images_used: number | null
           is_addon: boolean | null
           is_default: boolean | null
+          language_level: string | null
           logo_url: string | null
           name: string
           niche: string | null
           palette: Json | null
+          person: string | null
+          pitch: string | null
           plan: string | null
           quota_images: number | null
           quota_videos: number | null
           quota_woofs: number | null
           resets_on: string | null
           stripe_subscription_id: string | null
+          tagline: string | null
+          tone_sliders: Json | null
           updated_at: string | null
           user_id: string
           videos_used: number | null
+          visual_mood: string[] | null
+          visual_types: string[] | null
           voice: string | null
           woofs_used: number | null
         }
         Insert: {
+          adjectives?: string[] | null
+          avoid_in_visuals?: string | null
           canva_access_token?: string | null
           canva_connected?: boolean | null
           canva_refresh_token?: string | null
@@ -636,23 +647,32 @@ export type Database = {
           images_used?: number | null
           is_addon?: boolean | null
           is_default?: boolean | null
+          language_level?: string | null
           logo_url?: string | null
           name: string
           niche?: string | null
           palette?: Json | null
+          person?: string | null
+          pitch?: string | null
           plan?: string | null
           quota_images?: number | null
           quota_videos?: number | null
           quota_woofs?: number | null
           resets_on?: string | null
           stripe_subscription_id?: string | null
+          tagline?: string | null
+          tone_sliders?: Json | null
           updated_at?: string | null
           user_id: string
           videos_used?: number | null
+          visual_mood?: string[] | null
+          visual_types?: string[] | null
           voice?: string | null
           woofs_used?: number | null
         }
         Update: {
+          adjectives?: string[] | null
+          avoid_in_visuals?: string | null
           canva_access_token?: string | null
           canva_connected?: boolean | null
           canva_refresh_token?: string | null
@@ -663,19 +683,26 @@ export type Database = {
           images_used?: number | null
           is_addon?: boolean | null
           is_default?: boolean | null
+          language_level?: string | null
           logo_url?: string | null
           name?: string
           niche?: string | null
           palette?: Json | null
+          person?: string | null
+          pitch?: string | null
           plan?: string | null
           quota_images?: number | null
           quota_videos?: number | null
           quota_woofs?: number | null
           resets_on?: string | null
           stripe_subscription_id?: string | null
+          tagline?: string | null
+          tone_sliders?: Json | null
           updated_at?: string | null
           user_id?: string
           videos_used?: number | null
+          visual_mood?: string[] | null
+          visual_types?: string[] | null
           voice?: string | null
           woofs_used?: number | null
         }
