@@ -828,9 +828,9 @@ async function generateGcsSignedUrl(
       
       // ✅ Nettoyer le prompt des références au texte
       let cleanPrompt = (prompt || "")
-        .replace(/texte\s*(animé|:\s*|à l'écran|qui apparaît)/gi, '')
+        .replace(/texte\s*(anim|:\s*)/gi, '')
         .replace(/bouton\s*cta/gi, '')
-        .replace(/["«»"].*?["«»"](?=\s*(,|\.|\s|$))/g, '') // Retirer textes entre guillemets
+        .replace(/"[^"]*"/g, '') // Retirer textes entre guillemets
         .replace(/\s+/g, ' ')
         .trim();
       
