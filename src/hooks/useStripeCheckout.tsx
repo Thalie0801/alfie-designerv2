@@ -24,7 +24,13 @@ export function useStripeCheckout() {
         return;
       }
 
-      console.log("[useStripeCheckout] Creating checkout for user:", user.email);
+      console.log("[useStripeCheckout] Creating checkout:", { 
+        email: user.email, 
+        plan, 
+        billingPeriod, 
+        affiliateRef: affiliateRef || '(none)',
+        brandName 
+      });
 
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
@@ -43,6 +49,8 @@ export function useStripeCheckout() {
       if (data?.error) {
         throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
       }
+
+      console.log("[useStripeCheckout] Checkout session created:", { url: data?.url ? 'received' : 'missing', affiliateRef });
 
       if (data?.url) {
         // Redirect to Stripe Checkout in the same window

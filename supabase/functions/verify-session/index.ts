@@ -146,7 +146,12 @@ async function handleAffiliateConversion(
   planOrSize: string,
   amount: number
 ) {
-  if (!affiliateRef) return;
+  console.log("[verify-session] handleAffiliateConversion called:", { affiliateRef, userId, conversionType, planOrSize, amount });
+  
+  if (!affiliateRef) {
+    console.log("[verify-session] No affiliate ref provided, skipping conversion");
+    return;
+  }
 
   // Format plan field: "subscription:starter", "upgrade:pro", "woofs_pack:100"
   const planLabel = `${conversionType}:${planOrSize}`;
@@ -157,33 +162,56 @@ async function handleAffiliateConversion(
 
   // Try to find affiliate by ID or slug
   let affiliateId: string | null = null;
+  let affiliateEmail: string | null = null;
   
-  // First try by ID
-  const { data: affiliateById } = await supabase
-    .from("affiliates")
-    .select("id")
-    .eq("id", affiliateRef)
-    .single();
-
-  if (affiliateById) {
-    affiliateId = (affiliateById as any).id;
-  } else {
-    // Try by slug
-    const { data: affiliateBySlug } = await supabase
+  // Check if ref is a UUID
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(affiliateRef);
+  console.log("[verify-session] Affiliate ref type:", { affiliateRef, isUUID });
+  
+  if (isUUID) {
+    // First try by ID
+    const { data: affiliateById, error: idError } = await supabase
       .from("affiliates")
-      .select("id")
+      .select("id, email")
+      .eq("id", affiliateRef)
+      .single();
+
+    if (idError) {
+      console.log("[verify-session] Error finding affiliate by ID:", idError);
+    }
+
+    if (affiliateById) {
+      affiliateId = (affiliateById as any).id;
+      affiliateEmail = (affiliateById as any).email;
+      console.log("[verify-session] Found affiliate by ID:", { affiliateId, affiliateEmail });
+    }
+  }
+  
+  if (!affiliateId) {
+    // Try by slug
+    const { data: affiliateBySlug, error: slugError } = await supabase
+      .from("affiliates")
+      .select("id, email")
       .eq("slug", affiliateRef)
       .single();
     
+    if (slugError) {
+      console.log("[verify-session] Error finding affiliate by slug:", slugError);
+    }
+    
     if (affiliateBySlug) {
       affiliateId = (affiliateBySlug as any).id;
+      affiliateEmail = (affiliateBySlug as any).email;
+      console.log("[verify-session] Found affiliate by slug:", { affiliateId, affiliateEmail });
     }
   }
 
   if (!affiliateId) {
-    console.log("[verify-session] Affiliate not found", { affiliateRef });
+    console.error("[verify-session] Affiliate not found for ref:", affiliateRef);
     return;
   }
+
+  console.log("[verify-session] Creating conversion for affiliate:", { affiliateId, affiliateEmail, userId, planLabel, amount });
 
   const { data: conversionData, error: conversionError } = await supabase
     .from("affiliate_conversions")
@@ -198,22 +226,38 @@ async function handleAffiliateConversion(
     .single();
 
   if (conversionError) {
-    console.error("[verify-session] Error creating conversion", conversionError);
+    console.error("[verify-session] Error creating conversion:", conversionError);
     return;
   }
+
+  console.log("[verify-session] Conversion created successfully:", conversionData);
 
   if (conversionData) {
     const conversionId = (conversionData as any).id as string;
     
-    await supabase.rpc("calculate_mlm_commissions", {
+    console.log("[verify-session] Calculating MLM commissions for conversion:", conversionId);
+    
+    const { error: rpcError } = await supabase.rpc("calculate_mlm_commissions", {
       conversion_id_param: conversionId,
       direct_affiliate_id: affiliateId,
       conversion_amount: amount,
     } as any);
 
-    await supabase.rpc("update_affiliate_status", { 
+    if (rpcError) {
+      console.error("[verify-session] Error calculating commissions:", rpcError);
+    } else {
+      console.log("[verify-session] Commissions calculated successfully");
+    }
+
+    const { error: statusError } = await supabase.rpc("update_affiliate_status", { 
       affiliate_id_param: affiliateId
     } as any);
+
+    if (statusError) {
+      console.error("[verify-session] Error updating affiliate status:", statusError);
+    } else {
+      console.log("[verify-session] Affiliate status updated successfully");
+    }
   }
 }
 
