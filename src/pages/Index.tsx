@@ -4,6 +4,7 @@ import { HeroTextSection } from "@/components/landing/HeroTextSection";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
 import { FeaturesSection } from "@/components/landing/FeaturesSection";
 import { PricingSection } from "@/components/landing/PricingSection";
+import { AffiliateSection } from "@/components/landing/AffiliateSection";
 import { FinalCTA } from "@/components/landing/FinalCTA";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { ProspectBubble } from "@/components/ProspectBubble";
@@ -62,6 +63,7 @@ export default function AlfieLanding() {
       <HowItWorksSection />
       <FeaturesSection />
       <PricingSection />
+      <AffiliateSection />
       <FinalCTA />
       <LandingFooter />
       <ProspectBubble />
