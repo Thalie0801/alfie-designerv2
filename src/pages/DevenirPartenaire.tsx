@@ -163,7 +163,7 @@ export default function DevenirPartenaire() {
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Check className="h-5 w-5 text-green-500" />
-                  <span>Abonnement minimum 29€/mois</span>
+                  <span>Abonnement minimum 99€/mois</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="h-5 w-5 text-green-500" />
@@ -171,7 +171,7 @@ export default function DevenirPartenaire() {
                 </div>
                 <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg mt-4">
                   <p className="text-sm font-medium text-green-700 dark:text-green-300">
-                    Exemple: 5 filleuls × 29€ × 15% = <strong>21,75€/mois</strong>
+                    Exemple: 5 filleuls × 99€ × 15% = <strong>74,25€/mois</strong>
                   </p>
                 </div>
               </div>
@@ -201,7 +201,7 @@ export default function DevenirPartenaire() {
                 </div>
                 <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg mt-4">
                   <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                    Exemple: 15 niveau 2 × 29€ × 5% = <strong>21,75€/mois</strong>
+                    Exemple: 15 niveau 2 × 99€ × 5% = <strong>74,25€/mois</strong>
                   </p>
                 </div>
               </div>
@@ -231,7 +231,7 @@ export default function DevenirPartenaire() {
                 </div>
                 <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg mt-4">
                   <p className="text-sm font-medium text-purple-700 dark:text-purple-300">
-                    Exemple: 45 niveau 3 × 29€ × 2% = <strong>26,10€/mois</strong>
+                    Exemple: 45 niveau 3 × 99€ × 2% = <strong>89,10€/mois</strong>
                   </p>
                 </div>
               </div>
@@ -249,20 +249,20 @@ export default function DevenirPartenaire() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                   <span>5 filleuls directs (15%)</span>
-                  <span className="font-bold text-green-600">21,75€</span>
+                  <span className="font-bold text-green-600">74,25€</span>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                   <span>15 niveau 2 (5%)</span>
-                  <span className="font-bold text-blue-600">21,75€</span>
+                  <span className="font-bold text-blue-600">74,25€</span>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                   <span>45 niveau 3 (2%)</span>
-                  <span className="font-bold text-purple-600">26,10€</span>
+                  <span className="font-bold text-purple-600">89,10€</span>
                 </div>
                 <div className="flex items-center justify-between p-4 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-lg border-2 border-primary/30">
                   <span className="text-lg font-bold">Total mensuel récurrent</span>
                   <span className="text-3xl font-extrabold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                    ≈70€/mois
+                    ≈238€/mois
                   </span>
                 </div>
               </div>
@@ -369,7 +369,7 @@ export default function DevenirPartenaire() {
             </CardHeader>
             <CardContent>
               <p className="text-slate-600">
-                Il suffit de créer un compte Alfie Designer. Tous les utilisateurs actifs (avec un abonnement ≥29€/mois) deviennent automatiquement partenaires et reçoivent leur lien de parrainage unique.
+                Il suffit de créer un compte Alfie Designer. Tous les utilisateurs actifs (avec un abonnement ≥99€/mois) deviennent automatiquement partenaires et reçoivent leur lien de parrainage unique.
               </p>
             </CardContent>
           </Card>
