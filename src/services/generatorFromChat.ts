@@ -19,7 +19,8 @@ export interface SendPackParams {
   pack: AlfiePack;
   userId: string;
   selectedAssetIds: string[];
-  useBrandKit?: boolean; // ✅ Contrôle si le Brand Kit doit être appliqué
+  useBrandKit?: boolean;
+  userPlan?: string; // ✅ Plan utilisateur pour sélection du modèle IA
 }
 
 export interface SendPackResult {
@@ -38,7 +39,8 @@ export async function sendPackToGenerator({
   pack,
   userId,
   selectedAssetIds,
-  useBrandKit = true, // Par défaut : utiliser le Brand Kit
+  useBrandKit = true,
+  userPlan = 'starter', // ✅ Plan utilisateur pour sélection du modèle IA
 }: SendPackParams): Promise<SendPackResult> {
   // 1. Calculer le coût total Woofs
   const totalWoofs = calculatePackWoofCost(pack, selectedAssetIds);
@@ -93,7 +95,7 @@ export async function sendPackToGenerator({
           referenceImageUrl: asset.referenceImageUrl || "❌ MISSING",
           title: asset.title,
         });
-        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit);
+        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, userPlan);
       })
     );
 
@@ -146,7 +148,8 @@ async function createAssetJob(
   brandId: string,
   userId: string,
   packTitle: string,
-  useBrandKit: boolean = true
+  useBrandKit: boolean = true,
+  userPlan: string = 'starter'
 ): Promise<{ orderId: string }> {
   // Créer un order pour cet asset
   const { data: order, error: orderError } = await supabase
@@ -205,24 +208,25 @@ async function createAssetJob(
       brief: typeof order.brief_json === 'object' && order.brief_json !== null && !Array.isArray(order.brief_json)
         ? {
             ...(order.brief_json as Record<string, any>),
-            topic: asset.prompt || asset.title || packTitle, // ✅ Thème toujours présent
-            content: asset.prompt || asset.title, // ✅ Contenu explicite
+            topic: asset.prompt || asset.title || packTitle,
+            content: asset.prompt || asset.title,
           }
         : {
             topic: asset.prompt || asset.title || packTitle,
             content: asset.prompt || asset.title,
           },
       assetId: asset.id,
-      prompt: asset.prompt || asset.title || packTitle, // ✅ Prompt jamais vide
-      carousel_id, // Pour carrousels uniquement
+      prompt: asset.prompt || asset.title || packTitle,
+      carousel_id,
       count: asset.kind === "carousel" ? asset.count : 1,
-      referenceImageUrl: asset.referenceImageUrl, // Image de référence
-      generatedTexts: asset.generatedTexts, // ✅ CRITIQUE : Textes générés (slides pour carrousels, textes pour images)
-      campaign: packTitle, // Nom de la campagne pour organisation Cloudinary
-      useBrandKit, // ✅ Contrôle si le Brand Kit doit être appliqué
-      visualStyle: asset.visualStyle || 'photorealistic', // ✅ Style visuel
-      withAudio: false, // ✅ Toujours sans audio - sera ajouté via Canva plus tard
-      engine: videoEngine, // ✅ AJOUT: engine pour vidéos
+      referenceImageUrl: asset.referenceImageUrl,
+      generatedTexts: asset.generatedTexts,
+      campaign: packTitle,
+      useBrandKit,
+      userPlan, // ✅ Plan utilisateur pour sélection du modèle IA
+      visualStyle: asset.visualStyle || 'photorealistic',
+      withAudio: false,
+      engine: videoEngine,
       durationSeconds: asset.durationSeconds || 5,
       aspectRatio: asset.ratio || "4:5",
     },

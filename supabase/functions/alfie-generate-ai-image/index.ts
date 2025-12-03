@@ -7,6 +7,7 @@ import {
 } from '../_shared/env.ts';
 
 import { corsHeaders } from "../_shared/cors.ts";
+import { getModelsForPlan, getTierFromPlan } from "../_shared/aiModels.ts";
 /* ------------------------------- CORS ------------------------------- */
 function jsonRes(body: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(body), {
@@ -43,7 +44,8 @@ interface GenerateRequest {
   backgroundOnly?: boolean;
   seed?: string;
   negativePrompt?: string;
-  useBrandKit?: boolean; // ✅ AJOUT : Contrôle si le Brand Kit doit être appliqué
+  useBrandKit?: boolean;
+  userPlan?: string; // ✅ AJOUT : Plan utilisateur pour sélection du modèle IA
 }
 
 /* --------------------------- Small helpers -------------------------- */
@@ -168,8 +170,14 @@ function buildNegativePrompt(input: GenerateRequest) {
   return input.negativePrompt || "";
 }
 
-async function callLovableOnce(opts: { apiKey: string; system: string; userContent: any[] }) {
-  const { apiKey, system, userContent } = opts;
+async function callLovableOnce(opts: { apiKey: string; system: string; userContent: any[]; userPlan?: string }) {
+  const { apiKey, system, userContent, userPlan } = opts;
+  
+  // ✅ Sélection dynamique du modèle selon le plan
+  const models = getModelsForPlan(userPlan);
+  const tier = getTierFromPlan(userPlan);
+  console.log(`🎨 [alfie-generate-ai-image] Using ${tier === 'premium' ? 'Premium' : 'Standard'} tier - Model: ${models.image}`);
+  
   const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -177,7 +185,7 @@ async function callLovableOnce(opts: { apiKey: string; system: string; userConte
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash-image-preview",
+      model: models.image, // ✅ Modèle dynamique selon le plan
       messages: [
         { role: "system", content: system },
         { role: "user", content: userContent },
@@ -257,6 +265,7 @@ Deno.serve(async (req) => {
       apiKey: LOVABLE_API_KEY,
       system: systemPrompt,
       userContent,
+      userPlan: body.userPlan, // ✅ Plan utilisateur pour sélection du modèle
     });
 
     if (!resp.ok) {
@@ -290,6 +299,7 @@ Deno.serve(async (req) => {
         system:
           "You are a professional image generator. Always produce exactly ONE high-quality image in message.images[0]. Use PERFECT French spelling with proper accents.",
         userContent: retryContent,
+        userPlan: body.userPlan, // ✅ Plan utilisateur pour sélection du modèle
       });
 
       const retryJson = await retry.json().catch(() => null);

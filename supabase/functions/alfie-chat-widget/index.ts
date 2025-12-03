@@ -6,6 +6,7 @@
 
 import { corsHeaders } from "../_shared/cors.ts";
 import { callVertexChat } from "./vertexHelper.ts";
+import { getModelsForPlan, getTierFromPlan } from "../_shared/aiModels.ts";
 
 // System prompt unique pour Alfie Chat
 const SYSTEM_PROMPT = `Tu es « Alfie Chat », l'assistant d'Alfie Designer.
@@ -389,7 +390,8 @@ async function callLLM(
   brandContext?: { name?: string; niche?: string; voice?: string; palette?: string[] },
   woofsRemaining?: number,
   useBrandKit: boolean = true,
-  briefContext?: string
+  briefContext?: string,
+  userPlan?: string
 ): Promise<string> {
   // Utiliser le system prompt unique
   let enrichedPrompt = SYSTEM_PROMPT;
@@ -484,8 +486,11 @@ Le secteur d'activité est fourni pour contexte minimal, mais reste neutre dans 
     console.warn("⚠️ Vertex AI failed, falling back to Lovable AI:", error?.message || String(error));
   }
 
-  // 2. Lovable AI (moteur principal pour l'instant)
-  console.log("🔄 Using Lovable AI (Gemini 2.5 Flash)...");
+  // 2. Lovable AI - Sélection dynamique du modèle selon le plan
+  const models = getModelsForPlan(userPlan);
+  const tier = getTierFromPlan(userPlan);
+  console.log(`🔄 Using Lovable AI (${tier === 'premium' ? 'Premium' : 'Standard'}) - Model: ${models.text}`);
+  
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   
   if (!LOVABLE_API_KEY) {
@@ -499,7 +504,7 @@ Le secteur d'activité est fourni pour contexte minimal, mais reste neutre dans 
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: models.text, // ✅ Modèle dynamique selon le plan
       messages: [
         { role: "system", content: enrichedPrompt },
         ...messages,
@@ -572,7 +577,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { brandId, messages, lang, woofsRemaining, useBrandKit = true, brief } = await req.json();
+    const { brandId, messages, lang, woofsRemaining, useBrandKit = true, brief, userPlan } = await req.json();
 
     if (!brandId || !messages) {
       return new Response(
@@ -654,8 +659,8 @@ Deno.serve(async (req) => {
       briefContext += `\n\nIMPORTANT : Utilise TOUTES ces informations du brief pour générer le pack. Ne redemande PAS ce qui est déjà renseigné ci-dessus.`;
     }
 
-    // Appeler le LLM avec le system prompt unique
-    const rawReply = await callLLM(messages, SYSTEM_PROMPT, brandContext, woofsRemaining, useBrandKit, briefContext);
+    // Appeler le LLM avec le system prompt unique et le plan utilisateur
+    const rawReply = await callLLM(messages, SYSTEM_PROMPT, brandContext, woofsRemaining, useBrandKit, briefContext, userPlan);
 
     // Parser le pack si présent
     const pack = parsePack(rawReply);

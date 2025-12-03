@@ -170,7 +170,7 @@ const PRESET_PACKS = {
 };
 
 export function StudioGenerator() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { activeBrandId, activeBrand, loading: brandLoading } = useBrandKit();
   const location = useLocation();
   const navigate = useNavigate();
@@ -517,7 +517,8 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
         pack,
         userId: user.id,
         selectedAssetIds: pack.assets.map((a) => a.id),
-        useBrandKit: useBrandKitForPack, // ✅ Propagation du toggle Brand Kit
+        useBrandKit: useBrandKitForPack,
+        userPlan: profile?.plan || 'starter', // ✅ Plan utilisateur pour sélection du modèle IA
       });
 
       toast.success(`Super ! Alfie lance la génération de tes visuels 🐶`);
