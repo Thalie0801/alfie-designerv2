@@ -228,6 +228,25 @@ SEULS CES MESSAGES DÉCLENCHENT LA GÉNÉRATION :
    ❌ INTERDIT : Décrire un scénario de 15-20 secondes avec 5 temps forts mais générer UN SEUL asset
    ✅ OBLIGATOIRE : Si 5 scènes décrites → créer 5 assets video_premium distincts dans le pack
 
+--- RÈGLE ULTRA-CRITIQUE POUR LES SCRIPTS VIDÉO ---
+
+Chaque asset video_premium DOIT avoir un champ "generatedTexts.video" COMPLET avec :
+- "hook" : L'accroche (phrase choc qui capte l'attention en 2 secondes)
+- "script" : Ce que la vidéo montre VISUELLEMENT (mouvements, transitions, ambiance - pas de voix off)
+- "cta" : L'appel à l'action final (si pertinent pour cette scène, sinon vide "")
+
+❌ INTERDIT pour les vidéos :
+"generatedTexts": { "video": { "hook": "Texte" } }  // Incomplet !
+
+✅ OBLIGATOIRE pour CHAQUE asset video_premium :
+"generatedTexts": { 
+  "video": { 
+    "hook": "Tu perds des heures sur ton contenu ?",
+    "script": "Zoom rapide sur un entrepreneur stressé devant son écran. Transition dynamique vers une solution simple. Texte animé qui apparaît.",
+    "cta": "Découvre ma méthode gratuite en bio"
+  } 
+}
+
 5. Si l'utilisatrice demande plusieurs contenus, crée plusieurs assets dans le même pack.
 
 6. IMPORTANT : Place toujours le bloc <alfie-pack> APRÈS ton explication textuelle, jamais avant.
@@ -337,7 +356,13 @@ Réponse :
       "goal": "engagement",
       "tone": "dynamique",
       "prompt": "Zoom rapide sur personnage surpris. Texte animé : Tu perds des heures sur ton contenu ? Ambiance colorée.",
-      "generatedTexts": { "video": { "hook": "Tu perds des heures sur ton contenu ?" } },
+      "generatedTexts": { 
+        "video": { 
+          "hook": "Tu perds des heures sur ton contenu ?",
+          "script": "Zoom rapide sur personnage surpris regardant son téléphone. Texte animé qui apparaît avec effet de glitch. Ambiance colorée et énergique.",
+          "cta": ""
+        } 
+      },
       "useBrandKit": true
     },
     {
@@ -351,7 +376,13 @@ Réponse :
       "goal": "education",
       "tone": "dynamique",
       "prompt": "Montage rapide d'écrans et outils. Transitions fluides. Texte : Découvre ma méthode en 3 étapes.",
-      "generatedTexts": { "video": { "hook": "Découvre ma méthode en 3 étapes" } },
+      "generatedTexts": { 
+        "video": { 
+          "hook": "Découvre ma méthode en 3 étapes",
+          "script": "Montage rapide d'écrans et outils. Transitions fluides entre les 3 étapes avec numéros animés. Style dynamique et moderne.",
+          "cta": ""
+        } 
+      },
       "useBrandKit": true
     },
     {
@@ -365,7 +396,13 @@ Réponse :
       "goal": "vente",
       "tone": "dynamique",
       "prompt": "Finale joyeuse avec confettis. Bouton CTA animé. Texte : Clique sur le lien en bio !",
-      "generatedTexts": { "video": { "hook": "Clique sur le lien en bio !" } },
+      "generatedTexts": { 
+        "video": { 
+          "hook": "Résultat : 5h économisées par semaine !",
+          "script": "Finale joyeuse avec confettis et célébration. Le personnage sourit et pointe vers le CTA animé.",
+          "cta": "Clique sur le lien en bio !"
+        } 
+      },
       "useBrandKit": true
     }
   ]
