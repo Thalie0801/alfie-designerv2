@@ -409,7 +409,20 @@ export default function Billing() {
                   <CardTitle className={`bg-gradient-to-r ${planColors} bg-clip-text text-transparent`}>
                     {plan.name}
                   </CardTitle>
-                  {plan.popular && <Badge className="bg-gradient-to-r from-primary to-secondary text-white">⭐ Populaire</Badge>}
+                  <div className="flex items-center gap-2">
+                    {plan.key === 'starter' ? (
+                      <Badge variant="outline" className="gap-1 text-xs border-muted-foreground/30">
+                        <Zap className="h-3 w-3" />
+                        IA Standard
+                      </Badge>
+                    ) : (
+                      <Badge className="gap-1 text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+                        <Sparkles className="h-3 w-3" />
+                        IA PREMIUM
+                      </Badge>
+                    )}
+                    {plan.popular && <Badge className="bg-gradient-to-r from-primary to-secondary text-white">⭐ Populaire</Badge>}
+                  </div>
                 </div>
               <CardDescription>
                 {plan.price ? (
