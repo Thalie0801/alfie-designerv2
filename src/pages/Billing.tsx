@@ -9,7 +9,7 @@ import { useCustomerPortal } from '@/hooks/useCustomerPortal';
 import { useWoofsPack, WOOFS_PACKS } from '@/hooks/useWoofsPack';
 import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { safeWoofs } from '@/lib/woofs';
@@ -85,7 +85,8 @@ export default function Billing() {
   const { createCheckout, loading } = useStripeCheckout();
   const { openCustomerPortal, loading: portalLoading } = useCustomerPortal();
   const { purchaseWoofsPack, loading: woofsLoading } = useWoofsPack();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const preselectedPlan = searchParams.get('plan');
   const currentPlan = profile?.plan || null;
   const hasActivePlan = Boolean(profile?.status === 'active' || profile?.granted_by_admin);
@@ -99,6 +100,52 @@ export default function Billing() {
     remaining: number;
   } | null>(null);
   const [loadingWoofs, setLoadingWoofs] = useState(true);
+  const [verifyingPayment, setVerifyingPayment] = useState(false);
+
+  // ✅ Vérifier le paiement Stripe après retour de checkout
+  useEffect(() => {
+    const sessionId = searchParams.get('session_id');
+    const paymentStatus = searchParams.get('payment');
+
+    if (paymentStatus === 'success' && sessionId && !verifyingPayment) {
+      setVerifyingPayment(true);
+      
+      (async () => {
+        try {
+          console.log('[Billing] Verifying payment session:', sessionId);
+          const { data, error } = await supabase.functions.invoke('verify-session', {
+            body: { session_id: sessionId },
+          });
+
+          if (error || !data?.ok) {
+            console.error('[Billing] Verification failed:', error || data?.error);
+            throw error || new Error(data?.error || 'Verification failed');
+          }
+
+          console.log('[Billing] Payment verified successfully:', data);
+          
+          // Rafraîchir le profil pour avoir les nouveaux quotas
+          await refreshProfile();
+          
+          toast.success('🎉 Paiement validé ! Ton abonnement est maintenant actif.');
+          
+          // Nettoyer l'URL et rediriger vers dashboard
+          navigate('/dashboard', { replace: true });
+        } catch (err: any) {
+          console.error('[Billing] Payment verification failed:', err);
+          toast.error('Erreur lors de la vérification du paiement: ' + (err?.message || 'Erreur inconnue'));
+          
+          // Nettoyer l'URL même en cas d'erreur
+          const next = new URLSearchParams(searchParams);
+          next.delete('session_id');
+          next.delete('payment');
+          setSearchParams(next, { replace: true });
+        } finally {
+          setVerifyingPayment(false);
+        }
+      })();
+    }
+  }, [searchParams, verifyingPayment, refreshProfile, navigate, setSearchParams]);
 
   // Charger les Woofs
   const fetchWoofs = async () => {
