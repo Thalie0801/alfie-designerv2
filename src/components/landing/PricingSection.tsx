@@ -15,6 +15,7 @@ const plans = [
       "Export ZIP des créations prêtes à télécharger",
     ],
     plan: "starter" as const,
+    aiTier: "standard" as const,
   },
   {
     title: "Pro",
@@ -29,6 +30,7 @@ const plans = [
     ],
     plan: "pro" as const,
     popular: true,
+    aiTier: "premium" as const,
   },
   {
     title: "Studio",
@@ -42,6 +44,7 @@ const plans = [
       "Support dédié",
     ],
     plan: "studio" as const,
+    aiTier: "premium" as const,
   },
 ];
 
@@ -110,6 +113,7 @@ export function PricingSection() {
               features={plan.features}
               plan={plan.plan}
               popular={plan.popular}
+              aiTier={plan.aiTier}
               onSelectPlan={handleSelectPlan}
             />
           ))}
