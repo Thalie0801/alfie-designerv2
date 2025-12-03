@@ -225,16 +225,11 @@ function resolveUseBrandKit(payload: any, jobMeta?: { use_brand_kit?: boolean })
 }
 
 /**
- * Extrait le CONTENU (thème/sujet) du payload
+ * Extrait le CONTENU (thème/sujet) du payload pour images/carousels
  * Le thème utilisateur doit TOUJOURS être préservé
  */
 function buildContentPrompt(payload: any): string {
   const sources = [
-    // ✅ PRIORITÉ 1 : Script vidéo complet (hook + script + cta)
-    payload.generatedTexts?.video ? 
-      [payload.generatedTexts.video.hook, payload.generatedTexts.video.script, payload.generatedTexts.video.cta]
-        .filter(Boolean).join(" ") 
-      : undefined,
     payload.prompt,
     payload.brief?.topic,
     payload.brief?.content,
@@ -252,6 +247,35 @@ function buildContentPrompt(payload: any): string {
   }
   
   return content.trim();
+}
+
+/**
+ * Construit un prompt PUREMENT VISUEL pour les vidéos (sans texte à afficher)
+ * Le script vidéo (hook, script, cta) est stocké séparément pour overlay Canva
+ */
+function buildVideoPrompt(payload: any, useBrandKit: boolean, brand?: any): string {
+  // ✅ PRIORITÉ : Le prompt direct (description visuelle pure)
+  let visualPrompt = payload.prompt || "";
+  
+  // Si pas de prompt visuel, utiliser le brief
+  if (!visualPrompt.trim()) {
+    visualPrompt = payload.brief?.topic || payload.campaign || "Professional video footage";
+  }
+  
+  // ✅ Nettoyer les références au texte
+  visualPrompt = visualPrompt
+    .replace(/texte\s*(animé|:\s*|à l'écran|qui apparaît)/gi, '')
+    .replace(/bouton\s*cta/gi, '')
+    .replace(/["«»"].*?["«»"](?=\s*(,|\.|\s|$))/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  // ✅ Ajouter le style si Brand Kit activé
+  const stylePrefix = useBrandKit && brand?.niche 
+    ? `Professional ${brand.niche} style, ` 
+    : 'Professional modern style, ';
+    
+  return `${stylePrefix}${visualPrompt}. Cinematic quality, smooth motion, no text or writing visible.`;
 }
 
 /**
@@ -945,9 +969,9 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
   if (engine === "veo_3_1") {
     console.log("[processGenerateVideo] Using VEO 3 FAST engine for premium video");
     
-    // ✅ Utiliser buildFinalPrompt pour préserver le thème (sans script dans le prompt - vidéo brute)
+    // ✅ Utiliser buildVideoPrompt pour un prompt purement visuel (sans texte à afficher)
     const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : null;
-    const videoPrompt = buildFinalPrompt(payload, useBrandKit, brandMini);
+    const videoPrompt = buildVideoPrompt(payload, useBrandKit, brandMini);
 
     // ✅ Appeler generate-video avec provider "veo3" et timeout 6 minutes
     const veoResult = await callFn<any>("generate-video", {

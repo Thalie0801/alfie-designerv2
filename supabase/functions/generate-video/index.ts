@@ -823,8 +823,19 @@ async function generateGcsSignedUrl(
       // 3. Appeler VEO 3 API (long-running operation)
       const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${VEO3_MODEL}:predictLongRunning`;
 
-      // ✅ Construire l'instance avec image de référence si fournie
-      let instance: any = { prompt };
+      // ✅ Negative prompts pour éviter le texte généré dans la vidéo
+      const VEO_NEGATIVE_PROMPT = "No text, no letters, no words, no paragraphs, no subtitles, no UI labels, no watermark, no logo, no writing, no captions, no numbers on screen. Only pure visual footage.";
+      
+      // ✅ Nettoyer le prompt des références au texte
+      let cleanPrompt = (prompt || "")
+        .replace(/texte\s*(animé|:\s*|à l'écran|qui apparaît)/gi, '')
+        .replace(/bouton\s*cta/gi, '')
+        .replace(/["«»"].*?["«»"](?=\s*(,|\.|\s|$))/g, '') // Retirer textes entre guillemets
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      // ✅ Construire l'instance avec prompt nettoyé et negative prompts
+      let instance: any = { prompt: `${cleanPrompt}. ${VEO_NEGATIVE_PROMPT}` };
       
       // Si une image de référence est fournie, l'uploader vers GCS et utiliser gcsUri
       if (imageUrl) {
