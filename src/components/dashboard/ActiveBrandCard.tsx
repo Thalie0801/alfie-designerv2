@@ -15,11 +15,14 @@ interface Brand {
   id: string;
   name: string;
   logo_url?: string | null;
-  palette?: string[]; // hex or css color strings
+  palette?: string[];
   voice?: string | null;
   plan?: Plan | string | null;
   canva_connected?: boolean;
   is_addon?: boolean;
+  pitch?: string | null;
+  adjectives?: string[];
+  tone_sliders?: { fun: number; accessible: number; energetic: number; direct: number; };
 }
 
 export function ActiveBrandCard() {
@@ -154,11 +157,52 @@ export function ActiveBrandCard() {
               </div>
             )}
 
+            {/* Pitch */}
+            {activeBrand.pitch && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Pitch</label>
+                <p className="text-sm text-muted-foreground italic">"{activeBrand.pitch}"</p>
+              </div>
+            )}
+
+            {/* Adjectives */}
+            {Array.isArray(activeBrand.adjectives) && activeBrand.adjectives.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Personnalité</label>
+                <div className="flex gap-1 flex-wrap">
+                  {activeBrand.adjectives.map((adj, i) => (
+                    <Badge key={i} variant="secondary" className="text-xs">{adj}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tone indicators */}
+            {activeBrand.tone_sliders && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Ton</label>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">Fun/Sérieux:</span>
+                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-primary rounded-full" style={{ width: `${activeBrand.tone_sliders.fun * 10}%` }} />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">Accessible:</span>
+                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-primary rounded-full" style={{ width: `${activeBrand.tone_sliders.accessible * 10}%` }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Voice */}
             {activeBrand.voice && (
               <div className="space-y-2">
-                <label className="text-sm font-medium">Ton de la marque</label>
-                <p className="text-sm text-muted-foreground whitespace-pre-line">{activeBrand.voice}</p>
+                <label className="text-sm font-medium">Voix de marque</label>
+                <p className="text-sm text-muted-foreground whitespace-pre-line line-clamp-2">{activeBrand.voice}</p>
               </div>
             )}
           </div>

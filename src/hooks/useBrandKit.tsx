@@ -3,6 +3,13 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { safeString } from '@/lib/safeRender';
 
+export interface ToneSliders {
+  fun: number;       // 0-10 (fun ↔ sérieux)
+  accessible: number; // 0-10 (accessible ↔ corporate)
+  energetic: number;  // 0-10 (énergique ↔ calme)
+  direct: number;     // 0-10 (direct ↔ nuancé)
+}
+
 export interface BrandKit {
   id?: string;
   name?: string;
@@ -14,16 +21,43 @@ export interface BrandKit {
   };
   voice?: string;
   niche?: string;
+  
+  // V2 - Identité enrichie
+  pitch?: string;
+  adjectives?: string[];
+  
+  // V2 - Voix & Ton
+  tone_sliders?: ToneSliders;
+  person?: 'je' | 'nous' | 'tu' | 'vous';
+  language_level?: 'familier' | 'courant' | 'soutenu';
+  
+  // V2 - Style visuel
+  visual_types?: string[];
+  visual_mood?: string[];
+  avoid_in_visuals?: string;
+  
+  // Bonus
+  tagline?: string;
 }
 
 interface Brand {
   id: string;
   name: string;
   user_id: string;
-  palette: any; // Json type from Supabase
-  logo_url?: string;
+  palette: any;
+  logo_url?: string | null;
   fonts?: any;
-  voice?: string;
+  voice?: string | null;
+  niche?: string | null;
+  pitch?: string | null;
+  adjectives?: string[] | null;
+  tone_sliders?: ToneSliders | null;
+  person?: string | null;
+  language_level?: string | null;
+  visual_types?: string[] | null;
+  visual_mood?: string[] | null;
+  avoid_in_visuals?: string | null;
+  tagline?: string | null;
   canva_connected: boolean;
   created_at: string | null;
 }
@@ -119,13 +153,26 @@ export function useBrandKit() {
       if (brandsError) throw brandsError;
       
       // Transform null to undefined for TypeScript compatibility
-      const transformedBrands = (brandsData || []).map(brand => ({
-        ...brand,
+      const transformedBrands: Brand[] = (brandsData || []).map(brand => ({
+        id: brand.id,
         name: safeString(brand.name),
-        logo_url: brand.logo_url ?? undefined,
-        voice: brand.voice ?? undefined,
+        user_id: brand.user_id,
         palette: Array.isArray(brand.palette) ? brand.palette : [],
-        canva_connected: Boolean(brand.canva_connected)
+        logo_url: brand.logo_url ?? null,
+        fonts: brand.fonts,
+        voice: brand.voice ?? null,
+        niche: brand.niche ?? null,
+        pitch: brand.pitch ?? null,
+        adjectives: brand.adjectives ?? null,
+        tone_sliders: brand.tone_sliders ? brand.tone_sliders as unknown as ToneSliders : null,
+        person: brand.person ?? null,
+        language_level: brand.language_level ?? null,
+        visual_types: brand.visual_types ?? null,
+        visual_mood: brand.visual_mood ?? null,
+        avoid_in_visuals: brand.avoid_in_visuals ?? null,
+        tagline: brand.tagline ?? null,
+        canva_connected: Boolean(brand.canva_connected),
+        created_at: brand.created_at
       }));
       setBrands(transformedBrands);
 
@@ -178,10 +225,19 @@ export function useBrandKit() {
     id: activeBrand.id,
     name: activeBrand.name,
     palette: Array.isArray(activeBrand.palette) ? activeBrand.palette : [],
-    logo_url: activeBrand.logo_url,
+    logo_url: activeBrand.logo_url ?? undefined,
     fonts: activeBrand.fonts,
-    voice: activeBrand.voice,
-    niche: (activeBrand as any).niche
+    voice: activeBrand.voice ?? undefined,
+    niche: activeBrand.niche ?? undefined,
+    pitch: activeBrand.pitch ?? undefined,
+    adjectives: activeBrand.adjectives ?? undefined,
+    tone_sliders: activeBrand.tone_sliders ?? undefined,
+    person: (activeBrand.person as BrandKit['person']) ?? undefined,
+    language_level: (activeBrand.language_level as BrandKit['language_level']) ?? undefined,
+    visual_types: activeBrand.visual_types ?? undefined,
+    visual_mood: activeBrand.visual_mood ?? undefined,
+    avoid_in_visuals: activeBrand.avoid_in_visuals ?? undefined,
+    tagline: activeBrand.tagline ?? undefined
   } : null;
 
   // Get quota_brands from profile
