@@ -8,9 +8,13 @@ import { AffiliateSection } from "@/components/landing/AffiliateSection";
 import { FinalCTA } from "@/components/landing/FinalCTA";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { ProspectBubble } from "@/components/ProspectBubble";
+import { useAffiliate } from "@/hooks/useAffiliate";
 
 export default function AlfieLanding() {
   const [videoLoaded, setVideoLoaded] = useState(false);
+  
+  // Initialize affiliate tracking - will store ref from URL and track click
+  useAffiliate();
 
   return (
     <div className="min-h-screen bg-background text-foreground">

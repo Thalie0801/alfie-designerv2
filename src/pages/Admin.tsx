@@ -22,6 +22,7 @@ export default function Admin() {
   const [payouts, setPayouts] = useState<any[]>([]);
   const [designs, setDesigns] = useState<any[]>([]);
   const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [affiliateClicks, setAffiliateClicks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingUser, setEditingUser] = useState<any>(null);
@@ -49,7 +50,7 @@ export default function Admin() {
 
   const loadAdminData = async () => {
     try {
-      const [usersRes, affiliatesRes, conversionsRes, payoutsRes, designsRes, suggestionsRes] = await Promise.all([
+      const [usersRes, affiliatesRes, conversionsRes, payoutsRes, designsRes, suggestionsRes, clicksRes] = await Promise.all([
         supabase.from('profiles').select('*').order('created_at', { ascending: false }),
         supabase.from('affiliates').select('*').order('created_at', { ascending: false }),
         supabase
@@ -67,7 +68,12 @@ export default function Admin() {
           .from('contact_requests')
           .select('*')
           .ilike('message', '[SUGGESTION DE FONCTIONNALITÉ]%')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('affiliate_clicks')
+          .select('*')
           .order('created_at', { ascending: false })
+          .limit(100)
       ]);
 
       setUsers(usersRes.data || []);
@@ -76,6 +82,7 @@ export default function Admin() {
       setPayouts(payoutsRes.data || []);
       setDesigns(designsRes.data || []);
       setSuggestions(suggestionsRes.data || []);
+      setAffiliateClicks(clicksRes.data || []);
     } catch (error) {
       console.error('Error loading admin data:', error);
       toast.error('Erreur lors du chargement des données');
@@ -752,9 +759,49 @@ export default function Admin() {
 
         {/* Conversions Tab */}
         <TabsContent value="conversions" className="space-y-4">
+          {/* Affiliate Clicks Section */}
           <Card>
             <CardHeader>
-              <CardTitle>Conversions</CardTitle>
+              <CardTitle>Clics Affiliés ({affiliateClicks.length})</CardTitle>
+              <CardDescription>Tous les clics sur les liens d'affiliation</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <p className="text-center text-muted-foreground py-4">Chargement...</p>
+              ) : affiliateClicks.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">Aucun clic enregistré</p>
+              ) : (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {affiliateClicks.map((click: any) => {
+                    const affiliate = affiliates.find(a => a.id === click.affiliate_id);
+                    return (
+                      <div
+                        key={click.id}
+                        className="flex items-center justify-between p-3 rounded-lg border hover:shadow-sm transition text-sm"
+                      >
+                        <div>
+                          <p className="font-medium">{affiliate?.email || click.affiliate_id.substring(0, 8) + '...'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(click.created_at).toLocaleString('fr-FR')}
+                            {click.utm_source && ` • Source: ${click.utm_source}`}
+                            {click.utm_campaign && ` • Campaign: ${click.utm_campaign}`}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {click.click_id?.substring(0, 8)}...
+                        </Badge>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Conversions Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Conversions ({conversions.length})</CardTitle>
               <CardDescription>Suivi des conversions affiliés</CardDescription>
             </CardHeader>
             <CardContent>
@@ -764,25 +811,34 @@ export default function Admin() {
                 <p className="text-center text-muted-foreground py-4">Aucune conversion</p>
               ) : (
                 <div className="space-y-2">
-                  {conversions.map((conversion: any) => (
-                    <div
-                      key={conversion.id}
-                      className="flex items-center justify-between p-4 rounded-lg border hover:shadow-sm transition"
-                    >
-                      <div>
-                        <p className="font-medium">Utilisateur: {conversion.user_id.substring(0, 8)}...</p>
-                        <p className="text-sm text-muted-foreground">
-                          Plan: {conversion.plan} • {new Date(conversion.created_at).toLocaleDateString()}
-                        </p>
+                  {conversions.map((conversion: any) => {
+                    const affiliate = affiliates.find(a => a.id === conversion.affiliate_id);
+                    const user = users.find(u => u.id === conversion.user_id);
+                    return (
+                      <div
+                        key={conversion.id}
+                        className="flex items-center justify-between p-4 rounded-lg border hover:shadow-sm transition"
+                      >
+                        <div>
+                          <p className="font-medium">
+                            Client: {user?.email || conversion.user_id.substring(0, 8) + '...'}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Affilié: {affiliate?.email || conversion.affiliate_id.substring(0, 8) + '...'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Plan: {conversion.plan} • {new Date(conversion.created_at).toLocaleDateString('fr-FR')}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className={getStatusBadgeColor(conversion.status)}>
+                            {conversion.status}
+                          </Badge>
+                          <span className="font-medium">{conversion.amount}€</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className={getStatusBadgeColor(conversion.status)}>
-                          {conversion.status}
-                        </Badge>
-                        <span className="font-medium">{conversion.amount}€</span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { ProspectBubble } from '@/components/ProspectBubble';
+import { useAffiliate } from '@/hooks/useAffiliate';
 
 const authSchema = z.object({
   email: z.string().email({ message: "Email invalide" }),
@@ -28,6 +29,9 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const isMountedRef = useRef(true);
+  
+  // Initialize affiliate tracking - will store ref from URL and track click
+  useAffiliate();
 
   // Lire le paramètre plan de l'URL
   const intendedPlan = searchParams.get('plan') as 'starter' | 'pro' | 'studio' | null;
