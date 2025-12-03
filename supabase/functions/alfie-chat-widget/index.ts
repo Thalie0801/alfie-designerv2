@@ -510,7 +510,7 @@ Le secteur d'activité est fourni pour contexte minimal, mais reste neutre dans 
         ...messages,
       ],
       temperature: 0.7,
-      max_tokens: 2048,
+      max_tokens: 4096, // ✅ Augmenté pour packs complexes (vidéos multi-plans)
     }),
   });
 
