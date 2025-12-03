@@ -177,7 +177,9 @@ export default function Affiliate() {
   const copyAffiliateLink = () => {
     if (!affiliate) return;
     
-    const link = `${window.location.origin}?ref=${affiliate.id}`;
+    // ✅ Utiliser le slug personnalisé si disponible, sinon l'ID
+    const ref = affiliate.slug || affiliate.id;
+    const link = `${window.location.origin}?ref=${ref}`;
     navigator.clipboard.writeText(link);
     toast.success('Lien copié !');
   };
