@@ -17,6 +17,7 @@ function jsonRes(body: unknown, init?: ResponseInit) {
 }
 
 /* ------------------------------ Types ------------------------------ */
+// ✅ Brand Kit V2 - Interface enrichie
 interface BrandKit {
   id?: string;
   name?: string;
@@ -24,6 +25,22 @@ interface BrandKit {
   logo_url?: string;
   fonts?: any;
   voice?: string;
+  // V2 fields
+  niche?: string;
+  pitch?: string;
+  adjectives?: string[];
+  tagline?: string;
+  tone_sliders?: {
+    fun: number;
+    accessible: number;
+    energetic: number;
+    direct: number;
+  };
+  person?: string;
+  language_level?: string;
+  visual_types?: string[];
+  visual_mood?: string[];
+  avoid_in_visuals?: string;
 }
 
 interface GenerateRequest {
@@ -114,10 +131,74 @@ function buildMainPrompt(input: GenerateRequest): string {
     }
   }
 
-  // ✅ Brand info conditionné par useBrandKit
-  if (!backgroundOnly && shouldApplyBrand) {
-    if (brandKit?.palette?.length) fullPrompt += `\n\nBrand Colors: ${brandKit.palette.join(", ")}`;
-    if (brandKit?.voice) fullPrompt += `\nBrand Voice: ${brandKit.voice}`;
+  // ✅ Brand Kit V2 - Application conditionnée par useBrandKit
+  if (!backgroundOnly && shouldApplyBrand && brandKit) {
+    // V1: Couleurs
+    if (brandKit.palette?.length) {
+      fullPrompt += `\n\nCRITICAL - Brand Colors (use ONLY these): ${brandKit.palette.join(", ")}`;
+    }
+    
+    // V2: Secteur d'activité
+    if (brandKit.niche) {
+      fullPrompt += `\nIndustry/Niche: ${brandKit.niche}`;
+    }
+    
+    // V2: Pitch de marque
+    if (brandKit.pitch) {
+      fullPrompt += `\nBrand essence: ${brandKit.pitch}`;
+    }
+    
+    // V2: Adjectifs de personnalité
+    if (brandKit.adjectives?.length) {
+      fullPrompt += `\nBrand personality: ${brandKit.adjectives.join(', ')}`;
+    }
+    
+    // V1: Voice
+    if (brandKit.voice) {
+      fullPrompt += `\nBrand Voice/Style: ${brandKit.voice}`;
+    }
+    
+    // V2: Ton de communication (sliders)
+    if (brandKit.tone_sliders) {
+      const tone = brandKit.tone_sliders;
+      const toneDesc: string[] = [];
+      if (tone.fun !== undefined) toneDesc.push(tone.fun > 5 ? 'fun/playful' : 'serious/professional');
+      if (tone.accessible !== undefined) toneDesc.push(tone.accessible > 5 ? 'approachable' : 'corporate');
+      if (tone.energetic !== undefined) toneDesc.push(tone.energetic > 5 ? 'energetic' : 'calm');
+      if (tone.direct !== undefined) toneDesc.push(tone.direct > 5 ? 'direct' : 'nuanced');
+      if (toneDesc.length) fullPrompt += `\nCommunication style: ${toneDesc.join(', ')}`;
+    }
+    
+    // V2: Niveau de langage
+    if (brandKit.language_level) {
+      const levels: Record<string, string> = { familier: 'casual', courant: 'standard', soutenu: 'formal' };
+      fullPrompt += `\nLanguage style: ${levels[brandKit.language_level] || 'professional'}`;
+    }
+    
+    // V2: Style visuel préféré
+    if (brandKit.visual_types?.length) {
+      const typeLabels: Record<string, string> = {
+        illustrations_2d: '2D illustrations', illustrations_3d: '3D renders',
+        photos: 'photography', mockups: 'product mockups',
+        doodle: 'hand-drawn style', corporate: 'corporate/professional'
+      };
+      fullPrompt += `\nPreferred visual style: ${brandKit.visual_types.map(t => typeLabels[t] || t).join(', ')}`;
+    }
+    
+    // V2: Ambiance visuelle
+    if (brandKit.visual_mood?.length) {
+      fullPrompt += `\nVisual mood: ${brandKit.visual_mood.join(', ')}`;
+    }
+    
+    // V2: Éléments à éviter (CRITIQUE)
+    if (brandKit.avoid_in_visuals) {
+      fullPrompt += `\nCRITICAL - AVOID in visuals: ${brandKit.avoid_in_visuals}`;
+    }
+    
+    // V2: Tagline de référence
+    if (brandKit.tagline) {
+      fullPrompt += `\nReference tagline: "${brandKit.tagline}"`;
+    }
   } else if (!backgroundOnly) {
     // Style neutre si Brand Kit désactivé
     fullPrompt += `\n\nStyle: Professional, modern, clean design with neutral color palette.`;

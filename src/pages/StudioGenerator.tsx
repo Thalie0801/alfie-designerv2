@@ -689,26 +689,82 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
                 </p>
               )}
               
-              {/* Affichage Brand Kit existant (si toggle activé) */}
+              {/* Affichage Brand Kit V2 enrichi (si toggle activé) */}
               {useBrandKitForPack && activeBrand && (
-                <div className="space-y-2 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">{activeBrand.name}</Badge>
+                <div className="space-y-3 text-xs">
+                  {/* Nom et palette */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" className="font-medium">{activeBrand.name}</Badge>
+                    {activeBrand.niche && (
+                      <Badge variant="secondary" className="text-[10px]">{activeBrand.niche}</Badge>
+                    )}
                   </div>
+                  
+                  {/* Couleurs */}
                   {activeBrand.palette && Array.isArray(activeBrand.palette) && (
                     <div className="flex items-center gap-1">
                       {activeBrand.palette.slice(0, 5).map((color, i) => (
                         <div
                           key={i}
-                          className="w-6 h-6 rounded border border-border"
+                          className="w-5 h-5 rounded border border-border"
                           style={{ backgroundColor: color }}
+                          title={color}
                         />
                       ))}
                     </div>
                   )}
-                  {activeBrand.voice && (
-                    <p className="italic">"{activeBrand.voice}"</p>
+                  
+                  {/* Pitch */}
+                  {activeBrand.pitch && (
+                    <p className="text-muted-foreground italic line-clamp-2">
+                      "{activeBrand.pitch}"
+                    </p>
                   )}
+                  
+                  {/* Adjectifs */}
+                  {activeBrand.adjectives && activeBrand.adjectives.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {activeBrand.adjectives.slice(0, 3).map((adj, i) => (
+                        <Badge key={i} variant="outline" className="text-[10px] py-0">
+                          {adj}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Voice (V1) */}
+                  {activeBrand.voice && !activeBrand.pitch && (
+                    <p className="text-muted-foreground italic">"{activeBrand.voice}"</p>
+                  )}
+                  
+                  {/* Style visuel préféré */}
+                  {activeBrand.visual_types && activeBrand.visual_types.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      <span className="text-muted-foreground">Style:</span>
+                      {activeBrand.visual_types.slice(0, 2).map((vt, i) => (
+                        <Badge key={i} variant="secondary" className="text-[10px] py-0">
+                          {vt.replace('_', ' ')}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Éléments à éviter */}
+                  {activeBrand.avoid_in_visuals && (
+                    <div className="text-destructive/80 text-[10px]">
+                      ⚠️ Éviter: {activeBrand.avoid_in_visuals.slice(0, 50)}...
+                    </div>
+                  )}
+                  
+                  {/* Lien pour modifier */}
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-xs h-7 px-2 text-muted-foreground hover:text-foreground"
+                    onClick={() => navigate('/brand-kit')}
+                  >
+                    Modifier le Brand Kit →
+                  </Button>
                 </div>
               )}
             </Card>
