@@ -407,19 +407,12 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
           {/* ✅ Toggle Standard/Premium pour carrousels */}
           {hasCarousels && (
             <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-              <div>
-                <span className="font-medium text-sm">Mode carrousel</span>
-                <p className="text-xs text-muted-foreground">
-                  {carouselMode === 'premium' 
-                    ? "Premium : texte intégré par Gemini 3 Pro" 
-                    : "Standard : image + overlay texte Cloudinary"}
-                </p>
-              </div>
+              <span className="font-medium text-sm">Mode carrousel</span>
               <div className="flex gap-1">
                 <button 
                   type="button"
                   onClick={() => setCarouselMode('standard')}
-                  className={`px-3 py-1.5 text-xs rounded-l-md transition-colors ${
+                  className={`px-3 py-1.5 text-sm font-medium rounded-l-md transition-colors ${
                     carouselMode === 'standard' 
                       ? 'bg-primary text-primary-foreground' 
                       : 'bg-muted hover:bg-muted/80'
@@ -430,7 +423,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
                 <button 
                   type="button"
                   onClick={() => setCarouselMode('premium')}
-                  className={`px-3 py-1.5 text-xs rounded-r-md transition-colors ${
+                  className={`px-3 py-1.5 text-sm font-medium rounded-r-md transition-colors ${
                     carouselMode === 'premium' 
                       ? 'bg-primary text-primary-foreground' 
                       : 'bg-muted hover:bg-muted/80'

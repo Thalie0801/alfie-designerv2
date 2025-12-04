@@ -1105,14 +1105,17 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   const carouselMode = payload.carouselMode || 'standard';
   console.log(`[processRenderCarousels] 🎨 Mode: ${carouselMode} (${carouselMode === 'premium' ? 'texte intégré Gemini 3 Pro' : 'image + overlay Cloudinary'})`);
   
-  // ✅ Le globalStyle contient SEULEMENT le style visuel, pas le contenu
-  // ✅ Convertir codes hex en descriptions de couleurs
+  // ✅ Le globalStyle contient TOUS les champs Brand Kit V2
   const colorDescriptions = useBrandKit && brandMini?.palette?.length
     ? (brandMini.palette || []).slice(0, 3).map(hexToColorName).join(", ")
     : "";
   
   const globalStyle = useBrandKit && brandMini
-    ? `Brand aesthetic. Industry: ${brandMini.niche || 'business'}. Color palette with ${colorDescriptions}. Modern, professional.`
+    ? `${brandMini.niche || 'business'} brand. 
+       Visual style: ${(brandMini.visual_mood || ['modern']).join(', ')}, ${(brandMini.visual_types || ['professional photos']).join(', ')}.
+       ${brandMini.pitch ? `Brand essence: ${brandMini.pitch}.` : ''}
+       Color palette: ${colorDescriptions || 'neutral tones'}.
+       ${brandMini.avoid_in_visuals ? `Avoid: ${brandMini.avoid_in_visuals}.` : ''}`
     : `Neutral professional aesthetic. Clean, modern design.`;
 
   // Ratio à partir du brief ou 4:5 par défaut
@@ -1361,25 +1364,28 @@ async function createCascadeJobs(job: JobRow, result: any, sb: SupabaseClient) {
 }
 
 // ---------- helpers ----------
-async function loadBrandMini(brandId?: string, full = false) {
+async function loadBrandMini(brandId?: string, full = true) {
   if (!brandId) return undefined;
   
-  type BrandMini = { name: string | null; palette: any; voice: any; niche?: any };
-  
+  // ✅ Always load Brand Kit V2 fields for personalized generation
   const { data, error } = await supabaseAdmin
     .from("brands")
-    .select(full ? "name, palette, voice, niche" : "name, palette, voice")
+    .select("name, palette, voice, niche, pitch, adjectives, visual_types, visual_mood, avoid_in_visuals")
     .eq("id", brandId)
     .maybeSingle();
     
   if (error || !data) return undefined;
   
-  const brand = data as unknown as BrandMini;
   return {
-    name: brand.name,
-    palette: brand.palette,
-    voice: brand.voice,
-    niche: full ? brand.niche : undefined,
+    name: data.name,
+    palette: data.palette,
+    voice: data.voice,
+    niche: data.niche,
+    pitch: data.pitch,
+    adjectives: data.adjectives,
+    visual_types: data.visual_types,
+    visual_mood: data.visual_mood,
+    avoid_in_visuals: data.avoid_in_visuals,
   };
 }
 
