@@ -780,32 +780,25 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
                 <div className="flex gap-2">
                   <button
                     onClick={() => setCarouselMode('standard')}
-                    className={`flex-1 px-3 py-2 text-xs rounded-lg border transition-colors ${
+                    className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
                       carouselMode === 'standard'
                         ? 'bg-primary text-primary-foreground border-primary'
                         : 'bg-muted/50 hover:bg-muted border-transparent'
                     }`}
                   >
-                    <div className="font-medium">Standard</div>
-                    <div className="text-[10px] opacity-70">Image + overlay texte</div>
+                    Standard
                   </button>
                   <button
                     onClick={() => setCarouselMode('premium')}
-                    className={`flex-1 px-3 py-2 text-xs rounded-lg border transition-colors ${
+                    className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
                       carouselMode === 'premium'
                         ? 'bg-primary text-primary-foreground border-primary'
                         : 'bg-muted/50 hover:bg-muted border-transparent'
                     }`}
                   >
-                    <div className="font-medium">Premium</div>
-                    <div className="text-[10px] opacity-70">Texte intégré par IA</div>
+                    Premium
                   </button>
                 </div>
-                <p className="text-[10px] text-muted-foreground">
-                  {carouselMode === 'premium' 
-                    ? "Gemini 3 Pro génère l'image avec le texte intégré nativement." 
-                    : "Gemini Flash génère l'image, Cloudinary ajoute le texte en overlay."}
-                </p>
               </Card>
             )}
 

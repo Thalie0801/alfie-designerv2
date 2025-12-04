@@ -147,6 +147,7 @@ OUTPUT: High quality background image suitable for text overlay.`;
 
 /**
  * Build prompt for PREMIUM mode (image WITH text integrated by Gemini 3 Pro)
+ * ✅ Simplifié : titre uniquement pour éviter les chevauchements
  */
 function buildImagePromptPremium(
   globalStyle: string, 
@@ -157,36 +158,32 @@ function buildImagePromptPremium(
   totalSlides: number
 ): string {
   const globalTheme = prompt?.trim() || "Professional marketing";
-  const slideRole = getSlideRole(slideIndex, totalSlides);
   
   const styleHint = useBrandKit && globalStyle 
     ? globalStyle 
     : "Professional, modern, clean design";
 
-  // Build text instructions
-  let textInstructions = `MAIN TITLE (large, prominent, centered): "${slideContent.title}"`;
-  if (slideContent.subtitle) {
-    textInstructions += `\nSUBTITLE (smaller, below title): "${slideContent.subtitle}"`;
-  }
+  // ✅ Limiter le texte : titre UNIQUEMENT (max 60 caractères)
+  const displayTitle = slideContent.title.length > 60 
+    ? slideContent.title.substring(0, 60) + "..."
+    : slideContent.title;
   
-  return `Generate a carousel slide image WITH integrated text.
+  return `Generate a visually striking carousel slide.
 
-${textInstructions}
+INTEGRATE THIS TEXT beautifully into the image:
+"${displayTitle}"
 
-The text MUST be:
-- Clearly readable with high contrast against background
-- Well designed with professional typography
-- Properly positioned and visually balanced
-- Part of the overall design composition
+The text must be:
+- Clearly readable with high contrast
+- Large and prominent (main focus)
+- Professional typography
+- Centered or strategically placed
 
-CAMPAIGN THEME: ${globalTheme}
-SLIDE ROLE: ${slideRole} (slide ${slideIndex + 1} of ${totalSlides})
+THEME: ${globalTheme}
+STYLE: ${styleHint}
 
-VISUAL STYLE:
-${styleHint}
-
-Create a visually striking slide where the text is an integral, beautiful part of the design.
-The typography should be elegant and match the brand aesthetic.`;
+Create ONE cohesive image where the text is an integral, beautiful part of the design.
+NO extra text, NO subtitles, NO additional words.`;
 }
 
 async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, ms = 30000) {
