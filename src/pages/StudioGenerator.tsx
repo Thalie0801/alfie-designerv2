@@ -194,6 +194,7 @@ export function StudioGenerator() {
   const [isGeneratingFromBrief, setIsGeneratingFromBrief] = useState(false);
   const [briefGenerationError, setBriefGenerationError] = useState<string | null>(null);
   const [useBrandKitForPack, setUseBrandKitForPack] = useState(true);
+  const [carouselMode, setCarouselMode] = useState<'standard' | 'premium'>('standard');
 
   // Charger les Woofs disponibles
   useEffect(() => {
@@ -518,7 +519,8 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
         userId: user.id,
         selectedAssetIds: pack.assets.map((a) => a.id),
         useBrandKit: useBrandKitForPack,
-        userPlan: profile?.plan || 'starter', // ✅ Plan utilisateur pour sélection du modèle IA
+        userPlan: profile?.plan || 'starter',
+        carouselMode, // ✅ Mode carrousel Standard/Premium
       });
 
       toast.success(`Super ! Alfie lance la génération de tes visuels 🐶`);
@@ -768,6 +770,44 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
                 </div>
               )}
             </Card>
+
+            {/* Toggle Mode Carrousel - Visible uniquement si pack contient des carrousels */}
+            {pack.assets.some(a => a.kind === 'carousel') && (
+              <Card className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-sm">Mode carrousel</h3>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCarouselMode('standard')}
+                    className={`flex-1 px-3 py-2 text-xs rounded-lg border transition-colors ${
+                      carouselMode === 'standard'
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-muted/50 hover:bg-muted border-transparent'
+                    }`}
+                  >
+                    <div className="font-medium">Standard</div>
+                    <div className="text-[10px] opacity-70">Image + overlay texte</div>
+                  </button>
+                  <button
+                    onClick={() => setCarouselMode('premium')}
+                    className={`flex-1 px-3 py-2 text-xs rounded-lg border transition-colors ${
+                      carouselMode === 'premium'
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-muted/50 hover:bg-muted border-transparent'
+                    }`}
+                  >
+                    <div className="font-medium">Premium</div>
+                    <div className="text-[10px] opacity-70">Texte intégré par IA</div>
+                  </button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  {carouselMode === 'premium' 
+                    ? "Gemini 3 Pro génère l'image avec le texte intégré nativement." 
+                    : "Gemini Flash génère l'image, Cloudinary ajoute le texte en overlay."}
+                </p>
+              </Card>
+            )}
 
             <Card className="p-4">
               <h3 className="font-semibold mb-3 text-sm">Packs prédéfinis</h3>
