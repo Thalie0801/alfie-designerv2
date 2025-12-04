@@ -1070,19 +1070,29 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
     }
   });
 
+  // ✅ Extraire le carouselType avant la fusion
+  const carouselType = payload.carouselType || 'content';
+
   // ✅ FUSION : si un champ manque dans aiSlides, on prend le fallback
   const slides = Array.from({ length: totalSlides }, (_, index) => {
     const ai = aiSlides[index] ?? {};
     const fb = fallbackSlides[index];
 
     const title = (ai.title && ai.title.trim()) ? ai.title : fb.title;
+    const alt = ai.alt || fb.alt || title;
+    // ✅ Auteur pour les citations
+    const author = ai.author || undefined;
+
+    // ✅ Pour CITATIONS: JAMAIS de subtitle ni bullets
+    if (carouselType === 'citations') {
+      return { title, subtitle: "", bullets: [], alt, author };
+    }
+
+    // Pour CONTENT: garder la logique normale
     const subtitle = (ai.subtitle && ai.subtitle.trim()) ? ai.subtitle : fb.subtitle;
     const bullets = (Array.isArray(ai.bullets) && ai.bullets.length > 0) 
       ? ai.bullets 
       : (fb.bullets ?? []);
-    const alt = ai.alt || fb.alt || title;
-    // ✅ Auteur pour les citations
-    const author = ai.author || undefined;
 
     return { title, subtitle, bullets, alt, author };
   });
@@ -1105,9 +1115,6 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   
   // ✅ Extraire le carouselMode (standard avec overlay Cloudinary, ou premium avec texte intégré)
   const carouselMode = payload.carouselMode || 'standard';
-  
-  // ✅ Extraire le carouselType (citations vs content)
-  const carouselType = payload.carouselType || 'content';
   console.log(`[processRenderCarousels] 🎨 Mode: ${carouselMode} | Type: ${carouselType}`);
   
   // ✅ Le globalStyle contient TOUS les champs Brand Kit V2

@@ -507,11 +507,12 @@ Deno.serve(async (req) => {
         : slideIndex === totalSlides - 2 ? 'solution'
         : 'impact';
       
+      // ✅ Pour CITATIONS: forcer subtitle/bullets à vide, même si passés
       const slideData: Slide = {
         type: slideType,
         title: normTitle,
-        subtitle: normSubtitle || undefined,
-        bullets: normBullets.length > 0 ? normBullets : undefined,
+        subtitle: carouselType === 'citations' ? undefined : (normSubtitle || undefined),
+        bullets: carouselType === 'citations' ? undefined : (normBullets.length > 0 ? normBullets : undefined),
         cta: slideType === 'cta' ? normTitle : undefined,
         author: slideContent.author || undefined, // ✅ Auteur pour les citations
       };
