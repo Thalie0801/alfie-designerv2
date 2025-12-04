@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +64,11 @@ const VISUAL_STYLE_OPTIONS = [
 
 export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDialogProps) {
   const [formData, setFormData] = useState<PackAsset>({ ...asset });
+  
+  // ✅ Re-sync formData quand l'asset change (fix pour édition multiple)
+  useEffect(() => {
+    setFormData({ ...asset });
+  }, [asset.id]);
   const [uploading, setUploading] = useState(false);
 
   const handleSave = () => {

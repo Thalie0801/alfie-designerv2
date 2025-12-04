@@ -45,6 +45,8 @@ function enrichPackWithWoofCostType(pack: AlfiePack): AlfiePack {
         : asset.kind === 'image'
           ? 'image'
           : 'video_premium',
+      // ✅ Toujours initialiser carouselType pour les carrousels
+      carouselType: asset.kind === 'carousel' ? (asset.carouselType || 'content') : undefined,
     })),
   };
 }
@@ -80,6 +82,7 @@ const PRESET_PACKS = {
         title: "Carrousel : 5 raisons de découvrir",
         goal: "education" as const,
         tone: "informatif, engageant",
+        carouselType: "content" as const,
         prompt: "Carrousel expliquant 5 bénéfices clés du produit lancé",
         woofCostType: "carousel_slide" as const,
       },
@@ -116,6 +119,7 @@ const PRESET_PACKS = {
         tone: "pédagogique, accessible",
         prompt: "Carrousel guide pratique avec conseils actionnables",
         woofCostType: "carousel_slide" as const,
+        carouselType: "content" as const,
       },
       {
         id: "evergreen_2",
@@ -248,11 +252,12 @@ export function StudioGenerator() {
   };
 
   const addAsset = (template?: Partial<PackAsset>) => {
+    const kind = template?.kind || "image";
     const newAsset: PackAsset = {
       id: `asset_${Date.now()}`,
       brandId: activeBrandId || "",
-      kind: template?.kind || "image",
-      count: template?.count || 1,
+      kind,
+      count: kind === 'carousel' ? (template?.count || 5) : (template?.count || 1),
       platform: template?.platform || "instagram",
       format: template?.format || "post",
       ratio: template?.ratio || "4:5",
@@ -260,8 +265,10 @@ export function StudioGenerator() {
       goal: template?.goal || "engagement",
       tone: template?.tone || "friendly",
       prompt: template?.prompt || "",
-      woofCostType: template?.woofCostType || "image",
-      useBrandKit: useBrandKitForPack, // ✅ Propager le toggle Brand Kit
+      woofCostType: template?.woofCostType || (kind === 'carousel' ? 'carousel_slide' : 'image'),
+      useBrandKit: useBrandKitForPack,
+      // ✅ Toujours initialiser carouselType pour les carrousels
+      carouselType: kind === 'carousel' ? (template?.carouselType || 'content') : undefined,
       ...template,
     };
 
@@ -386,6 +393,7 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
               tone: activeBrand?.voice || "professionnel, accessible",
               prompt: `Carrousel de présentation de la marque ${activeBrand?.name || ""}. Slide 1: Accroche, Slide 2: Notre mission, Slides 3-4: Nos valeurs et notre offre, Slide 5: Call-to-action pour découvrir`,
               woofCostType: "carousel_slide",
+              carouselType: "content",
             },
           ],
         };
