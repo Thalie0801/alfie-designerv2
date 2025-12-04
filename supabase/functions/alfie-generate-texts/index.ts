@@ -29,12 +29,14 @@ interface AssetBrief {
   count?: number; // Pour carrousels
   durationSeconds?: number; // Pour vidéos
   prompt: string;
+  carouselType?: "citations" | "content"; // Type de carrousel
 }
 
 interface SlideText {
   title: string;
   subtitle?: string;
   bullets?: string[];
+  author?: string; // Pour les citations
 }
 
 interface ImageText {
@@ -82,6 +84,43 @@ async function callGemini(systemPrompt: string, userPrompt: string) {
   return data.choices?.[0]?.message?.content || "";
 }
 
+/**
+ * Build prompt for CITATIONS carousel (quotes + authors only)
+ */
+function buildCitationsPrompt(asset: AssetBrief, brandKit: BrandKit, brief: string, useBrandKit: boolean): string {
+  let prompt = `Génère ${asset.count || 5} citations inspirantes pour un carrousel.
+
+[CAMPAGNE_BRIEF]
+${brief}
+
+[CONTEXTE]
+- Secteur : ${brandKit.niche || "Non spécifié"}
+- Objectif : ${asset.goal}
+- Plateforme : ${asset.platform}
+
+STRUCTURE ATTENDUE - CHAQUE SLIDE = UNE CITATION :
+{
+  "slides": [
+    { "title": "La citation ici", "author": "Nom de l'Auteur" },
+    { "title": "Deuxième citation", "author": "Autre Auteur" },
+    ...
+  ]
+}
+
+RÈGLES CRITIQUES :
+- PAS de sous-titre, PAS de bullets, UNIQUEMENT title + author
+- Citations COURTES (max 120 caractères)
+- Auteurs réels ou attribués selon le contexte
+- Français PARFAIT, sans faute
+- Les citations doivent être en rapport avec le brief
+- Varier les auteurs (célèbres, experts du domaine, anonymes)`;
+
+  return prompt;
+}
+
+/**
+ * Build prompt for CONTENT carousel (tips/advice structure)
+ */
 function buildCarouselPrompt(asset: AssetBrief, brandKit: BrandKit, brief: string, useBrandKit: boolean): string {
   let prompt = `Génère les textes pour un carrousel de ${asset.count || 5} slides pour réseaux sociaux.
 
@@ -124,9 +163,8 @@ CONTEXTE ASSET :
 - Style du visuel : ${asset.tone}
 
 STRUCTURE ATTENDUE (progression narrative) :
-Slide 1 : Accroche / Hook percutant
-Slide 2 : Problème / Agitation
-Slides 3-4 : Solution / Bénéfices / Preuve
+Slide 1 : Accroche / Hook percutant (titre seul, pas de sous-titre)
+Slides 2-4 : Titre + Sous-titre + Corps explicatif
 Slide 5 : Call-to-Action
 
 RÈGLES CRITIQUES :
@@ -307,7 +345,12 @@ Deno.serve(async (req) => {
         let systemPrompt = "Tu es un expert en copywriting pour réseaux sociaux. Tu génères des textes marketing en français parfait, adaptés à chaque marque et objectif.";
 
         if (asset.kind === "carousel") {
-          prompt = buildCarouselPrompt(asset, brandKit, brief, useBrandKit);
+          // ✅ Choisir le prompt selon carouselType
+          if (asset.carouselType === "citations") {
+            prompt = buildCitationsPrompt(asset, brandKit, brief, useBrandKit);
+          } else {
+            prompt = buildCarouselPrompt(asset, brandKit, brief, useBrandKit);
+          }
         } else if (asset.kind.includes("video")) {
           prompt = buildVideoPrompt(asset, brandKit, brief, useBrandKit);
         } else {

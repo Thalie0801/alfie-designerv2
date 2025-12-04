@@ -1081,8 +1081,10 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
       ? ai.bullets 
       : (fb.bullets ?? []);
     const alt = ai.alt || fb.alt || title;
+    // ✅ Auteur pour les citations
+    const author = ai.author || undefined;
 
-    return { title, subtitle, bullets, alt };
+    return { title, subtitle, bullets, alt, author };
   });
 
   console.log("[processRenderCarousels] ✅ Merged slides with fallback:", 
@@ -1103,7 +1105,10 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   
   // ✅ Extraire le carouselMode (standard avec overlay Cloudinary, ou premium avec texte intégré)
   const carouselMode = payload.carouselMode || 'standard';
-  console.log(`[processRenderCarousels] 🎨 Mode: ${carouselMode} (${carouselMode === 'premium' ? 'texte intégré Gemini 3 Pro' : 'image + overlay Cloudinary'})`);
+  
+  // ✅ Extraire le carouselType (citations vs content)
+  const carouselType = payload.carouselType || 'content';
+  console.log(`[processRenderCarousels] 🎨 Mode: ${carouselMode} | Type: ${carouselType}`);
   
   // ✅ Le globalStyle contient TOUS les champs Brand Kit V2
   const colorDescriptions = useBrandKit && brandMini?.palette?.length
@@ -1148,6 +1153,7 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
             subtitle: slide.subtitle || "",
             bullets: slide.bullets || [],
             alt: `Slide ${index + 1} of ${slides.length}`,
+            author: slide.author || undefined, // ✅ Auteur pour les citations
           },
           brandId: payload.brandId,
           orderId: jobMeta?.order_id || payload.orderId,
@@ -1162,6 +1168,7 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
           language: "FR",
           useBrandKit, // ✅ Propagation de useBrandKit
           carouselMode, // ✅ Mode Standard/Premium pour carrousels
+          carouselType, // ✅ Type citations/content pour carrousels
         });
 
         return { success: true, slideIndex: index, result: slideResult };

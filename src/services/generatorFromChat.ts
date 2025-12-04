@@ -228,7 +228,8 @@ async function createAssetJob(
       campaign: packTitle,
       useBrandKit,
       userPlan,
-      carouselMode: asset.kind === "carousel" ? carouselMode : undefined, // ✅ Mode Standard/Premium
+      carouselMode: asset.kind === "carousel" ? (asset.carouselMode || carouselMode) : undefined, // ✅ Mode Standard/Premium
+      carouselType: asset.kind === "carousel" ? (asset.carouselType || 'content') : undefined, // ✅ Type: citations ou content
       visualStyle: asset.visualStyle || 'photorealistic',
       withAudio: false,
       engine: videoEngine,

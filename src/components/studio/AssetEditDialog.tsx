@@ -275,6 +275,80 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
             </p>
           </div>
 
+          {/* Carousel Type (Citations vs Contenu) */}
+          {formData.kind === "carousel" && (
+            <div className="space-y-2">
+              <Label>Type de carrousel</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, carouselType: 'content' })}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                    (formData.carouselType || 'content') === 'content'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-muted/50 hover:bg-muted border-border'
+                  }`}
+                >
+                  📝 Conseils / Astuces
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, carouselType: 'citations' })}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                    formData.carouselType === 'citations'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-muted/50 hover:bg-muted border-border'
+                  }`}
+                >
+                  💬 Citations
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {formData.carouselType === 'citations' 
+                  ? "Chaque slide affiche une citation + nom de l'auteur uniquement"
+                  : "Structure complète: Hook → Contenu → CTA"
+                }
+              </p>
+            </div>
+          )}
+
+          {/* Carousel Mode (Standard vs Premium) */}
+          {formData.kind === "carousel" && (
+            <div className="space-y-2">
+              <Label>Mode de génération</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, carouselMode: 'standard' })}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                    (formData.carouselMode || 'standard') === 'standard'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-muted/50 hover:bg-muted border-border'
+                  }`}
+                >
+                  Standard
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, carouselMode: 'premium' })}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                    formData.carouselMode === 'premium'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-muted/50 hover:bg-muted border-border'
+                  }`}
+                >
+                  ✨ Premium
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {formData.carouselMode === 'premium' 
+                  ? "Gemini 3 Pro intègre le texte directement dans l'image"
+                  : "Texte ajouté en overlay sur l'image générée"
+                }
+              </p>
+            </div>
+          )}
+
           {/* Count (pour carrousels) */}
           {formData.kind === "carousel" && (
             <div className="space-y-2">
