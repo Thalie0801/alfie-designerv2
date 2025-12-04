@@ -442,6 +442,17 @@ Deno.serve(async (req) => {
       session.amount_total ? session.amount_total / 100 : 0,
     );
 
+    // ✅ Envoyer l'email de bienvenue (non-bloquant)
+    try {
+      const supabase = getSupabaseClient();
+      await supabase.functions.invoke("send-confirmation-email", {
+        body: { email, plan },
+      });
+      console.log("[verify-session] Welcome email sent to:", email);
+    } catch (emailError) {
+      console.error("[verify-session] Failed to send welcome email:", emailError);
+    }
+
     return jsonResponse({ ok: true, userId });
   } catch (error: any) {
     console.error("[verify-session] Error processing session", error);
