@@ -87,6 +87,7 @@ Pour cela, utilise le format suivant en fin de ta réponse :
       "id": "unique-id",
       "brandId": "BRAND_ID_PLACEHOLDER",
       "kind": "image ou carousel ou video_basic ou video_premium",
+      "carouselType": "content ou citations (OBLIGATOIRE pour kind=carousel)",
       "count": 1 pour image/vidéo, 5-7 pour carousel (nombre de slides),
       "platform": "instagram ou linkedin ou tiktok",
       "ratio": "4:5 pour post, 9:16 pour story/reel, 1:1 pour carré",
@@ -100,6 +101,25 @@ Pour cela, utilise le format suivant en fin de ta réponse :
   ]
 }
 </alfie-pack>
+
+--- RÈGLE SPÉCIFIQUE POUR carouselType ---
+
+Quand tu génères un pack avec un carrousel (kind: "carousel"), tu DOIS TOUJOURS spécifier carouselType :
+- "content" : Carrousel de conseils, astuces, tutoriels avec structure Hook → Contenu → CTA
+- "citations" : Carrousel de citations inspirantes avec UNIQUEMENT citation + nom de l'auteur (PAS de subtitle, PAS de bullets)
+
+⚠️ TRÈS IMPORTANT pour carouselType: "citations" :
+- Le champ "author" est OBLIGATOIRE dans chaque slide
+- Les slides NE DOIVENT PAS avoir de subtitle ni de bullets
+- Format : { "title": "La citation exacte", "author": "Nom de l'auteur" }
+
+Exemple pour citations :
+"generatedTexts": {
+  "slides": [
+    { "title": "Le secret pour avancer, c'est de commencer.", "author": "Mark Twain" },
+    { "title": "La créativité, c'est l'intelligence qui s'amuse.", "author": "Albert Einstein" }
+  ]
+}
 
 --- RÈGLE PRIORITAIRE : ASSISTANCE PROACTIVE ---
 
