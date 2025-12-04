@@ -17,6 +17,18 @@ type Lang = "FR" | "EN";
 
 type CarouselMode = 'standard' | 'premium';
 
+interface BrandKit {
+  name?: string;
+  niche?: string;
+  voice?: string;
+  pitch?: string;
+  adjectives?: string[];
+  visual_types?: string[];
+  visual_mood?: string[];
+  avoid_in_visuals?: string;
+  palette?: string[];
+}
+
 interface SlideRequest {
   userId?: string;               // ✅ Required or deduced from orderId
   prompt: string;
@@ -43,6 +55,7 @@ interface SlideRequest {
   useBrandKit?: boolean;        // ✅ Contrôle si le Brand Kit doit être appliqué
   carouselMode?: CarouselMode;  // ✅ Standard (overlay) ou Premium (texte intégré)
   carouselType?: CarouselType;  // ✅ NOUVEAU: citations ou content
+  brandKit?: BrandKit;          // ✅ NOUVEAU: Brand Kit V2 complet
 }
 
 type GenSize = { w: number; h: number };
@@ -159,69 +172,100 @@ function truncateText(text: string, maxChars: number): string {
 
 /**
  * Build prompt for PREMIUM mode (image WITH text integrated by Gemini 3 Pro)
- * ✅ Refonte : titre + sous-titre + corps avec zones de placement claires
+ * ✅ Refonte V2 : utilise Brand Kit complet pour personnalisation
  */
 function buildImagePromptPremium(
-  globalStyle: string, 
-  prompt: string, 
+  userPrompt: string,
+  brandKit: BrandKit | undefined,
   useBrandKit: boolean,
   slideContent: { title: string; subtitle?: string; bullets?: string[]; alt: string },
   slideIndex: number,
-  totalSlides: number
+  totalSlides: number,
+  language: string = "FR"
 ): string {
   // Tronquer chaque élément avec limites strictes
-  const title = truncateText(slideContent.title, 50);
-  const subtitle = slideContent.subtitle ? truncateText(slideContent.subtitle, 70) : null;
+  const title = truncateText(slideContent.title, 60);
+  const subtitle = slideContent.subtitle ? truncateText(slideContent.subtitle, 90) : null;
   const bullets = (slideContent.bullets || [])
     .filter(b => b && b.trim())
     .slice(0, 3)
-    .map(b => truncateText(b, 55));
+    .map(b => truncateText(b, 60));
   
+  // ✅ Construire le contexte marque UNIQUEMENT si useBrandKit=true ET brandKit fourni
+  let brandContext = "";
+  if (useBrandKit && brandKit) {
+    const brandParts: string[] = [];
+    if (brandKit.name) brandParts.push(`- Brand: ${brandKit.name}`);
+    if (brandKit.niche) brandParts.push(`- Industry/Niche: ${brandKit.niche}`);
+    if (brandKit.voice) brandParts.push(`- Tone of voice: ${brandKit.voice}`);
+    if (brandKit.pitch) brandParts.push(`- Brand essence: ${brandKit.pitch}`);
+    if (brandKit.adjectives?.length) brandParts.push(`- Brand personality: ${brandKit.adjectives.join(", ")}`);
+    if (brandKit.visual_mood?.length) brandParts.push(`- Visual mood: ${brandKit.visual_mood.join(", ")}`);
+    if (brandKit.visual_types?.length) brandParts.push(`- Visual style: ${brandKit.visual_types.join(", ")}`);
+    if (brandKit.avoid_in_visuals) brandParts.push(`- AVOID in visuals: ${brandKit.avoid_in_visuals}`);
+    
+    brandContext = `
+=== BRAND CONTEXT (adapt visual style to this brand) ===
+${brandParts.join("\n")}
+`;
+  } else {
+    brandContext = `
+=== BRAND CONTEXT ===
+- Style: Clean, minimal, professional
+- Tone: Friendly and approachable
+- No specific branding required
+`;
+  }
+
   // Construire les zones de texte avec instructions de placement
-  let textInstructions = `TOP ZONE (20% from top, large bold text):\n"${title}"`;
-  
+  let textLayout = `TOP ZONE (20% from top, large bold typography):
+"${title}"`;
+
   if (subtitle) {
-    textInstructions += `\n\nCENTER ZONE (40-50% height, medium text):\n"${subtitle}"`;
+    textLayout += `
+
+CENTER ZONE (40-50% height, medium weight):
+"${subtitle}"`;
   }
-  
+
   if (bullets.length > 0) {
-    textInstructions += `\n\nBOTTOM ZONE (70-85% height, smaller text, list format):`;
-    bullets.forEach((b, i) => {
-      textInstructions += `\n• ${b}`;
-    });
+    textLayout += `
+
+BOTTOM ZONE (65-80% height, smaller list format):
+${bullets.map(b => `• ${b}`).join("\n")}`;
   }
-  
-  // Style simplifié pour éviter texte parasite
-  const styleKeywords = useBrandKit && globalStyle 
-    ? "modern, elegant, professional, branded" 
-    : "clean, minimal, professional";
 
-  return `Create a social media carousel slide with beautifully integrated text.
+  return `Create a social media carousel slide (${slideIndex + 1}/${totalSlides}) with beautifully integrated text.
 
-=== TEXT TO RENDER (render EXACTLY as written, respecting zones) ===
-${textInstructions}
+=== USER REQUEST (topic/theme of this carousel) ===
+"""
+${userPrompt || "Professional content"}
+"""
+${brandContext}
+=== TEXT TO DISPLAY (render EXACTLY as written, respecting zones) ===
+${textLayout}
 
 === TYPOGRAPHY RULES ===
-- TOP: Title - large bold font (biggest), high contrast, at top 20%
+- TOP: Title - large bold font, high contrast, positioned at top 20%
 - CENTER: Subtitle - medium weight, positioned around center
 - BOTTOM: List items - smaller font, positioned at bottom third
-- ALL text must be FULLY VISIBLE within image boundaries
-- Use white or cream text on darker backgrounds for contrast
-- If text would overflow, REDUCE font size (do NOT crop)
+- All text must be FULLY VISIBLE and READABLE
+- High contrast between text and background (white/cream text on darker backgrounds)
+- If text is long, REDUCE font size automatically (never crop or overflow)
 
-=== VISUAL STYLE ===
-Style: ${styleKeywords}
-Background: Soft gradients, abstract shapes, or blurred imagery that supports readability
+=== VISUAL RULES ===
+- Background should complement the brand context above
+- Soft gradients, abstract shapes, or subtle imagery that supports readability
+- The image must prioritize text legibility
 
-=== CRITICAL RULES (image will be rejected if violated) ===
-- Render ALL provided text elements in their designated zones
-- Text must be READABLE and FULLY VISIBLE (no cropping, no overflow)
-- Maintain clear visual hierarchy: title > subtitle > list
-- DO NOT add any text beyond what is specified above
-- NO hashtags, NO URLs, NO dates, NO brand names unless in the text above
-- NO decorative text, NO labels, NO watermarks
+=== CRITICAL (image rejected if violated) ===
+- Render ALL provided text in designated zones
+- DO NOT add any text beyond what's specified above
+- NO hashtags, NO URLs, NO dates, NO extra labels
+- NO decorative text, NO watermarks
+- Text language: ${language === "EN" ? "English" : "French"}
 
-Generate ONE cohesive image where ALL the specified text is beautifully integrated.`
+Generate ONE cohesive image where ALL specified text is beautifully integrated.`;
 }
 
 async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, ms = 30000) {
@@ -298,6 +342,7 @@ Deno.serve(async (req) => {
       useBrandKit = true, // ✅ Par défaut : utiliser le Brand Kit
       carouselMode = 'standard', // ✅ Par défaut : Standard (overlay Cloudinary)
       carouselType = 'content', // ✅ Par défaut : Content (conseils/astuces)
+      brandKit, // ✅ NOUVEAU: Brand Kit V2 complet
     } = params;
     
     // ✅ Sélectionner le modèle selon le mode
@@ -415,12 +460,13 @@ Deno.serve(async (req) => {
     // ✅ Prompt différent selon le mode
     const enrichedPrompt = carouselMode === 'premium'
       ? buildImagePromptPremium(
-          globalStyle, 
-          prompt, 
+          prompt,     // ✅ Thème utilisateur
+          brandKit,   // ✅ Brand Kit V2 complet
           useBrandKit,
           { title: normTitle, subtitle: normSubtitle, bullets: normBullets, alt: slideContent.alt },
           slideIndex,
-          totalSlides
+          totalSlides,
+          lang        // ✅ Langue pour le texte
         )
       : buildImagePromptStandard(
           globalStyle, 

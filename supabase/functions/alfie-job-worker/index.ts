@@ -1155,6 +1155,7 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
           userId: jobMeta?.user_id || payload.userId,
           prompt: contentPrompt, // ✅ Le thème est TOUJOURS là
           globalStyle,
+          brandKit: brandMini, // ✅ NOUVEAU: passer l'objet Brand Kit V2 complet
           slideContent: {
             title: slide.title || "",
             subtitle: slide.subtitle || "",
