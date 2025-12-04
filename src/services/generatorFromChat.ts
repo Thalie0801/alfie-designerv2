@@ -20,7 +20,8 @@ export interface SendPackParams {
   userId: string;
   selectedAssetIds: string[];
   useBrandKit?: boolean;
-  userPlan?: string; // ✅ Plan utilisateur pour sélection du modèle IA
+  userPlan?: string;
+  carouselMode?: 'standard' | 'premium'; // ✅ Mode Standard/Premium pour carrousels
 }
 
 export interface SendPackResult {
@@ -40,7 +41,8 @@ export async function sendPackToGenerator({
   userId,
   selectedAssetIds,
   useBrandKit = true,
-  userPlan = 'starter', // ✅ Plan utilisateur pour sélection du modèle IA
+  userPlan = 'starter',
+  carouselMode = 'standard', // ✅ Mode Standard/Premium pour carrousels
 }: SendPackParams): Promise<SendPackResult> {
   // 1. Calculer le coût total Woofs
   const totalWoofs = calculatePackWoofCost(pack, selectedAssetIds);
@@ -94,8 +96,9 @@ export async function sendPackToGenerator({
           kind: asset.kind,
           referenceImageUrl: asset.referenceImageUrl || "❌ MISSING",
           title: asset.title,
+          carouselMode: asset.kind === 'carousel' ? carouselMode : undefined,
         });
-        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, userPlan);
+        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, userPlan, carouselMode);
       })
     );
 
@@ -149,7 +152,8 @@ async function createAssetJob(
   userId: string,
   packTitle: string,
   useBrandKit: boolean = true,
-  userPlan: string = 'starter'
+  userPlan: string = 'starter',
+  carouselMode: 'standard' | 'premium' = 'standard'
 ): Promise<{ orderId: string }> {
   // Créer un order pour cet asset
   const { data: order, error: orderError } = await supabase
@@ -223,7 +227,8 @@ async function createAssetJob(
       generatedTexts: asset.generatedTexts,
       campaign: packTitle,
       useBrandKit,
-      userPlan, // ✅ Plan utilisateur pour sélection du modèle IA
+      userPlan,
+      carouselMode: asset.kind === "carousel" ? carouselMode : undefined, // ✅ Mode Standard/Premium
       visualStyle: asset.visualStyle || 'photorealistic',
       withAudio: false,
       engine: videoEngine,

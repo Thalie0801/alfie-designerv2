@@ -1,8 +1,10 @@
 // functions/alfie-render-carousel-slide/index.ts
-// v2.5.0 — Slide renderer (idempotent, retries + timeout, env.ts, internal secret)
+// v2.6.0 — Slide renderer with Standard/Premium mode (text overlay vs native text)
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { uploadTextAsRaw } from "../_shared/cloudinaryUploader.ts";
+import { buildCarouselSlideUrl, Slide } from "../_shared/imageCompositor.ts";
+import { getCarouselModel } from "../_shared/aiModels.ts";
 import { 
   SUPABASE_URL, 
   SUPABASE_SERVICE_ROLE_KEY, 
@@ -12,6 +14,8 @@ import {
 
 import { corsHeaders } from "../_shared/cors.ts";
 type Lang = "FR" | "EN";
+
+type CarouselMode = 'standard' | 'premium';
 
 interface SlideRequest {
   userId?: string;               // ✅ Required or deduced from orderId
@@ -35,12 +39,14 @@ interface SlideRequest {
   campaign: string;
   language?: Lang | string;
   requestId?: string | null;
-  useBrandKit?: boolean;        // ✅ NOUVEAU: contrôle si le Brand Kit doit être appliqué
+  useBrandKit?: boolean;        // ✅ Contrôle si le Brand Kit doit être appliqué
+  carouselMode?: CarouselMode;  // ✅ NOUVEAU: Standard (overlay) ou Premium (texte intégré)
 }
 
 type GenSize = { w: number; h: number };
 
-const MODEL_IMAGE = "google/gemini-2.5-flash-image-preview";
+const MODEL_IMAGE_STANDARD = "google/gemini-2.5-flash-image-preview";
+const MODEL_IMAGE_PREMIUM = "google/gemini-3-pro-image-preview";
 
 const AR_MAP: Record<string, GenSize> = {
   "1:1":  { w: 1024, h: 1024 },
@@ -93,7 +99,10 @@ function getSlideRole(index: number, total: number): string {
   return "KEY POINT/INSIGHT";
 }
 
-function buildImagePrompt(
+/**
+ * Build prompt for STANDARD mode (image only, no text - text added via Cloudinary overlay)
+ */
+function buildImagePromptStandard(
   globalStyle: string, 
   prompt: string, 
   useBrandKit: boolean,
@@ -122,7 +131,7 @@ SLIDE CONTEXT: This is a ${slideRole} slide. The text overlay will say: "${slide
 COMPOSITION REQUIREMENTS:
 - Create a visual that supports and reinforces the message: "${slideContent.title}"
 - Include a clear focal point related to the slide's message
-- Leave a clean area (solid color, soft gradient) for text overlay
+- Leave a clean area (solid color, soft gradient, or subtle texture) for text overlay
 - The image should visually represent the concept of: ${slideContext}
 
 VISUAL STYLE:
@@ -133,7 +142,51 @@ STRICT PROHIBITIONS:
 - NO logos, NO watermarks, NO icons, NO UI elements
 - NO seamless patterns, NO repeated motifs, NO wallpaper designs
 
-OUTPUT: High quality image that visually complements the message "${slideContent.title}".`;
+OUTPUT: High quality background image suitable for text overlay.`;
+}
+
+/**
+ * Build prompt for PREMIUM mode (image WITH text integrated by Gemini 3 Pro)
+ */
+function buildImagePromptPremium(
+  globalStyle: string, 
+  prompt: string, 
+  useBrandKit: boolean,
+  slideContent: { title: string; subtitle?: string; alt: string },
+  slideIndex: number,
+  totalSlides: number
+): string {
+  const globalTheme = prompt?.trim() || "Professional marketing";
+  const slideRole = getSlideRole(slideIndex, totalSlides);
+  
+  const styleHint = useBrandKit && globalStyle 
+    ? globalStyle 
+    : "Professional, modern, clean design";
+
+  // Build text instructions
+  let textInstructions = `MAIN TITLE (large, prominent, centered): "${slideContent.title}"`;
+  if (slideContent.subtitle) {
+    textInstructions += `\nSUBTITLE (smaller, below title): "${slideContent.subtitle}"`;
+  }
+  
+  return `Generate a carousel slide image WITH integrated text.
+
+${textInstructions}
+
+The text MUST be:
+- Clearly readable with high contrast against background
+- Well designed with professional typography
+- Properly positioned and visually balanced
+- Part of the overall design composition
+
+CAMPAIGN THEME: ${globalTheme}
+SLIDE ROLE: ${slideRole} (slide ${slideIndex + 1} of ${totalSlides})
+
+VISUAL STYLE:
+${styleHint}
+
+Create a visually striking slide where the text is an integral, beautiful part of the design.
+The typography should be elegant and match the brand aesthetic.`;
 }
 
 async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, ms = 30000) {
@@ -208,7 +261,12 @@ Deno.serve(async (req) => {
       language = "FR",
       requestId = null,
       useBrandKit = true, // ✅ Par défaut : utiliser le Brand Kit
+      carouselMode = 'standard', // ✅ Par défaut : Standard (overlay Cloudinary)
     } = params;
+    
+    // ✅ Sélectionner le modèle selon le mode
+    const MODEL_IMAGE = carouselMode === 'premium' ? MODEL_IMAGE_PREMIUM : MODEL_IMAGE_STANDARD;
+    console.log(`[render-slide] 🎨 Mode: ${carouselMode} - Model: ${MODEL_IMAGE}`);
 
     // —— Supabase admin client (service role)
     const supabaseAdmin = createClient(
@@ -316,15 +374,26 @@ Deno.serve(async (req) => {
     // =========================================
     // STEP 2/4 — Générer background (Lovable AI)
     // =========================================
-    console.log(`[render-slide] ${logCtx} 2/4 Generate background via Lovable AI`);
-    const enrichedPrompt = buildImagePrompt(
-      globalStyle, 
-      prompt, 
-      useBrandKit,
-      { title: normTitle, subtitle: normSubtitle, alt: slideContent.alt },
-      slideIndex,
-      totalSlides
-    );
+    console.log(`[render-slide] ${logCtx} 2/4 Generate ${carouselMode === 'premium' ? 'slide WITH text' : 'background'} via Lovable AI`);
+    
+    // ✅ Prompt différent selon le mode
+    const enrichedPrompt = carouselMode === 'premium'
+      ? buildImagePromptPremium(
+          globalStyle, 
+          prompt, 
+          useBrandKit,
+          { title: normTitle, subtitle: normSubtitle, alt: slideContent.alt },
+          slideIndex,
+          totalSlides
+        )
+      : buildImagePromptStandard(
+          globalStyle, 
+          prompt, 
+          useBrandKit,
+          { title: normTitle, subtitle: normSubtitle, alt: slideContent.alt },
+          slideIndex,
+          totalSlides
+        );
 
     const aiRes = await fetchWithRetries(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
@@ -424,6 +493,50 @@ Deno.serve(async (req) => {
     });
 
     // =========================================
+    // STEP 3.5 — Apply text overlay (STANDARD mode only)
+    // =========================================
+    let finalUrl = cloudinarySecureUrl;
+    
+    if (carouselMode === 'standard') {
+      console.log(`[render-slide] ${logCtx} 3.5/4 Applying Cloudinary text overlay (Standard mode)`);
+      
+      // Déterminer le type de slide pour l'overlay
+      const slideType = slideIndex === 0 ? 'hero' 
+        : slideIndex === totalSlides - 1 ? 'cta'
+        : slideIndex === 1 ? 'problem'
+        : slideIndex === totalSlides - 2 ? 'solution'
+        : 'impact';
+      
+      const slideData: Slide = {
+        type: slideType,
+        title: normTitle,
+        subtitle: normSubtitle || undefined,
+        bullets: normBullets.length > 0 ? normBullets : undefined,
+        cta: slideType === 'cta' ? normTitle : undefined,
+      };
+      
+      // Couleurs pour l'overlay (blanc par défaut)
+      const primaryColor = 'ffffff';
+      const secondaryColor = 'cccccc';
+      
+      try {
+        finalUrl = buildCarouselSlideUrl(
+          cloudinaryPublicId,
+          slideData,
+          primaryColor,
+          secondaryColor
+        );
+        console.log(`[render-slide] ${logCtx}   ↳ overlay URL: ${finalUrl?.slice(0, 150)}...`);
+      } catch (overlayErr) {
+        console.warn(`[render-slide] ${logCtx} ⚠️ Overlay failed, using base image:`, overlayErr);
+        // En cas d'erreur, utiliser l'image de base
+        finalUrl = cloudinarySecureUrl;
+      }
+    } else {
+      console.log(`[render-slide] ${logCtx} 3.5/4 Skipping overlay (Premium mode - text already integrated)`);
+    }
+
+    // =========================================
     // STEP 4/4 — Upsert DB (idempotent)
     // =========================================
     console.log(`[render-slide] ${logCtx} 4/4 Save to library_assets (idempotence check)`);
@@ -458,6 +571,7 @@ Deno.serve(async (req) => {
           renderVersion,
           textVersion,
           aspectRatio: normalizedAR,
+          carouselMode,
         },
       });
     }
@@ -472,8 +586,8 @@ Deno.serve(async (req) => {
       slide_index: slideIndex,
       format: normalizedAR,
       campaign,
-      cloudinary_url: cloudinarySecureUrl,       // URL complète pour affichage
-      cloudinary_public_id: cloudinaryPublicId,  // public_id pour transformations ultérieures
+      cloudinary_url: finalUrl,           // ✅ URL finale (avec ou sans overlay selon le mode)
+      cloudinary_public_id: cloudinaryPublicId,
       text_json: {
         title: normTitle,
         subtitle: normSubtitle,
@@ -482,16 +596,19 @@ Deno.serve(async (req) => {
         text_public_id: textPublicId,
         text_version: textVersion,
         render_version: renderVersion,
+        carousel_mode: carouselMode,      // ✅ Enregistrer le mode utilisé
       },
       metadata: {
         ...uploadMeta,
-        cloudinary_base_url: cloudinarySecureUrl,
+        cloudinary_base_url: cloudinarySecureUrl,   // ✅ URL de base (sans overlay)
+        cloudinary_overlay_url: carouselMode === 'standard' ? finalUrl : null, // ✅ URL avec overlay
         original_public_id: cloudinaryPublicId,
         totalSlides,
         aspectRatio: normalizedAR,
         size_hint: `${size.w}x${size.h}`,
         orderItemId: orderItemId ?? null,
         requestId,
+        carouselMode,
       },
     });
 
@@ -500,12 +617,14 @@ Deno.serve(async (req) => {
       return json({ error: `Failed to save slide: ${insertErr.message}` }, 500);
     }
 
-    console.log(`[render-slide] ${logCtx} ✅ Slide saved`);
+    console.log(`[render-slide] ${logCtx} ✅ Slide saved (mode: ${carouselMode})`);
     return json({
       success: true,
-      cloudinary_url: cloudinarySecureUrl,
+      cloudinary_url: finalUrl,           // ✅ URL finale
+      cloudinary_base_url: cloudinarySecureUrl, // ✅ URL de base
       cloudinary_public_id: cloudinaryPublicId,
       text_public_id: textPublicId,
+      carousel_mode: carouselMode,
       slide_metadata: {
         title: normTitle,
         subtitle: normSubtitle,
@@ -515,6 +634,7 @@ Deno.serve(async (req) => {
         renderVersion,
         textVersion,
         aspectRatio: normalizedAR,
+        carouselMode,
       },
     });
   } catch (err: any) {
