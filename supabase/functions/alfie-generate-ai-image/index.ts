@@ -7,7 +7,7 @@ import {
 } from '../_shared/env.ts';
 
 import { corsHeaders } from "../_shared/cors.ts";
-import { getModelsForPlan, getTierFromPlan } from "../_shared/aiModels.ts";
+import { getModelsForPlan } from "../_shared/aiModels.ts";
 /* ------------------------------- CORS ------------------------------- */
 function jsonRes(body: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(body), {
@@ -254,10 +254,9 @@ function buildNegativePrompt(input: GenerateRequest) {
 async function callLovableOnce(opts: { apiKey: string; system: string; userContent: any[]; userPlan?: string }) {
   const { apiKey, system, userContent, userPlan } = opts;
   
-  // ✅ Sélection dynamique du modèle selon le plan
+  // ✅ Tous les plans utilisent maintenant le modèle Premium
   const models = getModelsForPlan(userPlan);
-  const tier = getTierFromPlan(userPlan);
-  console.log(`🎨 [alfie-generate-ai-image] Using ${tier === 'premium' ? 'Premium' : 'Standard'} tier - Model: ${models.image}`);
+  console.log(`🎨 [alfie-generate-ai-image] Using Premium tier - Model: ${models.image}`);
   
   const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",

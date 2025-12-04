@@ -6,7 +6,7 @@
 
 import { corsHeaders } from "../_shared/cors.ts";
 import { callVertexChat } from "./vertexHelper.ts";
-import { getModelsForPlan, getTierFromPlan } from "../_shared/aiModels.ts";
+import { getModelsForPlan } from "../_shared/aiModels.ts";
 
 // System prompt unique pour Alfie Chat
 const SYSTEM_PROMPT = `Tu es « Alfie Chat », l'assistant d'Alfie Designer.
@@ -529,10 +529,9 @@ Le secteur d'activité est fourni pour contexte minimal, mais reste neutre dans 
     console.warn("⚠️ Vertex AI failed, falling back to Lovable AI:", error?.message || String(error));
   }
 
-  // 2. Lovable AI - Sélection dynamique du modèle selon le plan
+  // 2. Lovable AI - Tous les plans utilisent maintenant le modèle Premium
   const models = getModelsForPlan(userPlan);
-  const tier = getTierFromPlan(userPlan);
-  console.log(`🔄 Using Lovable AI (${tier === 'premium' ? 'Premium' : 'Standard'}) - Model: ${models.text}`);
+  console.log(`🔄 Using Lovable AI (Premium) - Model: ${models.text}`);
   
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   

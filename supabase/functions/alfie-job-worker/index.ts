@@ -1101,6 +1101,10 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   // ✅ Résoudre useBrandKit avec le helper
   const useBrandKit = resolveUseBrandKit(payload, jobMeta);
   
+  // ✅ Extraire le carouselMode (standard avec overlay Cloudinary, ou premium avec texte intégré)
+  const carouselMode = payload.carouselMode || 'standard';
+  console.log(`[processRenderCarousels] 🎨 Mode: ${carouselMode} (${carouselMode === 'premium' ? 'texte intégré Gemini 3 Pro' : 'image + overlay Cloudinary'})`);
+  
   // ✅ Le globalStyle contient SEULEMENT le style visuel, pas le contenu
   // ✅ Convertir codes hex en descriptions de couleurs
   const colorDescriptions = useBrandKit && brandMini?.palette?.length
@@ -1154,6 +1158,7 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
           campaign: payload.campaign || payload.brief?.campaign || "carousel",
           language: "FR",
           useBrandKit, // ✅ Propagation de useBrandKit
+          carouselMode, // ✅ Mode Standard/Premium pour carrousels
         });
 
         return { success: true, slideIndex: index, result: slideResult };

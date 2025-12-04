@@ -52,6 +52,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
   );
   const [isGenerating, setIsGenerating] = useState(false);
   const [useBrandKit, setUseBrandKit] = useState(true); // ✅ Phase 2: Toggle Brand Kit
+  const [carouselMode, setCarouselMode] = useState<'standard' | 'premium'>('standard'); // ✅ Toggle Standard/Premium carrousels
   const [audioSettings, setAudioSettings] = useState<Record<string, boolean>>(() => {
     // Par défaut, audio activé pour toutes les vidéos
     const initial: Record<string, boolean> = {};
@@ -62,6 +63,9 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
   });
   const { profile } = useAuth();
   const navigate = useNavigate();
+  
+  // Vérifie si le pack contient des carrousels
+  const hasCarousels = pack.assets.some(a => a.kind === 'carousel');
   
   // Toggle audio pour une vidéo spécifique
   const toggleAudio = (assetId: string) => {
@@ -232,7 +236,8 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         userId: profile.id,
         selectedAssetIds: Array.from(selectedAssetIds),
         useBrandKit,
-        userPlan: profile.plan || 'starter', // ✅ Plan utilisateur pour sélection du modèle IA
+        userPlan: profile.plan || 'starter',
+        carouselMode, // ✅ Mode Standard/Premium pour carrousels
       });
 
       toast.success("C'est parti ! Alfie prépare ton pack de visuels 🎬");
@@ -398,6 +403,44 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
             </div>
             <Switch checked={useBrandKit} onCheckedChange={setUseBrandKit} />
           </div>
+
+          {/* ✅ Toggle Standard/Premium pour carrousels */}
+          {hasCarousels && (
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+              <div>
+                <span className="font-medium text-sm">Mode carrousel</span>
+                <p className="text-xs text-muted-foreground">
+                  {carouselMode === 'premium' 
+                    ? "Premium : texte intégré par Gemini 3 Pro" 
+                    : "Standard : image + overlay texte Cloudinary"}
+                </p>
+              </div>
+              <div className="flex gap-1">
+                <button 
+                  type="button"
+                  onClick={() => setCarouselMode('standard')}
+                  className={`px-3 py-1.5 text-xs rounded-l-md transition-colors ${
+                    carouselMode === 'standard' 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'bg-muted hover:bg-muted/80'
+                  }`}
+                >
+                  Standard
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setCarouselMode('premium')}
+                  className={`px-3 py-1.5 text-xs rounded-r-md transition-colors ${
+                    carouselMode === 'premium' 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'bg-muted hover:bg-muted/80'
+                  }`}
+                >
+                  Premium
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Warning si pas assez de Woofs */}
           {totalWoofs > 0 && (
