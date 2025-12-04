@@ -14,7 +14,10 @@ export type Slide = {
   note?: string;
   badge?: string;
   kpis?: Array<{ label: string; delta: string }>;
+  author?: string; // ✅ Auteur pour les carrousels de citations
 };
+
+export type CarouselType = 'citations' | 'content';
 
 type TextLayer = {
   text: string;
@@ -257,14 +260,54 @@ function layersForCTA(slide: Slide, primaryColor: string): TextLayer[] {
 // ============= MAIN FUNCTION =============
 
 /**
+ * Generate text layers for CITATIONS carousel
+ * ✅ SIMPLIFIÉ: Citation centrée + Auteur en bas uniquement
+ */
+function layersForCitation(slide: Slide): TextLayer[] {
+  const layers: TextLayer[] = [];
+  
+  // Citation principale (centrée avec guillemets)
+  layers.push({
+    text: `"${slide.title}"`,
+    font: 'Inter',
+    weight: 'Bold',
+    size: 56,
+    color: 'ffffff',
+    outline: 12,
+    gravity: 'center',
+    y: -50,
+    w: 900
+  });
+  
+  // Auteur (en bas, avec tiret)
+  if (slide.author) {
+    layers.push({
+      text: `— ${slide.author}`,
+      font: 'Inter',
+      weight: 'Regular',
+      size: 32,
+      color: 'cccccc',
+      outline: 8,
+      gravity: 'center',
+      y: 100,
+      w: 700
+    });
+  }
+  
+  return layers;
+}
+
+/**
  * Build complete carousel slide URL with text overlays
  * This is the NEW primary function to use for carousel rendering
+ * ✅ Supporte carouselType: 'citations' ou 'content'
  */
 export function buildCarouselSlideUrl(
   backgroundPublicId: string,
   slide: Slide,
   primaryColor: string,
-  secondaryColor: string
+  secondaryColor: string,
+  carouselType: CarouselType = 'content' // ✅ NOUVEAU paramètre
 ): string {
   const CLOUD_NAME = Deno.env.get('CLOUDINARY_CLOUD_NAME')?.trim();
   if (!CLOUD_NAME) {
@@ -274,33 +317,40 @@ export function buildCarouselSlideUrl(
   const cloudName = CLOUD_NAME.toLowerCase();
   const baseUrl = `https://res.cloudinary.com/${cloudName}/image/upload`;
   
-  // Select appropriate layer mapper based on slide type
+  // Select appropriate layer mapper based on carouselType and slide type
   let layers: TextLayer[] = [];
   
-  switch (slide.type) {
-    case 'hero':
-      layers = layersForHero(slide, primaryColor, secondaryColor);
-      break;
-    case 'problem':
-    case 'solution':
-    case 'impact':
-      layers = layersForContent(slide, primaryColor);
-      break;
-    case 'cta':
-      layers = layersForCTA(slide, primaryColor);
-      break;
-    default:
-      // Fallback: simple centered title
-      layers = [{
-        text: slide.title,
-        font: 'Inter',
-        weight: 'ExtraBold',
-        size: 68,
-        color: 'ffffff',
-        outline: 14,
-        gravity: 'center',
-        w: 900
-      }];
+  // ✅ CITATIONS: uniquement citation + auteur
+  if (carouselType === 'citations') {
+    layers = layersForCitation(slide);
+    console.log(`🎨 [buildCarouselSlideUrl] CITATIONS mode - title: "${slide.title.slice(0, 30)}..." author: "${slide.author || 'N/A'}"`);
+  } else {
+    // ✅ CONTENT: structure complète selon le type de slide
+    switch (slide.type) {
+      case 'hero':
+        layers = layersForHero(slide, primaryColor, secondaryColor);
+        break;
+      case 'problem':
+      case 'solution':
+      case 'impact':
+        layers = layersForContent(slide, primaryColor);
+        break;
+      case 'cta':
+        layers = layersForCTA(slide, primaryColor);
+        break;
+      default:
+        // Fallback: simple centered title
+        layers = [{
+          text: slide.title,
+          font: 'Inter',
+          weight: 'ExtraBold',
+          size: 68,
+          color: 'ffffff',
+          outline: 14,
+          gravity: 'center',
+          w: 900
+        }];
+    }
   }
   
   // Build all text overlays
@@ -309,7 +359,7 @@ export function buildCarouselSlideUrl(
   // Final URL with quality params
   const url = `${baseUrl}/${overlays}/f_png,q_auto,cs_srgb/${backgroundPublicId}.png`;
   
-  console.log(`🎨 [buildCarouselSlideUrl] Generated URL for ${slide.type} slide (${layers.length} layers)`);
+  console.log(`🎨 [buildCarouselSlideUrl] Generated URL for ${carouselType}/${slide.type} slide (${layers.length} layers)`);
   
   return url;
 }

@@ -13,10 +13,16 @@ export type AssetFormat = "post" | "story" | "reel" | "short" | "pin";
 export type AssetGoal = "education" | "vente" | "lead" | "engagement";
 export type WoofCostType = "image" | "carousel_slide" | "video_premium";
 
+// Types de carrousel
+export type CarouselType = 'citations' | 'content';
+export type CarouselMode = 'standard' | 'premium';
+
 // PackAsset is now just UnifiedAlfieIntent with additional legacy fields
 export interface PackAsset extends UnifiedAlfieIntent {
   format?: AssetFormat; // Legacy - kept for compatibility
   woofCostType: WoofCostType;
+  carouselType?: CarouselType; // Type de carrousel: citations ou contenu
+  carouselMode?: CarouselMode; // Mode de rendu: standard (overlay) ou premium (texte intégré)
 }
 
 // Woof cost mapping

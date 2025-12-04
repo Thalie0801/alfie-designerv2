@@ -3,7 +3,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { uploadTextAsRaw } from "../_shared/cloudinaryUploader.ts";
-import { buildCarouselSlideUrl, Slide } from "../_shared/imageCompositor.ts";
+import { buildCarouselSlideUrl, Slide, CarouselType } from "../_shared/imageCompositor.ts";
 import { getCarouselModel } from "../_shared/aiModels.ts";
 import { 
   SUPABASE_URL, 
@@ -26,6 +26,7 @@ interface SlideRequest {
     subtitle?: string;
     bullets?: string[];
     alt: string;
+    author?: string; // ✅ Auteur pour les citations
   };
   brandId: string;
   orderId: string;
@@ -40,7 +41,8 @@ interface SlideRequest {
   language?: Lang | string;
   requestId?: string | null;
   useBrandKit?: boolean;        // ✅ Contrôle si le Brand Kit doit être appliqué
-  carouselMode?: CarouselMode;  // ✅ NOUVEAU: Standard (overlay) ou Premium (texte intégré)
+  carouselMode?: CarouselMode;  // ✅ Standard (overlay) ou Premium (texte intégré)
+  carouselType?: CarouselType;  // ✅ NOUVEAU: citations ou content
 }
 
 type GenSize = { w: number; h: number };
@@ -259,6 +261,7 @@ Deno.serve(async (req) => {
       requestId = null,
       useBrandKit = true, // ✅ Par défaut : utiliser le Brand Kit
       carouselMode = 'standard', // ✅ Par défaut : Standard (overlay Cloudinary)
+      carouselType = 'content', // ✅ Par défaut : Content (conseils/astuces)
     } = params;
     
     // ✅ Sélectionner le modèle selon le mode
@@ -495,7 +498,7 @@ Deno.serve(async (req) => {
     let finalUrl = cloudinarySecureUrl;
     
     if (carouselMode === 'standard') {
-      console.log(`[render-slide] ${logCtx} 3.5/4 Applying Cloudinary text overlay (Standard mode)`);
+      console.log(`[render-slide] ${logCtx} 3.5/4 Applying Cloudinary text overlay (Standard mode, type=${carouselType})`);
       
       // Déterminer le type de slide pour l'overlay
       const slideType = slideIndex === 0 ? 'hero' 
@@ -510,6 +513,7 @@ Deno.serve(async (req) => {
         subtitle: normSubtitle || undefined,
         bullets: normBullets.length > 0 ? normBullets : undefined,
         cta: slideType === 'cta' ? normTitle : undefined,
+        author: slideContent.author || undefined, // ✅ Auteur pour les citations
       };
       
       // Couleurs pour l'overlay (blanc par défaut)
@@ -521,7 +525,8 @@ Deno.serve(async (req) => {
           cloudinaryPublicId,
           slideData,
           primaryColor,
-          secondaryColor
+          secondaryColor,
+          carouselType // ✅ Passer le type de carrousel
         );
         console.log(`[render-slide] ${logCtx}   ↳ overlay URL: ${finalUrl?.slice(0, 150)}...`);
       } catch (overlayErr) {
