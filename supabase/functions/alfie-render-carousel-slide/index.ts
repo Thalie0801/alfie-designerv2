@@ -148,44 +148,80 @@ OUTPUT: High quality background image suitable for text overlay.`;
 }
 
 /**
+ * Tronquer un texte intelligemment avec ellipsis
+ */
+function truncateText(text: string, maxChars: number): string {
+  if (!text || text.length <= maxChars) return text || "";
+  // Trouver le dernier espace avant la limite pour couper proprement
+  const cutIndex = text.lastIndexOf(' ', maxChars - 3);
+  return text.substring(0, cutIndex > maxChars * 0.5 ? cutIndex : maxChars - 3).trim() + "...";
+}
+
+/**
  * Build prompt for PREMIUM mode (image WITH text integrated by Gemini 3 Pro)
- * ✅ Simplifié : titre uniquement pour éviter les chevauchements
+ * ✅ Refonte : titre + sous-titre + corps avec zones de placement claires
  */
 function buildImagePromptPremium(
   globalStyle: string, 
   prompt: string, 
   useBrandKit: boolean,
-  slideContent: { title: string; subtitle?: string; alt: string },
+  slideContent: { title: string; subtitle?: string; bullets?: string[]; alt: string },
   slideIndex: number,
   totalSlides: number
 ): string {
-  const globalTheme = prompt?.trim() || "Professional marketing";
+  // Tronquer chaque élément avec limites strictes
+  const title = truncateText(slideContent.title, 50);
+  const subtitle = slideContent.subtitle ? truncateText(slideContent.subtitle, 70) : null;
+  const bullets = (slideContent.bullets || [])
+    .filter(b => b && b.trim())
+    .slice(0, 3)
+    .map(b => truncateText(b, 55));
   
-  const styleHint = useBrandKit && globalStyle 
-    ? globalStyle 
-    : "Professional, modern, clean design";
-
-  // ✅ Limiter le texte : titre UNIQUEMENT (max 60 caractères)
-  const displayTitle = slideContent.title.length > 60 
-    ? slideContent.title.substring(0, 60) + "..."
-    : slideContent.title;
+  // Construire les zones de texte avec instructions de placement
+  let textInstructions = `TOP ZONE (20% from top, large bold text):\n"${title}"`;
   
-  return `Generate a visually striking carousel slide.
+  if (subtitle) {
+    textInstructions += `\n\nCENTER ZONE (40-50% height, medium text):\n"${subtitle}"`;
+  }
+  
+  if (bullets.length > 0) {
+    textInstructions += `\n\nBOTTOM ZONE (70-85% height, smaller text, list format):`;
+    bullets.forEach((b, i) => {
+      textInstructions += `\n• ${b}`;
+    });
+  }
+  
+  // Style simplifié pour éviter texte parasite
+  const styleKeywords = useBrandKit && globalStyle 
+    ? "modern, elegant, professional, branded" 
+    : "clean, minimal, professional";
 
-INTEGRATE THIS TEXT beautifully into the image:
-"${displayTitle}"
+  return `Create a social media carousel slide with beautifully integrated text.
 
-The text must be:
-- Clearly readable with high contrast
-- Large and prominent (main focus)
-- Professional typography
-- Centered or strategically placed
+=== TEXT TO RENDER (render EXACTLY as written, respecting zones) ===
+${textInstructions}
 
-THEME: ${globalTheme}
-STYLE: ${styleHint}
+=== TYPOGRAPHY RULES ===
+- TOP: Title - large bold font (biggest), high contrast, at top 20%
+- CENTER: Subtitle - medium weight, positioned around center
+- BOTTOM: List items - smaller font, positioned at bottom third
+- ALL text must be FULLY VISIBLE within image boundaries
+- Use white or cream text on darker backgrounds for contrast
+- If text would overflow, REDUCE font size (do NOT crop)
 
-Create ONE cohesive image where the text is an integral, beautiful part of the design.
-NO extra text, NO subtitles, NO additional words.`;
+=== VISUAL STYLE ===
+Style: ${styleKeywords}
+Background: Soft gradients, abstract shapes, or blurred imagery that supports readability
+
+=== CRITICAL RULES (image will be rejected if violated) ===
+- Render ALL provided text elements in their designated zones
+- Text must be READABLE and FULLY VISIBLE (no cropping, no overflow)
+- Maintain clear visual hierarchy: title > subtitle > list
+- DO NOT add any text beyond what is specified above
+- NO hashtags, NO URLs, NO dates, NO brand names unless in the text above
+- NO decorative text, NO labels, NO watermarks
+
+Generate ONE cohesive image where ALL the specified text is beautifully integrated.`
 }
 
 async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, ms = 30000) {
@@ -382,7 +418,7 @@ Deno.serve(async (req) => {
           globalStyle, 
           prompt, 
           useBrandKit,
-          { title: normTitle, subtitle: normSubtitle, alt: slideContent.alt },
+          { title: normTitle, subtitle: normSubtitle, bullets: normBullets, alt: slideContent.alt },
           slideIndex,
           totalSlides
         )
