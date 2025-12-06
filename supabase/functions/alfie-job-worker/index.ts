@@ -1037,7 +1037,9 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
 
   // ✅ Utiliser un UUID valide pour carousel_id
   const carousel_id = payload.carousel_id || crypto.randomUUID();
-  const totalSlides = payload.count || 5;
+  // ✅ UTILISER LE COUNT DU PAYLOAD (pas de fallback 5 par défaut)
+  const totalSlides = payload.count || payload.generatedTexts?.slides?.length || 5;
+  console.log(`[processRenderCarousels] 📌 Using slide count: ${totalSlides} (payload.count: ${payload.count})`);
   
   // ✅ Extraire le carouselType et carouselMode AVANT le traitement
   const carouselType = payload.carouselType || 'content';
@@ -1046,8 +1048,23 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   // ✅ Phase 3: Récupérer les slides AI
   const rawAiSlides = payload.generatedTexts?.slides ?? [];
   
+  // ✅ PARSER les prompts structurés "Slide N : texte"
+  function parseStructuredPrompt(prompt: string): Array<{ title: string; body?: string }> | null {
+    if (!prompt) return null;
+    // Pattern: "Slide 1 : texte", "slide 2: autre texte", etc.
+    const slidePattern = /slide\s*(\d+)\s*:\s*([^]*?)(?=slide\s*\d+\s*:|$)/gi;
+    const matches = [...prompt.matchAll(slidePattern)];
+    
+    if (matches.length >= 2) {
+      return matches.map(m => ({
+        title: m[2].trim().slice(0, 60), // Limite titre à 60 chars
+        body: m[2].trim().length > 60 ? m[2].trim() : undefined
+      }));
+    }
+    return null;
+  }
+  
   // ✅ NETTOYAGE DU TOPIC: extraire le thème réel du prompt brut
-  // Supprimer les instructions de structure comme "Carrousel de X slides : Slide 1 : ..."
   function extractCleanTopic(rawTopic: string | undefined): string {
     if (!rawTopic) return "Votre sujet";
     
@@ -1059,6 +1076,10 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
       /^créer?\s+un?\s+carrousel\s*/gi,
       /^génère\s+/gi,
       /^faire\s+/gi,
+      // ✅ NOUVEAUX PATTERNS pour mieux nettoyer
+      /^fais(-|\s+)?(moi|un|une|des|du)?\s*/gi,
+      /^je\s+veux\s+(du|de\s+la|des|un|une)?\s*/gi,
+      /^crée\s+(moi\s+)?(un|une|des)?\s*/gi,
     ];
     
     let cleaned = rawTopic;
@@ -1069,12 +1090,11 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
     // Nettoyer les espaces multiples et trim
     cleaned = cleaned.replace(/\s+/g, ' ').trim();
     
-    // Si le résultat est trop court ou vide, essayer d'extraire le premier mot-clé significatif
+    // Si le résultat est trop court ou vide, essayer d'extraire les mots-clés significatifs
     if (!cleaned || cleaned.length < 3) {
-      // Extraire les mots significatifs du prompt original (ignorer "je veux", "avec", etc.)
       const significantWords = rawTopic
         .split(/[:\s,]+/)
-        .filter(w => w.length > 3 && !/^(avec|pour|dans|slide|carrousel|visuels?|ajouter|créer|génère|faire|je|veux|du|de|la|le|les|un|une)$/i.test(w));
+        .filter(w => w.length > 3 && !/^(avec|pour|dans|slide|carrousel|visuels?|ajouter|créer|génère|faire|fais|crée|je|veux|moi|du|de|la|le|les|un|une|des)$/i.test(w));
       
       if (significantWords.length > 0) {
         cleaned = significantWords.slice(0, 3).join(' ');
@@ -1085,10 +1105,13 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   }
   
   const rawTopic = payload.brief?.topic || payload.topic || payload.prompt || "";
-  const topic = extractCleanTopic(rawTopic);
+  
+  // ✅ ESSAYER DE PARSER UN PROMPT STRUCTURÉ
+  const parsedSlides = parseStructuredPrompt(rawTopic);
+  const topic = parsedSlides ? parsedSlides[0]?.title || "Votre sujet" : extractCleanTopic(rawTopic);
   const cta = payload.brief?.cta || "En savoir plus";
   
-  console.log(`[processRenderCarousels] 🧹 Topic cleaned: "${rawTopic.slice(0, 50)}..." → "${topic}"`);
+  console.log(`[processRenderCarousels] 🧹 Topic: "${rawTopic.slice(0, 50)}..." → "${topic}" (parsed: ${parsedSlides?.length || 0} slides)`);
 
   console.log(`[processRenderCarousels] 📊 Raw AI slides: ${rawAiSlides.length}, mode: ${carouselMode}, type: ${carouselType}`);
 

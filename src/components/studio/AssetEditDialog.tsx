@@ -483,23 +483,37 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                             placeholder="Titre de la slide"
                           />
                         </div>
-                        {slide.subtitle && (
-                          <div>
-                            <Label className="text-xs">Sous-titre</Label>
-                            <Input
-                              value={slide.subtitle || ""}
-                              onChange={(e) => {
-                                const newSlides = [...(formData.generatedTexts?.slides || [])];
-                                newSlides[index] = { ...newSlides[index], subtitle: e.target.value };
-                                setFormData({
-                                  ...formData,
-                                  generatedTexts: { ...formData.generatedTexts, slides: newSlides },
-                                });
-                              }}
-                              placeholder="Sous-titre"
-                            />
-                          </div>
-                        )}
+                        <div>
+                          <Label className="text-xs">Sous-titre</Label>
+                          <Input
+                            value={slide.subtitle || ""}
+                            onChange={(e) => {
+                              const newSlides = [...(formData.generatedTexts?.slides || [])];
+                              newSlides[index] = { ...newSlides[index], subtitle: e.target.value };
+                              setFormData({
+                                ...formData,
+                                generatedTexts: { ...formData.generatedTexts, slides: newSlides },
+                              });
+                            }}
+                            placeholder="Sous-titre"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Corps (texte libre)</Label>
+                          <Textarea
+                            value={slide.body || ""}
+                            onChange={(e) => {
+                              const newSlides = [...(formData.generatedTexts?.slides || [])];
+                              newSlides[index] = { ...newSlides[index], body: e.target.value };
+                              setFormData({
+                                ...formData,
+                                generatedTexts: { ...formData.generatedTexts, slides: newSlides },
+                              });
+                            }}
+                            placeholder="Contenu détaillé de cette slide..."
+                            rows={3}
+                          />
+                        </div>
                         {slide.bullets && slide.bullets.length > 0 && (
                           <div>
                             <Label className="text-xs">Points clés</Label>

@@ -19,7 +19,7 @@ export type VisualStyle =
   | 'comic_book';
 
 export interface GeneratedTexts {
-  slides?: Array<{ title: string; subtitle?: string; bullets?: string[] }>;
+  slides?: Array<{ title: string; subtitle?: string; body?: string; bullets?: string[]; author?: string }>;
   text?: { title: string; body: string; cta?: string };
   video?: { hook: string; script: string; cta?: string };
 }
