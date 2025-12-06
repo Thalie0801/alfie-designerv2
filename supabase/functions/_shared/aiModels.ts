@@ -28,8 +28,8 @@ export const VERTEX_MODELS = {
   text_proofread: 'gemini-2.5-flash-lite-preview-06-17',
   
   // Images (Flash = rapide, Pro = qualité max)
-  image_standard: 'gemini-2.0-flash-exp',
-  image_premium: 'gemini-2.0-flash-exp',
+  image_standard: 'gemini-2.5-flash-preview-05-20',
+  image_premium: 'gemini-2.5-pro-preview-06-05',
   
   // Vidéos
   video: 'veo-3.0-fast-generate-001',
