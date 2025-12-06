@@ -1207,27 +1207,29 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
     const alt = ai.alt || fb.alt || title || `Slide ${index + 1}`;
     const author = ai.author || undefined;
 
-    // ✅ Pour CITATIONS: JAMAIS de subtitle ni bullets
+    // ✅ Pour CITATIONS: JAMAIS de subtitle ni bullets ni body
     if (carouselType === 'citations') {
-      return { title, subtitle: "", bullets: [], alt, author };
+      return { title, subtitle: "", body: "", bullets: [], alt, author };
     }
 
-    // ✅ En mode PREMIUM: NE JAMAIS ajouter de subtitle/bullets fallback génériques
+    // ✅ En mode PREMIUM: NE JAMAIS ajouter de subtitle/bullets/body fallback génériques
     if (carouselMode === 'premium') {
       return {
         title,
         subtitle: ai.subtitle?.trim() || "",
+        body: ai.body?.trim() || "", // ✅ BODY AJOUTÉ
         bullets: Array.isArray(ai.bullets) ? ai.bullets : [],
         alt,
         author,
       };
     }
 
-    // ✅ Mode STANDARD: garder la logique actuelle mais sans "Point clé X"
+    // ✅ Mode STANDARD: garder la logique actuelle avec body
     if (hasValidAiTitle) {
       return {
         title,
         subtitle: ai.subtitle?.trim() || "",
+        body: ai.body?.trim() || "", // ✅ BODY AJOUTÉ
         bullets: Array.isArray(ai.bullets) && ai.bullets.length > 0 ? ai.bullets : [],
         alt,
         author,
@@ -1236,6 +1238,7 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
       return {
         title: fb.title,
         subtitle: fb.subtitle,
+        body: "", // ✅ BODY AJOUTÉ (vide en fallback)
         bullets: fb.bullets ?? [],
         alt,
         author,
@@ -1244,7 +1247,7 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   }).filter(s => s.title || carouselMode !== 'premium'); // Filtrer les slides vides en mode premium
 
   console.log("[processRenderCarousels] ✅ Merged slides with fallback:", 
-    slides.map((s, i) => ({ index: i, hasTitle: !!s.title, hasSubtitle: !!s.subtitle }))
+    slides.map((s, i) => ({ index: i, hasTitle: !!s.title, hasSubtitle: !!s.subtitle, hasBody: !!s.body }))
   );
 
   if (!Array.isArray(slides) || slides.length === 0) {
@@ -1304,9 +1307,10 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
           slideContent: {
             title: slide.title || "",
             subtitle: slide.subtitle || "",
+            body: slide.body || "", // ✅ BODY PROPAGÉ
             bullets: slide.bullets || [],
             alt: `Slide ${index + 1} of ${slides.length}`,
-            author: slide.author || undefined, // ✅ Auteur pour les citations
+            author: slide.author || undefined,
           },
           brandId: payload.brandId,
           orderId: jobMeta?.order_id || payload.orderId,
