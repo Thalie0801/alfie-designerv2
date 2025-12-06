@@ -6,6 +6,8 @@ import { WOOF_COSTS } from "../_shared/woofsCosts.ts";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, INTERNAL_FN_SECRET } from "../_shared/env.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";
+import { LOVABLE_API_KEY } from "../_shared/env.ts";
+
 type JobRow = {
   id: string;
   user_id: string;
@@ -16,6 +18,14 @@ type JobRow = {
   max_retries: number | null;
   payload: any;
   error?: string | null;
+};
+
+// ✅ TYPE CAROUSEL SLIDE - Architecture "Carousel Plan First"
+type CarouselSlide = {
+  slide_number: number;
+  title_on_image: string;    // Max 5 mots, punchy
+  text_on_image: string;     // Max 20 mots, 2-3 lignes courtes
+  caption: string;           // Pour le post social (1-3 phrases)
 };
 
 const supabaseAdmin = createClient(
@@ -556,14 +566,176 @@ Deno.serve(async (req) => {
   }
 });
 
+// ========================================
+// ✅ GÉNÉRATION DU PLAN CAROUSEL (Gemini 3 Pro)
+// Architecture "Carousel Plan First"
+// ========================================
+async function generateCarouselPlan(
+  topic: string,
+  slideCount: number,
+  brandKit: any | null,
+  useBrandKit: boolean,
+  language: string = "FR"
+): Promise<CarouselSlide[]> {
+  console.log(`[generateCarouselPlan] 🎯 Generating ${slideCount} slides for topic: "${topic.slice(0, 50)}..."`);
+  
+  if (!LOVABLE_API_KEY) {
+    console.error("[generateCarouselPlan] ❌ LOVABLE_API_KEY missing");
+    return generateFallbackSlides(topic, slideCount, language);
+  }
+  
+  // Contexte de marque (optionnel)
+  const brandContext = useBrandKit && brandKit
+    ? `Brand context: ${brandKit.name || 'Brand'}, niche: ${brandKit.niche || 'business'}, tone: ${brandKit.voice || 'professional'}.`
+    : 'Generic professional tone.';
+  
+  const systemPrompt = `You are an expert social media content creator specializing in Instagram carousels.
+Your goal is to create engaging, swipeable carousel content that keeps users reading.
+
+CRITICAL RULES:
+- title_on_image: MAX 5 WORDS, punchy, attention-grabbing
+- text_on_image: MAX 20 WORDS, 2-3 very short lines for mobile readability
+- caption: 1-3 sentences for the post caption (not displayed on image)
+- NEVER include structural labels like "Hook", "CTA", "Problem", "Solution"
+- NEVER include slide numbers in the text
+- Return ONLY valid JSON, no markdown formatting`;
+
+  const userPrompt = `Create a ${slideCount}-slide Instagram carousel.
+
+Topic: "${topic}"
+
+${brandContext}
+Language: ${language === "EN" ? "English" : "French"}
+
+Requirements:
+- Exactly ${slideCount} slides
+- First slide: Hook that grabs attention
+- Middle slides: Key insights/points (one idea per slide)
+- Last slide: Clear call-to-action
+
+Return ONLY this JSON structure (no markdown, no explanation):
+{
+  "slides": [
+    {
+      "slide_number": 1,
+      "title_on_image": "...",
+      "text_on_image": "...",
+      "caption": "..."
+    }
+  ]
+}`;
+
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      console.error(`[generateCarouselPlan] ❌ API error: ${response.status} - ${errText.slice(0, 200)}`);
+      return generateFallbackSlides(topic, slideCount, language);
+    }
+
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content ?? "";
+    
+    // Parser le JSON (gérer le markdown ```json...```)
+    let jsonStr = content;
+    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[1];
+    }
+    
+    const parsed = JSON.parse(jsonStr.trim());
+    const slidesArray = parsed?.slides;
+    
+    if (!Array.isArray(slidesArray) || slidesArray.length === 0) {
+      console.warn("[generateCarouselPlan] ⚠️ Invalid slides array, using fallback");
+      return generateFallbackSlides(topic, slideCount, language);
+    }
+    
+    // Normaliser et valider chaque slide
+    const normalizedSlides: CarouselSlide[] = Array.from({ length: slideCount }, (_, i) => {
+      const found = slidesArray.find((s: any) => s.slide_number === i + 1) || slidesArray[i];
+      return {
+        slide_number: i + 1,
+        title_on_image: found?.title_on_image?.slice(0, 50) || `Slide ${i + 1}`,
+        text_on_image: found?.text_on_image?.slice(0, 100) || "",
+        caption: found?.caption?.slice(0, 300) || "",
+      };
+    });
+    
+    // Forcer un CTA sur la dernière slide si vide
+    const lastIdx = normalizedSlides.length - 1;
+    if (!normalizedSlides[lastIdx].title_on_image || normalizedSlides[lastIdx].title_on_image === `Slide ${slideCount}`) {
+      normalizedSlides[lastIdx].title_on_image = language === "EN" ? "Learn More" : "En savoir plus";
+    }
+    
+    console.log(`[generateCarouselPlan] ✅ Generated ${normalizedSlides.length} slides successfully`);
+    normalizedSlides.forEach((s, i) => {
+      console.log(`  Slide ${i + 1}: "${s.title_on_image}" | "${s.text_on_image.slice(0, 30)}..."`);
+    });
+    
+    return normalizedSlides;
+  } catch (error) {
+    console.error("[generateCarouselPlan] ❌ Error:", error);
+    return generateFallbackSlides(topic, slideCount, language);
+  }
+}
+
+/**
+ * Génère des slides de fallback basées sur le topic utilisateur
+ */
+function generateFallbackSlides(topic: string, count: number, language: string = "FR"): CarouselSlide[] {
+  console.log(`[generateFallbackSlides] Generating ${count} fallback slides for: "${topic.slice(0, 30)}..."`);
+  
+  const isFR = language !== "EN";
+  
+  return Array.from({ length: count }, (_, i) => {
+    if (i === 0) {
+      return {
+        slide_number: 1,
+        title_on_image: topic.slice(0, 50),
+        text_on_image: isFR ? "Découvrez comment..." : "Discover how...",
+        caption: topic,
+      };
+    } else if (i === count - 1) {
+      return {
+        slide_number: i + 1,
+        title_on_image: isFR ? "Passez à l'action" : "Take Action",
+        text_on_image: isFR ? "Prêt à commencer ?" : "Ready to start?",
+        caption: isFR ? "Passez à l'action maintenant !" : "Take action now!",
+      };
+    } else {
+      return {
+        slide_number: i + 1,
+        title_on_image: topic.slice(0, 40),
+        text_on_image: "",
+        caption: "",
+      };
+    }
+  });
+}
+
 // ========== JOB PROCESSORS ==========
 
 async function processGenerateTexts(payload: any) {
   console.log("📝 [processGenerateTexts]");
 
   const { brief, brandKit, count = 1, type } = payload;
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY missing");
+  const apiKey = LOVABLE_API_KEY || Deno.env.get("LOVABLE_API_KEY");
+  if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
 
   const systemPrompt =
     type === "image"
@@ -1025,329 +1197,84 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
 }
 
 // ========================================
-// processRenderCarousels
+// processRenderCarousels - Architecture "Carousel Plan First"
 // ========================================
 async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string; order_id?: string; job_id?: string; use_brand_kit?: boolean }): Promise<any> {
-  console.log("[processRenderCarousels] start", {
+  console.log("[processRenderCarousels] 🚀 START - Architecture 'Carousel Plan First'", {
     orderId: payload.orderId,
     brandId: payload.brandId,
     count: payload.count,
-    hasGeneratedTexts: !!payload.generatedTexts,
+    hasCarouselSlides: !!payload.carousel_slides,
   });
 
-  // ✅ Utiliser un UUID valide pour carousel_id
+  // ✅ UUID valide pour carousel_id
   const carousel_id = payload.carousel_id || crypto.randomUUID();
-  // ✅ UTILISER LE COUNT DU PAYLOAD (pas de fallback 5 par défaut)
-  const totalSlides = payload.count || payload.generatedTexts?.slides?.length || 5;
-  console.log(`[processRenderCarousels] 📌 Using slide count: ${totalSlides} (payload.count: ${payload.count})`);
-  
-  // ✅ Extraire le carouselType et carouselMode AVANT le traitement
+  const totalSlides = payload.count || 5;
   const carouselType = payload.carouselType || 'content';
   const carouselMode = payload.carouselMode || 'standard';
-  
-  // ✅ Phase 3: Récupérer les slides AI
-  const rawAiSlides = payload.generatedTexts?.slides ?? [];
-  
-  // ✅ PARSER les prompts structurés STRICTEMENT
-  // UNIQUEMENT le format explicite : "Slide 1 : texte", "Slide 2 : texte", etc.
-  // NE DÉTECTE PAS "5 slides" ou "carrousel de 5 slides"
-  function parseStructuredPrompt(prompt: string): Array<{ title: string; subtitle?: string; body?: string }> | null {
-    if (!prompt) return null;
-    
-    // ✅ REGEX STRICT : "Slide" + numéro + séparateur obligatoire (: – - —)
-    // Doit être en début de ligne ou après un saut de ligne
-    const strictPattern = /(?:^|\n)\s*slide\s*(\d+)\s*[:\–\-–—]\s*/gi;
-    const matches = [...prompt.matchAll(strictPattern)];
-    
-    // Vérifier qu'on a au moins 2 slides avec le format strict
-    if (matches.length < 2) {
-      console.log(`[parseStructuredPrompt] No strict format detected (matches: ${matches.length})`);
-      return null;
-    }
-    
-    console.log(`[parseStructuredPrompt] ✅ Detected ${matches.length} slides in structured prompt`);
-    
-    // Extraire le contenu entre chaque "Slide N :"
-    const slides: Array<{ title: string; subtitle?: string; body?: string }> = [];
-    
-    for (let i = 0; i < matches.length; i++) {
-      const startIdx = matches[i].index! + matches[i][0].length;
-      const endIdx = i + 1 < matches.length ? matches[i + 1].index! : prompt.length;
-      const content = prompt.slice(startIdx, endIdx).trim();
-      
-      // Nettoyer le contenu
-      const lines = content
-        .split(/\n+/)
-        .map(l => l.replace(/^[>\*\-•]\s*/, '').trim())
-        .filter(l => l && !l.match(/^(texte|sous-?texte|petit|titre|erreur)/i));
-      
-      const title = lines[0]?.slice(0, 80) || `Slide ${i + 1}`;
-      const subtitle = lines[1]?.slice(0, 100) || "";
-      const body = lines.slice(1).join(' ').slice(0, 200) || "";
-      
-      console.log(`[parseStructuredPrompt] Slide ${i + 1}: title="${title.slice(0, 30)}..."`);
-      
-      slides.push({ title, subtitle, body });
-    }
-    
-    return slides.length >= 2 ? slides : null;
-  }
-  
-  // ✅ NETTOYAGE DU TOPIC: extraire le thème réel du prompt brut
-  function extractCleanTopic(rawTopic: string | undefined): string {
-    if (!rawTopic) return "Votre sujet";
-    
-    let cleaned = rawTopic;
-    
-    // ✅ NOUVEAUX PATTERNS pour détecter TOUS les formats courants
-    const structurePatterns = [
-      // Format emoji + "Carrousel X slides"
-      /^[🎨🧩📸🎬🎥✨🚀💡📝🔥]*\s*/g,
-      /carrousel\s*\d+\s*slides?\s*[–\-:]*\s*/gi,
-      /"([^"]+)"/g, // Extraire le contenu entre guillemets
-      /carrousel\s+de\s+\d+\s+slides?\s*:?\s*/gi,
-      /slide\s*\d+\s*:\s*/gi,
-      /^ajouter\s+un?\s+visuels?\s*/gi,
-      /^créer?\s+un?\s+carrousel\s*/gi,
-      /^génère\s+/gi,
-      /^faire\s+/gi,
-      /^fais(-|\s+)?(moi|un|une|des|du)?\s*/gi,
-      /^je\s+veux\s+(du|de\s+la|des|un|une)?\s*/gi,
-      /^crée\s+(moi\s+)?(un|une|des)?\s*/gi,
-    ];
-    
-    // ✅ PRIORITÉ 1: Extraire le contenu entre guillemets s'il existe
-    const quotedMatch = rawTopic.match(/"([^"]+)"/);
-    if (quotedMatch && quotedMatch[1] && quotedMatch[1].length > 5) {
-      return quotedMatch[1].trim();
-    }
-    
-    // ✅ PRIORITÉ 2: Nettoyer avec les patterns
-    for (const pattern of structurePatterns) {
-      cleaned = cleaned.replace(pattern, ' ');
-    }
-    
-    // Nettoyer les espaces multiples et trim
-    cleaned = cleaned.replace(/\s+/g, ' ').trim();
-    
-    // Si le résultat est trop court ou vide, essayer d'extraire les mots-clés significatifs
-    if (!cleaned || cleaned.length < 3) {
-      const significantWords = rawTopic
-        .split(/[:\s,–\-]+/)
-        .filter(w => w.length > 3 && !/^(avec|pour|dans|slide|slides|carrousel|visuels?|ajouter|créer|génère|faire|fais|crée|je|veux|moi|du|de|la|le|les|un|une|des)$/i.test(w));
-      
-      if (significantWords.length > 0) {
-        cleaned = significantWords.slice(0, 5).join(' ');
-      }
-    }
-    
-    return cleaned || "Votre sujet";
-  }
-  
-  // ✅ DÉTECTER ET FILTRER LES LABELS STRUCTURELS
-  function isStructuralLabel(title: string): boolean {
-    if (!title) return true;
-    const lowerTitle = title.toLowerCase().trim();
-    const structuralLabels = [
-      'cover', 'hook', 'cta', 'call to action',
-      'le problème', 'le probleme', 'the problem', 'problem',
-      'la solution', 'the solution', 'solution',
-      'les avantages', 'avantages', 'benefits', 'advantages',
-      'comment', 'how to', 'how it works',
-      'conclusion', 'recap', 'résumé', 'resume',
-      'introduction', 'intro',
-      'slide 1', 'slide 2', 'slide 3', 'slide 4', 'slide 5',
-      'étape 1', 'étape 2', 'étape 3', 'step 1', 'step 2', 'step 3',
-      'point clé', 'key point',
-    ];
-    return structuralLabels.some(label => lowerTitle === label || lowerTitle.startsWith(label + ':') || lowerTitle.startsWith(label + ' :'));
-  }
-  
-  const rawTopic = payload.brief?.topic || payload.topic || payload.prompt || "";
-  
-  // ✅ ESSAYER DE PARSER UN PROMPT STRUCTURÉ
-  const parsedSlides = parseStructuredPrompt(rawTopic);
-  const topic = parsedSlides ? parsedSlides[0]?.title || "Votre sujet" : extractCleanTopic(rawTopic);
-  const cta = payload.brief?.cta || "En savoir plus";
-  
-  console.log(`[processRenderCarousels] 🧹 Topic: "${rawTopic.slice(0, 50)}..." → "${topic}" (parsed: ${parsedSlides?.length || 0} slides)`);
-
-  console.log(`[processRenderCarousels] 📊 Raw AI slides: ${rawAiSlides.length}, mode: ${carouselMode}, type: ${carouselType}`);
-
-  // ✅ DÉTECTION DES TITRES CONCATÉNÉS
-  // Si un titre contient des retours à la ligne ou "Slide X:" ou est très long, on le split
-  function isConcatenatedTitle(title: string): boolean {
-    if (!title) return false;
-    return title.includes('\n') || 
-           title.includes('Slide ') || 
-           title.includes('slide ') ||
-           title.length > 120;
-  }
-
-  function splitConcatenatedTitle(title: string): string[] {
-    // Essayer de splitter par "\n" ou "Slide X:"
-    const byNewline = title.split(/\n+/).filter(s => s.trim());
-    if (byNewline.length > 1) {
-      return byNewline.map(s => s.replace(/^Slide\s*\d+\s*:\s*/i, '').trim()).filter(Boolean);
-    }
-    // Splitter par "Slide X:" pattern
-    const bySlidePattern = title.split(/Slide\s*\d+\s*:\s*/i).filter(s => s.trim());
-    if (bySlidePattern.length > 1) {
-      return bySlidePattern;
-    }
-    return [title];
-  }
-
-  // ✅ NORMALISER les slides AI (détecter et corriger les concaténations)
-  let aiSlides: any[] = [];
-  
-  // ✅ PRIORITÉ 1: Si rawAiSlides est vide mais parsedSlides existe, utiliser parsedSlides
-  if (rawAiSlides.length === 0 && parsedSlides && parsedSlides.length > 0) {
-    console.log(`[processRenderCarousels] ✅ Using ${parsedSlides.length} slides from parsed structured prompt`);
-    aiSlides = parsedSlides.slice(0, totalSlides).map((s, i) => ({
-      title: s.title,
-      subtitle: s.subtitle || "",
-      body: s.body || "",
-      bullets: [],
-      author: undefined,
-    }));
-  } else if (rawAiSlides.length > 0 && rawAiSlides[0]?.title && isConcatenatedTitle(rawAiSlides[0].title)) {
-    // La slide 1 contient tous les titres concaténés - les splitter
-    console.log("[processRenderCarousels] ⚠️ Detected concatenated title in slide 1, splitting...");
-    const splitTitles = splitConcatenatedTitle(rawAiSlides[0].title);
-    aiSlides = splitTitles.slice(0, totalSlides).map((t, i) => ({
-      title: t,
-      subtitle: rawAiSlides[i]?.subtitle || "",
-      body: rawAiSlides[i]?.body || "", // ✅ BODY AJOUTÉ
-      bullets: rawAiSlides[i]?.bullets || [],
-      author: rawAiSlides[i]?.author || undefined,
-    }));
-    console.log(`[processRenderCarousels] ✅ Split into ${aiSlides.length} individual slides`);
-  } else {
-    // ✅ S'assurer que chaque slide a un body
-    aiSlides = rawAiSlides.map((s: any) => ({
-      ...s,
-      body: s.body || "",
-    }));
-  }
-
-  // ✅ Construire les fallback basés sur le topic utilisateur - JAMAIS de labels structurels
-  const fallbackSlides = Array.from({ length: totalSlides }, (_, i) => {
-    // ✅ TOUJOURS utiliser le topic utilisateur, jamais des labels génériques
-    if (i === 0) {
-      return {
-        title: topic,
-        subtitle: "",
-        body: "",
-        bullets: [],
-        alt: topic,
-      };
-    } else if (i === totalSlides - 1) {
-      return {
-        title: cta || "Passez à l'action",
-        subtitle: "",
-        body: "",
-        bullets: [],
-        alt: "Call to action",
-      };
-    } else {
-      // ✅ Slides intermédiaires : utiliser le topic, pas des labels
-      return {
-        title: topic,
-        subtitle: "",
-        body: "",
-        bullets: [],
-        alt: topic,
-      };
-    }
-  });
-
-  // ✅ FUSION avec logique améliorée - FILTRAGE DES LABELS STRUCTURELS
-  const slides = Array.from({ length: totalSlides }, (_, index) => {
-    const ai = aiSlides[index] ?? {};
-    const fb = fallbackSlides[index];
-
-    // Nettoyer le titre AI (enlever les newlines résiduels)
-    const cleanAiTitle = ai.title?.replace(/\n/g, ' ').trim() || "";
-    
-    // ✅ VÉRIFIER si c'est un label structurel - si oui, utiliser le topic
-    const isLabel = isStructuralLabel(cleanAiTitle);
-    const hasValidAiTitle = cleanAiTitle.length > 0 && cleanAiTitle.length < 150 && !isLabel;
-    
-    if (isLabel) {
-      console.log(`[processRenderCarousels] ⚠️ Slide ${index + 1}: "${cleanAiTitle}" est un label structurel → remplacé par topic`);
-    }
-    
-    // ✅ Choisir le titre : AI valide > topic > fallback
-    let title = hasValidAiTitle ? cleanAiTitle : topic;
-    
-    // ✅ En mode Premium avec titre vide, utiliser le topic
-    if (!title && carouselMode === 'premium') {
-      title = topic;
-    }
-    
-    const alt = hasValidAiTitle ? cleanAiTitle : topic;
-    const author = ai.author || undefined;
-
-    // ✅ Pour CITATIONS: JAMAIS de subtitle ni bullets ni body
-    if (carouselType === 'citations') {
-      return { title, subtitle: "", body: "", bullets: [], alt, author };
-    }
-
-    // ✅ En mode PREMIUM: NE JAMAIS ajouter de subtitle/bullets/body si c'était un label
-    if (carouselMode === 'premium') {
-      return {
-        title,
-        subtitle: isLabel ? "" : (ai.subtitle?.trim() || ""),
-        body: isLabel ? "" : (ai.body?.trim() || ""),
-        bullets: isLabel ? [] : (Array.isArray(ai.bullets) ? ai.bullets : []),
-        alt,
-        author,
-      };
-    }
-
-    // ✅ Mode STANDARD: garder la logique actuelle avec body
-    if (hasValidAiTitle) {
-      return {
-        title,
-        subtitle: ai.subtitle?.trim() || "",
-        body: ai.body?.trim() || "",
-        bullets: Array.isArray(ai.bullets) && ai.bullets.length > 0 ? ai.bullets : [],
-        alt,
-        author,
-      };
-    } else {
-      return {
-        title,
-        subtitle: "",
-        body: "",
-        bullets: [],
-        alt,
-        author,
-      };
-    }
-  }).filter(s => s.title || carouselMode !== 'premium'); // Filtrer les slides vides en mode premium
-
-  console.log("[processRenderCarousels] ✅ Merged slides with fallback:", 
-    slides.map((s, i) => ({ index: i, hasTitle: !!s.title, hasSubtitle: !!s.subtitle, hasBody: !!s.body }))
-  );
-
-  if (!Array.isArray(slides) || slides.length === 0) {
-    throw new Error("Generated texts must contain an array of slides");
-  }
-
-  console.log(`[processRenderCarousels] 🎨 Rendering ${slides.length} slides for carousel ${carousel_id}`);
-
-  // Charger le brand minimal
-  const brandMini = await loadBrandMini(payload.brandId, false);
-  
-  // ✅ Résoudre useBrandKit avec le helper
   const useBrandKit = resolveUseBrandKit(payload, jobMeta);
   
-  // ✅ carouselMode déjà extrait plus haut
-  console.log(`[processRenderCarousels] 🎨 Mode: ${carouselMode} | Type: ${carouselType}`);
+  console.log(`[processRenderCarousels] 📌 Config: ${totalSlides} slides, mode: ${carouselMode}, type: ${carouselType}, useBrandKit: ${useBrandKit}`);
+
+  // ✅ Charger le Brand Kit
+  const brandMini = await loadBrandMini(payload.brandId, false);
   
-  // ✅ Le globalStyle contient TOUS les champs Brand Kit V2
+  // ✅ Extraire le topic (thème) du prompt utilisateur
+  const rawTopic = payload.brief?.topic || payload.topic || payload.prompt || "";
+  const topic = extractCleanTopic(rawTopic);
+  console.log(`[processRenderCarousels] 📝 Topic: "${topic}"`);
+
+  // ========================================
+  // ÉTAPE 1: Obtenir le plan de carousel (carousel_slides)
+  // ========================================
+  let carouselSlides: CarouselSlide[];
+  
+  // Vérifier si le plan existe déjà dans le payload (évite re-génération sur retry)
+  if (payload.carousel_slides && Array.isArray(payload.carousel_slides) && payload.carousel_slides.length > 0) {
+    console.log(`[processRenderCarousels] ✅ Using existing carousel_slides from payload (${payload.carousel_slides.length} slides)`);
+    carouselSlides = payload.carousel_slides;
+  } else {
+    // Générer le plan via Gemini
+    console.log(`[processRenderCarousels] 🎯 Generating carousel plan via Gemini...`);
+    carouselSlides = await generateCarouselPlan(
+      topic,
+      totalSlides,
+      brandMini,
+      useBrandKit,
+      payload.language || "FR"
+    );
+    
+    // Stocker dans le payload pour les retries
+    payload.carousel_slides = carouselSlides;
+  }
+
+  // ✅ S'assurer qu'on a exactement le bon nombre de slides
+  if (carouselSlides.length < totalSlides) {
+    const missing = totalSlides - carouselSlides.length;
+    console.log(`[processRenderCarousels] ⚠️ Adding ${missing} missing slides`);
+    for (let i = carouselSlides.length; i < totalSlides; i++) {
+      carouselSlides.push({
+        slide_number: i + 1,
+        title_on_image: i === totalSlides - 1 ? "En savoir plus" : topic,
+        text_on_image: "",
+        caption: "",
+      });
+    }
+  }
+
+  // ✅ Forcer CTA sur la dernière slide
+  const lastIdx = carouselSlides.length - 1;
+  if (!carouselSlides[lastIdx].title_on_image || carouselSlides[lastIdx].title_on_image.length < 2) {
+    carouselSlides[lastIdx].title_on_image = "En savoir plus";
+  }
+
+  console.log(`[processRenderCarousels] ✅ Final carousel plan:`, 
+    carouselSlides.map((s, i) => `  ${i + 1}: "${s.title_on_image}" | "${s.text_on_image.slice(0, 25)}..."`).join('\n')
+  );
+
+  // ========================================
+  // ÉTAPE 2: Construire le style visuel
+  // ========================================
   const colorDescriptions = useBrandKit && brandMini?.palette?.length
     ? (brandMini.palette || []).slice(0, 3).map(hexToColorName).join(", ")
     : "";
@@ -1360,17 +1287,15 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
        ${brandMini.avoid_in_visuals ? `Avoid: ${brandMini.avoid_in_visuals}.` : ''}`
     : `Neutral professional aesthetic. Clean, modern design.`;
 
-  // Ratio à partir du brief ou 4:5 par défaut
   const aspectRatio = payload.brief?.ratio || payload.ratio || "4:5";
 
-  // ✅ Extraire le contenu utilisateur (thème)
-  const contentPrompt = buildContentPrompt(payload);
+  // ========================================
+  // ÉTAPE 3: Rendre chaque slide avec le plan
+  // ========================================
+  console.log(`[processRenderCarousels] 🎨 Rendering ${carouselSlides.length} slides...`);
 
-  // Générer toutes les slides en parallèle avec retry automatique
-  const slidePromises = slides.map(async (slide: any, index: number) => {
-    console.log(`[processRenderCarousels] 📄 Slide ${index + 1}/${slides.length}:`, {
-      title: slide.title?.slice(0, 50),
-    });
+  const slidePromises = carouselSlides.map(async (slide: CarouselSlide, index: number) => {
+    console.log(`[processRenderCarousels] 📄 Slide ${index + 1}/${carouselSlides.length}: "${slide.title_on_image}"`);
 
     const maxRetries = 2;
     let lastError: any = null;
@@ -1379,61 +1304,55 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
       try {
         if (attempt > 0) {
           console.log(`[processRenderCarousels] 🔄 Retry ${attempt}/${maxRetries} for slide ${index + 1}`);
+          await sleep(1000 * attempt);
         }
 
+        // ✅ UTILISER UNIQUEMENT les champs du carousel plan
+        // JAMAIS asset.prompt comme texte d'overlay !
         const slideResult = await callFn("alfie-render-carousel-slide", {
           userId: jobMeta?.user_id || payload.userId,
-          prompt: contentPrompt, // ✅ Le thème est TOUJOURS là
+          prompt: topic, // ✅ Le thème pour le contexte visuel (pas affiché)
           globalStyle,
-          brandKit: brandMini, // ✅ NOUVEAU: passer l'objet Brand Kit V2 complet
+          brandKit: brandMini,
           slideContent: {
-            title: slide.title || "",
-            subtitle: slide.subtitle || "",
-            body: slide.body || "", // ✅ BODY PROPAGÉ
-            bullets: slide.bullets || [],
-            alt: `Slide ${index + 1} of ${slides.length}`,
-            author: slide.author || undefined,
+            // ✅ NOUVEAU: utiliser carousel_slides[i], PAS asset.prompt
+            title: slide.title_on_image || "",
+            subtitle: slide.text_on_image || "", // text_on_image devient subtitle
+            body: "", // Plus de body séparé
+            bullets: [],
+            alt: `Slide ${index + 1}: ${slide.title_on_image}`,
+            author: undefined,
           },
           brandId: payload.brandId,
           orderId: jobMeta?.order_id || payload.orderId,
           orderItemId: payload.orderItemId || null,
           carouselId: carousel_id,
           slideIndex: index,
-          totalSlides: slides.length,
+          totalSlides: carouselSlides.length,
           aspectRatio,
           textVersion: 1,
           renderVersion: 1,
           campaign: payload.campaign || payload.brief?.campaign || "carousel",
-          language: "FR",
-          useBrandKit, // ✅ Propagation de useBrandKit
-          carouselMode, // ✅ Mode Standard/Premium pour carrousels
-          carouselType, // ✅ Type citations/content pour carrousels
+          language: payload.language || "FR",
+          useBrandKit,
+          carouselMode,
+          carouselType,
         });
 
         return { success: true, slideIndex: index, result: slideResult };
       } catch (error: any) {
         lastError = error;
         console.error(`[processRenderCarousels] ❌ Attempt ${attempt + 1} failed for slide ${index + 1}:`, error.message);
-        
-        // Si on a encore des retries, attendre un peu avant de réessayer
-        if (attempt < maxRetries) {
-          await sleep(1000 * (attempt + 1)); // Backoff progressif
-        }
       }
     }
 
-    // Si on arrive ici, tous les retries ont échoué
-    return { success: false, slideIndex: index, error: lastError?.message || "Unknown error after retries" };
+    return { success: false, slideIndex: index, error: lastError?.message || "Unknown error" };
   });
 
   const results = await Promise.all(slidePromises);
-
-  // Compter les succès
   const successCount = results.filter((r) => r.success).length;
   const failedCount = results.filter((r) => !r.success).length;
 
-  console.log(`[processRenderCarousels] ✅ ${successCount}/${slides.length} slides rendered successfully`);
-  
   if (failedCount > 0) {
     console.warn(`[processRenderCarousels] ⚠️ ${failedCount} slides failed`);
   }
@@ -1455,11 +1374,60 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
 
   return {
     carousel_id,
-    totalSlides: slides.length,
+    totalSlides: carouselSlides.length,
     successCount,
     failedCount,
     results,
   };
+}
+
+/**
+ * Nettoie le topic brut pour extraire le thème réel
+ */
+function extractCleanTopic(rawTopic: string | undefined): string {
+  if (!rawTopic) return "Votre sujet";
+  
+  let cleaned = rawTopic;
+  
+  // Patterns à supprimer
+  const structurePatterns = [
+    /^[🎨🧩📸🎬🎥✨🚀💡📝🔥]*\s*/g,
+    /carrousel\s*\d+\s*slides?\s*[–\-:]*\s*/gi,
+    /carrousel\s+de\s+\d+\s+slides?\s*:?\s*/gi,
+    /slide\s*\d+\s*:\s*/gi,
+    /^ajouter\s+un?\s+visuels?\s*/gi,
+    /^créer?\s+un?\s+carrousel\s*/gi,
+    /^génère\s+/gi,
+    /^faire\s+/gi,
+    /^fais(-|\s+)?(moi|un|une|des|du)?\s*/gi,
+    /^je\s+veux\s+(du|de\s+la|des|un|une)?\s*/gi,
+    /^crée\s+(moi\s+)?(un|une|des)?\s*/gi,
+  ];
+  
+  // Extraire le contenu entre guillemets s'il existe
+  const quotedMatch = rawTopic.match(/"([^"]+)"/);
+  if (quotedMatch && quotedMatch[1] && quotedMatch[1].length > 5) {
+    return quotedMatch[1].trim();
+  }
+  
+  // Nettoyer avec les patterns
+  for (const pattern of structurePatterns) {
+    cleaned = cleaned.replace(pattern, ' ');
+  }
+  
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  
+  if (!cleaned || cleaned.length < 3) {
+    const significantWords = rawTopic
+      .split(/[:\s,–\-]+/)
+      .filter(w => w.length > 3 && !/^(avec|pour|dans|slide|slides|carrousel|visuels?|ajouter|créer|génère|faire|fais|crée|je|veux|moi|du|de|la|le|les|un|une|des)$/i.test(w));
+    
+    if (significantWords.length > 0) {
+      cleaned = significantWords.slice(0, 5).join(' ');
+    }
+  }
+  
+  return cleaned || "Votre sujet";
 }
 
 // ========== CASCADE JOB CREATION ==========
