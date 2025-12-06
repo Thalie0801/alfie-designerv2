@@ -64,9 +64,22 @@ export async function callVertexChat(
 
   if (!response.ok) {
     const error = await response.text();
+    console.error("❌ Vertex AI HTTP error:", response.status, error.substring(0, 500));
     throw new Error(`Vertex AI error: ${response.status} - ${error}`);
   }
 
   const data = await response.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  
+  // Logging détaillé pour debug
+  console.log("📝 Vertex AI response length:", rawText.length);
+  console.log("📝 Vertex AI contains alfie-pack:", rawText.includes("<alfie-pack>"));
+  
+  if (rawText.length < 50) {
+    console.warn("⚠️ Vertex AI returned very short response:", rawText);
+  } else if (!rawText.includes("<alfie-pack>")) {
+    console.warn("⚠️ Vertex response without pack (first 500 chars):", rawText.substring(0, 500));
+  }
+  
+  return rawText;
 }

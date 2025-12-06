@@ -542,14 +542,22 @@ Le secteur d'activité est fourni pour contexte minimal, mais reste neutre dans 
   }
 
   // 1. Essayer Vertex AI si configuré
-  try {
-    const vertexConfigured = Deno.env.get("VERTEX_PROJECT_ID") && Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
-    if (vertexConfigured) {
+  const vertexConfigured = Deno.env.get("VERTEX_PROJECT_ID") && Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
+  if (vertexConfigured) {
+    try {
       console.log("🎯 Using Vertex AI (Gemini)...");
-      return await callVertexChat(messages, enrichedPrompt);
+      const vertexResponse = await callVertexChat(messages, enrichedPrompt);
+      
+      // ✅ Vérifier que la réponse est valide (non vide)
+      if (vertexResponse && vertexResponse.length > 100) {
+        console.log("✅ Vertex AI responded successfully with", vertexResponse.length, "chars");
+        return vertexResponse;
+      } else {
+        console.warn("⚠️ Vertex AI returned empty/short response, falling back to Lovable AI");
+      }
+    } catch (error: any) {
+      console.warn("⚠️ Vertex AI failed, falling back to Lovable AI:", error?.message || String(error));
     }
-  } catch (error: any) {
-    console.warn("⚠️ Vertex AI failed, falling back to Lovable AI:", error?.message || String(error));
   }
 
   // 2. Lovable AI - Tous les plans utilisent maintenant le modèle Premium
