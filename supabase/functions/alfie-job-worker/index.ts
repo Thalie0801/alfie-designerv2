@@ -1051,15 +1051,24 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   // ✅ PARSER les prompts structurés "Slide N : texte"
   function parseStructuredPrompt(prompt: string): Array<{ title: string; body?: string }> | null {
     if (!prompt) return null;
-    // Pattern: "Slide 1 : texte", "slide 2: autre texte", etc.
-    const slidePattern = /slide\s*(\d+)\s*:\s*([^]*?)(?=slide\s*\d+\s*:|$)/gi;
-    const matches = [...prompt.matchAll(slidePattern)];
     
-    if (matches.length >= 2) {
-      return matches.map(m => ({
-        title: m[2].trim().slice(0, 60), // Limite titre à 60 chars
-        body: m[2].trim().length > 60 ? m[2].trim() : undefined
-      }));
+    // Vérifier si c'est un format "Slide N :" (minimum 2 occurrences)
+    const hasSlideFormat = (prompt.match(/slide\s*\d+\s*:/gi) || []).length >= 2;
+    if (!hasSlideFormat) return null;
+    
+    // Splitter par "Slide N :" et récupérer chaque morceau
+    const parts = prompt.split(/slide\s*\d+\s*:\s*/i).filter(s => s.trim());
+    
+    console.log(`[parseStructuredPrompt] Split into ${parts.length} parts:`, parts.map(p => p.slice(0, 30)));
+    
+    if (parts.length >= 2) {
+      return parts.map(p => {
+        const text = p.trim();
+        return {
+          title: text.slice(0, 60),
+          body: text.length > 60 ? text : undefined
+        };
+      });
     }
     return null;
   }
@@ -1149,21 +1158,26 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
     aiSlides = splitTitles.slice(0, totalSlides).map((t, i) => ({
       title: t,
       subtitle: rawAiSlides[i]?.subtitle || "",
+      body: rawAiSlides[i]?.body || "", // ✅ BODY AJOUTÉ
       bullets: rawAiSlides[i]?.bullets || [],
       author: rawAiSlides[i]?.author || undefined,
     }));
     console.log(`[processRenderCarousels] ✅ Split into ${aiSlides.length} individual slides`);
   } else {
-    aiSlides = rawAiSlides;
+    // ✅ S'assurer que chaque slide a un body
+    aiSlides = rawAiSlides.map((s: any) => ({
+      ...s,
+      body: s.body || "",
+    }));
   }
 
-  // ✅ Construire les fallback basés sur le brief SANS "Point clé X" générique
-  // En mode Premium, le fallback doit être le topic/brief, pas du texte générique
+  // ✅ Construire les fallback basés sur le brief AVEC body
   const fallbackSlides = Array.from({ length: totalSlides }, (_, i) => {
     if (i === 0) {
       return {
         title: topic,
         subtitle: "",
+        body: "", // ✅ BODY AJOUTÉ
         bullets: [],
         alt: `Slide d'introduction : ${topic}`,
       };
@@ -1171,16 +1185,15 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
       return {
         title: cta || topic,
         subtitle: "",
+        body: "", // ✅ BODY AJOUTÉ
         bullets: [],
         alt: `Slide finale`,
       };
     } else {
-      // ✅ NE JAMAIS utiliser "Point clé X" - toujours le topic/brief
-      // En mode Premium: vide pour laisser l'AI décider
-      // En mode Standard: utiliser le topic comme contexte
       return {
         title: carouselMode === 'premium' ? "" : topic,
         subtitle: "",
+        body: topic, // ✅ BODY = topic pour slides intermédiaires
         bullets: [],
         alt: `Slide ${i + 1} : ${topic}`,
       };

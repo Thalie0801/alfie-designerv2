@@ -91,12 +91,15 @@ export async function sendPackToGenerator({
   try {
   const results = await Promise.all(
       selectedAssets.map((asset) => {
-        // ✅ DEBUG LOG : Vérifier si referenceImageUrl est présent
+        // ✅ DEBUG LOG : Vérifier generatedTexts
         console.log(`[Pack] Creating job for asset ${asset.id}:`, {
           kind: asset.kind,
           referenceImageUrl: asset.referenceImageUrl || "❌ MISSING",
           title: asset.title,
           carouselMode: asset.kind === 'carousel' ? carouselMode : undefined,
+          hasGeneratedTexts: !!asset.generatedTexts,
+          slidesCount: asset.generatedTexts?.slides?.length || 0,
+          slidesPreview: asset.generatedTexts?.slides?.slice(0, 2).map((s: any) => ({ title: s.title?.slice(0, 30), hasBody: !!s.body })),
         });
         return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, userPlan, carouselMode);
       })
