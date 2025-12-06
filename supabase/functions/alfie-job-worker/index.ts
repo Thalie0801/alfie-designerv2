@@ -1201,42 +1201,33 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
     }));
   }
 
-  // ✅ Construire les fallback basés sur le brief - TEXTES DIFFÉRENCIÉS
+  // ✅ Construire les fallback basés sur le topic utilisateur - JAMAIS de labels structurels
   const fallbackSlides = Array.from({ length: totalSlides }, (_, i) => {
+    // ✅ TOUJOURS utiliser le topic utilisateur, jamais des labels génériques
     if (i === 0) {
-      // Hook : seulement le titre, pas de body
       return {
         title: topic,
         subtitle: "",
-        body: "", // ✅ PAS de body sur le hook
+        body: "",
         bullets: [],
-        alt: `Slide d'introduction : ${topic}`,
+        alt: topic,
       };
     } else if (i === totalSlides - 1) {
-      // CTA : seulement le titre
       return {
         title: cta || "Passez à l'action",
         subtitle: "",
-        body: "", // ✅ PAS de body sur le CTA
+        body: "",
         bullets: [],
-        alt: `Slide finale`,
+        alt: "Call to action",
       };
     } else {
-      // Slides intermédiaires : titres DIFFÉRENCIÉS, pas de body en mode premium
-      const slideTitles = [
-        "Pourquoi c'est important",
-        "Les avantages clés", 
-        "Comment ça fonctionne",
-        "Ce qui change pour vous",
-        "Les prochaines étapes"
-      ];
-      const slideTitle = slideTitles[(i - 1) % slideTitles.length];
+      // ✅ Slides intermédiaires : utiliser le topic, pas des labels
       return {
-        title: carouselMode === 'premium' ? slideTitle : topic,
+        title: topic,
         subtitle: "",
-        body: carouselMode === 'premium' ? "" : topic, // ✅ Body seulement en Standard
+        body: "",
         bullets: [],
-        alt: `Slide ${i + 1} : ${topic}`,
+        alt: topic,
       };
     }
   });

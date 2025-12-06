@@ -116,7 +116,8 @@ function getSlideRole(index: number, total: number): string {
 }
 
 /**
- * Build prompt for STANDARD mode (image only, no text - text added via Cloudinary overlay)
+ * Build prompt for STANDARD mode (PURE IMAGE ONLY - NO TEXT AT ALL)
+ * Text is added AFTER via Cloudinary overlay
  */
 function buildImagePromptStandard(
   globalStyle: string, 
@@ -126,39 +127,33 @@ function buildImagePromptStandard(
   slideIndex: number,
   totalSlides: number
 ): string {
-  // Thème global de la campagne
-  const globalTheme = prompt?.trim() || "Professional marketing";
-  
-  // Contexte spécifique de la slide basé sur sa position
-  const slideRole = getSlideRole(slideIndex, totalSlides);
-  
-  // Contenu textuel de cette slide pour guider l'image
-  const slideContext = slideContent.alt || slideContent.title;
+  // Thème global de la campagne (contenu utilisateur)
+  const globalTheme = prompt?.trim() || "Professional business";
   
   const styleHint = useBrandKit && globalStyle 
     ? globalStyle 
-    : "Professional, modern, clean design";
+    : "soft gradient background, pastel colors, modern aesthetic";
   
-  return `Generate ONE SINGLE scene illustration.
+  return `Generate ONE background illustration for a social media carousel slide.
 
-CAMPAIGN THEME: ${globalTheme}
-SLIDE CONTEXT: This is a ${slideRole} slide. The text overlay will say: "${slideContext}"
+VISUAL THEME: ${globalTheme}
 
-COMPOSITION REQUIREMENTS:
-- Create a visual that supports and reinforces the message: "${slideContent.title}"
-- Include a clear focal point related to the slide's message
-- Leave a clean area (solid color, soft gradient, or subtle texture) for text overlay
-- The image should visually represent the concept of: ${slideContext}
+STYLE: ${styleHint}
 
-VISUAL STYLE:
-${styleHint}
+COMPOSITION:
+- Soft, elegant background suitable for text overlay
+- Can include subtle 3D elements, soft gradients, abstract shapes
+- Leave central area clean for text placement
+- Professional social media aesthetic
 
-STRICT PROHIBITIONS:
-- NO text, NO typography, NO letters, NO numbers, NO words
-- NO logos, NO watermarks, NO icons, NO UI elements
-- NO seamless patterns, NO repeated motifs, NO wallpaper designs
+=== ABSOLUTE PROHIBITIONS (CRITICAL) ===
+❌ NO TEXT of any kind - no letters, words, numbers, labels
+❌ NO typography, NO captions, NO titles, NO subtitles
+❌ NO logos, NO watermarks, NO icons with text
+❌ NO UI elements, NO buttons, NO signs
+❌ The image must be 100% text-free
 
-OUTPUT: High quality background image suitable for text overlay.`;
+OUTPUT: Pure visual background image with NO text whatsoever.`
 }
 
 /**
