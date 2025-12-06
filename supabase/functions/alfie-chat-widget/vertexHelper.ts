@@ -10,14 +10,23 @@ interface VertexMessage {
   parts: { text: string }[];
 }
 
+// Valid Vertex AI regions
+const VALID_VERTEX_LOCATIONS = ['us-central1', 'europe-west1', 'europe-west4', 'europe-west9', 'asia-northeast1', 'asia-southeast1'];
+
 export async function callVertexChat(
   messages: { role: string; content: string }[],
   systemPrompt: string
 ): Promise<string> {
   const projectId = Deno.env.get("VERTEX_PROJECT_ID");
-  const location = Deno.env.get("VERTEX_LOCATION") || "europe-west9";
+  const rawLocation = Deno.env.get("VERTEX_LOCATION") || "europe-west9";
   const model = Deno.env.get("VERTEX_CHAT_MODEL") || "gemini-2.5-pro";
   const serviceAccountJson = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
+
+  // Validate and normalize location
+  const location = VALID_VERTEX_LOCATIONS.includes(rawLocation) ? rawLocation : "europe-west9";
+  if (rawLocation && !VALID_VERTEX_LOCATIONS.includes(rawLocation)) {
+    console.warn(`⚠️ Invalid VERTEX_LOCATION "${rawLocation}", using default "europe-west9". Valid: ${VALID_VERTEX_LOCATIONS.join(', ')}`);
+  }
 
   if (!projectId || !serviceAccountJson) {
     throw new Error("Vertex AI not configured - missing VERTEX_PROJECT_ID or GOOGLE_SERVICE_ACCOUNT_JSON");
