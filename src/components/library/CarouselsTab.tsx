@@ -193,6 +193,29 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     }));
   }, [slides]);
 
+  const handleDownloadSlide = useCallback(async (src: string, slideIndex: number) => {
+    try {
+      const response = await fetch(src);
+      if (!response.ok) throw new Error('Erreur téléchargement');
+      
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = `carousel-slide-${slideIndex + 1}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
+      
+      toast.success('Téléchargement démarré');
+    } catch (error) {
+      console.error('[CarouselsTab] Download error:', error);
+      toast.error('Erreur lors du téléchargement');
+    }
+  }, []);
+
   const handleDownloadZip = useCallback(async (carouselKey: string, carouselSlides: CarouselSlide[]) => {
     if (!carouselSlides.length) return;
     setDownloadingZip(carouselKey);
@@ -316,7 +339,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
                     <Button
                       size="sm"
-                      onClick={() => window.open(src, "_blank")}
+                      onClick={() => handleDownloadSlide(src, slide.slide_index ?? 0)}
                       aria-label="Télécharger la slide avec texte"
                     >
                       <Download className="h-4 w-4" />
