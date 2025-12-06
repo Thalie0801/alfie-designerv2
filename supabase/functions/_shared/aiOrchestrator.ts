@@ -2,6 +2,8 @@
 // AI Orchestrator - Fallback intelligent Gemini/OpenAI
 // ============================================
 
+import { paletteToDescriptions } from './colorContrast.ts';
+
 export type AIProvider = 'gemini' | 'openai';
 
 export interface AIConfig {
@@ -269,8 +271,9 @@ function buildBrandContext(brandKit?: AgentContext['brandKit']): string {
 - Nom: ${brandKit.name || 'N/A'}
 - Secteur/Niche: ${brandKit.niche || 'N/A'}
 
-**Palette couleurs:**
-${colors.length > 0 ? colors.map((c: any) => `  • ${typeof c === 'string' ? c : c.hex || c.value}`).join('\n') : '  • (Non définie)'}
+**Color palette:**
+${colors.length > 0 ? `  • ${paletteToDescriptions(colors.map((c: any) => typeof c === 'string' ? c : c.hex || c.value))}` : '  • (Non définie)'}
+(Never display hex codes in visuals)
 
 **Typographie:**
 ${fontsText ? fontsText.split(', ').map(line => `  • ${line}`).join('\n') : '  • (Non définie)'}
