@@ -93,9 +93,10 @@ function buildOverlayUrl(slide: any): string | null {
     return null;
   }
 
-  const { title, subtitle, bullets = [] } = slide.text_json;
+  const { title, subtitle, body, bullets = [] } = slide.text_json;
   const cleanTitle = cleanText(title || '', 120);
   const cleanSubtitle = cleanText(subtitle || '', 220);
+  const cleanBody = cleanText(body || '', 300);
   const cleanBullets = (bullets || []).map((b: string) => cleanText(b, 80)).slice(0, 6);
 
   if (!cleanTitle || cleanTitle.trim() === '') {
@@ -142,6 +143,15 @@ function buildOverlayUrl(slide: any): string | null {
     );
   }
   
+  // BODY - entre sous-titre et bullets
+  if (cleanBody && cleanBody.trim() !== '') {
+    const bodySize = config.bulletSize + 4;
+    const bodyY = config.bulletStart - 80;
+    overlays.push(
+      `l_text:Arial_${bodySize}:${encodeCloudinaryText(cleanBody)},co_rgb:D1D5DB,g_center,y_${bodyY},w_${Math.round(dims.w * 0.82)},c_fit`
+    );
+  }
+
   // BULLETS - centrés
   if (cleanBullets.length > 0) {
     cleanBullets.forEach((b: string, i: number) => {
