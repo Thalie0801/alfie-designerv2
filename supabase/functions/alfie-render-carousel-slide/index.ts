@@ -236,13 +236,8 @@ ${bullets.map(b => `• ${b}`).join("\n")}`;
   }
 
   return `Create a social media carousel slide (${slideIndex + 1}/${totalSlides}) with beautifully integrated text.
-
-=== USER REQUEST (topic/theme of this carousel) ===
-"""
-${userPrompt || "Professional content"}
-"""
 ${brandContext}
-=== TEXT TO DISPLAY (render EXACTLY as written, respecting zones) ===
+=== EXACT TEXT TO DISPLAY (render ONLY this text, nothing else) ===
 ${textLayout}
 
 === TYPOGRAPHY RULES ===
@@ -258,14 +253,16 @@ ${textLayout}
 - Soft gradients, abstract shapes, or subtle imagery that supports readability
 - The image must prioritize text legibility
 
-=== CRITICAL (image rejected if violated) ===
-- Render ALL provided text in designated zones
-- DO NOT add any text beyond what's specified above
+=== CRITICAL WARNINGS (image rejected if violated) ===
+- ONLY display text from "EXACT TEXT TO DISPLAY" section above
+- DO NOT add ANY other text from the prompt, brand context, or theme
+- DO NOT repeat the title in multiple places
+- DO NOT display the brand name, niche, or industry as visible text
 - NO hashtags, NO URLs, NO dates, NO extra labels
 - NO decorative text, NO watermarks
 - Text language: ${language === "EN" ? "English" : "French"}
 
-Generate ONE cohesive image where ALL specified text is beautifully integrated.`;
+Generate ONE cohesive image where ONLY the specified text is beautifully integrated.`;
 }
 
 async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, ms = 30000) {
