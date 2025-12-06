@@ -5,10 +5,10 @@ import {
   INTERNAL_FN_SECRET,
   LOVABLE_API_KEY 
 } from '../_shared/env.ts';
-import { getAccessToken } from "../_shared/vertexAuth.ts";
+import { callVertexGeminiImage, isVertexGeminiConfigured } from "../_shared/vertexGeminiImage.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";
-import { getModelsForPlan } from "../_shared/aiModels.ts";
+import { getModelsForPlan, LOVABLE_MODELS } from "../_shared/aiModels.ts";
 /* ------------------------------- CORS ------------------------------- */
 function jsonRes(body: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(body), {
@@ -258,67 +258,30 @@ function buildNegativePrompt(input: GenerateRequest) {
   return input.negativePrompt || "";
 }
 
-// ✅ VERTEX AI IMAGEN - Génération d'images via Google Cloud
-async function callVertexImagen(prompt: string, referenceImageUrl?: string | null): Promise<string | null> {
-  const projectId = Deno.env.get("VERTEX_PROJECT_ID");
-  const location = Deno.env.get("VERTEX_LOCATION") || "europe-west9";
-  const serviceAccountJson = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
-
-  if (!projectId || !serviceAccountJson) {
-    console.warn("⚠️ Vertex AI Imagen not configured, falling back to Lovable AI");
+// ✅ VERTEX AI GEMINI 2.5 - Génération d'images via Google Cloud
+async function callVertexGemini(prompt: string, systemPrompt: string): Promise<string | null> {
+  if (!isVertexGeminiConfigured()) {
+    console.warn("⚠️ Vertex AI Gemini not configured, falling back to Lovable AI");
     return null;
   }
 
   try {
-    console.log("🎨 [Vertex Imagen] Generating image...");
-    const accessToken = await getAccessToken(serviceAccountJson);
-
-    // Utiliser Imagen 3 pour la génération d'images
-    const model = "imagen-3.0-generate-002";
-    const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:predict`;
-
-    const payload = {
-      instances: [
-        {
-          prompt: prompt,
-        }
-      ],
-      parameters: {
-        sampleCount: 1,
-        aspectRatio: "4:3",
-        safetyFilterLevel: "block_few",
-        personGeneration: "allow_adult",
-        outputMimeType: "image/jpeg",
-      }
-    };
-
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ Vertex Imagen error:", response.status, errorText.substring(0, 500));
-      return null;
-    }
-
-    const data = await response.json();
-    const base64Image = data?.predictions?.[0]?.bytesBase64Encoded;
+    console.log("🎨 [Vertex Gemini] Generating image with Gemini 2.5 Flash...");
     
-    if (!base64Image) {
-      console.warn("⚠️ Vertex Imagen returned no image");
-      return null;
+    // Combiner system prompt et user prompt pour Gemini
+    const fullPrompt = `${systemPrompt}\n\n${prompt}`;
+    
+    const imageUrl = await callVertexGeminiImage(fullPrompt, "flash");
+    
+    if (imageUrl) {
+      console.log("✅ Vertex AI Gemini generated image successfully");
+      return imageUrl;
     }
-
-    console.log("✅ Vertex Imagen generated image successfully");
-    return `data:image/jpeg;base64,${base64Image}`;
+    
+    console.warn("⚠️ Vertex Gemini returned no image");
+    return null;
   } catch (error: any) {
-    console.error("❌ Vertex Imagen exception:", error?.message || error);
+    console.error("❌ Vertex Gemini exception:", error?.message || error);
     return null;
   }
 }
@@ -326,9 +289,8 @@ async function callVertexImagen(prompt: string, referenceImageUrl?: string | nul
 async function callLovableOnce(opts: { apiKey: string; system: string; userContent: any[]; userPlan?: string }) {
   const { apiKey, system, userContent, userPlan } = opts;
   
-  // ✅ Tous les plans utilisent maintenant le modèle Premium
-  const models = getModelsForPlan(userPlan);
-  console.log(`🎨 [alfie-generate-ai-image] Using Lovable AI - Model: ${models.image}`);
+  // ✅ Fallback Lovable AI - utilise les modèles Lovable
+  console.log(`🎨 [alfie-generate-ai-image] Fallback Lovable AI - Model: ${LOVABLE_MODELS.image_premium}`);
   
   const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -337,7 +299,7 @@ async function callLovableOnce(opts: { apiKey: string; system: string; userConte
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: models.image, // ✅ Modèle dynamique selon le plan
+      model: LOVABLE_MODELS.image_premium, // ✅ Modèle Lovable pour fallback
       messages: [
         { role: "system", content: system },
         { role: "user", content: userContent },
@@ -412,18 +374,17 @@ Deno.serve(async (req) => {
       userContent.push({ type: "text", text: `Negative prompt: ${negative}` });
     }
 
-    // --- 1. Essayer Vertex AI Imagen d'abord ---
+    // --- 1. Essayer Vertex AI Gemini 2.5 Flash d'abord ---
     let generatedImageUrl: string | undefined;
     
-    const vertexConfigured = Deno.env.get("VERTEX_PROJECT_ID") && Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
-    if (vertexConfigured) {
-      console.log("🎯 [alfie-generate-ai-image] Trying Vertex AI Imagen first...");
-      const vertexImage = await callVertexImagen(fullPrompt, referenceImage);
+    if (isVertexGeminiConfigured()) {
+      console.log("🎯 [alfie-generate-ai-image] Trying Vertex AI Gemini 2.5 Flash first...");
+      const vertexImage = await callVertexGemini(fullPrompt, systemPrompt);
       if (vertexImage) {
         generatedImageUrl = vertexImage;
-        console.log("✅ Vertex AI Imagen succeeded");
+        console.log("✅ Vertex AI Gemini succeeded");
       } else {
-        console.warn("⚠️ Vertex AI Imagen failed, falling back to Lovable AI");
+        console.warn("⚠️ Vertex AI Gemini failed, falling back to Lovable AI");
       }
     }
 
