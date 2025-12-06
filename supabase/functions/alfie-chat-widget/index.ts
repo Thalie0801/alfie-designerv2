@@ -541,17 +541,31 @@ Le secteur d'activité est fourni pour contexte minimal, mais reste neutre dans 
     enrichedPrompt += briefContext;
   }
 
-  // 1. Essayer Vertex AI si configuré
+// 1. Essayer Vertex AI si configuré (avec retry si format invalide)
   const vertexConfigured = Deno.env.get("VERTEX_PROJECT_ID") && Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
   if (vertexConfigured) {
     try {
       console.log("🎯 Using Vertex AI (Gemini)...");
       const vertexResponse = await callVertexChat(messages, enrichedPrompt);
       
-      // ✅ Vérifier que la réponse est valide (non vide)
-      if (vertexResponse && vertexResponse.length > 100) {
-        console.log("✅ Vertex AI responded successfully with", vertexResponse.length, "chars");
+      // ✅ Vérifier que la réponse contient un pack valide
+      if (vertexResponse && vertexResponse.length > 100 && vertexResponse.includes("<alfie-pack>")) {
+        console.log("✅ Vertex AI responded successfully with valid pack format");
         return vertexResponse;
+      } else if (vertexResponse && vertexResponse.length > 100) {
+        // Réponse longue mais sans pack - RETRY avec instruction plus stricte
+        console.warn("⚠️ Vertex AI response without <alfie-pack>, attempting retry with stricter prompt...");
+        
+        const retryPrompt = enrichedPrompt + `\n\n⚠️ RAPPEL CRITIQUE FINAL : Tu DOIS ABSOLUMENT terminer ta réponse avec un bloc <alfie-pack>{...JSON valide...}</alfie-pack>. C'est OBLIGATOIRE pour que la génération fonctionne. Sans ce bloc, l'utilisateur verra une erreur.`;
+        
+        const retryResponse = await callVertexChat(messages, retryPrompt);
+        
+        if (retryResponse && retryResponse.includes("<alfie-pack>")) {
+          console.log("✅ Retry succeeded with valid pack format");
+          return retryResponse;
+        } else {
+          console.warn("⚠️ Retry also failed to include <alfie-pack>, falling back to Lovable AI");
+        }
       } else {
         console.warn("⚠️ Vertex AI returned empty/short response, falling back to Lovable AI");
       }
