@@ -23,6 +23,7 @@ interface CarouselSlide {
   text_json?: {
     title?: string;
     subtitle?: string;
+    body?: string;
     bullets?: string[];
     [k: string]: any;
   } | null;
@@ -193,27 +194,14 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     }));
   }, [slides]);
 
-  const handleDownloadSlide = useCallback(async (src: string, slideIndex: number) => {
-    try {
-      const response = await fetch(src);
-      if (!response.ok) throw new Error('Erreur téléchargement');
-      
-      const blob = await response.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      
-      const a = document.createElement('a');
-      a.href = objectUrl;
-      a.download = `carousel-slide-${slideIndex + 1}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(objectUrl);
-      
-      toast.success('Téléchargement démarré');
-    } catch (error) {
-      console.error('[CarouselsTab] Download error:', error);
-      toast.error('Erreur lors du téléchargement');
-    }
+  const handleDownloadSlide = useCallback((src: string, slideIndex: number) => {
+    // Utiliser fl_attachment de Cloudinary pour forcer le téléchargement (évite CORS)
+    const downloadUrl = src.includes('/upload/')
+      ? src.replace('/upload/', `/upload/fl_attachment:carousel-slide-${slideIndex + 1}/`)
+      : src;
+    
+    window.open(downloadUrl, '_blank');
+    toast.success('Téléchargement démarré');
   }, []);
 
   const handleDownloadZip = useCallback(async (carouselKey: string, carouselSlides: CarouselSlide[]) => {
@@ -309,6 +297,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                   return slideUrl(slide.cloudinary_public_id as string, {
                     title: displayTitle,
                     subtitle: slide.text_json?.subtitle,
+                    body: slide.text_json?.body,
                     bulletPoints: sanitizedBullets.length ? sanitizedBullets : undefined,
                     aspectRatio: (slide.format || "4:5") as Aspect,
                     cloudName,

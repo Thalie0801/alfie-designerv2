@@ -5,6 +5,7 @@ export type SlideUrlOptions = {
   cloudName: string;
   title?: string;
   subtitle?: string;
+  body?: string;
   bulletPoints?: string[];
   cta?: string;
   aspectRatio?: '4:5' | '1:1' | '9:16' | '16:9';
@@ -77,6 +78,16 @@ export function slideUrl(publicId: string, o: SlideUrlOptions): string {
     const subY = config.titleY + config.subOffset + (title ? config.titleSize : 0);
     overlays.push(
       `l_text:Arial_${config.subSize}:${enc(sub)},co_rgb:E5E7EB,g_center,y_${subY},w_${Math.round(w * 0.84)},c_fit`
+    );
+  }
+
+  // BODY - entre sous-titre et bullets
+  const bodyText = cleanText(o.body ?? '', 300);
+  if (bodyText) {
+    const bodySize = config.bulletSize + 4; // Légèrement plus grand que bullets
+    const bodyY = config.bulletStart - 80; // Au-dessus des bullets
+    overlays.push(
+      `l_text:Arial_${bodySize}:${enc(bodyText)},co_rgb:D1D5DB,g_center,y_${bodyY},w_${Math.round(w * 0.82)},c_fit`
     );
   }
 

@@ -36,6 +36,7 @@ interface SlideRequest {
   slideContent: {
     title: string;
     subtitle?: string;
+    body?: string;
     bullets?: string[];
     alt: string;
     author?: string; // ✅ Auteur pour les citations
@@ -673,6 +674,7 @@ Deno.serve(async (req) => {
       text_json: {
         title: normTitle,
         subtitle: normSubtitle,
+        body: slideContent.body || '',
         bullets: normBullets,
         alt: slideContent.alt,
         text_public_id: textPublicId,
