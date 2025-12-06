@@ -1073,12 +1073,15 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   // ✅ Extraire le carouselType avant la fusion
   const carouselType = payload.carouselType || 'content';
 
-  // ✅ FUSION : si un champ manque dans aiSlides, on prend le fallback
+  // ✅ FUSION : si l'AI a fourni un title, on utilise ses données (pas de fallback subtitle/bullets)
   const slides = Array.from({ length: totalSlides }, (_, index) => {
     const ai = aiSlides[index] ?? {};
     const fb = fallbackSlides[index];
 
-    const title = (ai.title && ai.title.trim()) ? ai.title : fb.title;
+    // ✅ L'AI a fourni un titre = utiliser ses données directement
+    const hasAiContent = ai.title && ai.title.trim();
+    
+    const title = hasAiContent ? ai.title : fb.title;
     const alt = ai.alt || fb.alt || title;
     // ✅ Auteur pour les citations
     const author = ai.author || undefined;
@@ -1088,13 +1091,18 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
       return { title, subtitle: "", bullets: [], alt, author };
     }
 
-    // Pour CONTENT: garder la logique normale
-    const subtitle = (ai.subtitle && ai.subtitle.trim()) ? ai.subtitle : fb.subtitle;
-    const bullets = (Array.isArray(ai.bullets) && ai.bullets.length > 0) 
-      ? ai.bullets 
-      : (fb.bullets ?? []);
-
-    return { title, subtitle, bullets, alt, author };
+    // ✅ NOUVELLE LOGIQUE pour CONTENT :
+    // - Si l'AI a fourni du contenu (title), utiliser ses subtitle/bullets même s'ils sont vides
+    // - Si l'AI n'a rien fourni, utiliser le fallback complet
+    if (hasAiContent) {
+      // L'AI a généré ce slide - on ne force PAS de fallback générique
+      const subtitle = (ai.subtitle && ai.subtitle.trim()) ? ai.subtitle : "";
+      const bullets = Array.isArray(ai.bullets) && ai.bullets.length > 0 ? ai.bullets : [];
+      return { title, subtitle, bullets, alt, author };
+    } else {
+      // Slide entièrement vide - utiliser le fallback complet
+      return { title: fb.title, subtitle: fb.subtitle, bullets: fb.bullets ?? [], alt, author };
+    }
   });
 
   console.log("[processRenderCarousels] ✅ Merged slides with fallback:", 
