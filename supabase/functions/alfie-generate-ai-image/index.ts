@@ -5,7 +5,7 @@ import {
   INTERNAL_FN_SECRET,
   LOVABLE_API_KEY 
 } from '../_shared/env.ts';
-import { callVertexGeminiImage, isVertexGeminiConfigured } from "../_shared/vertexGeminiImage.ts";
+import { callVertexImagen, isVertexImagenConfigured, resolutionToAspectRatio } from "../_shared/vertexImagen.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";
 import { getModelsForPlan, LOVABLE_MODELS } from "../_shared/aiModels.ts";
@@ -258,30 +258,28 @@ function buildNegativePrompt(input: GenerateRequest) {
   return input.negativePrompt || "";
 }
 
-// ✅ VERTEX AI GEMINI 2.5 - Génération d'images via Google Cloud
-async function callVertexGemini(prompt: string, systemPrompt: string): Promise<string | null> {
-  if (!isVertexGeminiConfigured()) {
-    console.warn("⚠️ Vertex AI Gemini not configured, falling back to Lovable AI");
+// ✅ VERTEX AI IMAGEN 3 - Génération d'images via Google Cloud
+async function callVertexImagenGenerate(prompt: string, resolution?: string): Promise<string | null> {
+  if (!isVertexImagenConfigured()) {
+    console.warn("⚠️ Vertex AI Imagen not configured, falling back to Lovable AI");
     return null;
   }
 
   try {
-    console.log("🎨 [Vertex Gemini] Generating image with Gemini 2.5 Flash...");
+    console.log("🎨 [Vertex Imagen] Generating image with Imagen 3...");
     
-    // Combiner system prompt et user prompt pour Gemini
-    const fullPrompt = `${systemPrompt}\n\n${prompt}`;
-    
-    const imageUrl = await callVertexGeminiImage(fullPrompt, "flash");
+    const aspectRatio = resolutionToAspectRatio(resolution);
+    const imageUrl = await callVertexImagen(prompt, aspectRatio, "standard");
     
     if (imageUrl) {
-      console.log("✅ Vertex AI Gemini generated image successfully");
+      console.log("✅ Vertex AI Imagen generated image successfully");
       return imageUrl;
     }
     
-    console.warn("⚠️ Vertex Gemini returned no image");
+    console.warn("⚠️ Vertex Imagen returned no image");
     return null;
   } catch (error: any) {
-    console.error("❌ Vertex Gemini exception:", error?.message || error);
+    console.error("❌ Vertex Imagen exception:", error?.message || error);
     return null;
   }
 }
@@ -374,17 +372,17 @@ Deno.serve(async (req) => {
       userContent.push({ type: "text", text: `Negative prompt: ${negative}` });
     }
 
-    // --- 1. Essayer Vertex AI Gemini 2.5 Flash d'abord ---
+    // --- 1. Essayer Vertex AI Imagen 3 d'abord ---
     let generatedImageUrl: string | undefined;
     
-    if (isVertexGeminiConfigured()) {
-      console.log("🎯 [alfie-generate-ai-image] Trying Vertex AI Gemini 2.5 Flash first...");
-      const vertexImage = await callVertexGemini(fullPrompt, systemPrompt);
+    if (isVertexImagenConfigured()) {
+      console.log("🎯 [alfie-generate-ai-image] Trying Vertex AI Imagen 3 first...");
+      const vertexImage = await callVertexImagenGenerate(fullPrompt, body.resolution);
       if (vertexImage) {
         generatedImageUrl = vertexImage;
-        console.log("✅ Vertex AI Gemini succeeded");
+        console.log("✅ Vertex AI Imagen succeeded");
       } else {
-        console.warn("⚠️ Vertex AI Gemini failed, falling back to Lovable AI");
+        console.warn("⚠️ Vertex AI Imagen failed, falling back to Lovable AI");
       }
     }
 

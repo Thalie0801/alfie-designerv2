@@ -27,9 +27,9 @@ export const VERTEX_MODELS = {
   text_generate: 'gemini-2.5-flash-preview-05-20',
   text_proofread: 'gemini-2.5-flash-lite-preview-06-17',
   
-  // Images (Flash = rapide, Pro = qualité max)
-  image_standard: 'gemini-2.5-flash-image',       // ✅ Modèle IMAGE officiel
-  image_premium: 'gemini-3-pro-image-preview',    // ✅ Modèle IMAGE Premium
+  // Images - Imagen 3 (API /predict sur us-central1)
+  image_standard: 'imagen-3.0-generate-002',      // ✅ Imagen 3 Fast
+  image_premium: 'imagen-3.0-generate-001',       // ✅ Imagen 3 Premium (qualité max)
   
   // Vidéos
   video: 'veo-3.0-fast-generate-001',
