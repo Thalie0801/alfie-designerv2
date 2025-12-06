@@ -209,9 +209,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (!hasSubscription) {
-      console.debug('[Auth] signIn: no active subscription, signing out');
-      await supabase.auth.signOut();
-      return { error: new Error('NO_ACTIVE_SUBSCRIPTION') };
+      // ✅ NE PAS déconnecter - laisser l'utilisateur connecté pour redirection vers /billing
+      console.debug('[Auth] signIn: no active subscription, will redirect to /billing');
+      return { error: null }; // Pas d'erreur, ProtectedRoute gère la redirection
     }
 
     console.debug('[Auth] signIn: user has active subscription');
