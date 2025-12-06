@@ -180,9 +180,10 @@ function truncateText(text: string, maxChars: number): string {
 }
 
 /**
- * Build prompt for PREMIUM mode (image WITH text integrated by Gemini 3 Pro)
- * ✅ V3 REFONTE COMPLÈTE : Isolation stricte du texte à afficher
- * ✅ PLUS AUCUN contexte textuel parasite (thème, niche, brand name)
+ * Build prompt for PREMIUM mode - HYBRID APPROACH
+ * ✅ V4: Generate BACKGROUND ONLY with Gemini 3 Pro (better visual quality)
+ * ✅ Text will be applied AFTER via Cloudinary overlay (like Standard mode)
+ * ✅ This eliminates the double-text issue from Gemini 3 Pro
  */
 function buildImagePromptPremium(
   userPrompt: string,
@@ -193,68 +194,69 @@ function buildImagePromptPremium(
   totalSlides: number,
   language: string = "FR"
 ): string {
-  // ✅ Tronquer strictement chaque élément
-  const title = truncateText(slideContent.title, 50);
+  // ✅ Extraire le concept visuel du prompt utilisateur (sans texte)
+  const extractVisualConcept = (rawPrompt: string): string => {
+    if (!rawPrompt) return "modern professional design";
+    
+    const visualKeywords = rawPrompt.toLowerCase().match(
+      /(tech|ia|ai|business|marketing|social|digital|créatif|innovation|productivité|santé|bien-être|nature|voyage|food|cuisine|fitness|mode|fashion|beauté|immobilier|finance|éducation|musique|art|sport|lifestyle|coaching|entrepreneuriat)/gi
+    );
+    
+    if (visualKeywords && visualKeywords.length > 0) {
+      return `${visualKeywords[0]} themed visual, premium aesthetic`;
+    }
+    
+    return "modern professional design";
+  };
   
-  // ✅ PRIORITÉ: body > subtitle pour éviter duplication
-  const bodyText = slideContent.body ? truncateText(slideContent.body, 100) : null;
-  const subtitleText = !bodyText && slideContent.subtitle ? truncateText(slideContent.subtitle, 80) : null;
+  const visualConcept = extractVisualConcept(userPrompt);
   
-  // ✅ Construire le texte à afficher - RIEN D'AUTRE
-  let textToDisplay = `"${title}"`;
-  if (bodyText) {
-    textToDisplay += `\n"${bodyText}"`;
-  } else if (subtitleText) {
-    textToDisplay += `\n"${subtitleText}"`;
-  }
-  
-  // ✅ Style visuel UNIQUEMENT (aucun texte de la marque)
-  let visualStyle = "soft gradient background, pastel colors, modern clean design";
+  // ✅ Style visuel enrichi par le Brand Kit V2
+  let visualStyle = "soft gradient background, pastel colors, elegant design";
   if (useBrandKit && brandKit) {
+    const styleParts: string[] = [];
+    
     if (brandKit.visual_mood?.length) {
-      visualStyle = brandKit.visual_mood.slice(0, 2).join(", ") + " style";
+      styleParts.push(brandKit.visual_mood.slice(0, 2).join(", ") + " aesthetic");
+    }
+    if (brandKit.visual_types?.length) {
+      const type = brandKit.visual_types[0];
+      if (type === "illustrations_3d") styleParts.push("3D rendered elements");
+      else if (type === "illustrations_2d") styleParts.push("flat 2D illustration style");
+      else if (type === "photos") styleParts.push("photorealistic quality");
     }
     if (brandKit.palette?.length) {
-      // Convertir hex en descriptions de couleur
-      visualStyle += ", harmonious color palette";
+      styleParts.push("harmonious color palette with brand colors");
+    }
+    
+    if (styleParts.length > 0) {
+      visualStyle = styleParts.join(", ");
     }
   }
   
-  // ✅ Ce que le modèle ne doit JAMAIS faire
+  // ✅ Éléments à éviter
   const avoid = brandKit?.avoid_in_visuals || "";
 
-  return `Generate ONE clean social media slide with text.
+  return `Generate ONE premium abstract background illustration.
 
-=== EXACT TEXT TO DISPLAY ===
-${textToDisplay}
+VISUAL CONCEPT: ${visualConcept}
+STYLE: ${visualStyle}
 
-=== CRITICAL: RENDER TEXT EXACTLY ONCE ===
-✅ Each line of text appears ONE TIME ONLY
-❌ NO shadow layer behind text
-❌ NO ghost/faded duplicate of text
-❌ NO background text layer
-❌ NO blur effect creating double text
-The text must be sharp, single-layer, clean typography.
+COMPOSITION:
+- Premium, elegant background with soft 3D elements
+- Rich gradients, depth, and subtle visual interest
+- Geometric shapes, abstract forms, modern aesthetic
+- Clean central area reserved for text overlay
+- Professional social media quality (Instagram/LinkedIn grade)
 
-=== VISUAL STYLE ===
-- ${visualStyle}
-- High contrast background for excellent readability
-- Professional, elegant typography
-- Modern social media aesthetic
-
-=== TEXT PLACEMENT ===
-- Title: TOP area (20% from top), large bold font
-- Secondary text (if any): CENTER area, medium weight
-
-=== ABSOLUTE PROHIBITIONS ===
-❌ DO NOT render text more than once (no shadow text, no duplicate)
-❌ DO NOT add labels like "HOOK", "CTA", "PROBLEM", slide numbers
-❌ DO NOT show the theme, topic, brand name, or niche as text
-❌ DO NOT add hashtags, URLs, dates, decorative elements
+=== CRITICAL RULE: ABSOLUTELY NO TEXT ===
+❌ DO NOT include ANY text, words, letters, typography
+❌ DO NOT add titles, subtitles, labels, captions
+❌ DO NOT include hashtags, dates, numbers, symbols
+❌ This is PURELY a visual background
 ${avoid ? `❌ AVOID: ${avoid}` : ""}
 
-✅ Output: Single clean image with text rendered EXACTLY ONCE
-✅ Language: ${language === "EN" ? "English" : "French"}`;
+✅ OUTPUT: Clean, premium abstract visual background with ZERO text.`;
 }
 
 async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, ms = 30000) {
@@ -607,7 +609,40 @@ Deno.serve(async (req) => {
         finalUrl = cloudinarySecureUrl;
       }
     } else {
-      console.log(`[render-slide] ${logCtx} 3.5/4 Skipping overlay (Premium mode - text already integrated)`);
+      // ✅ HYBRID PREMIUM MODE: Apply Cloudinary overlay to Gemini 3 Pro background
+      console.log(`[render-slide] ${logCtx} 3.5/4 Applying Cloudinary text overlay (Premium HYBRID mode, type=${carouselType})`);
+      
+      const slideType = slideIndex === 0 ? 'hero' 
+        : slideIndex === totalSlides - 1 ? 'cta'
+        : slideIndex === 1 ? 'problem'
+        : slideIndex === totalSlides - 2 ? 'solution'
+        : 'impact';
+      
+      const slideData: Slide = {
+        type: slideType,
+        title: normTitle,
+        subtitle: carouselType === 'citations' ? undefined : (normSubtitle || undefined),
+        bullets: carouselType === 'citations' ? undefined : (normBullets.length > 0 ? normBullets : undefined),
+        cta: slideType === 'cta' ? normTitle : undefined,
+        author: slideContent.author || undefined,
+      };
+      
+      const primaryColor = 'ffffff';
+      const secondaryColor = 'cccccc';
+      
+      try {
+        finalUrl = buildCarouselSlideUrl(
+          cloudinaryPublicId,
+          slideData,
+          primaryColor,
+          secondaryColor,
+          carouselType
+        );
+        console.log(`[render-slide] ${logCtx}   ↳ Premium HYBRID overlay URL: ${finalUrl?.slice(0, 150)}...`);
+      } catch (overlayErr) {
+        console.warn(`[render-slide] ${logCtx} ⚠️ Premium overlay failed, using base image:`, overlayErr);
+        finalUrl = cloudinarySecureUrl;
+      }
     }
 
     // =========================================
