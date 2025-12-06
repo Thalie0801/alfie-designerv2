@@ -8,8 +8,8 @@ import { getAccessToken } from "./vertexAuth.ts";
 export type GeminiImageModel = "flash" | "pro";
 
 const MODEL_MAP: Record<GeminiImageModel, string> = {
-  flash: "gemini-2.5-flash-preview-05-20",
-  pro: "gemini-2.5-pro-preview-06-05",
+  flash: "gemini-2.5-flash-image",        // ✅ Modèle IMAGE officiel
+  pro: "gemini-3-pro-image-preview",      // ✅ Modèle IMAGE officiel (Premium)
 };
 
 /**
@@ -23,7 +23,7 @@ export async function callVertexGeminiImage(
   model: GeminiImageModel = "flash"
 ): Promise<string | null> {
   const projectId = Deno.env.get("VERTEX_PROJECT_ID");
-  const location = Deno.env.get("VERTEX_LOCATION") || "europe-west9";
+  const location = "global"; // Endpoint global pour meilleure disponibilité des modèles image
   const serviceAccountJson = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
 
   if (!projectId || !serviceAccountJson) {
