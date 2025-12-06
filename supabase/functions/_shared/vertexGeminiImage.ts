@@ -8,8 +8,8 @@ import { getAccessToken } from "./vertexAuth.ts";
 export type GeminiImageModel = "flash" | "pro";
 
 const MODEL_MAP: Record<GeminiImageModel, string> = {
-  flash: "gemini-2.0-flash-exp",
-  pro: "gemini-2.0-flash-exp",
+  flash: "gemini-2.5-flash-preview-05-20",
+  pro: "gemini-2.5-pro-preview-06-05",
 };
 
 /**
