@@ -35,6 +35,7 @@ interface AssetBrief {
 interface SlideText {
   title: string;
   subtitle?: string;
+  body?: string; // Corps explicatif (1-2 phrases)
   bullets?: string[];
   author?: string; // Pour les citations
 }
@@ -163,20 +164,21 @@ CONTEXTE ASSET :
 - Style du visuel : ${asset.tone}
 
 STRUCTURE ATTENDUE (progression narrative) :
-Slide 1 : Accroche / Hook percutant (titre seul, pas de sous-titre)
-Slides 2-4 : Titre + Sous-titre + Corps explicatif
-Slide 5 : Call-to-Action
+Slide 1 : Accroche / Hook percutant (titre seul, pas de sous-titre ni body)
+Slides 2-4 : Titre + Sous-titre court + Body explicatif (1-2 phrases) + Bullets optionnels
+Slide 5 : Call-to-Action (titre + body court)
 
 RÈGLES CRITIQUES :
 - LE BRIEF EST PRIORITAIRE sur le Brand Kit
 - Français PARFAIT, sans aucune faute d'orthographe
 - Textes courts, lisibles, adaptés au format visuel
 - Ne JAMAIS écrire de codes couleur ni de texte technique
+- Le body est un texte explicatif de 1-2 phrases qui développe le titre
 
 Retourne un JSON strictement conforme à ce format :
 {
   "slides": [
-    { "title": "Titre slide 1", "subtitle": "Sous-titre optionnel", "bullets": ["Point 1", "Point 2"] },
+    { "title": "Titre slide 1", "subtitle": "Sous-titre optionnel", "body": "Corps explicatif 1-2 phrases", "bullets": ["Point 1", "Point 2"] },
     ...
   ]
 }`;
@@ -414,6 +416,7 @@ Deno.serve(async (req) => {
               ? slide.title.replace(/\n/g, ' ').trim()
               : "",
             subtitle: typeof slide.subtitle === 'string' ? slide.subtitle.trim() : "",
+            body: typeof slide.body === 'string' ? slide.body.trim() : "",
             bullets: Array.isArray(slide.bullets) ? slide.bullets : [],
             author: slide.author || undefined,
           }));
