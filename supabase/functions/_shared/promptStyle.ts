@@ -3,6 +3,8 @@
  * Utilisé pour tous les types d'assets (images, carrousels, vidéos)
  */
 
+import { paletteToDescriptions } from './colorContrast.ts';
+
 export const ALFIE_IMAGE_STYLE = `Style visuel : rendu 3D inspiré Pixar, chiot golden retriever mascotte adorable, proportions légèrement cartoon, expression expressive et positive, lumière douce de studio, ombres propres, ultra détaillé, haute résolution, rendu sharp, palette de couleurs pastel Alfie Designer (pêche chaud, rose doux, lavande, menthe, jaune clair), ambiance moderne chaleureuse, esthétique réseaux sociaux, fond propre.`;
 
 interface BrandKit {
@@ -61,8 +63,10 @@ export function buildBrandEnrichedPrompt(
   // Enrichissement Brand Kit
   if (brandKit) {
     if (brandKit.palette && brandKit.palette.length > 0) {
-      enrichedPrompt += `\n\nCouleurs de la marque : ${brandKit.palette.slice(0, 5).join(", ")}`;
-      enrichedPrompt += `\nUtilise ces couleurs comme palette principale pour créer un visuel cohérent avec l'identité de marque.`;
+      const colorDesc = paletteToDescriptions(brandKit.palette);
+      enrichedPrompt += `\n\nColor palette: ${colorDesc}`;
+      enrichedPrompt += `\nUse these colors as the main palette for brand-consistent visuals.`;
+      enrichedPrompt += `\n(CRITICAL: Never display hex codes like #90E3C2 in the image)`;
     }
 
     if (brandKit.voice) {

@@ -7,6 +7,7 @@
 import { corsHeaders } from "../_shared/cors.ts";
 import { callVertexChat } from "./vertexHelper.ts";
 import { getModelsForPlan } from "../_shared/aiModels.ts";
+import { paletteToDescriptions } from "../_shared/colorContrast.ts";
 
 // System prompt unique pour Alfie Chat
 const SYSTEM_PROMPT = `Tu es « Alfie Chat », l'assistant d'Alfie Designer.
@@ -500,7 +501,9 @@ async function callLLM(
         enrichedPrompt += `\nTon de la marque : ${brandContext.voice}`;
       }
       if (brandContext.palette && Array.isArray(brandContext.palette) && brandContext.palette.length > 0) {
-        enrichedPrompt += `\nCouleurs de la marque : ${brandContext.palette.slice(0, 5).join(", ")}`;
+        const colorDesc = paletteToDescriptions(brandContext.palette);
+        enrichedPrompt += `\nBrand colors: ${colorDesc}`;
+        enrichedPrompt += `\n(Never render hex codes as visible text in images)`;
       }
       enrichedPrompt += `\n\nIMPORTANT : Tu connais déjà le ton, le positionnement, les couleurs et le secteur via le Brand Kit. Ne redemande JAMAIS ces informations (ton, voix, niche, industrie, couleurs). Utilise ces données pour adapter tes recommandations de pack sans poser de questions redondantes.`;
     } else {

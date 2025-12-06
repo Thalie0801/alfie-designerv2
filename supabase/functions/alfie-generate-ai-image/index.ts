@@ -74,17 +74,21 @@ const clampRes = (res?: string) => {
 
 const short = (s?: string, n = 300) => (s || "").slice(0, n);
 
+import { paletteToDescriptions } from '../_shared/colorContrast.ts';
+
 function buildBackgroundOnlyPrompt(brand?: BrandKit) {
+  const colorDesc = paletteToDescriptions(brand?.palette);
   return `Abstract background composition.
 Style: ${brand?.voice || "modern, professional"}
-Colors ONLY: ${brand?.palette?.join(", ") || "neutral tones"}
+Color palette: ${colorDesc}
 
 CRITICAL RULES:
 - NO TEXT whatsoever
 - NO LETTERS, NO WORDS, NO TYPOGRAPHY
 - Pure visual: gradients, shapes, geometric patterns, textures
 - Clean, minimal, suitable as background layer
-- Leave center area lighter for text overlay`;
+- Leave center area lighter for text overlay
+- NEVER display hex codes or color values in the image`;
 }
 
 function buildMainPrompt(input: GenerateRequest): string {
@@ -133,9 +137,11 @@ function buildMainPrompt(input: GenerateRequest): string {
 
   // ✅ Brand Kit V2 - Application conditionnée par useBrandKit
   if (!backgroundOnly && shouldApplyBrand && brandKit) {
-    // V1: Couleurs
+    // V1: Couleurs - convertir en descriptions naturelles
     if (brandKit.palette?.length) {
-      fullPrompt += `\n\nCRITICAL - Brand Colors (use ONLY these): ${brandKit.palette.join(", ")}`;
+      const colorDesc = paletteToDescriptions(brandKit.palette);
+      fullPrompt += `\n\nBrand Color Palette (use these colors): ${colorDesc}`;
+      fullPrompt += `\nNEVER display hex codes or color values as text in the image.`;
     }
     
     // V2: Secteur d'activité
