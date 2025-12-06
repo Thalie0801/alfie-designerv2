@@ -16,13 +16,16 @@ interface PackPreparationModalProps {
   onClose: () => void;
 }
 
-// ✅ Phase 2: Fallback text generation function
+// ✅ Phase 2: Fallback text generation function - utilise le topic/brief au lieu de textes génériques
 function generateFallbackTexts(asset: PackAsset, campaignTitle: string): any {
   if (asset.kind === 'carousel') {
+    const topic = asset.prompt || asset.title || campaignTitle;
+    const totalSlides = asset.count || 5;
     return {
-      slides: Array.from({ length: asset.count }, (_, i) => ({
-        title: i === 0 ? asset.title : i === asset.count - 1 ? "Passez à l'action" : `Point ${i}`,
-        subtitle: i === 0 ? campaignTitle : `Élément ${i + 1} de ${asset.goal}`,
+      slides: Array.from({ length: totalSlides }, (_, i) => ({
+        // ✅ Utiliser le topic/brief au lieu de "Point X"
+        title: i === 0 ? (asset.title || topic) : i === totalSlides - 1 ? "Passez à l'action" : topic,
+        subtitle: i === 0 ? campaignTitle : "",
       })),
     };
   }
