@@ -29,7 +29,7 @@ export const VERTEX_MODELS = {
   
   // Images (Flash = rapide, Pro = qualité max)
   image_standard: 'gemini-2.5-flash-preview-05-20',
-  image_premium: 'gemini-2.5-pro-preview-05-06',
+  image_premium: 'gemini-3.0-pro-preview',
   
   // Vidéos
   video: 'veo-3.0-fast-generate-001',
