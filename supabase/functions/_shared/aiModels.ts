@@ -4,6 +4,8 @@
  * ARCHITECTURE:
  * - Priorité 1: Vertex AI Gemini 2.5 (utilise crédits Google Cloud)
  * - Priorité 2: Lovable AI (fallback uniquement)
+ * 
+ * MARGE CIBLE: 80%+ sur toutes les générations
  */
 
 export type AITier = 'standard' | 'premium';
@@ -18,17 +20,26 @@ export interface AIModelsConfig {
 // VERTEX AI MODELS (Priorité 1 - Google Cloud)
 // ============================================
 export const VERTEX_MODELS = {
-  text: 'gemini-2.5-pro',
-  image_standard: 'gemini-2.5-flash-preview-05-20',  // Flash pour génération rapide
-  image_premium: 'gemini-2.5-pro-preview-05-06',     // Pro pour qualité maximum
-  chat: 'gemini-2.5-pro',
+  // Chat / Conversation
+  text_chat: 'gemini-2.5-pro',
+  
+  // Génération de textes (économique)
+  text_generate: 'gemini-2.5-flash-preview-05-20',
+  text_proofread: 'gemini-2.5-flash-lite-preview-06-17',
+  
+  // Images (Flash = rapide, Pro = qualité max)
+  image_standard: 'gemini-2.5-flash-preview-05-20',
+  image_premium: 'gemini-2.5-pro-preview-05-06',
+  
+  // Vidéos
+  video: 'veo-3.0-fast-generate-001',
 };
 
 // ============================================
 // LOVABLE AI MODELS (Fallback uniquement)
 // ============================================
 export const LOVABLE_MODELS = {
-  text: 'google/gemini-2.5-pro',
+  text: 'google/gemini-2.5-flash',
   image_standard: 'google/gemini-2.5-flash-image-preview',
   image_premium: 'google/gemini-3-pro-image-preview',
 };
@@ -54,7 +65,7 @@ export function getCarouselModel(mode: CarouselMode): string {
 }
 
 export function getModelDescription(_plan?: string | null, _forcePremium?: boolean): string {
-  return 'Vertex AI Gemini 2.5 Pro - Qualité maximum';
+  return 'Vertex AI Gemini 2.5 - Qualité maximum';
 }
 
 /**
