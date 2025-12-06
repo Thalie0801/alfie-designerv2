@@ -223,29 +223,37 @@ function buildImagePromptPremium(
   // ✅ Ce que le modèle ne doit JAMAIS faire
   const avoid = brandKit?.avoid_in_visuals || "";
 
-  return `Create a social media carousel slide with integrated text.
+  return `Generate ONE clean social media slide with text.
 
-=== TEXT TO RENDER (display ONLY these exact words) ===
+=== EXACT TEXT TO DISPLAY ===
 ${textToDisplay}
+
+=== CRITICAL: RENDER TEXT EXACTLY ONCE ===
+✅ Each line of text appears ONE TIME ONLY
+❌ NO shadow layer behind text
+❌ NO ghost/faded duplicate of text
+❌ NO background text layer
+❌ NO blur effect creating double text
+The text must be sharp, single-layer, clean typography.
 
 === VISUAL STYLE ===
 - ${visualStyle}
-- High contrast for text readability
-- Elegant typography, well-spaced
+- High contrast background for excellent readability
+- Professional, elegant typography
+- Modern social media aesthetic
 
-=== TYPOGRAPHY PLACEMENT ===
-- Title: TOP 20%, large bold font
-- Secondary text (if any): CENTER, medium weight
+=== TEXT PLACEMENT ===
+- Title: TOP area (20% from top), large bold font
+- Secondary text (if any): CENTER area, medium weight
 
 === ABSOLUTE PROHIBITIONS ===
-❌ DO NOT display ANY text except what is in "TEXT TO RENDER" above
+❌ DO NOT render text more than once (no shadow text, no duplicate)
 ❌ DO NOT add labels like "HOOK", "CTA", "PROBLEM", slide numbers
 ❌ DO NOT show the theme, topic, brand name, or niche as text
-❌ DO NOT repeat the same text multiple times
-❌ DO NOT add hashtags, URLs, dates, decorative text
+❌ DO NOT add hashtags, URLs, dates, decorative elements
 ${avoid ? `❌ AVOID: ${avoid}` : ""}
 
-✅ ONLY the exact quoted text above should appear in the image
+✅ Output: Single clean image with text rendered EXACTLY ONCE
 ✅ Language: ${language === "EN" ? "English" : "French"}`;
 }
 
