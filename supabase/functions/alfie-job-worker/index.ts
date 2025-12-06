@@ -1201,29 +1201,40 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
     }));
   }
 
-  // ✅ Construire les fallback basés sur le brief AVEC body
+  // ✅ Construire les fallback basés sur le brief - TEXTES DIFFÉRENCIÉS
   const fallbackSlides = Array.from({ length: totalSlides }, (_, i) => {
     if (i === 0) {
+      // Hook : seulement le titre, pas de body
       return {
         title: topic,
         subtitle: "",
-        body: "", // ✅ BODY AJOUTÉ
+        body: "", // ✅ PAS de body sur le hook
         bullets: [],
         alt: `Slide d'introduction : ${topic}`,
       };
     } else if (i === totalSlides - 1) {
+      // CTA : seulement le titre
       return {
-        title: cta || topic,
+        title: cta || "Passez à l'action",
         subtitle: "",
-        body: "", // ✅ BODY AJOUTÉ
+        body: "", // ✅ PAS de body sur le CTA
         bullets: [],
         alt: `Slide finale`,
       };
     } else {
+      // Slides intermédiaires : titres DIFFÉRENCIÉS, pas de body en mode premium
+      const slideTitles = [
+        "Pourquoi c'est important",
+        "Les avantages clés", 
+        "Comment ça fonctionne",
+        "Ce qui change pour vous",
+        "Les prochaines étapes"
+      ];
+      const slideTitle = slideTitles[(i - 1) % slideTitles.length];
       return {
-        title: carouselMode === 'premium' ? "" : topic,
+        title: carouselMode === 'premium' ? slideTitle : topic,
         subtitle: "",
-        body: topic, // ✅ BODY = topic pour slides intermédiaires
+        body: carouselMode === 'premium' ? "" : topic, // ✅ Body seulement en Standard
         bullets: [],
         alt: `Slide ${i + 1} : ${topic}`,
       };

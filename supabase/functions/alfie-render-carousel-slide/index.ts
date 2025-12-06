@@ -166,104 +166,78 @@ OUTPUT: High quality background image suitable for text overlay.`;
  */
 function truncateText(text: string, maxChars: number): string {
   if (!text || text.length <= maxChars) return text || "";
-  // Trouver le dernier espace avant la limite pour couper proprement
   const cutIndex = text.lastIndexOf(' ', maxChars - 3);
   return text.substring(0, cutIndex > maxChars * 0.5 ? cutIndex : maxChars - 3).trim() + "...";
 }
 
 /**
  * Build prompt for PREMIUM mode (image WITH text integrated by Gemini 3 Pro)
- * ✅ Refonte V2 : utilise Brand Kit complet pour personnalisation
+ * ✅ V3 REFONTE COMPLÈTE : Isolation stricte du texte à afficher
+ * ✅ PLUS AUCUN contexte textuel parasite (thème, niche, brand name)
  */
 function buildImagePromptPremium(
   userPrompt: string,
   brandKit: BrandKit | undefined,
   useBrandKit: boolean,
-  slideContent: { title: string; subtitle?: string; bullets?: string[]; alt: string },
+  slideContent: { title: string; subtitle?: string; body?: string; bullets?: string[]; alt: string },
   slideIndex: number,
   totalSlides: number,
   language: string = "FR"
 ): string {
-  // Tronquer chaque élément avec limites strictes
-  const title = truncateText(slideContent.title, 60);
-  const subtitle = slideContent.subtitle ? truncateText(slideContent.subtitle, 90) : null;
-  const bullets = (slideContent.bullets || [])
-    .filter(b => b && b.trim())
-    .slice(0, 3)
-    .map(b => truncateText(b, 60));
+  // ✅ Tronquer strictement chaque élément
+  const title = truncateText(slideContent.title, 50);
   
-  // ✅ Construire le contexte marque UNIQUEMENT si useBrandKit=true ET brandKit fourni
-  let brandContext = "";
+  // ✅ PRIORITÉ: body > subtitle pour éviter duplication
+  const bodyText = slideContent.body ? truncateText(slideContent.body, 100) : null;
+  const subtitleText = !bodyText && slideContent.subtitle ? truncateText(slideContent.subtitle, 80) : null;
+  
+  // ✅ Construire le texte à afficher - RIEN D'AUTRE
+  let textToDisplay = `"${title}"`;
+  if (bodyText) {
+    textToDisplay += `\n"${bodyText}"`;
+  } else if (subtitleText) {
+    textToDisplay += `\n"${subtitleText}"`;
+  }
+  
+  // ✅ Style visuel UNIQUEMENT (aucun texte de la marque)
+  let visualStyle = "soft gradient background, pastel colors, modern clean design";
   if (useBrandKit && brandKit) {
-    const brandParts: string[] = [];
-    if (brandKit.name) brandParts.push(`- Brand: ${brandKit.name}`);
-    if (brandKit.niche) brandParts.push(`- Industry/Niche: ${brandKit.niche}`);
-    if (brandKit.voice) brandParts.push(`- Tone of voice: ${brandKit.voice}`);
-    if (brandKit.pitch) brandParts.push(`- Brand essence: ${brandKit.pitch}`);
-    if (brandKit.adjectives?.length) brandParts.push(`- Brand personality: ${brandKit.adjectives.join(", ")}`);
-    if (brandKit.visual_mood?.length) brandParts.push(`- Visual mood: ${brandKit.visual_mood.join(", ")}`);
-    if (brandKit.visual_types?.length) brandParts.push(`- Visual style: ${brandKit.visual_types.join(", ")}`);
-    if (brandKit.avoid_in_visuals) brandParts.push(`- AVOID in visuals: ${brandKit.avoid_in_visuals}`);
-    
-    brandContext = `
-=== BRAND CONTEXT (adapt visual style to this brand) ===
-${brandParts.join("\n")}
-`;
-  } else {
-    brandContext = `
-=== BRAND CONTEXT ===
-- Style: Clean, minimal, professional
-- Tone: Friendly and approachable
-- No specific branding required
-`;
+    if (brandKit.visual_mood?.length) {
+      visualStyle = brandKit.visual_mood.slice(0, 2).join(", ") + " style";
+    }
+    if (brandKit.palette?.length) {
+      // Convertir hex en descriptions de couleur
+      visualStyle += ", harmonious color palette";
+    }
   }
+  
+  // ✅ Ce que le modèle ne doit JAMAIS faire
+  const avoid = brandKit?.avoid_in_visuals || "";
 
-  // Construire les zones de texte avec instructions de placement
-  let textLayout = `TOP ZONE (20% from top, large bold typography):
-"${title}"`;
+  return `Create a social media carousel slide with integrated text.
 
-  if (subtitle) {
-    textLayout += `
+=== TEXT TO RENDER (display ONLY these exact words) ===
+${textToDisplay}
 
-CENTER ZONE (40-50% height, medium weight):
-"${subtitle}"`;
-  }
+=== VISUAL STYLE ===
+- ${visualStyle}
+- High contrast for text readability
+- Elegant typography, well-spaced
 
-  if (bullets.length > 0) {
-    textLayout += `
+=== TYPOGRAPHY PLACEMENT ===
+- Title: TOP 20%, large bold font
+- Secondary text (if any): CENTER, medium weight
 
-BOTTOM ZONE (65-80% height, smaller list format):
-${bullets.map(b => `• ${b}`).join("\n")}`;
-  }
+=== ABSOLUTE PROHIBITIONS ===
+❌ DO NOT display ANY text except what is in "TEXT TO RENDER" above
+❌ DO NOT add labels like "HOOK", "CTA", "PROBLEM", slide numbers
+❌ DO NOT show the theme, topic, brand name, or niche as text
+❌ DO NOT repeat the same text multiple times
+❌ DO NOT add hashtags, URLs, dates, decorative text
+${avoid ? `❌ AVOID: ${avoid}` : ""}
 
-  return `Create a social media carousel slide (${slideIndex + 1}/${totalSlides}) with beautifully integrated text.
-${brandContext}
-=== EXACT TEXT TO DISPLAY (render ONLY this text, nothing else) ===
-${textLayout}
-
-=== TYPOGRAPHY RULES ===
-- TOP: Title - large bold font, high contrast, positioned at top 20%
-- CENTER: Subtitle - medium weight, positioned around center
-- BOTTOM: List items - smaller font, positioned at bottom third
-- All text must be FULLY VISIBLE and READABLE
-- High contrast between text and background (white/cream text on darker backgrounds)
-- If text is long, REDUCE font size automatically (never crop or overflow)
-
-=== VISUAL RULES ===
-- Background should complement the brand context above
-- Soft gradients, abstract shapes, or subtle imagery that supports readability
-- The image must prioritize text legibility
-
-=== CRITICAL WARNINGS (image rejected if violated) ===
-- ONLY display text from "EXACT TEXT TO DISPLAY" section above
-- DO NOT add ANY other text from the prompt, brand context, or theme
-- DO NOT repeat the title in multiple places
-- DO NOT display the brand name, niche, or industry as visible text
-- NO hashtags, NO URLs, NO dates, NO extra labels
-- NO decorative text, NO watermarks
-- Text language: ${language === "EN" ? "English" : "French"}
-
-Generate ONE cohesive image where ONLY the specified text is beautifully integrated.`;
+✅ ONLY the exact quoted text above should appear in the image
+✅ Language: ${language === "EN" ? "English" : "French"}`;
 }
 
 async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, ms = 30000) {
