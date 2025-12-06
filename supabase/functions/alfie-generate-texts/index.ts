@@ -378,9 +378,51 @@ Deno.serve(async (req) => {
         const parsed = JSON.parse(jsonMatch[0]);
 
         if (asset.kind === "carousel") {
+          // ✅ VALIDATION des slides: chaque slide doit avoir un titre individuel valide
+          let validSlides = parsed.slides || [];
+          
+          // Vérifier si la première slide a un titre concaténé (contient \n ou "Slide X:")
+          if (validSlides.length > 0 && validSlides[0]?.title) {
+            const firstTitle = validSlides[0].title;
+            const hasConcatenation = firstTitle.includes('\n') || 
+                                     firstTitle.includes('Slide ') || 
+                                     firstTitle.length > 120;
+            
+            if (hasConcatenation) {
+              console.warn(`[alfie-generate-texts] ⚠️ Detected concatenated title in asset ${asset.id}, attempting to split...`);
+              // Essayer de splitter le titre concaténé
+              const splitTitles = firstTitle
+                .split(/\n+|Slide\s*\d+\s*:\s*/i)
+                .filter((s: string) => s.trim())
+                .map((s: string) => s.trim());
+              
+              if (splitTitles.length > 1) {
+                console.log(`[alfie-generate-texts] ✅ Split into ${splitTitles.length} slides`);
+                validSlides = splitTitles.slice(0, asset.count || 5).map((title: string, i: number) => ({
+                  title,
+                  subtitle: validSlides[i]?.subtitle || "",
+                  bullets: validSlides[i]?.bullets || [],
+                  author: validSlides[i]?.author || undefined,
+                }));
+              }
+            }
+          }
+          
+          // Valider chaque slide individuellement
+          validSlides = validSlides.map((slide: any, i: number) => ({
+            title: typeof slide.title === 'string' && slide.title.length < 150 
+              ? slide.title.replace(/\n/g, ' ').trim()
+              : "",
+            subtitle: typeof slide.subtitle === 'string' ? slide.subtitle.trim() : "",
+            bullets: Array.isArray(slide.bullets) ? slide.bullets : [],
+            author: slide.author || undefined,
+          }));
+          
+          console.log(`[alfie-generate-texts] ✅ Validated ${validSlides.length} slides for asset ${asset.id}`);
+          
           generatedTexts[asset.id] = {
             kind: "carousel",
-            slides: parsed.slides || [],
+            slides: validSlides,
           };
         } else if (asset.kind.includes("video")) {
           generatedTexts[asset.id] = {

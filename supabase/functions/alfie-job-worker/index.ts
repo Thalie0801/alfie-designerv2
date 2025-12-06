@@ -1039,51 +1039,105 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   const carousel_id = payload.carousel_id || crypto.randomUUID();
   const totalSlides = payload.count || 5;
   
-  // ✅ Phase 3: Fallback SLIDE PAR SLIDE (pas tout ou rien)
-  const aiSlides = payload.generatedTexts?.slides ?? [];
+  // ✅ Extraire le carouselType et carouselMode AVANT le traitement
+  const carouselType = payload.carouselType || 'content';
+  const carouselMode = payload.carouselMode || 'standard';
+  
+  // ✅ Phase 3: Récupérer les slides AI
+  const rawAiSlides = payload.generatedTexts?.slides ?? [];
   const topic = payload.brief?.topic || payload.topic || "Votre sujet";
   const cta = payload.brief?.cta || "En savoir plus";
 
-  // Construire les slides de fallback basées sur le brief
+  console.log(`[processRenderCarousels] 📊 Raw AI slides: ${rawAiSlides.length}, mode: ${carouselMode}, type: ${carouselType}`);
+
+  // ✅ DÉTECTION DES TITRES CONCATÉNÉS
+  // Si un titre contient des retours à la ligne ou "Slide X:" ou est très long, on le split
+  function isConcatenatedTitle(title: string): boolean {
+    if (!title) return false;
+    return title.includes('\n') || 
+           title.includes('Slide ') || 
+           title.includes('slide ') ||
+           title.length > 120;
+  }
+
+  function splitConcatenatedTitle(title: string): string[] {
+    // Essayer de splitter par "\n" ou "Slide X:"
+    const byNewline = title.split(/\n+/).filter(s => s.trim());
+    if (byNewline.length > 1) {
+      return byNewline.map(s => s.replace(/^Slide\s*\d+\s*:\s*/i, '').trim()).filter(Boolean);
+    }
+    // Splitter par "Slide X:" pattern
+    const bySlidePattern = title.split(/Slide\s*\d+\s*:\s*/i).filter(s => s.trim());
+    if (bySlidePattern.length > 1) {
+      return bySlidePattern;
+    }
+    return [title];
+  }
+
+  // ✅ NORMALISER les slides AI (détecter et corriger les concaténations)
+  let aiSlides: any[] = [];
+  
+  if (rawAiSlides.length > 0 && rawAiSlides[0]?.title && isConcatenatedTitle(rawAiSlides[0].title)) {
+    // La slide 1 contient tous les titres concaténés - les splitter
+    console.log("[processRenderCarousels] ⚠️ Detected concatenated title in slide 1, splitting...");
+    const splitTitles = splitConcatenatedTitle(rawAiSlides[0].title);
+    aiSlides = splitTitles.slice(0, totalSlides).map((t, i) => ({
+      title: t,
+      subtitle: rawAiSlides[i]?.subtitle || "",
+      bullets: rawAiSlides[i]?.bullets || [],
+      author: rawAiSlides[i]?.author || undefined,
+    }));
+    console.log(`[processRenderCarousels] ✅ Split into ${aiSlides.length} individual slides`);
+  } else {
+    aiSlides = rawAiSlides;
+  }
+
+  // ✅ Construire les fallback basés sur le brief SANS "Point clé X" générique
+  // En mode Premium, le fallback doit être le topic/brief, pas du texte générique
   const fallbackSlides = Array.from({ length: totalSlides }, (_, i) => {
     if (i === 0) {
       return {
         title: topic,
-        subtitle: "Découvrez les points essentiels",
+        subtitle: "",
         bullets: [],
         alt: `Slide d'introduction : ${topic}`,
       };
     } else if (i === totalSlides - 1) {
       return {
-        title: cta,
-        subtitle: "Passez à l'action",
+        title: cta || topic,
+        subtitle: "",
         bullets: [],
-        alt: `Slide finale : ${cta}`,
+        alt: `Slide finale`,
       };
     } else {
+      // ✅ En mode Premium, NE PAS utiliser "Point clé X" - laisser vide ou utiliser le topic
       return {
-        title: `Point clé ${i}`,
-        subtitle: `${topic} - aspect ${i}`,
-        bullets: [`Détail important ${i}`],
-        alt: `Slide ${i + 1} sur ${topic}`,
+        title: carouselMode === 'premium' ? "" : `Point clé ${i}`,
+        subtitle: "",
+        bullets: [],
+        alt: `Slide ${i + 1}`,
       };
     }
   });
 
-  // ✅ Extraire le carouselType avant la fusion
-  const carouselType = payload.carouselType || 'content';
-
-  // ✅ FUSION : si l'AI a fourni un title, on utilise ses données (pas de fallback subtitle/bullets)
+  // ✅ FUSION avec logique améliorée
   const slides = Array.from({ length: totalSlides }, (_, index) => {
     const ai = aiSlides[index] ?? {};
     const fb = fallbackSlides[index];
 
-    // ✅ L'AI a fourni un titre = utiliser ses données directement
-    const hasAiContent = ai.title && ai.title.trim();
+    // Nettoyer le titre AI (enlever les newlines résiduels)
+    const cleanAiTitle = ai.title?.replace(/\n/g, ' ').trim() || "";
+    const hasValidAiTitle = cleanAiTitle.length > 0 && cleanAiTitle.length < 150;
     
-    const title = hasAiContent ? ai.title : fb.title;
-    const alt = ai.alt || fb.alt || title;
-    // ✅ Auteur pour les citations
+    // Choisir le titre
+    let title = hasValidAiTitle ? cleanAiTitle : fb.title;
+    
+    // ✅ En mode Premium avec fallback vide, skip cette slide ou utiliser le topic
+    if (!title && carouselMode === 'premium') {
+      title = index === 0 ? topic : "";
+    }
+    
+    const alt = ai.alt || fb.alt || title || `Slide ${index + 1}`;
     const author = ai.author || undefined;
 
     // ✅ Pour CITATIONS: JAMAIS de subtitle ni bullets
@@ -1091,19 +1145,36 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
       return { title, subtitle: "", bullets: [], alt, author };
     }
 
-    // ✅ NOUVELLE LOGIQUE pour CONTENT :
-    // - Si l'AI a fourni du contenu (title), utiliser ses subtitle/bullets même s'ils sont vides
-    // - Si l'AI n'a rien fourni, utiliser le fallback complet
-    if (hasAiContent) {
-      // L'AI a généré ce slide - on ne force PAS de fallback générique
-      const subtitle = (ai.subtitle && ai.subtitle.trim()) ? ai.subtitle : "";
-      const bullets = Array.isArray(ai.bullets) && ai.bullets.length > 0 ? ai.bullets : [];
-      return { title, subtitle, bullets, alt, author };
-    } else {
-      // Slide entièrement vide - utiliser le fallback complet
-      return { title: fb.title, subtitle: fb.subtitle, bullets: fb.bullets ?? [], alt, author };
+    // ✅ En mode PREMIUM: NE JAMAIS ajouter de subtitle/bullets fallback génériques
+    if (carouselMode === 'premium') {
+      return {
+        title,
+        subtitle: ai.subtitle?.trim() || "",
+        bullets: Array.isArray(ai.bullets) ? ai.bullets : [],
+        alt,
+        author,
+      };
     }
-  });
+
+    // ✅ Mode STANDARD: garder la logique actuelle mais sans "Point clé X"
+    if (hasValidAiTitle) {
+      return {
+        title,
+        subtitle: ai.subtitle?.trim() || "",
+        bullets: Array.isArray(ai.bullets) && ai.bullets.length > 0 ? ai.bullets : [],
+        alt,
+        author,
+      };
+    } else {
+      return {
+        title: fb.title,
+        subtitle: fb.subtitle,
+        bullets: fb.bullets ?? [],
+        alt,
+        author,
+      };
+    }
+  }).filter(s => s.title || carouselMode !== 'premium'); // Filtrer les slides vides en mode premium
 
   console.log("[processRenderCarousels] ✅ Merged slides with fallback:", 
     slides.map((s, i) => ({ index: i, hasTitle: !!s.title, hasSubtitle: !!s.subtitle }))
@@ -1121,8 +1192,7 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   // ✅ Résoudre useBrandKit avec le helper
   const useBrandKit = resolveUseBrandKit(payload, jobMeta);
   
-  // ✅ Extraire le carouselMode (standard avec overlay Cloudinary, ou premium avec texte intégré)
-  const carouselMode = payload.carouselMode || 'standard';
+  // ✅ carouselMode déjà extrait plus haut
   console.log(`[processRenderCarousels] 🎨 Mode: ${carouselMode} | Type: ${carouselType}`);
   
   // ✅ Le globalStyle contient TOUS les champs Brand Kit V2
