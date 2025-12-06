@@ -54,55 +54,85 @@ export function slideUrl(publicId: string, o: SlideUrlOptions): string {
 
   const title = cleanText(o.title ?? '', 120);
   const sub = cleanText(o.subtitle ?? '', 220);
+  const bodyText = cleanText(o.body ?? '', 300);
   const bullets = (o.bulletPoints ?? []).map((b) => cleanText(b, 80)).slice(0, 6);
   const cta = cleanText(o.cta ?? '', 60);
 
-  // Configuration responsive selon format (layout centré verticalement)
+  // Configuration responsive selon format
   const config = o.aspectRatio === '9:16' 
-    ? { titleSize: 80, subSize: 52, bulletSize: 36, titleY: -350, subOffset: 80, bulletStart: -100, bulletStep: 60 }
+    ? { titleSize: 80, subSize: 52, bulletSize: 36, bodySize: 40 }
     : o.aspectRatio === '16:9'
-    ? { titleSize: 64, subSize: 38, bulletSize: 32, titleY: -200, subOffset: 60, bulletStart: -50, bulletStep: 50 }
+    ? { titleSize: 64, subSize: 38, bulletSize: 32, bodySize: 36 }
     : o.aspectRatio === '1:1'
-    ? { titleSize: 72, subSize: 42, bulletSize: 36, titleY: -280, subOffset: 70, bulletStart: -80, bulletStep: 55 }
-    : { titleSize: 72, subSize: 42, bulletSize: 36, titleY: -320, subOffset: 70, bulletStart: -100, bulletStep: 55 }; // 4:5
+    ? { titleSize: 72, subSize: 42, bulletSize: 36, bodySize: 40 }
+    : { titleSize: 72, subSize: 42, bulletSize: 36, bodySize: 40 }; // 4:5
 
-  // TITRE - centré verticalement vers le haut
-  if (title) {
+  // Déterminer le mode de layout selon le contenu disponible
+  const hasOnlyTitle = title && !sub && !bodyText && bullets.length === 0 && !cta;
+  const hasTitleAndBody = title && bodyText && !sub && bullets.length === 0 && !cta;
+
+  if (hasOnlyTitle) {
+    // MODE 1 : Titre seul → centré verticalement au milieu (y_0)
     overlays.push(
-      `l_text:Arial_${config.titleSize}_bold:${enc(title)},co_rgb:FFFFFF,g_center,y_${config.titleY},w_${Math.round(w * 0.9)},c_fit`
+      `l_text:Arial_${config.titleSize}_bold:${enc(title)},co_rgb:FFFFFF,g_center,y_0,w_${Math.round(w * 0.9)},c_fit`
     );
-  }
-
-  // SOUS-TITRE - juste sous le titre
-  if (sub) {
-    const subY = config.titleY + config.subOffset + (title ? config.titleSize : 0);
+  } else if (hasTitleAndBody) {
+    // MODE 2 : Titre + Corps → titre légèrement au-dessus, corps en dessous
+    const titleY = -80;
+    const bodyY = titleY + config.titleSize + 40;
+    
     overlays.push(
-      `l_text:Arial_${config.subSize}:${enc(sub)},co_rgb:E5E7EB,g_center,y_${subY},w_${Math.round(w * 0.84)},c_fit`
+      `l_text:Arial_${config.titleSize}_bold:${enc(title)},co_rgb:FFFFFF,g_center,y_${titleY},w_${Math.round(w * 0.9)},c_fit`
     );
-  }
-
-  // BODY - entre sous-titre et bullets
-  const bodyText = cleanText(o.body ?? '', 300);
-  if (bodyText) {
-    const bodySize = config.bulletSize + 4; // Légèrement plus grand que bullets
-    const bodyY = config.bulletStart - 80; // Au-dessus des bullets
     overlays.push(
-      `l_text:Arial_${bodySize}:${enc(bodyText)},co_rgb:D1D5DB,g_center,y_${bodyY},w_${Math.round(w * 0.82)},c_fit`
+      `l_text:Arial_${config.bodySize}:${enc(bodyText)},co_rgb:D1D5DB,g_center,y_${bodyY},w_${Math.round(w * 0.82)},c_fit`
     );
-  }
+  } else {
+    // MODE 3 : Layout complet - titre en haut, puis sous-titre, body, bullets, CTA
+    const fullConfig = o.aspectRatio === '9:16' 
+      ? { titleY: -350, subOffset: 80, bulletStart: -100, bulletStep: 60 }
+      : o.aspectRatio === '16:9'
+      ? { titleY: -200, subOffset: 60, bulletStart: -50, bulletStep: 50 }
+      : o.aspectRatio === '1:1'
+      ? { titleY: -280, subOffset: 70, bulletStart: -80, bulletStep: 55 }
+      : { titleY: -320, subOffset: 70, bulletStart: -100, bulletStep: 55 }; // 4:5
 
-  // BULLETS - centrés (tiret ASCII au lieu de • Unicode non supporté par Cloudinary)
-  bullets.forEach((b, i) => {
-    const bulletY = config.bulletStart + i * config.bulletStep;
-    overlays.push(
-      `l_text:Arial_${config.bulletSize}:${enc('- ' + b)},co_rgb:FFFFFF,g_center,y_${bulletY},w_${Math.round(w * 0.8)},c_fit`
-    );
-  });
+    // TITRE
+    if (title) {
+      overlays.push(
+        `l_text:Arial_${config.titleSize}_bold:${enc(title)},co_rgb:FFFFFF,g_center,y_${fullConfig.titleY},w_${Math.round(w * 0.9)},c_fit`
+      );
+    }
 
-  // CTA - en bas
-  if (cta) {
-    const ctaSize = o.aspectRatio === '16:9' ? 44 : 48;
-    overlays.push(`l_text:Arial_${ctaSize}_bold:${enc(cta)},co_rgb:FFFFFF,g_south,y_80`);
+    // SOUS-TITRE
+    if (sub) {
+      const subY = fullConfig.titleY + fullConfig.subOffset + (title ? config.titleSize : 0);
+      overlays.push(
+        `l_text:Arial_${config.subSize}:${enc(sub)},co_rgb:E5E7EB,g_center,y_${subY},w_${Math.round(w * 0.84)},c_fit`
+      );
+    }
+
+    // BODY
+    if (bodyText) {
+      const bodyY = fullConfig.bulletStart - 80;
+      overlays.push(
+        `l_text:Arial_${config.bodySize}:${enc(bodyText)},co_rgb:D1D5DB,g_center,y_${bodyY},w_${Math.round(w * 0.82)},c_fit`
+      );
+    }
+
+    // BULLETS
+    bullets.forEach((b, i) => {
+      const bulletY = fullConfig.bulletStart + i * fullConfig.bulletStep;
+      overlays.push(
+        `l_text:Arial_${config.bulletSize}:${enc('- ' + b)},co_rgb:FFFFFF,g_center,y_${bulletY},w_${Math.round(w * 0.8)},c_fit`
+      );
+    });
+
+    // CTA
+    if (cta) {
+      const ctaSize = o.aspectRatio === '16:9' ? 44 : 48;
+      overlays.push(`l_text:Arial_${ctaSize}_bold:${enc(cta)},co_rgb:FFFFFF,g_south,y_80`);
+    }
   }
 
   const tf = overlays.length ? `/${overlays.join('/')}` : '';
