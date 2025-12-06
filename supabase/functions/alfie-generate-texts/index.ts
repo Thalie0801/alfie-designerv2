@@ -2,12 +2,16 @@
  * alfie-generate-texts
  * 
  * Génère les textes structurés pour un pack d'assets avant la génération visuelle
- * Utilise Gemini pour créer des textes marketing en français parfait
+ * 
+ * ARCHITECTURE:
+ * - Priorité 1: Vertex AI Gemini 2.5 Flash
+ * - Priorité 2: Lovable AI (fallback uniquement)
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, LOVABLE_API_KEY } from "../_shared/env.ts";
+import { callVertexGeminiText, isVertexGeminiTextConfigured } from "../_shared/vertexGeminiText.ts";
 
 const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
@@ -26,18 +30,18 @@ interface AssetBrief {
   tone: string;
   platform: string;
   ratio: string;
-  count?: number; // Pour carrousels
-  durationSeconds?: number; // Pour vidéos
+  count?: number;
+  durationSeconds?: number;
   prompt: string;
-  carouselType?: "citations" | "content"; // Type de carrousel
+  carouselType?: "citations" | "content";
 }
 
 interface SlideText {
   title: string;
   subtitle?: string;
-  body?: string; // Corps explicatif (1-2 phrases)
+  body?: string;
   bullets?: string[];
-  author?: string; // Pour les citations
+  author?: string;
 }
 
 interface ImageText {
@@ -55,13 +59,28 @@ interface VideoText {
 interface GeneratedTexts {
   [assetId: string]: {
     kind: string;
-    slides?: SlideText[]; // Pour carrousels
-    text?: ImageText; // Pour images
-    video?: VideoText; // Pour vidéos
+    slides?: SlideText[];
+    text?: ImageText;
+    video?: VideoText;
   };
 }
 
-async function callGemini(systemPrompt: string, userPrompt: string) {
+/**
+ * Appelle Gemini via Vertex AI (priorité) ou Lovable AI (fallback)
+ */
+async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
+  // Priorité 1: Vertex AI Gemini
+  if (isVertexGeminiTextConfigured()) {
+    console.log("[alfie-generate-texts] 🎯 Using Vertex AI Gemini Flash...");
+    const vertexResult = await callVertexGeminiText(systemPrompt, userPrompt, "flash");
+    if (vertexResult) {
+      return vertexResult;
+    }
+    console.log("[alfie-generate-texts] ⚠️ Vertex AI failed, falling back to Lovable AI...");
+  }
+
+  // Priorité 2: Lovable AI (fallback)
+  console.log("[alfie-generate-texts] 🔄 Using Lovable AI fallback...");
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -78,18 +97,15 @@ async function callGemini(systemPrompt: string, userPrompt: string) {
   });
 
   if (!response.ok) {
-    throw new Error(`Gemini API error: ${response.status}`);
+    throw new Error(`Lovable AI error: ${response.status}`);
   }
 
   const data = await response.json();
   return data.choices?.[0]?.message?.content || "";
 }
 
-/**
- * Build prompt for CITATIONS carousel (quotes + authors only)
- */
 function buildCitationsPrompt(asset: AssetBrief, brandKit: BrandKit, brief: string, useBrandKit: boolean): string {
-  let prompt = `Génère ${asset.count || 5} citations inspirantes pour un carrousel.
+  return `Génère ${asset.count || 5} citations inspirantes pour un carrousel.
 
 [CAMPAGNE_BRIEF]
 ${brief}
@@ -115,13 +131,8 @@ RÈGLES CRITIQUES :
 - Français PARFAIT, sans faute
 - Les citations doivent être en rapport avec le brief
 - Varier les auteurs (célèbres, experts du domaine, anonymes)`;
-
-  return prompt;
 }
 
-/**
- * Build prompt for CONTENT carousel (tips/advice structure)
- */
 function buildCarouselPrompt(asset: AssetBrief, brandKit: BrandKit, brief: string, useBrandKit: boolean): string {
   let prompt = `Génère les textes pour un carrousel de ${asset.count || 5} slides pour réseaux sociaux.
 
@@ -338,16 +349,16 @@ Deno.serve(async (req) => {
       niche: brand.niche || undefined,
     };
 
-    // Générer les textes pour chaque asset
+    console.log(`[alfie-generate-texts] 🚀 Generating texts for ${assets.length} assets (Vertex AI: ${isVertexGeminiTextConfigured() ? 'YES' : 'NO'})`);
+
     const generatedTexts: GeneratedTexts = {};
 
     for (const asset of assets) {
       try {
         let prompt: string;
-        let systemPrompt = "Tu es un expert en copywriting pour réseaux sociaux. Tu génères des textes marketing en français parfait, adaptés à chaque marque et objectif.";
+        const systemPrompt = "Tu es un expert en copywriting pour réseaux sociaux. Tu génères des textes marketing en français parfait, adaptés à chaque marque et objectif.";
 
         if (asset.kind === "carousel") {
-          // ✅ Choisir le prompt selon carouselType
           if (asset.carouselType === "citations") {
             prompt = buildCitationsPrompt(asset, brandKit, brief, useBrandKit);
           } else {
@@ -356,13 +367,11 @@ Deno.serve(async (req) => {
         } else if (asset.kind.includes("video")) {
           prompt = buildVideoPrompt(asset, brandKit, brief, useBrandKit);
         } else {
-          // image only
           prompt = buildImagePrompt(asset, brandKit, brief, useBrandKit);
         }
 
         const response = await callGemini(systemPrompt, prompt);
         
-        // Parser la réponse JSON
         const jsonMatch = response.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
           console.warn(`No JSON found for asset ${asset.id}, using fallback`);
@@ -380,10 +389,8 @@ Deno.serve(async (req) => {
         const parsed = JSON.parse(jsonMatch[0]);
 
         if (asset.kind === "carousel") {
-          // ✅ VALIDATION des slides: chaque slide doit avoir un titre individuel valide
           let validSlides = parsed.slides || [];
           
-          // Vérifier si la première slide a un titre concaténé (contient \n ou "Slide X:")
           if (validSlides.length > 0 && validSlides[0]?.title) {
             const firstTitle = validSlides[0].title;
             const hasConcatenation = firstTitle.includes('\n') || 
@@ -391,15 +398,13 @@ Deno.serve(async (req) => {
                                      firstTitle.length > 120;
             
             if (hasConcatenation) {
-              console.warn(`[alfie-generate-texts] ⚠️ Detected concatenated title in asset ${asset.id}, attempting to split...`);
-              // Essayer de splitter le titre concaténé
+              console.warn(`[alfie-generate-texts] ⚠️ Detected concatenated title, splitting...`);
               const splitTitles = firstTitle
                 .split(/\n+|Slide\s*\d+\s*:\s*/i)
                 .filter((s: string) => s.trim())
                 .map((s: string) => s.trim());
               
               if (splitTitles.length > 1) {
-                console.log(`[alfie-generate-texts] ✅ Split into ${splitTitles.length} slides`);
                 validSlides = splitTitles.slice(0, asset.count || 5).map((title: string, i: number) => ({
                   title,
                   subtitle: validSlides[i]?.subtitle || "",
@@ -410,8 +415,7 @@ Deno.serve(async (req) => {
             }
           }
           
-          // Valider chaque slide individuellement
-          validSlides = validSlides.map((slide: any, i: number) => ({
+          validSlides = validSlides.map((slide: any) => ({
             title: typeof slide.title === 'string' && slide.title.length < 150 
               ? slide.title.replace(/\n/g, ' ').trim()
               : "",
@@ -420,8 +424,6 @@ Deno.serve(async (req) => {
             bullets: Array.isArray(slide.bullets) ? slide.bullets : [],
             author: slide.author || undefined,
           }));
-          
-          console.log(`[alfie-generate-texts] ✅ Validated ${validSlides.length} slides for asset ${asset.id}`);
           
           generatedTexts[asset.id] = {
             kind: "carousel",
@@ -440,7 +442,6 @@ Deno.serve(async (req) => {
         }
       } catch (error) {
         console.error(`Error generating texts for asset ${asset.id}:`, error);
-        // Fallback : utiliser les données existantes
         generatedTexts[asset.id] = {
           kind: asset.kind,
           text: {
@@ -450,6 +451,8 @@ Deno.serve(async (req) => {
         };
       }
     }
+
+    console.log(`[alfie-generate-texts] ✅ Generated texts for ${Object.keys(generatedTexts).length} assets`);
 
     return new Response(
       JSON.stringify({ ok: true, texts: generatedTexts }),
