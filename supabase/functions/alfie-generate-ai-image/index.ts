@@ -5,6 +5,7 @@ import {
   INTERNAL_FN_SECRET,
   LOVABLE_API_KEY 
 } from '../_shared/env.ts';
+import { getAccessToken } from "../_shared/vertexAuth.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";
 import { getModelsForPlan } from "../_shared/aiModels.ts";
@@ -257,12 +258,77 @@ function buildNegativePrompt(input: GenerateRequest) {
   return input.negativePrompt || "";
 }
 
+// ✅ VERTEX AI IMAGEN - Génération d'images via Google Cloud
+async function callVertexImagen(prompt: string, referenceImageUrl?: string | null): Promise<string | null> {
+  const projectId = Deno.env.get("VERTEX_PROJECT_ID");
+  const location = Deno.env.get("VERTEX_LOCATION") || "europe-west9";
+  const serviceAccountJson = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
+
+  if (!projectId || !serviceAccountJson) {
+    console.warn("⚠️ Vertex AI Imagen not configured, falling back to Lovable AI");
+    return null;
+  }
+
+  try {
+    console.log("🎨 [Vertex Imagen] Generating image...");
+    const accessToken = await getAccessToken(serviceAccountJson);
+
+    // Utiliser Imagen 3 pour la génération d'images
+    const model = "imagen-3.0-generate-002";
+    const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:predict`;
+
+    const payload = {
+      instances: [
+        {
+          prompt: prompt,
+        }
+      ],
+      parameters: {
+        sampleCount: 1,
+        aspectRatio: "4:3",
+        safetyFilterLevel: "block_few",
+        personGeneration: "allow_adult",
+        outputMimeType: "image/jpeg",
+      }
+    };
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ Vertex Imagen error:", response.status, errorText.substring(0, 500));
+      return null;
+    }
+
+    const data = await response.json();
+    const base64Image = data?.predictions?.[0]?.bytesBase64Encoded;
+    
+    if (!base64Image) {
+      console.warn("⚠️ Vertex Imagen returned no image");
+      return null;
+    }
+
+    console.log("✅ Vertex Imagen generated image successfully");
+    return `data:image/jpeg;base64,${base64Image}`;
+  } catch (error: any) {
+    console.error("❌ Vertex Imagen exception:", error?.message || error);
+    return null;
+  }
+}
+
 async function callLovableOnce(opts: { apiKey: string; system: string; userContent: any[]; userPlan?: string }) {
   const { apiKey, system, userContent, userPlan } = opts;
   
   // ✅ Tous les plans utilisent maintenant le modèle Premium
   const models = getModelsForPlan(userPlan);
-  console.log(`🎨 [alfie-generate-ai-image] Using Premium tier - Model: ${models.image}`);
+  console.log(`🎨 [alfie-generate-ai-image] Using Lovable AI - Model: ${models.image}`);
   
   const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -294,7 +360,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    // ✅ Lovable AI plus obligatoire si Vertex AI configuré
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error("Supabase env not configured");
     }
@@ -346,53 +412,71 @@ Deno.serve(async (req) => {
       userContent.push({ type: "text", text: `Negative prompt: ${negative}` });
     }
 
-    // --- 1er appel Lovable ---
-    const resp = await callLovableOnce({
-      apiKey: LOVABLE_API_KEY,
-      system: systemPrompt,
-      userContent,
-      userPlan: body.userPlan, // ✅ Plan utilisateur pour sélection du modèle
-    });
-
-    if (!resp.ok) {
-      const errText = await resp.text().catch(() => "");
-      console.error("Lovable error:", resp.status, short(errText, 500));
-
-      if (resp.status === 429)
-        return jsonRes({ error: "Rate limit exceeded. Please try again later." }, { status: 429 });
-      if (resp.status === 402)
-        return jsonRes({ error: "Insufficient credits. Please add credits to your workspace." }, { status: 402 });
-
-      throw new Error(`AI gateway error: ${resp.status}`);
+    // --- 1. Essayer Vertex AI Imagen d'abord ---
+    let generatedImageUrl: string | undefined;
+    
+    const vertexConfigured = Deno.env.get("VERTEX_PROJECT_ID") && Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
+    if (vertexConfigured) {
+      console.log("🎯 [alfie-generate-ai-image] Trying Vertex AI Imagen first...");
+      const vertexImage = await callVertexImagen(fullPrompt, referenceImage);
+      if (vertexImage) {
+        generatedImageUrl = vertexImage;
+        console.log("✅ Vertex AI Imagen succeeded");
+      } else {
+        console.warn("⚠️ Vertex AI Imagen failed, falling back to Lovable AI");
+      }
     }
 
-    const data = await resp.json();
-    let generatedImageUrl: string | undefined = data?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-
-    // --- Retry unique si pas d'image ---
-    if (!generatedImageUrl) {
-      const retryPrompt =
-        fullPrompt +
-        "\n\nIMPORTANT: You MUST return an image. Generate a single canvas, no tiles, no grids, no multiple frames. One composition.";
-      const retryContent = [{ type: "text", text: retryPrompt }] as any[];
-      if (referenceImage) {
-        retryContent.push({ type: "image_url", image_url: { url: referenceImage } });
-      }
-      if (negative) retryContent.push({ type: "text", text: `Negative prompt: ${negative}` });
-
-      const retry = await callLovableOnce({
+    // --- 2. Fallback Lovable AI si Vertex échoue ---
+    if (!generatedImageUrl && LOVABLE_API_KEY) {
+      console.log("🔄 Using Lovable AI as fallback...");
+      const resp = await callLovableOnce({
         apiKey: LOVABLE_API_KEY,
-        system:
-          "You are a professional image generator. Always produce exactly ONE high-quality image in message.images[0]. Use PERFECT French spelling with proper accents.",
-        userContent: retryContent,
-        userPlan: body.userPlan, // ✅ Plan utilisateur pour sélection du modèle
+        system: systemPrompt,
+        userContent,
+        userPlan: body.userPlan,
       });
 
-      const retryJson = await retry.json().catch(() => null);
-      generatedImageUrl = retryJson?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => "");
+        console.error("Lovable error:", resp.status, short(errText, 500));
 
-      if (!generatedImageUrl) throw new Error("No image generated");
+        if (resp.status === 429)
+          return jsonRes({ error: "Rate limit exceeded. Please try again later." }, { status: 429 });
+        if (resp.status === 402)
+          return jsonRes({ error: "Insufficient credits. Please add credits to your workspace." }, { status: 402 });
+
+        throw new Error(`AI gateway error: ${resp.status}`);
+      }
+
+      const data = await resp.json();
+      generatedImageUrl = data?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+
+      // --- Retry unique si pas d'image ---
+      if (!generatedImageUrl) {
+        const retryPrompt =
+          fullPrompt +
+          "\n\nIMPORTANT: You MUST return an image. Generate a single canvas, no tiles, no grids, no multiple frames. One composition.";
+        const retryContent = [{ type: "text", text: retryPrompt }] as any[];
+        if (referenceImage) {
+          retryContent.push({ type: "image_url", image_url: { url: referenceImage } });
+        }
+        if (negative) retryContent.push({ type: "text", text: `Negative prompt: ${negative}` });
+
+        const retry = await callLovableOnce({
+          apiKey: LOVABLE_API_KEY,
+          system:
+            "You are a professional image generator. Always produce exactly ONE high-quality image in message.images[0]. Use PERFECT French spelling with proper accents.",
+          userContent: retryContent,
+          userPlan: body.userPlan,
+        });
+
+        const retryJson = await retry.json().catch(() => null);
+        generatedImageUrl = retryJson?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      }
     }
+
+    if (!generatedImageUrl) throw new Error("No image generated - both Vertex AI and Lovable AI failed");
 
     // --- Upload sur Cloudinary pour stockage permanent ---
     let cloudinaryPublicId: string | null = null;
@@ -532,7 +616,7 @@ Deno.serve(async (req) => {
     return jsonRes({
       imageUrl: generatedImageUrl,
       cloudinaryPublicId: cloudinaryPublicId || null,
-      message: data?.choices?.[0]?.message?.content || "Image générée avec succès",
+      message: "Image générée avec succès",
       saved,
       errorDetail,
     });
