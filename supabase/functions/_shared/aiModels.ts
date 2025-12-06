@@ -1,31 +1,51 @@
 /**
  * Configuration des modèles IA
- * Tous les plans utilisent maintenant Gemini 3 Pro (y compris Starter 39€)
+ * 
+ * ARCHITECTURE:
+ * - Priorité 1: Vertex AI Gemini 2.5 (utilise crédits Google Cloud)
+ * - Priorité 2: Lovable AI (fallback uniquement)
  */
 
 export type AITier = 'standard' | 'premium';
+export type CarouselMode = 'standard' | 'premium';
 
 export interface AIModelsConfig {
   text: string;
   image: string;
 }
 
-// ✅ Tous les plans utilisent Gemini 3 Pro
-export const AI_MODELS: AIModelsConfig = {
+// ============================================
+// VERTEX AI MODELS (Priorité 1 - Google Cloud)
+// ============================================
+export const VERTEX_MODELS = {
+  text: 'gemini-2.5-pro',
+  image_standard: 'gemini-2.5-flash-preview-05-20',  // Flash pour génération rapide
+  image_premium: 'gemini-2.5-pro-preview-05-06',     // Pro pour qualité maximum
+  chat: 'gemini-2.5-pro',
+};
+
+// ============================================
+// LOVABLE AI MODELS (Fallback uniquement)
+// ============================================
+export const LOVABLE_MODELS = {
   text: 'google/gemini-2.5-pro',
-  image: 'google/gemini-3-pro-image-preview',
+  image_standard: 'google/gemini-2.5-flash-image-preview',
+  image_premium: 'google/gemini-3-pro-image-preview',
 };
 
-// ✅ Configuration spécifique carrousels (toggle Standard/Premium)
+// ✅ Configuration par défaut (Lovable AI - sera overridé par Vertex si configuré)
+export const AI_MODELS: AIModelsConfig = {
+  text: LOVABLE_MODELS.text,
+  image: LOVABLE_MODELS.image_premium,
+};
+
+// ✅ Configuration carrousels
 export const CAROUSEL_MODELS = {
-  standard: 'google/gemini-2.5-flash-image-preview',  // Rapide + overlay Cloudinary
-  premium: 'google/gemini-3-pro-image-preview',       // Texte intégré nativement
+  standard: LOVABLE_MODELS.image_standard,
+  premium: LOVABLE_MODELS.image_premium,
 };
-
-export type CarouselMode = 'standard' | 'premium';
 
 export function getModelsForPlan(_plan?: string | null, _forcePremium?: boolean): AIModelsConfig {
-  // ✅ Tous les plans utilisent les mêmes modèles maintenant
   return AI_MODELS;
 }
 
@@ -34,12 +54,19 @@ export function getCarouselModel(mode: CarouselMode): string {
 }
 
 export function getModelDescription(_plan?: string | null, _forcePremium?: boolean): string {
-  return 'IA Premium (Gemini 3 Pro) - Qualité maximum';
+  return 'Vertex AI Gemini 2.5 Pro - Qualité maximum';
 }
 
 /**
- * Tous les utilisateurs ont maintenant accès Premium
+ * Tous les utilisateurs ont accès Premium
  */
 export function hasPremiumAccess(_plan?: string | null, _hasPurchasedPacks?: boolean): boolean {
   return true;
+}
+
+/**
+ * Retourne le modèle Vertex AI selon le mode carrousel
+ */
+export function getVertexCarouselModel(mode: CarouselMode): "flash" | "pro" {
+  return mode === 'premium' ? 'pro' : 'flash';
 }

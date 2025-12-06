@@ -1,10 +1,11 @@
 // functions/alfie-render-carousel-slide/index.ts
-// v2.6.0 — Slide renderer with Standard/Premium mode (text overlay vs native text)
+// v2.7.0 — Slide renderer with Vertex AI Gemini 2.5 priority + Lovable fallback
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { uploadTextAsRaw } from "../_shared/cloudinaryUploader.ts";
 import { buildCarouselSlideUrl, Slide, CarouselType } from "../_shared/imageCompositor.ts";
-import { getCarouselModel } from "../_shared/aiModels.ts";
+import { getCarouselModel, getVertexCarouselModel, LOVABLE_MODELS } from "../_shared/aiModels.ts";
+import { callVertexGeminiImage, isVertexGeminiConfigured } from "../_shared/vertexGeminiImage.ts";
 import { 
   SUPABASE_URL, 
   SUPABASE_SERVICE_ROLE_KEY, 
@@ -61,8 +62,9 @@ interface SlideRequest {
 
 type GenSize = { w: number; h: number };
 
-const MODEL_IMAGE_STANDARD = "google/gemini-2.5-flash-image-preview";
-const MODEL_IMAGE_PREMIUM = "google/gemini-3-pro-image-preview";
+// ✅ Modèles Lovable AI (fallback uniquement)
+const MODEL_IMAGE_STANDARD = LOVABLE_MODELS.image_standard;
+const MODEL_IMAGE_PREMIUM = LOVABLE_MODELS.image_premium;
 
 const AR_MAP: Record<string, GenSize> = {
   "1:1":  { w: 1024, h: 1024 },
@@ -444,9 +446,8 @@ Deno.serve(async (req) => {
     console.log(`[render-slide] ${logCtx}   ↳ text_public_id: ${textPublicId}`);
 
     // =========================================
-    // STEP 2/4 — Générer background (Lovable AI)
+    // STEP 2/4 — Générer background (Vertex AI Gemini priorité)
     // =========================================
-    console.log(`[render-slide] ${logCtx} 2/4 Generate ${carouselMode === 'premium' ? 'slide WITH text' : 'background'} via Lovable AI`);
     
     // ✅ Prompt différent selon le mode
     const enrichedPrompt = carouselMode === 'premium'
@@ -468,50 +469,75 @@ Deno.serve(async (req) => {
           totalSlides
         );
 
-    const aiRes = await fetchWithRetries(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
+    let bgUrl: string | null = null;
+
+    // ✅ PRIORITÉ 1: Vertex AI Gemini 2.5
+    if (isVertexGeminiConfigured()) {
+      const vertexModel = getVertexCarouselModel(carouselMode);
+      console.log(`[render-slide] ${logCtx} 2/4 Trying Vertex AI Gemini ${vertexModel}...`);
+      
+      try {
+        const vertexImage = await callVertexGeminiImage(enrichedPrompt, vertexModel);
+        if (vertexImage) {
+          bgUrl = vertexImage;
+          console.log(`[render-slide] ${logCtx} ✅ Vertex AI Gemini succeeded`);
+        } else {
+          console.warn(`[render-slide] ${logCtx} ⚠️ Vertex AI Gemini returned no image`);
+        }
+      } catch (vertexErr) {
+        console.error(`[render-slide] ${logCtx} ❌ Vertex AI Gemini error:`, vertexErr);
+      }
+    }
+
+    // ✅ PRIORITÉ 2: Fallback Lovable AI
+    if (!bgUrl) {
+      const MODEL_IMAGE = carouselMode === 'premium' ? MODEL_IMAGE_PREMIUM : MODEL_IMAGE_STANDARD;
+      console.log(`[render-slide] ${logCtx} 2/4 Fallback to Lovable AI (${MODEL_IMAGE})...`);
+      
+      const aiRes = await fetchWithRetries(
+        "https://ai.gateway.lovable.dev/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: MODEL_IMAGE,
+            messages: [{ role: "user", content: enrichedPrompt }],
+            modalities: ["image", "text"],
+            size_hint: { width: size.w, height: size.h },
+          }),
         },
-        body: JSON.stringify({
-          model: MODEL_IMAGE,
-          messages: [{ role: "user", content: enrichedPrompt }],
-          modalities: ["image", "text"],
-          // hint de taille — ignoré si non supporté
-          size_hint: { width: size.w, height: size.h },
-        }),
-      },
-      2
-    );
+        2
+      );
 
-    if (aiRes.status === 429) {
-      console.error(`[render-slide] ${logCtx} ⏱️ Rate limit (429) after retries`);
-      return json({ error: "Rate limit exceeded, please try again shortly." }, 429);
-    }
-    if (aiRes.status === 402) {
-      console.error(`[render-slide] ${logCtx} 💳 Insufficient credits (402)`);
-      return json({ error: "Insufficient credits for AI generation" }, 402);
-    }
-    if (!aiRes.ok) {
-      const errTxt = await aiRes.text().catch(() => "");
-      console.error(`[render-slide] ${logCtx} ❌ AI error:`, aiRes.status, errTxt.slice(0, 600));
-      return json({ error: `Background generation failed (${aiRes.status})` }, 502);
-    }
+      if (aiRes.status === 429) {
+        console.error(`[render-slide] ${logCtx} ⏱️ Rate limit (429) after retries`);
+        return json({ error: "Rate limit exceeded, please try again shortly." }, 429);
+      }
+      if (aiRes.status === 402) {
+        console.error(`[render-slide] ${logCtx} 💳 Insufficient credits (402)`);
+        return json({ error: "Insufficient credits for AI generation" }, 402);
+      }
+      if (!aiRes.ok) {
+        const errTxt = await aiRes.text().catch(() => "");
+        console.error(`[render-slide] ${logCtx} ❌ AI error:`, aiRes.status, errTxt.slice(0, 600));
+        return json({ error: `Background generation failed (${aiRes.status})` }, 502);
+      }
 
-    const aiData = await aiRes.json().catch(() => ({}));
-    const bgUrl =
-      aiData?.choices?.[0]?.message?.images?.[0]?.image_url?.url ||
-      aiData?.choices?.[0]?.message?.content?.[0]?.image_url?.url ||
-      aiData?.choices?.[0]?.message?.image_url?.url ||
-      aiData?.image_url?.url ||
-      null;
+      const aiData = await aiRes.json().catch(() => ({}));
+      bgUrl =
+        aiData?.choices?.[0]?.message?.images?.[0]?.image_url?.url ||
+        aiData?.choices?.[0]?.message?.content?.[0]?.image_url?.url ||
+        aiData?.choices?.[0]?.message?.image_url?.url ||
+        aiData?.image_url?.url ||
+        null;
+    }
 
     if (!bgUrl) {
-      console.error(`[render-slide] ${logCtx} ❌ No background URL in AI response:`, JSON.stringify(aiData).slice(0, 1200));
-      return json({ error: "AI did not return an image URL", details: aiData }, 500);
+      console.error(`[render-slide] ${logCtx} ❌ No background URL from any AI provider`);
+      return json({ error: "AI did not return an image URL" }, 500);
     }
     console.log(`[render-slide] ${logCtx}   ↳ background_url: ${String(bgUrl).slice(0, 120)}`);
 
