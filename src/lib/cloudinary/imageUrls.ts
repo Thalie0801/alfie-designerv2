@@ -72,66 +72,66 @@ export function slideUrl(publicId: string, o: SlideUrlOptions): string {
   const hasTitleAndBody = title && bodyText && !sub && bullets.length === 0 && !cta;
 
   if (hasOnlyTitle) {
-    // MODE 1 : Titre seul → centré verticalement au milieu (y_0)
+    // MODE 1 : Titre seul → CENTRÉ verticalement avec CONTRASTE
     overlays.push(
-      `l_text:Arial_${config.titleSize}_bold:${enc(title)},co_rgb:FFFFFF,g_center,y_0,w_${Math.round(w * 0.9)},c_fit`
+      `l_text:Arial_${config.titleSize}_bold:${enc(title)},co_rgb:FFFFFF,e_stroke:8:co_rgb:000000,e_shadow:50,g_center,y_0,w_${Math.round(w * 0.9)},c_fit`
     );
   } else if (hasTitleAndBody) {
-    // MODE 2 : Titre + Corps → titre légèrement au-dessus, corps en dessous
-    const titleY = -80;
-    const bodyY = titleY + config.titleSize + 40;
+    // MODE 2 : Titre + Corps → CENTRÉS avec CONTRASTE
+    const titleY = -60;
+    const bodyY = titleY + config.titleSize + 30;
     
     overlays.push(
-      `l_text:Arial_${config.titleSize}_bold:${enc(title)},co_rgb:FFFFFF,g_center,y_${titleY},w_${Math.round(w * 0.9)},c_fit`
+      `l_text:Arial_${config.titleSize}_bold:${enc(title)},co_rgb:FFFFFF,e_stroke:8:co_rgb:000000,e_shadow:50,g_center,y_${titleY},w_${Math.round(w * 0.9)},c_fit`
     );
     overlays.push(
-      `l_text:Arial_${config.bodySize}:${enc(bodyText)},co_rgb:D1D5DB,g_center,y_${bodyY},w_${Math.round(w * 0.82)},c_fit`
+      `l_text:Arial_${config.bodySize}:${enc(bodyText)},co_rgb:FFFFFF,e_stroke:4:co_rgb:000000,e_shadow:40,g_center,y_${bodyY},w_${Math.round(w * 0.82)},c_fit`
     );
   } else {
-    // MODE 3 : Layout complet - titre en haut, puis sous-titre, body, bullets, CTA
+    // MODE 3 : Layout complet - CENTRÉ avec CONTRASTE
     const fullConfig = o.aspectRatio === '9:16' 
-      ? { titleY: -350, subOffset: 80, bulletStart: -100, bulletStep: 60 }
+      ? { titleY: -120, subOffset: 80, bulletStart: 60, bulletStep: 60 }
       : o.aspectRatio === '16:9'
-      ? { titleY: -200, subOffset: 60, bulletStart: -50, bulletStep: 50 }
+      ? { titleY: -80, subOffset: 60, bulletStart: 40, bulletStep: 50 }
       : o.aspectRatio === '1:1'
-      ? { titleY: -280, subOffset: 70, bulletStart: -80, bulletStep: 55 }
-      : { titleY: -320, subOffset: 70, bulletStart: -100, bulletStep: 55 }; // 4:5
+      ? { titleY: -100, subOffset: 70, bulletStart: 50, bulletStep: 55 }
+      : { titleY: -100, subOffset: 70, bulletStart: 50, bulletStep: 55 }; // 4:5
 
-    // TITRE
+    // TITRE (CENTRÉ)
     if (title) {
       overlays.push(
-        `l_text:Arial_${config.titleSize}_bold:${enc(title)},co_rgb:FFFFFF,g_center,y_${fullConfig.titleY},w_${Math.round(w * 0.9)},c_fit`
+        `l_text:Arial_${config.titleSize}_bold:${enc(title)},co_rgb:FFFFFF,e_stroke:8:co_rgb:000000,e_shadow:50,g_center,y_${fullConfig.titleY},w_${Math.round(w * 0.9)},c_fit`
       );
     }
 
-    // SOUS-TITRE
+    // SOUS-TITRE (CENTRÉ sous le titre)
     if (sub) {
-      const subY = fullConfig.titleY + fullConfig.subOffset + (title ? config.titleSize : 0);
+      const subY = fullConfig.titleY + fullConfig.subOffset + (title ? 40 : 0);
       overlays.push(
-        `l_text:Arial_${config.subSize}:${enc(sub)},co_rgb:E5E7EB,g_center,y_${subY},w_${Math.round(w * 0.84)},c_fit`
+        `l_text:Arial_${config.subSize}:${enc(sub)},co_rgb:FFFFFF,e_stroke:5:co_rgb:000000,e_shadow:40,g_center,y_${subY},w_${Math.round(w * 0.84)},c_fit`
       );
     }
 
-    // BODY
+    // BODY (CENTRÉ)
     if (bodyText) {
-      const bodyY = fullConfig.bulletStart - 80;
+      const bodyY = fullConfig.bulletStart;
       overlays.push(
-        `l_text:Arial_${config.bodySize}:${enc(bodyText)},co_rgb:D1D5DB,g_center,y_${bodyY},w_${Math.round(w * 0.82)},c_fit`
+        `l_text:Arial_${config.bodySize}:${enc(bodyText)},co_rgb:FFFFFF,e_stroke:4:co_rgb:000000,e_shadow:40,g_center,y_${bodyY},w_${Math.round(w * 0.82)},c_fit`
       );
     }
 
-    // BULLETS
+    // BULLETS (CENTRÉS)
     bullets.forEach((b, i) => {
-      const bulletY = fullConfig.bulletStart + i * fullConfig.bulletStep;
+      const bulletY = fullConfig.bulletStart + (bodyText ? 80 : 0) + i * fullConfig.bulletStep;
       overlays.push(
-        `l_text:Arial_${config.bulletSize}:${enc('- ' + b)},co_rgb:FFFFFF,g_center,y_${bulletY},w_${Math.round(w * 0.8)},c_fit`
+        `l_text:Arial_${config.bulletSize}:${enc('- ' + b)},co_rgb:FFFFFF,e_stroke:4:co_rgb:000000,e_shadow:40,g_center,y_${bulletY},w_${Math.round(w * 0.8)},c_fit`
       );
     });
 
-    // CTA
+    // CTA (en bas centré)
     if (cta) {
       const ctaSize = o.aspectRatio === '16:9' ? 44 : 48;
-      overlays.push(`l_text:Arial_${ctaSize}_bold:${enc(cta)},co_rgb:FFFFFF,g_south,y_80`);
+      overlays.push(`l_text:Arial_${ctaSize}_bold:${enc(cta)},co_rgb:FFFFFF,e_stroke:6:co_rgb:000000,e_shadow:50,g_center,y_250`);
     }
   }
 
