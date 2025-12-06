@@ -1048,49 +1048,49 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   // ✅ Phase 3: Récupérer les slides AI
   const rawAiSlides = payload.generatedTexts?.slides ?? [];
   
-  // ✅ PARSER les prompts structurés - supporte plusieurs formats :
-  // - "Slide N : texte"
-  // - "Slide N – texte" (tiret long)
-  // - "Slide N - texte" (tiret simple)
-  // - "Slide N\n texte" (saut de ligne)
+  // ✅ PARSER les prompts structurés STRICTEMENT
+  // UNIQUEMENT le format explicite : "Slide 1 : texte", "Slide 2 : texte", etc.
+  // NE DÉTECTE PAS "5 slides" ou "carrousel de 5 slides"
   function parseStructuredPrompt(prompt: string): Array<{ title: string; subtitle?: string; body?: string }> | null {
     if (!prompt) return null;
     
-    // Pattern universel : "Slide" suivi d'un numéro, puis séparateur (: – - ou newline)
-    const slidePattern = /slide\s*\d+\s*[:\–\-–—]?\s*[^\n]*/gi;
-    const matches = prompt.match(slidePattern);
+    // ✅ REGEX STRICT : "Slide" + numéro + séparateur obligatoire (: – - —)
+    // Doit être en début de ligne ou après un saut de ligne
+    const strictPattern = /(?:^|\n)\s*slide\s*(\d+)\s*[:\–\-–—]\s*/gi;
+    const matches = [...prompt.matchAll(strictPattern)];
     
-    // Vérifier qu'on a au moins 2 slides
-    if (!matches || matches.length < 2) {
-      console.log(`[parseStructuredPrompt] No structured format detected (matches: ${matches?.length || 0})`);
+    // Vérifier qu'on a au moins 2 slides avec le format strict
+    if (matches.length < 2) {
+      console.log(`[parseStructuredPrompt] No strict format detected (matches: ${matches.length})`);
       return null;
     }
     
     console.log(`[parseStructuredPrompt] ✅ Detected ${matches.length} slides in structured prompt`);
     
-    // Splitter le prompt en sections par "Slide N"
-    const sections = prompt.split(/slide\s*\d+\s*[:\–\-–—]?\s*/i).filter(s => s.trim());
+    // Extraire le contenu entre chaque "Slide N :"
+    const slides: Array<{ title: string; subtitle?: string; body?: string }> = [];
     
-    console.log(`[parseStructuredPrompt] Split into ${sections.length} sections`);
-    
-    if (sections.length >= 2) {
-      return sections.map((section, i) => {
-        // Nettoyer la section
-        const lines = section
-          .split(/\n+/)
-          .map(l => l.replace(/^[>\*\-•]\s*/, '').trim()) // Retirer les bullets/quotes
-          .filter(l => l && !l.match(/^(texte|sous-?texte|petit|titre|erreur)/i)); // Retirer les labels
-        
-        const title = lines[0]?.slice(0, 80) || `Slide ${i + 1}`;
-        const subtitle = lines[1]?.slice(0, 100) || "";
-        const body = lines.slice(1).join(' ').slice(0, 200) || "";
-        
-        console.log(`[parseStructuredPrompt] Slide ${i + 1}: title="${title.slice(0, 30)}...", hasSubtitle=${!!subtitle}, hasBody=${!!body}`);
-        
-        return { title, subtitle, body };
-      });
+    for (let i = 0; i < matches.length; i++) {
+      const startIdx = matches[i].index! + matches[i][0].length;
+      const endIdx = i + 1 < matches.length ? matches[i + 1].index! : prompt.length;
+      const content = prompt.slice(startIdx, endIdx).trim();
+      
+      // Nettoyer le contenu
+      const lines = content
+        .split(/\n+/)
+        .map(l => l.replace(/^[>\*\-•]\s*/, '').trim())
+        .filter(l => l && !l.match(/^(texte|sous-?texte|petit|titre|erreur)/i));
+      
+      const title = lines[0]?.slice(0, 80) || `Slide ${i + 1}`;
+      const subtitle = lines[1]?.slice(0, 100) || "";
+      const body = lines.slice(1).join(' ').slice(0, 200) || "";
+      
+      console.log(`[parseStructuredPrompt] Slide ${i + 1}: title="${title.slice(0, 30)}..."`);
+      
+      slides.push({ title, subtitle, body });
     }
-    return null;
+    
+    return slides.length >= 2 ? slides : null;
   }
   
   // ✅ NETTOYAGE DU TOPIC: extraire le thème réel du prompt brut
