@@ -1229,13 +1229,24 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   // ========================================
   let carouselSlides: CarouselSlide[];
   
+  // ✅ CONVERSION: Si generatedTexts.slides existe, le convertir en carousel_slides
+  if (!payload.carousel_slides && payload.generatedTexts?.slides?.length > 0) {
+    console.log(`[processRenderCarousels] ♻️ Converting generatedTexts.slides (${payload.generatedTexts.slides.length}) to carousel_slides`);
+    payload.carousel_slides = payload.generatedTexts.slides.map((slide: any, i: number) => ({
+      slide_number: i + 1,
+      title_on_image: slide.title || "",
+      text_on_image: slide.subtitle || slide.body || "",
+      caption: slide.caption || "",
+    }));
+  }
+  
   // Vérifier si le plan existe déjà dans le payload (évite re-génération sur retry)
   if (payload.carousel_slides && Array.isArray(payload.carousel_slides) && payload.carousel_slides.length > 0) {
     console.log(`[processRenderCarousels] ✅ Using existing carousel_slides from payload (${payload.carousel_slides.length} slides)`);
     carouselSlides = payload.carousel_slides;
   } else {
-    // Générer le plan via Gemini
-    console.log(`[processRenderCarousels] 🎯 Generating carousel plan via Gemini...`);
+    // Générer le plan via Gemini (fallback si aucun texte fourni)
+    console.log(`[processRenderCarousels] 🎯 Generating carousel plan via Gemini (no existing slides)...`);
     carouselSlides = await generateCarouselPlan(
       topic,
       totalSlides,
