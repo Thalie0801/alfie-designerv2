@@ -118,6 +118,7 @@ function getSlideRole(index: number, total: number): string {
 /**
  * Build prompt for STANDARD mode (PURE IMAGE ONLY - NO TEXT AT ALL)
  * Text is added AFTER via Cloudinary overlay
+ * ✅ NE CONTIENT AUCUN TEXTE UTILISATEUR - uniquement des descriptions visuelles abstraites
  */
 function buildImagePromptStandard(
   globalStyle: string, 
@@ -127,33 +128,46 @@ function buildImagePromptStandard(
   slideIndex: number,
   totalSlides: number
 ): string {
-  // Thème global de la campagne (contenu utilisateur)
-  const globalTheme = prompt?.trim() || "Professional business";
+  // ✅ EXTRAIRE UNIQUEMENT LES CONCEPTS VISUELS, pas le texte brut
+  // Convertir le prompt en thème abstrait sans phrases lisibles
+  const extractVisualConcept = (rawPrompt: string): string => {
+    if (!rawPrompt) return "modern professional design";
+    
+    // Mots-clés visuels à extraire
+    const visualKeywords = rawPrompt.toLowerCase().match(
+      /(tech|ia|ai|business|marketing|social|digital|créatif|innovation|productivité|santé|bien-être|nature|voyage|food|cuisine|fitness|mode|fashion|beauté|immobilier|finance|éducation|musique|art|sport)/gi
+    );
+    
+    if (visualKeywords && visualKeywords.length > 0) {
+      return `${visualKeywords[0]} themed visual, modern aesthetic`;
+    }
+    
+    return "modern professional design";
+  };
+  
+  const visualConcept = extractVisualConcept(prompt);
   
   const styleHint = useBrandKit && globalStyle 
     ? globalStyle 
-    : "soft gradient background, pastel colors, modern aesthetic";
+    : "soft gradient background, pastel colors";
   
-  return `Generate ONE background illustration for a social media carousel slide.
+  return `Generate ONE abstract background illustration.
 
-VISUAL THEME: ${globalTheme}
-
+VISUAL CONCEPT: ${visualConcept}
 STYLE: ${styleHint}
 
 COMPOSITION:
-- Soft, elegant background suitable for text overlay
-- Can include subtle 3D elements, soft gradients, abstract shapes
-- Leave central area clean for text placement
+- Abstract, elegant background with soft 3D elements
+- Geometric shapes, gradients, subtle depth
+- Clean central area for future overlay
 - Professional social media aesthetic
 
-=== ABSOLUTE PROHIBITIONS (CRITICAL) ===
-❌ NO TEXT of any kind - no letters, words, numbers, labels
-❌ NO typography, NO captions, NO titles, NO subtitles
-❌ NO logos, NO watermarks, NO icons with text
-❌ NO UI elements, NO buttons, NO signs
-❌ The image must be 100% text-free
+=== CRITICAL RULE ===
+This image must contain ZERO TEXT.
+No letters. No words. No numbers. No labels. No typography.
+Only abstract visual elements and colors.
 
-OUTPUT: Pure visual background image with NO text whatsoever.`
+OUTPUT: Pure abstract visual background.`
 }
 
 /**
