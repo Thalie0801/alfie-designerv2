@@ -121,47 +121,77 @@ function buildOverlayUrl(slide: any): string | null {
   
   const overlays: string[] = [];
   
-  // Configuration responsive selon format (layout centré verticalement)
+  // Configuration selon format
   const config = format === '9:16' 
-    ? { titleSize: 80, subSize: 52, bulletSize: 36, titleY: -350, subOffset: 80, bulletStart: -100, bulletStep: 60 }
+    ? { titleSize: 80, subSize: 52, bulletSize: 36, bodySize: 40 }
     : format === '16:9'
-    ? { titleSize: 64, subSize: 38, bulletSize: 32, titleY: -200, subOffset: 60, bulletStart: -50, bulletStep: 50 }
+    ? { titleSize: 64, subSize: 38, bulletSize: 32, bodySize: 36 }
     : format === '1:1'
-    ? { titleSize: 72, subSize: 42, bulletSize: 36, titleY: -280, subOffset: 70, bulletStart: -80, bulletStep: 55 }
-    : { titleSize: 72, subSize: 42, bulletSize: 36, titleY: -320, subOffset: 70, bulletStart: -100, bulletStep: 55 }; // 4:5
-  
-  // TITRE - centré verticalement vers le haut
-  overlays.push(
-    `l_text:Arial_${config.titleSize}_bold:${encodeCloudinaryText(cleanTitle)},co_rgb:FFFFFF,g_center,y_${config.titleY},w_${Math.round(dims.w * 0.9)},c_fit`
-  );
-  
-  // SOUS-TITRE - juste sous le titre
-  if (cleanSubtitle && cleanSubtitle.trim() !== '') {
-    const subY = config.titleY + config.subOffset + config.titleSize;
-    overlays.push(
-      `l_text:Arial_${config.subSize}:${encodeCloudinaryText(cleanSubtitle)},co_rgb:E5E7EB,g_center,y_${subY},w_${Math.round(dims.w * 0.84)},c_fit`
-    );
-  }
-  
-  // BODY - entre sous-titre et bullets
-  if (cleanBody && cleanBody.trim() !== '') {
-    const bodySize = config.bulletSize + 4;
-    const bodyY = config.bulletStart - 80;
-    overlays.push(
-      `l_text:Arial_${bodySize}:${encodeCloudinaryText(cleanBody)},co_rgb:D1D5DB,g_center,y_${bodyY},w_${Math.round(dims.w * 0.82)},c_fit`
-    );
-  }
+    ? { titleSize: 72, subSize: 42, bulletSize: 36, bodySize: 40 }
+    : { titleSize: 72, subSize: 42, bulletSize: 36, bodySize: 40 }; // 4:5
 
-  // BULLETS - centrés
-  if (cleanBullets.length > 0) {
-    cleanBullets.forEach((b: string, i: number) => {
-      if (b.trim() !== '') {
-        const bulletY = config.bulletStart + i * config.bulletStep;
-        overlays.push(
-          `l_text:Arial_${config.bulletSize}:${encodeCloudinaryText('- ' + b)},co_rgb:FFFFFF,g_center,y_${bulletY},w_${Math.round(dims.w * 0.8)},c_fit`
-        );
-      }
-    });
+  // Déterminer le mode de layout selon le contenu disponible
+  const hasOnlyTitle = cleanTitle && !cleanSubtitle && !cleanBody && cleanBullets.length === 0;
+  const hasTitleAndBody = cleanTitle && cleanBody && !cleanSubtitle && cleanBullets.length === 0;
+
+  if (hasOnlyTitle) {
+    // MODE 1 : Titre seul → centré verticalement au milieu (y_0)
+    overlays.push(
+      `l_text:Arial_${config.titleSize}_bold:${encodeCloudinaryText(cleanTitle)},co_rgb:FFFFFF,g_center,y_0,w_${Math.round(dims.w * 0.9)},c_fit`
+    );
+  } else if (hasTitleAndBody) {
+    // MODE 2 : Titre + Corps → titre légèrement au-dessus, corps en dessous
+    const titleY = -80;
+    const bodyY = titleY + config.titleSize + 40;
+    
+    overlays.push(
+      `l_text:Arial_${config.titleSize}_bold:${encodeCloudinaryText(cleanTitle)},co_rgb:FFFFFF,g_center,y_${titleY},w_${Math.round(dims.w * 0.9)},c_fit`
+    );
+    overlays.push(
+      `l_text:Arial_${config.bodySize}:${encodeCloudinaryText(cleanBody)},co_rgb:D1D5DB,g_center,y_${bodyY},w_${Math.round(dims.w * 0.82)},c_fit`
+    );
+  } else {
+    // MODE 3 : Layout complet
+    const fullConfig = format === '9:16' 
+      ? { titleY: -350, subOffset: 80, bulletStart: -100, bulletStep: 60 }
+      : format === '16:9'
+      ? { titleY: -200, subOffset: 60, bulletStart: -50, bulletStep: 50 }
+      : format === '1:1'
+      ? { titleY: -280, subOffset: 70, bulletStart: -80, bulletStep: 55 }
+      : { titleY: -320, subOffset: 70, bulletStart: -100, bulletStep: 55 }; // 4:5
+
+    // TITRE
+    overlays.push(
+      `l_text:Arial_${config.titleSize}_bold:${encodeCloudinaryText(cleanTitle)},co_rgb:FFFFFF,g_center,y_${fullConfig.titleY},w_${Math.round(dims.w * 0.9)},c_fit`
+    );
+
+    // SOUS-TITRE
+    if (cleanSubtitle && cleanSubtitle.trim() !== '') {
+      const subY = fullConfig.titleY + fullConfig.subOffset + config.titleSize;
+      overlays.push(
+        `l_text:Arial_${config.subSize}:${encodeCloudinaryText(cleanSubtitle)},co_rgb:E5E7EB,g_center,y_${subY},w_${Math.round(dims.w * 0.84)},c_fit`
+      );
+    }
+
+    // BODY
+    if (cleanBody && cleanBody.trim() !== '') {
+      const bodyY = fullConfig.bulletStart - 80;
+      overlays.push(
+        `l_text:Arial_${config.bodySize}:${encodeCloudinaryText(cleanBody)},co_rgb:D1D5DB,g_center,y_${bodyY},w_${Math.round(dims.w * 0.82)},c_fit`
+      );
+    }
+
+    // BULLETS
+    if (cleanBullets.length > 0) {
+      cleanBullets.forEach((b: string, i: number) => {
+        if (b.trim() !== '') {
+          const bulletY = fullConfig.bulletStart + i * fullConfig.bulletStep;
+          overlays.push(
+            `l_text:Arial_${config.bulletSize}:${encodeCloudinaryText('- ' + b)},co_rgb:FFFFFF,g_center,y_${bulletY},w_${Math.round(dims.w * 0.8)},c_fit`
+          );
+        }
+      });
+    }
   }
 
   const overlayTransforms = overlays.length > 0 ? '/' + overlays.join('/') : '';
