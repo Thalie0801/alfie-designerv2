@@ -9,7 +9,7 @@ export type GeminiImageModel = "flash" | "pro";
 
 const MODEL_MAP: Record<GeminiImageModel, string> = {
   flash: "gemini-2.5-flash-preview-05-20",
-  pro: "gemini-2.5-pro-preview-05-06",
+  pro: "gemini-3.0-pro-preview",
 };
 
 /**
