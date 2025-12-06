@@ -58,9 +58,12 @@ function buildTextLayer(layer: TextLayer): string {
   // ✅ CRITICAL FIX: Font order must be font_family_size_style
   const font = `${fontFamily}_${fontSize}_${fontWeight}`;
   
+  // ✅ CONTRAST FIX: Use stroke for black outline + shadow for depth
+  const strokeWidth = layer.outline || 12;
   const styleParams = [
     layer.color ? `co_rgb:${layer.color.replace('#', '')}` : '',
-    layer.outline ? `e_outline:${layer.outline}:color_black` : '',
+    `e_stroke:${strokeWidth}:co_rgb:000000`, // ✅ Stroke noir épais
+    `e_shadow:60,x_3,y_3,co_rgb:000000`, // ✅ Ombre portée pour contraste
     layer.w ? `w_${layer.w},c_fit` : ''
   ].filter(Boolean).join(',');
   
@@ -82,11 +85,12 @@ function buildTextLayer(layer: TextLayer): string {
 
 /**
  * Generate text layers for hero slide (title + punchline + CTA + badge)
+ * ✅ CENTERED: Textes centrés verticalement
  */
 function layersForHero(slide: Slide, primaryColor: string, secondaryColor: string): TextLayer[] {
   const layers: TextLayer[] = [];
   
-  // Badge (top-left)
+  // Badge (centered above title)
   if (slide.badge) {
     layers.push({
       text: slide.badge.toUpperCase(),
@@ -94,28 +98,27 @@ function layersForHero(slide: Slide, primaryColor: string, secondaryColor: strin
       weight: 'Bold',
       size: 28,
       color: primaryColor,
-      outline: 8,
-      gravity: 'north_west',
-      x: 64,
-      y: 64,
+      outline: 10,
+      gravity: 'center',
+      y: -180,
       w: 600
     });
   }
   
-  // Main title (center)
+  // Main title (CENTERED vertically)
   layers.push({
     text: slide.title,
     font: 'Inter',
     weight: 'ExtraBold',
     size: 76,
     color: 'ffffff',
-    outline: 16,
+    outline: 20, // ✅ Plus épais pour contraste
     gravity: 'center',
-    y: slide.badge ? -50 : 0,
+    y: -40, // ✅ Légèrement au-dessus du centre
     w: 900
   });
   
-  // Punchline/subtitle (center-bottom)
+  // Punchline/subtitle (centered below title)
   if (slide.punchline) {
     layers.push({
       text: slide.punchline,
@@ -123,9 +126,9 @@ function layersForHero(slide: Slide, primaryColor: string, secondaryColor: strin
       weight: 'Regular',
       size: 40,
       color: 'ffffff',
-      outline: 10,
+      outline: 12,
       gravity: 'center',
-      y: 100,
+      y: 80, // ✅ En dessous du titre centré
       w: 900
     });
   }
@@ -138,9 +141,9 @@ function layersForHero(slide: Slide, primaryColor: string, secondaryColor: strin
       weight: 'Bold',
       size: 44,
       color: primaryColor,
-      outline: 12,
-      gravity: 'south',
-      y: 80,
+      outline: 14,
+      gravity: 'center',
+      y: 200,
       w: 700
     });
   }
@@ -150,26 +153,25 @@ function layersForHero(slide: Slide, primaryColor: string, secondaryColor: strin
 
 /**
  * Generate text layers for content slides (problem/solution/impact)
- * Title + bullets list
+ * ✅ CENTERED: Title + bullets centrés verticalement
  */
 function layersForContent(slide: Slide, primaryColor: string): TextLayer[] {
   const layers: TextLayer[] = [];
   
-  // Title (top-left)
+  // Title (CENTERED, légèrement au-dessus)
   layers.push({
     text: slide.title,
     font: 'Inter',
     weight: 'ExtraBold',
     size: 68,
     color: 'ffffff',
-    outline: 14,
-    gravity: 'north_west',
-    x: 64,
-    y: 80,
+    outline: 18, // ✅ Plus épais pour contraste
+    gravity: 'center',
+    y: -80, // ✅ Au-dessus du centre
     w: 900
   });
   
-  // Bullets (bottom-left as list)
+  // Bullets (CENTERED, en dessous du titre)
   if (slide.bullets && slide.bullets.length > 0) {
     const bulletText = slide.bullets.map(b => `• ${b}`).join('\n');
     layers.push({
@@ -178,10 +180,9 @@ function layersForContent(slide: Slide, primaryColor: string): TextLayer[] {
       weight: 'Regular',
       size: 42,
       color: 'ffffff',
-      outline: 10,
-      gravity: 'south_west',
-      x: 80,
-      y: 100,
+      outline: 12,
+      gravity: 'center',
+      y: 80, // ✅ En dessous du titre
       w: 950
     });
   }
@@ -261,33 +262,33 @@ function layersForCTA(slide: Slide, primaryColor: string): TextLayer[] {
 
 /**
  * Generate text layers for CITATIONS carousel
- * ✅ SIMPLIFIÉ: Citation centrée + Auteur en bas uniquement
+ * ✅ CENTERED + CONTRAST: Citation centrée avec bon contraste
  */
 function layersForCitation(slide: Slide): TextLayer[] {
   const layers: TextLayer[] = [];
   
-  // Citation principale (centrée avec guillemets)
+  // Citation principale (CENTRÉE avec guillemets + contraste)
   layers.push({
     text: `"${slide.title}"`,
     font: 'Inter',
     weight: 'Bold',
     size: 56,
     color: 'ffffff',
-    outline: 12,
+    outline: 16, // ✅ Plus épais pour contraste
     gravity: 'center',
-    y: -50,
+    y: -30, // ✅ Centré verticalement
     w: 900
   });
   
-  // Auteur (en bas, avec tiret)
+  // Auteur (centré en dessous)
   if (slide.author) {
     layers.push({
       text: `— ${slide.author}`,
       font: 'Inter',
       weight: 'Regular',
       size: 32,
-      color: 'cccccc',
-      outline: 8,
+      color: 'ffffff', // ✅ Blanc au lieu de gris pour contraste
+      outline: 10,
       gravity: 'center',
       y: 100,
       w: 700
