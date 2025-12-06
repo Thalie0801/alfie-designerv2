@@ -431,20 +431,19 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
         textsError = e;
       }
 
-      // ✅ Phase 4: Local fallback helper
+      // ✅ Phase 4: Local fallback helper - utilise le topic/brief au lieu de textes génériques
       const generateLocalFallback = (asset: PackAsset) => {
         const brandName = activeBrand?.name || "Notre marque";
+        const topic = asset.prompt || asset.title || brief || "Contenu exclusif";
+        const totalSlides = asset.count || 5;
         
         if (asset.kind === 'carousel') {
           return {
-            slides: [
-              { title: asset.title || "Découvrez", subtitle: brief.slice(0, 80) || "Notre contenu exclusif" },
-              ...Array.from({ length: asset.count - 2 }, (_, i) => ({
-                title: `Point clé ${i + 1}`,
-                subtitle: `Élément ${i + 1}`,
-              })),
-              { title: "Passez à l'action", subtitle: `Rejoignez ${brandName}` },
-            ],
+            slides: Array.from({ length: totalSlides }, (_, i) => ({
+              // ✅ Utiliser le topic/brief au lieu de "Point clé X"
+              title: i === 0 ? (asset.title || topic) : i === totalSlides - 1 ? "Passez à l'action" : topic,
+              subtitle: i === 0 ? brief.slice(0, 80) : i === totalSlides - 1 ? `Rejoignez ${brandName}` : "",
+            })),
           };
         }
         
