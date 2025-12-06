@@ -1110,12 +1110,14 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
         alt: `Slide finale`,
       };
     } else {
-      // ✅ En mode Premium, NE PAS utiliser "Point clé X" - laisser vide ou utiliser le topic
+      // ✅ NE JAMAIS utiliser "Point clé X" - toujours le topic/brief
+      // En mode Premium: vide pour laisser l'AI décider
+      // En mode Standard: utiliser le topic comme contexte
       return {
-        title: carouselMode === 'premium' ? "" : `Point clé ${i}`,
+        title: carouselMode === 'premium' ? "" : topic,
         subtitle: "",
         bullets: [],
-        alt: `Slide ${i + 1}`,
+        alt: `Slide ${i + 1} : ${topic}`,
       };
     }
   });
