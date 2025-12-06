@@ -1048,26 +1048,46 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   // ✅ Phase 3: Récupérer les slides AI
   const rawAiSlides = payload.generatedTexts?.slides ?? [];
   
-  // ✅ PARSER les prompts structurés "Slide N : texte"
-  function parseStructuredPrompt(prompt: string): Array<{ title: string; body?: string }> | null {
+  // ✅ PARSER les prompts structurés - supporte plusieurs formats :
+  // - "Slide N : texte"
+  // - "Slide N – texte" (tiret long)
+  // - "Slide N - texte" (tiret simple)
+  // - "Slide N\n texte" (saut de ligne)
+  function parseStructuredPrompt(prompt: string): Array<{ title: string; subtitle?: string; body?: string }> | null {
     if (!prompt) return null;
     
-    // Vérifier si c'est un format "Slide N :" (minimum 2 occurrences)
-    const hasSlideFormat = (prompt.match(/slide\s*\d+\s*:/gi) || []).length >= 2;
-    if (!hasSlideFormat) return null;
+    // Pattern universel : "Slide" suivi d'un numéro, puis séparateur (: – - ou newline)
+    const slidePattern = /slide\s*\d+\s*[:\–\-–—]?\s*[^\n]*/gi;
+    const matches = prompt.match(slidePattern);
     
-    // Splitter par "Slide N :" et récupérer chaque morceau
-    const parts = prompt.split(/slide\s*\d+\s*:\s*/i).filter(s => s.trim());
+    // Vérifier qu'on a au moins 2 slides
+    if (!matches || matches.length < 2) {
+      console.log(`[parseStructuredPrompt] No structured format detected (matches: ${matches?.length || 0})`);
+      return null;
+    }
     
-    console.log(`[parseStructuredPrompt] Split into ${parts.length} parts:`, parts.map(p => p.slice(0, 30)));
+    console.log(`[parseStructuredPrompt] ✅ Detected ${matches.length} slides in structured prompt`);
     
-    if (parts.length >= 2) {
-      return parts.map(p => {
-        const text = p.trim();
-        return {
-          title: text.slice(0, 60),
-          body: text.length > 60 ? text : undefined
-        };
+    // Splitter le prompt en sections par "Slide N"
+    const sections = prompt.split(/slide\s*\d+\s*[:\–\-–—]?\s*/i).filter(s => s.trim());
+    
+    console.log(`[parseStructuredPrompt] Split into ${sections.length} sections`);
+    
+    if (sections.length >= 2) {
+      return sections.map((section, i) => {
+        // Nettoyer la section
+        const lines = section
+          .split(/\n+/)
+          .map(l => l.replace(/^[>\*\-•]\s*/, '').trim()) // Retirer les bullets/quotes
+          .filter(l => l && !l.match(/^(texte|sous-?texte|petit|titre|erreur)/i)); // Retirer les labels
+        
+        const title = lines[0]?.slice(0, 80) || `Slide ${i + 1}`;
+        const subtitle = lines[1]?.slice(0, 100) || "";
+        const body = lines.slice(1).join(' ').slice(0, 200) || "";
+        
+        console.log(`[parseStructuredPrompt] Slide ${i + 1}: title="${title.slice(0, 30)}...", hasSubtitle=${!!subtitle}, hasBody=${!!body}`);
+        
+        return { title, subtitle, body };
       });
     }
     return null;
@@ -1151,7 +1171,17 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   // ✅ NORMALISER les slides AI (détecter et corriger les concaténations)
   let aiSlides: any[] = [];
   
-  if (rawAiSlides.length > 0 && rawAiSlides[0]?.title && isConcatenatedTitle(rawAiSlides[0].title)) {
+  // ✅ PRIORITÉ 1: Si rawAiSlides est vide mais parsedSlides existe, utiliser parsedSlides
+  if (rawAiSlides.length === 0 && parsedSlides && parsedSlides.length > 0) {
+    console.log(`[processRenderCarousels] ✅ Using ${parsedSlides.length} slides from parsed structured prompt`);
+    aiSlides = parsedSlides.slice(0, totalSlides).map((s, i) => ({
+      title: s.title,
+      subtitle: s.subtitle || "",
+      body: s.body || "",
+      bullets: [],
+      author: undefined,
+    }));
+  } else if (rawAiSlides.length > 0 && rawAiSlides[0]?.title && isConcatenatedTitle(rawAiSlides[0].title)) {
     // La slide 1 contient tous les titres concaténés - les splitter
     console.log("[processRenderCarousels] ⚠️ Detected concatenated title in slide 1, splitting...");
     const splitTitles = splitConcatenatedTitle(rawAiSlides[0].title);
