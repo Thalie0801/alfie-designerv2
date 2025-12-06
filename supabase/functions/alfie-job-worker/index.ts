@@ -1097,21 +1097,32 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   function extractCleanTopic(rawTopic: string | undefined): string {
     if (!rawTopic) return "Votre sujet";
     
-    // Pattern pour détecter les instructions de structure
+    let cleaned = rawTopic;
+    
+    // ✅ NOUVEAUX PATTERNS pour détecter TOUS les formats courants
     const structurePatterns = [
+      // Format emoji + "Carrousel X slides"
+      /^[🎨🧩📸🎬🎥✨🚀💡📝🔥]*\s*/g,
+      /carrousel\s*\d+\s*slides?\s*[–\-:]*\s*/gi,
+      /"([^"]+)"/g, // Extraire le contenu entre guillemets
       /carrousel\s+de\s+\d+\s+slides?\s*:?\s*/gi,
       /slide\s*\d+\s*:\s*/gi,
       /^ajouter\s+un?\s+visuels?\s*/gi,
       /^créer?\s+un?\s+carrousel\s*/gi,
       /^génère\s+/gi,
       /^faire\s+/gi,
-      // ✅ NOUVEAUX PATTERNS pour mieux nettoyer
       /^fais(-|\s+)?(moi|un|une|des|du)?\s*/gi,
       /^je\s+veux\s+(du|de\s+la|des|un|une)?\s*/gi,
       /^crée\s+(moi\s+)?(un|une|des)?\s*/gi,
     ];
     
-    let cleaned = rawTopic;
+    // ✅ PRIORITÉ 1: Extraire le contenu entre guillemets s'il existe
+    const quotedMatch = rawTopic.match(/"([^"]+)"/);
+    if (quotedMatch && quotedMatch[1] && quotedMatch[1].length > 5) {
+      return quotedMatch[1].trim();
+    }
+    
+    // ✅ PRIORITÉ 2: Nettoyer avec les patterns
     for (const pattern of structurePatterns) {
       cleaned = cleaned.replace(pattern, ' ');
     }
@@ -1122,15 +1133,34 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
     // Si le résultat est trop court ou vide, essayer d'extraire les mots-clés significatifs
     if (!cleaned || cleaned.length < 3) {
       const significantWords = rawTopic
-        .split(/[:\s,]+/)
-        .filter(w => w.length > 3 && !/^(avec|pour|dans|slide|carrousel|visuels?|ajouter|créer|génère|faire|fais|crée|je|veux|moi|du|de|la|le|les|un|une|des)$/i.test(w));
+        .split(/[:\s,–\-]+/)
+        .filter(w => w.length > 3 && !/^(avec|pour|dans|slide|slides|carrousel|visuels?|ajouter|créer|génère|faire|fais|crée|je|veux|moi|du|de|la|le|les|un|une|des)$/i.test(w));
       
       if (significantWords.length > 0) {
-        cleaned = significantWords.slice(0, 3).join(' ');
+        cleaned = significantWords.slice(0, 5).join(' ');
       }
     }
     
     return cleaned || "Votre sujet";
+  }
+  
+  // ✅ DÉTECTER ET FILTRER LES LABELS STRUCTURELS
+  function isStructuralLabel(title: string): boolean {
+    if (!title) return true;
+    const lowerTitle = title.toLowerCase().trim();
+    const structuralLabels = [
+      'cover', 'hook', 'cta', 'call to action',
+      'le problème', 'le probleme', 'the problem', 'problem',
+      'la solution', 'the solution', 'solution',
+      'les avantages', 'avantages', 'benefits', 'advantages',
+      'comment', 'how to', 'how it works',
+      'conclusion', 'recap', 'résumé', 'resume',
+      'introduction', 'intro',
+      'slide 1', 'slide 2', 'slide 3', 'slide 4', 'slide 5',
+      'étape 1', 'étape 2', 'étape 3', 'step 1', 'step 2', 'step 3',
+      'point clé', 'key point',
+    ];
+    return structuralLabels.some(label => lowerTitle === label || lowerTitle.startsWith(label + ':') || lowerTitle.startsWith(label + ' :'));
   }
   
   const rawTopic = payload.brief?.topic || payload.topic || payload.prompt || "";
@@ -1232,24 +1262,31 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
     }
   });
 
-  // ✅ FUSION avec logique améliorée
+  // ✅ FUSION avec logique améliorée - FILTRAGE DES LABELS STRUCTURELS
   const slides = Array.from({ length: totalSlides }, (_, index) => {
     const ai = aiSlides[index] ?? {};
     const fb = fallbackSlides[index];
 
     // Nettoyer le titre AI (enlever les newlines résiduels)
     const cleanAiTitle = ai.title?.replace(/\n/g, ' ').trim() || "";
-    const hasValidAiTitle = cleanAiTitle.length > 0 && cleanAiTitle.length < 150;
     
-    // Choisir le titre
-    let title = hasValidAiTitle ? cleanAiTitle : fb.title;
+    // ✅ VÉRIFIER si c'est un label structurel - si oui, utiliser le topic
+    const isLabel = isStructuralLabel(cleanAiTitle);
+    const hasValidAiTitle = cleanAiTitle.length > 0 && cleanAiTitle.length < 150 && !isLabel;
     
-    // ✅ En mode Premium avec fallback vide, skip cette slide ou utiliser le topic
-    if (!title && carouselMode === 'premium') {
-      title = index === 0 ? topic : "";
+    if (isLabel) {
+      console.log(`[processRenderCarousels] ⚠️ Slide ${index + 1}: "${cleanAiTitle}" est un label structurel → remplacé par topic`);
     }
     
-    const alt = ai.alt || fb.alt || title || `Slide ${index + 1}`;
+    // ✅ Choisir le titre : AI valide > topic > fallback
+    let title = hasValidAiTitle ? cleanAiTitle : topic;
+    
+    // ✅ En mode Premium avec titre vide, utiliser le topic
+    if (!title && carouselMode === 'premium') {
+      title = topic;
+    }
+    
+    const alt = hasValidAiTitle ? cleanAiTitle : topic;
     const author = ai.author || undefined;
 
     // ✅ Pour CITATIONS: JAMAIS de subtitle ni bullets ni body
@@ -1257,13 +1294,13 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
       return { title, subtitle: "", body: "", bullets: [], alt, author };
     }
 
-    // ✅ En mode PREMIUM: NE JAMAIS ajouter de subtitle/bullets/body fallback génériques
+    // ✅ En mode PREMIUM: NE JAMAIS ajouter de subtitle/bullets/body si c'était un label
     if (carouselMode === 'premium') {
       return {
         title,
-        subtitle: ai.subtitle?.trim() || "",
-        body: ai.body?.trim() || "", // ✅ BODY AJOUTÉ
-        bullets: Array.isArray(ai.bullets) ? ai.bullets : [],
+        subtitle: isLabel ? "" : (ai.subtitle?.trim() || ""),
+        body: isLabel ? "" : (ai.body?.trim() || ""),
+        bullets: isLabel ? [] : (Array.isArray(ai.bullets) ? ai.bullets : []),
         alt,
         author,
       };
@@ -1274,17 +1311,17 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
       return {
         title,
         subtitle: ai.subtitle?.trim() || "",
-        body: ai.body?.trim() || "", // ✅ BODY AJOUTÉ
+        body: ai.body?.trim() || "",
         bullets: Array.isArray(ai.bullets) && ai.bullets.length > 0 ? ai.bullets : [],
         alt,
         author,
       };
     } else {
       return {
-        title: fb.title,
-        subtitle: fb.subtitle,
-        body: "", // ✅ BODY AJOUTÉ (vide en fallback)
-        bullets: fb.bullets ?? [],
+        title,
+        subtitle: "",
+        body: "",
+        bullets: [],
         alt,
         author,
       };
