@@ -1045,8 +1045,50 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   
   // ✅ Phase 3: Récupérer les slides AI
   const rawAiSlides = payload.generatedTexts?.slides ?? [];
-  const topic = payload.brief?.topic || payload.topic || "Votre sujet";
+  
+  // ✅ NETTOYAGE DU TOPIC: extraire le thème réel du prompt brut
+  // Supprimer les instructions de structure comme "Carrousel de X slides : Slide 1 : ..."
+  function extractCleanTopic(rawTopic: string | undefined): string {
+    if (!rawTopic) return "Votre sujet";
+    
+    // Pattern pour détecter les instructions de structure
+    const structurePatterns = [
+      /carrousel\s+de\s+\d+\s+slides?\s*:?\s*/gi,
+      /slide\s*\d+\s*:\s*/gi,
+      /^ajouter\s+un?\s+visuels?\s*/gi,
+      /^créer?\s+un?\s+carrousel\s*/gi,
+      /^génère\s+/gi,
+      /^faire\s+/gi,
+    ];
+    
+    let cleaned = rawTopic;
+    for (const pattern of structurePatterns) {
+      cleaned = cleaned.replace(pattern, ' ');
+    }
+    
+    // Nettoyer les espaces multiples et trim
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    
+    // Si le résultat est trop court ou vide, essayer d'extraire le premier mot-clé significatif
+    if (!cleaned || cleaned.length < 3) {
+      // Extraire les mots significatifs du prompt original (ignorer "je veux", "avec", etc.)
+      const significantWords = rawTopic
+        .split(/[:\s,]+/)
+        .filter(w => w.length > 3 && !/^(avec|pour|dans|slide|carrousel|visuels?|ajouter|créer|génère|faire|je|veux|du|de|la|le|les|un|une)$/i.test(w));
+      
+      if (significantWords.length > 0) {
+        cleaned = significantWords.slice(0, 3).join(' ');
+      }
+    }
+    
+    return cleaned || "Votre sujet";
+  }
+  
+  const rawTopic = payload.brief?.topic || payload.topic || payload.prompt || "";
+  const topic = extractCleanTopic(rawTopic);
   const cta = payload.brief?.cta || "En savoir plus";
+  
+  console.log(`[processRenderCarousels] 🧹 Topic cleaned: "${rawTopic.slice(0, 50)}..." → "${topic}"`);
 
   console.log(`[processRenderCarousels] 📊 Raw AI slides: ${rawAiSlides.length}, mode: ${carouselMode}, type: ${carouselType}`);
 
