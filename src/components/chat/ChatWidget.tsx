@@ -716,12 +716,23 @@ export default function ChatWidget() {
     if (asset.kind === 'carousel') {
       const topic = asset.prompt || asset.title || campaignTitle;
       const totalSlides = asset.count || 5;
+      
+      // ✅ Titres DIFFÉRENCIÉS pour chaque slide intermédiaire
+      const defaultTitles = ["Le problème", "La solution", "Les avantages", "Comment ça marche", "Ce qui change"];
+      const defaultSubtitles = ["Découvrez ce défi courant...", "Voici notre approche...", "Ce que vous obtenez...", "Simple et efficace...", "Faites le premier pas..."];
+      
       return {
-        slides: Array.from({ length: totalSlides }, (_, i) => ({
-          // ✅ Utiliser le topic/brief au lieu de "Point X"
-          title: i === 0 ? (asset.title || topic) : i === totalSlides - 1 ? "Passez à l'action" : topic,
-          subtitle: i === 0 ? campaignTitle : "",
-        })),
+        slides: Array.from({ length: totalSlides }, (_, i) => {
+          if (i === 0) {
+            return { title: asset.title || topic, subtitle: campaignTitle };
+          } else if (i === totalSlides - 1) {
+            return { title: "Passez à l'action", subtitle: "Prêt à commencer ?" };
+          } else {
+            // ✅ Titres UNIQUES par position
+            const titleIndex = Math.min(i - 1, defaultTitles.length - 1);
+            return { title: defaultTitles[titleIndex], subtitle: defaultSubtitles[titleIndex] };
+          }
+        }),
       };
     }
     

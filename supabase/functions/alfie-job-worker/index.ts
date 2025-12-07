@@ -698,19 +698,31 @@ Return ONLY this JSON structure (no markdown, no explanation):
  * Génère des slides de fallback basées sur le topic utilisateur
  */
 function generateFallbackSlides(topic: string, count: number, language: string = "FR"): CarouselSlide[] {
-  console.log(`[generateFallbackSlides] Generating ${count} fallback slides for: "${topic.slice(0, 30)}..."`);
+  console.log(`[generateFallbackSlides] Generating ${count} DIFFERENTIATED fallback slides for: "${topic.slice(0, 30)}..."`);
   
   const isFR = language !== "EN";
+  const topicClean = topic.slice(0, 50);
+  
+  // ✅ Titres DIFFÉRENCIÉS pour chaque slide intermédiaire
+  const defaultTitles = isFR 
+    ? ["Le problème", "La solution", "Les avantages", "Comment ça marche", "Ce qui change"]
+    : ["The problem", "The solution", "Key benefits", "How it works", "What changes"];
+  
+  const defaultBodies = isFR
+    ? ["Découvrez ce défi courant...", "Voici notre approche...", "Ce que vous obtenez...", "Simple et efficace...", "Faites le premier pas..."]
+    : ["Discover this common challenge...", "Here's our approach...", "What you get...", "Simple and effective...", "Take the first step..."];
   
   return Array.from({ length: count }, (_, i) => {
     if (i === 0) {
+      // Première slide: titre = topic
       return {
         slide_number: 1,
-        title_on_image: topic.slice(0, 50),
+        title_on_image: topicClean,
         text_on_image: isFR ? "Découvrez comment..." : "Discover how...",
         caption: topic,
       };
     } else if (i === count - 1) {
+      // Dernière slide: CTA
       return {
         slide_number: i + 1,
         title_on_image: isFR ? "Passez à l'action" : "Take Action",
@@ -718,10 +730,12 @@ function generateFallbackSlides(topic: string, count: number, language: string =
         caption: isFR ? "Passez à l'action maintenant !" : "Take action now!",
       };
     } else {
+      // ✅ Slides intermédiaires: titres UNIQUES par position
+      const titleIndex = Math.min(i - 1, defaultTitles.length - 1);
       return {
         slide_number: i + 1,
-        title_on_image: topic.slice(0, 40),
-        text_on_image: "",
+        title_on_image: defaultTitles[titleIndex],
+        text_on_image: defaultBodies[titleIndex],
         caption: "",
       };
     }
