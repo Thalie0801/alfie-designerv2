@@ -58,12 +58,12 @@ function buildTextLayer(layer: TextLayer): string {
   // ✅ CRITICAL FIX: Font order must be font_family_size_style
   const font = `${fontFamily}_${fontSize}_${fontWeight}`;
   
-  // ✅ CONTRAST FIX: Use stroke for black outline + shadow for depth
-  const strokeWidth = layer.outline || 12;
+  // ✅ CONTRAST FIX: Use thick stroke for black outline + shadow for depth
+  const strokeWidth = layer.outline || 16; // ✅ Increased stroke for better contrast
   const styleParams = [
     layer.color ? `co_rgb:${layer.color.replace('#', '')}` : '',
     `e_stroke:${strokeWidth}:co_rgb:000000`, // ✅ Stroke noir épais
-    `e_shadow:60,x_3,y_3,co_rgb:000000`, // ✅ Ombre portée pour contraste
+    `e_shadow:80`, // ✅ FIX: Syntaxe correcte (shadow simple sans paramètres invalides)
     layer.w ? `w_${layer.w},c_fit` : ''
   ].filter(Boolean).join(',');
   
