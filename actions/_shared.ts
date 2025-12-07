@@ -7,7 +7,11 @@ export const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KE
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-const ADMIN_EMAILS = ['nathaliestaelens@gmail.com', 'staelensnathalie@gmail.com'];
+// Load admin emails from environment variable - NEVER hardcode in source
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
+  .split(',')
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
 
 function parseCookies(cookieHeader: string | null): Record<string, string> {
   if (!cookieHeader) return {};
@@ -51,32 +55,9 @@ async function resolveUserFromToken(token: string | undefined) {
 export async function getCurrentUser(
   req: Request
 ): Promise<{ id: string; role: 'admin' | 'user'; email?: string } | null> {
-  const headerEmail = req.headers.get('x-user-email')?.toLowerCase();
-  if (headerEmail && ADMIN_EMAILS.includes(headerEmail)) {
-    return { id: 'admin', role: 'admin', email: headerEmail };
-  }
-
-  const headerUser = req.headers.get('x-user') ?? req.headers.get('x-lovable-user');
-  if (headerUser) {
-    try {
-      const parsed = JSON.parse(headerUser);
-      if (parsed && typeof parsed.id === 'string' && parsed.role) {
-        const parsedEmail =
-          typeof parsed.email === 'string' ? parsed.email.toLowerCase() : undefined;
-        const isAdmin =
-          parsed.role === 'admin' ||
-          (parsedEmail ? ADMIN_EMAILS.includes(parsedEmail) : false);
-        return {
-          id: parsed.id,
-          role: isAdmin ? 'admin' : 'user',
-          email: parsedEmail ?? undefined,
-        };
-      }
-    } catch (error) {
-      console.warn('Failed to parse x-user header', error);
-    }
-  }
-
+  // SECURITY: Only trust JWT tokens - never trust client-provided headers
+  // The x-user-email and x-user headers have been removed as they can be forged
+  
   const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization');
   const bearer = authHeader?.startsWith('Bearer ')
     ? authHeader.slice('Bearer '.length).trim()
