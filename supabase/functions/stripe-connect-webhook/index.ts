@@ -1,9 +1,16 @@
+import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { corsHeaders } from "../_shared/cors.ts";
 
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY") || "";
+const STRIPE_CONNECT_WEBHOOK_SECRET = Deno.env.get("STRIPE_CONNECT_WEBHOOK_SECRET") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+const stripe = new Stripe(STRIPE_SECRET_KEY, {
+  apiVersion: "2023-10-16",
+  httpClient: Stripe.createFetchHttpClient(),
+});
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -12,15 +19,47 @@ Deno.serve(async (req) => {
 
   try {
     const rawBody = await req.text();
-    const event = JSON.parse(rawBody);
+    const signature = req.headers.get("stripe-signature");
 
-    console.log("[Stripe Connect Webhook] Received event:", event.type);
+    // SECURITY: Verify Stripe webhook signature to prevent forged events
+    if (!signature) {
+      console.error("[Stripe Connect Webhook] Missing stripe-signature header");
+      return new Response(
+        JSON.stringify({ error: "Missing stripe-signature header" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!STRIPE_CONNECT_WEBHOOK_SECRET) {
+      console.error("[Stripe Connect Webhook] STRIPE_CONNECT_WEBHOOK_SECRET not configured");
+      return new Response(
+        JSON.stringify({ error: "Webhook secret not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    let event: Stripe.Event;
+    try {
+      event = await stripe.webhooks.constructEventAsync(
+        rawBody,
+        signature,
+        STRIPE_CONNECT_WEBHOOK_SECRET
+      );
+    } catch (err: any) {
+      console.error("[Stripe Connect Webhook] Signature verification failed:", err.message);
+      return new Response(
+        JSON.stringify({ error: "Invalid signature" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("[Stripe Connect Webhook] Verified event:", event.type);
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Traiter l'événement account.updated
     if (event.type === "account.updated") {
-      const account = event.data.object;
+      const account = event.data.object as Stripe.Account;
       const accountId = account.id;
 
       console.log("[Stripe Connect Webhook] Account updated:", accountId);
@@ -46,7 +85,7 @@ Deno.serve(async (req) => {
       }
 
       // Mettre à jour le statut de l'affilié
-      const updates: any = {
+      const updates = {
         stripe_connect_onboarding_complete: account.details_submitted || false,
         stripe_connect_charges_enabled: account.charges_enabled || false,
         stripe_connect_payouts_enabled: account.payouts_enabled || false,
