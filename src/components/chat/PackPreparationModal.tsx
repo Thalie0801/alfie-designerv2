@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { X, Image, Film, Grid3x3, AlertCircle, Volume2, VolumeX } from "lucide-react";
+import { useState, useMemo, useRef } from "react";
+import { X, Image, Film, Grid3x3, AlertCircle, Volume2, VolumeX, Upload } from "lucide-react";
 import type { AlfiePack, PackAsset } from "@/types/alfiePack";
 import { calculatePackWoofCost, safeWoofs } from "@/lib/woofs";
 import { getWoofCost } from "@/types/alfiePack";
@@ -61,6 +61,8 @@ function generateFallbackTexts(asset: PackAsset, campaignTitle: string): any {
 }
 
 export default function PackPreparationModal({ pack, brandId, onClose }: PackPreparationModalProps) {
+  // ✅ State local pour pouvoir modifier les assets (notamment referenceImageUrl)
+  const [localAssets, setLocalAssets] = useState<PackAsset[]>(pack.assets);
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(
     new Set(pack.assets.map((a) => a.id))
   );
@@ -75,6 +77,8 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
     });
     return initial;
   });
+  const [uploadingForId, setUploadingForId] = useState<string | null>(null);
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const { profile } = useAuth();
   const navigate = useNavigate();
   
@@ -89,10 +93,51 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
     }));
   };
 
-  // Calculer le coût dynamique selon la sélection
+  // ✅ Upload d'image de référence pour vidéos/images
+  const handleImageUpload = async (assetId: string, file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Seules les images sont acceptées');
+      return;
+    }
+
+    setUploadingForId(assetId);
+    try {
+      const fileName = `${Date.now()}_${file.name}`;
+      const filePath = `video-refs/${assetId}/${fileName}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('chat-uploads')
+        .upload(filePath, file, { upsert: true });
+      
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat-uploads')
+        .getPublicUrl(filePath);
+
+      // ✅ Mettre à jour le localAssets avec l'image
+      setLocalAssets(prev => prev.map(asset => 
+        asset.id === assetId 
+          ? { ...asset, referenceImageUrl: publicUrl }
+          : asset
+      ));
+      
+      console.log(`[PackPreparationModal] ✅ Image uploaded for ${assetId}:`, publicUrl);
+      toast.success('Image source ajoutée !');
+    } catch (err) {
+      console.error('Upload error:', err);
+      toast.error('Erreur lors de l\'upload');
+    } finally {
+      setUploadingForId(null);
+    }
+  };
+
+  // Calculer le coût dynamique selon la sélection (utilise localAssets)
+  const localPack = useMemo(() => ({ ...pack, assets: localAssets }), [pack, localAssets]);
+  
   const totalWoofs = useMemo(
-    () => safeWoofs(calculatePackWoofCost(pack, Array.from(selectedAssetIds))),
-    [pack, selectedAssetIds]
+    () => safeWoofs(calculatePackWoofCost(localPack, Array.from(selectedAssetIds))),
+    [localPack, selectedAssetIds]
   );
 
   // Toggle checkbox
@@ -144,11 +189,19 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
       return;
     }
 
-    // ✅ Vérifier que les vidéos ont une image de référence (recommandé mais pas obligatoire)
-    const selectedAssets = pack.assets.filter((a) => selectedAssetIds.has(a.id));
+    // ✅ Utiliser localAssets au lieu de pack.assets pour avoir les images uploadées
+    const selectedAssets = localAssets.filter((a) => selectedAssetIds.has(a.id));
     const videosWithoutImage = selectedAssets.filter(
       (a) => a.kind === "video_premium" && !a.referenceImageUrl
     );
+    
+    // ✅ DEBUG LOG : Vérifier que les images sont bien présentes
+    console.log("[PackPreparationModal] Selected assets with images:", selectedAssets.map(a => ({
+      id: a.id,
+      kind: a.kind,
+      title: a.title,
+      referenceImageUrl: a.referenceImageUrl ? "✅ " + a.referenceImageUrl.slice(0, 50) : "❌ MISSING"
+    })));
 
     if (videosWithoutImage.length > 0) {
       // ✅ Simple warning, pas bloquant
@@ -164,7 +217,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
     try {
       // ✅ ÉTAPE 1 : Vérifier si les textes existent déjà dans le pack
       
-      const hasExistingTexts = pack.assets.some(a =>
+      const hasExistingTexts = localAssets.some(a =>
         (a.generatedTexts?.slides?.length ?? 0) > 0 || 
         a.generatedTexts?.text?.title ||
         a.generatedTexts?.video?.hook
@@ -210,11 +263,12 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
       }
 
       // ✅ ÉTAPE 2 : Fallback si génération de textes échoue (Phase 2)
-      let assetsWithTexts = pack.assets;
+      // ✅ IMPORTANT: Utiliser localAssets pour conserver les images uploadées
+      let assetsWithTexts = localAssets;
       
       if (hasExistingTexts) {
         // ✅ Utiliser les textes existants du pack sans appeler alfie-generate-texts
-        assetsWithTexts = pack.assets.map((asset) => ({
+        assetsWithTexts = localAssets.map((asset) => ({
           ...asset,
           useBrandKit, // ✅ Propager useBrandKit du toggle
           withAudio: asset.kind === 'video_premium' ? audioSettings[asset.id] : undefined, // ✅ Propager audio setting
@@ -223,25 +277,25 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         console.warn("[PackPreparationModal] Text generation failed, using fallback texts:", textsError);
         
         // Générer des textes par défaut localement
-        assetsWithTexts = pack.assets.map((asset) => ({
+        assetsWithTexts = localAssets.map((asset) => ({
           ...asset,
           useBrandKit, // ✅ Propager useBrandKit du toggle
           withAudio: asset.kind === 'video_premium' ? audioSettings[asset.id] : undefined, // ✅ Propager audio setting
-          generatedTexts: generateFallbackTexts(asset, pack.title),
+          generatedTexts: generateFallbackTexts(asset, localPack.title),
         }));
         
         toast.warning("Textes générés localement. Tu peux les éditer dans le Studio.", { duration: 4000 });
       } else {
         console.log("[PackPreparationModal] ✅ Texts generated:", textsData);
-        assetsWithTexts = pack.assets.map((asset) => ({
+        assetsWithTexts = localAssets.map((asset) => ({
           ...asset,
           useBrandKit, // ✅ Propager useBrandKit du toggle
           withAudio: asset.kind === 'video_premium' ? audioSettings[asset.id] : undefined, // ✅ Propager audio setting
-          generatedTexts: textsData.texts?.[asset.id] || generateFallbackTexts(asset, pack.title),
+          generatedTexts: textsData.texts?.[asset.id] || generateFallbackTexts(asset, localPack.title),
         }));
       }
 
-      const packWithTexts = { ...pack, assets: assetsWithTexts };
+      const packWithTexts = { ...localPack, assets: assetsWithTexts };
 
       // ✅ ÉTAPE 3 : Envoyer le pack AVEC les textes et le plan utilisateur
       await sendPackToGenerator({
@@ -326,79 +380,136 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
 
           {/* Liste des assets */}
           <div className="space-y-2">
-          {pack.assets.map((asset) => {
+          {localAssets.map((asset) => {
               const isSelected = selectedAssetIds.has(asset.id);
               const cost = getWoofCost(asset);
 
               return (
-                <label
+                <div
                   key={asset.id}
-                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                  className={`p-3 rounded-lg border transition-all ${
                     isSelected
                       ? "bg-primary/10 border-primary/30"
                       : "bg-background hover:bg-muted/50 border-border"
                   }`}
                 >
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleAsset(asset.id)}
-                    className="mt-1"
-                    disabled={isGenerating}
-                  />
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      {getAssetIcon(asset)}
-                      <span className="font-medium text-sm">{asset.title}</span>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleAsset(asset.id)}
+                      className="mt-1"
+                      disabled={isGenerating}
+                    />
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        {getAssetIcon(asset)}
+                        <span className="font-medium text-sm">{asset.title}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        <span>{getAssetTypeLabel(asset)}</span>
+                        <span>•</span>
+                        <span>{asset.platform}</span>
+                        <span>•</span>
+                        <span>{asset.ratio}</span>
+                        <span>•</span>
+                        <span>{asset.goal}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {/* ✅ Afficher les textes selon le type d'asset */}
+                        {asset.kind === 'carousel' && asset.generatedTexts?.slides 
+                          ? `Carrousel ${asset.generatedTexts.slides.length} slides : ${asset.generatedTexts.slides.slice(0, 2).map(s => s.title).join(' • ')}...`
+                          : asset.kind.includes('video') && asset.generatedTexts?.video
+                          ? `🎬 ${asset.generatedTexts.video.hook || 'Script vidéo'}`
+                          : asset.kind === 'image' && asset.generatedTexts?.text
+                          ? asset.generatedTexts.text.title
+                          : asset.prompt
+                        }
+                      </p>
+                      
+                      {/* ✅ Toggle audio pour les vidéos */}
+                      {asset.kind === 'video_premium' && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleAudio(asset.id);
+                          }}
+                          className={`flex items-center gap-1.5 mt-2 px-2 py-1 rounded text-xs transition-colors ${
+                            audioSettings[asset.id] 
+                              ? 'bg-primary/20 text-primary' 
+                              : 'bg-muted text-muted-foreground'
+                          }`}
+                        >
+                          {audioSettings[asset.id] ? (
+                            <><Volume2 className="w-3 h-3" /> Avec son</>
+                          ) : (
+                            <><VolumeX className="w-3 h-3" /> Sans son</>
+                          )}
+                        </button>
+                      )}
                     </div>
-                    <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                      <span>{getAssetTypeLabel(asset)}</span>
-                      <span>•</span>
-                      <span>{asset.platform}</span>
-                      <span>•</span>
-                      <span>{asset.ratio}</span>
-                      <span>•</span>
-                      <span>{asset.goal}</span>
+                    <div className="text-xs font-medium px-2 py-1 bg-primary/20 rounded-full">
+                      {cost} Woofs
                     </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2">
-                      {/* ✅ Afficher les textes selon le type d'asset */}
-                      {asset.kind === 'carousel' && asset.generatedTexts?.slides 
-                        ? `Carrousel ${asset.generatedTexts.slides.length} slides : ${asset.generatedTexts.slides.slice(0, 2).map(s => s.title).join(' • ')}...`
-                        : asset.kind.includes('video') && asset.generatedTexts?.video
-                        ? `🎬 ${asset.generatedTexts.video.hook || 'Script vidéo'}`
-                        : asset.kind === 'image' && asset.generatedTexts?.text
-                        ? asset.generatedTexts.text.title
-                        : asset.prompt
-                      }
-                    </p>
-                    
-                    {/* ✅ Toggle audio pour les vidéos */}
-                    {asset.kind === 'video_premium' && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          toggleAudio(asset.id);
+                  </label>
+                  
+                  {/* ✅ Upload d'image pour vidéos et images */}
+                  {(asset.kind === 'video_premium' || asset.kind === 'image') && (
+                    <div className="mt-2 ml-6">
+                      {asset.referenceImageUrl ? (
+                        <div className="flex items-center gap-2 p-2 bg-muted/50 rounded">
+                          <img 
+                            src={asset.referenceImageUrl} 
+                            alt="Image source" 
+                            className="w-12 h-12 object-cover rounded"
+                          />
+                          <span className="text-xs text-muted-foreground flex-1">Image source ajoutée ✓</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              fileInputRefs.current[asset.id]?.click();
+                            }}
+                            className="text-xs text-primary hover:underline"
+                          >
+                            Changer
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            fileInputRefs.current[asset.id]?.click();
+                          }}
+                          disabled={uploadingForId === asset.id}
+                          className="flex items-center gap-2 p-2 border border-dashed border-orange-400 rounded bg-orange-50 dark:bg-orange-950/20 text-orange-600 text-xs hover:bg-orange-100 dark:hover:bg-orange-950/40 transition w-full"
+                        >
+                          {uploadingForId === asset.id ? (
+                            <span>Upload en cours...</span>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4" />
+                              <span>📸 Ajouter une image source {asset.kind === 'video_premium' ? '(recommandé)' : ''}</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                      <input
+                        ref={(el) => { fileInputRefs.current[asset.id] = el; }}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(asset.id, file);
                         }}
-                        className={`flex items-center gap-1.5 mt-2 px-2 py-1 rounded text-xs transition-colors ${
-                          audioSettings[asset.id] 
-                            ? 'bg-primary/20 text-primary' 
-                            : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        {audioSettings[asset.id] ? (
-                          <><Volume2 className="w-3 h-3" /> Avec son</>
-                        ) : (
-                          <><VolumeX className="w-3 h-3" /> Sans son</>
-                        )}
-                      </button>
-                    )}
-                  </div>
-                  <div className="text-xs font-medium px-2 py-1 bg-primary/20 rounded-full">
-                    {cost} Woofs
-                  </div>
-                </label>
+                      />
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
