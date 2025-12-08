@@ -3,12 +3,24 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
 import type { PackAsset } from "@/types/alfiePack";
 import { WOOF_COSTS } from "@/config/woofs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AssetEditDialog } from "./AssetEditDialog";
+import { CharacterCounter } from "@/components/carousel/CharacterCounter";
+
+// Character limits for carousel overlays
+const CHAR_LIMITS = {
+  title: 40,
+  subtitle: 70,
+  body: 150,
+};
 
 interface PackAssetRowProps {
   asset: PackAsset;
@@ -195,19 +207,85 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
                 </div>
               )}
 
-              {asset.generatedTexts.slides && (
-                <div className="space-y-1 text-muted-foreground text-xs">
-                  <p className="font-medium">Carrousel {asset.generatedTexts.slides.length} slides :</p>
-                  {asset.generatedTexts.slides.slice(0, 2).map((slide: any, i: number) => (
-                    <p key={i}>• {slide.title}</p>
-                  ))}
-                  {asset.generatedTexts.slides.length > 2 && (
-                    <p className="italic">... et {asset.generatedTexts.slides.length - 2} autres slides</p>
-                  )}
+              {asset.kind === "carousel" && asset.generatedTexts?.slides && (
+                <div className="space-y-2">
+                  <p className="font-medium text-xs">📝 Contenu des slides (max: Titre {CHAR_LIMITS.title}, Sous-titre {CHAR_LIMITS.subtitle}, Corps {CHAR_LIMITS.body})</p>
+                  <Accordion type="single" collapsible className="w-full">
+                    {asset.generatedTexts.slides.map((slide: any, i: number) => (
+                      <AccordionItem key={i} value={`slide-${i}`}>
+                        <AccordionTrigger className="text-xs py-2">
+                          Slide {i + 1}: {slide.title || "(sans titre)"}
+                        </AccordionTrigger>
+                        <AccordionContent className="space-y-3 pt-2">
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-xs">Titre</Label>
+                              <CharacterCounter current={(slide.title || "").length} max={CHAR_LIMITS.title} />
+                            </div>
+                            <Input
+                              value={slide.title || ""}
+                              maxLength={CHAR_LIMITS.title + 10}
+                              onChange={(e) => {
+                                const newSlides = [...(asset.generatedTexts?.slides || [])];
+                                newSlides[i] = { ...newSlides[i], title: e.target.value };
+                                onEdit({
+                                  ...asset,
+                                  generatedTexts: { ...asset.generatedTexts, slides: newSlides },
+                                });
+                              }}
+                              placeholder="Titre de la slide"
+                              className={(slide.title || "").length > CHAR_LIMITS.title ? "border-destructive" : ""}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-xs">Sous-titre</Label>
+                              <CharacterCounter current={(slide.subtitle || "").length} max={CHAR_LIMITS.subtitle} />
+                            </div>
+                            <Input
+                              value={slide.subtitle || ""}
+                              maxLength={CHAR_LIMITS.subtitle + 10}
+                              onChange={(e) => {
+                                const newSlides = [...(asset.generatedTexts?.slides || [])];
+                                newSlides[i] = { ...newSlides[i], subtitle: e.target.value };
+                                onEdit({
+                                  ...asset,
+                                  generatedTexts: { ...asset.generatedTexts, slides: newSlides },
+                                });
+                              }}
+                              placeholder="Sous-titre"
+                              className={(slide.subtitle || "").length > CHAR_LIMITS.subtitle ? "border-destructive" : ""}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-xs">Corps</Label>
+                              <CharacterCounter current={(slide.body || "").length} max={CHAR_LIMITS.body} />
+                            </div>
+                            <Textarea
+                              value={slide.body || ""}
+                              maxLength={CHAR_LIMITS.body + 20}
+                              onChange={(e) => {
+                                const newSlides = [...(asset.generatedTexts?.slides || [])];
+                                newSlides[i] = { ...newSlides[i], body: e.target.value };
+                                onEdit({
+                                  ...asset,
+                                  generatedTexts: { ...asset.generatedTexts, slides: newSlides },
+                                });
+                              }}
+                              placeholder="Contenu détaillé..."
+                              rows={2}
+                              className={(slide.body || "").length > CHAR_LIMITS.body ? "border-destructive" : ""}
+                            />
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
                 </div>
               )}
 
-              {asset.generatedTexts.video && (
+              {asset.generatedTexts?.video && (
                 <div className="space-y-1 text-muted-foreground">
                   <p className="font-medium">{asset.generatedTexts.video.hook}</p>
                   <p className="text-xs line-clamp-2">{asset.generatedTexts.video.script}</p>
