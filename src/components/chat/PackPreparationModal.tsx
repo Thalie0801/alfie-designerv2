@@ -349,17 +349,6 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
     }
   };
 
-  // Envoyer au Studio pour édition
-  const handleEditInStudio = () => {
-    navigate("/studio", {
-      state: {
-        pack,
-        brief: pack.summary,
-      },
-    });
-    onClose();
-  };
-
   return (
     <div className="fixed inset-0 z-[10000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-background rounded-t-2xl sm:rounded-lg shadow-xl w-full sm:max-w-2xl h-[92vh] sm:h-auto sm:max-h-[90vh] overflow-hidden flex flex-col">
@@ -594,27 +583,18 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 border-t safe-bottom">
           <button
             onClick={onClose}
-            className="order-3 sm:order-1 px-4 py-3 sm:py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors touch-target"
+            className="order-2 sm:order-1 px-4 py-3 sm:py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors touch-target"
             disabled={isGenerating}
           >
-            Retour au Studio
+            Annuler
           </button>
-          <div className="flex flex-col sm:flex-row gap-2 sm:ml-auto">
-            <button
-              onClick={handleEditInStudio}
-              disabled={isGenerating}
-              className="order-1 px-4 py-3 sm:py-2 text-sm font-medium border rounded-lg hover:bg-muted transition-colors disabled:opacity-50 touch-target"
-            >
-              ✏️ Éditer dans le Studio
-            </button>
-            <button
-              onClick={handleGenerate}
-              disabled={isGenerating || selectedAssetIds.size === 0}
-              className="order-2 px-4 py-3 sm:py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-target"
-            >
-              {isGenerating ? "Alfie prépare tes visuels..." : "Créer ce pack avec Alfie"}
-            </button>
-          </div>
+          <button
+            onClick={handleGenerate}
+            disabled={isGenerating || selectedAssetIds.size === 0}
+            className="order-1 sm:order-2 px-4 py-3 sm:py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-target"
+          >
+            {isGenerating ? "Alfie prépare tes visuels..." : "Créer ce pack avec Alfie"}
+          </button>
         </div>
       </div>
     </div>
