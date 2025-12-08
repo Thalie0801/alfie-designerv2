@@ -55,9 +55,10 @@ interface SlideRequest {
   language?: Lang | string;
   requestId?: string | null;
   useBrandKit?: boolean;        // ✅ Contrôle si le Brand Kit doit être appliqué
-  carouselMode?: CarouselMode;  // ✅ Standard (overlay) ou Premium (texte intégré)
+  carouselMode?: CarouselMode;  // ✅ Standard (overlay) ou Premium (texte intégré nativement)
   carouselType?: CarouselType;  // ✅ NOUVEAU: citations ou content
   brandKit?: BrandKit;          // ✅ NOUVEAU: Brand Kit V2 complet
+  referenceImageUrl?: string | null; // ✅ NOUVEAU: Image de référence pour le style
 }
 
 type GenSize = { w: number; h: number };
@@ -182,10 +183,11 @@ function truncateText(text: string, maxChars: number): string {
 }
 
 /**
- * Build prompt for PREMIUM mode - HYBRID APPROACH
- * ✅ V4: Generate BACKGROUND ONLY with Gemini 3 Pro (better visual quality)
- * ✅ Text will be applied AFTER via Cloudinary overlay (like Standard mode)
- * ✅ This eliminates the double-text issue from Gemini 3 Pro
+ * Build prompt for PREMIUM mode - TRUE NATIVE TEXT INTEGRATION
+ * ✅ V5: Gemini 3 Pro génère l'image avec le texte INTÉGRÉ nativement
+ * ✅ Si texte fourni → l'intégrer exactement
+ * ✅ Si pas de texte → Gemini le génère et l'intègre
+ * ✅ Si referenceImage → s'en inspirer pour le style
  */
 function buildImagePromptPremium(
   userPrompt: string,
@@ -194,41 +196,94 @@ function buildImagePromptPremium(
   slideContent: { title: string; subtitle?: string; body?: string; bullets?: string[]; alt: string },
   slideIndex: number,
   totalSlides: number,
-  language: string = "FR"
+  language: string = "FR",
+  referenceImageUrl?: string | null
 ): string {
-  // ✅ Extraire le concept visuel du prompt utilisateur (sans texte)
-  const extractVisualConcept = (rawPrompt: string): string => {
-    if (!rawPrompt) return "modern professional design";
-    
-    const visualKeywords = rawPrompt.toLowerCase().match(
-      /(tech|ia|ai|business|marketing|social|digital|créatif|innovation|productivité|santé|bien-être|nature|voyage|food|cuisine|fitness|mode|fashion|beauté|immobilier|finance|éducation|musique|art|sport|lifestyle|coaching|entrepreneuriat)/gi
-    );
-    
-    if (visualKeywords && visualKeywords.length > 0) {
-      return `${visualKeywords[0]} themed visual, premium aesthetic`;
-    }
-    
-    return "modern professional design";
-  };
+  // ✅ Vérifier si texte utilisateur fourni (pas un placeholder)
+  const hasUserText = !!(
+    slideContent.title?.trim() && 
+    slideContent.title !== "Titre par défaut" &&
+    slideContent.title !== "Slide" &&
+    slideContent.title.length > 2
+  );
   
-  const visualConcept = extractVisualConcept(userPrompt);
+  const isFR = language !== "EN";
+  
+  // ✅ Construire le bloc texte selon le cas
+  let textInstruction: string;
+  
+  if (hasUserText) {
+    // CAS 1: Texte fourni → Intégration EXACTE dans l'image
+    const titleToDisplay = truncateText(slideContent.title, 60);
+    const subtitleToDisplay = slideContent.subtitle ? truncateText(slideContent.subtitle, 120) : "";
+    const bodyToDisplay = slideContent.body ? truncateText(slideContent.body, 150) : "";
+    const bulletsToDisplay = slideContent.bullets?.length 
+      ? slideContent.bullets.slice(0, 3).map(b => `• ${truncateText(b, 50)}`).join("\n") 
+      : "";
+    
+    textInstruction = `
+=== TEXT TO INTEGRATE NATIVELY IN THE IMAGE ===
+TITLE (big, bold, centered or top): "${titleToDisplay}"
+${subtitleToDisplay ? `SUBTITLE (smaller, below title): "${subtitleToDisplay}"` : ""}
+${bodyToDisplay ? `BODY TEXT (readable size): "${bodyToDisplay}"` : ""}
+${bulletsToDisplay ? `BULLET POINTS:\n${bulletsToDisplay}` : ""}
+
+INTEGRATION RULES:
+- Reproduce the text EXACTLY as provided (spelling, accents, punctuation)
+- Title must be LARGE, prominent, centered or at top of image
+- Secondary text smaller, positioned below title
+- Professional modern typography integrated seamlessly
+- HIGH CONTRAST mandatory (drop shadow or outline on text)
+- Text is PART OF the graphic design, not overlaid
+- Text must be READABLE and CRISP`;
+  } else {
+    // CAS 2: Pas de texte → Gemini GÉNÈRE et intègre
+    const slideRole = getSlideRole(slideIndex, totalSlides);
+    const tone = brandKit?.voice || (isFR ? "professionnel et engageant" : "professional and engaging");
+    
+    textInstruction = `
+=== GENERATE AND INTEGRATE TEXT NATIVELY ===
+You must CREATE ${isFR ? 'French' : 'English'} marketing text for this slide.
+Slide ${slideIndex + 1}/${totalSlides} - Role: ${slideRole}
+
+GENERATE:
+- A PUNCHY TITLE (3-5 words max, impactful)
+- A brief subtitle if relevant (8-12 words max)
+
+THEME: ${userPrompt}
+LANGUAGE: ${isFR ? 'French' : 'English'}
+TONE: ${tone}
+
+INTEGRATE this text natively in the image with:
+- Professional typography, large and readable
+- High contrast (drop shadow or outline)
+- Style coherent with the visual design`;
+  }
   
   // ✅ Style visuel enrichi par le Brand Kit V2
-  let visualStyle = "soft gradient background, pastel colors, elegant design";
+  let visualStyle = "soft gradient background, pastel colors, elegant modern design";
   if (useBrandKit && brandKit) {
     const styleParts: string[] = [];
     
+    if (brandKit.niche) {
+      styleParts.push(`${brandKit.niche} industry aesthetic`);
+    }
     if (brandKit.visual_mood?.length) {
-      styleParts.push(brandKit.visual_mood.slice(0, 2).join(", ") + " aesthetic");
+      styleParts.push(brandKit.visual_mood.slice(0, 2).join(", ") + " mood");
     }
     if (brandKit.visual_types?.length) {
       const type = brandKit.visual_types[0];
-      if (type === "illustrations_3d") styleParts.push("3D rendered elements");
+      if (type === "illustrations_3d") styleParts.push("3D rendered elements with depth");
       else if (type === "illustrations_2d") styleParts.push("flat 2D illustration style");
       else if (type === "photos") styleParts.push("photorealistic quality");
+      else if (type === "mockups") styleParts.push("professional mockup style");
     }
     if (brandKit.palette?.length) {
-      styleParts.push("harmonious color palette with brand colors");
+      // Convertir hex en descriptions (éviter d'afficher les codes)
+      styleParts.push("harmonious brand color palette");
+    }
+    if (brandKit.pitch) {
+      styleParts.push(`Brand essence: ${brandKit.pitch}`);
     }
     
     if (styleParts.length > 0) {
@@ -239,26 +294,32 @@ function buildImagePromptPremium(
   // ✅ Éléments à éviter
   const avoid = brandKit?.avoid_in_visuals || "";
 
-  return `Generate ONE premium abstract background illustration.
+  // ✅ Instruction pour image de référence
+  const referenceInstruction = referenceImageUrl ? `
+=== REFERENCE IMAGE STYLE ===
+Use the provided reference image as style inspiration.
+Match its color palette, composition style, and overall aesthetic.
+Maintain visual coherence with this reference.` : "";
 
-VISUAL CONCEPT: ${visualConcept}
+  return `Create ONE premium social media slide image for a carousel.
+
+VISUAL CONCEPT: ${userPrompt}
 STYLE: ${visualStyle}
 
+${textInstruction}
+
+${referenceInstruction}
+
 COMPOSITION:
-- Premium, elegant background with soft 3D elements
-- Rich gradients, depth, and subtle visual interest
-- Geometric shapes, abstract forms, modern aesthetic
-- Clean central area reserved for text overlay
+- Single cohesive image, ready to post
 - Professional social media quality (Instagram/LinkedIn grade)
+- Slide ${slideIndex + 1}/${totalSlides} of a carousel - maintain style consistency
+- Text integrated as part of the design, not floating
+- Clean, balanced layout with visual hierarchy
 
-=== CRITICAL RULE: ABSOLUTELY NO TEXT ===
-❌ DO NOT include ANY text, words, letters, typography
-❌ DO NOT add titles, subtitles, labels, captions
-❌ DO NOT include hashtags, dates, numbers, symbols
-❌ This is PURELY a visual background
-${avoid ? `❌ AVOID: ${avoid}` : ""}
+${avoid ? `AVOID: ${avoid}` : ""}
 
-✅ OUTPUT: Clean, premium abstract visual background with ZERO text.`;
+OUTPUT: Professional carousel slide with text NATIVELY integrated in the design.`;
 }
 
 async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, ms = 30000) {
@@ -336,6 +397,7 @@ Deno.serve(async (req) => {
       carouselMode = 'standard', // ✅ Par défaut : Standard (overlay Cloudinary)
       carouselType = 'content', // ✅ Par défaut : Content (conseils/astuces)
       brandKit, // ✅ NOUVEAU: Brand Kit V2 complet
+      referenceImageUrl, // ✅ NOUVEAU: Image de référence pour le style
     } = params;
     
     // ✅ Sélectionner le modèle selon le mode
@@ -455,10 +517,11 @@ Deno.serve(async (req) => {
           prompt,     // ✅ Thème utilisateur
           brandKit,   // ✅ Brand Kit V2 complet
           useBrandKit,
-          { title: normTitle, subtitle: normSubtitle, bullets: normBullets, alt: slideContent.alt },
+          { title: normTitle, subtitle: normSubtitle, body: slideContent.body, bullets: normBullets, alt: slideContent.alt },
           slideIndex,
           totalSlides,
-          lang        // ✅ Langue pour le texte
+          lang,       // ✅ Langue pour le texte
+          referenceImageUrl // ✅ Image de référence
         )
       : buildImagePromptStandard(
           globalStyle, 
@@ -468,6 +531,8 @@ Deno.serve(async (req) => {
           slideIndex,
           totalSlides
         );
+    
+    console.log(`[render-slide] ${logCtx} 🎨 Mode: ${carouselMode}, hasText: ${!!normTitle && normTitle !== "Titre par défaut"}, hasRef: ${!!referenceImageUrl}`);
 
     let bgUrl: string | null = null;
 
@@ -635,40 +700,14 @@ Deno.serve(async (req) => {
         finalUrl = cloudinarySecureUrl;
       }
     } else {
-      // ✅ HYBRID PREMIUM MODE: Apply Cloudinary overlay to Gemini 3 Pro background
-      console.log(`[render-slide] ${logCtx} 3.5/4 Applying Cloudinary text overlay (Premium HYBRID mode, type=${carouselType})`);
+      // ✅ PREMIUM MODE: Le texte est INTÉGRÉ NATIVEMENT par Gemini 3 Pro
+      // PAS d'overlay Cloudinary - l'image est déjà complète avec le texte
+      console.log(`[render-slide] ${logCtx} 3.5/4 Premium mode: text integrated natively by Gemini 3 Pro (NO overlay)`);
       
-      const slideType = slideIndex === 0 ? 'hero' 
-        : slideIndex === totalSlides - 1 ? 'cta'
-        : slideIndex === 1 ? 'problem'
-        : slideIndex === totalSlides - 2 ? 'solution'
-        : 'impact';
-      
-      const slideData: Slide = {
-        type: slideType,
-        title: normTitle,
-        subtitle: carouselType === 'citations' ? undefined : (normSubtitle || undefined),
-        bullets: carouselType === 'citations' ? undefined : (normBullets.length > 0 ? normBullets : undefined),
-        cta: slideType === 'cta' ? normTitle : undefined,
-        author: slideContent.author || undefined,
-      };
-      
-      const primaryColor = 'ffffff';
-      const secondaryColor = 'cccccc';
-      
-      try {
-        finalUrl = buildCarouselSlideUrl(
-          cloudinaryPublicId,
-          slideData,
-          primaryColor,
-          secondaryColor,
-          carouselType
-        );
-        console.log(`[render-slide] ${logCtx}   ↳ Premium HYBRID overlay URL: ${finalUrl?.slice(0, 150)}...`);
-      } catch (overlayErr) {
-        console.warn(`[render-slide] ${logCtx} ⚠️ Premium overlay failed, using base image:`, overlayErr);
-        finalUrl = cloudinarySecureUrl;
-      }
+      // L'URL finale est directement l'image générée par Gemini
+      // Le texte a été intégré dans buildImagePromptPremium
+      finalUrl = cloudinarySecureUrl;
+      console.log(`[render-slide] ${logCtx}   ↳ Premium native URL: ${finalUrl?.slice(0, 150)}...`);
     }
 
     // =========================================
