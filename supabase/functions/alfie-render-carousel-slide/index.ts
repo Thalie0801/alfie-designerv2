@@ -265,27 +265,38 @@ ${referenceInstruction}
 === TEXTE À INTÉGRER EXACTEMENT (copier-coller, pas un mot de plus) ===
 ${textInstructions.join('\n')}
 
-=== RÈGLES ABSOLUES POUR LE TEXTE ===
+=== RÈGLES DE POSITIONNEMENT STRICTES ===
+1. MARGES OBLIGATOIRES : minimum 15% de marge à GAUCHE et à DROITE
+2. Zone de texte = 70% de la largeur MAXIMUM, CENTRÉE horizontalement
+3. Le texte ne doit JAMAIS toucher les bords de l'image
+4. Si un texte est trop long, le COUPER EN PLUSIEURS LIGNES (jamais dépasser la zone)
+5. Positionné dans la MOITIÉ SUPÉRIEURE (25-45% du haut de l'image)
+6. Titre centré en haut, sous-titre/corps en dessous avec interligne généreux
+
+=== RÈGLES TYPOGRAPHIQUES ABSOLUES ===
 1. Reproduire le texte EXACTEMENT comme écrit ci-dessus, lettre par lettre
 2. JAMAIS de mots collés (ex: "IApour" est INTERDIT, écrire "IA pour")
-3. Centré HORIZONTALEMENT au milieu de l'image
-4. Positionné dans la MOITIÉ SUPÉRIEURE (25-45% du haut)
-5. Police BLANCHE (#FFFFFF) avec OMBRE NOIRE épaisse (6px offset, 12px blur) pour contraste maximum
-6. Taille de police lisible (titre > sous-titre > corps)
-7. Interligne généreux entre les éléments textuels
-8. TOUT le texte en FRANÇAIS uniquement
+3. Police BLANCHE (#FFFFFF) avec OMBRE NOIRE épaisse (8px offset, 15px blur)
+4. Titre : MAXIMUM 8-10 mots par ligne, sinon couper sur 2 lignes
+5. Sous-titre/corps : MAXIMUM 12 mots par ligne
+6. Adapter la TAILLE de police à la longueur du texte (texte long = police plus petite)
+7. TOUT le texte en FRANÇAIS uniquement
 
-=== ERREURS À ÉVITER ABSOLUMENT ===
-- Mots collés sans espaces
-- Texte en anglais
-- Texte tronqué ou incomplet
-- Texte en bas de l'image
-- Texte sans contraste (difficilement lisible)
-- Texte trop petit ou trop grand
+=== INTERDICTIONS ABSOLUES (CRITIQUE) ===
+❌ JAMAIS afficher le texte 2 fois (pas de texte en arrière-plan/filigrane)
+❌ Le texte doit apparaître UNE SEULE FOIS, net et lisible
+❌ Pas d'effet "ombre de texte" qui duplique visuellement le texte
+❌ Pas de texte "fantôme" en fond
+❌ Mots collés sans espaces
+❌ Texte en anglais
+❌ Texte tronqué, coupé par les bords, ou incomplet
+❌ Texte en bas de l'image (doit être dans le TOP 50%)
+❌ Texte sans contraste (difficilement lisible)
+❌ Texte qui déborde de la zone centrale 70%
 
 ${avoid ? `ÉLÉMENTS À ÉVITER: ${avoid}` : ""}
 
-OUTPUT: Image professionnelle avec texte parfaitement intégré et lisible.`;
+OUTPUT: Image professionnelle avec texte UNE SEULE FOIS, bien centré dans les marges, parfaitement lisible.`;
 }
 
 /**
