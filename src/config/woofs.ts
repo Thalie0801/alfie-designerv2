@@ -11,7 +11,7 @@
 export const WOOF_COSTS = {
   image: 1,
   carousel_slide: 1,
-  carousel_slide_premium: 2, // Mode Premium (Gemini 3 Pro)
+  carousel_slide_premium: 3, // ✅ Mode Premium (Gemini 3 Pro) = 3 Woofs
   video_premium: 25,
 } as const;
 

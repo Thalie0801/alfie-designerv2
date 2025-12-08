@@ -561,8 +561,11 @@ Deno.serve(async (req) => {
     const MAX_BUL   = 4;
     const MAX_BUL_LEN = 60;
 
+    const MAX_BODY = 150; // ✅ Ajout limite body
+    
     const normTitle = String(slideContent.title || "").trim().slice(0, MAX_TITLE);
     const normSubtitle = String(slideContent.subtitle || "").trim().slice(0, MAX_SUB);
+    const normBody = String(slideContent.body || "").trim().slice(0, MAX_BODY); // ✅ Extraire le body
     const normBullets = (Array.isArray(slideContent.bullets) ? slideContent.bullets : [])
       .map(b => String(b || "").trim())
       .filter(b => b.length > 0)
@@ -602,8 +605,6 @@ Deno.serve(async (req) => {
     // =========================================
     
     // ✅ V8: Standard = Gemini Flash + overlay, Premium = Gemini 3 Pro + overlay (same overlay logic)
-    const normBody = String(slideContent.body || "").trim().slice(0, 200);
-    
     // ✅ V8: BOTH modes now generate background-only images (NO TEXT)
     // Text is added via Cloudinary overlay with Brand Kit fonts/colors
     const enrichedPrompt = carouselMode === 'premium'
@@ -778,10 +779,12 @@ Deno.serve(async (req) => {
       return raw;
     })();
     const brandSecondaryColor = brandKit?.palette?.[1]?.replace('#', '') || 'cccccc';
+    // ✅ V9: Couleur de texte du Brand Kit avec fallback blanc
+    const brandTextColor = (brandKit as any)?.text_color?.replace('#', '') || 'ffffff';
     
     console.log(`[render-slide] ${logCtx} 3.5/4 Applying Cloudinary text overlay (${carouselMode} mode, type=${carouselType})`);
     console.log(`[render-slide] ${logCtx}   ↳ Brand fonts: primary="${brandFonts.primary}", secondary="${brandFonts.secondary}"`);
-    console.log(`[render-slide] ${logCtx}   ↳ Brand colors: primary=#${brandPrimaryColor}, secondary=#${brandSecondaryColor}`);
+    console.log(`[render-slide] ${logCtx}   ↳ Brand colors: primary=#${brandPrimaryColor}, secondary=#${brandSecondaryColor}, text=#${brandTextColor}`);
     
     // Déterminer le type de slide pour l'overlay
     const slideType = slideIndex === 0 ? 'hero' 
@@ -790,25 +793,27 @@ Deno.serve(async (req) => {
       : slideIndex === totalSlides - 2 ? 'solution'
       : 'impact';
     
-    // ✅ Pour CITATIONS: forcer subtitle/bullets à vide, même si passés
+    // ✅ Pour CITATIONS: forcer subtitle/bullets/body à vide, même si passés
     const slideData: Slide = {
       type: slideType,
       title: normTitle,
       subtitle: carouselType === 'citations' ? undefined : (normSubtitle || undefined),
+      punchline: carouselType === 'citations' ? undefined : (normBody || undefined), // ✅ Ajout du body/punchline
       bullets: carouselType === 'citations' ? undefined : (normBullets.length > 0 ? normBullets : undefined),
       cta: slideType === 'cta' ? normTitle : undefined,
       author: slideContent.author || undefined, // ✅ Auteur pour les citations
     };
     
     try {
-      // ✅ V8: Apply overlay with Brand Kit fonts and colors (BOTH modes)
+      // ✅ V9: Apply overlay with Brand Kit fonts, colors AND text color
       finalUrl = buildCarouselSlideUrl(
         cloudinaryPublicId,
         slideData,
         brandPrimaryColor,    // ✅ Brand Kit primary color
         brandSecondaryColor,  // ✅ Brand Kit secondary color
         carouselType,         // ✅ citations or content
-        brandFonts            // ✅ Brand Kit fonts
+        brandFonts,           // ✅ Brand Kit fonts
+        brandTextColor        // ✅ V9: Brand Kit text color
       );
       console.log(`[render-slide] ${logCtx}   ↳ overlay URL: ${finalUrl?.slice(0, 150)}...`);
     } catch (overlayErr) {

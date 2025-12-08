@@ -52,6 +52,7 @@ export default function BrandKit() {
     font_primary: '',
     font_secondary: '',
     colors: [] as string[],
+    text_color: '#FFFFFF', // ✅ V9: Couleur de texte
     // V2 fields
     pitch: '',
     adjectives: [] as string[],
@@ -86,6 +87,7 @@ export default function BrandKit() {
         font_primary: brandKit.fonts?.primary || '',
         font_secondary: brandKit.fonts?.secondary || '',
         colors,
+        text_color: (brandKit as any).text_color || '#FFFFFF', // ✅ V9
         pitch: brandKit.pitch || '',
         adjectives: brandKit.adjectives || [],
         tone_sliders: brandKit.tone_sliders || { fun: 5, accessible: 5, energetic: 5, direct: 5 },
@@ -174,6 +176,7 @@ export default function BrandKit() {
             primary: formData.font_primary || null,
             secondary: formData.font_secondary || null
           },
+          text_color: formData.text_color || '#FFFFFF', // ✅ V9
           pitch: formData.pitch || null,
           adjectives: formData.adjectives,
           tone_sliders: formData.tone_sliders as { fun: number; accessible: number; energetic: number; direct: number },
@@ -376,6 +379,29 @@ export default function BrandKit() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Couleur de texte */}
+          <div className="space-y-3">
+            <Label htmlFor="text_color">Couleur de texte principale</Label>
+            <p className="text-xs text-muted-foreground">
+              Couleur utilisée pour les textes sur vos carrousels
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                id="text_color"
+                value={formData.text_color.match(/^#[0-9A-Fa-f]{6}$/) ? formData.text_color : '#FFFFFF'}
+                onChange={(e) => setFormData({ ...formData, text_color: e.target.value.toUpperCase() })}
+                className="h-10 w-16 rounded border cursor-pointer"
+              />
+              <Input
+                value={formData.text_color}
+                onChange={(e) => setFormData({ ...formData, text_color: e.target.value.toUpperCase() })}
+                placeholder="#FFFFFF"
+                className="flex-1 font-mono max-w-32"
+              />
+            </div>
           </div>
 
           {/* Polices */}
