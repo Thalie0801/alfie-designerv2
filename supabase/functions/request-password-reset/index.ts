@@ -80,11 +80,14 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     // Cleanup old requests (older than 24h) - fire and forget
-    supabaseAdmin.rpc('cleanup_old_password_reset_requests').then(() => {
-      console.log("[request-password-reset] Cleanup completed");
-    }).catch(err => {
-      console.warn("[request-password-reset] Cleanup failed:", err);
-    });
+    (async () => {
+      try {
+        await supabaseAdmin.rpc('cleanup_old_password_reset_requests');
+        console.log("[request-password-reset] Cleanup completed");
+      } catch (err: unknown) {
+        console.warn("[request-password-reset] Cleanup failed:", err);
+      }
+    })();
 
     // === GENERATE RESET LINK ===
     const { data, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
