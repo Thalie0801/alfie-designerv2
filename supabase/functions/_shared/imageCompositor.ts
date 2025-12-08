@@ -126,7 +126,6 @@ function buildTextLayer(layer: TextLayer): string {
   const font = `${fontFamily}_${fontSize}_${fontWeight}`;
   
   // ✅ FIX: Utiliser layer.color du Brand Kit avec fallback blanc
-  // Le système triple-layer (ombres noires) garantit le contraste sur tout fond
   const textColor = (layer.color?.replace('#', '') || 'ffffff');
   const encodedText = encodeCloudinaryText(layer.text);
   
@@ -135,24 +134,26 @@ function buildTextLayer(layer: TextLayer): string {
   const baseY = layer.y || 0;
   const widthParam = layer.w ? `w_${layer.w},c_fit` : '';
   
-  // ✅ TECHNIQUE TRIPLE LAYER: 2 ombres NOIRES ÉPAISSES + texte BLANC pour max contraste
+  // ✅ TECHNIQUE AMÉLIORÉE: Stroke noir + ombre profonde + texte
+  // Calcul du stroke proportionnel à la taille de police
+  const strokeSize = Math.max(3, Math.round(fontSize / 16)); // 3px min, proportionnel
   
-  // Layer 1: Ombre lointaine (profondeur) - 12px offset, opacité 80%
-  const shadow1Y = baseY + 12;
-  const shadow1Params = [`g_${layer.gravity || 'center'}`, `x_${baseX}`, `y_${shadow1Y}`, widthParam].filter(Boolean).join(',');
-  const shadow1Layer = `l_text:${font}:${encodedText},co_rgb:000000,o_80${shadow1Params ? ',' + shadow1Params : ''}/fl_layer_apply`;
+  // Layer 1: Ombre lointaine floue (profondeur) - 15px offset, opacité 70%
+  const shadow1Y = baseY + 15;
+  const shadow1X = baseX + 8;
+  const shadow1Params = [`g_${layer.gravity || 'center'}`, `x_${shadow1X}`, `y_${shadow1Y}`, widthParam].filter(Boolean).join(',');
+  const shadow1Layer = `l_text:${font}:${encodedText},co_rgb:000000,o_70${shadow1Params ? ',' + shadow1Params : ''}/fl_layer_apply`;
   
-  // Layer 2: Ombre proche (contraste fort) - 6px offset, opacité 90%
-  const shadow2Y = baseY + 6;
-  const shadow2Params = [`g_${layer.gravity || 'center'}`, `x_${baseX}`, `y_${shadow2Y}`, widthParam].filter(Boolean).join(',');
-  const shadow2Layer = `l_text:${font}:${encodedText},co_rgb:000000,o_90${shadow2Params ? ',' + shadow2Params : ''}/fl_layer_apply`;
+  // Layer 2: Contour noir (stroke) - utilise bo_ pour border/outline
+  const strokeParams = [gravity, `x_${baseX}`, `y_${baseY}`, widthParam].filter(Boolean).join(',');
+  const strokeLayer = `l_text:${font}:${encodedText},co_rgb:000000,bo_${strokeSize}px_solid_black${strokeParams ? ',' + strokeParams : ''}/fl_layer_apply`;
   
-  // Layer 3: Texte BLANC par-dessus (toujours lisible grâce aux ombres noires)
+  // Layer 3: Texte principal avec couleur Brand Kit
   const textParams = [gravity, `x_${baseX}`, `y_${baseY}`, widthParam].filter(Boolean).join(',');
   const textLayer = `l_text:${font}:${encodedText},co_rgb:${textColor}${textParams ? ',' + textParams : ''}/fl_layer_apply`;
   
-  // Retourner les trois layers (2 ombres noires + texte blanc)
-  return `${shadow1Layer}/${shadow2Layer}/${textLayer}`;
+  // Retourner les trois layers (ombre + stroke noir + texte couleur)
+  return `${shadow1Layer}/${strokeLayer}/${textLayer}`;
 }
 
 // ============= BRAND FONTS TYPE =============
@@ -177,61 +178,61 @@ function layersForHero(slide: Slide, primaryColor: string, secondaryColor: strin
   // ✅ Utiliser textColor du Brand Kit avec fallback
   const mainTextColor = textColor || 'ffffff';
   
-  // Badge (centered above title)
+  // Badge (centered above title) - ESPACEMENT AUGMENTÉ
   if (slide.badge) {
     layers.push({
       text: slide.badge.toUpperCase(),
       font: bodyFont,
       weight: 'Bold',
-      size: 28,
+      size: 32, // ✅ AUGMENTÉ de 28 à 32
       color: mainTextColor,
-      outline: 10,
+      outline: 12,
       gravity: 'center',
-      y: -180,
-      w: 600
+      y: -220, // ✅ AUGMENTÉ de -180 à -220
+      w: 700
     });
   }
   
-  // Main title (CENTERED vertically)
+  // Main title (CENTERED vertically) - TAILLE AUGMENTÉE
   layers.push({
     text: slide.title,
     font: titleFont,
     weight: 'ExtraBold',
-    size: 76,
-    color: mainTextColor, // ✅ Couleur Brand Kit
-    outline: 20,
+    size: 92, // ✅ AUGMENTÉ de 76 à 92
+    color: mainTextColor,
+    outline: 22,
     gravity: 'center',
-    y: -40,
-    w: 900
+    y: -60, // ✅ AJUSTÉ pour meilleur centrage
+    w: 920
   });
   
-  // Punchline/subtitle (centered below title)
+  // Punchline/subtitle (centered below title) - ESPACEMENT AUGMENTÉ
   if (slide.punchline) {
     layers.push({
       text: slide.punchline,
       font: bodyFont,
-      weight: 'Regular',
-      size: 40,
-      color: mainTextColor, // ✅ Couleur Brand Kit
-      outline: 12,
+      weight: 'Bold', // ✅ Bold au lieu de Regular
+      size: 48, // ✅ AUGMENTÉ de 40 à 48
+      color: mainTextColor,
+      outline: 14,
       gravity: 'center',
-      y: 80,
+      y: 120, // ✅ AUGMENTÉ de 80 à 120
       w: 900
     });
   }
   
-  // CTA (bottom-center)
+  // CTA (bottom-center) - ESPACEMENT AUGMENTÉ
   if (slide.cta_primary) {
     layers.push({
       text: slide.cta_primary,
       font: titleFont,
       weight: 'Bold',
-      size: 44,
+      size: 52, // ✅ AUGMENTÉ de 44 à 52
       color: mainTextColor,
-      outline: 14,
+      outline: 16,
       gravity: 'center',
-      y: 200,
-      w: 700
+      y: 260, // ✅ AUGMENTÉ de 200 à 260
+      w: 750
     });
   }
   
@@ -256,75 +257,76 @@ function layersForContent(slide: Slide, primaryColor: string, brandFonts?: Brand
   const hasBody = !!slide.punchline; // punchline = body text
   const hasBullets = slide.bullets && slide.bullets.length > 0;
   
-  // ✅ CENTRAGE VERTICAL CORRIGÉ - positions ajustées pour meilleur équilibre
-  // Calculer la position du titre selon le contenu présent
-  let titleY = -40; // Défaut: centré
+  // ✅ ESPACEMENT VERTICAL DRASTIQUEMENT AUGMENTÉ - zones distinctes
+  // Titre: tiers supérieur (-200), Subtitle: centre (0), Body: tiers inférieur (+160)
+  let titleY = -60; // Défaut: légèrement au-dessus du centre
   if (hasSubtitle && hasBody) {
-    titleY = -120; // Titre + sous-titre + body
+    titleY = -200; // Titre tout en haut
   } else if (hasSubtitle || hasBody) {
-    titleY = -80; // Titre + un élément
+    titleY = -150; // Titre en haut
   } else if (hasBullets) {
-    titleY = -140; // Titre + bullets
+    titleY = -180; // Titre en haut pour laisser place aux bullets
   }
   
+  // ✅ TITRE: Taille augmentée à 86px avec font Bold
   layers.push({
     text: truncateForOverlay(slide.title, CHAR_LIMITS.title),
     font: titleFont,
     weight: 'ExtraBold',
-    size: 64,
-    color: mainTextColor, // ✅ Couleur Brand Kit
-    outline: 18,
+    size: 86, // ✅ AUGMENTÉ de 64 à 86
+    color: mainTextColor,
+    outline: 20,
     gravity: 'center',
     y: titleY,
-    w: 850
+    w: 900
   });
   
-  // ✅ Subtitle - espacement de 100px minimum après le titre
+  // ✅ Subtitle - ESPACEMENT GÉNÉREUX: 160px minimum sous le titre
   if (hasSubtitle) {
-    const subtitleY = hasBody ? 10 : 40; // Position ajustée
+    const subtitleY = hasBody ? 0 : 50; // Centre ou légèrement en dessous
     layers.push({
       text: truncateForOverlay(slide.subtitle!, CHAR_LIMITS.subtitle),
       font: bodyFont,
-      weight: 'Regular',
-      size: 36,
-      color: mainTextColor, // ✅ Couleur Brand Kit
-      outline: 10,
+      weight: 'Bold', // ✅ Bold au lieu de Regular pour meilleure lisibilité
+      size: 48, // ✅ AUGMENTÉ de 36 à 48
+      color: mainTextColor,
+      outline: 12,
       gravity: 'center',
       y: subtitleY,
-      w: 850
+      w: 880
     });
   }
   
-  // ✅ Body text (punchline) - 100px sous le subtitle
+  // ✅ Body text (punchline) - ESPACEMENT: 160px sous le subtitle
   if (hasBody) {
-    const bodyY = hasSubtitle ? 120 : 60; // Position selon présence subtitle
+    const bodyY = hasSubtitle ? 160 : 100; // ✅ AUGMENTÉ de 120 à 160
     layers.push({
       text: truncateForOverlay(slide.punchline!, CHAR_LIMITS.body),
       font: bodyFont,
       weight: 'Regular',
-      size: 32,
-      color: mainTextColor, // ✅ Couleur Brand Kit
-      outline: 8,
+      size: 40, // ✅ AUGMENTÉ de 32 à 40
+      color: mainTextColor,
+      outline: 10,
       gravity: 'center',
       y: bodyY,
-      w: 850
+      w: 880
     });
   }
   
-  // Bullets (CENTERED, below body or subtitle)
+  // Bullets (CENTERED, below body or subtitle) - ESPACEMENT AUGMENTÉ
   if (hasBullets) {
     const bulletText = slide.bullets!.map(b => `• ${truncateForOverlay(b, CHAR_LIMITS.bullet)}`).join('\n');
-    const bulletY = hasBody ? 220 : (hasSubtitle ? 140 : 80);
+    const bulletY = hasBody ? 280 : (hasSubtitle ? 200 : 120); // ✅ AUGMENTÉ
     layers.push({
       text: bulletText,
       font: bodyFont,
       weight: 'Regular',
-      size: 38,
-      color: mainTextColor, // ✅ Couleur Brand Kit
-      outline: 10,
+      size: 42, // ✅ AUGMENTÉ de 38 à 42
+      color: mainTextColor,
+      outline: 12,
       gravity: 'center',
       y: bulletY,
-      w: 900
+      w: 920
     });
   }
   
@@ -344,46 +346,46 @@ function layersForCTA(slide: Slide, primaryColor: string, brandFonts?: BrandFont
   // ✅ Utiliser textColor du Brand Kit avec fallback
   const mainTextColor = textColor || 'ffffff';
   
-  // Title (center-top)
+  // Title (center-top) - TAILLE AUGMENTÉE
   layers.push({
     text: slide.title,
     font: titleFont,
     weight: 'ExtraBold',
-    size: 72,
-    color: mainTextColor, // ✅ Couleur Brand Kit
-    outline: 16,
+    size: 86, // ✅ AUGMENTÉ de 72 à 86
+    color: mainTextColor,
+    outline: 20,
     gravity: 'center',
-    y: -100,
-    w: 900
+    y: -140, // ✅ AJUSTÉ pour meilleur espacement
+    w: 920
   });
   
-  // Subtitle (center)
+  // Subtitle (center) - ESPACEMENT AUGMENTÉ
   if (slide.subtitle) {
     layers.push({
       text: slide.subtitle,
       font: bodyFont,
-      weight: 'Regular',
-      size: 36,
-      color: mainTextColor, // ✅ Couleur Brand Kit
-      outline: 10,
+      weight: 'Bold', // ✅ Bold au lieu de Regular
+      size: 44, // ✅ AUGMENTÉ de 36 à 44
+      color: mainTextColor,
+      outline: 12,
       gravity: 'center',
-      y: 0,
+      y: 40, // ✅ AJUSTÉ de 0 à 40 pour espacement
       w: 900
     });
   }
   
-  // Primary CTA (center-bottom)
+  // Primary CTA (center-bottom) - TAILLE AUGMENTÉE
   if (slide.cta_primary) {
     layers.push({
       text: slide.cta_primary,
       font: titleFont,
       weight: 'Bold',
-      size: 48,
+      size: 56, // ✅ AUGMENTÉ de 48 à 56
       color: mainTextColor,
-      outline: 12,
+      outline: 14,
       gravity: 'south',
-      y: 150,
-      w: 700
+      y: 180, // ✅ AUGMENTÉ de 150 à 180
+      w: 750
     });
   }
   
@@ -393,11 +395,11 @@ function layersForCTA(slide: Slide, primaryColor: string, brandFonts?: BrandFont
       text: slide.note,
       font: bodyFont,
       weight: 'Regular',
-      size: 28,
-      color: mainTextColor, // ✅ Couleur Brand Kit
-      outline: 8,
+      size: 32, // ✅ AUGMENTÉ de 28 à 32
+      color: mainTextColor,
+      outline: 10,
       gravity: 'south',
-      y: 64,
+      y: 80, // ✅ AJUSTÉ de 64 à 80
       w: 900
     });
   }
@@ -420,31 +422,31 @@ function layersForCitation(slide: Slide, primaryColor: string, brandFonts?: Bran
   // ✅ Utiliser textColor du Brand Kit avec fallback
   const mainTextColor = textColor || 'ffffff';
   
-  // Citation principale (CENTRÉE avec guillemets + contraste)
+  // Citation principale (CENTRÉE avec guillemets + contraste) - TAILLE AUGMENTÉE
   layers.push({
     text: `"${slide.title}"`,
     font: titleFont,
     weight: 'Bold',
-    size: 56,
-    color: mainTextColor, // ✅ Couleur Brand Kit
-    outline: 16,
+    size: 72, // ✅ AUGMENTÉ de 56 à 72
+    color: mainTextColor,
+    outline: 18,
     gravity: 'center',
-    y: -30,
-    w: 900
+    y: -60, // ✅ AJUSTÉ pour meilleur centrage
+    w: 920
   });
   
-  // Auteur (centré en dessous)
+  // Auteur (centré en dessous) - ESPACEMENT AUGMENTÉ
   if (slide.author) {
     layers.push({
       text: `— ${slide.author}`,
       font: bodyFont,
-      weight: 'Regular',
-      size: 32,
-      color: mainTextColor, // ✅ Couleur Brand Kit
-      outline: 10,
+      weight: 'Bold', // ✅ Bold au lieu de Regular
+      size: 40, // ✅ AUGMENTÉ de 32 à 40
+      color: mainTextColor,
+      outline: 12,
       gravity: 'center',
-      y: 100,
-      w: 700
+      y: 140, // ✅ AUGMENTÉ de 100 à 140
+      w: 750
     });
   }
   
