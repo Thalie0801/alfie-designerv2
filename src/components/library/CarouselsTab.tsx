@@ -7,8 +7,6 @@ import { Eye, Download, FileArchive, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { slideUrl } from "@/lib/cloudinary/imageUrls";
-import { getCloudName } from "@/lib/cloudinary/config";
 import { cn } from "@/lib/utils";
 
 interface CarouselSlide {
@@ -36,9 +34,6 @@ interface CarouselSlide {
   brand_id?: string;
 }
 
-function resolveCloudName(slide: CarouselSlide): string {
-  return getCloudName(slide.cloudinary_url || slide.metadata?.cloudinary_base_url);
-}
 
 type Aspect = "4:5" | "1:1" | "9:16" | "16:9";
 function aspectClassFor(format?: string | null) {
@@ -279,34 +274,8 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {carouselSlides.map((slide) => {
               const aspect = aspectClassFor(slide.format);
-              const base = slide.cloudinary_url ?? "";
-              const canOverlay = Boolean(slide.cloudinary_public_id && slide.text_json);
-              const cloudName = canOverlay ? resolveCloudName(slide) : undefined;
-
-              const src = (() => {
-                if (!canOverlay || !cloudName) return base;
-                try {
-                  // ✅ Sanitizer les bullets pour éviter les caractères Unicode problématiques
-                  const sanitizedBullets = (slide.text_json?.bullets || [])
-                    .map(b => b.replace(/^[•\-–—]\s*/g, '').trim())
-                    .filter(b => b.length > 0); // ✅ Filtrer les bullets vides
-
-                  // ✅ Fallback pour titre si vraiment vide (cas limite)
-                  const displayTitle = slide.text_json?.title?.trim() || `Slide ${(slide.slide_index ?? 0) + 1}`;
-
-                  return slideUrl(slide.cloudinary_public_id as string, {
-                    title: displayTitle,
-                    subtitle: slide.text_json?.subtitle,
-                    body: slide.text_json?.body,
-                    bulletPoints: sanitizedBullets.length ? sanitizedBullets : undefined,
-                    aspectRatio: (slide.format || "4:5") as Aspect,
-                    cloudName,
-                  });
-                } catch (e) {
-                  console.warn("[CarouselsTab] overlay url error => fallback base", e);
-                  return base;
-                }
-              })();
+              // ✅ Utiliser directement l'URL déjà calculée par le backend (avec couleur/font Brand Kit)
+              const src = slide.cloudinary_url || (slide.metadata?.cloudinary_base_url as string) || "";
 
               return (
                 <div key={slide.id} className="relative group">
@@ -316,10 +285,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                     className={cn("w-full rounded-lg object-cover border", aspect)}
                     loading="lazy"
                     onError={(e) => {
-                      if (base?.startsWith("https://") && e.currentTarget.src !== base) {
-                        console.warn("[CarouselsTab] overlay failed, fallback base:", e.currentTarget.src);
-                        e.currentTarget.src = base;
-                      }
+                      console.warn("[CarouselsTab] image load error:", e.currentTarget.src);
                     }}
                   />
                   <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
