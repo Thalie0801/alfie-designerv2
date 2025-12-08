@@ -199,6 +199,7 @@ export function StudioGenerator() {
   const [briefGenerationError, setBriefGenerationError] = useState<string | null>(null);
   const [useBrandKitForPack, setUseBrandKitForPack] = useState(true);
   const [carouselMode] = useState<'standard' | 'premium'>('standard');
+  const [colorMode, setColorMode] = useState<'vibrant' | 'pastel'>('vibrant');
 
   // Charger les Woofs disponibles
   useEffect(() => {
@@ -776,6 +777,40 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
                   </Button>
                 </div>
               )}
+            </Card>
+
+            {/* Toggle Style Couleurs */}
+            <Card className="p-4 space-y-3">
+              <h3 className="font-semibold text-sm">Style couleurs</h3>
+              <div className="flex gap-1">
+                <button 
+                  type="button"
+                  onClick={() => setColorMode('vibrant')}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-l-md transition-colors flex items-center justify-center gap-1 ${
+                    colorMode === 'vibrant' 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'bg-muted hover:bg-muted/80'
+                  }`}
+                >
+                  🌈 Coloré
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setColorMode('pastel')}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-r-md transition-colors flex items-center justify-center gap-1 ${
+                    colorMode === 'pastel' 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'bg-muted hover:bg-muted/80'
+                  }`}
+                >
+                  🎀 Pastel
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {colorMode === 'vibrant' 
+                  ? "Visuels avec couleurs vives et saturées" 
+                  : "Visuels avec tons doux et pastel"}
+              </p>
             </Card>
 
             <Card className="p-4">

@@ -129,34 +129,14 @@ function buildTextLayer(layer: TextLayer): string {
   const baseY = layer.y || 0;
   const widthParam = layer.w ? `,w_${layer.w},c_fit` : '';
   
-  // ✅ TECHNIQUE STROKE SIMULÉ : 8 copies noires décalées + ombre + texte principal
-  const strokeOffset = Math.max(2, Math.round(fontSize / 28)); // 2-3px selon taille
   const layers: string[] = [];
   
-  // 1. Ombre douce lointaine (profondeur)
-  const shadowY = baseY + 12;
-  const shadowX = baseX + 5;
-  layers.push(`l_text:${font}:${encodedText},co_rgb:000000,o_50,g_${gravity},x_${shadowX},y_${shadowY}${widthParam}/fl_layer_apply`);
+  // 1. Ombre noire décalée (profondeur et lisibilité)
+  const shadowY = baseY + 4;
+  const shadowX = baseX + 4;
+  layers.push(`l_text:${font}:${encodedText},co_rgb:000000,o_80,g_${gravity},x_${shadowX},y_${shadowY}${widthParam}/fl_layer_apply`);
   
-  // 2. Stroke simulé : 8 copies noires dans toutes les directions
-  const directions = [
-    { x: -strokeOffset, y: 0 },
-    { x: strokeOffset, y: 0 },
-    { x: 0, y: -strokeOffset },
-    { x: 0, y: strokeOffset },
-    { x: -strokeOffset, y: -strokeOffset },
-    { x: strokeOffset, y: -strokeOffset },
-    { x: -strokeOffset, y: strokeOffset },
-    { x: strokeOffset, y: strokeOffset },
-  ];
-  
-  for (const dir of directions) {
-    const x = baseX + dir.x;
-    const y = baseY + dir.y;
-    layers.push(`l_text:${font}:${encodedText},co_rgb:000000,g_${gravity},x_${x},y_${y}${widthParam}/fl_layer_apply`);
-  }
-  
-  // 3. Texte principal avec couleur Brand Kit (par-dessus)
+  // 2. Texte principal avec couleur Brand Kit
   layers.push(`l_text:${font}:${encodedText},co_rgb:${textColor},g_${gravity},x_${baseX},y_${baseY}${widthParam}/fl_layer_apply`);
   
   return layers.join('/');
