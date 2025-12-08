@@ -556,10 +556,10 @@ Deno.serve(async (req) => {
     // ------------------------------------------
     // Normalize textual content + soft limits
     // ------------------------------------------
-    const MAX_TITLE = 80;
-    const MAX_SUB   = 160;
+    const MAX_TITLE = 35; // ✅ Réduit pour éviter troncature visuelle
+    const MAX_SUB   = 70;  // ✅ Aligné avec frontend CHAR_LIMITS
     const MAX_BUL   = 4;
-    const MAX_BUL_LEN = 90;
+    const MAX_BUL_LEN = 60;
 
     const normTitle = String(slideContent.title || "").trim().slice(0, MAX_TITLE);
     const normSubtitle = String(slideContent.subtitle || "").trim().slice(0, MAX_SUB);
