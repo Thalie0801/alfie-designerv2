@@ -1351,19 +1351,26 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
           await sleep(1000 * attempt);
         }
 
-        // ✅ UTILISER UNIQUEMENT les champs du carousel plan
-        // JAMAIS asset.prompt comme texte d'overlay !
+        // ✅ REFONTE: Générer des images de fond SANS TEXTE
+        // Les textes sont stockés séparément dans text_json pour récupération via 3 méthodes
+        const backgroundPrompt = `Abstract colorful background for social media carousel.
+NO TEXT whatsoever - no letters, words, numbers, labels.
+ONLY abstract shapes, gradients, patterns, visual elements.
+Style: ${colorMode === 'vibrant' ? 'vibrant saturated colors, bold gradients' : 'soft pastel tones, gentle gradients'}.
+${useBrandKit && brandMini?.niche ? `Theme context: ${brandMini.niche} brand.` : ''}
+${useBrandKit && brandMini?.visual_mood?.length ? `Mood: ${brandMini.visual_mood.join(', ')}.` : ''}
+Slide ${index + 1} of ${carouselSlides.length}.`;
+
         const slideResult = await callFn("alfie-render-carousel-slide", {
           userId: jobMeta?.user_id || payload.userId,
-          prompt: topic, // ✅ Le thème pour le contexte visuel (pas affiché)
+          prompt: backgroundPrompt, // ✅ Prompt pour fond abstrait SANS TEXTE
           globalStyle,
           brandKit: brandMini,
-        slideContent: {
-            // ✅ NOUVEAU: utiliser carousel_slides[i], PAS asset.prompt
-            // ✅ FIX: Séparer subtitle et body correctement
+          slideContent: {
+            // ✅ Textes stockés dans text_json pour récupération (pas de rendu overlay)
             title: slide.title_on_image || "",
-            subtitle: (slide as any).subtitle || "", // ✅ Sous-titre séparé (si dispo)
-            body: slide.text_on_image || "", // ✅ Body = text_on_image (descriptif)
+            subtitle: (slide as any).subtitle || "",
+            body: slide.text_on_image || "",
             bullets: (slide as any).bullets || [],
             alt: `Slide ${index + 1}: ${slide.title_on_image}`,
             author: (slide as any).author || undefined,
@@ -1380,10 +1387,11 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
           campaign: payload.campaign || payload.brief?.campaign || "carousel",
           language: payload.language || "FR",
           useBrandKit,
-          carouselMode,
+          carouselMode: "background_only", // ✅ FORCER mode fond uniquement
           carouselType,
-          colorMode, // ✅ Mode Coloré/Pastel
-          referenceImageUrl: payload.referenceImageUrl || null, // ✅ NOUVEAU: Image de référence
+          colorMode,
+          referenceImageUrl: payload.referenceImageUrl || null,
+          backgroundOnly: true, // ✅ Flag explicite: pas d'overlays texte
         });
 
         return { success: true, slideIndex: index, result: slideResult };

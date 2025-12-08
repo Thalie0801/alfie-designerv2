@@ -280,21 +280,12 @@ Deno.serve(async (req) => {
     let successCount = 0;
     let failureCount = 0;
 
+    // ✅ REFONTE: Télécharger les images de fond directement (SANS overlays)
     for (const slide of slides) {
       const meta = (slide.metadata as any) || {};
       
-      // ✅ NOUVEAU : Tenter d'abord l'URL overlay
-      let imageUrl = buildOverlayUrl(slide);
-      
-      // Fallback vers images de base si pas d'overlay possible
-      if (!imageUrl) {
-        imageUrl = slide.cloudinary_url;
-        console.log(`[download-zip] No overlay for slide ${slide.id}, using base image`);
-      }
-      
-      if (!imageUrl && meta.cloudinary_base_url) {
-        imageUrl = meta.cloudinary_base_url;
-      }
+      // ✅ Utiliser directement l'image de base (plus d'overlays)
+      let imageUrl = slide.cloudinary_url || meta.cloudinary_base_url;
 
       if (!imageUrl) {
         console.warn(`[download-zip] ⚠️ No URL found for slide ${slide.id}`);
@@ -303,34 +294,12 @@ Deno.serve(async (req) => {
       }
 
       try {
-        const overlayIndicator = imageUrl.includes('l_text:') ? '🎨 WITH OVERLAY' : '📦 base';
-        console.log(
-          `[download-zip] Downloading slide ${slide.slide_index} ${overlayIndicator}: ${imageUrl.substring(
-            0,
-            120
-          )}...`
-        );
+        console.log(`[download-zip] Downloading slide ${slide.slide_index}: ${imageUrl.substring(0, 120)}...`);
 
         const response = await fetch(imageUrl);
         
         if (!response.ok) {
-          console.warn(`[download-zip] ⚠️ Overlay failed (${response.status}), trying base...`);
-          
-          // Fallback vers image de base si overlay échoue
-          if (slide.cloudinary_url) {
-            const fallbackResp = await fetch(slide.cloudinary_url);
-            if (fallbackResp.ok) {
-              const blob = await fallbackResp.blob();
-              const arrayBuffer = await blob.arrayBuffer();
-              const slideNum = (slide.slide_index ?? 0) + 1;
-              const filename = `slide-${slideNum.toString().padStart(2, '0')}.png`;
-              zip.file(filename, new Uint8Array(arrayBuffer));
-              console.log(`[download-zip] ✅ Added ${filename} via base fallback`);
-              successCount++;
-              continue;
-            }
-          }
-          
+          console.warn(`[download-zip] ⚠️ Failed to fetch slide ${slide.slide_index} (${response.status})`);
           failureCount++;
           continue;
         }
@@ -341,13 +310,50 @@ Deno.serve(async (req) => {
         const slideNum = (slide.slide_index ?? 0) + 1;
         const filename = `slide-${slideNum.toString().padStart(2, '0')}.png`;
         zip.file(filename, new Uint8Array(arrayBuffer));
-        console.log(`[download-zip] ✅ Added ${filename} (${arrayBuffer.byteLength} bytes) ${imageUrl.includes('l_text:') ? '🎨 WITH OVERLAY' : '📦 base'}`);
+        console.log(`[download-zip] ✅ Added ${filename} (${arrayBuffer.byteLength} bytes)`);
         successCount++;
         
       } catch (err) {
         console.error(`[download-zip] ❌ Error fetching slide ${slide.id}:`, err);
         failureCount++;
       }
+    }
+
+    // ✅ MÉTHODE B: Ajouter le fichier textes-slides.txt
+    const slidesWithTexts = slides.filter((s: any) => s.text_json);
+    if (slidesWithTexts.length > 0) {
+      console.log(`[download-zip] 📝 Adding textes-slides.txt with ${slidesWithTexts.length} slides`);
+      
+      let txtContent = `═══════════════════════════════════════
+   CARROUSEL - Textes des slides
+   Généré par Alfie Designer
+═══════════════════════════════════════
+
+`;
+
+      slidesWithTexts.sort((a: any, b: any) => (a.slide_index ?? 0) - (b.slide_index ?? 0));
+      
+      for (const slide of slidesWithTexts) {
+        const txt = slide.text_json as any;
+        const slideNum = (slide.slide_index ?? 0) + 1;
+        
+        txtContent += `📱 SLIDE ${slideNum}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+        if (txt.title) txtContent += `Titre : ${txt.title}\n`;
+        if (txt.subtitle) txtContent += `Sous-titre : ${txt.subtitle}\n`;
+        if (txt.body) txtContent += `Corps : ${txt.body}\n`;
+        if (txt.bullets?.length > 0) {
+          txtContent += `Points clés :\n`;
+          txt.bullets.forEach((b: string) => {
+            txtContent += `  • ${b}\n`;
+          });
+        }
+        txtContent += `\n`;
+      }
+
+      zip.file("textes-slides.txt", txtContent);
+      console.log(`[download-zip] ✅ Added textes-slides.txt`);
     }
 
     console.log(`[download-zip] Summary: ${successCount} successful, ${failureCount} failed`);

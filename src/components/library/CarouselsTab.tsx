@@ -3,11 +3,12 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Eye, Download, FileArchive, Loader2 } from "lucide-react";
+import { Eye, Download, FileArchive, Loader2, Copy, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface CarouselSlide {
   id: string;
@@ -224,6 +225,51 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     }
   }, []);
 
+  // ✅ MÉTHODE C: Copier un texte de slide
+  const handleCopySlideText = useCallback((slide: CarouselSlide) => {
+    if (!slide.text_json) return;
+    const { title, subtitle, body, bullets } = slide.text_json;
+    let text = "";
+    if (title) text += `Titre : ${title}\n`;
+    if (subtitle) text += `Sous-titre : ${subtitle}\n`;
+    if (body) text += `Corps : ${body}\n`;
+    if (bullets?.length) {
+      text += `Points clés :\n${bullets.map((b) => `  • ${b}`).join("\n")}`;
+    }
+    navigator.clipboard.writeText(text.trim());
+    toast.success("Texte de la slide copié !");
+  }, []);
+
+  // ✅ MÉTHODE C: Copier tous les textes d'un carrousel
+  const handleCopyAllTexts = useCallback((carouselSlides: CarouselSlide[]) => {
+    const slidesWithTexts = carouselSlides.filter((s) => s.text_json);
+    if (slidesWithTexts.length === 0) {
+      toast.error("Aucun texte disponible pour ce carrousel");
+      return;
+    }
+
+    let allTexts = "📱 CARROUSEL - Textes des slides\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
+
+    slidesWithTexts.sort((a, b) => (a.slide_index ?? 0) - (b.slide_index ?? 0));
+
+    for (const slide of slidesWithTexts) {
+      const { title, subtitle, body, bullets } = slide.text_json!;
+      const slideNum = (slide.slide_index ?? 0) + 1;
+
+      allTexts += `📄 SLIDE ${slideNum}\n`;
+      if (title) allTexts += `Titre : ${title}\n`;
+      if (subtitle) allTexts += `Sous-titre : ${subtitle}\n`;
+      if (body) allTexts += `Corps : ${body}\n`;
+      if (bullets?.length) {
+        allTexts += `Points clés :\n${bullets.map((b) => `  • ${b}`).join("\n")}\n`;
+      }
+      allTexts += "\n";
+    }
+
+    navigator.clipboard.writeText(allTexts.trim());
+    toast.success("Tous les textes copiés !");
+  }, []);
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -244,76 +290,160 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     );
   }
 
+  // Vérifier si le carrousel a des textes
+  const hasTexts = useCallback((carouselSlides: CarouselSlide[]) => {
+    return carouselSlides.some((s) => s.text_json && (s.text_json.title || s.text_json.body));
+  }, []);
+
   return (
     <div className="space-y-8">
-      {grouped.map(({ key, slides: carouselSlides, title }) => (
-        <div key={key} className="border rounded-lg p-4 space-y-3">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-semibold">{title}</h3>
-              <Badge variant="secondary">{carouselSlides.length} slides</Badge>
-              {carouselSlides[0]?.format && <Badge variant="outline">{carouselSlides[0].format}</Badge>}
+      {grouped.map(({ key, slides: carouselSlides, title }) => {
+        const slidesHaveTexts = hasTexts(carouselSlides);
+
+        return (
+          <div key={key} className="border rounded-lg p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-semibold">{title}</h3>
+                <Badge variant="secondary">{carouselSlides.length} slides</Badge>
+                {carouselSlides[0]?.format && <Badge variant="outline">{carouselSlides[0].format}</Badge>}
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto">
+                {slidesHaveTexts && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleCopyAllTexts(carouselSlides)}
+                    className="touch-target flex-1 sm:flex-none"
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copier textes
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleDownloadZip(key, carouselSlides)}
+                  disabled={downloadingZip === key}
+                  aria-label="Télécharger en ZIP"
+                  className="touch-target flex-1 sm:flex-none"
+                >
+                  {downloadingZip === key ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileArchive className="h-4 w-4 mr-2" />
+                  )}
+                  ZIP
+                </Button>
+              </div>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleDownloadZip(key, carouselSlides)}
-              disabled={downloadingZip === key}
-              aria-label="Télécharger en ZIP"
-              className="touch-target w-full sm:w-auto"
-            >
-              {downloadingZip === key ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <FileArchive className="h-4 w-4 mr-2" />
-              )}
-              ZIP
-            </Button>
-          </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {carouselSlides.map((slide) => {
-              const aspect = aspectClassFor(slide.format);
-              // ✅ URL principale avec overlays, fallback vers base_url si erreur
-              const primaryUrl = slide.cloudinary_url || "";
-              const fallbackUrl = (slide.metadata?.cloudinary_base_url as string) || "";
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {carouselSlides.map((slide) => {
+                const aspect = aspectClassFor(slide.format);
+                const primaryUrl = slide.cloudinary_url || "";
+                const fallbackUrl = (slide.metadata?.cloudinary_base_url as string) || "";
 
-              return (
-                <div key={slide.id} className="relative group">
-                  <img
-                    src={primaryUrl || fallbackUrl}
-                    alt={`Slide ${(slide.slide_index ?? 0) + 1}`}
-                    className={cn("w-full rounded-lg object-cover border", aspect)}
-                    loading="lazy"
-                    onError={(e) => {
-                      const target = e.currentTarget;
-                      // Si l'URL principale échoue et qu'on a un fallback, l'utiliser
-                      if (target.src === primaryUrl && fallbackUrl && fallbackUrl !== primaryUrl) {
-                        console.info("[CarouselsTab] Fallback to base URL:", fallbackUrl);
-                        target.src = fallbackUrl;
-                      } else {
-                        console.warn("[CarouselsTab] Image load error, no fallback:", target.src);
-                      }
-                    }}
-                  />
-                  <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                    {(slide.slide_index ?? 0) + 1}
+                return (
+                  <div key={slide.id} className="relative group">
+                    <img
+                      src={primaryUrl || fallbackUrl}
+                      alt={`Slide ${(slide.slide_index ?? 0) + 1}`}
+                      className={cn("w-full rounded-lg object-cover border", aspect)}
+                      loading="lazy"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (target.src === primaryUrl && fallbackUrl && fallbackUrl !== primaryUrl) {
+                          console.info("[CarouselsTab] Fallback to base URL:", fallbackUrl);
+                          target.src = fallbackUrl;
+                        } else {
+                          console.warn("[CarouselsTab] Image load error, no fallback:", target.src);
+                        }
+                      }}
+                    />
+                    <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                      {(slide.slide_index ?? 0) + 1}
+                    </div>
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => handleDownloadSlide(primaryUrl || fallbackUrl, slide.slide_index ?? 0)}
+                        aria-label="Télécharger l'image"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      {slide.text_json && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => handleCopySlideText(slide)}
+                          aria-label="Copier le texte"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
-                    <Button
-                      size="sm"
-                      onClick={() => handleDownloadSlide(primaryUrl || fallbackUrl, slide.slide_index ?? 0)}
-                      aria-label="Télécharger la slide avec texte"
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+
+            {/* ✅ MÉTHODE C: Affichage des textes copiables */}
+            {slidesHaveTexts && (
+              <Collapsible>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="w-full justify-between mt-2">
+                    <span className="flex items-center gap-2">
+                      📝 Textes du carrousel
+                    </span>
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2 space-y-2">
+                  {carouselSlides
+                    .filter((s) => s.text_json)
+                    .sort((a, b) => (a.slide_index ?? 0) - (b.slide_index ?? 0))
+                    .map((slide) => {
+                      const { title, subtitle, body, bullets } = slide.text_json!;
+                      const slideNum = (slide.slide_index ?? 0) + 1;
+
+                      return (
+                        <div
+                          key={slide.id}
+                          className="p-3 bg-muted/50 rounded-lg text-sm flex items-start justify-between gap-2"
+                        >
+                          <div className="flex-1 space-y-1">
+                            <p className="font-medium">
+                              Slide {slideNum}
+                              {title && <span className="text-muted-foreground"> : {title}</span>}
+                            </p>
+                            {subtitle && <p className="text-muted-foreground text-xs">{subtitle}</p>}
+                            {body && <p className="text-muted-foreground text-xs">{body}</p>}
+                            {bullets && bullets.length > 0 && (
+                              <ul className="text-muted-foreground text-xs list-disc list-inside">
+                                {bullets.map((b, i) => (
+                                  <li key={i}>{b}</li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleCopySlideText(slide)}
+                            className="shrink-0"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
