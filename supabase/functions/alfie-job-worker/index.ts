@@ -1626,16 +1626,16 @@ async function createCascadeJobs(job: JobRow, result: any, sb: SupabaseClient) {
 async function loadBrandMini(brandId?: string, full = true) {
   if (!brandId) return undefined;
   
-  // ✅ Always load Brand Kit V2 fields + fonts for personalized generation
+  // ✅ Always load Brand Kit V2 fields + fonts + text_color for personalized generation
   const { data, error } = await supabaseAdmin
     .from("brands")
-    .select("name, palette, fonts, voice, niche, pitch, adjectives, visual_types, visual_mood, avoid_in_visuals")
+    .select("name, palette, fonts, voice, niche, pitch, adjectives, visual_types, visual_mood, avoid_in_visuals, text_color")
     .eq("id", brandId)
     .maybeSingle();
     
   if (error || !data) return undefined;
   
-  console.log(`[loadBrandMini] fonts:`, JSON.stringify(data.fonts), `palette:`, JSON.stringify(data.palette));
+  console.log(`[loadBrandMini] fonts:`, JSON.stringify(data.fonts), `palette:`, JSON.stringify(data.palette), `text_color:`, data.text_color);
   
   return {
     name: data.name,
@@ -1648,6 +1648,7 @@ async function loadBrandMini(brandId?: string, full = true) {
     visual_types: data.visual_types,
     visual_mood: data.visual_mood,
     avoid_in_visuals: data.avoid_in_visuals,
+    text_color: data.text_color, // ✅ Include text_color for carousel overlays
   };
 }
 
