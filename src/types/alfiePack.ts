@@ -34,7 +34,12 @@ export const WOOF_COST_MAP: Record<AssetKind, number | 'perSlide'> = {
 
 export function getWoofCost(asset: UnifiedAlfieIntent | PackAsset): number {
   const costType = WOOF_COST_MAP[asset.kind];
-  if (costType === 'perSlide') return asset.count;
+  if (costType === 'perSlide') {
+    // ✅ Mode Premium = 2 Woofs/slide, Standard = 1 Woof/slide
+    const packAsset = asset as PackAsset;
+    const perSlideMultiplier = packAsset.carouselMode === 'premium' ? 2 : 1;
+    return asset.count * perSlideMultiplier;
+  }
   return costType;
 }
 

@@ -324,25 +324,33 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, carouselMode: 'standard' })}
+                  onClick={() => setFormData({ 
+                    ...formData, 
+                    carouselMode: 'standard',
+                    woofCostType: 'carousel_slide'
+                  })}
                   className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
                     (formData.carouselMode || 'standard') === 'standard'
                       ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-muted/50 hover:bg-muted border-border'
                   }`}
                 >
-                  Standard
+                  Standard (1🐶/slide)
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, carouselMode: 'premium' })}
+                  onClick={() => setFormData({ 
+                    ...formData, 
+                    carouselMode: 'premium',
+                    woofCostType: 'carousel_slide_premium'
+                  })}
                   className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
                     formData.carouselMode === 'premium'
                       ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-muted/50 hover:bg-muted border-border'
                   }`}
                 >
-                  ✨ Premium
+                  ✨ Premium (2🐶/slide)
                 </button>
               </div>
               <p className="text-xs text-muted-foreground">
