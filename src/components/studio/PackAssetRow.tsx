@@ -17,7 +17,7 @@ import { CharacterCounter } from "@/components/carousel/CharacterCounter";
 
 // Character limits for carousel overlays
 const CHAR_LIMITS = {
-  title: 40,
+  title: 35, // ✅ Réduit pour éviter troncature visuelle
   subtitle: 70,
   body: 150,
 };

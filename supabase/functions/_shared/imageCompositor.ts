@@ -59,7 +59,7 @@ function truncateForOverlay(text: string, maxChars: number): string {
 
 // Character limits for overlays
 const CHAR_LIMITS = {
-  title: 40,
+  title: 35, // ✅ Réduit pour éviter troncature visuelle
   subtitle: 70,
   body: 150,
   bullet: 60,
@@ -122,8 +122,9 @@ function buildTextLayer(layer: TextLayer): string {
   // ✅ CRITICAL FIX: Font order must be font_family_size_style
   const font = `${fontFamily}_${fontSize}_${fontWeight}`;
   
-  // ✅ Ensure text color has good contrast
-  const textColor = ensureContrastColor(layer.color || 'ffffff');
+  // ✅ FIX CONTRASTE: Toujours utiliser BLANC pur avec ombres noires épaisses
+  // Cela garantit la lisibilité sur N'IMPORTE QUEL fond (clair ou foncé)
+  const textColor = 'ffffff'; // Blanc pur toujours
   const encodedText = encodeCloudinaryText(layer.text);
   
   const gravity = layer.gravity ? `g_${layer.gravity}` : 'g_center';
@@ -131,23 +132,23 @@ function buildTextLayer(layer: TextLayer): string {
   const baseY = layer.y || 0;
   const widthParam = layer.w ? `w_${layer.w},c_fit` : '';
   
-  // ✅ TECHNIQUE TRIPLE LAYER: 2 ombres + texte coloré pour max contraste
+  // ✅ TECHNIQUE TRIPLE LAYER: 2 ombres NOIRES ÉPAISSES + texte BLANC pour max contraste
   
-  // Layer 1: Ombre lointaine (profondeur) - 12px offset
+  // Layer 1: Ombre lointaine (profondeur) - 12px offset, opacité 80%
   const shadow1Y = baseY + 12;
   const shadow1Params = [`g_${layer.gravity || 'center'}`, `x_${baseX}`, `y_${shadow1Y}`, widthParam].filter(Boolean).join(',');
-  const shadow1Layer = `l_text:${font}:${encodedText},co_rgb:000000,o_60${shadow1Params ? ',' + shadow1Params : ''}/fl_layer_apply`;
+  const shadow1Layer = `l_text:${font}:${encodedText},co_rgb:000000,o_80${shadow1Params ? ',' + shadow1Params : ''}/fl_layer_apply`;
   
-  // Layer 2: Ombre proche (contraste) - 6px offset  
+  // Layer 2: Ombre proche (contraste fort) - 6px offset, opacité 90%
   const shadow2Y = baseY + 6;
   const shadow2Params = [`g_${layer.gravity || 'center'}`, `x_${baseX}`, `y_${shadow2Y}`, widthParam].filter(Boolean).join(',');
-  const shadow2Layer = `l_text:${font}:${encodedText},co_rgb:000000,o_80${shadow2Params ? ',' + shadow2Params : ''}/fl_layer_apply`;
+  const shadow2Layer = `l_text:${font}:${encodedText},co_rgb:000000,o_90${shadow2Params ? ',' + shadow2Params : ''}/fl_layer_apply`;
   
-  // Layer 3: Texte coloré Brand Kit par-dessus
+  // Layer 3: Texte BLANC par-dessus (toujours lisible grâce aux ombres noires)
   const textParams = [gravity, `x_${baseX}`, `y_${baseY}`, widthParam].filter(Boolean).join(',');
   const textLayer = `l_text:${font}:${encodedText},co_rgb:${textColor}${textParams ? ',' + textParams : ''}/fl_layer_apply`;
   
-  // Retourner les trois layers (2 ombres + texte)
+  // Retourner les trois layers (2 ombres noires + texte blanc)
   return `${shadow1Layer}/${shadow2Layer}/${textLayer}`;
 }
 
