@@ -122,9 +122,9 @@ function buildTextLayer(layer: TextLayer): string {
   // ✅ CRITICAL FIX: Font order must be font_family_size_style
   const font = `${fontFamily}_${fontSize}_${fontWeight}`;
   
-  // ✅ FIX CONTRASTE: Toujours utiliser BLANC pur avec ombres noires épaisses
-  // Cela garantit la lisibilité sur N'IMPORTE QUEL fond (clair ou foncé)
-  const textColor = 'ffffff'; // Blanc pur toujours
+  // ✅ FIX: Utiliser layer.color du Brand Kit avec fallback blanc
+  // Le système triple-layer (ombres noires) garantit le contraste sur tout fond
+  const textColor = (layer.color?.replace('#', '') || 'ffffff');
   const encodedText = encodeCloudinaryText(layer.text);
   
   const gravity = layer.gravity ? `g_${layer.gravity}` : 'g_center';
