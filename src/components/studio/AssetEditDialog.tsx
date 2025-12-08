@@ -8,18 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { PackAsset } from "@/types/alfiePack";
 import { Badge } from "@/components/ui/badge";
 import { WOOF_COSTS } from "@/config/woofs";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Upload, X as XIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CharacterCounter } from "@/components/carousel/CharacterCounter";
-
-// Character limits for carousel overlays
-const CHAR_LIMITS = {
-  title: 35, // ✅ Réduit pour éviter troncature visuelle
-  subtitle: 70,
-  body: 150,
-};
 
 interface AssetEditDialogProps {
   asset: PackAsset;
@@ -73,30 +64,9 @@ const VISUAL_STYLE_OPTIONS = [
 export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDialogProps) {
   const [formData, setFormData] = useState<PackAsset>({ ...asset });
   
-  // ✅ Re-sync formData quand l'asset change (fix pour édition multiple)
-  // ✅ Auto-créer les slides vides pour les carrousels sans generatedTexts
+  // ✅ Re-sync formData quand l'asset change
   useEffect(() => {
-    let updatedAsset = { ...asset };
-    
-    // Si c'est un carrousel sans slides, créer des slides vides
-    if (asset.kind === "carousel" && !asset.generatedTexts?.slides) {
-      const slideCount = asset.count || 5;
-      const emptySlides = Array.from({ length: slideCount }, () => ({
-        title: "",
-        subtitle: "",
-        body: "",
-        bullets: [],
-      }));
-      updatedAsset = {
-        ...updatedAsset,
-        generatedTexts: {
-          ...updatedAsset.generatedTexts,
-          slides: emptySlides,
-        },
-      };
-    }
-    
-    setFormData(updatedAsset);
+    setFormData({ ...asset });
   }, [asset.id, asset.kind, asset.count]);
   const [uploading, setUploading] = useState(false);
 
@@ -510,129 +480,18 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
             </div>
           )}
 
-          {/* Generated texts section - always show for carousels */}
-          {(formData.generatedTexts || formData.kind === "carousel") && (
+          {/* Generated texts section */}
+          {formData.generatedTexts && (
             <div className="border-t pt-4 space-y-3">
-              <Label className="text-base">
-                {formData.kind === "carousel" ? "📝 Contenu des slides" : "Textes générés par Alfie"}
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                {formData.kind === "carousel" 
-                  ? "Saisis le texte de chaque slide. Le prompt sert à décrire le style visuel de fond."
-                  : "Alfie a pré-rédigé ces textes marketing pour toi. Tu peux les modifier avant la génération des visuels."
-                }
-              </p>
-
-              {/* For carousels: show slides in accordion */}
-              {formData.kind === "carousel" && formData.generatedTexts?.slides && (
-                <Accordion type="single" collapsible className="w-full">
-                  {formData.generatedTexts.slides.map((slide: any, index: number) => (
-                    <AccordionItem key={index} value={`slide-${index}`}>
-                      <AccordionTrigger className="text-sm">
-                        Slide {index + 1}: {slide.title || "(sans titre)"}
-                      </AccordionTrigger>
-                      <AccordionContent className="space-y-3">
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-xs">Titre</Label>
-                            <CharacterCounter 
-                              current={(slide.title || "").length} 
-                              max={CHAR_LIMITS.title} 
-                            />
-                          </div>
-                          <Input
-                            value={slide.title || ""}
-                            maxLength={CHAR_LIMITS.title + 10}
-                            onChange={(e) => {
-                              const currentTexts = formData.generatedTexts || {};
-                              const newSlides = [...(currentTexts.slides || [])];
-                              newSlides[index] = { ...newSlides[index], title: e.target.value };
-                              setFormData({
-                                ...formData,
-                                generatedTexts: { ...currentTexts, slides: newSlides },
-                              });
-                            }}
-                            placeholder="Titre de la slide"
-                            className={(slide.title || "").length > CHAR_LIMITS.title ? "border-destructive" : ""}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-xs">Sous-titre</Label>
-                            <CharacterCounter 
-                              current={(slide.subtitle || "").length} 
-                              max={CHAR_LIMITS.subtitle} 
-                            />
-                          </div>
-                          <Input
-                            value={slide.subtitle || ""}
-                            maxLength={CHAR_LIMITS.subtitle + 10}
-                            onChange={(e) => {
-                              const currentTexts = formData.generatedTexts || {};
-                              const newSlides = [...(currentTexts.slides || [])];
-                              newSlides[index] = { ...newSlides[index], subtitle: e.target.value };
-                              setFormData({
-                                ...formData,
-                                generatedTexts: { ...currentTexts, slides: newSlides },
-                              });
-                            }}
-                            placeholder="Sous-titre"
-                            className={(slide.subtitle || "").length > CHAR_LIMITS.subtitle ? "border-destructive" : ""}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-xs">Corps (texte libre)</Label>
-                            <CharacterCounter 
-                              current={(slide.body || "").length} 
-                              max={CHAR_LIMITS.body} 
-                            />
-                          </div>
-                          <Textarea
-                            value={slide.body || ""}
-                            maxLength={CHAR_LIMITS.body + 20}
-                            onChange={(e) => {
-                              const currentTexts = formData.generatedTexts || {};
-                              const newSlides = [...(currentTexts.slides || [])];
-                              newSlides[index] = { ...newSlides[index], body: e.target.value };
-                              setFormData({
-                                ...formData,
-                                generatedTexts: { ...currentTexts, slides: newSlides },
-                              });
-                            }}
-                            placeholder="Contenu détaillé de cette slide..."
-                            rows={3}
-                            className={(slide.body || "").length > CHAR_LIMITS.body ? "border-destructive" : ""}
-                          />
-                        </div>
-                        {slide.bullets && slide.bullets.length > 0 && (
-                          <div>
-                            <Label className="text-xs">Points clés</Label>
-                            {slide.bullets.map((bullet: string, bulletIndex: number) => (
-                              <Input
-                                key={bulletIndex}
-                                value={bullet}
-                                onChange={(e) => {
-                                  const currentTexts = formData.generatedTexts || {};
-                                  const newSlides = [...(currentTexts.slides || [])];
-                                  const newBullets = [...(newSlides[index].bullets || [])];
-                                  newBullets[bulletIndex] = e.target.value;
-                                  newSlides[index] = { ...newSlides[index], bullets: newBullets };
-                                  setFormData({
-                                    ...formData,
-                                    generatedTexts: { ...currentTexts, slides: newSlides },
-                                  });
-                                }}
-                                placeholder={`Point ${bulletIndex + 1}`}
-                                className="mt-1"
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
+              <Label className="text-base">Textes générés par Alfie</Label>
+              
+              {/* For carousels: simple message - texts are AI generated */}
+              {formData.kind === "carousel" && (
+                <div className="bg-muted/50 px-4 py-3 rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    📝 Les textes de chaque slide ({formData.count} slides) seront générés automatiquement par Alfie en fonction de ton brief.
+                  </p>
+                </div>
               )}
 
               {/* For images: show title, body, cta */}

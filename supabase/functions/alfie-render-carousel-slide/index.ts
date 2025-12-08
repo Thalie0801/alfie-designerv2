@@ -696,7 +696,17 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             model: selectedModel,
-            messages: [{ role: "user", content: currentPrompt }],
+            messages: [
+              { 
+                role: "system", 
+                content: `You are an expert image generator for social media.
+CRITICAL: Generate a VIBRANT, COLORFUL image - NOT white, NOT blank, NOT empty.
+Always produce ONE high-quality image with rich colors, gradients, and visual depth.
+Output dimensions: ${size.w}x${size.h}.
+NO TEXT whatsoever - no letters, words, numbers, labels in the image.` 
+              },
+              { role: "user", content: currentPrompt }
+            ],
             modalities: ["image", "text"],
             size_hint: { width: size.w, height: size.h },
           }),
