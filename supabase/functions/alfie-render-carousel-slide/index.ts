@@ -209,16 +209,29 @@ function buildImagePromptPremium(
   
   const isFR = language !== "EN";
   
+  // ✅ INSTRUCTION ABSOLUE DE LANGUE
+  const languageForce = isFR 
+    ? `
+=== LANGUAGE (ABSOLUTE MANDATORY RULE) ===
+⚠️ WRITE ALL TEXT IN FRENCH ONLY.
+⚠️ DO NOT USE ANY ENGLISH WORDS.
+⚠️ Every single word, title, subtitle, and sentence MUST be in French.
+⚠️ Example valid: "Découvrez nos conseils" - NOT "Discover our tips"
+⚠️ Failure to use French = GENERATION FAILURE.`
+    : `
+=== LANGUAGE ===
+Write all text in English.`;
+
   // ✅ Construire le bloc texte selon le cas
   let textInstruction: string;
   
   if (hasUserText) {
     // CAS 1: Texte fourni → Intégration EXACTE dans l'image
-    const titleToDisplay = truncateText(slideContent.title, 60);
-    const subtitleToDisplay = slideContent.subtitle ? truncateText(slideContent.subtitle, 120) : "";
-    const bodyToDisplay = slideContent.body ? truncateText(slideContent.body, 150) : "";
+    const titleToDisplay = truncateText(slideContent.title, 50);
+    const subtitleToDisplay = slideContent.subtitle ? truncateText(slideContent.subtitle, 100) : "";
+    const bodyToDisplay = slideContent.body ? truncateText(slideContent.body, 120) : "";
     const bulletsToDisplay = slideContent.bullets?.length 
-      ? slideContent.bullets.slice(0, 3).map(b => `• ${truncateText(b, 50)}`).join("\n") 
+      ? slideContent.bullets.slice(0, 3).map(b => `• ${truncateText(b, 40)}`).join("\n") 
       : "";
     
     textInstruction = `
@@ -228,29 +241,8 @@ ${subtitleToDisplay ? `SUBTITLE: "${subtitleToDisplay}"` : ""}
 ${bodyToDisplay ? `BODY TEXT: "${bodyToDisplay}"` : ""}
 ${bulletsToDisplay ? `BULLET POINTS:\n${bulletsToDisplay}` : ""}
 
-=== POSITIONING RULES (CRITICAL) ===
-1. ALL text must be HORIZONTALLY CENTERED (equal left/right margins)
-2. VERTICAL position: Title in UPPER-CENTER of image (not top edge, not middle)
-3. If subtitle/body exists: place DIRECTLY BELOW title with 20-30px visual gap
-4. Keep ALL text within SAFE ZONE (inner 80% of image - 10% margin each side)
-5. Text must NEVER touch or overflow image edges
-
-=== CONTRAST RULES (MANDATORY) ===
-1. Apply THICK DROP SHADOW on ALL text:
-   - Color: Black or very dark gray
-   - Offset: 4-5 pixels down and right
-   - Blur/spread: 10-15 pixels
-2. Text color: WHITE or very light color for maximum visibility
-3. Soften/blur background area directly behind text if needed
-
-=== TYPOGRAPHY SIZING ===
-1. Title: Bold, LARGE but proportional - max 70% of image WIDTH
-2. Subtitle: 50% of title size, same font family
-3. Body text: 40% of title size, clean and readable
-4. All text must fit comfortably without cropping
-
 Reproduce text EXACTLY as provided (spelling, accents, punctuation).
-Text is INTEGRATED into the design, professional and polished.`;
+Text must be readable, professional, and NATIVELY INTEGRATED into the design.`;
   } else {
     // CAS 2: Pas de texte → Gemini GÉNÈRE et intègre
     const slideRole = getSlideRole(slideIndex, totalSlides);
@@ -258,32 +250,15 @@ Text is INTEGRATED into the design, professional and polished.`;
     
     textInstruction = `
 === GENERATE AND INTEGRATE TEXT NATIVELY ===
-Create ${isFR ? 'French' : 'English'} marketing text for slide ${slideIndex + 1}/${totalSlides}.
+Create ${isFR ? 'FRENCH' : 'English'} marketing text for slide ${slideIndex + 1}/${totalSlides}.
 Role: ${slideRole}
 
 GENERATE:
-- TITLE: 3-5 impactful words (punchy, memorable)
-- SUBTITLE: 8-12 words explaining the point (optional)
+- TITLE: 3-5 impactful words (punchy, memorable) ${isFR ? 'IN FRENCH' : ''}
+- SUBTITLE: 8-12 words explaining the point ${isFR ? 'IN FRENCH' : ''} (optional)
 
 THEME: ${userPrompt}
-LANGUAGE: ${isFR ? 'French' : 'English'}
-TONE: ${tone}
-
-=== POSITIONING RULES (CRITICAL) ===
-1. ALL text HORIZONTALLY CENTERED (equal left/right margins)
-2. Title in UPPER-CENTER of image (not edge, not middle)
-3. Subtitle DIRECTLY BELOW title with balanced spacing
-4. All text within SAFE ZONE (inner 80% of image)
-
-=== CONTRAST RULES (MANDATORY) ===
-1. THICK DROP SHADOW on all text (black, 4-5px offset, 10-15px spread)
-2. White or very light text color
-3. Background softened/blurred behind text area if needed
-
-=== TYPOGRAPHY ===
-1. Title: Bold, max 70% image width
-2. Subtitle: 50% of title size
-3. Professional modern sans-serif`;
+TONE: ${tone}`;
   }
   
   // ✅ Style visuel enrichi par le Brand Kit V2
@@ -305,7 +280,6 @@ TONE: ${tone}
       else if (type === "mockups") styleParts.push("professional mockup style");
     }
     if (brandKit.palette?.length) {
-      // Convertir hex en descriptions (éviter d'afficher les codes)
       styleParts.push("harmonious brand color palette");
     }
     if (brandKit.pitch) {
@@ -324,28 +298,74 @@ TONE: ${tone}
   const referenceInstruction = referenceImageUrl ? `
 === REFERENCE IMAGE STYLE ===
 Use the provided reference image as style inspiration.
-Match its color palette, composition style, and overall aesthetic.
-Maintain visual coherence with this reference.` : "";
+Match its color palette, composition style, and overall aesthetic.` : "";
 
   return `Create ONE premium social media slide image for a carousel.
 
 VISUAL CONCEPT: ${userPrompt}
 STYLE: ${visualStyle}
 
+${languageForce}
+
 ${textInstruction}
+
+=== POSITIONING (ABSOLUTE RULES - DO NOT DEVIATE) ===
+1. TEXT MUST BE **PERFECTLY CENTERED HORIZONTALLY**
+   - Equal margins LEFT and RIGHT (MINIMUM 15% of image width on each side)
+   - Text block must occupy AT MOST 70% of image width
+   - NEVER allow text to touch or approach edges
+   
+2. VERTICAL PLACEMENT:
+   - Title: UPPER-CENTER (approximately 25-35% from top, NOT at very top)
+   - Subtitle/Body: DIRECTLY BELOW title with 5% vertical gap
+   - All text must be in TOP HALF of image
+   
+3. SAFE ZONE (MANDATORY):
+   - ALL text must stay within the CENTER 70% of the image width
+   - 15% margin on LEFT edge (text cannot enter this zone)
+   - 15% margin on RIGHT edge (text cannot enter this zone)
+   - 20% margin from TOP edge
+   - 35% margin from BOTTOM edge (keep bottom clean)
+
+=== TYPOGRAPHY SIZE (STRICT LIMITS) ===
+1. TITLE:
+   - Maximum 8 words per line
+   - If longer than 8 words: SPLIT into 2 lines
+   - Font size: LARGE but proportional
+   - Width: MAXIMUM 60% of image width
+   
+2. SUBTITLE/BODY:
+   - Maximum 12 words per line
+   - Font size: 40-50% of title size
+   - Width: MAXIMUM 65% of image width
+
+3. NEVER let text:
+   - Extend beyond safe zone
+   - Touch image edges
+   - Get cut off or cropped
+
+=== CONTRAST (MANDATORY - HIGH VISIBILITY) ===
+1. THICK BLACK DROP SHADOW on ALL text:
+   - Offset: 6px down, 4px right
+   - Blur/spread: 12-15px
+   - Color: Pure black or very dark gray
+   
+2. Text color: PURE WHITE (#FFFFFF)
+
+3. Text must be 100% readable at FIRST GLANCE on any background
 
 ${referenceInstruction}
 
 COMPOSITION:
 - Single cohesive image, ready to post
-- Professional social media quality (Instagram/LinkedIn grade)
-- Slide ${slideIndex + 1}/${totalSlides} of a carousel - maintain style consistency
+- Professional Instagram/LinkedIn quality
+- Slide ${slideIndex + 1}/${totalSlides} - maintain visual consistency
 - Text integrated as part of the design, not floating
-- Clean, balanced layout with visual hierarchy
+- Clean, balanced layout with clear visual hierarchy
 
 ${avoid ? `AVOID: ${avoid}` : ""}
 
-OUTPUT: Professional carousel slide with text NATIVELY integrated in the design.`;
+OUTPUT: Professional carousel slide with text NATIVELY integrated, PERFECTLY CENTERED, with HIGH CONTRAST.`;
 }
 
 async function fetchWithTimeout(input: RequestInfo, init: RequestInit = {}, ms = 30000) {
