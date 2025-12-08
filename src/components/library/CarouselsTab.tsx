@@ -339,23 +339,27 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              {carouselSlides.map((slide) => {
+            {carouselSlides.map((slide) => {
                 const aspect = aspectClassFor(slide.format);
-                const primaryUrl = slide.cloudinary_url || "";
-                const fallbackUrl = (slide.metadata?.cloudinary_base_url as string) || "";
+                // ✅ CORRECTION: Prioriser cloudinary_base_url (image de fond SANS texte)
+                // cloudinary_url peut maintenant être l'URL de base aussi, mais on garde le fallback
+                const baseUrl = (slide.metadata?.cloudinary_base_url as string) || "";
+                const primaryUrl = baseUrl || slide.cloudinary_url || "";
 
                 return (
                   <div key={slide.id} className="relative group">
                     <img
-                      src={primaryUrl || fallbackUrl}
+                      src={primaryUrl}
                       alt={`Slide ${(slide.slide_index ?? 0) + 1}`}
                       className={cn("w-full rounded-lg object-cover border", aspect)}
                       loading="lazy"
                       onError={(e) => {
                         const target = e.currentTarget;
-                        if (target.src === primaryUrl && fallbackUrl && fallbackUrl !== primaryUrl) {
-                          console.info("[CarouselsTab] Fallback to base URL:", fallbackUrl);
-                          target.src = fallbackUrl;
+                        // Fallback vers cloudinary_url si base_url échoue
+                        const fallback = slide.cloudinary_url || "";
+                        if (target.src !== fallback && fallback) {
+                          console.info("[CarouselsTab] Fallback to cloudinary_url:", fallback);
+                          target.src = fallback;
                         } else {
                           console.warn("[CarouselsTab] Image load error, no fallback:", target.src);
                         }
@@ -367,7 +371,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 gap-2">
                       <Button
                         size="sm"
-                        onClick={() => handleDownloadSlide(primaryUrl || fallbackUrl, slide.slide_index ?? 0)}
+                        onClick={() => handleDownloadSlide(primaryUrl, slide.slide_index ?? 0)}
                         aria-label="Télécharger l'image"
                       >
                         <Download className="h-4 w-4" />
