@@ -1058,6 +1058,14 @@ ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
 
     try {
       // 1) generate
+      // ✅ Log diagnostic pour tracer referenceImageUrl
+      const sourceImageUrl = payload.referenceImageUrl ?? payload.sourceUrl ?? null;
+      console.log("[processRenderImages] referenceImageUrl check:", {
+        fromPayload: payload.referenceImageUrl ? "✅ " + payload.referenceImageUrl.slice(0, 60) : "❌ MISSING",
+        fromSourceUrl: payload.sourceUrl ? "✅ present" : "❌ MISSING",
+        finalSourceUrl: sourceImageUrl ? "✅ " + sourceImageUrl.slice(0, 60) : "❌ NONE",
+      });
+
       console.log("[processRenderImages] calling image engine", {
         orderId,
         brandId: payload.brandId,
@@ -1076,8 +1084,8 @@ ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
         orderId,
         orderItemId: payload.orderItemId ?? null,
         requestId: payload.requestId ?? null,
-        templateImageUrl: img.templateImageUrl ?? payload.sourceUrl ?? null,
-        uploadedSourceUrl: payload.sourceUrl ?? null,
+        templateImageUrl: img.templateImageUrl ?? payload.referenceImageUrl ?? payload.sourceUrl ?? null,
+        uploadedSourceUrl: payload.referenceImageUrl ?? payload.sourceUrl ?? null,
         carousel_id,
         slideIndex,
         useBrandKit,
