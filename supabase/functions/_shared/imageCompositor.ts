@@ -117,43 +117,49 @@ function ensureContrastColor(hex: string): string {
 }
 
 function buildTextLayer(layer: TextLayer): string {
-  // ✅ Validate and normalize font to Google Fonts
   const fontFamily = normalizeFont(layer.font || 'Inter');
-  // ✅ CRITICAL FIX: Normalize ExtraBold to Bold (Cloudinary doesn't support ExtraBold)
   const fontWeight = layer.weight === 'ExtraBold' ? 'Bold' : (layer.weight || 'Bold');
   const fontSize = layer.size || 64;
-  // ✅ CRITICAL FIX: Font order must be font_family_size_style
   const font = `${fontFamily}_${fontSize}_${fontWeight}`;
-  
-  // ✅ FIX: Utiliser layer.color du Brand Kit avec fallback blanc
   const textColor = (layer.color?.replace('#', '') || 'ffffff');
   const encodedText = encodeCloudinaryText(layer.text);
   
-  const gravity = layer.gravity ? `g_${layer.gravity}` : 'g_center';
+  const gravity = layer.gravity || 'center';
   const baseX = layer.x || 0;
   const baseY = layer.y || 0;
-  const widthParam = layer.w ? `w_${layer.w},c_fit` : '';
+  const widthParam = layer.w ? `,w_${layer.w},c_fit` : '';
   
-  // ✅ TECHNIQUE AMÉLIORÉE: Stroke noir + ombre profonde + texte
-  // Calcul du stroke proportionnel à la taille de police
-  const strokeSize = Math.max(3, Math.round(fontSize / 16)); // 3px min, proportionnel
+  // ✅ TECHNIQUE STROKE SIMULÉ : 8 copies noires décalées + ombre + texte principal
+  const strokeOffset = Math.max(2, Math.round(fontSize / 28)); // 2-3px selon taille
+  const layers: string[] = [];
   
-  // Layer 1: Ombre lointaine floue (profondeur) - 15px offset, opacité 70%
-  const shadow1Y = baseY + 15;
-  const shadow1X = baseX + 8;
-  const shadow1Params = [`g_${layer.gravity || 'center'}`, `x_${shadow1X}`, `y_${shadow1Y}`, widthParam].filter(Boolean).join(',');
-  const shadow1Layer = `l_text:${font}:${encodedText},co_rgb:000000,o_70${shadow1Params ? ',' + shadow1Params : ''}/fl_layer_apply`;
+  // 1. Ombre douce lointaine (profondeur)
+  const shadowY = baseY + 12;
+  const shadowX = baseX + 5;
+  layers.push(`l_text:${font}:${encodedText},co_rgb:000000,o_50,g_${gravity},x_${shadowX},y_${shadowY}${widthParam}/fl_layer_apply`);
   
-  // Layer 2: Contour noir (stroke) - utilise bo_ pour border/outline
-  const strokeParams = [gravity, `x_${baseX}`, `y_${baseY}`, widthParam].filter(Boolean).join(',');
-  const strokeLayer = `l_text:${font}:${encodedText},co_rgb:000000,bo_${strokeSize}px_solid_black${strokeParams ? ',' + strokeParams : ''}/fl_layer_apply`;
+  // 2. Stroke simulé : 8 copies noires dans toutes les directions
+  const directions = [
+    { x: -strokeOffset, y: 0 },
+    { x: strokeOffset, y: 0 },
+    { x: 0, y: -strokeOffset },
+    { x: 0, y: strokeOffset },
+    { x: -strokeOffset, y: -strokeOffset },
+    { x: strokeOffset, y: -strokeOffset },
+    { x: -strokeOffset, y: strokeOffset },
+    { x: strokeOffset, y: strokeOffset },
+  ];
   
-  // Layer 3: Texte principal avec couleur Brand Kit
-  const textParams = [gravity, `x_${baseX}`, `y_${baseY}`, widthParam].filter(Boolean).join(',');
-  const textLayer = `l_text:${font}:${encodedText},co_rgb:${textColor}${textParams ? ',' + textParams : ''}/fl_layer_apply`;
+  for (const dir of directions) {
+    const x = baseX + dir.x;
+    const y = baseY + dir.y;
+    layers.push(`l_text:${font}:${encodedText},co_rgb:000000,g_${gravity},x_${x},y_${y}${widthParam}/fl_layer_apply`);
+  }
   
-  // Retourner les trois layers (ombre + stroke noir + texte couleur)
-  return `${shadow1Layer}/${strokeLayer}/${textLayer}`;
+  // 3. Texte principal avec couleur Brand Kit (par-dessus)
+  layers.push(`l_text:${font}:${encodedText},co_rgb:${textColor},g_${gravity},x_${baseX},y_${baseY}${widthParam}/fl_layer_apply`);
+  
+  return layers.join('/');
 }
 
 // ============= BRAND FONTS TYPE =============
@@ -257,15 +263,14 @@ function layersForContent(slide: Slide, primaryColor: string, brandFonts?: Brand
   const hasBody = !!slide.punchline; // punchline = body text
   const hasBullets = slide.bullets && slide.bullets.length > 0;
   
-  // ✅ ESPACEMENT VERTICAL DRASTIQUEMENT AUGMENTÉ - zones distinctes
-  // Titre: tiers supérieur (-200), Subtitle: centre (0), Body: tiers inférieur (+160)
+  // ✅ ESPACEMENT VERTICAL MAXIMAL - zones bien distinctes
   let titleY = -60; // Défaut: légèrement au-dessus du centre
   if (hasSubtitle && hasBody) {
-    titleY = -200; // Titre tout en haut
+    titleY = -250; // Titre tout en haut
   } else if (hasSubtitle || hasBody) {
-    titleY = -150; // Titre en haut
+    titleY = -180; // Titre en haut
   } else if (hasBullets) {
-    titleY = -180; // Titre en haut pour laisser place aux bullets
+    titleY = -200; // Titre en haut pour laisser place aux bullets
   }
   
   // ✅ TITRE: Taille augmentée à 86px avec font Bold
@@ -281,14 +286,14 @@ function layersForContent(slide: Slide, primaryColor: string, brandFonts?: Brand
     w: 900
   });
   
-  // ✅ Subtitle - ESPACEMENT GÉNÉREUX: 160px minimum sous le titre
+  // ✅ Subtitle - ESPACEMENT MAXIMAL
   if (hasSubtitle) {
-    const subtitleY = hasBody ? 0 : 50; // Centre ou légèrement en dessous
+    const subtitleY = hasBody ? 0 : 80; // Centre ou en dessous
     layers.push({
       text: truncateForOverlay(slide.subtitle!, CHAR_LIMITS.subtitle),
       font: bodyFont,
-      weight: 'Bold', // ✅ Bold au lieu de Regular pour meilleure lisibilité
-      size: 48, // ✅ AUGMENTÉ de 36 à 48
+      weight: 'Bold',
+      size: 48,
       color: mainTextColor,
       outline: 12,
       gravity: 'center',
@@ -297,14 +302,14 @@ function layersForContent(slide: Slide, primaryColor: string, brandFonts?: Brand
     });
   }
   
-  // ✅ Body text (punchline) - ESPACEMENT: 160px sous le subtitle
+  // ✅ Body text - ESPACEMENT MAXIMAL
   if (hasBody) {
-    const bodyY = hasSubtitle ? 160 : 100; // ✅ AUGMENTÉ de 120 à 160
+    const bodyY = hasSubtitle ? 220 : 180; // ✅ AUGMENTÉ à 220/180
     layers.push({
       text: truncateForOverlay(slide.punchline!, CHAR_LIMITS.body),
       font: bodyFont,
       weight: 'Regular',
-      size: 40, // ✅ AUGMENTÉ de 32 à 40
+      size: 40,
       color: mainTextColor,
       outline: 10,
       gravity: 'center',
