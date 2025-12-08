@@ -12,6 +12,14 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Upload, X as XIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { CharacterCounter } from "@/components/carousel/CharacterCounter";
+
+// Character limits for carousel overlays
+const CHAR_LIMITS = {
+  title: 40,
+  subtitle: 70,
+  body: 150,
+};
 
 interface AssetEditDialogProps {
   asset: PackAsset;
@@ -523,11 +531,18 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                       <AccordionTrigger className="text-sm">
                         Slide {index + 1}: {slide.title || "(sans titre)"}
                       </AccordionTrigger>
-                      <AccordionContent className="space-y-2">
-                        <div>
-                          <Label className="text-xs">Titre</Label>
+                      <AccordionContent className="space-y-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs">Titre</Label>
+                            <CharacterCounter 
+                              current={(slide.title || "").length} 
+                              max={CHAR_LIMITS.title} 
+                            />
+                          </div>
                           <Input
                             value={slide.title || ""}
+                            maxLength={CHAR_LIMITS.title + 10}
                             onChange={(e) => {
                               const currentTexts = formData.generatedTexts || {};
                               const newSlides = [...(currentTexts.slides || [])];
@@ -538,12 +553,20 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                               });
                             }}
                             placeholder="Titre de la slide"
+                            className={(slide.title || "").length > CHAR_LIMITS.title ? "border-destructive" : ""}
                           />
                         </div>
-                        <div>
-                          <Label className="text-xs">Sous-titre</Label>
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs">Sous-titre</Label>
+                            <CharacterCounter 
+                              current={(slide.subtitle || "").length} 
+                              max={CHAR_LIMITS.subtitle} 
+                            />
+                          </div>
                           <Input
                             value={slide.subtitle || ""}
+                            maxLength={CHAR_LIMITS.subtitle + 10}
                             onChange={(e) => {
                               const currentTexts = formData.generatedTexts || {};
                               const newSlides = [...(currentTexts.slides || [])];
@@ -554,12 +577,20 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                               });
                             }}
                             placeholder="Sous-titre"
+                            className={(slide.subtitle || "").length > CHAR_LIMITS.subtitle ? "border-destructive" : ""}
                           />
                         </div>
-                        <div>
-                          <Label className="text-xs">Corps (texte libre)</Label>
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs">Corps (texte libre)</Label>
+                            <CharacterCounter 
+                              current={(slide.body || "").length} 
+                              max={CHAR_LIMITS.body} 
+                            />
+                          </div>
                           <Textarea
                             value={slide.body || ""}
+                            maxLength={CHAR_LIMITS.body + 20}
                             onChange={(e) => {
                               const currentTexts = formData.generatedTexts || {};
                               const newSlides = [...(currentTexts.slides || [])];
@@ -571,6 +602,7 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                             }}
                             placeholder="Contenu détaillé de cette slide..."
                             rows={3}
+                            className={(slide.body || "").length > CHAR_LIMITS.body ? "border-destructive" : ""}
                           />
                         </div>
                         {slide.bullets && slide.bullets.length > 0 && (

@@ -49,6 +49,22 @@ function encodeCloudinaryText(text: string): string {
 /**
  * Build a single text layer transformation for Cloudinary
  */
+/**
+ * Truncate text for overlay display to prevent Cloudinary truncation
+ */
+function truncateForOverlay(text: string, maxChars: number): string {
+  if (!text || text.length <= maxChars) return text;
+  return text.slice(0, maxChars - 3) + '...';
+}
+
+// Character limits for overlays
+const CHAR_LIMITS = {
+  title: 40,
+  subtitle: 70,
+  body: 150,
+  bullet: 60,
+};
+
 function buildTextLayer(layer: TextLayer): string {
   // ✅ FIX: Encode font names with spaces (e.g., "Nunito Sans" -> "Nunito%20Sans")
   const fontFamily = (layer.font || 'Inter').replace(/\s+/g, '%20');
@@ -58,12 +74,15 @@ function buildTextLayer(layer: TextLayer): string {
   // ✅ CRITICAL FIX: Font order must be font_family_size_style
   const font = `${fontFamily}_${fontSize}_${fontWeight}`;
   
-  // ✅ CONTRAST FIX: Use thick stroke for black outline + shadow for depth
-  const strokeWidth = layer.outline || 16; // ✅ Increased stroke for better contrast
+  // ✅ CONTRAST FIX: Use outline effect instead of stroke to preserve text color
+  // e_outline preserves co_rgb color better than e_stroke
+  const outlineWidth = layer.outline || 16;
+  const textColor = layer.color ? layer.color.replace('#', '') : 'ffffff';
+  
   const styleParams = [
-    layer.color ? `co_rgb:${layer.color.replace('#', '')}` : '',
-    `e_stroke:${strokeWidth}:co_rgb:000000`, // ✅ Stroke noir épais
-    `e_shadow:80`, // ✅ FIX: Syntaxe correcte (shadow simple sans paramètres invalides)
+    `co_rgb:${textColor}`, // ✅ Apply text color FIRST
+    `e_outline:outer:${outlineWidth}:s_black`, // ✅ Use e_outline instead of e_stroke
+    `e_shadow:60`, // ✅ Add shadow for depth
     layer.w ? `w_${layer.w},c_fit` : ''
   ].filter(Boolean).join(',');
   
@@ -171,22 +190,42 @@ function layersForContent(slide: Slide, primaryColor: string, brandFonts?: Brand
   const titleFont = brandFonts?.primary || 'Inter';
   const bodyFont = brandFonts?.secondary || 'Inter';
   
-  // Title (CENTERED, légèrement au-dessus) - Use brand primary color
+  // Determine if we have body text to adjust positioning
+  const hasBody = !!slide.subtitle;
+  const hasBullets = slide.bullets && slide.bullets.length > 0;
+  
+  // Title (CENTERED, position depends on content below)
+  const titleY = hasBody || hasBullets ? -120 : -40;
   layers.push({
-    text: slide.title,
+    text: truncateForOverlay(slide.title, CHAR_LIMITS.title),
     font: titleFont,
     weight: 'ExtraBold',
     size: 68,
     color: primaryColor, // ✅ V8: Use brand primary color
     outline: 18,
     gravity: 'center',
-    y: -80,
+    y: titleY,
     w: 900
   });
   
-  // Bullets (CENTERED, en dessous du titre)
-  if (slide.bullets && slide.bullets.length > 0) {
-    const bulletText = slide.bullets.map(b => `• ${b}`).join('\n');
+  // ✅ Body text (subtitle field) - positioned below title
+  if (slide.subtitle) {
+    layers.push({
+      text: truncateForOverlay(slide.subtitle, CHAR_LIMITS.body),
+      font: bodyFont,
+      weight: 'Regular',
+      size: 38,
+      color: 'ffffff',
+      outline: 10,
+      gravity: 'center',
+      y: hasBullets ? 0 : 40, // Adjust if bullets follow
+      w: 900
+    });
+  }
+  
+  // Bullets (CENTERED, below body or title)
+  if (hasBullets) {
+    const bulletText = slide.bullets!.map(b => `• ${truncateForOverlay(b, CHAR_LIMITS.bullet)}`).join('\n');
     layers.push({
       text: bulletText,
       font: bodyFont,
@@ -195,7 +234,7 @@ function layersForContent(slide: Slide, primaryColor: string, brandFonts?: Brand
       color: 'ffffff',
       outline: 12,
       gravity: 'center',
-      y: 80,
+      y: hasBody ? 120 : 80,
       w: 950
     });
   }
