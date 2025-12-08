@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
 
     const idem = req.headers.get("x-idempotency-key") ?? crypto.randomUUID();
     const body = await req.json();
-    const { brandId, prompt, count, aspectRatio } = body;
+    const { brandId, prompt, count, aspectRatio, carouselMode = 'standard' } = body;
 
     // ✅ LOG D'ENTRÉE COMPLET pour debug
     console.log('[chat-create-carousel] START', {
@@ -93,9 +93,10 @@ Deno.serve(async (req) => {
       return json({ jobSetId: reuse?.id });
     }
 
-    // 2) Vérifier et consommer les Woofs
-    const totalWoofsCost = count * WOOF_COSTS.carousel_slide;
-    console.log(`[CreateCarousel] Checking ${totalWoofsCost} Woofs for ${count} slides (brand ${brandId})`);
+    // 2) Vérifier et consommer les Woofs (coût selon le mode)
+    const slideWoofCost = carouselMode === 'premium' ? WOOF_COSTS.carousel_slide_premium : WOOF_COSTS.carousel_slide;
+    const totalWoofsCost = count * slideWoofCost;
+    console.log(`[CreateCarousel] Checking ${totalWoofsCost} Woofs for ${count} slides (mode: ${carouselMode}, brand: ${brandId})`);
     
     const { data: woofsData, error: woofsError } = await adminClient.functions.invoke(
       "woofs-check-consume",

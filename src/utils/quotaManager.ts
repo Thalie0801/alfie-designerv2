@@ -56,7 +56,7 @@ export async function getQuotaStatus(brandId: string): Promise<QuotaStatus | nul
  */
 export async function consumeQuota(
   brandId: string,
-  type: 'image' | 'carousel_slide' | 'video_premium',
+  type: 'image' | 'carousel_slide' | 'carousel_slide_premium' | 'video_premium',
   metadata?: Record<string, any>
 ): Promise<boolean> {
   try {
