@@ -1380,6 +1380,7 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
           useBrandKit,
           carouselMode,
           carouselType,
+          referenceImageUrl: payload.referenceImageUrl || null, // ✅ NOUVEAU: Image de référence
         });
 
         return { success: true, slideIndex: index, result: slideResult };
