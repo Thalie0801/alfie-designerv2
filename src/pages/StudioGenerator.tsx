@@ -39,27 +39,26 @@ function enrichPackWithWoofCostType(pack: AlfiePack): AlfiePack {
     ...pack,
     assets: pack.assets.map((asset) => ({
       ...asset,
-      count: asset.kind === 'carousel' ? (asset.count || 5) : (asset.count || 1),
+      count: asset.kind === 'carousel' ? 5 : (asset.count || 1), // Carrousels = 5 slides fixes
       woofCostType: asset.kind === 'carousel' 
-        ? (asset.carouselMode === 'premium' ? 'carousel_slide_premium' : 'carousel_slide')
+        ? 'carousel' // 10 Woofs fixe par carrousel
         : asset.kind === 'image'
           ? 'image'
           : 'video_premium',
-      // ✅ Toujours initialiser carouselType pour les carrousels
       carouselType: asset.kind === 'carousel' ? (asset.carouselType || 'content') : undefined,
     })),
   };
 }
 
-// Packs prédéfinis
+// Packs prédéfinis - SANS carrousels (carrousels uniquement via ChatWidget)
 const PRESET_PACKS = {
   lancement: {
     title: "Pack de lancement",
-    summary: "3 visuels + 1 carrousel pour annoncer ton lancement",
+    summary: "4 visuels pour annoncer ton lancement",
     assets: [
       {
         id: "launch_1",
-        brandId: "", // Will be filled with activeBrandId
+        brandId: "",
         kind: "image" as const,
         count: 1,
         platform: "instagram" as const,
@@ -74,17 +73,16 @@ const PRESET_PACKS = {
       {
         id: "launch_2",
         brandId: "",
-        kind: "carousel" as const,
-        count: 5,
+        kind: "image" as const,
+        count: 1,
         platform: "instagram" as const,
         format: "post" as const,
-        ratio: "4:5" as const,
-        title: "Carrousel : 5 raisons de découvrir",
-        goal: "education" as const,
-        tone: "informatif, engageant",
-        carouselType: "content" as const,
-        prompt: "Carrousel expliquant 5 bénéfices clés du produit lancé",
-        woofCostType: "carousel_slide" as const,
+        ratio: "1:1" as const,
+        title: "Teaser produit",
+        goal: "engagement" as const,
+        tone: "mystérieux, teaser",
+        prompt: "Image teaser montrant un aperçu du nouveau produit",
+        woofCostType: "image" as const,
       },
       {
         id: "launch_3",
@@ -100,6 +98,20 @@ const PRESET_PACKS = {
         prompt: "Story verticale en teaser avant-première",
         woofCostType: "image" as const,
       },
+      {
+        id: "launch_4",
+        brandId: "",
+        kind: "image" as const,
+        count: 1,
+        platform: "instagram" as const,
+        format: "post" as const,
+        ratio: "4:5" as const,
+        title: "Lancement officiel",
+        goal: "vente" as const,
+        tone: "enthousiaste, professionnel",
+        prompt: "Visuel d'annonce officielle du lancement avec call-to-action",
+        woofCostType: "image" as const,
+      },
     ],
   },
   evergreen: {
@@ -109,17 +121,16 @@ const PRESET_PACKS = {
       {
         id: "evergreen_1",
         brandId: "",
-        kind: "carousel" as const,
-        count: 7,
+        kind: "image" as const,
+        count: 1,
         platform: "instagram" as const,
         format: "post" as const,
         ratio: "4:5" as const,
-        title: "Carrousel : Guide pratique",
+        title: "Conseil pratique",
         goal: "education" as const,
         tone: "pédagogique, accessible",
-        prompt: "Carrousel guide pratique avec conseils actionnables",
-        woofCostType: "carousel_slide" as const,
-        carouselType: "content" as const,
+        prompt: "Visuel conseils avec astuce pratique pour la communauté",
+        woofCostType: "image" as const,
       },
       {
         id: "evergreen_2",
@@ -258,7 +269,7 @@ export function StudioGenerator() {
       id: `asset_${Date.now()}`,
       brandId: activeBrandId || "",
       kind,
-      count: kind === 'carousel' ? (template?.count || 5) : (template?.count || 1),
+      count: kind === 'carousel' ? 5 : (template?.count || 1), // Carrousels = toujours 5 slides
       platform: template?.platform || "instagram",
       format: template?.format || "post",
       ratio: template?.ratio || "4:5",
@@ -266,9 +277,8 @@ export function StudioGenerator() {
       goal: template?.goal || "engagement",
       tone: template?.tone || "friendly",
       prompt: template?.prompt || "",
-      woofCostType: template?.woofCostType || (kind === 'carousel' ? 'carousel_slide' : 'image'),
+      woofCostType: template?.woofCostType || (kind === 'carousel' ? 'carousel' : 'image'),
       useBrandKit: useBrandKitForPack,
-      // ✅ Toujours initialiser carouselType pour les carrousels
       carouselType: kind === 'carousel' ? (template?.carouselType || 'content') : undefined,
       ...template,
     };
@@ -384,17 +394,16 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
             {
               id: `default_${Date.now()}_1`,
               brandId: activeBrandId || "",
-              kind: "carousel",
-              count: 5,
+              kind: "image",
+              count: 1,
               platform: "instagram",
               format: "post",
               ratio: "4:5",
-              title: "Carrousel : Découvrez notre marque",
+              title: "Visuel de présentation",
               goal: "education",
               tone: activeBrand?.voice || "professionnel, accessible",
-              prompt: `Carrousel de présentation de la marque ${activeBrand?.name || ""}. Slide 1: Accroche, Slide 2: Notre mission, Slides 3-4: Nos valeurs et notre offre, Slide 5: Call-to-action pour découvrir`,
-              woofCostType: "carousel_slide",
-              carouselType: "content",
+              prompt: `Visuel de présentation de la marque ${activeBrand?.name || ""}. Accroche forte et visuellement impactant.`,
+              woofCostType: "image",
             },
           ],
         };
@@ -860,8 +869,8 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
                     <DropdownMenuItem onClick={() => addAsset({ kind: "image", woofCostType: "image" })}>
                       🖼️ Image
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => addAsset({ kind: "carousel", count: 5, woofCostType: "carousel_slide" })}>
-                      📊 Carrousel
+                    <DropdownMenuItem onClick={() => addAsset({ kind: "carousel", count: 5, woofCostType: "carousel" })}>
+                      📊 Carrousel (10 🐶)
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => addAsset({ kind: "video_premium", durationSeconds: 6, woofCostType: "video_premium" })}>
                       ✨ Asset vidéo (6s)
