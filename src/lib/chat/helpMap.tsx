@@ -1,5 +1,6 @@
 export const HELP = [
-  { match: /studio|génération|créer|lancer/i, to: "/studio", label: "Ouvrir Studio", why: "Lancer une génération guidée" },
+  // Pattern strict : seulement demandes explicites de navigation vers Studio
+  { match: /ouvr(e|ir)\s+(le\s+)?studio|lance\s+(le\s+)?studio|accéder\s+(au\s+)?studio/i, to: "/studio", label: "Ouvrir Studio", why: "Lancer une génération guidée" },
   { match: /template|catalogue|modèles?/i, to: "/templates", label: "Catalogue", why: "Parcourir les modèles" },
   { match: /bibli|assets?|médias?/i, to: "/library", label: "Bibliothèque", why: "Retrouver vos visuels" },
   { match: /brand.?kit|couleurs|typo/i, to: "/brand-kit", label: "Brand Kit", why: "Couleurs, typographies, ton" },
