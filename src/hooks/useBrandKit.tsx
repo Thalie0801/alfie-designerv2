@@ -35,6 +35,7 @@ export interface BrandKit {
   visual_types?: string[];
   visual_mood?: string[];
   avoid_in_visuals?: string;
+  text_color?: string; // ✅ V9: Couleur de texte pour overlays carrousels
   
   // Bonus
   tagline?: string;
@@ -57,6 +58,7 @@ interface Brand {
   visual_types?: string[] | null;
   visual_mood?: string[] | null;
   avoid_in_visuals?: string | null;
+  text_color?: string | null; // ✅ V9: Couleur de texte
   tagline?: string | null;
   canva_connected: boolean;
   created_at: string | null;

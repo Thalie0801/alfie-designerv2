@@ -625,6 +625,7 @@ export type Database = {
           resets_on: string | null
           stripe_subscription_id: string | null
           tagline: string | null
+          text_color: string | null
           tone_sliders: Json | null
           updated_at: string | null
           user_id: string
@@ -661,6 +662,7 @@ export type Database = {
           resets_on?: string | null
           stripe_subscription_id?: string | null
           tagline?: string | null
+          text_color?: string | null
           tone_sliders?: Json | null
           updated_at?: string | null
           user_id: string
@@ -697,6 +699,7 @@ export type Database = {
           resets_on?: string | null
           stripe_subscription_id?: string | null
           tagline?: string | null
+          text_color?: string | null
           tone_sliders?: Json | null
           updated_at?: string | null
           user_id?: string
