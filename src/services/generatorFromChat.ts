@@ -22,6 +22,7 @@ export interface SendPackParams {
   useBrandKit?: boolean;
   userPlan?: string;
   carouselMode?: 'standard' | 'premium'; // ✅ Mode Standard/Premium pour carrousels
+  colorMode?: 'vibrant' | 'pastel'; // ✅ Mode Coloré/Pastel
 }
 
 export interface SendPackResult {
@@ -43,6 +44,7 @@ export async function sendPackToGenerator({
   useBrandKit = true,
   userPlan = 'starter',
   carouselMode = 'standard', // ✅ Mode Standard/Premium pour carrousels
+  colorMode = 'vibrant', // ✅ Mode Coloré/Pastel
 }: SendPackParams): Promise<SendPackResult> {
   // 1. Calculer le coût total Woofs
   const totalWoofs = calculatePackWoofCost(pack, selectedAssetIds);
@@ -101,7 +103,7 @@ export async function sendPackToGenerator({
           slidesCount: asset.generatedTexts?.slides?.length || 0,
           slidesPreview: asset.generatedTexts?.slides?.slice(0, 2).map((s: any) => ({ title: s.title?.slice(0, 30), hasBody: !!s.body })),
         });
-        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, userPlan, carouselMode);
+        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, userPlan, carouselMode, colorMode);
       })
     );
 
@@ -156,7 +158,8 @@ async function createAssetJob(
   packTitle: string,
   useBrandKit: boolean = true,
   userPlan: string = 'starter',
-  carouselMode: 'standard' | 'premium' = 'standard'
+  carouselMode: 'standard' | 'premium' = 'standard',
+  colorMode: 'vibrant' | 'pastel' = 'vibrant'
 ): Promise<{ orderId: string }> {
   // Créer un order pour cet asset
   const { data: order, error: orderError } = await supabase
@@ -232,6 +235,7 @@ async function createAssetJob(
       useBrandKit,
       userPlan,
       carouselMode: asset.kind === "carousel" ? (asset.carouselMode || carouselMode) : undefined, // ✅ Mode Standard/Premium
+      colorMode: colorMode, // ✅ Mode Coloré/Pastel
       carouselType: asset.kind === "carousel" ? (asset.carouselType || 'content') : undefined, // ✅ Type: citations ou content
       visualStyle: asset.visualStyle || 'photorealistic',
       withAudio: false,

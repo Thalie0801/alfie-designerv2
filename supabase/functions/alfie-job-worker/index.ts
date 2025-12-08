@@ -1244,9 +1244,10 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   const totalSlides = payload.count || 5;
   const carouselType = payload.carouselType || 'content';
   const carouselMode = payload.carouselMode || 'standard';
+  const colorMode = payload.colorMode || 'vibrant'; // ✅ Mode Coloré/Pastel
   const useBrandKit = resolveUseBrandKit(payload, jobMeta);
   
-  console.log(`[processRenderCarousels] 📌 Config: ${totalSlides} slides, mode: ${carouselMode}, type: ${carouselType}, useBrandKit: ${useBrandKit}`);
+  console.log(`[processRenderCarousels] 📌 Config: ${totalSlides} slides, mode: ${carouselMode}, type: ${carouselType}, colorMode: ${colorMode}, useBrandKit: ${useBrandKit}`);
 
   // ✅ Charger le Brand Kit
   const brandMini = await loadBrandMini(payload.brandId, false);
@@ -1381,6 +1382,7 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
           useBrandKit,
           carouselMode,
           carouselType,
+          colorMode, // ✅ Mode Coloré/Pastel
           referenceImageUrl: payload.referenceImageUrl || null, // ✅ NOUVEAU: Image de référence
         });
 

@@ -22,6 +22,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 type Lang = "FR" | "EN";
 
 type CarouselMode = 'standard' | 'premium';
+type ColorMode = 'vibrant' | 'pastel';
 
 interface BrandKit {
   name?: string;
@@ -65,6 +66,7 @@ interface SlideRequest {
   carouselType?: CarouselType;  // ✅ NOUVEAU: citations ou content
   brandKit?: BrandKit;          // ✅ NOUVEAU: Brand Kit V2 complet
   referenceImageUrl?: string | null; // ✅ NOUVEAU: Image de référence pour le style
+  colorMode?: ColorMode;        // ✅ NOUVEAU: Coloré ou Pastel
 }
 
 type GenSize = { w: number; h: number };
@@ -128,6 +130,7 @@ function getSlideRole(index: number, total: number): string {
  * Build prompt for STANDARD mode (PURE IMAGE ONLY - NO TEXT AT ALL)
  * Text is added AFTER via Cloudinary overlay
  * ✅ ADAPTATIF: utilise le Brand Kit (niche, visual_types, visual_mood) pour le style
+ * ✅ COLORMODE: adapte la palette selon vibrant/pastel
  */
 function buildImagePromptStandard(
   globalStyle: string, 
@@ -136,12 +139,17 @@ function buildImagePromptStandard(
   slideContent: { title: string; subtitle?: string; alt: string },
   slideIndex: number,
   totalSlides: number,
-  brandKit?: BrandKit // ✅ NEW: Brand Kit pour personnalisation
+  brandKit?: BrandKit, // ✅ NEW: Brand Kit pour personnalisation
+  colorMode: ColorMode = 'vibrant' // ✅ NEW: Mode couleurs
 ): string {
   // ✅ Déterminer le style visuel basé sur le Brand Kit
   let visualStyle = "modern professional design";
-  let colorScheme = "rich saturated colors with gradients";
   let visualElements = "soft 3D geometric elements, glowing orbs, smooth shapes";
+  
+  // ✅ COLORMODE: adapter les couleurs selon le choix utilisateur
+  let colorScheme = colorMode === 'pastel' 
+    ? "soft pastel colors, gentle muted tones, delicate hues, subtle gradients"
+    : "rich saturated colors with vibrant gradients";
   
   if (useBrandKit && brandKit) {
     // Adapter au visual_types du Brand Kit
@@ -158,14 +166,20 @@ function buildImagePromptStandard(
       visualElements = "professional product mockup style";
     }
     
-    // Adapter au visual_mood
+    // Adapter au visual_mood - RESPECTER le colorMode
     const mood = brandKit.visual_mood?.[0];
-    if (mood === "coloré") colorScheme = "vibrant bold saturated colors";
-    else if (mood === "minimaliste") colorScheme = "clean minimal color palette, negative space";
-    else if (mood === "pastel") colorScheme = "soft pastel colors, gentle tones";
-    else if (mood === "contrasté") colorScheme = "high contrast dramatic colors";
-    else if (mood === "lumineux") colorScheme = "bright luminous colors with glow effects";
-    else if (mood === "sombre") colorScheme = "deep dark tones with accent highlights";
+    if (colorMode === 'pastel') {
+      // ✅ Mode PASTEL: toujours des tons doux
+      colorScheme = "soft pastel colors, gentle muted tones, delicate hues, light and airy palette";
+    } else {
+      // ✅ Mode VIBRANT: adapter au mood du Brand Kit
+      if (mood === "coloré") colorScheme = "vibrant bold saturated colors";
+      else if (mood === "minimaliste") colorScheme = "clean minimal color palette, negative space, subtle colors";
+      else if (mood === "pastel") colorScheme = "soft pastel colors, gentle tones";
+      else if (mood === "contrasté") colorScheme = "high contrast dramatic colors";
+      else if (mood === "lumineux") colorScheme = "bright luminous colors with glow effects";
+      else if (mood === "sombre") colorScheme = "deep dark tones with accent highlights";
+    }
     
     // Adapter au niche/secteur
     if (brandKit.niche) {
@@ -179,7 +193,9 @@ function buildImagePromptStandard(
   // Style hint du globalStyle si disponible
   const additionalStyle = (useBrandKit && globalStyle) ? `, ${globalStyle}` : "";
   
-  return `Create a VIBRANT, COLORFUL background image for social media.
+  const colorModeLabel = colorMode === 'pastel' ? 'SOFT PASTEL' : 'RICH, COLORFUL';
+  
+  return `Create a ${colorModeLabel} background image for social media.
 
 THEME: ${theme}
 INDUSTRY: ${visualStyle}${additionalStyle}
@@ -187,14 +203,14 @@ COLOR SCHEME: ${colorScheme}
 VISUAL ELEMENTS: ${visualElements}
 
 CRITICAL REQUIREMENTS:
-- Generate a RICH, COLORFUL image - NOT white, NOT blank, NOT empty
+- Generate a ${colorModeLabel} image - NOT white, NOT blank, NOT empty
 - Image must reflect the THEME: ${theme}
 - Modern social media aesthetic with depth and dimension
 - Leave clean central area for text overlay
 
 ABSOLUTE RULES:
-- NO TEXT whatsoever - no letters, words, numbers, labels
-- NO white/empty backgrounds - always colorful
+- NO TEXT whatsoever - no letters, words, numbers, labels, typography
+- NO white/empty backgrounds - always colorful (${colorMode === 'pastel' ? 'soft pastel tones' : 'saturated colors'})
 - Match the visual style to the industry/theme
 
 OUTPUT: A beautiful, thematic background image with NO text.`
@@ -213,6 +229,7 @@ function truncateText(text: string, maxChars: number): string {
  * Build prompt for PREMIUM mode - BACKGROUND ONLY (NO TEXT)
  * ✅ V8: Gemini 3 Pro génère un fond haute qualité SANS AUCUN texte
  * ✅ Le texte est ajouté ensuite via Cloudinary overlay avec fonts du Brand Kit
+ * ✅ COLORMODE: adapte la palette selon vibrant/pastel
  */
 function buildImagePromptPremium(
   userPrompt: string,
@@ -220,11 +237,16 @@ function buildImagePromptPremium(
   useBrandKit: boolean,
   slideIndex: number,
   totalSlides: number,
-  referenceImageUrl?: string | null
+  referenceImageUrl?: string | null,
+  colorMode: ColorMode = 'vibrant' // ✅ NEW: Mode couleurs
 ): string {
   // ✅ Style visuel enrichi par le Brand Kit V2
   let visualStyle = "vibrant gradient background, rich saturated colors, elegant modern design";
-  let colorHint = "blues, purples, pinks, teals, warm oranges";
+  
+  // ✅ COLORMODE: adapter les couleurs selon le choix utilisateur
+  let colorHint = colorMode === 'pastel' 
+    ? "soft pastels: blush pink, mint green, lavender, baby blue, peach"
+    : "blues, purples, pinks, teals, warm oranges";
   
   if (useBrandKit && brandKit) {
     const styleParts: string[] = [];
@@ -233,7 +255,12 @@ function buildImagePromptPremium(
       styleParts.push(`${brandKit.niche} industry aesthetic`);
     }
     if (brandKit.visual_mood?.length) {
-      styleParts.push(brandKit.visual_mood.slice(0, 2).join(", ") + " mood");
+      // ✅ COLORMODE: override mood si pastel demandé
+      if (colorMode === 'pastel') {
+        styleParts.push("soft pastel, gentle, delicate mood");
+      } else {
+        styleParts.push(brandKit.visual_mood.slice(0, 2).join(", ") + " mood");
+      }
     }
     if (brandKit.visual_types?.length) {
       const type = brandKit.visual_types[0];
@@ -244,7 +271,9 @@ function buildImagePromptPremium(
     }
     if (brandKit.palette?.length) {
       // ✅ Utiliser les couleurs du palette comme hint
-      colorHint = "brand colors from palette";
+      colorHint = colorMode === 'pastel' 
+        ? "soft pastel versions of brand colors"
+        : "brand colors from palette";
       styleParts.push("harmonious brand color palette with rich saturation");
     }
     if (brandKit.pitch) {
@@ -262,31 +291,36 @@ function buildImagePromptPremium(
 Use the provided reference image as style inspiration for colors and composition.` : "";
 
   const slideRole = getSlideRole(slideIndex, totalSlides);
+  
+  const colorModeLabel = colorMode === 'pastel' ? 'SOFT PASTEL' : 'VIBRANT, COLORFUL';
+  const colorDescription = colorMode === 'pastel'
+    ? "soft, muted, gentle tones with delicate hues"
+    : "rich, saturated with visible color transitions";
 
-  // ✅ PROMPT SIMPLIFIÉ ET RENFORCÉ POUR FORCER DES COULEURS
-  return `Create a VIBRANT, COLORFUL premium background image.
+  // ✅ PROMPT SIMPLIFIÉ ET RENFORCÉ POUR RESPECTER LE COLORMODE
+  return `Create a ${colorModeLabel} premium background image.
 
 THEME: ${userPrompt}
 STYLE: ${visualStyle}
-COLORS: Use rich, saturated ${colorHint} - NO WHITE BACKGROUND
+COLORS: Use ${colorDescription} ${colorHint} - NO WHITE BACKGROUND
 SLIDE: ${slideRole} (${slideIndex + 1}/${totalSlides})
 ${referenceInstruction}
 
 CRITICAL REQUIREMENTS:
-- Generate a RICH, COLORFUL image - NOT white, NOT blank, NOT empty
-- Beautiful gradients with visible color transitions
+- Generate a ${colorModeLabel} image - NOT white, NOT blank, NOT empty
+- ${colorMode === 'pastel' ? 'Soft pastel tones, gentle gradients, muted palette' : 'Beautiful gradients with visible color transitions'}
 - Soft 3D geometric elements, glowing orbs, smooth flowing shapes
 - Modern social media aesthetic with depth and dimension
 - Leave clean central area for text overlay (added separately)
 
 ABSOLUTE RULES:
-- Image MUST be colorful and vibrant with saturated colors
+- Image MUST be ${colorMode === 'pastel' ? 'soft and gentle in pastel tones' : 'colorful and vibrant with saturated colors'}
 - NO TEXT whatsoever - no letters, words, numbers, labels, typography
 - Background must have visible colors and patterns, never pure white
 
 ${avoid ? `AVOID: ${avoid}` : ""}
 
-OUTPUT: A stunning, colorful abstract background with ZERO text.`;
+OUTPUT: A stunning, ${colorMode === 'pastel' ? 'pastel' : 'colorful'} abstract background with ZERO text.`;
 }
 
 /**
@@ -553,6 +587,7 @@ Deno.serve(async (req) => {
       carouselType = 'content', // ✅ Par défaut : Content (conseils/astuces)
       brandKit, // ✅ NOUVEAU: Brand Kit V2 complet
       referenceImageUrl, // ✅ NOUVEAU: Image de référence pour le style
+      colorMode = 'vibrant', // ✅ NOUVEAU: Mode couleurs (vibrant/pastel)
     } = params;
     
     // ✅ Sélectionner le modèle selon le mode
@@ -679,7 +714,8 @@ Deno.serve(async (req) => {
           useBrandKit,
           slideIndex,
           totalSlides,
-          referenceImageUrl // ✅ Image de référence
+          referenceImageUrl, // ✅ Image de référence
+          colorMode as ColorMode // ✅ Mode couleurs
         )
       : buildImagePromptStandard(
           globalStyle, 
@@ -688,7 +724,8 @@ Deno.serve(async (req) => {
           { title: normTitle, subtitle: normSubtitle, alt: slideContent.alt },
           slideIndex,
           totalSlides,
-          brandKit // ✅ Pass Brand Kit for adaptive styling
+          brandKit, // ✅ Pass Brand Kit for adaptive styling
+          colorMode as ColorMode // ✅ Mode couleurs
         );
     
     console.log(`[render-slide] ${logCtx} 🎨 Mode: ${carouselMode}, hasText: ${!!normTitle && normTitle !== "Titre par défaut"}, hasRef: ${!!referenceImageUrl}`);
