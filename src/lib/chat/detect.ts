@@ -75,7 +75,8 @@ export function detectPlatformHelp(raw: string) {
   const q = raw.toLowerCase();
 
   const intents = [
-    { test: /(studio|génération|créer|lancer)/, to: "/studio", label: "Ouvrir Studio" },
+    // Pattern strict : seulement si demande explicite de navigation vers Studio
+    { test: /(ouvr(e|ir)\s+(le\s+)?studio|va\s+(sur|dans)\s+(le\s+)?studio|lance\s+(le\s+)?studio|accéder\s+(au\s+)?studio)/, to: "/studio", label: "Ouvrir Studio" },
     { test: /(template|catalogue|modèles?)/, to: "/templates", label: "Catalogue" },
     { test: /(bibliothèque|assets?|médias?)/, to: "/library", label: "Bibliothèque" },
     { test: /(brand[\s-]?kit|modifier (ma |mon |les )?couleurs|configurer (ma |mes )?typo)/, to: "/brand-kit-questionnaire", label: "Brand Kit" },
@@ -87,7 +88,12 @@ export function detectPlatformHelp(raw: string) {
     { test: /(admin|job queue|monitor|bloqués?)/, to: "/admin", label: "Admin" },
   ];
 
-  const matches = intents.filter((i) => i.test.test(q));
+  // Exclure le routage Studio si c'est une demande de création de contenu
+  const isContentRequest = /(carrousel|carousel|image|visuel|vidéo|video|slides?|génère|crée|fais(-| )?moi)/.test(q);
+
+  const matches = intents
+    .filter((i) => i.test.test(q))
+    .filter((i) => !(i.to === "/studio" && isContentRequest));
 
   const isWhatCanDo =
     /(que|quoi).*(peut|peux).*(faire|proposer)|capacités?|features?|fonctionnalités?|comment (ça|ca) marche|mode d'emploi|help/i.test(q);
