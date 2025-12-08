@@ -97,6 +97,22 @@ function normalizeFont(font: string): string {
   return 'Inter';
 }
 
+/**
+ * Ensure color has good contrast (not too light)
+ */
+function ensureContrastColor(hex: string): string {
+  const clean = (hex || '').replace('#', '');
+  if (!clean || clean === 'ffffff' || clean === 'fff') return '222222';
+  
+  const r = parseInt(clean.slice(0, 2), 16) || 0;
+  const g = parseInt(clean.slice(2, 4), 16) || 0;
+  const b = parseInt(clean.slice(4, 6), 16) || 0;
+  
+  // Si RGB > 650 (très clair), utiliser gris foncé
+  if (r + g + b > 650) return '333333';
+  return clean;
+}
+
 function buildTextLayer(layer: TextLayer): string {
   // ✅ Validate and normalize font to Google Fonts
   const fontFamily = normalizeFont(layer.font || 'Inter');
@@ -106,30 +122,33 @@ function buildTextLayer(layer: TextLayer): string {
   // ✅ CRITICAL FIX: Font order must be font_family_size_style
   const font = `${fontFamily}_${fontSize}_${fontWeight}`;
   
-  const textColor = layer.color ? layer.color.replace('#', '') : 'ffffff';
+  // ✅ Ensure text color has good contrast
+  const textColor = ensureContrastColor(layer.color || 'ffffff');
   const encodedText = encodeCloudinaryText(layer.text);
   
   const gravity = layer.gravity ? `g_${layer.gravity}` : 'g_center';
-  const position = (layer.x !== undefined || layer.y !== undefined) 
-    ? `x_${layer.x || 0},y_${layer.y || 0}` 
-    : '';
+  const baseX = layer.x || 0;
+  const baseY = layer.y || 0;
   const widthParam = layer.w ? `w_${layer.w},c_fit` : '';
   
-  const positionParams = [gravity, position, widthParam].filter(Boolean).join(',');
+  // ✅ TECHNIQUE TRIPLE LAYER: 2 ombres + texte coloré pour max contraste
   
-  // ✅ TECHNIQUE DOUBLE LAYER: ombre noire décalée + texte coloré par-dessus
-  // Layer 1: Texte noir (ombre) décalé de 4px vers le bas
-  const shadowY = (layer.y || 0) + 4;
-  const shadowPosition = `x_${layer.x || 0},y_${shadowY}`;
-  const shadowGravity = layer.gravity ? `g_${layer.gravity}` : 'g_center';
-  const shadowPositionParams = [shadowGravity, shadowPosition, widthParam].filter(Boolean).join(',');
-  const shadowLayer = `l_text:${font}:${encodedText},co_rgb:000000${shadowPositionParams ? ',' + shadowPositionParams : ''}/fl_layer_apply`;
+  // Layer 1: Ombre lointaine (profondeur) - 12px offset
+  const shadow1Y = baseY + 12;
+  const shadow1Params = [`g_${layer.gravity || 'center'}`, `x_${baseX}`, `y_${shadow1Y}`, widthParam].filter(Boolean).join(',');
+  const shadow1Layer = `l_text:${font}:${encodedText},co_rgb:000000,o_60${shadow1Params ? ',' + shadow1Params : ''}/fl_layer_apply`;
   
-  // Layer 2: Texte coloré Brand Kit par-dessus
-  const textLayer = `l_text:${font}:${encodedText},co_rgb:${textColor}${positionParams ? ',' + positionParams : ''}/fl_layer_apply`;
+  // Layer 2: Ombre proche (contraste) - 6px offset  
+  const shadow2Y = baseY + 6;
+  const shadow2Params = [`g_${layer.gravity || 'center'}`, `x_${baseX}`, `y_${shadow2Y}`, widthParam].filter(Boolean).join(',');
+  const shadow2Layer = `l_text:${font}:${encodedText},co_rgb:000000,o_80${shadow2Params ? ',' + shadow2Params : ''}/fl_layer_apply`;
   
-  // Retourner les deux layers (ombre puis texte)
-  return `${shadowLayer}/${textLayer}`;
+  // Layer 3: Texte coloré Brand Kit par-dessus
+  const textParams = [gravity, `x_${baseX}`, `y_${baseY}`, widthParam].filter(Boolean).join(',');
+  const textLayer = `l_text:${font}:${encodedText},co_rgb:${textColor}${textParams ? ',' + textParams : ''}/fl_layer_apply`;
+  
+  // Retourner les trois layers (2 ombres + texte)
+  return `${shadow1Layer}/${shadow2Layer}/${textLayer}`;
 }
 
 // ============= BRAND FONTS TYPE =============
@@ -223,51 +242,69 @@ function layersForContent(slide: Slide, primaryColor: string, brandFonts?: Brand
   const bodyFont = brandFonts?.secondary || 'Inter';
   
   // Determine if we have body text to adjust positioning
-  const hasBody = !!slide.subtitle;
+  const hasSubtitle = !!slide.subtitle;
+  const hasBody = !!slide.punchline; // punchline = body text
   const hasBullets = slide.bullets && slide.bullets.length > 0;
+  const hasContent = hasSubtitle || hasBody || hasBullets;
   
+  // ✅ ESPACEMENT VERTICAL AMÉLIORÉ - plus d'espace entre éléments
   // Title (CENTERED, position depends on content below)
-  const titleY = hasBody || hasBullets ? -120 : -40;
+  const titleY = hasContent ? -200 : -40;
   layers.push({
     text: truncateForOverlay(slide.title, CHAR_LIMITS.title),
     font: titleFont,
     weight: 'ExtraBold',
-    size: 68,
+    size: 64, // Réduit de 68 pour éviter troncature
     color: primaryColor, // ✅ V8: Use brand primary color
     outline: 18,
     gravity: 'center',
     y: titleY,
-    w: 900
+    w: 850
   });
   
-  // ✅ Body text (subtitle field) - positioned below title, uses Brand Kit secondary color
-  if (slide.subtitle) {
+  // ✅ Subtitle - positionné juste en dessous du titre
+  if (hasSubtitle) {
     layers.push({
-      text: truncateForOverlay(slide.subtitle, CHAR_LIMITS.body),
+      text: truncateForOverlay(slide.subtitle!, CHAR_LIMITS.subtitle),
       font: bodyFont,
       weight: 'Regular',
-      size: 38,
-      color: primaryColor, // ✅ Use brand primary color instead of white
+      size: 36,
+      color: 'ffffff', // Blanc pour contraste
       outline: 10,
       gravity: 'center',
-      y: hasBullets ? 0 : 40, // Adjust if bullets follow
-      w: 900
+      y: -80, // ✅ Bien séparé du titre
+      w: 850
     });
   }
   
-  // Bullets (CENTERED, below body or title)
+  // ✅ Body text (punchline field) - positionné encore plus bas
+  if (hasBody) {
+    layers.push({
+      text: truncateForOverlay(slide.punchline!, CHAR_LIMITS.body),
+      font: bodyFont,
+      weight: 'Regular',
+      size: 32,
+      color: 'ffffff',
+      outline: 8,
+      gravity: 'center',
+      y: hasSubtitle ? 40 : -20, // ✅ Ajusté selon présence subtitle
+      w: 850
+    });
+  }
+  
+  // Bullets (CENTERED, below body or subtitle)
   if (hasBullets) {
     const bulletText = slide.bullets!.map(b => `• ${truncateForOverlay(b, CHAR_LIMITS.bullet)}`).join('\n');
     layers.push({
       text: bulletText,
       font: bodyFont,
       weight: 'Regular',
-      size: 42,
+      size: 38,
       color: 'ffffff',
-      outline: 12,
+      outline: 10,
       gravity: 'center',
-      y: hasBody ? 120 : 80,
-      w: 950
+      y: hasBody ? 160 : (hasSubtitle ? 80 : 60), // ✅ Espacement dynamique
+      w: 900
     });
   }
   

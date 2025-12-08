@@ -1357,14 +1357,15 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
           prompt: topic, // ✅ Le thème pour le contexte visuel (pas affiché)
           globalStyle,
           brandKit: brandMini,
-          slideContent: {
+        slideContent: {
             // ✅ NOUVEAU: utiliser carousel_slides[i], PAS asset.prompt
+            // ✅ FIX: Séparer subtitle et body correctement
             title: slide.title_on_image || "",
-            subtitle: slide.text_on_image || "", // text_on_image devient subtitle
-            body: "", // Plus de body séparé
-            bullets: [],
+            subtitle: (slide as any).subtitle || "", // ✅ Sous-titre séparé (si dispo)
+            body: slide.text_on_image || "", // ✅ Body = text_on_image (descriptif)
+            bullets: (slide as any).bullets || [],
             alt: `Slide ${index + 1}: ${slide.title_on_image}`,
-            author: undefined,
+            author: (slide as any).author || undefined,
           },
           brandId: payload.brandId,
           orderId: jobMeta?.order_id || payload.orderId,
