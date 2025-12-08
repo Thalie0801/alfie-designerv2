@@ -1,5 +1,5 @@
 // functions/alfie-render-carousel-slide/index.ts
-// v2.8.0 — Slide renderer with SVG overlay for Premium mode (Option C)
+// v3.0.0 — Premium mode with native text integration (no SVG overlay)
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { uploadTextAsRaw } from "../_shared/cloudinaryUploader.ts";
@@ -188,17 +188,17 @@ function truncateText(text: string, maxChars: number): string {
 }
 
 /**
- * Build prompt for PREMIUM mode - BACKGROUND ONLY (NO TEXT)
- * ✅ V6 Option C: Gemini 3 Pro génère UNIQUEMENT le fond visuel
- * ✅ Le texte sera ajouté via SVG overlay (renderSlideToSVG)
- * ✅ Garantit un centrage parfait et une qualité typographique optimale
+ * Build prompt for PREMIUM mode - TEXT INTEGRATED NATIVELY
+ * ✅ V7: Gemini 3 Pro génère l'image AVEC le texte intégré artistiquement
+ * ✅ Pas d'overlay SVG - typographie native AI
  */
-function buildImagePromptPremiumBackgroundOnly(
+function buildImagePromptPremiumWithText(
   userPrompt: string,
   brandKit: BrandKit | undefined,
   useBrandKit: boolean,
   slideIndex: number,
   totalSlides: number,
+  slideContent: { title: string; subtitle?: string; body?: string },
   referenceImageUrl?: string | null
 ): string {
   // ✅ Style visuel enrichi par le Brand Kit V2
@@ -241,33 +241,51 @@ Use the provided reference image as style inspiration.
 Match its color palette, composition style, and overall aesthetic.` : "";
 
   const slideRole = getSlideRole(slideIndex, totalSlides);
+  
+  // ✅ Construire les instructions texte
+  const textInstructions: string[] = [];
+  if (slideContent.title) {
+    textInstructions.push(`TITRE : "${slideContent.title}"`);
+  }
+  if (slideContent.subtitle) {
+    textInstructions.push(`SOUS-TITRE : "${slideContent.subtitle}"`);
+  }
+  if (slideContent.body) {
+    textInstructions.push(`CORPS : "${slideContent.body}"`);
+  }
 
-  return `Create ONE premium BACKGROUND IMAGE for a social media carousel slide.
+  return `Crée une image sociale media professionnelle avec texte intégré.
 
-=== CRITICAL INSTRUCTION ===
-Generate ONLY the VISUAL BACKGROUND. 
-NO TEXT WHATSOEVER in the image.
-- Do NOT include any words, letters, numbers, or typography
-- Do NOT include any UI elements, buttons, or labels  
-- Do NOT write anything - not even single letters
-- Create a PURE VISUAL BACKGROUND that will have text overlaid separately
-
-VISUAL THEME: ${userPrompt}
+=== FOND VISUEL ===
+THÈME: ${userPrompt}
 STYLE: ${visualStyle}
 SLIDE ROLE: ${slideRole} (slide ${slideIndex + 1}/${totalSlides})
-
 ${referenceInstruction}
 
-COMPOSITION:
-- Leave CLEAR SPACE in the upper-center area (top 40% of image)
-- This space will be used for text overlay
-- Background should be slightly darker or muted in text area for contrast
-- Professional Instagram/LinkedIn quality
-- Maintain visual consistency across carousel
+=== TEXTE À INTÉGRER EXACTEMENT (copier-coller, pas un mot de plus) ===
+${textInstructions.join('\n')}
 
-${avoid ? `AVOID: ${avoid}` : ""}
+=== RÈGLES ABSOLUES POUR LE TEXTE ===
+1. Reproduire le texte EXACTEMENT comme écrit ci-dessus, lettre par lettre
+2. JAMAIS de mots collés (ex: "IApour" est INTERDIT, écrire "IA pour")
+3. Centré HORIZONTALEMENT au milieu de l'image
+4. Positionné dans la MOITIÉ SUPÉRIEURE (25-45% du haut)
+5. Police BLANCHE (#FFFFFF) avec OMBRE NOIRE épaisse (6px offset, 12px blur) pour contraste maximum
+6. Taille de police lisible (titre > sous-titre > corps)
+7. Interligne généreux entre les éléments textuels
+8. TOUT le texte en FRANÇAIS uniquement
 
-OUTPUT: Pure visual background image with NO TEXT, optimized for text overlay.`;
+=== ERREURS À ÉVITER ABSOLUMENT ===
+- Mots collés sans espaces
+- Texte en anglais
+- Texte tronqué ou incomplet
+- Texte en bas de l'image
+- Texte sans contraste (difficilement lisible)
+- Texte trop petit ou trop grand
+
+${avoid ? `ÉLÉMENTS À ÉVITER: ${avoid}` : ""}
+
+OUTPUT: Image professionnelle avec texte parfaitement intégré et lisible.`;
 }
 
 /**
@@ -602,15 +620,17 @@ Deno.serve(async (req) => {
     // STEP 2/4 — Générer background (Vertex AI Gemini priorité)
     // =========================================
     
-    // ✅ V6 Option C: Les deux modes utilisent des prompts BACKGROUND ONLY
-    // Le texte sera ajouté via overlay (Standard: Cloudinary, Premium: SVG)
+    // ✅ V7: Standard = background only + overlay, Premium = texte intégré nativement
+    const normBody = String(slideContent.body || "").trim().slice(0, 200);
+    
     const enrichedPrompt = carouselMode === 'premium'
-      ? buildImagePromptPremiumBackgroundOnly(
+      ? buildImagePromptPremiumWithText(
           prompt,     // ✅ Thème utilisateur
           brandKit,   // ✅ Brand Kit V2 complet
           useBrandKit,
           slideIndex,
           totalSlides,
+          { title: normTitle, subtitle: normSubtitle, body: normBody }, // ✅ Texte à intégrer
           referenceImageUrl // ✅ Image de référence
         )
       : buildImagePromptStandard(
@@ -791,82 +811,11 @@ Deno.serve(async (req) => {
         finalUrl = cloudinarySecureUrl;
       }
     } else {
-      // ✅ PREMIUM MODE (Option C): SVG overlay with pixel-perfect text
-      console.log(`[render-slide] ${logCtx} 3.5/4 Generating SVG overlay (Premium mode Option C)`);
-      
-      try {
-        // ✅ Étape 1: Créer le template dynamique basé sur l'aspect ratio
-        const template = createDynamicTemplate(normalizedAR, brandKit);
-        console.log(`[render-slide] ${logCtx}   ↳ Template created: ${template.layout.width}x${template.layout.height}`);
-        
-        // ✅ Étape 2: Préparer le contenu textuel COMPLET (titre + subtitle + body)
-        const normBody = String(slideContent.body || "").trim().slice(0, 200);
-        const svgSlideContent: SlideContent = {
-          title: normTitle,
-          subtitle: carouselType === 'citations' ? undefined : (normSubtitle || undefined),
-          punchline: carouselType === 'citations' ? undefined : (normBody || undefined), // ✅ Body mappé sur punchline
-          bullets: carouselType === 'citations' ? undefined : (normBullets.length > 0 ? normBullets : undefined),
-        };
-        
-        // ✅ Étape 3: Préparer le snapshot de marque avec police du Brand Kit
-        const brandFontFamily = brandKit?.name || 'Inter, -apple-system, BlinkMacSystemFont, sans-serif';
-        const brandSnapshot = {
-          primary_color: '#FFFFFF', // ✅ Blanc pour texte sur fond sombre
-          secondary_color: '#E0E0E0', // ✅ Gris clair pour contraste
-          logo_url: undefined,
-          fonts: { default: brandFontFamily }, // ✅ Police du Brand Kit
-        };
-        
-        // ✅ Étape 4: Générer le SVG avec texte parfaitement centré
-        const svgContent = await renderSlideToSVG(svgSlideContent, template, brandSnapshot);
-        console.log(`[render-slide] ${logCtx}   ↳ SVG generated: ${svgContent.length} bytes`);
-        
-        // ✅ Étape 5: Upload SVG vers Cloudinary
-        const svgFolder = `alfie/${brandId}/${carouselId}/overlays`;
-        const svgPublicId = `overlay_${String(slideIndex + 1).padStart(2, "0")}`;
-        
-        const { public_id: svgCloudinaryId } = await uploadSvgToCloudinary(
-          svgContent,
-          svgFolder,
-          svgPublicId,
-          supabaseAdmin // ✅ Passer le client Supabase pour utiliser l'Edge Function
-        );
-        console.log(`[render-slide] ${logCtx}   ↳ SVG uploaded: ${svgCloudinaryId}`);
-        
-        // ✅ Étape 6: Construire l'URL composite (fond + SVG overlay)
-        const cloudName = CLOUDINARY_CLOUD_NAME || '';
-        finalUrl = buildCompositeUrl(cloudinaryPublicId, svgCloudinaryId, cloudName);
-        console.log(`[render-slide] ${logCtx}   ↳ Composite URL: ${finalUrl?.slice(0, 150)}...`);
-        
-      } catch (svgErr) {
-        console.error(`[render-slide] ${logCtx} ❌ SVG overlay failed:`, svgErr);
-        console.log(`[render-slide] ${logCtx} ⚠️ Fallback to Cloudinary text overlay`);
-        
-        // ✅ Fallback: utiliser Cloudinary overlay comme Standard mode
-        const slideType = slideIndex === 0 ? 'hero' 
-          : slideIndex === totalSlides - 1 ? 'cta'
-          : 'impact';
-        
-        const slideData: Slide = {
-          type: slideType,
-          title: normTitle,
-          subtitle: carouselType === 'citations' ? undefined : (normSubtitle || undefined),
-          bullets: carouselType === 'citations' ? undefined : (normBullets.length > 0 ? normBullets : undefined),
-          cta: slideType === 'cta' ? normTitle : undefined,
-        };
-        
-        try {
-          finalUrl = buildCarouselSlideUrl(
-            cloudinaryPublicId,
-            slideData,
-            'ffffff',
-            'cccccc',
-            carouselType
-          );
-        } catch {
-          finalUrl = cloudinarySecureUrl;
-        }
-      }
+      // ✅ PREMIUM MODE V7: Texte intégré nativement par Lovable AI (pas de SVG)
+      console.log(`[render-slide] ${logCtx} 3.5/4 Premium mode: text already integrated in image (no overlay needed)`);
+      // L'image générée contient déjà le texte intégré nativement
+      // Pas besoin d'overlay supplémentaire
+      finalUrl = cloudinarySecureUrl;
     }
 
     // =========================================
