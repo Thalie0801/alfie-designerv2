@@ -65,37 +65,71 @@ const CHAR_LIMITS = {
   bullet: 60,
 };
 
+// ✅ Polices Google Fonts supportées par Cloudinary
+const GOOGLE_FONTS = [
+  'Inter', 'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Nunito Sans', 'Poppins', 
+  'Raleway', 'Playfair Display', 'Merriweather', 'Ubuntu', 'Source Sans Pro',
+  'Oswald', 'Quicksand', 'Archivo', 'Libre Franklin', 'Work Sans', 'DM Sans',
+  'Manrope', 'Outfit', 'Sora', 'Space Grotesk', 'Plus Jakarta Sans'
+];
+
+/**
+ * Normalize font to Google Fonts supported by Cloudinary
+ */
+function normalizeFont(font: string): string {
+  if (!font) return 'Inter';
+  
+  // Check if font is supported (case-insensitive)
+  const isSupported = GOOGLE_FONTS.some(gf => 
+    gf.toLowerCase().replace(/\s+/g, '') === font.toLowerCase().replace(/\s+/g, '')
+  );
+  
+  if (isSupported) {
+    // Return the properly cased version
+    const matched = GOOGLE_FONTS.find(gf => 
+      gf.toLowerCase().replace(/\s+/g, '') === font.toLowerCase().replace(/\s+/g, '')
+    );
+    return (matched || font).replace(/\s+/g, '%20');
+  }
+  
+  // Fallback to Inter for unsupported fonts
+  console.warn(`[imageCompositor] Font "${font}" not in Google Fonts, using Inter`);
+  return 'Inter';
+}
+
 function buildTextLayer(layer: TextLayer): string {
-  // ✅ FIX: Encode font names with spaces (e.g., "Nunito Sans" -> "Nunito%20Sans")
-  const fontFamily = (layer.font || 'Inter').replace(/\s+/g, '%20');
+  // ✅ Validate and normalize font to Google Fonts
+  const fontFamily = normalizeFont(layer.font || 'Inter');
   // ✅ CRITICAL FIX: Normalize ExtraBold to Bold (Cloudinary doesn't support ExtraBold)
   const fontWeight = layer.weight === 'ExtraBold' ? 'Bold' : (layer.weight || 'Bold');
   const fontSize = layer.size || 64;
   // ✅ CRITICAL FIX: Font order must be font_family_size_style
   const font = `${fontFamily}_${fontSize}_${fontWeight}`;
   
-  // ✅ CLOUDINARY FIX: Use bo_ (border) for outline - e_outline syntax is invalid
-  const outlineWidth = layer.outline || 16;
   const textColor = layer.color ? layer.color.replace('#', '') : 'ffffff';
-  
-  const styleParams = [
-    `co_rgb:${textColor}`, // ✅ Apply text color
-    `bo_${outlineWidth}px_solid_rgb:000000`, // ✅ Black border/outline
-    layer.w ? `w_${layer.w},c_fit` : ''
-  ].filter(Boolean).join(',');
-  
   const encodedText = encodeCloudinaryText(layer.text);
-  const base = `l_text:${font}:${encodedText}`;
   
-  const gravity = layer.gravity ? `g_${layer.gravity}` : '';
+  const gravity = layer.gravity ? `g_${layer.gravity}` : 'g_center';
   const position = (layer.x !== undefined || layer.y !== undefined) 
     ? `x_${layer.x || 0},y_${layer.y || 0}` 
     : '';
+  const widthParam = layer.w ? `w_${layer.w},c_fit` : '';
   
-  const positionParams = [gravity, position].filter(Boolean).join(',');
+  const positionParams = [gravity, position, widthParam].filter(Boolean).join(',');
   
-  // ✅ CRITICAL FIX: All parameters BEFORE /fl_layer_apply
-  return `${base}${styleParams ? ',' + styleParams : ''}${positionParams ? ',' + positionParams : ''}/fl_layer_apply`;
+  // ✅ TECHNIQUE DOUBLE LAYER: ombre noire décalée + texte coloré par-dessus
+  // Layer 1: Texte noir (ombre) décalé de 4px vers le bas
+  const shadowY = (layer.y || 0) + 4;
+  const shadowPosition = `x_${layer.x || 0},y_${shadowY}`;
+  const shadowGravity = layer.gravity ? `g_${layer.gravity}` : 'g_center';
+  const shadowPositionParams = [shadowGravity, shadowPosition, widthParam].filter(Boolean).join(',');
+  const shadowLayer = `l_text:${font}:${encodedText},co_rgb:000000${shadowPositionParams ? ',' + shadowPositionParams : ''}/fl_layer_apply`;
+  
+  // Layer 2: Texte coloré Brand Kit par-dessus
+  const textLayer = `l_text:${font}:${encodedText},co_rgb:${textColor}${positionParams ? ',' + positionParams : ''}/fl_layer_apply`;
+  
+  // Retourner les deux layers (ombre puis texte)
+  return `${shadowLayer}/${textLayer}`;
 }
 
 // ============= BRAND FONTS TYPE =============
