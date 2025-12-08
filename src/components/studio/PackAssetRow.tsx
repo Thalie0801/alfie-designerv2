@@ -64,6 +64,22 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
     setReferenceImage(asset.referenceImageUrl || "");
   }, [asset.referenceImageUrl]);
 
+  // ✅ Auto-initialiser les slides vides pour les carrousels
+  useEffect(() => {
+    if (asset.kind === "carousel" && (!asset.generatedTexts?.slides || asset.generatedTexts.slides.length === 0)) {
+      const slideCount = asset.count || 5;
+      const emptySlides = Array.from({ length: slideCount }, () => ({
+        title: "",
+        subtitle: "",
+        body: "",
+      }));
+      onEdit({
+        ...asset,
+        generatedTexts: { ...asset.generatedTexts, slides: emptySlides },
+      });
+    }
+  }, [asset.id, asset.kind]);
+
   const woofCost = WOOF_COSTS[asset.woofCostType];
   const totalCost = asset.kind === "carousel" ? woofCost * asset.count : woofCost;
 
