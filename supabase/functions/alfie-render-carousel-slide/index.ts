@@ -629,69 +629,50 @@ Deno.serve(async (req) => {
 
     let bgUrl: string | null = null;
 
-    // ✅ PRIORITÉ 1: Vertex AI Gemini 2.5
-    if (isVertexGeminiConfigured()) {
-      const vertexModel = getVertexCarouselModel(carouselMode);
-      console.log(`[render-slide] ${logCtx} 2/4 Trying Vertex AI Gemini ${vertexModel}...`);
-      
-      try {
-        const vertexImage = await callVertexGeminiImage(enrichedPrompt, vertexModel);
-        if (vertexImage) {
-          bgUrl = vertexImage;
-          console.log(`[render-slide] ${logCtx} ✅ Vertex AI Gemini succeeded`);
-        } else {
-          console.warn(`[render-slide] ${logCtx} ⚠️ Vertex AI Gemini returned no image`);
-        }
-      } catch (vertexErr) {
-        console.error(`[render-slide] ${logCtx} ❌ Vertex AI Gemini error:`, vertexErr);
-      }
-    }
-
-    // ✅ PRIORITÉ 2: Fallback Lovable AI
-    if (!bgUrl) {
-      const MODEL_IMAGE = carouselMode === 'premium' ? MODEL_IMAGE_PREMIUM : MODEL_IMAGE_STANDARD;
-      console.log(`[render-slide] ${logCtx} 2/4 Fallback to Lovable AI (${MODEL_IMAGE})...`);
-      
-      const aiRes = await fetchWithRetries(
-        "https://ai.gateway.lovable.dev/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: MODEL_IMAGE,
-            messages: [{ role: "user", content: enrichedPrompt }],
-            modalities: ["image", "text"],
-            size_hint: { width: size.w, height: size.h },
-          }),
+    // ✅ LOVABLE AI UNIQUEMENT - gemini-3-pro-image-preview n'existe PAS sur Vertex AI
+    // Vertex AI natif utilise Imagen 3, pas les modèles Gemini image
+    const selectedModel = carouselMode === 'premium' ? MODEL_IMAGE_PREMIUM : MODEL_IMAGE_STANDARD;
+    console.log(`[render-slide] ${logCtx} 2/4 Generating with Lovable AI (${selectedModel})...`);
+    
+    const aiRes = await fetchWithRetries(
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
         },
-        2
-      );
+        body: JSON.stringify({
+          model: selectedModel,
+          messages: [{ role: "user", content: enrichedPrompt }],
+          modalities: ["image", "text"],
+          size_hint: { width: size.w, height: size.h },
+        }),
+      },
+      2
+    );
 
-      if (aiRes.status === 429) {
-        console.error(`[render-slide] ${logCtx} ⏱️ Rate limit (429) after retries`);
-        return json({ error: "Rate limit exceeded, please try again shortly." }, 429);
-      }
-      if (aiRes.status === 402) {
-        console.error(`[render-slide] ${logCtx} 💳 Insufficient credits (402)`);
-        return json({ error: "Insufficient credits for AI generation" }, 402);
-      }
-      if (!aiRes.ok) {
-        const errTxt = await aiRes.text().catch(() => "");
-        console.error(`[render-slide] ${logCtx} ❌ AI error:`, aiRes.status, errTxt.slice(0, 600));
-        return json({ error: `Background generation failed (${aiRes.status})` }, 502);
-      }
-
-      const aiData = await aiRes.json().catch(() => ({}));
-      bgUrl =
-        aiData?.choices?.[0]?.message?.images?.[0]?.image_url?.url ||
-        aiData?.choices?.[0]?.message?.content?.[0]?.image_url?.url ||
-        aiData?.choices?.[0]?.message?.image_url?.url ||
-        aiData?.image_url?.url ||
-        null;
+    if (aiRes.status === 429) {
+      console.error(`[render-slide] ${logCtx} ⏱️ Rate limit (429) after retries`);
+      return json({ error: "Rate limit exceeded, please try again shortly." }, 429);
     }
+    if (aiRes.status === 402) {
+      console.error(`[render-slide] ${logCtx} 💳 Insufficient credits (402)`);
+      return json({ error: "Insufficient credits for AI generation" }, 402);
+    }
+    if (!aiRes.ok) {
+      const errTxt = await aiRes.text().catch(() => "");
+      console.error(`[render-slide] ${logCtx} ❌ AI error:`, aiRes.status, errTxt.slice(0, 600));
+      return json({ error: `Background generation failed (${aiRes.status})` }, 502);
+    }
+
+    const aiData = await aiRes.json().catch(() => ({}));
+    bgUrl =
+      aiData?.choices?.[0]?.message?.images?.[0]?.image_url?.url ||
+      aiData?.choices?.[0]?.message?.content?.[0]?.image_url?.url ||
+      aiData?.choices?.[0]?.message?.image_url?.url ||
+      aiData?.image_url?.url ||
+      null;
 
     if (!bgUrl) {
       console.error(`[render-slide] ${logCtx} ❌ No background URL from any AI provider`);
