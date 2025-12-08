@@ -10,6 +10,7 @@
 export const WOOF_COSTS = {
   image: 1,
   carousel_slide: 1,
+  carousel_slide_premium: 2, // Mode Premium (Gemini 3 Pro)
   video_premium: 25,
 } as const;
 
@@ -46,8 +47,10 @@ export function calculatePackWoofCost(
 
   return assetsToCount.reduce((total, asset) => {
     const baseCost = getWoofCost(asset.woofCostType);
-    // Pour les carrousels, multiplier par le nombre de slides
-    const multiplier = asset.woofCostType === "carousel_slide" ? (asset.count || 1) : 1;
+    // Pour les carrousels (standard et premium), multiplier par le nombre de slides
+    const multiplier = (asset.woofCostType === "carousel_slide" || asset.woofCostType === "carousel_slide_premium") 
+      ? (asset.count || 1) 
+      : 1;
     return total + baseCost * multiplier;
   }, 0);
 }
