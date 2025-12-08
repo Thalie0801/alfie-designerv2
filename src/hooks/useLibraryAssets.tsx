@@ -108,11 +108,16 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
   const [assets, setAssets] = useState<LibraryAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const MAX_RETRIES = 3;
 
   const fetchAssets = async (isRetry = false) => {
+    setErrorMessage(null);
+    
     if (!userId) {
       console.warn('[LibraryAssets] No userId provided');
+      setErrorMessage("Non connecté – veuillez vous reconnecter");
+      setLoading(false);
       return;
     }
     
@@ -121,15 +126,23 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
     
     try {
       // Get active brand
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('active_brand_id')
         .eq('id', userId)
         .single();
 
+      if (profileError) {
+        console.error('[LibraryAssets] Profile fetch error:', profileError);
+        setErrorMessage("Erreur de chargement du profil – reconnectez-vous");
+        setLoading(false);
+        return;
+      }
+
       const activeBrandId = profile?.active_brand_id;
       if (!activeBrandId) {
         console.warn('[useLibraryAssets] No active brand selected');
+        setErrorMessage("Aucune marque active – allez dans Brand Kit");
         setAssets([]);
         setLoading(false);
         return;
@@ -470,6 +483,7 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
   return {
     assets,
     loading,
+    errorMessage,
     deleteAsset,
     downloadAsset,
     downloadMultiple,

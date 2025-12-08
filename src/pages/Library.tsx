@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Download, Trash2, Eye, RefreshCw } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Search, Download, Trash2, Eye, RefreshCw, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useLibraryAssets } from '@/hooks/useLibraryAssets';
 import { AssetCard } from '@/components/library/AssetCard';
@@ -11,6 +12,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { AccessGuard } from '@/components/AccessGuard';
 import { CarouselsTab } from '@/components/library/CarouselsTab';
+import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 
 export default function Library() {
   const { user } = useAuth();
@@ -25,16 +28,50 @@ export default function Library() {
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { 
     assets, 
     loading, 
+    errorMessage,
     deleteAsset, 
     downloadAsset,
     downloadMultiple,
     cleanupProcessingVideos,
     refetch
   } = useLibraryAssets(user?.id, activeTab === 'carousels' ? 'images' : activeTab);
+
+  // Mobile session check on mount
+  useEffect(() => {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      supabase.auth.getSession().then(({ data, error }) => {
+        if (error || !data.session) {
+          console.warn('[Library] Mobile session invalid:', error);
+          toast.error("Session expirée – reconnectez-vous");
+        }
+      });
+    }
+  }, []);
+
+  // Loading timeout warning (10 seconds)
+  useEffect(() => {
+    if (loading) {
+      loadingTimeoutRef.current = setTimeout(() => {
+        toast.info("Chargement long… vérifiez votre connexion");
+      }, 10000);
+    } else {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
+    }
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
+  }, [loading]);
 
   // Auto cleanup when switching to videos tab
   useEffect(() => {
@@ -111,6 +148,14 @@ export default function Library() {
           Toutes vos créations en un seul endroit. Stockage 30 jours.
         </p>
       </div>
+
+      {/* Error Alert */}
+      {errorMessage && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'images' | 'videos' | 'carousels')}>
