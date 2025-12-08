@@ -81,20 +81,30 @@ function buildTextLayer(layer: TextLayer): string {
   return `${base}${styleParams ? ',' + styleParams : ''}${positionParams ? ',' + positionParams : ''}/fl_layer_apply`;
 }
 
+// ============= BRAND FONTS TYPE =============
+
+export type BrandFonts = {
+  primary?: string;
+  secondary?: string;
+};
+
 // ============= SLIDE TYPE MAPPERS =============
 
 /**
  * Generate text layers for hero slide (title + punchline + CTA + badge)
  * ✅ CENTERED: Textes centrés verticalement
+ * ✅ V8: Supports Brand Kit fonts
  */
-function layersForHero(slide: Slide, primaryColor: string, secondaryColor: string): TextLayer[] {
+function layersForHero(slide: Slide, primaryColor: string, secondaryColor: string, brandFonts?: BrandFonts): TextLayer[] {
   const layers: TextLayer[] = [];
+  const titleFont = brandFonts?.primary || 'Inter';
+  const bodyFont = brandFonts?.secondary || 'Inter';
   
   // Badge (centered above title)
   if (slide.badge) {
     layers.push({
       text: slide.badge.toUpperCase(),
-      font: 'Inter',
+      font: bodyFont,
       weight: 'Bold',
       size: 28,
       color: primaryColor,
@@ -105,16 +115,16 @@ function layersForHero(slide: Slide, primaryColor: string, secondaryColor: strin
     });
   }
   
-  // Main title (CENTERED vertically)
+  // Main title (CENTERED vertically) - Use Brand Kit primary color
   layers.push({
     text: slide.title,
-    font: 'Inter',
+    font: titleFont,
     weight: 'ExtraBold',
     size: 76,
-    color: 'ffffff',
-    outline: 20, // ✅ Plus épais pour contraste
+    color: primaryColor, // ✅ V8: Use brand primary color instead of white
+    outline: 20,
     gravity: 'center',
-    y: -40, // ✅ Légèrement au-dessus du centre
+    y: -40,
     w: 900
   });
   
@@ -122,13 +132,13 @@ function layersForHero(slide: Slide, primaryColor: string, secondaryColor: strin
   if (slide.punchline) {
     layers.push({
       text: slide.punchline,
-      font: 'Inter',
+      font: bodyFont,
       weight: 'Regular',
       size: 40,
       color: 'ffffff',
       outline: 12,
       gravity: 'center',
-      y: 80, // ✅ En dessous du titre centré
+      y: 80,
       w: 900
     });
   }
@@ -137,7 +147,7 @@ function layersForHero(slide: Slide, primaryColor: string, secondaryColor: strin
   if (slide.cta_primary) {
     layers.push({
       text: slide.cta_primary,
-      font: 'Inter',
+      font: titleFont,
       weight: 'Bold',
       size: 44,
       color: primaryColor,
@@ -154,20 +164,23 @@ function layersForHero(slide: Slide, primaryColor: string, secondaryColor: strin
 /**
  * Generate text layers for content slides (problem/solution/impact)
  * ✅ CENTERED: Title + bullets centrés verticalement
+ * ✅ V8: Supports Brand Kit fonts
  */
-function layersForContent(slide: Slide, primaryColor: string): TextLayer[] {
+function layersForContent(slide: Slide, primaryColor: string, brandFonts?: BrandFonts): TextLayer[] {
   const layers: TextLayer[] = [];
+  const titleFont = brandFonts?.primary || 'Inter';
+  const bodyFont = brandFonts?.secondary || 'Inter';
   
-  // Title (CENTERED, légèrement au-dessus)
+  // Title (CENTERED, légèrement au-dessus) - Use brand primary color
   layers.push({
     text: slide.title,
-    font: 'Inter',
+    font: titleFont,
     weight: 'ExtraBold',
     size: 68,
-    color: 'ffffff',
-    outline: 18, // ✅ Plus épais pour contraste
+    color: primaryColor, // ✅ V8: Use brand primary color
+    outline: 18,
     gravity: 'center',
-    y: -80, // ✅ Au-dessus du centre
+    y: -80,
     w: 900
   });
   
@@ -176,13 +189,13 @@ function layersForContent(slide: Slide, primaryColor: string): TextLayer[] {
     const bulletText = slide.bullets.map(b => `• ${b}`).join('\n');
     layers.push({
       text: bulletText,
-      font: 'Inter',
+      font: bodyFont,
       weight: 'Regular',
       size: 42,
       color: 'ffffff',
       outline: 12,
       gravity: 'center',
-      y: 80, // ✅ En dessous du titre
+      y: 80,
       w: 950
     });
   }
@@ -193,17 +206,20 @@ function layersForContent(slide: Slide, primaryColor: string): TextLayer[] {
 /**
  * Generate text layers for CTA slide
  * Title + subtitle + CTA + note
+ * ✅ V8: Supports Brand Kit fonts
  */
-function layersForCTA(slide: Slide, primaryColor: string): TextLayer[] {
+function layersForCTA(slide: Slide, primaryColor: string, brandFonts?: BrandFonts): TextLayer[] {
   const layers: TextLayer[] = [];
+  const titleFont = brandFonts?.primary || 'Inter';
+  const bodyFont = brandFonts?.secondary || 'Inter';
   
-  // Title (center-top)
+  // Title (center-top) - Use brand primary color
   layers.push({
     text: slide.title,
-    font: 'Inter',
+    font: titleFont,
     weight: 'ExtraBold',
     size: 72,
-    color: 'ffffff',
+    color: primaryColor, // ✅ V8: Use brand primary color
     outline: 16,
     gravity: 'center',
     y: -100,
@@ -214,7 +230,7 @@ function layersForCTA(slide: Slide, primaryColor: string): TextLayer[] {
   if (slide.subtitle) {
     layers.push({
       text: slide.subtitle,
-      font: 'Inter',
+      font: bodyFont,
       weight: 'Regular',
       size: 36,
       color: 'ffffff',
@@ -229,7 +245,7 @@ function layersForCTA(slide: Slide, primaryColor: string): TextLayer[] {
   if (slide.cta_primary) {
     layers.push({
       text: slide.cta_primary,
-      font: 'Inter',
+      font: titleFont,
       weight: 'Bold',
       size: 48,
       color: primaryColor,
@@ -244,7 +260,7 @@ function layersForCTA(slide: Slide, primaryColor: string): TextLayer[] {
   if (slide.note) {
     layers.push({
       text: slide.note,
-      font: 'Inter',
+      font: bodyFont,
       weight: 'Regular',
       size: 28,
       color: 'ffffff',
@@ -263,20 +279,23 @@ function layersForCTA(slide: Slide, primaryColor: string): TextLayer[] {
 /**
  * Generate text layers for CITATIONS carousel
  * ✅ CENTERED + CONTRAST: Citation centrée avec bon contraste
+ * ✅ V8: Supports Brand Kit fonts
  */
-function layersForCitation(slide: Slide): TextLayer[] {
+function layersForCitation(slide: Slide, primaryColor: string, brandFonts?: BrandFonts): TextLayer[] {
   const layers: TextLayer[] = [];
+  const titleFont = brandFonts?.primary || 'Inter';
+  const bodyFont = brandFonts?.secondary || 'Inter';
   
-  // Citation principale (CENTRÉE avec guillemets + contraste)
+  // Citation principale (CENTRÉE avec guillemets + contraste) - Use brand primary color
   layers.push({
     text: `"${slide.title}"`,
-    font: 'Inter',
+    font: titleFont,
     weight: 'Bold',
     size: 56,
-    color: 'ffffff',
-    outline: 16, // ✅ Plus épais pour contraste
+    color: primaryColor, // ✅ V8: Use brand primary color
+    outline: 16,
     gravity: 'center',
-    y: -30, // ✅ Centré verticalement
+    y: -30,
     w: 900
   });
   
@@ -284,10 +303,10 @@ function layersForCitation(slide: Slide): TextLayer[] {
   if (slide.author) {
     layers.push({
       text: `— ${slide.author}`,
-      font: 'Inter',
+      font: bodyFont,
       weight: 'Regular',
       size: 32,
-      color: 'ffffff', // ✅ Blanc au lieu de gris pour contraste
+      color: 'ffffff',
       outline: 10,
       gravity: 'center',
       y: 100,
@@ -301,6 +320,7 @@ function layersForCitation(slide: Slide): TextLayer[] {
 /**
  * Build complete carousel slide URL with text overlays
  * This is the NEW primary function to use for carousel rendering
+ * ✅ V8: Supports Brand Kit fonts and colors
  * ✅ Supporte carouselType: 'citations' ou 'content'
  */
 export function buildCarouselSlideUrl(
@@ -308,7 +328,8 @@ export function buildCarouselSlideUrl(
   slide: Slide,
   primaryColor: string,
   secondaryColor: string,
-  carouselType: CarouselType = 'content' // ✅ NOUVEAU paramètre
+  carouselType: CarouselType = 'content',
+  brandFonts?: BrandFonts // ✅ V8: Brand Kit fonts
 ): string {
   const CLOUD_NAME = Deno.env.get('CLOUDINARY_CLOUD_NAME')?.trim();
   if (!CLOUD_NAME) {
@@ -323,30 +344,31 @@ export function buildCarouselSlideUrl(
   
   // ✅ CITATIONS: uniquement citation + auteur
   if (carouselType === 'citations') {
-    layers = layersForCitation(slide);
-    console.log(`🎨 [buildCarouselSlideUrl] CITATIONS mode - title: "${slide.title.slice(0, 30)}..." author: "${slide.author || 'N/A'}"`);
+    layers = layersForCitation(slide, primaryColor, brandFonts);
+    console.log(`🎨 [buildCarouselSlideUrl] CITATIONS mode - title: "${slide.title.slice(0, 30)}..." author: "${slide.author || 'N/A'}" font: "${brandFonts?.primary || 'Inter'}"`);
   } else {
     // ✅ CONTENT: structure complète selon le type de slide
     switch (slide.type) {
       case 'hero':
-        layers = layersForHero(slide, primaryColor, secondaryColor);
+        layers = layersForHero(slide, primaryColor, secondaryColor, brandFonts);
         break;
       case 'problem':
       case 'solution':
       case 'impact':
-        layers = layersForContent(slide, primaryColor);
+        layers = layersForContent(slide, primaryColor, brandFonts);
         break;
       case 'cta':
-        layers = layersForCTA(slide, primaryColor);
+        layers = layersForCTA(slide, primaryColor, brandFonts);
         break;
       default:
-        // Fallback: simple centered title
+        // Fallback: simple centered title with brand font
+        const titleFont = brandFonts?.primary || 'Inter';
         layers = [{
           text: slide.title,
-          font: 'Inter',
+          font: titleFont,
           weight: 'ExtraBold',
           size: 68,
-          color: 'ffffff',
+          color: primaryColor, // ✅ V8: Use brand primary color
           outline: 14,
           gravity: 'center',
           w: 900
@@ -360,7 +382,7 @@ export function buildCarouselSlideUrl(
   // Final URL with quality params
   const url = `${baseUrl}/${overlays}/f_png,q_auto,cs_srgb/${backgroundPublicId}.png`;
   
-  console.log(`🎨 [buildCarouselSlideUrl] Generated URL for ${carouselType}/${slide.type} slide (${layers.length} layers)`);
+  console.log(`🎨 [buildCarouselSlideUrl] Generated URL for ${carouselType}/${slide.type} slide (${layers.length} layers, font: ${brandFonts?.primary || 'Inter'})`);
   
   return url;
 }

@@ -3,7 +3,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { uploadTextAsRaw } from "../_shared/cloudinaryUploader.ts";
-import { buildCarouselSlideUrl, Slide, CarouselType } from "../_shared/imageCompositor.ts";
+import { buildCarouselSlideUrl, Slide, CarouselType, BrandFonts } from "../_shared/imageCompositor.ts";
 import { getCarouselModel, getVertexCarouselModel, LOVABLE_MODELS } from "../_shared/aiModels.ts";
 import { callVertexGeminiImage, isVertexGeminiConfigured } from "../_shared/vertexGeminiImage.ts";
 import { 
@@ -33,6 +33,7 @@ interface BrandKit {
   visual_mood?: string[];
   avoid_in_visuals?: string;
   palette?: string[];
+  fonts?: { primary?: string; secondary?: string }; // ✅ V8: Brand Kit fonts
 }
 
 interface SlideRequest {
@@ -188,17 +189,16 @@ function truncateText(text: string, maxChars: number): string {
 }
 
 /**
- * Build prompt for PREMIUM mode - TEXT INTEGRATED NATIVELY
- * ✅ V7: Gemini 3 Pro génère l'image AVEC le texte intégré artistiquement
- * ✅ Pas d'overlay SVG - typographie native AI
+ * Build prompt for PREMIUM mode - BACKGROUND ONLY (NO TEXT)
+ * ✅ V8: Gemini 3 Pro génère un fond haute qualité SANS AUCUN texte
+ * ✅ Le texte est ajouté ensuite via Cloudinary overlay avec fonts du Brand Kit
  */
-function buildImagePromptPremiumWithText(
+function buildImagePromptPremium(
   userPrompt: string,
   brandKit: BrandKit | undefined,
   useBrandKit: boolean,
   slideIndex: number,
   totalSlides: number,
-  slideContent: { title: string; subtitle?: string; body?: string },
   referenceImageUrl?: string | null
 ): string {
   // ✅ Style visuel enrichi par le Brand Kit V2
@@ -241,62 +241,32 @@ Use the provided reference image as style inspiration.
 Match its color palette, composition style, and overall aesthetic.` : "";
 
   const slideRole = getSlideRole(slideIndex, totalSlides);
-  
-  // ✅ Construire les instructions texte
-  const textInstructions: string[] = [];
-  if (slideContent.title) {
-    textInstructions.push(`TITRE : "${slideContent.title}"`);
-  }
-  if (slideContent.subtitle) {
-    textInstructions.push(`SOUS-TITRE : "${slideContent.subtitle}"`);
-  }
-  if (slideContent.body) {
-    textInstructions.push(`CORPS : "${slideContent.body}"`);
-  }
 
-  return `Crée une image sociale media professionnelle avec texte intégré.
+  return `Generate a premium social media BACKGROUND IMAGE for carousel slide.
 
-=== FOND VISUEL ===
-THÈME: ${userPrompt}
+=== VISUAL BACKGROUND ONLY (ABSOLUTELY NO TEXT) ===
+THEME: ${userPrompt}
 STYLE: ${visualStyle}
 SLIDE ROLE: ${slideRole} (slide ${slideIndex + 1}/${totalSlides})
 ${referenceInstruction}
 
-=== TEXTE À INTÉGRER EXACTEMENT (copier-coller, pas un mot de plus) ===
-${textInstructions.join('\n')}
+=== COMPOSITION REQUIREMENTS ===
+- Create a stunning, professional background
+- Leave clean central area for text overlay (added separately)
+- Subtle 3D elements, gradients, abstract shapes
+- High-quality visual elements matching the theme
+- Elegant, modern social media aesthetic
 
-=== RÈGLES DE POSITIONNEMENT STRICTES ===
-1. MARGES OBLIGATOIRES : minimum 15% de marge à GAUCHE et à DROITE
-2. Zone de texte = 70% de la largeur MAXIMUM, CENTRÉE horizontalement
-3. Le texte ne doit JAMAIS toucher les bords de l'image
-4. Si un texte est trop long, le COUPER EN PLUSIEURS LIGNES (jamais dépasser la zone)
-5. Positionné dans la MOITIÉ SUPÉRIEURE (25-45% du haut de l'image)
-6. Titre centré en haut, sous-titre/corps en dessous avec interligne généreux
+=== ABSOLUTE PROHIBITION (CRITICAL) ===
+❌ ZERO TEXT in the image
+❌ No letters, no words, no numbers, no labels
+❌ No typography whatsoever
+❌ No quotes, no titles, no captions
+❌ Text will be added EXTERNALLY by a separate system
 
-=== RÈGLES TYPOGRAPHIQUES ABSOLUES ===
-1. Reproduire le texte EXACTEMENT comme écrit ci-dessus, lettre par lettre
-2. JAMAIS de mots collés (ex: "IApour" est INTERDIT, écrire "IA pour")
-3. Police BLANCHE (#FFFFFF) avec OMBRE NOIRE épaisse (8px offset, 15px blur)
-4. Titre : MAXIMUM 8-10 mots par ligne, sinon couper sur 2 lignes
-5. Sous-titre/corps : MAXIMUM 12 mots par ligne
-6. Adapter la TAILLE de police à la longueur du texte (texte long = police plus petite)
-7. TOUT le texte en FRANÇAIS uniquement
+${avoid ? `ELEMENTS TO AVOID: ${avoid}` : ""}
 
-=== INTERDICTIONS ABSOLUES (CRITIQUE) ===
-❌ JAMAIS afficher le texte 2 fois (pas de texte en arrière-plan/filigrane)
-❌ Le texte doit apparaître UNE SEULE FOIS, net et lisible
-❌ Pas d'effet "ombre de texte" qui duplique visuellement le texte
-❌ Pas de texte "fantôme" en fond
-❌ Mots collés sans espaces
-❌ Texte en anglais
-❌ Texte tronqué, coupé par les bords, ou incomplet
-❌ Texte en bas de l'image (doit être dans le TOP 50%)
-❌ Texte sans contraste (difficilement lisible)
-❌ Texte qui déborde de la zone centrale 70%
-
-${avoid ? `ÉLÉMENTS À ÉVITER: ${avoid}` : ""}
-
-OUTPUT: Image professionnelle avec texte UNE SEULE FOIS, bien centré dans les marges, parfaitement lisible.`;
+OUTPUT: Pure visual background with ZERO text. Only abstract visuals and colors.`;
 }
 
 /**
@@ -631,17 +601,18 @@ Deno.serve(async (req) => {
     // STEP 2/4 — Générer background (Vertex AI Gemini priorité)
     // =========================================
     
-    // ✅ V7: Standard = background only + overlay, Premium = texte intégré nativement
+    // ✅ V8: Standard = Gemini Flash + overlay, Premium = Gemini 3 Pro + overlay (same overlay logic)
     const normBody = String(slideContent.body || "").trim().slice(0, 200);
     
+    // ✅ V8: BOTH modes now generate background-only images (NO TEXT)
+    // Text is added via Cloudinary overlay with Brand Kit fonts/colors
     const enrichedPrompt = carouselMode === 'premium'
-      ? buildImagePromptPremiumWithText(
+      ? buildImagePromptPremium(
           prompt,     // ✅ Thème utilisateur
           brandKit,   // ✅ Brand Kit V2 complet
           useBrandKit,
           slideIndex,
           totalSlides,
-          { title: normTitle, subtitle: normSubtitle, body: normBody }, // ✅ Texte à intégrer
           referenceImageUrl // ✅ Image de référence
         )
       : buildImagePromptStandard(
@@ -778,54 +749,55 @@ Deno.serve(async (req) => {
     });
 
     // =========================================
-    // STEP 3.5 — Apply text overlay
+    // STEP 3.5 — Apply text overlay (BOTH modes now use Cloudinary overlay)
     // =========================================
     let finalUrl = cloudinarySecureUrl;
     
-    if (carouselMode === 'standard') {
-      // ✅ STANDARD MODE: Cloudinary text overlay (existing approach)
-      console.log(`[render-slide] ${logCtx} 3.5/4 Applying Cloudinary text overlay (Standard mode, type=${carouselType})`);
-      
-      // Déterminer le type de slide pour l'overlay
-      const slideType = slideIndex === 0 ? 'hero' 
-        : slideIndex === totalSlides - 1 ? 'cta'
-        : slideIndex === 1 ? 'problem'
-        : slideIndex === totalSlides - 2 ? 'solution'
-        : 'impact';
-      
-      // ✅ Pour CITATIONS: forcer subtitle/bullets à vide, même si passés
-      const slideData: Slide = {
-        type: slideType,
-        title: normTitle,
-        subtitle: carouselType === 'citations' ? undefined : (normSubtitle || undefined),
-        bullets: carouselType === 'citations' ? undefined : (normBullets.length > 0 ? normBullets : undefined),
-        cta: slideType === 'cta' ? normTitle : undefined,
-        author: slideContent.author || undefined, // ✅ Auteur pour les citations
-      };
-      
-      // Couleurs pour l'overlay (blanc par défaut)
-      const primaryColor = 'ffffff';
-      const secondaryColor = 'cccccc';
-      
-      try {
-        finalUrl = buildCarouselSlideUrl(
-          cloudinaryPublicId,
-          slideData,
-          primaryColor,
-          secondaryColor,
-          carouselType // ✅ Passer le type de carrousel
-        );
-        console.log(`[render-slide] ${logCtx}   ↳ overlay URL: ${finalUrl?.slice(0, 150)}...`);
-      } catch (overlayErr) {
-        console.warn(`[render-slide] ${logCtx} ⚠️ Overlay failed, using base image:`, overlayErr);
-        // En cas d'erreur, utiliser l'image de base
-        finalUrl = cloudinarySecureUrl;
-      }
-    } else {
-      // ✅ PREMIUM MODE V7: Texte intégré nativement par Lovable AI (pas de SVG)
-      console.log(`[render-slide] ${logCtx} 3.5/4 Premium mode: text already integrated in image (no overlay needed)`);
-      // L'image générée contient déjà le texte intégré nativement
-      // Pas besoin d'overlay supplémentaire
+    // ✅ V8: Extract Brand Kit fonts and colors for overlay
+    const brandFonts: BrandFonts = {
+      primary: brandKit?.fonts?.primary || 'Inter',
+      secondary: brandKit?.fonts?.secondary || 'Inter'
+    };
+    
+    // ✅ V8: Extract primary color from Brand Kit palette (or default to white)
+    const brandPrimaryColor = brandKit?.palette?.[0]?.replace('#', '') || 'ffffff';
+    const brandSecondaryColor = brandKit?.palette?.[1]?.replace('#', '') || 'cccccc';
+    
+    console.log(`[render-slide] ${logCtx} 3.5/4 Applying Cloudinary text overlay (${carouselMode} mode, type=${carouselType})`);
+    console.log(`[render-slide] ${logCtx}   ↳ Brand fonts: primary="${brandFonts.primary}", secondary="${brandFonts.secondary}"`);
+    console.log(`[render-slide] ${logCtx}   ↳ Brand colors: primary=#${brandPrimaryColor}, secondary=#${brandSecondaryColor}`);
+    
+    // Déterminer le type de slide pour l'overlay
+    const slideType = slideIndex === 0 ? 'hero' 
+      : slideIndex === totalSlides - 1 ? 'cta'
+      : slideIndex === 1 ? 'problem'
+      : slideIndex === totalSlides - 2 ? 'solution'
+      : 'impact';
+    
+    // ✅ Pour CITATIONS: forcer subtitle/bullets à vide, même si passés
+    const slideData: Slide = {
+      type: slideType,
+      title: normTitle,
+      subtitle: carouselType === 'citations' ? undefined : (normSubtitle || undefined),
+      bullets: carouselType === 'citations' ? undefined : (normBullets.length > 0 ? normBullets : undefined),
+      cta: slideType === 'cta' ? normTitle : undefined,
+      author: slideContent.author || undefined, // ✅ Auteur pour les citations
+    };
+    
+    try {
+      // ✅ V8: Apply overlay with Brand Kit fonts and colors (BOTH modes)
+      finalUrl = buildCarouselSlideUrl(
+        cloudinaryPublicId,
+        slideData,
+        brandPrimaryColor,    // ✅ Brand Kit primary color
+        brandSecondaryColor,  // ✅ Brand Kit secondary color
+        carouselType,         // ✅ citations or content
+        brandFonts            // ✅ Brand Kit fonts
+      );
+      console.log(`[render-slide] ${logCtx}   ↳ overlay URL: ${finalUrl?.slice(0, 150)}...`);
+    } catch (overlayErr) {
+      console.warn(`[render-slide] ${logCtx} ⚠️ Overlay failed, using base image:`, overlayErr);
+      // En cas d'erreur, utiliser l'image de base
       finalUrl = cloudinarySecureUrl;
     }
 
