@@ -983,6 +983,8 @@ NO TEXT whatsoever - no letters, words, numbers, labels in the image.`
       });
     }
 
+    // ✅ CORRECTION: Sauvegarder l'URL de BASE (sans overlays) dans cloudinary_url
+    // Les images doivent être téléchargeables sans problème de fonts Cloudinary
     const { error: insertErr } = await supabaseAdmin.from("library_assets").insert({
       user_id: userId,
       brand_id: brandId,
@@ -993,7 +995,7 @@ NO TEXT whatsoever - no letters, words, numbers, labels in the image.`
       slide_index: slideIndex,
       format: normalizedAR,
       campaign,
-      cloudinary_url: finalUrl,           // ✅ URL finale (avec ou sans overlay selon le mode)
+      cloudinary_url: cloudinarySecureUrl,  // ✅ CORRECTION: URL de BASE (sans overlay)
       cloudinary_public_id: cloudinaryPublicId,
       text_json: {
         title: normTitle,
@@ -1004,12 +1006,12 @@ NO TEXT whatsoever - no letters, words, numbers, labels in the image.`
         text_public_id: textPublicId,
         text_version: textVersion,
         render_version: renderVersion,
-        carousel_mode: carouselMode,      // ✅ Enregistrer le mode utilisé
+        carousel_mode: carouselMode,
       },
       metadata: {
         ...uploadMeta,
         cloudinary_base_url: cloudinarySecureUrl,   // ✅ URL de base (sans overlay)
-        cloudinary_overlay_url: carouselMode === 'standard' ? finalUrl : null, // ✅ URL avec overlay
+        cloudinary_overlay_url: finalUrl,           // ✅ URL avec overlay (pour référence)
         original_public_id: cloudinaryPublicId,
         totalSlides,
         aspectRatio: normalizedAR,

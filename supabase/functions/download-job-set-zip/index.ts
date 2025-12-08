@@ -284,8 +284,10 @@ Deno.serve(async (req) => {
     for (const slide of slides) {
       const meta = (slide.metadata as any) || {};
       
-      // ✅ Utiliser directement l'image de base (plus d'overlays)
-      let imageUrl = slide.cloudinary_url || meta.cloudinary_base_url;
+      // ✅ CORRECTION: Prioriser cloudinary_base_url (image brute SANS overlays)
+      // meta.cloudinary_base_url = image de fond pure
+      // slide.cloudinary_url = peut contenir des overlays texte qui cassent parfois
+      let imageUrl = meta.cloudinary_base_url || slide.cloudinary_url;
 
       if (!imageUrl) {
         console.warn(`[download-zip] ⚠️ No URL found for slide ${slide.id}`);
