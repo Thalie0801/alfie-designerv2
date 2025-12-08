@@ -94,18 +94,27 @@ export async function renderSlideToSVG(
     const lines = wrapText(text, safeMaxWidth, layer.size);
     
     lines.slice(0, layer.maxLines).forEach((line, i) => {
-      const y = layer.position.y + i * (layer.size * 1.2);
+      const y = layer.position.y + i * (layer.size * 1.3); // ✅ Line height 1.3 pour meilleure lisibilité
       const x = width / 2;
       
-      // ✅ FIX: Contraste automatique (stroke blanc sur texte sombre, noir sur texte clair)
-      const textLum = relativeLuminance(textColor);
-      const strokeColor = textLum > 0.5 ? '#000000' : '#FFFFFF';
-      const strokeWidth = textLum > 0.5 ? 4 : 3;
+      // ✅ FIX CONTRASTE: Stroke épais + ombre portée pour visibilité maximale
+      const strokeColor = '#000000'; // ✅ Toujours noir pour contraste sur fond variable
+      const strokeWidth = layer.type === 'title' ? 8 : 5; // ✅ Stroke épais (8px titre, 5px autres)
+      const shadowBlur = layer.type === 'title' ? 12 : 8;
+      
+      // ✅ Filtre drop-shadow pour effet d'ombre portée
+      const filterId = `shadow_${layer.id}_${i}`;
+      svg += `<defs>
+        <filter id="${filterId}" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="3" dy="3" stdDeviation="${shadowBlur}" flood-color="#000000" flood-opacity="0.7"/>
+        </filter>
+      </defs>`;
       
       svg += `<text x="${x}" y="${y}"
         font-family="${fontFamily}" font-size="${layer.size}" font-weight="${layer.weight}"
         fill="${textColor}" text-anchor="middle" 
-        stroke="${strokeColor}" stroke-opacity="0.4" stroke-width="${strokeWidth}" 
+        stroke="${strokeColor}" stroke-opacity="0.8" stroke-width="${strokeWidth}" 
+        filter="url(#${filterId})"
         style="paint-order: stroke fill">
         ${escapeXml(line)}
       </text>`;
