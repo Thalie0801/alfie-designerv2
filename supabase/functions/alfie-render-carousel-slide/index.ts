@@ -127,7 +127,7 @@ function getSlideRole(index: number, total: number): string {
 /**
  * Build prompt for STANDARD mode (PURE IMAGE ONLY - NO TEXT AT ALL)
  * Text is added AFTER via Cloudinary overlay
- * ✅ NE CONTIENT AUCUN TEXTE UTILISATEUR - uniquement des descriptions visuelles abstraites
+ * ✅ ADAPTATIF: utilise le Brand Kit (niche, visual_types, visual_mood) pour le style
  */
 function buildImagePromptStandard(
   globalStyle: string, 
@@ -135,48 +135,69 @@ function buildImagePromptStandard(
   useBrandKit: boolean,
   slideContent: { title: string; subtitle?: string; alt: string },
   slideIndex: number,
-  totalSlides: number
+  totalSlides: number,
+  brandKit?: BrandKit // ✅ NEW: Brand Kit pour personnalisation
 ): string {
-  // ✅ EXTRAIRE UNIQUEMENT LES CONCEPTS VISUELS, pas le texte brut
-  const extractVisualConcept = (rawPrompt: string): string => {
-    if (!rawPrompt) return "modern professional design";
-    
-    const visualKeywords = rawPrompt.toLowerCase().match(
-      /(tech|ia|ai|business|marketing|social|digital|créatif|innovation|productivité|santé|bien-être|nature|voyage|food|cuisine|fitness|mode|fashion|beauté|immobilier|finance|éducation|musique|art|sport)/gi
-    );
-    
-    if (visualKeywords && visualKeywords.length > 0) {
-      return `${visualKeywords[0]} themed visual, modern aesthetic`;
+  // ✅ Déterminer le style visuel basé sur le Brand Kit
+  let visualStyle = "modern professional design";
+  let colorScheme = "rich saturated colors with gradients";
+  let visualElements = "soft 3D geometric elements, glowing orbs, smooth shapes";
+  
+  if (useBrandKit && brandKit) {
+    // Adapter au visual_types du Brand Kit
+    const visualType = brandKit.visual_types?.[0];
+    if (visualType === "illustrations_3d") {
+      visualElements = "3D rendered objects with depth and lighting, floating elements";
+    } else if (visualType === "illustrations_2d") {
+      visualElements = "flat 2D illustration style with clean shapes";
+    } else if (visualType === "photos") {
+      visualElements = "photorealistic professional imagery";
+    } else if (visualType === "doodle") {
+      visualElements = "hand-drawn doodle style sketches";
+    } else if (visualType === "mockups") {
+      visualElements = "professional product mockup style";
     }
     
-    return "modern professional design";
-  };
+    // Adapter au visual_mood
+    const mood = brandKit.visual_mood?.[0];
+    if (mood === "coloré") colorScheme = "vibrant bold saturated colors";
+    else if (mood === "minimaliste") colorScheme = "clean minimal color palette, negative space";
+    else if (mood === "pastel") colorScheme = "soft pastel colors, gentle tones";
+    else if (mood === "contrasté") colorScheme = "high contrast dramatic colors";
+    else if (mood === "lumineux") colorScheme = "bright luminous colors with glow effects";
+    else if (mood === "sombre") colorScheme = "deep dark tones with accent highlights";
+    
+    // Adapter au niche/secteur
+    if (brandKit.niche) {
+      visualStyle = `${brandKit.niche} industry aesthetic`;
+    }
+  }
   
-  const visualConcept = extractVisualConcept(prompt);
+  // Extraire le thème du prompt utilisateur
+  const theme = prompt?.trim() || "professional social media content";
   
-  const styleHint = useBrandKit && globalStyle 
-    ? globalStyle 
-    : "soft gradient background, pastel colors";
+  // Style hint du globalStyle si disponible
+  const additionalStyle = (useBrandKit && globalStyle) ? `, ${globalStyle}` : "";
   
-  // ✅ PROMPT SIMPLIFIÉ ET RENFORCÉ POUR FORCER DES COULEURS
-  return `Create a VIBRANT, COLORFUL abstract background image.
+  return `Create a VIBRANT, COLORFUL background image for social media.
 
-THEME: ${visualConcept}
-STYLE: ${styleHint}
+THEME: ${theme}
+INDUSTRY: ${visualStyle}${additionalStyle}
+COLOR SCHEME: ${colorScheme}
+VISUAL ELEMENTS: ${visualElements}
 
 CRITICAL REQUIREMENTS:
-- Generate a RICH, COLORFUL image with visible gradients and shapes
-- Use bold colors: blues, purples, pinks, teals, oranges - NO WHITE BACKGROUND
-- Include soft 3D geometric elements, glowing orbs, smooth gradients
-- Modern, professional social media aesthetic
+- Generate a RICH, COLORFUL image - NOT white, NOT blank, NOT empty
+- Image must reflect the THEME: ${theme}
+- Modern social media aesthetic with depth and dimension
 - Leave clean central area for text overlay
 
 ABSOLUTE RULES:
-- Image MUST be colorful and vibrant - NOT white, NOT blank, NOT empty
 - NO TEXT whatsoever - no letters, words, numbers, labels
-- Only abstract visual elements with saturated colors
+- NO white/empty backgrounds - always colorful
+- Match the visual style to the industry/theme
 
-OUTPUT: A beautiful, colorful abstract background with NO text.`
+OUTPUT: A beautiful, thematic background image with NO text.`
 }
 
 /**
@@ -666,7 +687,8 @@ Deno.serve(async (req) => {
           useBrandKit,
           { title: normTitle, subtitle: normSubtitle, alt: slideContent.alt },
           slideIndex,
-          totalSlides
+          totalSlides,
+          brandKit // ✅ Pass Brand Kit for adaptive styling
         );
     
     console.log(`[render-slide] ${logCtx} 🎨 Mode: ${carouselMode}, hasText: ${!!normTitle && normTitle !== "Titre par défaut"}, hasRef: ${!!referenceImageUrl}`);
