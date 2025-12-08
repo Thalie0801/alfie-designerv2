@@ -302,7 +302,12 @@ Match its color palette, composition style, and overall aesthetic.` : "";
 
   return `Create ONE premium social media slide image for a carousel.
 
-VISUAL CONCEPT: ${userPrompt}
+=== CRITICAL INSTRUCTION ===
+DO NOT display the following words as text in the image: "${userPrompt}"
+This is only the VISUAL THEME/CONCEPT - use it to inspire the background design ONLY.
+The ONLY text that should appear in the image is specified below in TEXT TO INTEGRATE section.
+
+VISUAL CONCEPT (for background inspiration ONLY, NOT for display): ${userPrompt}
 STYLE: ${visualStyle}
 
 ${languageForce}
