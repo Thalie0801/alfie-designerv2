@@ -270,6 +270,11 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     toast.success("Tous les textes copiés !");
   }, []);
 
+  // Vérifier si le carrousel a des textes
+  const hasTexts = useCallback((carouselSlides: CarouselSlide[]) => {
+    return carouselSlides.some((s) => s.text_json && (s.text_json.title || s.text_json.body));
+  }, []);
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -289,11 +294,6 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
       </div>
     );
   }
-
-  // Vérifier si le carrousel a des textes
-  const hasTexts = useCallback((carouselSlides: CarouselSlide[]) => {
-    return carouselSlides.some((s) => s.text_json && (s.text_json.title || s.text_json.body));
-  }, []);
 
   return (
     <div className="space-y-8">
