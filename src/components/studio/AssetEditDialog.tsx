@@ -115,8 +115,8 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
     }
   };
 
-  const woofCost = WOOF_COSTS[formData.woofCostType];
-  const totalCost = formData.kind === "carousel" ? woofCost * formData.count : woofCost;
+  // Carrousels = coût fixe de 10 Woofs, sinon utiliser la map
+  const totalCost = formData.kind === "carousel" ? 10 : (WOOF_COSTS[formData.woofCostType as keyof typeof WOOF_COSTS] || 1);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -138,7 +138,7 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                 const newKind = value as PackAsset["kind"];
                 const newWoofCostType = 
                   newKind === "image" ? "image" :
-                  newKind === "carousel" ? "carousel_slide" :
+                  newKind === "carousel" ? "carousel" :
                   "video_premium";
                 
                 const fixedDuration = newKind === "video_premium" ? 6 : undefined;
@@ -146,7 +146,7 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                   ...formData, 
                   kind: newKind,
                   woofCostType: newWoofCostType,
-                  count: newKind === "carousel" ? (formData.count || 5) : 1,
+                  count: newKind === "carousel" ? 5 : 1, // Carrousels = toujours 5 slides
                   durationSeconds: fixedDuration
                 });
               }}
@@ -317,46 +317,14 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
           )}
 
           {/* Carousel Mode (Standard vs Premium) */}
+          {/* Note: Les carrousels sont maintenant disponibles uniquement via le Chat Alfie */}
           {formData.kind === "carousel" && (
-            <div className="space-y-2">
-              <Label>Mode de génération</Label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setFormData({ 
-                    ...formData, 
-                    carouselMode: 'standard',
-                    woofCostType: 'carousel_slide'
-                  })}
-                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                    (formData.carouselMode || 'standard') === 'standard'
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-muted/50 hover:bg-muted border-border'
-                  }`}
-                >
-                  Standard (1🐶/slide)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ 
-                    ...formData, 
-                    carouselMode: 'premium',
-                    woofCostType: 'carousel_slide_premium'
-                  })}
-                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                    formData.carouselMode === 'premium'
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-muted/50 hover:bg-muted border-border'
-                  }`}
-                >
-                  ✨ Premium (2🐶/slide)
-                </button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {formData.carouselMode === 'premium' 
-                  ? "Gemini 3 Pro intègre le texte directement dans l'image"
-                  : "Texte ajouté en overlay sur l'image générée"
-                }
+            <div className="p-3 bg-muted/50 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                📱 <strong>Carrousel (5 slides)</strong> — Coût fixe : 10 Woofs
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Alfie génère 5 images de fond + les textes affichés dans le chat.
               </p>
             </div>
           )}

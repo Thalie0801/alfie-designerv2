@@ -93,10 +93,9 @@ Deno.serve(async (req) => {
       return json({ jobSetId: reuse?.id });
     }
 
-    // 2) Vérifier et consommer les Woofs (coût selon le mode)
-    const slideWoofCost = carouselMode === 'premium' ? WOOF_COSTS.carousel_slide_premium : WOOF_COSTS.carousel_slide;
-    const totalWoofsCost = count * slideWoofCost;
-    console.log(`[CreateCarousel] Checking ${totalWoofsCost} Woofs for ${count} slides (mode: ${carouselMode}, brand: ${brandId})`);
+    // 2) Vérifier et consommer les Woofs (coût fixe de 10 Woofs par carrousel)
+    const totalWoofsCost = WOOF_COSTS.carousel; // 10 Woofs fixe
+    console.log(`[CreateCarousel] Checking ${totalWoofsCost} Woofs for carousel (brand: ${brandId})`);
     
     const { data: woofsData, error: woofsError } = await adminClient.functions.invoke(
       "woofs-check-consume",

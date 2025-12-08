@@ -68,7 +68,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
   );
   const [isGenerating, setIsGenerating] = useState(false);
   const [useBrandKit, setUseBrandKit] = useState(true); // ✅ Phase 2: Toggle Brand Kit
-  const [carouselMode, setCarouselMode] = useState<'standard' | 'premium'>('standard'); // ✅ Toggle Standard/Premium carrousels
+  // carouselMode supprimé - carrousels ont maintenant un coût fixe de 10 Woofs
   const [colorMode, setColorMode] = useState<'vibrant' | 'pastel'>('vibrant'); // ✅ Toggle Coloré/Pastel
   const [audioSettings, setAudioSettings] = useState<Record<string, boolean>>(() => {
     // Par défaut, audio activé pour toutes les vidéos
@@ -136,18 +136,15 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
   // Calculer le coût dynamique selon la sélection (utilise localAssets)
   const localPack = useMemo(() => ({ ...pack, assets: localAssets }), [pack, localAssets]);
   
-  // ✅ FIX: Calculer le coût en injectant carouselMode pour les carrousels
+  // Calculer le coût - carrousel = 10 Woofs fixe
   const totalWoofs = useMemo(() => {
     const assetsWithMode = localAssets.map(asset => ({
       ...asset,
-      // ✅ Appliquer le mode Premium aux carrousels pour calcul correct
-      woofCostType: asset.kind === 'carousel' 
-        ? (carouselMode === 'premium' ? 'carousel_slide_premium' : 'carousel_slide')
-        : asset.woofCostType,
+      woofCostType: asset.kind === 'carousel' ? 'carousel' as const : asset.woofCostType,
     }));
     const packWithMode = { ...pack, assets: assetsWithMode };
     return safeWoofs(calculatePackWoofCost(packWithMode, Array.from(selectedAssetIds)));
-  }, [localAssets, pack, selectedAssetIds, carouselMode]);
+  }, [localAssets, pack, selectedAssetIds]);
 
   // Toggle checkbox
   const toggleAsset = (assetId: string) => {
@@ -279,12 +276,9 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         // ✅ Utiliser les textes existants du pack sans appeler alfie-generate-texts
         assetsWithTexts = localAssets.map((asset) => ({
           ...asset,
-          useBrandKit, // ✅ Propager useBrandKit du toggle
-          carouselMode: asset.kind === 'carousel' ? carouselMode : undefined, // ✅ Propager carouselMode
-          woofCostType: asset.kind === 'carousel' 
-            ? (carouselMode === 'premium' ? 'carousel_slide_premium' : 'carousel_slide')
-            : asset.woofCostType, // ✅ Propager woofCostType correct
-          withAudio: asset.kind === 'video_premium' ? audioSettings[asset.id] : undefined, // ✅ Propager audio setting
+          useBrandKit,
+          woofCostType: asset.kind === 'carousel' ? 'carousel' as const : asset.woofCostType,
+          withAudio: asset.kind === 'video_premium' ? audioSettings[asset.id] : undefined,
         }));
       } else if (textsError || !textsData?.texts) {
         console.warn("[PackPreparationModal] Text generation failed, using fallback texts:", textsError);
@@ -292,12 +286,9 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         // Générer des textes par défaut localement
         assetsWithTexts = localAssets.map((asset) => ({
           ...asset,
-          useBrandKit, // ✅ Propager useBrandKit du toggle
-          carouselMode: asset.kind === 'carousel' ? carouselMode : undefined, // ✅ Propager carouselMode
-          woofCostType: asset.kind === 'carousel' 
-            ? (carouselMode === 'premium' ? 'carousel_slide_premium' : 'carousel_slide')
-            : asset.woofCostType, // ✅ Propager woofCostType correct
-          withAudio: asset.kind === 'video_premium' ? audioSettings[asset.id] : undefined, // ✅ Propager audio setting
+          useBrandKit,
+          woofCostType: asset.kind === 'carousel' ? 'carousel' as const : asset.woofCostType,
+          withAudio: asset.kind === 'video_premium' ? audioSettings[asset.id] : undefined,
           generatedTexts: generateFallbackTexts(asset, localPack.title),
         }));
         
@@ -306,12 +297,9 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         console.log("[PackPreparationModal] ✅ Texts generated:", textsData);
         assetsWithTexts = localAssets.map((asset) => ({
           ...asset,
-          useBrandKit, // ✅ Propager useBrandKit du toggle
-          carouselMode: asset.kind === 'carousel' ? carouselMode : undefined, // ✅ Propager carouselMode
-          woofCostType: asset.kind === 'carousel' 
-            ? (carouselMode === 'premium' ? 'carousel_slide_premium' : 'carousel_slide')
-            : asset.woofCostType, // ✅ Propager woofCostType correct
-          withAudio: asset.kind === 'video_premium' ? audioSettings[asset.id] : undefined, // ✅ Propager audio setting
+          useBrandKit,
+          woofCostType: asset.kind === 'carousel' ? 'carousel' as const : asset.woofCostType,
+          withAudio: asset.kind === 'video_premium' ? audioSettings[asset.id] : undefined,
           generatedTexts: textsData.texts?.[asset.id] || generateFallbackTexts(asset, localPack.title),
         }));
       }
@@ -326,8 +314,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         selectedAssetIds: Array.from(selectedAssetIds),
         useBrandKit,
         userPlan: profile.plan || 'starter',
-        carouselMode, // ✅ Mode Standard/Premium pour carrousels
-        colorMode, // ✅ Mode Coloré/Pastel
+        colorMode,
       });
 
       toast.success("C'est parti ! Alfie prépare ton pack de visuels 🎬");
@@ -404,10 +391,8 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
           <div className="space-y-2">
           {localAssets.map((asset) => {
               const isSelected = selectedAssetIds.has(asset.id);
-              // ✅ FIX: Calculer le coût en tenant compte du mode carrousel
-              const cost = asset.kind === 'carousel' 
-                ? (asset.count || 5) * (carouselMode === 'premium' ? 2 : 1)
-                : getWoofCost(asset);
+              // Carrousels = 10 Woofs fixe
+              const cost = asset.kind === 'carousel' ? 10 : getWoofCost(asset);
 
               return (
                 <div
@@ -554,34 +539,11 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
             <Switch checked={useBrandKit} onCheckedChange={setUseBrandKit} />
           </div>
 
-          {/* ✅ Toggle Standard/Premium pour carrousels */}
+          {/* Note: Les carrousels ont un coût fixe de 10 Woofs */}
           {hasCarousels && (
-            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-              <span className="font-medium text-sm">Mode carrousel</span>
-              <div className="flex gap-1">
-                <button 
-                  type="button"
-                  onClick={() => setCarouselMode('standard')}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-l-md transition-colors ${
-                    carouselMode === 'standard' 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'bg-muted hover:bg-muted/80'
-                  }`}
-                >
-                  Standard
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => setCarouselMode('premium')}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-r-md transition-colors ${
-                    carouselMode === 'premium' 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'bg-muted hover:bg-muted/80'
-                  }`}
-                >
-                  Premium
-                </button>
-              </div>
+            <div className="p-3 bg-muted/30 rounded-lg">
+              <p className="text-sm font-medium">📱 Carrousel : 10 Woofs</p>
+              <p className="text-xs text-muted-foreground">5 slides texte + images de fond</p>
             </div>
           )}
 

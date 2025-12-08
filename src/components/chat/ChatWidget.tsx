@@ -31,9 +31,9 @@ function enrichPackWithWoofCostType(pack: AlfiePack): AlfiePack {
     ...pack,
     assets: pack.assets.map(asset => ({
       ...asset,
-      count: asset.kind === 'carousel' ? (asset.count || 5) : (asset.count || 1),
+      count: asset.kind === 'carousel' ? 5 : (asset.count || 1), // Carrousels = toujours 5 slides
       woofCostType: asset.kind === 'carousel' 
-        ? (asset.carouselMode === 'premium' ? 'carousel_slide_premium' : 'carousel_slide')
+        ? 'carousel' // 10 Woofs fixe par carrousel
         : asset.kind === 'image'
         ? 'image'
         : 'video_premium',
