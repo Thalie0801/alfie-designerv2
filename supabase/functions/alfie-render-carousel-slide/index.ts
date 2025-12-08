@@ -138,11 +138,9 @@ function buildImagePromptStandard(
   totalSlides: number
 ): string {
   // ✅ EXTRAIRE UNIQUEMENT LES CONCEPTS VISUELS, pas le texte brut
-  // Convertir le prompt en thème abstrait sans phrases lisibles
   const extractVisualConcept = (rawPrompt: string): string => {
     if (!rawPrompt) return "modern professional design";
     
-    // Mots-clés visuels à extraire
     const visualKeywords = rawPrompt.toLowerCase().match(
       /(tech|ia|ai|business|marketing|social|digital|créatif|innovation|productivité|santé|bien-être|nature|voyage|food|cuisine|fitness|mode|fashion|beauté|immobilier|finance|éducation|musique|art|sport)/gi
     );
@@ -160,23 +158,25 @@ function buildImagePromptStandard(
     ? globalStyle 
     : "soft gradient background, pastel colors";
   
-  return `Generate ONE abstract background illustration.
+  // ✅ PROMPT SIMPLIFIÉ ET RENFORCÉ POUR FORCER DES COULEURS
+  return `Create a VIBRANT, COLORFUL abstract background image.
 
-VISUAL CONCEPT: ${visualConcept}
+THEME: ${visualConcept}
 STYLE: ${styleHint}
 
-COMPOSITION:
-- Abstract, elegant background with soft 3D elements
-- Geometric shapes, gradients, subtle depth
-- Clean central area for future overlay
-- Professional social media aesthetic
+CRITICAL REQUIREMENTS:
+- Generate a RICH, COLORFUL image with visible gradients and shapes
+- Use bold colors: blues, purples, pinks, teals, oranges - NO WHITE BACKGROUND
+- Include soft 3D geometric elements, glowing orbs, smooth gradients
+- Modern, professional social media aesthetic
+- Leave clean central area for text overlay
 
-=== CRITICAL RULE ===
-This image must contain ZERO TEXT.
-No letters. No words. No numbers. No labels. No typography.
-Only abstract visual elements and colors.
+ABSOLUTE RULES:
+- Image MUST be colorful and vibrant - NOT white, NOT blank, NOT empty
+- NO TEXT whatsoever - no letters, words, numbers, labels
+- Only abstract visual elements with saturated colors
 
-OUTPUT: Pure abstract visual background.`
+OUTPUT: A beautiful, colorful abstract background with NO text.`
 }
 
 /**
@@ -202,7 +202,9 @@ function buildImagePromptPremium(
   referenceImageUrl?: string | null
 ): string {
   // ✅ Style visuel enrichi par le Brand Kit V2
-  let visualStyle = "soft gradient background, pastel colors, elegant modern design";
+  let visualStyle = "vibrant gradient background, rich saturated colors, elegant modern design";
+  let colorHint = "blues, purples, pinks, teals, warm oranges";
+  
   if (useBrandKit && brandKit) {
     const styleParts: string[] = [];
     
@@ -220,7 +222,9 @@ function buildImagePromptPremium(
       else if (type === "mockups") styleParts.push("professional mockup style");
     }
     if (brandKit.palette?.length) {
-      styleParts.push("harmonious brand color palette");
+      // ✅ Utiliser les couleurs du palette comme hint
+      colorHint = "brand colors from palette";
+      styleParts.push("harmonious brand color palette with rich saturation");
     }
     if (brandKit.pitch) {
       styleParts.push(`Brand essence: ${brandKit.pitch}`);
@@ -231,42 +235,37 @@ function buildImagePromptPremium(
     }
   }
   
-  // ✅ Éléments à éviter
   const avoid = brandKit?.avoid_in_visuals || "";
 
-  // ✅ Instruction pour image de référence
   const referenceInstruction = referenceImageUrl ? `
-=== REFERENCE IMAGE STYLE ===
-Use the provided reference image as style inspiration.
-Match its color palette, composition style, and overall aesthetic.` : "";
+Use the provided reference image as style inspiration for colors and composition.` : "";
 
   const slideRole = getSlideRole(slideIndex, totalSlides);
 
-  return `Generate a premium social media BACKGROUND IMAGE for carousel slide.
+  // ✅ PROMPT SIMPLIFIÉ ET RENFORCÉ POUR FORCER DES COULEURS
+  return `Create a VIBRANT, COLORFUL premium background image.
 
-=== VISUAL BACKGROUND ONLY (ABSOLUTELY NO TEXT) ===
 THEME: ${userPrompt}
 STYLE: ${visualStyle}
-SLIDE ROLE: ${slideRole} (slide ${slideIndex + 1}/${totalSlides})
+COLORS: Use rich, saturated ${colorHint} - NO WHITE BACKGROUND
+SLIDE: ${slideRole} (${slideIndex + 1}/${totalSlides})
 ${referenceInstruction}
 
-=== COMPOSITION REQUIREMENTS ===
-- Create a stunning, professional background
+CRITICAL REQUIREMENTS:
+- Generate a RICH, COLORFUL image - NOT white, NOT blank, NOT empty
+- Beautiful gradients with visible color transitions
+- Soft 3D geometric elements, glowing orbs, smooth flowing shapes
+- Modern social media aesthetic with depth and dimension
 - Leave clean central area for text overlay (added separately)
-- Subtle 3D elements, gradients, abstract shapes
-- High-quality visual elements matching the theme
-- Elegant, modern social media aesthetic
 
-=== ABSOLUTE PROHIBITION (CRITICAL) ===
-❌ ZERO TEXT in the image
-❌ No letters, no words, no numbers, no labels
-❌ No typography whatsoever
-❌ No quotes, no titles, no captions
-❌ Text will be added EXTERNALLY by a separate system
+ABSOLUTE RULES:
+- Image MUST be colorful and vibrant with saturated colors
+- NO TEXT whatsoever - no letters, words, numbers, labels, typography
+- Background must have visible colors and patterns, never pure white
 
-${avoid ? `ELEMENTS TO AVOID: ${avoid}` : ""}
+${avoid ? `AVOID: ${avoid}` : ""}
 
-OUTPUT: Pure visual background with ZERO text. Only abstract visuals and colors.`;
+OUTPUT: A stunning, colorful abstract background with ZERO text.`;
 }
 
 /**
@@ -442,6 +441,51 @@ async function fetchWithRetries(url: string, init: RequestInit, maxRetries = 2) 
     // propagate last response (non ok)
     return new Response(body, { status: res.status, headers: res.headers });
   }
+}
+
+/**
+ * ✅ Valide qu'une image base64 n'est pas blanche/vide
+ * Vérifie les premiers pixels pour détecter une image entièrement blanche
+ */
+function isWhiteImage(base64Data: string): boolean {
+  try {
+    // Retirer le préfixe data:image/...;base64, si présent
+    const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
+    
+    // Décoder quelques octets pour vérifier
+    const binaryString = atob(cleanBase64.slice(0, 1000)); // Premiers 750 bytes environ
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    
+    // Pour un PNG, les données pixels commencent après le header
+    // Compter combien d'octets sont >= 250 (presque blanc)
+    let whiteCount = 0;
+    let totalChecked = 0;
+    for (let i = 50; i < bytes.length && totalChecked < 500; i++) {
+      if (bytes[i] >= 250) whiteCount++;
+      totalChecked++;
+    }
+    
+    // Si plus de 90% des bytes vérifiés sont "blancs", image probablement blanche
+    const whiteRatio = whiteCount / totalChecked;
+    console.log(`[render-slide] Image validation: ${(whiteRatio * 100).toFixed(1)}% white pixels detected`);
+    return whiteRatio > 0.90;
+  } catch (e) {
+    console.warn("[render-slide] Could not validate image, assuming OK:", e);
+    return false;
+  }
+}
+
+/**
+ * ✅ Prompt de secours ultra-simple pour forcer des couleurs
+ */
+function buildEmergencyColorPrompt(theme: string): string {
+  return `Create a colorful abstract background.
+Use bright colors: purple and blue gradient with glowing pink orbs.
+Theme hint: ${theme || "modern professional"}.
+NO WHITE. NO TEXT. Rich saturated colors only.`;
 }
 
 // -----------------------------
@@ -628,57 +672,84 @@ Deno.serve(async (req) => {
     console.log(`[render-slide] ${logCtx} 🎨 Mode: ${carouselMode}, hasText: ${!!normTitle && normTitle !== "Titre par défaut"}, hasRef: ${!!referenceImageUrl}`);
 
     let bgUrl: string | null = null;
+    let imageAttempt = 0;
+    const maxImageAttempts = 2;
 
-    // ✅ LOVABLE AI UNIQUEMENT - gemini-3-pro-image-preview n'existe PAS sur Vertex AI
-    // Vertex AI natif utilise Imagen 3, pas les modèles Gemini image
-    const selectedModel = carouselMode === 'premium' ? MODEL_IMAGE_PREMIUM : MODEL_IMAGE_STANDARD;
-    console.log(`[render-slide] ${logCtx} 2/4 Generating with Lovable AI (${selectedModel})...`);
-    
-    const aiRes = await fetchWithRetries(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
+    // ✅ LOVABLE AI avec validation anti-images blanches et retry
+    while (imageAttempt < maxImageAttempts && !bgUrl) {
+      const selectedModel = carouselMode === 'premium' ? MODEL_IMAGE_PREMIUM : MODEL_IMAGE_STANDARD;
+      
+      // ✅ Utiliser prompt de secours si première tentative a échoué
+      const currentPrompt = imageAttempt === 0 
+        ? enrichedPrompt 
+        : buildEmergencyColorPrompt(prompt);
+      
+      console.log(`[render-slide] ${logCtx} 2/4 Attempt ${imageAttempt + 1}/${maxImageAttempts} with Lovable AI (${selectedModel})...`);
+      
+      const aiRes = await fetchWithRetries(
+        "https://ai.gateway.lovable.dev/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: selectedModel,
+            messages: [{ role: "user", content: currentPrompt }],
+            modalities: ["image", "text"],
+            size_hint: { width: size.w, height: size.h },
+          }),
         },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: [{ role: "user", content: enrichedPrompt }],
-          modalities: ["image", "text"],
-          size_hint: { width: size.w, height: size.h },
-        }),
-      },
-      2
-    );
+        2
+      );
 
-    if (aiRes.status === 429) {
-      console.error(`[render-slide] ${logCtx} ⏱️ Rate limit (429) after retries`);
-      return json({ error: "Rate limit exceeded, please try again shortly." }, 429);
-    }
-    if (aiRes.status === 402) {
-      console.error(`[render-slide] ${logCtx} 💳 Insufficient credits (402)`);
-      return json({ error: "Insufficient credits for AI generation" }, 402);
-    }
-    if (!aiRes.ok) {
-      const errTxt = await aiRes.text().catch(() => "");
-      console.error(`[render-slide] ${logCtx} ❌ AI error:`, aiRes.status, errTxt.slice(0, 600));
-      return json({ error: `Background generation failed (${aiRes.status})` }, 502);
-    }
+      if (aiRes.status === 429) {
+        console.error(`[render-slide] ${logCtx} ⏱️ Rate limit (429) after retries`);
+        return json({ error: "Rate limit exceeded, please try again shortly." }, 429);
+      }
+      if (aiRes.status === 402) {
+        console.error(`[render-slide] ${logCtx} 💳 Insufficient credits (402)`);
+        return json({ error: "Insufficient credits for AI generation" }, 402);
+      }
+      if (!aiRes.ok) {
+        const errTxt = await aiRes.text().catch(() => "");
+        console.error(`[render-slide] ${logCtx} ❌ AI error:`, aiRes.status, errTxt.slice(0, 600));
+        imageAttempt++;
+        continue;
+      }
 
-    const aiData = await aiRes.json().catch(() => ({}));
-    bgUrl =
-      aiData?.choices?.[0]?.message?.images?.[0]?.image_url?.url ||
-      aiData?.choices?.[0]?.message?.content?.[0]?.image_url?.url ||
-      aiData?.choices?.[0]?.message?.image_url?.url ||
-      aiData?.image_url?.url ||
-      null;
+      const aiData = await aiRes.json().catch(() => ({}));
+      const candidateUrl =
+        aiData?.choices?.[0]?.message?.images?.[0]?.image_url?.url ||
+        aiData?.choices?.[0]?.message?.content?.[0]?.image_url?.url ||
+        aiData?.choices?.[0]?.message?.image_url?.url ||
+        aiData?.image_url?.url ||
+        null;
+
+      if (!candidateUrl) {
+        console.warn(`[render-slide] ${logCtx} ⚠️ No image URL in response, retrying...`);
+        imageAttempt++;
+        continue;
+      }
+
+      // ✅ VALIDATION ANTI-IMAGE BLANCHE
+      if (candidateUrl.startsWith('data:image')) {
+        if (isWhiteImage(candidateUrl)) {
+          console.warn(`[render-slide] ${logCtx} ⚠️ White/blank image detected, retrying with emergency prompt...`);
+          imageAttempt++;
+          continue;
+        }
+      }
+      
+      bgUrl = candidateUrl;
+      console.log(`[render-slide] ${logCtx}   ↳ background_url: ${String(bgUrl).slice(0, 120)}`);
+    }
 
     if (!bgUrl) {
-      console.error(`[render-slide] ${logCtx} ❌ No background URL from any AI provider`);
-      return json({ error: "AI did not return an image URL" }, 500);
+      console.error(`[render-slide] ${logCtx} ❌ No valid colorful image after ${maxImageAttempts} attempts`);
+      return json({ error: "AI failed to generate a colorful image after multiple attempts" }, 500);
     }
-    console.log(`[render-slide] ${logCtx}   ↳ background_url: ${String(bgUrl).slice(0, 120)}`);
 
     // =========================================
     // STEP 3/4 — Upload image → Cloudinary (edge)
