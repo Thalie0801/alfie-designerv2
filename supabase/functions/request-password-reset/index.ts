@@ -6,6 +6,9 @@ const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// Rate limiting configuration
+const MAX_REQUESTS_PER_HOUR = 3;
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -28,17 +31,65 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Email requis");
     }
 
-    console.log(`[request-password-reset] Processing reset for ${email}`);
+    // Normalize email
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Get client IP for logging
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || 
+                     req.headers.get("cf-connecting-ip") || 
+                     "unknown";
 
-    // Créer client admin Supabase
+    console.log(`[request-password-reset] Processing reset for ${normalizedEmail} from ${clientIp}`);
+
+    // Create admin Supabase client
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    // Générer un lien de récupération sécurisé via Supabase Admin
+    // === RATE LIMITING ===
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    
+    // Count recent requests for this email
+    const { count, error: countError } = await supabaseAdmin
+      .from('password_reset_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('email', normalizedEmail)
+      .gte('created_at', oneHourAgo);
+
+    if (countError) {
+      console.error("[request-password-reset] Rate limit check error:", countError);
+      // Continue anyway - don't block legitimate requests due to DB errors
+    }
+
+    const requestCount = count || 0;
+    console.log(`[request-password-reset] Recent requests for ${normalizedEmail}: ${requestCount}/${MAX_REQUESTS_PER_HOUR}`);
+
+    if (requestCount >= MAX_REQUESTS_PER_HOUR) {
+      console.warn(`[request-password-reset] Rate limit exceeded for ${normalizedEmail}`);
+      // Return success to prevent email enumeration, but don't actually send
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    // Log this request for rate limiting
+    await supabaseAdmin.from('password_reset_requests').insert({
+      email: normalizedEmail,
+      ip_address: clientIp
+    });
+
+    // Cleanup old requests (older than 24h) - fire and forget
+    supabaseAdmin.rpc('cleanup_old_password_reset_requests').then(() => {
+      console.log("[request-password-reset] Cleanup completed");
+    }).catch(err => {
+      console.warn("[request-password-reset] Cleanup failed:", err);
+    });
+
+    // === GENERATE RESET LINK ===
     const { data, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
-      email,
+      email: normalizedEmail,
       options: {
         redirectTo: `${appOrigin}/reset-password`
       }
@@ -46,32 +97,44 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (linkError) {
       console.error("[request-password-reset] Link generation error:", linkError);
-      throw new Error("Erreur lors de la génération du lien");
+      // Return success to prevent email enumeration
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
     }
 
     if (!data?.properties?.action_link) {
-      throw new Error("Lien de réinitialisation non généré");
+      console.error("[request-password-reset] No action link generated");
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
     }
 
-    // Extraire le token et type du lien Supabase généré
+    // Extract token from Supabase-generated link
     const actionLink = data.properties.action_link;
     const actionUrl = new URL(actionLink);
     const token = actionUrl.searchParams.get('token');
     const type = actionUrl.searchParams.get('type');
 
     if (!token || !type) {
-      throw new Error("Token ou type manquant dans le lien généré");
+      console.error("[request-password-reset] Missing token or type");
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
     }
 
-    // Construire le lien vers notre page intermédiaire (anti-préchargement)
+    // Build safe intermediate link (anti-preload)
     const resetLink = `${appOrigin}/verify-reset?token=${encodeURIComponent(token)}&type=${encodeURIComponent(type)}`;
 
-    console.log(`[request-password-reset] Sending email to ${email} with safe link`);
+    console.log(`[request-password-reset] Sending email to ${normalizedEmail}`);
 
-    // Envoyer l'email avec template Alfie en français
+    // === SEND EMAIL ===
     const emailResponse = await resend.emails.send({
       from: "Alfie <onboarding@resend.dev>",
-      to: [email],
+      to: [normalizedEmail],
       subject: "Réinitialisation de votre mot de passe Alfie",
       html: `
         <!DOCTYPE html>
@@ -115,24 +178,22 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (emailResponse.error) {
       console.error("[request-password-reset] Email error:", emailResponse.error);
-      throw emailResponse.error;
+      // Still return success to prevent enumeration
+    } else {
+      console.log("[request-password-reset] Email sent successfully:", emailResponse.data?.id);
     }
 
-    console.log("[request-password-reset] Email sent successfully:", emailResponse.data?.id);
-
-    return new Response(JSON.stringify({ success: true, id: emailResponse.data?.id }), {
+    return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   } catch (error: any) {
     console.error("[request-password-reset] Error:", error);
-    return new Response(
-      JSON.stringify({ error: error.message || "Erreur lors de l'envoi de l'email" }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
-    );
+    // Return success even on error to prevent email enumeration
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
   }
 };
 
