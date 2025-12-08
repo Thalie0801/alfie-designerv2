@@ -1056,6 +1056,14 @@ ${imageTexts.body ? `Texte : "${imageTexts.body}"` : ""}
 ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
     }
 
+    // ✅ Construire overlayText formaté pour Gemini 3 Pro (intégration native)
+    let overlayText: string | null = null;
+    if (payload.generatedTexts?.text && resolvedKind === "image") {
+      const t = payload.generatedTexts.text;
+      overlayText = [t.title, t.body, t.cta].filter(Boolean).join("\n");
+      console.log("[processRenderImages] overlayText construit:", overlayText?.slice(0, 80));
+    }
+
     try {
       // 1) generate
       // ✅ Log diagnostic pour tracer referenceImageUrl
@@ -1069,6 +1077,7 @@ ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
       console.log("[processRenderImages] calling image engine", {
         orderId,
         brandId: payload.brandId,
+        overlayText: overlayText ? "✅ " + overlayText.slice(0, 50) : "❌ NONE",
       });
       console.log(
         `[job-worker] calling image engine for order=${orderId} brand=${img.brandId ?? payload.brandId} ratio=${aspectRatio}`,
@@ -1089,7 +1098,8 @@ ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
         carousel_id,
         slideIndex,
         useBrandKit,
-        userPlan: payload.userPlan, // ✅ Plan utilisateur pour sélection du modèle IA
+        userPlan: payload.userPlan,
+        overlayText, // ✅ Texte marketing intégré nativement par Gemini 3 Pro
       });
 
       const imagePayload = unwrapResult<any>(imageResult);
