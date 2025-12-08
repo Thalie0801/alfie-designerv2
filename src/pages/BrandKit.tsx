@@ -7,13 +7,24 @@ import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useBrandKit, ToneSliders } from '@/hooks/useBrandKit';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { Palette, Save, Loader2, X, MessageSquare, Eye, Sparkles } from 'lucide-react';
+import { Palette, Save, Loader2, X, MessageSquare, Eye, Sparkles, Type } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { BrandSelector } from '@/components/BrandSelector';
 import { cn } from '@/lib/utils';
+
+// Polices supportées par Cloudinary Google Fonts
+const SUPPORTED_FONTS = [
+  'Inter', 'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Nunito Sans', 'Poppins', 
+  'Raleway', 'Playfair Display', 'Merriweather', 'Ubuntu', 'Source Sans Pro',
+  'Oswald', 'Quicksand', 'Archivo', 'Libre Franklin', 'Work Sans', 'DM Sans',
+  'Manrope', 'Outfit', 'Sora', 'Space Grotesk', 'Plus Jakarta Sans',
+  'Baloon', 'Pacifico', 'Lobster', 'Dancing Script', 'Comic Neue', 'Fredoka One',
+  'Caveat', 'Satisfy', 'Courgette', 'Great Vibes', 'Amatic SC', 'Permanent Marker'
+];
 
 // Predefined lists
 const ADJECTIVES_LIST = [
@@ -404,27 +415,77 @@ export default function BrandKit() {
             </div>
           </div>
 
-          {/* Polices */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="font_primary">Police principale</Label>
-              <Input
-                id="font_primary"
-                placeholder="Ex: Montserrat, Inter..."
-                value={formData.font_primary}
-                onChange={(e) => setFormData({ ...formData, font_primary: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="font_secondary">Police secondaire</Label>
-              <Input
-                id="font_secondary"
-                placeholder="Ex: Open Sans, Lato..."
-                value={formData.font_secondary}
-                onChange={(e) => setFormData({ ...formData, font_secondary: e.target.value })}
-              />
-            </div>
-          </div>
+          {/* Polices - Accordéon */}
+          <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="fonts" className="border rounded-lg px-4">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Type className="h-4 w-4" />
+                  <span>Polices</span>
+                  {(formData.font_primary || formData.font_secondary) && (
+                    <Badge variant="secondary" className="ml-2 text-xs">
+                      {formData.font_primary || formData.font_secondary}
+                    </Badge>
+                  )}
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pt-4 space-y-4">
+                <p className="text-xs text-muted-foreground">
+                  ⚠️ Choisis parmi les polices Google Fonts supportées ci-dessous pour garantir un rendu correct sur tes carrousels.
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="font_primary">Police principale (titres)</Label>
+                    <Input
+                      id="font_primary"
+                      placeholder="Clique pour voir les options..."
+                      value={formData.font_primary}
+                      onChange={(e) => setFormData({ ...formData, font_primary: e.target.value })}
+                      list="fonts-primary-list"
+                    />
+                    <datalist id="fonts-primary-list">
+                      {SUPPORTED_FONTS.map(font => (
+                        <option key={font} value={font} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="font_secondary">Police secondaire (corps)</Label>
+                    <Input
+                      id="font_secondary"
+                      placeholder="Clique pour voir les options..."
+                      value={formData.font_secondary}
+                      onChange={(e) => setFormData({ ...formData, font_secondary: e.target.value })}
+                      list="fonts-secondary-list"
+                    />
+                    <datalist id="fonts-secondary-list">
+                      {SUPPORTED_FONTS.map(font => (
+                        <option key={font} value={font} />
+                      ))}
+                    </datalist>
+                  </div>
+                </div>
+
+                {/* Quick select buttons */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Sélection rapide :</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['Montserrat', 'Poppins', 'Playfair Display', 'Inter', 'Raleway', 'Oswald', 'Quicksand', 'DM Sans'].map(font => (
+                      <Badge
+                        key={font}
+                        variant={formData.font_primary === font ? "default" : "outline"}
+                        className="cursor-pointer text-xs hover:bg-primary/10 transition-colors"
+                        onClick={() => setFormData({ ...formData, font_primary: font })}
+                      >
+                        {font}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </CardContent>
       </Card>
 
