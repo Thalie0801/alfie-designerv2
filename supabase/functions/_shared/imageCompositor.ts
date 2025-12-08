@@ -72,7 +72,7 @@ const GOOGLE_FONTS = [
   'Oswald', 'Quicksand', 'Archivo', 'Libre Franklin', 'Work Sans', 'DM Sans',
   'Manrope', 'Outfit', 'Sora', 'Space Grotesk', 'Plus Jakarta Sans',
   // ✅ Polices additionnelles pour Brand Kit personnalisés
-  'Baloon', 'Pacifico', 'Lobster', 'Dancing Script', 'Comic Neue', 'Fredoka One',
+  'Baloo 2', 'Pacifico', 'Lobster', 'Dancing Script', 'Comic Neue', 'Fredoka One',
   'Caveat', 'Satisfy', 'Courgette', 'Great Vibes', 'Amatic SC', 'Permanent Marker'
 ];
 

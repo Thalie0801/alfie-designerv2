@@ -274,18 +274,26 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {carouselSlides.map((slide) => {
               const aspect = aspectClassFor(slide.format);
-              // ✅ Utiliser directement l'URL déjà calculée par le backend (avec couleur/font Brand Kit)
-              const src = slide.cloudinary_url || (slide.metadata?.cloudinary_base_url as string) || "";
+              // ✅ URL principale avec overlays, fallback vers base_url si erreur
+              const primaryUrl = slide.cloudinary_url || "";
+              const fallbackUrl = (slide.metadata?.cloudinary_base_url as string) || "";
 
               return (
                 <div key={slide.id} className="relative group">
                   <img
-                    src={src}
+                    src={primaryUrl || fallbackUrl}
                     alt={`Slide ${(slide.slide_index ?? 0) + 1}`}
                     className={cn("w-full rounded-lg object-cover border", aspect)}
                     loading="lazy"
                     onError={(e) => {
-                      console.warn("[CarouselsTab] image load error:", e.currentTarget.src);
+                      const target = e.currentTarget;
+                      // Si l'URL principale échoue et qu'on a un fallback, l'utiliser
+                      if (target.src === primaryUrl && fallbackUrl && fallbackUrl !== primaryUrl) {
+                        console.info("[CarouselsTab] Fallback to base URL:", fallbackUrl);
+                        target.src = fallbackUrl;
+                      } else {
+                        console.warn("[CarouselsTab] Image load error, no fallback:", target.src);
+                      }
                     }}
                   />
                   <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
@@ -294,7 +302,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
                     <Button
                       size="sm"
-                      onClick={() => handleDownloadSlide(src, slide.slide_index ?? 0)}
+                      onClick={() => handleDownloadSlide(primaryUrl || fallbackUrl, slide.slide_index ?? 0)}
                       aria-label="Télécharger la slide avec texte"
                     >
                       <Download className="h-4 w-4" />
