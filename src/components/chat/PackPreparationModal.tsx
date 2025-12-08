@@ -69,6 +69,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
   const [isGenerating, setIsGenerating] = useState(false);
   const [useBrandKit, setUseBrandKit] = useState(true); // ✅ Phase 2: Toggle Brand Kit
   const [carouselMode, setCarouselMode] = useState<'standard' | 'premium'>('standard'); // ✅ Toggle Standard/Premium carrousels
+  const [colorMode, setColorMode] = useState<'vibrant' | 'pastel'>('vibrant'); // ✅ Toggle Coloré/Pastel
   const [audioSettings, setAudioSettings] = useState<Record<string, boolean>>(() => {
     // Par défaut, audio activé pour toutes les vidéos
     const initial: Record<string, boolean> = {};
@@ -326,6 +327,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         useBrandKit,
         userPlan: profile.plan || 'starter',
         carouselMode, // ✅ Mode Standard/Premium pour carrousels
+        colorMode, // ✅ Mode Coloré/Pastel
       });
 
       toast.success("C'est parti ! Alfie prépare ton pack de visuels 🎬");
@@ -582,6 +584,38 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
               </div>
             </div>
           )}
+
+          {/* ✅ Toggle Coloré/Pastel */}
+          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+            <div>
+              <span className="font-medium text-sm">Style couleurs</span>
+              <p className="text-xs text-muted-foreground">Choisir le style de couleurs des visuels</p>
+            </div>
+            <div className="flex gap-1">
+              <button 
+                type="button"
+                onClick={() => setColorMode('vibrant')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-l-md transition-colors flex items-center gap-1 ${
+                  colorMode === 'vibrant' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+              >
+                🌈 Coloré
+              </button>
+              <button 
+                type="button"
+                onClick={() => setColorMode('pastel')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-r-md transition-colors flex items-center gap-1 ${
+                  colorMode === 'pastel' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+              >
+                🎀 Pastel
+              </button>
+            </div>
+          </div>
 
           {/* Warning si pas assez de Woofs */}
           {totalWoofs > 0 && (
