@@ -172,6 +172,7 @@ export function useBrandKit() {
         visual_types: brand.visual_types ?? null,
         visual_mood: brand.visual_mood ?? null,
         avoid_in_visuals: brand.avoid_in_visuals ?? null,
+        text_color: brand.text_color ?? null,
         tagline: brand.tagline ?? null,
         canva_connected: Boolean(brand.canva_connected),
         created_at: brand.created_at
@@ -239,6 +240,7 @@ export function useBrandKit() {
     visual_types: activeBrand.visual_types ?? undefined,
     visual_mood: activeBrand.visual_mood ?? undefined,
     avoid_in_visuals: activeBrand.avoid_in_visuals ?? undefined,
+    text_color: activeBrand.text_color ?? undefined,
     tagline: activeBrand.tagline ?? undefined
   } : null;
 
