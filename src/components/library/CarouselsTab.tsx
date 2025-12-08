@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Eye, Download, FileArchive, Loader2, Copy, ChevronDown } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -392,7 +393,7 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
               })}
             </div>
 
-            {/* ✅ MÉTHODE C: Affichage des textes copiables */}
+            {/* ✅ MÉTHODE C: Affichage des textes en tableau */}
             {slidesHaveTexts && (
               <Collapsible>
                 <CollapsibleTrigger asChild>
@@ -403,45 +404,47 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2 space-y-2">
-                  {carouselSlides
-                    .filter((s) => s.text_json)
-                    .sort((a, b) => (a.slide_index ?? 0) - (b.slide_index ?? 0))
-                    .map((slide) => {
-                      const { title, subtitle, body, bullets } = slide.text_json!;
-                      const slideNum = (slide.slide_index ?? 0) + 1;
+                <CollapsibleContent className="mt-2">
+                  <div className="overflow-x-auto rounded-lg border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-16">Slide</TableHead>
+                          <TableHead>Titre</TableHead>
+                          <TableHead>Sous-titre</TableHead>
+                          <TableHead>Corps</TableHead>
+                          <TableHead className="w-12"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {carouselSlides
+                          .filter((s) => s.text_json)
+                          .sort((a, b) => (a.slide_index ?? 0) - (b.slide_index ?? 0))
+                          .map((slide) => {
+                            const { title, subtitle, body } = slide.text_json!;
+                            const slideNum = (slide.slide_index ?? 0) + 1;
 
-                      return (
-                        <div
-                          key={slide.id}
-                          className="p-3 bg-muted/50 rounded-lg text-sm flex items-start justify-between gap-2"
-                        >
-                          <div className="flex-1 space-y-1">
-                            <p className="font-medium">
-                              Slide {slideNum}
-                              {title && <span className="text-muted-foreground"> : {title}</span>}
-                            </p>
-                            {subtitle && <p className="text-muted-foreground text-xs">{subtitle}</p>}
-                            {body && <p className="text-muted-foreground text-xs">{body}</p>}
-                            {bullets && bullets.length > 0 && (
-                              <ul className="text-muted-foreground text-xs list-disc list-inside">
-                                {bullets.map((b, i) => (
-                                  <li key={i}>{b}</li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleCopySlideText(slide)}
-                            className="shrink-0"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      );
-                    })}
+                            return (
+                              <TableRow key={slide.id}>
+                                <TableCell className="font-medium">{slideNum}</TableCell>
+                                <TableCell className="max-w-[200px] truncate">{title || "—"}</TableCell>
+                                <TableCell className="max-w-[200px] truncate text-muted-foreground">{subtitle || "—"}</TableCell>
+                                <TableCell className="max-w-[300px] truncate text-muted-foreground">{body || "—"}</TableCell>
+                                <TableCell>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleCopySlideText(slide)}
+                                  >
+                                    <Copy className="h-3 w-3" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CollapsibleContent>
               </Collapsible>
             )}
