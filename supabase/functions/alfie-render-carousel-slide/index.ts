@@ -280,27 +280,33 @@ function createDynamicTemplate(aspectRatio: string, brandKit?: BrandKit | null):
   const height = Math.round(1080 * (hRatio / wRatio));
   
   // ✅ Tailles de police adaptatives selon l'aspect ratio
-  const titleSize = height > 1200 ? 64 : 56;
-  const subtitleSize = height > 1200 ? 36 : 32;
+  const titleSize = height > 1200 ? 72 : 64;
+  const subtitleSize = height > 1200 ? 40 : 36;
+  const bodySize = height > 1200 ? 32 : 28;
   
   // ✅ Positions centrées dans la moitié supérieure
-  const titleY = Math.round(height * 0.28); // 28% du haut
-  const subtitleY = Math.round(height * 0.42); // 42% du haut
+  const titleY = Math.round(height * 0.25); // 25% du haut
+  const subtitleY = Math.round(height * 0.38); // 38% du haut
+  const bodyY = Math.round(height * 0.50); // 50% du haut (nouveau)
+  
+  // ✅ Police du Brand Kit ou fallback
+  const fontFamily = brandKit?.name || 'Inter';
   
   const template: SlideTemplate = {
     type: 'hero',
     requiredFields: ['title'],
-    optionalFields: ['subtitle', 'bullets'],
+    optionalFields: ['subtitle', 'punchline', 'bullets'],
     charLimits: {
       title: { min: 5, max: 60 },
       subtitle: { min: 10, max: 120 },
+      punchline: { min: 10, max: 200 },
     },
     layout: { 
       width, 
       height, 
       safeZones: { 
-        top: Math.round(height * 0.15), 
-        bottom: Math.round(height * 0.35), 
+        top: Math.round(height * 0.10), 
+        bottom: Math.round(height * 0.30), 
         left: Math.round(width * 0.10), 
         right: Math.round(width * 0.10) 
       } 
@@ -309,25 +315,37 @@ function createDynamicTemplate(aspectRatio: string, brandKit?: BrandKit | null):
       { 
         id: 'title', 
         type: 'title', 
-        font: 'Inter', 
+        font: fontFamily, 
         size: titleSize, 
         weight: 700, 
-        color: '#FFFFFF', // ✅ Blanc pour contraste
+        color: '#FFFFFF',
         position: { x: width / 2, y: titleY }, 
-        maxWidth: Math.round(width * 0.75), 
+        maxWidth: Math.round(width * 0.80), 
         maxLines: 3, 
         align: 'center' 
       },
       { 
         id: 'subtitle', 
         type: 'subtitle', 
-        font: 'Inter', 
+        font: fontFamily, 
         size: subtitleSize, 
-        weight: 400, 
-        color: '#FFFFFF', // ✅ Blanc pour contraste
+        weight: 500, 
+        color: '#FFFFFF',
         position: { x: width / 2, y: subtitleY }, 
+        maxWidth: Math.round(width * 0.75), 
+        maxLines: 3, 
+        align: 'center' 
+      },
+      { 
+        id: 'punchline', 
+        type: 'subtitle', 
+        font: fontFamily, 
+        size: bodySize, 
+        weight: 400, 
+        color: '#FFFFFF',
+        position: { x: width / 2, y: bodyY }, 
         maxWidth: Math.round(width * 0.70), 
-        maxLines: 4, 
+        maxLines: 5, 
         align: 'center' 
       }
     ],
@@ -343,60 +361,42 @@ function createDynamicTemplate(aspectRatio: string, brandKit?: BrandKit | null):
 }
 
 /**
- * Upload SVG to Cloudinary and return public_id
+ * Upload SVG to Cloudinary using the official cloudinary Edge Function
+ * ✅ FIX: Utilise supabase.functions.invoke au lieu de signature manuelle
  */
 async function uploadSvgToCloudinary(
   svgContent: string, 
   folder: string, 
-  publicId: string
+  publicId: string,
+  supabaseAdmin: any // ✅ Type générique pour éviter les erreurs de typage
 ): Promise<{ public_id: string; secure_url: string }> {
-  const cloudName = CLOUDINARY_CLOUD_NAME;
-  const apiKey = CLOUDINARY_API_KEY;
-  const apiSecret = CLOUDINARY_API_SECRET;
-  
-  if (!cloudName || !apiKey || !apiSecret) {
-    throw new Error("Cloudinary credentials not configured");
-  }
-  
   // ✅ Convertir SVG en base64 data URL
   const svgBase64 = btoa(unescape(encodeURIComponent(svgContent)));
   const dataUrl = `data:image/svg+xml;base64,${svgBase64}`;
   
-  // ✅ Générer signature pour upload signé
-  const timestamp = Math.floor(Date.now() / 1000);
-  const paramsToSign = `folder=${folder}&public_id=${publicId}&resource_type=image&timestamp=${timestamp}`;
-  
-  // Créer signature SHA1
-  const encoder = new TextEncoder();
-  const data = encoder.encode(paramsToSign + apiSecret);
-  const hashBuffer = await crypto.subtle.digest('SHA-1', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  
-  const formData = new FormData();
-  formData.append('file', dataUrl);
-  formData.append('folder', folder);
-  formData.append('public_id', publicId);
-  formData.append('resource_type', 'image');
-  formData.append('timestamp', String(timestamp));
-  formData.append('api_key', apiKey);
-  formData.append('signature', signature);
-  
-  const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-    method: 'POST',
-    body: formData,
+  // ✅ Utiliser l'Edge Function cloudinary qui gère la signature correctement
+  const { data: uploadData, error: uploadErr } = await supabaseAdmin.functions.invoke("cloudinary", {
+    body: {
+      action: "upload",
+      params: {
+        file: dataUrl,
+        folder: folder,
+        public_id: publicId,
+        resource_type: "image",
+        overwrite: true,
+        tags: ["svg_overlay", "carousel", "premium"],
+      },
+    },
   });
   
-  if (!response.ok) {
-    const errText = await response.text();
-    console.error('[uploadSvgToCloudinary] ❌ Upload failed:', errText);
-    throw new Error(`SVG upload failed: ${response.status}`);
+  if (uploadErr || !uploadData) {
+    console.error('[uploadSvgToCloudinary] ❌ Upload failed:', uploadErr);
+    throw new Error(`SVG upload failed: ${uploadErr?.message || 'Unknown error'}`);
   }
   
-  const result = await response.json();
   return {
-    public_id: result.public_id,
-    secure_url: result.secure_url,
+    public_id: uploadData.public_id,
+    secure_url: uploadData.secure_url,
   };
 }
 
@@ -799,19 +799,22 @@ Deno.serve(async (req) => {
         const template = createDynamicTemplate(normalizedAR, brandKit);
         console.log(`[render-slide] ${logCtx}   ↳ Template created: ${template.layout.width}x${template.layout.height}`);
         
-        // ✅ Étape 2: Préparer le contenu textuel
+        // ✅ Étape 2: Préparer le contenu textuel COMPLET (titre + subtitle + body)
+        const normBody = String(slideContent.body || "").trim().slice(0, 200);
         const svgSlideContent: SlideContent = {
           title: normTitle,
           subtitle: carouselType === 'citations' ? undefined : (normSubtitle || undefined),
+          punchline: carouselType === 'citations' ? undefined : (normBody || undefined), // ✅ Body mappé sur punchline
           bullets: carouselType === 'citations' ? undefined : (normBullets.length > 0 ? normBullets : undefined),
         };
         
-        // ✅ Étape 3: Préparer le snapshot de marque pour le renderer
+        // ✅ Étape 3: Préparer le snapshot de marque avec police du Brand Kit
+        const brandFontFamily = brandKit?.name || 'Inter, -apple-system, BlinkMacSystemFont, sans-serif';
         const brandSnapshot = {
           primary_color: '#FFFFFF', // ✅ Blanc pour texte sur fond sombre
-          secondary_color: '#CCCCCC',
-          logo_url: brandKit?.palette ? undefined : undefined, // Logo optionnel
-          fonts: { default: 'Inter, sans-serif' },
+          secondary_color: '#E0E0E0', // ✅ Gris clair pour contraste
+          logo_url: undefined,
+          fonts: { default: brandFontFamily }, // ✅ Police du Brand Kit
         };
         
         // ✅ Étape 4: Générer le SVG avec texte parfaitement centré
@@ -825,7 +828,8 @@ Deno.serve(async (req) => {
         const { public_id: svgCloudinaryId } = await uploadSvgToCloudinary(
           svgContent,
           svgFolder,
-          svgPublicId
+          svgPublicId,
+          supabaseAdmin // ✅ Passer le client Supabase pour utiliser l'Edge Function
         );
         console.log(`[render-slide] ${logCtx}   ↳ SVG uploaded: ${svgCloudinaryId}`);
         
