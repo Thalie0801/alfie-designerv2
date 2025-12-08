@@ -11,7 +11,7 @@ export type { AssetKind, Platform, Ratio, Goal, GeneratedTexts } from '@/lib/typ
 export type PackAssetKind = AssetKind;
 export type AssetFormat = "post" | "story" | "reel" | "short" | "pin";
 export type AssetGoal = "education" | "vente" | "lead" | "engagement";
-export type WoofCostType = "image" | "carousel_slide" | "video_premium";
+export type WoofCostType = "image" | "carousel_slide" | "carousel_slide_premium" | "video_premium";
 
 // Types de carrousel
 export type CarouselType = 'citations' | 'content';

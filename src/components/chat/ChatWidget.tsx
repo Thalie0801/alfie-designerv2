@@ -33,10 +33,10 @@ function enrichPackWithWoofCostType(pack: AlfiePack): AlfiePack {
       ...asset,
       count: asset.kind === 'carousel' ? (asset.count || 5) : (asset.count || 1),
       woofCostType: asset.kind === 'carousel' 
-        ? 'carousel_slide' 
+        ? (asset.carouselMode === 'premium' ? 'carousel_slide_premium' : 'carousel_slide')
         : asset.kind === 'image'
         ? 'image'
-        : 'video_premium', // Only video_premium now
+        : 'video_premium',
     })),
   };
 }
