@@ -66,9 +66,30 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
   const [formData, setFormData] = useState<PackAsset>({ ...asset });
   
   // ✅ Re-sync formData quand l'asset change (fix pour édition multiple)
+  // ✅ Auto-créer les slides vides pour les carrousels sans generatedTexts
   useEffect(() => {
-    setFormData({ ...asset });
-  }, [asset.id]);
+    let updatedAsset = { ...asset };
+    
+    // Si c'est un carrousel sans slides, créer des slides vides
+    if (asset.kind === "carousel" && !asset.generatedTexts?.slides) {
+      const slideCount = asset.count || 5;
+      const emptySlides = Array.from({ length: slideCount }, () => ({
+        title: "",
+        subtitle: "",
+        body: "",
+        bullets: [],
+      }));
+      updatedAsset = {
+        ...updatedAsset,
+        generatedTexts: {
+          ...updatedAsset.generatedTexts,
+          slides: emptySlides,
+        },
+      };
+    }
+    
+    setFormData(updatedAsset);
+  }, [asset.id, asset.kind, asset.count]);
   const [uploading, setUploading] = useState(false);
 
   const handleSave = () => {
@@ -372,7 +393,29 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                 min={2}
                 max={10}
                 value={formData.count}
-                onChange={(e) => setFormData({ ...formData, count: parseInt(e.target.value) || 1 })}
+                onChange={(e) => {
+                  const newCount = Math.max(2, Math.min(10, parseInt(e.target.value) || 5));
+                  const currentSlides = formData.generatedTexts?.slides || [];
+                  let newSlides = [...currentSlides];
+                  
+                  // Ajouter des slides vides si on augmente
+                  while (newSlides.length < newCount) {
+                    newSlides.push({ title: "", subtitle: "", body: "", bullets: [] });
+                  }
+                  // Retirer des slides si on diminue
+                  if (newSlides.length > newCount) {
+                    newSlides = newSlides.slice(0, newCount);
+                  }
+                  
+                  setFormData({ 
+                    ...formData, 
+                    count: newCount,
+                    generatedTexts: {
+                      ...formData.generatedTexts,
+                      slides: newSlides,
+                    },
+                  });
+                }}
               />
             </div>
           )}
@@ -459,16 +502,21 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
             </div>
           )}
 
-          {/* Generated texts section */}
-          {formData.generatedTexts && (
+          {/* Generated texts section - always show for carousels */}
+          {(formData.generatedTexts || formData.kind === "carousel") && (
             <div className="border-t pt-4 space-y-3">
-              <Label className="text-base">Textes générés par Alfie</Label>
+              <Label className="text-base">
+                {formData.kind === "carousel" ? "📝 Contenu des slides" : "Textes générés par Alfie"}
+              </Label>
               <p className="text-xs text-muted-foreground">
-                Alfie a pré-rédigé ces textes marketing pour toi. Tu peux les modifier avant la génération des visuels.
+                {formData.kind === "carousel" 
+                  ? "Saisis le texte de chaque slide. Le prompt sert à décrire le style visuel de fond."
+                  : "Alfie a pré-rédigé ces textes marketing pour toi. Tu peux les modifier avant la génération des visuels."
+                }
               </p>
 
               {/* For carousels: show slides in accordion */}
-              {formData.kind === "carousel" && formData.generatedTexts.slides && (
+              {formData.kind === "carousel" && formData.generatedTexts?.slides && (
                 <Accordion type="single" collapsible className="w-full">
                   {formData.generatedTexts.slides.map((slide: any, index: number) => (
                     <AccordionItem key={index} value={`slide-${index}`}>
@@ -481,11 +529,12 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                           <Input
                             value={slide.title || ""}
                             onChange={(e) => {
-                              const newSlides = [...(formData.generatedTexts?.slides || [])];
+                              const currentTexts = formData.generatedTexts || {};
+                              const newSlides = [...(currentTexts.slides || [])];
                               newSlides[index] = { ...newSlides[index], title: e.target.value };
                               setFormData({
                                 ...formData,
-                                generatedTexts: { ...formData.generatedTexts, slides: newSlides },
+                                generatedTexts: { ...currentTexts, slides: newSlides },
                               });
                             }}
                             placeholder="Titre de la slide"
@@ -496,11 +545,12 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                           <Input
                             value={slide.subtitle || ""}
                             onChange={(e) => {
-                              const newSlides = [...(formData.generatedTexts?.slides || [])];
+                              const currentTexts = formData.generatedTexts || {};
+                              const newSlides = [...(currentTexts.slides || [])];
                               newSlides[index] = { ...newSlides[index], subtitle: e.target.value };
                               setFormData({
                                 ...formData,
-                                generatedTexts: { ...formData.generatedTexts, slides: newSlides },
+                                generatedTexts: { ...currentTexts, slides: newSlides },
                               });
                             }}
                             placeholder="Sous-titre"
@@ -511,11 +561,12 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                           <Textarea
                             value={slide.body || ""}
                             onChange={(e) => {
-                              const newSlides = [...(formData.generatedTexts?.slides || [])];
+                              const currentTexts = formData.generatedTexts || {};
+                              const newSlides = [...(currentTexts.slides || [])];
                               newSlides[index] = { ...newSlides[index], body: e.target.value };
                               setFormData({
                                 ...formData,
-                                generatedTexts: { ...formData.generatedTexts, slides: newSlides },
+                                generatedTexts: { ...currentTexts, slides: newSlides },
                               });
                             }}
                             placeholder="Contenu détaillé de cette slide..."
@@ -530,13 +581,14 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                                 key={bulletIndex}
                                 value={bullet}
                                 onChange={(e) => {
-                                  const newSlides = [...(formData.generatedTexts?.slides || [])];
+                                  const currentTexts = formData.generatedTexts || {};
+                                  const newSlides = [...(currentTexts.slides || [])];
                                   const newBullets = [...(newSlides[index].bullets || [])];
                                   newBullets[bulletIndex] = e.target.value;
                                   newSlides[index] = { ...newSlides[index], bullets: newBullets };
                                   setFormData({
                                     ...formData,
-                                    generatedTexts: { ...formData.generatedTexts, slides: newSlides },
+                                    generatedTexts: { ...currentTexts, slides: newSlides },
                                   });
                                 }}
                                 placeholder={`Point ${bulletIndex + 1}`}
@@ -552,20 +604,21 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
               )}
 
               {/* For images: show title, body, cta */}
-              {formData.generatedTexts.text && (
+              {formData.generatedTexts?.text && (
                 <div className="space-y-2">
                   <div>
                     <Label className="text-xs">Titre</Label>
                     <Input
                       value={formData.generatedTexts.text.title || ""}
                       onChange={(e) => {
-                        if (!formData.generatedTexts?.text) return;
+                        const currentTexts = formData.generatedTexts;
+                        if (!currentTexts?.text) return;
                         setFormData({
                           ...formData,
                           generatedTexts: {
-                            ...formData.generatedTexts,
+                            ...currentTexts,
                             text: { 
-                              ...formData.generatedTexts.text, 
+                              ...currentTexts.text, 
                               title: e.target.value 
                             },
                           },
@@ -579,13 +632,14 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                     <Textarea
                       value={formData.generatedTexts.text.body || ""}
                       onChange={(e) => {
-                        if (!formData.generatedTexts?.text) return;
+                        const currentTexts = formData.generatedTexts;
+                        if (!currentTexts?.text) return;
                         setFormData({
                           ...formData,
                           generatedTexts: {
-                            ...formData.generatedTexts,
+                            ...currentTexts,
                             text: { 
-                              ...formData.generatedTexts.text, 
+                              ...currentTexts.text, 
                               body: e.target.value 
                             },
                           },
@@ -601,13 +655,14 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                       <Input
                         value={formData.generatedTexts.text.cta || ""}
                         onChange={(e) => {
-                          if (!formData.generatedTexts?.text) return;
+                          const currentTexts = formData.generatedTexts;
+                          if (!currentTexts?.text) return;
                           setFormData({
                             ...formData,
                             generatedTexts: {
-                              ...formData.generatedTexts,
+                              ...currentTexts,
                               text: { 
-                                ...formData.generatedTexts.text, 
+                                ...currentTexts.text, 
                                 cta: e.target.value 
                               },
                             },
@@ -621,20 +676,21 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
               )}
 
               {/* For videos: show hook, script, cta */}
-              {formData.generatedTexts.video && (
+              {formData.generatedTexts?.video && (
                 <div className="space-y-2">
                   <div>
                     <Label className="text-xs">Hook (accroche)</Label>
                     <Input
                       value={formData.generatedTexts.video.hook || ""}
                       onChange={(e) => {
-                        if (!formData.generatedTexts?.video) return;
+                        const currentTexts = formData.generatedTexts;
+                        if (!currentTexts?.video) return;
                         setFormData({
                           ...formData,
                           generatedTexts: {
-                            ...formData.generatedTexts,
+                            ...currentTexts,
                             video: { 
-                              ...formData.generatedTexts.video, 
+                              ...currentTexts.video, 
                               hook: e.target.value 
                             },
                           },
@@ -648,13 +704,14 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                     <Textarea
                       value={formData.generatedTexts.video.script || ""}
                       onChange={(e) => {
-                        if (!formData.generatedTexts?.video) return;
+                        const currentTexts = formData.generatedTexts;
+                        if (!currentTexts?.video) return;
                         setFormData({
                           ...formData,
                           generatedTexts: {
-                            ...formData.generatedTexts,
+                            ...currentTexts,
                             video: { 
-                              ...formData.generatedTexts.video, 
+                              ...currentTexts.video, 
                               script: e.target.value 
                             },
                           },
@@ -670,13 +727,14 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
                       <Input
                         value={formData.generatedTexts.video.cta || ""}
                         onChange={(e) => {
-                          if (!formData.generatedTexts?.video) return;
+                          const currentTexts = formData.generatedTexts;
+                          if (!currentTexts?.video) return;
                           setFormData({
                             ...formData,
                             generatedTexts: {
-                              ...formData.generatedTexts,
+                              ...currentTexts,
                               video: { 
-                                ...formData.generatedTexts.video, 
+                                ...currentTexts.video, 
                                 cta: e.target.value 
                               },
                             },
