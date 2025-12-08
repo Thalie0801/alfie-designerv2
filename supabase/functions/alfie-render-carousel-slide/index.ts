@@ -753,6 +753,13 @@ Deno.serve(async (req) => {
     // =========================================
     let finalUrl = cloudinarySecureUrl;
     
+    // ✅ V8: Debug raw brandKit data
+    console.log(`[render-slide] ${logCtx} Raw brandKit:`, JSON.stringify({
+      palette: brandKit?.palette,
+      fonts: brandKit?.fonts,
+      name: brandKit?.name
+    }));
+    
     // ✅ V8: Extract Brand Kit fonts and colors for overlay
     const brandFonts: BrandFonts = {
       primary: brandKit?.fonts?.primary || 'Inter',
