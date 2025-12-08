@@ -222,6 +222,12 @@ All colors MUST be HSL.
     min-height: 44px;
   }
 
+  @media (pointer: coarse) {
+    .touch-target {
+      min-height: 52px;
+    }
+  }
+
   /* Touch manipulation for better mobile interaction */
   button, a, [role="button"] {
     touch-action: manipulation;
