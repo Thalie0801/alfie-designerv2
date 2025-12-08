@@ -1638,6 +1638,27 @@ export type Database = {
           },
         ]
       }
+      password_reset_requests: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          ip_address: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          ip_address?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          ip_address?: string | null
+        }
+        Relationships: []
+      }
       payment_sessions: {
         Row: {
           amount: number | null
@@ -2423,6 +2444,7 @@ export type Database = {
         }[]
       }
       cleanup_expired_assets: { Args: never; Returns: undefined }
+      cleanup_old_password_reset_requests: { Args: never; Returns: undefined }
       consume_visuals: {
         Args: {
           brand_id_param: string
