@@ -766,8 +766,17 @@ Deno.serve(async (req) => {
       secondary: brandKit?.fonts?.secondary || 'Inter'
     };
     
-    // ✅ V8: Extract primary color from Brand Kit palette (or default to white)
-    const brandPrimaryColor = brandKit?.palette?.[0]?.replace('#', '') || 'ffffff';
+    // ✅ V8: Extract primary color from Brand Kit palette with contrast fallback
+    const brandPrimaryColor = (() => {
+      const raw = brandKit?.palette?.[0]?.replace('#', '') || '';
+      if (!raw || raw === 'ffffff' || raw === 'fff') return '222222'; // Fallback noir
+      // Vérifier si couleur très claire (R+G+B > 650)
+      const r = parseInt(raw.slice(0, 2), 16) || 0;
+      const g = parseInt(raw.slice(2, 4), 16) || 0;
+      const b = parseInt(raw.slice(4, 6), 16) || 0;
+      if (r + g + b > 650) return '333333'; // Trop clair, utiliser gris foncé
+      return raw;
+    })();
     const brandSecondaryColor = brandKit?.palette?.[1]?.replace('#', '') || 'cccccc';
     
     console.log(`[render-slide] ${logCtx} 3.5/4 Applying Cloudinary text overlay (${carouselMode} mode, type=${carouselType})`);
