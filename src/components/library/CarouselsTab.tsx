@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Eye, Download, FileArchive, Loader2, Copy, ChevronDown } from "lucide-react";
+import { Eye, Download, FileArchive, Loader2, Copy, ChevronDown, FileSpreadsheet } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -276,6 +276,38 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     return carouselSlides.some((s) => s.text_json && (s.text_json.title || s.text_json.body));
   }, []);
 
+  // ✅ Export CSV pour Canva Bulk Create
+  const handleExportCSV = useCallback((carouselSlides: CarouselSlide[], carouselTitle: string) => {
+    const slidesWithTexts = carouselSlides.filter((s) => s.text_json);
+    if (slidesWithTexts.length === 0) {
+      toast.error("Aucun texte à exporter");
+      return;
+    }
+
+    const headers = "slide,title,subtitle,body";
+    const escapeCSV = (str: string) => `"${(str || "").replace(/"/g, '""')}"`;
+
+    const rows = slidesWithTexts
+      .sort((a, b) => (a.slide_index ?? 0) - (b.slide_index ?? 0))
+      .map((slide) => {
+        const { title, subtitle, body } = slide.text_json!;
+        const slideNum = (slide.slide_index ?? 0) + 1;
+        return [slideNum, escapeCSV(title || ""), escapeCSV(subtitle || ""), escapeCSV(body || "")].join(",");
+      })
+      .join("\n");
+
+    const csv = `${headers}\n${rows}`;
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${carouselTitle.replace(/[^a-zA-Z0-9]/g, "-")}-canva.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    toast.success("CSV exporté ! Importe-le dans Canva Bulk Create");
+  }, []);
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -311,15 +343,26 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
                 {slidesHaveTexts && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleCopyAllTexts(carouselSlides)}
-                    className="touch-target flex-1 sm:flex-none"
-                  >
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copier textes
-                  </Button>
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleExportCSV(carouselSlides, title)}
+                      className="touch-target flex-1 sm:flex-none"
+                    >
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      CSV Canva
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleCopyAllTexts(carouselSlides)}
+                      className="touch-target flex-1 sm:flex-none"
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copier textes
+                    </Button>
+                  </>
                 )}
                 <Button
                   size="sm"
