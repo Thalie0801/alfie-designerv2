@@ -116,12 +116,20 @@ function buildMainPrompt(input: GenerateRequest): string {
   if (backgroundOnly) {
     fullPrompt = buildBackgroundOnlyPrompt(shouldApplyBrand ? brandKit : undefined);
   } else {
-    // Mode normal : forcing overlayText exact si présent
+    // Mode normal : intégration native du texte par Gemini 3 Pro
     if (overlayText) {
-      fullPrompt += `\n\n--- EXACT TEXT TO OVERLAY ---`;
-      fullPrompt += `\nUse EXACTLY this French text, word-for-word, no additions, no modifications:`;
+      fullPrompt += `\n\n--- TEXTE À INTÉGRER NATIVEMENT DANS L'IMAGE ---`;
+      fullPrompt += `\nIntègre ce texte français EXACTEMENT tel quel dans l'image :`;
       fullPrompt += `\n« ${overlayText} »`;
-      fullPrompt += `\n--- END EXACT TEXT ---`;
+      fullPrompt += `\n\nRÈGLES D'INTÉGRATION TEXTE MARKETING :`;
+      fullPrompt += `\n- Le TITRE principal doit être en gros, centré ou légèrement en haut`;
+      fullPrompt += `\n- Le BODY (texte secondaire) plus petit sous le titre`;
+      fullPrompt += `\n- Le CTA (appel à l'action) en style bouton ou zone distincte en bas`;
+      fullPrompt += `\n- CONTRASTE ÉLEVÉ obligatoire : texte clair sur fond sombre OU texte sombre sur fond clair`;
+      fullPrompt += `\n- Ajoute une ombre portée ou un contour pour garantir la lisibilité`;
+      fullPrompt += `\n- Typographie professionnelle, moderne, adaptée à la marque`;
+      fullPrompt += `\n- Le texte fait PARTIE INTÉGRANTE du design graphique`;
+      fullPrompt += `\n--- FIN INSTRUCTIONS TEXTE ---`;
     }
   }
 
