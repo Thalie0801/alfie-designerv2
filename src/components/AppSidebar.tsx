@@ -97,7 +97,8 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     asChild
                     isActive={location.pathname === item.path}
-                    className="min-h-[48px] touch-target"
+                    size={isMobile ? "lg" : "default"}
+                    className="min-h-[52px] md:min-h-[40px] touch-target"
                   >
                     <NavLink 
                       to={item.path} 
