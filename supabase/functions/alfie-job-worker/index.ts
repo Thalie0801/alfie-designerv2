@@ -23,9 +23,12 @@ type JobRow = {
 // ✅ TYPE CAROUSEL SLIDE - Architecture "Carousel Plan First"
 type CarouselSlide = {
   slide_number: number;
-  title_on_image: string;    // Max 5 mots, punchy
-  text_on_image: string;     // Max 20 mots, 2-3 lignes courtes
+  title_on_image: string;    // Max 50 caractères, punchy
+  subtitle?: string;         // ✅ Sous-titre explicatif (max 30 caractères)
+  text_on_image: string;     // Max 150 caractères, corps du texte
   caption: string;           // Pour le post social (1-3 phrases)
+  bullets?: string[];        // Points liste optionnels
+  author?: string;           // Auteur pour citations
 };
 
 const supabaseAdmin = createClient(
@@ -1268,7 +1271,8 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
     payload.carousel_slides = payload.generatedTexts.slides.map((slide: any, i: number) => ({
       slide_number: i + 1,
       title_on_image: slide.title || "",
-      text_on_image: slide.subtitle || slide.body || "",
+      subtitle: slide.subtitle || "",           // ✅ Propager subtitle
+      text_on_image: slide.body || "",          // ✅ body → text_on_image
       caption: slide.caption || "",
     }));
   }
@@ -1369,8 +1373,8 @@ Slide ${index + 1} of ${carouselSlides.length}.`;
           slideContent: {
             // ✅ Textes stockés dans text_json pour récupération (pas de rendu overlay)
             title: slide.title_on_image || "",
-            subtitle: (slide as any).subtitle || "",
-            body: slide.text_on_image || "",
+            subtitle: slide.subtitle || "",             // ✅ Propager subtitle explicitement
+            body: slide.text_on_image || "",            // ✅ Propager body (text_on_image)
             bullets: (slide as any).bullets || [],
             alt: `Slide ${index + 1}: ${slide.title_on_image}`,
             author: (slide as any).author || undefined,

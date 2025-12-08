@@ -293,24 +293,35 @@ Ce sont ces textes qui seront affichés dans le popup de confirmation avant gén
 - TOUTES les slides doivent avoir un texte unique et pertinent
 - JAMAIS de slides vides, JAMAIS de slides manquantes
 
-Structure obligatoire pour les carrousels :
+Structure obligatoire pour les carrousels (3 champs par slide) :
 "generatedTexts": {
   "slides": [
-    { "title": "Texte exact de la slide 1" },
-    { "title": "Texte exact de la slide 2" },
-    { "title": "Texte exact de la slide 3" },
-    { "title": "Texte exact de la slide 4" },
-    { "title": "Texte exact de la slide 5" }
+    { 
+      "title": "Accroche principale (max 50 caractères)", 
+      "subtitle": "Sous-titre explicatif (max 30 caractères)",
+      "body": "Corps du texte avec 1-2 phrases (max 150 caractères)"
+    },
+    { 
+      "title": "Astuce #1 - Point clé", 
+      "subtitle": "En bref",
+      "body": "Explication détaillée de ce point avec un exemple concret."
+    },
+    ...
   ]
 }
+
+RÈGLES POUR LES TEXTES DES SLIDES :
+- title : Accroche courte et percutante (max 50 caractères)
+- subtitle : Sous-titre explicatif optionnel (max 30 caractères) 
+- body : Corps du texte avec détails (1-2 phrases, max 150 caractères)
 
 ❌ INTERDIT : 
 - "prompt": "Carrousel sur les erreurs avec 5 slides..."
 - generatedTexts vide ou absent
 - Seulement 3 slides alors que 5 sont demandées
 
-✅ CORRECT : 
-- "generatedTexts": { "slides": [{ "title": "Tu fais ces erreurs ?" }, { "title": "Erreur #1 - Tu postes sans stratégie" }, { "title": "Erreur #2 - Tu copies tes concurrents" }, { "title": "Erreur #3 - Tu négliges ta bio" }, { "title": "La solution : une vraie stratégie" }] }
+✅ CORRECT (avec title + subtitle + body) : 
+- "generatedTexts": { "slides": [{ "title": "Tu fais ces erreurs ?", "subtitle": "Découvre-les vite", "body": "Voici les 3 erreurs qui sabotent ta visibilité en ligne." }, { "title": "Erreur #1", "subtitle": "Poster sans stratégie", "body": "Tu postes quand tu y penses, pas quand ton audience est là." }, { "title": "Erreur #2", "subtitle": "Copier les autres", "body": "Tu reproduis ce que font tes concurrents sans te différencier." }, { "title": "Erreur #3", "subtitle": "Négliger ta bio", "body": "Ta bio ne donne pas envie de te suivre ou de te contacter." }, { "title": "La solution", "subtitle": "Une vraie stratégie", "body": "Avec un planning et des objectifs clairs, tout change !" }] }
 
 Exemple de réponse complète :
 
@@ -339,16 +350,16 @@ Structure :
     "goal": "education",
     "tone": "professionnel",
     "prompt": "Carrousel sur l'organisation business avec 6 slides structurées",
-    "generatedTexts": {
-      "slides": [
-        { "title": "Tu perds des heures à chercher tes fichiers ? 😱" },
-        { "title": "Astuce #1 - Crée 3 dossiers : Clients, Projets, Admin" },
-        { "title": "Astuce #2 - Nomme tes fichiers avec la date en premier (2024-01-15_facture)" },
-        { "title": "Astuce #3 - Planifie 15 min de rangement chaque vendredi" },
-        { "title": "Astuce #4 - Utilise un outil de gestion de projet" },
-        { "title": "Résultat ? Tu retrouves tout en 10 secondes ! 🎯" }
-      ]
-    },
+      "generatedTexts": {
+        "slides": [
+          { "title": "Tu perds des heures ? 😱", "subtitle": "Stop au chaos", "body": "Tu cherches tes fichiers partout sans les retrouver." },
+          { "title": "Astuce #1", "subtitle": "3 dossiers clés", "body": "Crée 3 dossiers simples : Clients, Projets, Admin." },
+          { "title": "Astuce #2", "subtitle": "Nommage malin", "body": "Nomme tes fichiers avec la date en premier : 2024-01-15_facture." },
+          { "title": "Astuce #3", "subtitle": "15 min/semaine", "body": "Planifie 15 min de rangement chaque vendredi." },
+          { "title": "Astuce #4", "subtitle": "Outil de gestion", "body": "Utilise Notion ou Trello pour tout centraliser." },
+          { "title": "Résultat ? 🎯", "subtitle": "10 secondes", "body": "Tu retrouves tout en un clin d'œil !" }
+        ]
+      },
     "useBrandKit": true,
     "campaign": "Organisation business"
   }]
