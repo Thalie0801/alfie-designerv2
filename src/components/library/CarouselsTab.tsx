@@ -276,13 +276,19 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     return carouselSlides.some((s) => s.text_json && (s.text_json.title || s.text_json.body));
   }, []);
 
-  // ✅ Export CSV pour Canva Bulk Create
+  // ✅ Export CSV pour Canva Bulk Create avec limites de caractères
   const handleExportCSV = useCallback((carouselSlides: CarouselSlide[], carouselTitle: string) => {
     const slidesWithTexts = carouselSlides.filter((s) => s.text_json);
     if (slidesWithTexts.length === 0) {
       toast.error("Aucun texte à exporter");
       return;
     }
+
+    // Troncature pour Canva Bulk Create
+    const truncate = (str: string, max: number) => {
+      const clean = (str || "").trim();
+      return clean.length > max ? clean.slice(0, max - 1) + "…" : clean;
+    };
 
     const headers = "slide,title,subtitle,body";
     const escapeCSV = (str: string) => `"${(str || "").replace(/"/g, '""')}"`;
@@ -292,7 +298,12 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
       .map((slide) => {
         const { title, subtitle, body } = slide.text_json!;
         const slideNum = (slide.slide_index ?? 0) + 1;
-        return [slideNum, escapeCSV(title || ""), escapeCSV(subtitle || ""), escapeCSV(body || "")].join(",");
+        return [
+          slideNum, 
+          escapeCSV(truncate(title || "", 40)), 
+          escapeCSV(truncate(subtitle || "", 60)), 
+          escapeCSV(truncate(body || "", 120))
+        ].join(",");
       })
       .join("\n");
 
