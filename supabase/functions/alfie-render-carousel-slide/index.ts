@@ -223,19 +223,34 @@ function buildImagePromptPremium(
     
     textInstruction = `
 === TEXT TO INTEGRATE NATIVELY IN THE IMAGE ===
-TITLE (big, bold, centered or top): "${titleToDisplay}"
-${subtitleToDisplay ? `SUBTITLE (smaller, below title): "${subtitleToDisplay}"` : ""}
-${bodyToDisplay ? `BODY TEXT (readable size): "${bodyToDisplay}"` : ""}
+TITLE: "${titleToDisplay}"
+${subtitleToDisplay ? `SUBTITLE: "${subtitleToDisplay}"` : ""}
+${bodyToDisplay ? `BODY TEXT: "${bodyToDisplay}"` : ""}
 ${bulletsToDisplay ? `BULLET POINTS:\n${bulletsToDisplay}` : ""}
 
-INTEGRATION RULES:
-- Reproduce the text EXACTLY as provided (spelling, accents, punctuation)
-- Title must be LARGE, prominent, centered or at top of image
-- Secondary text smaller, positioned below title
-- Professional modern typography integrated seamlessly
-- HIGH CONTRAST mandatory (drop shadow or outline on text)
-- Text is PART OF the graphic design, not overlaid
-- Text must be READABLE and CRISP`;
+=== POSITIONING RULES (CRITICAL) ===
+1. ALL text must be HORIZONTALLY CENTERED (equal left/right margins)
+2. VERTICAL position: Title in UPPER-CENTER of image (not top edge, not middle)
+3. If subtitle/body exists: place DIRECTLY BELOW title with 20-30px visual gap
+4. Keep ALL text within SAFE ZONE (inner 80% of image - 10% margin each side)
+5. Text must NEVER touch or overflow image edges
+
+=== CONTRAST RULES (MANDATORY) ===
+1. Apply THICK DROP SHADOW on ALL text:
+   - Color: Black or very dark gray
+   - Offset: 4-5 pixels down and right
+   - Blur/spread: 10-15 pixels
+2. Text color: WHITE or very light color for maximum visibility
+3. Soften/blur background area directly behind text if needed
+
+=== TYPOGRAPHY SIZING ===
+1. Title: Bold, LARGE but proportional - max 70% of image WIDTH
+2. Subtitle: 50% of title size, same font family
+3. Body text: 40% of title size, clean and readable
+4. All text must fit comfortably without cropping
+
+Reproduce text EXACTLY as provided (spelling, accents, punctuation).
+Text is INTEGRATED into the design, professional and polished.`;
   } else {
     // CAS 2: Pas de texte → Gemini GÉNÈRE et intègre
     const slideRole = getSlideRole(slideIndex, totalSlides);
@@ -243,21 +258,32 @@ INTEGRATION RULES:
     
     textInstruction = `
 === GENERATE AND INTEGRATE TEXT NATIVELY ===
-You must CREATE ${isFR ? 'French' : 'English'} marketing text for this slide.
-Slide ${slideIndex + 1}/${totalSlides} - Role: ${slideRole}
+Create ${isFR ? 'French' : 'English'} marketing text for slide ${slideIndex + 1}/${totalSlides}.
+Role: ${slideRole}
 
 GENERATE:
-- A PUNCHY TITLE (3-5 words max, impactful)
-- A brief subtitle if relevant (8-12 words max)
+- TITLE: 3-5 impactful words (punchy, memorable)
+- SUBTITLE: 8-12 words explaining the point (optional)
 
 THEME: ${userPrompt}
 LANGUAGE: ${isFR ? 'French' : 'English'}
 TONE: ${tone}
 
-INTEGRATE this text natively in the image with:
-- Professional typography, large and readable
-- High contrast (drop shadow or outline)
-- Style coherent with the visual design`;
+=== POSITIONING RULES (CRITICAL) ===
+1. ALL text HORIZONTALLY CENTERED (equal left/right margins)
+2. Title in UPPER-CENTER of image (not edge, not middle)
+3. Subtitle DIRECTLY BELOW title with balanced spacing
+4. All text within SAFE ZONE (inner 80% of image)
+
+=== CONTRAST RULES (MANDATORY) ===
+1. THICK DROP SHADOW on all text (black, 4-5px offset, 10-15px spread)
+2. White or very light text color
+3. Background softened/blurred behind text area if needed
+
+=== TYPOGRAPHY ===
+1. Title: Bold, max 70% image width
+2. Subtitle: 50% of title size
+3. Professional modern sans-serif`;
   }
   
   // ✅ Style visuel enrichi par le Brand Kit V2
