@@ -74,15 +74,13 @@ function buildTextLayer(layer: TextLayer): string {
   // ✅ CRITICAL FIX: Font order must be font_family_size_style
   const font = `${fontFamily}_${fontSize}_${fontWeight}`;
   
-  // ✅ CONTRAST FIX: Use outline effect instead of stroke to preserve text color
-  // e_outline preserves co_rgb color better than e_stroke
+  // ✅ CLOUDINARY FIX: Use bo_ (border) for outline - e_outline syntax is invalid
   const outlineWidth = layer.outline || 16;
   const textColor = layer.color ? layer.color.replace('#', '') : 'ffffff';
   
   const styleParams = [
-    `co_rgb:${textColor}`, // ✅ Apply text color FIRST
-    `e_outline:outer:${outlineWidth}:s_black`, // ✅ Use e_outline instead of e_stroke
-    `e_shadow:60`, // ✅ Add shadow for depth
+    `co_rgb:${textColor}`, // ✅ Apply text color
+    `bo_${outlineWidth}px_solid_rgb:000000`, // ✅ Black border/outline
     layer.w ? `w_${layer.w},c_fit` : ''
   ].filter(Boolean).join(',');
   
@@ -208,14 +206,14 @@ function layersForContent(slide: Slide, primaryColor: string, brandFonts?: Brand
     w: 900
   });
   
-  // ✅ Body text (subtitle field) - positioned below title
+  // ✅ Body text (subtitle field) - positioned below title, uses Brand Kit secondary color
   if (slide.subtitle) {
     layers.push({
       text: truncateForOverlay(slide.subtitle, CHAR_LIMITS.body),
       font: bodyFont,
       weight: 'Regular',
       size: 38,
-      color: 'ffffff',
+      color: primaryColor, // ✅ Use brand primary color instead of white
       outline: 10,
       gravity: 'center',
       y: hasBullets ? 0 : 40, // Adjust if bullets follow
