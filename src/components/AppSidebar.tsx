@@ -13,6 +13,7 @@ import {
   Sparkles,
   Link2,
   Palette,
+  BookOpen,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
@@ -57,6 +58,7 @@ export function AppSidebar() {
     { path: "/integrations", label: "Intégrations", icon: Link2 },
     { path: "/billing", label: "Abonnement", icon: CreditCard },
     { path: "/affiliate", label: "Affiliation", icon: TrendingUp, tourId: "affiliate" },
+    { path: "/guide", label: "Guide", icon: BookOpen },
   ];
 
   const navItems = [...baseNavItems];

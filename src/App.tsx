@@ -31,6 +31,7 @@ import Templates from "./pages/Templates";
 import Library from "./pages/Library";
 import CloudinaryTest from "./pages/CloudinaryTest";
 import Creator from "./pages/Creator";
+import UserGuide from "./pages/UserGuide";
 
 import ActivateAccess from "./pages/onboarding/Activate";
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
@@ -54,6 +55,16 @@ const AppRoutes = () => {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/legal" element={<Legal />} />
         <Route path="/faq" element={<FAQ />} />
+        <Route
+          path="/guide"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <UserGuide />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/brand-kit-questionnaire"
