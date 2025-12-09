@@ -9,6 +9,7 @@ import { Copy, DollarSign, MousePointerClick, TrendingUp, Users, Award, Target, 
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
+import { maskEmail } from '@/utils/privacy';
 
 export default function Affiliate() {
   const { user, profile } = useAuth();
@@ -776,7 +777,7 @@ export default function Affiliate() {
                       </div>
                       <div>
                         <p className="font-medium">{referral.name}</p>
-                        <p className="text-sm text-muted-foreground">{referral.email}</p>
+                        <p className="text-sm text-muted-foreground">{maskEmail(referral.email)}</p>
                       </div>
                     </div>
                     <div className="text-right">

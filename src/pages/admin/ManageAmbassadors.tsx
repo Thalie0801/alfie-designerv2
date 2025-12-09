@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Plus, Award, Trash2 } from 'lucide-react';
+import { MaskableEmail } from '@/components/MaskableEmail';
 
 export default function ManageAmbassadors() {
   const [ambassadors, setAmbassadors] = useState<any[]>([]);
@@ -175,7 +176,7 @@ export default function ManageAmbassadors() {
                         🎖️ Ambassadeur
                       </Badge>
                     </CardTitle>
-                    <CardDescription>{amb.email}</CardDescription>
+                    <CardDescription><MaskableEmail email={amb.email} /></CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge className={getPlanBadgeColor(amb.plan)}>
@@ -234,7 +235,7 @@ export default function ManageAmbassadors() {
                 <SelectContent>
                   {users.filter(u => !u.granted_by_admin).map((user) => (
                     <SelectItem key={user.id} value={user.id}>
-                      {user.email} {user.full_name && `(${user.full_name})`}
+                      {user.email?.substring(0, 3)}***@{user.email?.split('@')[1]} {user.full_name && `(${user.full_name})`}
                     </SelectItem>
                   ))}
                 </SelectContent>
