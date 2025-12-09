@@ -657,16 +657,26 @@ Le secteur d'activité est fourni pour contexte minimal, mais reste neutre dans 
 
 /**
  * Parse le bloc <alfie-pack>{...}</alfie-pack> depuis la réponse LLM
+ * Utilise indexOf/slice au lieu de regex pour un parsing robuste du JSON imbriqué
  */
 function parsePack(text: string): any | null {
-  // Utilise un quantificateur gourmand (*) au lieu de lazy (*?) pour capturer tout le JSON imbriqué
-  const match = /<alfie-pack>\s*(\{[\s\S]*\})\s*<\/alfie-pack>/i.exec(text);
-  if (!match) return null;
-
+  const startTag = '<alfie-pack>';
+  const endTag = '</alfie-pack>';
+  
+  const startIdx = text.toLowerCase().indexOf(startTag.toLowerCase());
+  if (startIdx === -1) return null;
+  
+  const endIdx = text.toLowerCase().indexOf(endTag.toLowerCase(), startIdx);
+  if (endIdx === -1 || endIdx <= startIdx) return null;
+  
+  const jsonContent = text.slice(startIdx + startTag.length, endIdx).trim();
+  
   try {
-    return JSON.parse(match[1]);
+    const parsed = JSON.parse(jsonContent);
+    console.log("📦 Pack parsed successfully, assets count:", parsed.assets?.length || 0);
+    return parsed;
   } catch (error) {
-    console.error("Failed to parse alfie-pack JSON:", error);
+    console.error("Failed to parse alfie-pack JSON:", error, "Content preview:", jsonContent.substring(0, 300));
     return null;
   }
 }
