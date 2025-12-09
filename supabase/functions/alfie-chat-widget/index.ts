@@ -659,7 +659,8 @@ Le secteur d'activité est fourni pour contexte minimal, mais reste neutre dans 
  * Parse le bloc <alfie-pack>{...}</alfie-pack> depuis la réponse LLM
  */
 function parsePack(text: string): any | null {
-  const match = /<alfie-pack>\s*(\{[\s\S]*?\})\s*<\/alfie-pack>/i.exec(text);
+  // Utilise un quantificateur gourmand (*) au lieu de lazy (*?) pour capturer tout le JSON imbriqué
+  const match = /<alfie-pack>\s*(\{[\s\S]*\})\s*<\/alfie-pack>/i.exec(text);
   if (!match) return null;
 
   try {
