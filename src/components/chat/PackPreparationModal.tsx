@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { X, Image, Film, Grid3x3, AlertCircle, Volume2, VolumeX, Upload } from "lucide-react";
 import type { AlfiePack, PackAsset } from "@/types/alfiePack";
 import { calculatePackWoofCost, safeWoofs } from "@/lib/woofs";
@@ -67,6 +67,8 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
   );
   const [isGenerating, setIsGenerating] = useState(false);
   const [useBrandKit, setUseBrandKit] = useState(true);
+  const [useLogo, setUseLogo] = useState(false); // ✅ NEW: Option logo
+  const [brandLogoUrl, setBrandLogoUrl] = useState<string | null>(null); // ✅ NEW: Logo URL from brand
   const [colorMode, setColorMode] = useState<'vibrant' | 'pastel'>('vibrant');
   const [visualStyle, setVisualStyle] = useState<'background' | 'character' | 'product'>(() => {
     // ✅ Auto-detect from first asset's AI-detected visualStyleCategory
@@ -84,6 +86,21 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const { profile } = useAuth();
   const navigate = useNavigate();
+  
+  // ✅ NEW: Fetch brand logo_url on mount
+  useEffect(() => {
+    if (!brandId) return;
+    supabase
+      .from("brands")
+      .select("logo_url")
+      .eq("id", brandId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.logo_url) {
+          setBrandLogoUrl(data.logo_url);
+        }
+      });
+  }, [brandId]);
   
   // ✅ Detect if pack has hints for character/product style
   const hasCharacterHint = pack.assets.some(a => 
@@ -319,6 +336,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         userId: profile.id,
         selectedAssetIds: Array.from(selectedAssetIds),
         useBrandKit,
+        useLogo, // ✅ NEW: Option logo
         userPlan: profile.plan || 'starter',
         colorMode,
         visualStyle, // ✅ NEW: Style visuel adaptatif
@@ -540,6 +558,21 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
             >
               🏢 Brand Kit {useBrandKit && '✓'}
             </button>
+            
+            {/* ✅ NEW: Chip Logo - visible uniquement si la marque a un logo */}
+            {brandLogoUrl && (
+              <button 
+                type="button"
+                onClick={() => setUseLogo(!useLogo)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                  useLogo 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-background border border-border hover:bg-muted'
+                }`}
+              >
+                🖼️ Logo {useLogo && '✓'}
+              </button>
+            )}
             
             {/* Chip Coloré/Pastel */}
             <button 
