@@ -15,23 +15,55 @@ import {
   Dog,
   ArrowRight,
   CheckCircle2,
-  Lightbulb
+  Lightbulb,
+  Play
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useTour } from "@/components/tour/InteractiveTour";
 
-export default function UserGuide() {
+export default function Documentation() {
   const navigate = useNavigate();
+  const { start } = useTour();
+
+  const handleStartTour = () => {
+    navigate("/dashboard");
+    // Small delay to let the dashboard render before starting the tour
+    setTimeout(() => start(), 500);
+  };
 
   return (
     <div className="container max-w-4xl py-8 space-y-8">
       {/* Header */}
       <div className="text-center space-y-4">
-        <Badge variant="secondary" className="text-sm">Guide Utilisateur</Badge>
+        <Badge variant="secondary" className="text-sm">Documentation</Badge>
         <h1 className="text-4xl font-bold">Bienvenue sur Alfie Designer 🐾</h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
           Ton assistant IA créatif pour générer des visuels professionnels en quelques secondes.
         </p>
       </div>
+
+      {/* Interactive Tour CTA */}
+      <Card className="border-alfie-mint/30 bg-alfie-mint/5">
+        <CardContent className="pt-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-alfie-mint/20 flex items-center justify-center">
+                <Play className="h-6 w-6 text-alfie-mint" />
+              </div>
+              <div>
+                <p className="font-medium">Découvrir en 2 minutes</p>
+                <p className="text-sm text-muted-foreground">
+                  Lance le tour interactif pour une visite guidée de l'interface
+                </p>
+              </div>
+            </div>
+            <Button onClick={handleStartTour} className="whitespace-nowrap">
+              <Play className="mr-2 h-4 w-4" />
+              Lancer le tour guidé
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Quick Start */}
       <Card className="border-primary/20 bg-primary/5">

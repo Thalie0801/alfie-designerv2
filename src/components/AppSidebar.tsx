@@ -58,7 +58,7 @@ export function AppSidebar() {
     { path: "/integrations", label: "Intégrations", icon: Link2 },
     { path: "/billing", label: "Abonnement", icon: CreditCard },
     { path: "/affiliate", label: "Affiliation", icon: TrendingUp, tourId: "affiliate" },
-    { path: "/guide", label: "Guide", icon: BookOpen },
+    { path: "/documentation", label: "Documentation", icon: BookOpen },
   ];
 
   const navItems = [...baseNavItems];
