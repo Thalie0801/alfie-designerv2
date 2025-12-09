@@ -7,15 +7,31 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { Loader2, User, Mail, CreditCard } from 'lucide-react';
+import { Loader2, User, Mail, CreditCard, Download, Trash2, AlertTriangle } from 'lucide-react';
 import { useCustomerPortal } from '@/hooks/useCustomerPortal';
+import { useNavigate } from 'react-router-dom';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function Profile() {
-  const { user, profile } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const { openCustomerPortal, loading: portalLoading } = useCustomerPortal();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [exportLoading, setExportLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   useEffect(() => {
     if (profile) {
@@ -43,6 +59,56 @@ export default function Profile() {
       toast.error('Erreur lors de la mise à jour');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportData = async () => {
+    setExportLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('export-user-data');
+      
+      if (error) throw error;
+
+      // Download as JSON file
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `alfie-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success('Données exportées avec succès');
+    } catch (error: any) {
+      console.error('Error exporting data:', error);
+      toast.error('Erreur lors de l\'export des données');
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'SUPPRIMER') {
+      toast.error('Veuillez taper SUPPRIMER pour confirmer');
+      return;
+    }
+
+    setDeleteLoading(true);
+    try {
+      const { error } = await supabase.functions.invoke('delete-own-account');
+      
+      if (error) throw error;
+
+      toast.success('Compte supprimé avec succès');
+      await signOut();
+      navigate('/');
+    } catch (error: any) {
+      console.error('Error deleting account:', error);
+      toast.error('Erreur lors de la suppression du compte');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -183,6 +249,110 @@ export default function Profile() {
                 )}
               </Button>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* RGPD - Data Rights */}
+      <Card className="border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Download className="h-5 w-5 text-muted-foreground" />
+            Vos droits RGPD
+          </CardTitle>
+          <CardDescription>
+            Exportez ou supprimez vos données personnelles
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Data Export (Art. 20 RGPD - Portabilité) */}
+          <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+            <div>
+              <p className="font-medium">Exporter mes données</p>
+              <p className="text-sm text-muted-foreground">
+                Téléchargez toutes vos données au format JSON
+              </p>
+            </div>
+            <Button 
+              variant="outline" 
+              onClick={handleExportData}
+              disabled={exportLoading}
+            >
+              {exportLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Exporter
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Account Deletion (Art. 17 RGPD - Droit à l'oubli) */}
+          <div className="flex items-center justify-between p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+            <div>
+              <p className="font-medium text-destructive">Supprimer mon compte</p>
+              <p className="text-sm text-muted-foreground">
+                Action irréversible. Toutes vos données seront supprimées.
+              </p>
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Supprimer
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                    Supprimer définitivement votre compte ?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="space-y-3">
+                    <p>
+                      Cette action est <strong>irréversible</strong>. Toutes vos données seront supprimées :
+                    </p>
+                    <ul className="list-disc list-inside text-sm space-y-1">
+                      <li>Profil et informations personnelles</li>
+                      <li>Marques et Brand Kits</li>
+                      <li>Visuels et médias générés</li>
+                      <li>Historique de conversations</li>
+                      <li>Abonnement et facturation</li>
+                    </ul>
+                    <div className="pt-4">
+                      <Label htmlFor="confirmDelete">
+                        Tapez <strong>SUPPRIMER</strong> pour confirmer :
+                      </Label>
+                      <Input
+                        id="confirmDelete"
+                        value={deleteConfirmText}
+                        onChange={(e) => setDeleteConfirmText(e.target.value)}
+                        placeholder="SUPPRIMER"
+                        className="mt-2"
+                      />
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setDeleteConfirmText('')}>
+                    Annuler
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteAccount}
+                    disabled={deleteLoading || deleteConfirmText !== 'SUPPRIMER'}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {deleteLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      'Supprimer définitivement'
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </CardContent>
       </Card>
