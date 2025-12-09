@@ -95,6 +95,8 @@ async function upsertProfile(
   const planConfig = PLAN_CONFIG[plan];
   const supabase = getSupabaseClient();
 
+  console.log("[verify-session] Upserting profile:", { userId, email, plan, stripeSubscriptionId });
+
   const { error } = await supabase
     .from("profiles")
     .upsert({
@@ -102,9 +104,9 @@ async function upsertProfile(
       email,
       plan,
       quota_brands: planConfig.quota_brands,
-      quota_images: planConfig.quota_images,
+      quota_visuals_per_month: planConfig.quota_images, // Nom correct de la colonne
       quota_videos: planConfig.quota_videos,
-      quota_woofs: planConfig.quota_woofs,
+      // quota_woofs retiré - géré par brands/counters_monthly
       stripe_customer_id: stripeCustomerId,
       stripe_subscription_id: stripeSubscriptionId,
       status: "active",
@@ -112,8 +114,11 @@ async function upsertProfile(
     .eq("id", userId);
   
   if (error) {
+    console.error("[verify-session] Profile upsert error:", error);
     throw new Error(`Profile upsert failed: ${error.message}`);
   }
+  
+  console.log("[verify-session] Profile upserted successfully for:", email);
 }
 
 async function insertPaymentSession(sessionId: string, email: string, plan: string, amount?: number) {
