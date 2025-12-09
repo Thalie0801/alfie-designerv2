@@ -104,10 +104,7 @@ export function PackSummarySidebar({
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Carrousels</span>
                 <Badge variant="outline">
-                  {pack.assets
-                    .filter((a) => a.kind === "carousel")
-                    .reduce((sum, a) => sum + a.count, 0)}{" "}
-                  slides
+                  {carouselCount} × {WOOF_COSTS.carousel} 🐾
                 </Badge>
               </div>
             )}
