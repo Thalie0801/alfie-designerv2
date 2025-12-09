@@ -55,7 +55,8 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
   // ✅ Les slides sont générés automatiquement par l'IA - plus d'édition manuelle
 
   const woofCost = WOOF_COSTS[asset.woofCostType];
-  const totalCost = asset.kind === "carousel" ? woofCost * asset.count : woofCost;
+  // ✅ Carrousel = coût FIXE de 10 Woofs (pas multiplié par slides)
+  const totalCost = asset.kind === "carousel" ? WOOF_COSTS.carousel : woofCost;
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
