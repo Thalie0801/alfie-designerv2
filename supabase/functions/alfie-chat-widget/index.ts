@@ -683,12 +683,21 @@ function parsePack(text: string): any | null {
 
 /**
  * Nettoie le texte en retirant le bloc <alfie-pack> et TOUS les astérisques markdown
+ * Utilise indexOf/slice pour une extraction robuste (pas de regex)
  */
 function cleanReply(text: string): string {
   let cleaned = text;
   
-  // 1. Retirer le bloc <alfie-pack>
-  cleaned = cleaned.replace(/<alfie-pack>[\s\S]*?<\/alfie-pack>/gi, "");
+  // 1. Retirer le bloc <alfie-pack> avec indexOf/slice (robuste)
+  const startTag = '<alfie-pack>';
+  const endTag = '</alfie-pack>';
+  const startIdx = cleaned.toLowerCase().indexOf(startTag.toLowerCase());
+  if (startIdx !== -1) {
+    const endIdx = cleaned.toLowerCase().indexOf(endTag.toLowerCase(), startIdx);
+    if (endIdx !== -1) {
+      cleaned = cleaned.slice(0, startIdx) + cleaned.slice(endIdx + endTag.length);
+    }
+  }
   
   // 2. Retirer markdown **gras** et *italique*
   cleaned = cleaned.replace(/\*{1,2}([^*]+)\*{1,2}/g, "$1");
@@ -809,6 +818,9 @@ Deno.serve(async (req) => {
     // Parser le pack si présent
     const pack = parsePack(rawReply);
     const reply = cleanReply(rawReply);
+    
+    // Log de debug pour vérifier le parsing
+    console.log("📦 Pack result:", pack ? `assets=${pack.assets?.length || 0}` : "null");
 
     return new Response(
       JSON.stringify({ reply, pack }),
