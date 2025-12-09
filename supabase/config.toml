@@ -38,3 +38,9 @@ verify_jwt = true
 
 [functions.alfie-vision]
 verify_jwt = true
+
+[functions.delete-own-account]
+verify_jwt = true
+
+[functions.export-user-data]
+verify_jwt = true
