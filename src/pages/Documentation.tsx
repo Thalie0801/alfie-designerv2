@@ -19,17 +19,9 @@ import {
   Play
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useTour } from "@/components/tour/InteractiveTour";
 
 export default function Documentation() {
   const navigate = useNavigate();
-  const { start } = useTour();
-
-  const handleStartTour = () => {
-    navigate("/dashboard");
-    // Small delay to let the dashboard render before starting the tour
-    setTimeout(() => start(), 500);
-  };
 
   return (
     <div className="container max-w-4xl py-8 space-y-8">
@@ -53,14 +45,13 @@ export default function Documentation() {
               <div>
                 <p className="font-medium">Découvrir en 2 minutes</p>
                 <p className="text-sm text-muted-foreground">
-                  Lance le tour interactif pour une visite guidée de l'interface
+                  Tour interactif de l'interface
                 </p>
               </div>
             </div>
-            <Button onClick={handleStartTour} className="whitespace-nowrap">
-              <Play className="mr-2 h-4 w-4" />
-              Lancer le tour guidé
-            </Button>
+            <Badge variant="secondary" className="text-sm">
+              🚀 À venir
+            </Badge>
           </div>
         </CardContent>
       </Card>
