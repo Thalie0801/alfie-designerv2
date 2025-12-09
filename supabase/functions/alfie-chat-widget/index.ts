@@ -490,7 +490,7 @@ RÈGLE IMPORTANTE : Si le CONTEXTE DE LA MARQUE est fourni avec niche et/ou voic
 async function callLLM(
   messages: { role: string; content: string }[],
   systemPrompt: string,
-  brandContext?: { name?: string; niche?: string; voice?: string; palette?: string[] },
+  brandContext?: { name?: string; niche?: string; voice?: string; palette?: string[]; logo_url?: string },
   woofsRemaining?: number,
   useBrandKit: boolean = true,
   briefContext?: string,
@@ -543,6 +543,12 @@ async function callLLM(
         const colorDesc = paletteToDescriptions(brandContext.palette);
         enrichedPrompt += `\nBrand colors: ${colorDesc}`;
         enrichedPrompt += `\n(Never render hex codes as visible text in images)`;
+      }
+      // ✅ NEW: Mention logo if available
+      if (brandContext.logo_url) {
+        enrichedPrompt += `\n\n🖼️ LOGO DE MARQUE DISPONIBLE : L'utilisateur a configuré un logo dans son Brand Kit.
+Tu peux lui proposer de l'intégrer dans ses visuels en ajoutant le champ "useLogo": true dans les assets du pack.
+Exemples de suggestions : "Tu veux que j'ajoute ton logo ?" ou "Je peux intégrer ton logo en filigrane".`;
       }
       enrichedPrompt += `\n\nIMPORTANT : Tu connais déjà le ton, le positionnement, les couleurs et le secteur via le Brand Kit. Ne redemande JAMAIS ces informations (ton, voix, niche, industrie, couleurs). Utilise ces données pour adapter tes recommandations de pack sans poser de questions redondantes.`;
     } else {
@@ -717,7 +723,7 @@ Deno.serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
     
-    let brandContext: { name?: string; niche?: string; voice?: string; palette?: string[] } | undefined;
+    let brandContext: { name?: string; niche?: string; voice?: string; palette?: string[]; logo_url?: string } | undefined;
     
     if (SUPABASE_URL && SUPABASE_ANON_KEY) {
       try {
@@ -735,8 +741,8 @@ Deno.serve(async (req) => {
           );
         }
 
-        // Vérifier que l'utilisateur possède la brand
-        const brandResponse = await fetch(`${SUPABASE_URL}/rest/v1/brands?id=eq.${brandId}&select=user_id,name,niche,voice,palette`, {
+        // ✅ Vérifier que l'utilisateur possède la brand + récupérer logo_url
+        const brandResponse = await fetch(`${SUPABASE_URL}/rest/v1/brands?id=eq.${brandId}&select=user_id,name,niche,voice,palette,logo_url`, {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
             'Authorization': authHeader
@@ -754,7 +760,8 @@ Deno.serve(async (req) => {
             }
             brandContext = {
               niche: brands[0].niche,
-              voice: brands[0].voice
+              voice: brands[0].voice,
+              logo_url: brands[0].logo_url, // ✅ NEW: Include logo_url
             };
           } else {
             return new Response(

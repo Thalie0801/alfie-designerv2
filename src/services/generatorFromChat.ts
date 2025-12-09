@@ -20,6 +20,7 @@ export interface SendPackParams {
   userId: string;
   selectedAssetIds: string[];
   useBrandKit?: boolean;
+  useLogo?: boolean; // ✅ NEW: Option logo
   userPlan?: string;
   carouselMode?: 'standard' | 'premium'; // ✅ Mode Standard/Premium pour carrousels
   colorMode?: 'vibrant' | 'pastel'; // ✅ Mode Coloré/Pastel
@@ -43,6 +44,7 @@ export async function sendPackToGenerator({
   userId,
   selectedAssetIds,
   useBrandKit = true,
+  useLogo = false, // ✅ NEW: Option logo
   userPlan = 'starter',
   carouselMode = 'standard', // ✅ Mode Standard/Premium pour carrousels
   colorMode = 'vibrant', // ✅ Mode Coloré/Pastel
@@ -106,7 +108,7 @@ export async function sendPackToGenerator({
           slidesPreview: asset.generatedTexts?.slides?.slice(0, 2).map((s: any) => ({ title: s.title?.slice(0, 30), hasBody: !!s.body })),
           visualStyle,
         });
-        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, userPlan, carouselMode, colorMode, visualStyle);
+        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, useLogo, userPlan, carouselMode, colorMode, visualStyle);
       })
     );
 
@@ -160,6 +162,7 @@ async function createAssetJob(
   userId: string,
   packTitle: string,
   useBrandKit: boolean = true,
+  useLogo: boolean = false, // ✅ NEW: Option logo
   userPlan: string = 'starter',
   carouselMode: 'standard' | 'premium' = 'standard',
   colorMode: 'vibrant' | 'pastel' = 'vibrant',
@@ -237,6 +240,7 @@ async function createAssetJob(
       generatedTexts: asset.generatedTexts,
       campaign: packTitle,
       useBrandKit,
+      useLogo, // ✅ NEW: Option logo
       userPlan,
       carouselMode: asset.kind === "carousel" ? (asset.carouselMode || carouselMode) : undefined, // ✅ Mode Standard/Premium
       colorMode: colorMode, // ✅ Mode Coloré/Pastel

@@ -320,11 +320,20 @@ function buildStyleSuffix(
 
 /**
  * Combine contenu utilisateur + style pour le prompt final
+ * Ajoute des instructions logo si useLogo=true et brand.logo_url existe
  */
-function buildFinalPrompt(payload: any, useBrandKit: boolean, brand?: any, visualStyle?: string): string {
+function buildFinalPrompt(payload: any, useBrandKit: boolean, brand?: any, visualStyle?: string, useLogo?: boolean): string {
   const content = buildContentPrompt(payload);
   const style = buildStyleSuffix(useBrandKit, brand, visualStyle);
-  return `${content}. ${style}`;
+  
+  let prompt = `${content}. ${style}`;
+  
+  // ✅ NEW: Add logo integration instructions if enabled
+  if (useLogo && brand?.logo_url) {
+    prompt += ` Include subtle brand logo placement or leave space for logo overlay in composition. The logo should be integrated naturally without dominating the visual.`;
+  }
+  
+  return prompt;
 }
 
 // ---------- HTTP Entrypoint ----------
@@ -919,8 +928,9 @@ async function processRenderImages(
   const orderId = payload.orderId as string;
   const brandId = (payload.brandId as string | undefined) || undefined;
   
-  // ✅ Résoudre useBrandKit une seule fois pour toute la fonction
+  // ✅ Résoudre useBrandKit et useLogo une seule fois pour toute la fonction
   const useBrandKit = resolveUseBrandKit(payload, jobMeta);
+  const useLogo = payload?.useLogo === true; // ✅ NEW: Résoudre useLogo
 
   const payloadEmail =
     typeof payload?.userEmail === "string" ? payload.userEmail.toLowerCase() : null;
@@ -986,7 +996,7 @@ async function processRenderImages(
     const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : undefined;
     const visualStyle = payload.visualStyle || "photorealistic";
     const visualStyleCategory = payload.visualStyleCategory || 'background'; // ✅ NEW
-    const basePrompt = buildFinalPrompt(payload, useBrandKit, brandMini, visualStyle);
+    const basePrompt = buildFinalPrompt(payload, useBrandKit, brandMini, visualStyle, useLogo); // ✅ Pass useLogo
 
     imagesToRender = Array.from({ length: imagesCount }).map((_, index) => ({
       prompt: `${basePrompt}. ${resolvedKind === "carousel" ? `Carousel slide ${index + 1}.` : ""} Format ${ratioToUse}.`,
@@ -1691,16 +1701,16 @@ async function createCascadeJobs(job: JobRow, result: any, sb: SupabaseClient) {
 async function loadBrandMini(brandId?: string, full = true) {
   if (!brandId) return undefined;
   
-  // ✅ Always load Brand Kit V2 fields + fonts + text_color for personalized generation
+  // ✅ Always load Brand Kit V2 fields + fonts + text_color + logo_url for personalized generation
   const { data, error } = await supabaseAdmin
     .from("brands")
-    .select("name, palette, fonts, voice, niche, pitch, adjectives, visual_types, visual_mood, avoid_in_visuals, text_color")
+    .select("name, palette, fonts, voice, niche, pitch, adjectives, visual_types, visual_mood, avoid_in_visuals, text_color, logo_url")
     .eq("id", brandId)
     .maybeSingle();
     
   if (error || !data) return undefined;
   
-  console.log(`[loadBrandMini] fonts:`, JSON.stringify(data.fonts), `palette:`, JSON.stringify(data.palette), `text_color:`, data.text_color);
+  console.log(`[loadBrandMini] fonts:`, JSON.stringify(data.fonts), `palette:`, JSON.stringify(data.palette), `text_color:`, data.text_color, `logo_url:`, data.logo_url ? "✅" : "❌");
   
   return {
     name: data.name,
@@ -1714,6 +1724,7 @@ async function loadBrandMini(brandId?: string, full = true) {
     visual_mood: data.visual_mood,
     avoid_in_visuals: data.avoid_in_visuals,
     text_color: data.text_color, // ✅ Include text_color for carousel overlays
+    logo_url: data.logo_url, // ✅ NEW: Include logo_url for optional integration
   };
 }
 
