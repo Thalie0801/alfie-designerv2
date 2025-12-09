@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,10 +11,11 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { useBrandKit, ToneSliders } from '@/hooks/useBrandKit';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { Palette, Save, Loader2, X, MessageSquare, Eye, Sparkles, Type } from 'lucide-react';
+import { Palette, Save, Loader2, X, MessageSquare, Eye, Sparkles, Type, Upload, Trash2, Link } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { BrandSelector } from '@/components/BrandSelector';
 import { cn } from '@/lib/utils';
+import { useDropzone } from 'react-dropzone';
 
 // Polices supportées par Cloudinary Google Fonts
 const SUPPORTED_FONTS = [
@@ -60,6 +61,60 @@ export default function BrandKit() {
   const { brandKit, loadBrands } = useBrandKit();
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  // Handle logo file upload
+  const handleLogoDrop = useCallback(async (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file || !brandKit?.id) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Seules les images sont acceptées (PNG, JPG, WEBP)');
+      return;
+    }
+
+    // Validate file size (2MB max)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Le fichier est trop lourd (max 2 Mo)');
+      return;
+    }
+
+    setUploadingLogo(true);
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+      const path = `brand-logos/${brandKit.id}/${Date.now()}.${ext}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('chat-uploads')
+        .upload(path, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat-uploads')
+        .getPublicUrl(path);
+
+      setFormData(prev => ({ ...prev, logo_url: publicUrl }));
+      toast.success('Logo uploadé !');
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error('Erreur lors de l\'upload');
+    } finally {
+      setUploadingLogo(false);
+    }
+  }, [brandKit?.id]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop: handleLogoDrop,
+    accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp', '.gif'] },
+    maxFiles: 1,
+    disabled: uploadingLogo
+  });
+
+  const handleRemoveLogo = () => {
+    setFormData(prev => ({ ...prev, logo_url: '' }));
+  };
   const [formData, setFormData] = useState({
     name: '',
     logo_url: '',
@@ -277,28 +332,85 @@ export default function BrandKit() {
             />
           </div>
 
-          {/* Logo URL */}
-          <div className="space-y-2">
-            <Label htmlFor="logo_url">URL du logo</Label>
-            <Input
-              id="logo_url"
-              type="url"
-              placeholder="https://..."
-              value={formData.logo_url}
-              onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
-            />
+          {/* Logo - Upload + URL */}
+          <div className="space-y-4">
+            <Label>Logo de marque</Label>
+            
+            {/* Preview */}
             {formData.logo_url && (
-              <div className="mt-2 p-4 border rounded-lg bg-muted/30">
+              <div className="flex items-start gap-4 p-4 border rounded-lg bg-muted/30">
                 <img
                   src={formData.logo_url}
                   alt="Logo preview"
-                  className="h-20 object-contain"
+                  className="h-24 w-24 object-contain rounded-lg border bg-background"
                   onError={(e) => {
-                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.src = '/placeholder.svg';
                   }}
                 />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium mb-1">Logo actuel</p>
+                  <p className="text-xs text-muted-foreground truncate">{formData.logo_url}</p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleRemoveLogo}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             )}
+
+            {/* Upload zone */}
+            <div
+              {...getRootProps()}
+              className={cn(
+                "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors",
+                isDragActive && "border-primary bg-primary/5",
+                uploadingLogo && "opacity-50 cursor-not-allowed",
+                !isDragActive && "border-border hover:border-primary/50"
+              )}
+            >
+              <input {...getInputProps()} />
+              {uploadingLogo ? (
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Upload en cours...</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <Upload className="h-8 w-8 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    {isDragActive ? "Dépose ton logo ici" : "Glisse ton logo ou clique pour parcourir"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">PNG, JPG, WEBP • Max 2 Mo</p>
+                </div>
+              )}
+            </div>
+
+            {/* Separator */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">ou URL externe</span>
+              </div>
+            </div>
+
+            {/* URL input */}
+            <div className="flex items-center gap-2">
+              <Link className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <Input
+                id="logo_url"
+                type="url"
+                placeholder="https://example.com/logo.png"
+                value={formData.logo_url}
+                onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
+              />
+            </div>
           </div>
 
           {/* Niche */}
