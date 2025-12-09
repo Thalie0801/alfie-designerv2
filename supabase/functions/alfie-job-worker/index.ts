@@ -1342,6 +1342,10 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   // ========================================
   console.log(`[processRenderCarousels] 🎨 Rendering ${carouselSlides.length} slides...`);
 
+  // ✅ Extraire visualStyle du payload (background/character/product)
+  const visualStyle = payload.visualStyle || 'background';
+  console.log(`[processRenderCarousels] 🎨 Visual style: ${visualStyle}`);
+
   const slidePromises = carouselSlides.map(async (slide: CarouselSlide, index: number) => {
     console.log(`[processRenderCarousels] 📄 Slide ${index + 1}/${carouselSlides.length}: "${slide.title_on_image}"`);
 
@@ -1355,19 +1359,46 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
           await sleep(1000 * attempt);
         }
 
-        // ✅ REFONTE: Générer des images de fond SANS TEXTE
-        // Les textes sont stockés séparément dans text_json pour récupération via 3 méthodes
-        const backgroundPrompt = `Abstract colorful background for social media carousel.
+        // ✅ ADAPTATIF: Prompt différent selon visualStyle
+        let backgroundPrompt: string;
+        
+        if (visualStyle === 'character') {
+          // Mode PERSONNAGE: générer des avatars/personnages 3D
+          const characterType = brandMini?.visual_types?.[0] || 'avatars_3d';
+          let characterStyle = '3D cartoon character in Pixar/Disney style';
+          if (characterType === 'avatars_flat') characterStyle = 'flat 2D illustrated character, modern vector style';
+          if (characterType === 'mascotte') characterStyle = 'cute brand mascot character, friendly cartoon figure';
+          
+          backgroundPrompt = `Create a social media image featuring a CHARACTER.
+CHARACTER: ${characterStyle}, expressive, professional appearance
+SCENE: ${brandMini?.niche || 'professional'} setting, activity related to the content
+MOOD: ${colorMode === 'vibrant' ? 'vibrant saturated colors' : 'soft pastel tones'}
+Slide ${index + 1} of ${carouselSlides.length}.
+CRITICAL: Character must be central. NO TEXT whatsoever - no letters, words, labels.
+Leave space at top for text overlay.`;
+        } else if (visualStyle === 'product' && payload.referenceImageUrl) {
+          // Mode PRODUIT: mise en scène du produit uploadé
+          backgroundPrompt = `Create a professional PRODUCT SHOWCASE image.
+Use the reference image as inspiration for the product to feature.
+SCENE: Professional ${brandMini?.niche || 'e-commerce'} product photography setting
+BACKGROUND: ${colorMode === 'vibrant' ? 'vibrant colorful gradients' : 'soft pastel background'}
+Slide ${index + 1} of ${carouselSlides.length}.
+CRITICAL: Product must be central subject. NO TEXT whatsoever - no letters, prices, labels.
+Leave space at top for text overlay.`;
+        } else {
+          // Mode FOND ABSTRAIT (défaut)
+          backgroundPrompt = `Abstract colorful background for social media carousel.
 NO TEXT whatsoever - no letters, words, numbers, labels.
 ONLY abstract shapes, gradients, patterns, visual elements.
 Style: ${colorMode === 'vibrant' ? 'vibrant saturated colors, bold gradients' : 'soft pastel tones, gentle gradients'}.
 ${useBrandKit && brandMini?.niche ? `Theme context: ${brandMini.niche} brand.` : ''}
 ${useBrandKit && brandMini?.visual_mood?.length ? `Mood: ${brandMini.visual_mood.join(', ')}.` : ''}
 Slide ${index + 1} of ${carouselSlides.length}.`;
+        }
 
         const slideResult = await callFn("alfie-render-carousel-slide", {
           userId: jobMeta?.user_id || payload.userId,
-          prompt: backgroundPrompt, // ✅ Prompt pour fond abstrait SANS TEXTE
+          prompt: backgroundPrompt,
           globalStyle,
           brandKit: brandMini,
           slideContent: {
@@ -1394,6 +1425,7 @@ Slide ${index + 1} of ${carouselSlides.length}.`;
           carouselMode: "background_only", // ✅ FORCER mode fond uniquement
           carouselType,
           colorMode,
+          visualStyle, // ✅ NEW: Passer le style visuel adaptatif
           referenceImageUrl: payload.referenceImageUrl || null,
           backgroundOnly: true, // ✅ Flag explicite: pas d'overlays texte
         });

@@ -23,6 +23,7 @@ type Lang = "FR" | "EN";
 
 type CarouselMode = 'standard' | 'premium';
 type ColorMode = 'vibrant' | 'pastel';
+type VisualStyle = 'background' | 'character' | 'product'; // ✅ NEW: Style visuel adaptatif
 
 interface BrandKit {
   name?: string;
@@ -67,6 +68,7 @@ interface SlideRequest {
   brandKit?: BrandKit;          // ✅ NOUVEAU: Brand Kit V2 complet
   referenceImageUrl?: string | null; // ✅ NOUVEAU: Image de référence pour le style
   colorMode?: ColorMode;        // ✅ NOUVEAU: Coloré ou Pastel
+  visualStyle?: VisualStyle;    // ✅ NOUVEAU: Style visuel (background/character/product)
 }
 
 type GenSize = { w: number; h: number };
@@ -214,6 +216,134 @@ ABSOLUTE RULES:
 - Match the visual style to the industry/theme
 
 OUTPUT: A beautiful, thematic background image with NO text.`
+}
+
+/**
+ * ✅ NEW: Build prompt for CHARACTER mode (avatars, personnages 3D style Pixar)
+ * Génère des personnages/avatars selon le Brand Kit
+ */
+function buildImagePromptCharacter(
+  userPrompt: string,
+  brandKit: BrandKit | undefined,
+  useBrandKit: boolean,
+  slideIndex: number,
+  totalSlides: number,
+  colorMode: ColorMode = 'vibrant'
+): string {
+  // Déterminer le style de personnage selon le Brand Kit
+  let characterStyle = "3D cartoon character in Pixar/Disney animation style, expressive face, friendly appearance";
+  let characterDescription = "professional young adult";
+  
+  if (useBrandKit && brandKit) {
+    const visualType = brandKit.visual_types?.[0];
+    if (visualType === "avatars_3d" || visualType === "illustrations_3d") {
+      characterStyle = "3D rendered cartoon character in Pixar/Disney style, smooth rendering, expressive features";
+    } else if (visualType === "avatars_flat" || visualType === "illustrations_2d") {
+      characterStyle = "flat 2D illustrated character, modern vector art style, clean lines";
+    } else if (visualType === "mascotte") {
+      characterStyle = "cute brand mascot character, friendly cartoon animal or figure, memorable design";
+    }
+    
+    // Adapter au niche
+    if (brandKit.niche) {
+      characterDescription = `${brandKit.niche} professional`;
+    }
+  }
+  
+  const colorScheme = colorMode === 'pastel' 
+    ? "soft pastel color palette, gentle tones"
+    : "vibrant saturated colors";
+  
+  const slideRole = getSlideRole(slideIndex, totalSlides);
+  const theme = userPrompt?.trim() || "professional content";
+  
+  return `Create a social media image featuring a CHARACTER.
+
+CHARACTER: ${characterStyle}
+PERSON: ${characterDescription} engaged in activity related to: ${theme}
+MOOD: ${colorScheme}, modern professional aesthetic
+SCENE: Clean background with soft depth, ${slideRole.toLowerCase()}
+
+CRITICAL REQUIREMENTS:
+- Character must be the CENTRAL focus of the image
+- Character should express emotion/energy related to the content
+- Leave space at top for text overlay (added separately)
+- Modern social media aesthetic with professional quality
+
+ABSOLUTE RULES:
+- NO TEXT whatsoever in the image - no letters, words, labels
+- Character should be well-lit and clearly visible
+- Background should complement, not distract from character
+
+OUTPUT: A professional image with an expressive character and NO text.`;
+}
+
+/**
+ * ✅ NEW: Build prompt for PRODUCT mode (mise en scène produit)
+ * Utilise l'image de référence uploadée comme produit central
+ */
+function buildImagePromptProduct(
+  userPrompt: string,
+  brandKit: BrandKit | undefined,
+  useBrandKit: boolean,
+  referenceImageUrl: string | null | undefined,
+  slideIndex: number,
+  totalSlides: number,
+  colorMode: ColorMode = 'vibrant'
+): string {
+  // Si pas d'image de référence, fallback vers un style produit générique
+  const hasReference = !!referenceImageUrl;
+  
+  let sceneStyle = "professional product photography, elegant mockup setting";
+  let backgroundStyle = "clean gradient background with subtle shadows";
+  
+  if (useBrandKit && brandKit) {
+    if (brandKit.niche) {
+      sceneStyle = `${brandKit.niche} product showcase, professional setting`;
+    }
+    const mood = brandKit.visual_mood?.[0];
+    if (mood === "minimaliste") {
+      backgroundStyle = "minimal clean background with soft shadows";
+    } else if (mood === "lumineux") {
+      backgroundStyle = "bright luminous background with soft glow";
+    } else if (mood === "sombre") {
+      backgroundStyle = "dark elegant background with accent lighting";
+    }
+  }
+  
+  const colorScheme = colorMode === 'pastel' 
+    ? "soft pastel tones, gentle colors"
+    : "rich saturated colors";
+  
+  const slideRole = getSlideRole(slideIndex, totalSlides);
+  const theme = userPrompt?.trim() || "product showcase";
+  
+  const referenceInstruction = hasReference 
+    ? `Use the provided reference image as the MAIN PRODUCT to feature centrally.`
+    : `Create a generic product mockup scene suitable for: ${theme}`;
+  
+  return `Create a professional PRODUCT SHOWCASE image.
+
+${referenceInstruction}
+
+SCENE: ${sceneStyle}
+BACKGROUND: ${backgroundStyle}
+COLORS: ${colorScheme}
+CONTEXT: ${theme}
+SLIDE ROLE: ${slideRole}
+
+CRITICAL REQUIREMENTS:
+- Product must be the CENTRAL subject of the image
+- Professional e-commerce/marketing quality
+- Create an attractive lifestyle or studio setting around the product
+- Leave space at top for text overlay (added separately)
+
+ABSOLUTE RULES:
+- NO TEXT whatsoever in the image - no labels, prices, descriptions
+- Product should be well-lit and clearly visible
+- Background should enhance, not compete with the product
+
+OUTPUT: A stunning product showcase image with NO text.`;
 }
 
 /**
@@ -588,11 +718,12 @@ Deno.serve(async (req) => {
       brandKit, // ✅ NOUVEAU: Brand Kit V2 complet
       referenceImageUrl, // ✅ NOUVEAU: Image de référence pour le style
       colorMode = 'vibrant', // ✅ NOUVEAU: Mode couleurs (vibrant/pastel)
+      visualStyle = 'background', // ✅ NOUVEAU: Style visuel (background/character/product)
     } = params;
     
     // ✅ Sélectionner le modèle selon le mode
     const MODEL_IMAGE = carouselMode === 'premium' ? MODEL_IMAGE_PREMIUM : MODEL_IMAGE_STANDARD;
-    console.log(`[render-slide] 🎨 Mode: ${carouselMode} - Model: ${MODEL_IMAGE}`);
+    console.log(`[render-slide] 🎨 Mode: ${carouselMode} - Model: ${MODEL_IMAGE} - Visual: ${visualStyle}`);
 
     // —— Supabase admin client (service role)
     const supabaseAdmin = createClient(
@@ -704,31 +835,58 @@ Deno.serve(async (req) => {
     // STEP 2/4 — Générer background (Vertex AI Gemini priorité)
     // =========================================
     
-    // ✅ V8: Standard = Gemini Flash + overlay, Premium = Gemini 3 Pro + overlay (same overlay logic)
-    // ✅ V8: BOTH modes now generate background-only images (NO TEXT)
-    // Text is added via Cloudinary overlay with Brand Kit fonts/colors
-    const enrichedPrompt = carouselMode === 'premium'
-      ? buildImagePromptPremium(
-          prompt,     // ✅ Thème utilisateur
-          brandKit,   // ✅ Brand Kit V2 complet
-          useBrandKit,
-          slideIndex,
-          totalSlides,
-          referenceImageUrl, // ✅ Image de référence
-          colorMode as ColorMode // ✅ Mode couleurs
-        )
-      : buildImagePromptStandard(
-          globalStyle, 
-          prompt, 
-          useBrandKit,
-          { title: normTitle, subtitle: normSubtitle, alt: slideContent.alt },
-          slideIndex,
-          totalSlides,
-          brandKit, // ✅ Pass Brand Kit for adaptive styling
-          colorMode as ColorMode // ✅ Mode couleurs
-        );
+    // ✅ V9: Route le prompt selon visualStyle (background/character/product)
+    let enrichedPrompt: string;
     
-    console.log(`[render-slide] ${logCtx} 🎨 Mode: ${carouselMode}, hasText: ${!!normTitle && normTitle !== "Titre par défaut"}, hasRef: ${!!referenceImageUrl}`);
+    if (visualStyle === 'character') {
+      // ✅ Mode PERSONNAGE: génère un avatar/personnage 3D
+      enrichedPrompt = buildImagePromptCharacter(
+        prompt,
+        brandKit,
+        useBrandKit,
+        slideIndex,
+        totalSlides,
+        colorMode as ColorMode
+      );
+      console.log(`[render-slide] ${logCtx} 🧑 Using CHARACTER prompt`);
+    } else if (visualStyle === 'product') {
+      // ✅ Mode PRODUIT: mise en scène du produit uploadé
+      enrichedPrompt = buildImagePromptProduct(
+        prompt,
+        brandKit,
+        useBrandKit,
+        referenceImageUrl,
+        slideIndex,
+        totalSlides,
+        colorMode as ColorMode
+      );
+      console.log(`[render-slide] ${logCtx} 📦 Using PRODUCT prompt (hasRef: ${!!referenceImageUrl})`);
+    } else {
+      // ✅ Mode BACKGROUND (défaut): fond abstrait
+      enrichedPrompt = carouselMode === 'premium'
+        ? buildImagePromptPremium(
+            prompt,
+            brandKit,
+            useBrandKit,
+            slideIndex,
+            totalSlides,
+            referenceImageUrl,
+            colorMode as ColorMode
+          )
+        : buildImagePromptStandard(
+            globalStyle, 
+            prompt, 
+            useBrandKit,
+            { title: normTitle, subtitle: normSubtitle, alt: slideContent.alt },
+            slideIndex,
+            totalSlides,
+            brandKit,
+            colorMode as ColorMode
+          );
+      console.log(`[render-slide] ${logCtx} 🎨 Using BACKGROUND prompt (mode: ${carouselMode})`);
+    }
+    
+    console.log(`[render-slide] ${logCtx} 🎨 Mode: ${carouselMode}, Visual: ${visualStyle}, hasText: ${!!normTitle && normTitle !== "Titre par défaut"}, hasRef: ${!!referenceImageUrl}`);
 
     let bgUrl: string | null = null;
     let imageAttempt = 0;

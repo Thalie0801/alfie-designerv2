@@ -23,6 +23,7 @@ export interface SendPackParams {
   userPlan?: string;
   carouselMode?: 'standard' | 'premium'; // ✅ Mode Standard/Premium pour carrousels
   colorMode?: 'vibrant' | 'pastel'; // ✅ Mode Coloré/Pastel
+  visualStyle?: 'background' | 'character' | 'product'; // ✅ NEW: Style visuel adaptatif
 }
 
 export interface SendPackResult {
@@ -45,6 +46,7 @@ export async function sendPackToGenerator({
   userPlan = 'starter',
   carouselMode = 'standard', // ✅ Mode Standard/Premium pour carrousels
   colorMode = 'vibrant', // ✅ Mode Coloré/Pastel
+  visualStyle = 'background', // ✅ NEW: Style visuel adaptatif
 }: SendPackParams): Promise<SendPackResult> {
   // 1. Calculer le coût total Woofs
   const totalWoofs = calculatePackWoofCost(pack, selectedAssetIds);
@@ -102,8 +104,9 @@ export async function sendPackToGenerator({
           hasGeneratedTexts: !!asset.generatedTexts,
           slidesCount: asset.generatedTexts?.slides?.length || 0,
           slidesPreview: asset.generatedTexts?.slides?.slice(0, 2).map((s: any) => ({ title: s.title?.slice(0, 30), hasBody: !!s.body })),
+          visualStyle,
         });
-        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, userPlan, carouselMode, colorMode);
+        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, userPlan, carouselMode, colorMode, visualStyle);
       })
     );
 
@@ -159,7 +162,8 @@ async function createAssetJob(
   useBrandKit: boolean = true,
   userPlan: string = 'starter',
   carouselMode: 'standard' | 'premium' = 'standard',
-  colorMode: 'vibrant' | 'pastel' = 'vibrant'
+  colorMode: 'vibrant' | 'pastel' = 'vibrant',
+  visualStyle: 'background' | 'character' | 'product' = 'background' // ✅ NEW
 ): Promise<{ orderId: string }> {
   // Créer un order pour cet asset
   const { data: order, error: orderError } = await supabase
@@ -237,7 +241,7 @@ async function createAssetJob(
       carouselMode: asset.kind === "carousel" ? (asset.carouselMode || carouselMode) : undefined, // ✅ Mode Standard/Premium
       colorMode: colorMode, // ✅ Mode Coloré/Pastel
       carouselType: asset.kind === "carousel" ? (asset.carouselType || 'content') : undefined, // ✅ Type: citations ou content
-      visualStyle: asset.visualStyle || 'photorealistic',
+      visualStyle: visualStyle, // ✅ NEW: Style visuel adaptatif (background/character/product)
       withAudio: false,
       engine: videoEngine,
       durationSeconds: asset.durationSeconds || 5,
