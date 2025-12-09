@@ -38,7 +38,12 @@ const VISUAL_TYPES = [
   { value: 'photos', label: 'Photos réalistes' },
   { value: 'mockups', label: 'Mockups produits' },
   { value: 'doodle', label: 'Style doodle/croquis' },
-  { value: 'corporate', label: 'Style corporate' }
+  { value: 'corporate', label: 'Style corporate' },
+  // ✅ NEW: Types adaptatifs pour carrousels
+  { value: 'avatars_3d', label: '🧑 Personnages 3D (Pixar)' },
+  { value: 'avatars_flat', label: '👤 Personnages illustrés' },
+  { value: 'mascotte', label: '🐕 Mascotte de marque' },
+  { value: 'product_showcase', label: '📦 Mise en scène produit' },
 ];
 
 const VISUAL_MOODS = [

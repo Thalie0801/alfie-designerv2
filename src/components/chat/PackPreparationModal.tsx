@@ -70,6 +70,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
   const [useBrandKit, setUseBrandKit] = useState(true); // ✅ Phase 2: Toggle Brand Kit
   // carouselMode supprimé - carrousels ont maintenant un coût fixe de 10 Woofs
   const [colorMode, setColorMode] = useState<'vibrant' | 'pastel'>('vibrant'); // ✅ Toggle Coloré/Pastel
+  const [visualStyle, setVisualStyle] = useState<'background' | 'character' | 'product'>('background'); // ✅ NEW: Style visuel adaptatif
   const [audioSettings, setAudioSettings] = useState<Record<string, boolean>>(() => {
     // Par défaut, audio activé pour toutes les vidéos
     const initial: Record<string, boolean> = {};
@@ -315,6 +316,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         useBrandKit,
         userPlan: profile.plan || 'starter',
         colorMode,
+        visualStyle, // ✅ NEW: Style visuel adaptatif
       });
 
       toast.success("C'est parti ! Alfie prépare ton pack de visuels 🎬");
@@ -567,6 +569,64 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
               </button>
             </div>
           </div>
+
+          {/* ✅ NEW: Toggle Style visuel adaptatif (fond/personnage/produit) */}
+          {hasCarousels && (
+            <div className="p-3 bg-muted/30 rounded-lg space-y-3">
+              <div>
+                <span className="font-medium text-sm">Style de visuels</span>
+                <p className="text-xs text-muted-foreground">Choisir le type de visuel pour tes carrousels</p>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <button 
+                  type="button"
+                  onClick={() => setVisualStyle('background')}
+                  className={`p-3 text-center rounded-lg border transition-all ${
+                    visualStyle === 'background' 
+                      ? 'bg-primary/10 border-primary text-primary' 
+                      : 'bg-background border-border hover:bg-muted/50'
+                  }`}
+                >
+                  <span className="text-xl block mb-1">🎨</span>
+                  <span className="text-xs font-medium">Fond abstrait</span>
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setVisualStyle('character')}
+                  className={`p-3 text-center rounded-lg border transition-all ${
+                    visualStyle === 'character' 
+                      ? 'bg-primary/10 border-primary text-primary' 
+                      : 'bg-background border-border hover:bg-muted/50'
+                  }`}
+                >
+                  <span className="text-xl block mb-1">🧑</span>
+                  <span className="text-xs font-medium">Personnage</span>
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setVisualStyle('product')}
+                  className={`p-3 text-center rounded-lg border transition-all ${
+                    visualStyle === 'product' 
+                      ? 'bg-primary/10 border-primary text-primary' 
+                      : 'bg-background border-border hover:bg-muted/50'
+                  }`}
+                >
+                  <span className="text-xl block mb-1">📦</span>
+                  <span className="text-xs font-medium">Produit</span>
+                </button>
+              </div>
+              {visualStyle === 'product' && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  💡 Ajoute une image de ton produit pour chaque asset pour de meilleurs résultats
+                </p>
+              )}
+              {visualStyle === 'character' && (
+                <p className="text-xs text-muted-foreground">
+                  Génère des personnages 3D style Pixar selon ton Brand Kit
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Warning si pas assez de Woofs */}
           {totalWoofs > 0 && (
