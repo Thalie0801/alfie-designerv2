@@ -401,21 +401,33 @@ export default function ChatWidget() {
   // --------- LOGIQUE AI PRINCIPALE ---------
 
   // Fonction pour parser plusieurs packs dans une réponse brute
+  // Utilise indexOf/slice au lieu de regex pour un parsing robuste du JSON imbriqué
   function parseMultipleIntents(raw: string): AlfiePack[] {
     const packs: AlfiePack[] = [];
+    const startTag = '<alfie-pack>';
+    const endTag = '</alfie-pack>';
+    let searchStart = 0;
     
-    // Chercher tous les blocs <alfie-pack>
-    const matches = raw.matchAll(/<alfie-pack>\s*(\{[\s\S]*?\})\s*<\/alfie-pack>/gi);
-    
-    for (const match of matches) {
+    while (true) {
+      const startIdx = raw.toLowerCase().indexOf(startTag.toLowerCase(), searchStart);
+      if (startIdx === -1) break;
+      
+      const endIdx = raw.toLowerCase().indexOf(endTag.toLowerCase(), startIdx);
+      if (endIdx === -1) break;
+      
+      const jsonContent = raw.slice(startIdx + startTag.length, endIdx).trim();
+      
       try {
-        const parsed = JSON.parse(match[1]);
+        const parsed = JSON.parse(jsonContent);
         if (parsed.assets?.length > 0) {
+          console.log("📦 Frontend pack parsed, assets:", parsed.assets.length);
           packs.push(parsed as AlfiePack);
         }
       } catch (e) {
-        console.warn("Failed to parse pack:", e);
+        console.warn("Failed to parse pack in frontend:", e, "Preview:", jsonContent.substring(0, 200));
       }
+      
+      searchStart = endIdx + endTag.length;
     }
     
     return packs;
