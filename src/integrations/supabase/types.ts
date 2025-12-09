@@ -600,6 +600,7 @@ export type Database = {
       brands: {
         Row: {
           adjectives: string[] | null
+          avatar_url: string | null
           avoid_in_visuals: string | null
           canva_access_token: string | null
           canva_connected: boolean | null
@@ -637,6 +638,7 @@ export type Database = {
         }
         Insert: {
           adjectives?: string[] | null
+          avatar_url?: string | null
           avoid_in_visuals?: string | null
           canva_access_token?: string | null
           canva_connected?: boolean | null
@@ -674,6 +676,7 @@ export type Database = {
         }
         Update: {
           adjectives?: string[] | null
+          avatar_url?: string | null
           avoid_in_visuals?: string | null
           canva_access_token?: string | null
           canva_connected?: boolean | null
