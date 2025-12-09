@@ -982,9 +982,10 @@ async function processRenderImages(
     const ratioToUse = ratioFromPayload || "4:5";
     const { w, h } = AR_MAP[ratioToUse] || AR_MAP["4:5"];
     
-    // ✅ Utiliser buildFinalPrompt avec visualStyle pour préserver le thème
+    // ✅ Utiliser buildFinalPrompt avec visualStyleCategory pour préserver le thème
     const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : undefined;
     const visualStyle = payload.visualStyle || "photorealistic";
+    const visualStyleCategory = payload.visualStyleCategory || 'background'; // ✅ NEW
     const basePrompt = buildFinalPrompt(payload, useBrandKit, brandMini, visualStyle);
 
     imagesToRender = Array.from({ length: imagesCount }).map((_, index) => ({
@@ -993,6 +994,7 @@ async function processRenderImages(
       aspectRatio: (ratioToUse as "1:1" | "4:5" | "9:16" | "16:9") ?? "4:5",
       brandId: brandId ?? undefined,
       slideIndex: resolvedKind === "carousel" ? index : undefined,
+      visualStyleCategory, // ✅ NEW: Propager le style visuel
     }));
   } else if (payload.brief) {
     const { briefs } = payload.brief;
@@ -1103,6 +1105,7 @@ ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
         useBrandKit,
         userPlan: payload.userPlan,
         overlayText, // ✅ Texte marketing intégré nativement par Gemini 3 Pro
+        visualStyleCategory: (img as any).visualStyleCategory ?? payload.visualStyleCategory ?? 'background', // ✅ NEW: Style visuel adaptatif
       });
 
       const imagePayload = unwrapResult<any>(imageResult);
@@ -1165,20 +1168,35 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
 
   const durationSec = duration || payload.durationSeconds || 5;
   const useBrandKit = resolveUseBrandKit(payload, jobMeta);
+  const visualStyleCategory = payload.visualStyleCategory || payload.visualStyle || 'background'; // ✅ NEW
   // ✅ Vidéos TOUJOURS sans audio (sera ajouté via Canva plus tard)
   const withAudio = false;
   
   // ✅ Extraire le script vidéo s'il existe (pour stockage metadata uniquement)
   const videoScript = generatedTexts?.video || null;
-  console.log("[processGenerateVideo] Engine:", engine, "| useBrandKit:", useBrandKit, "| withAudio:", withAudio, "| hasScript:", !!videoScript, "| hasImage:", !!referenceImageUrl);
+  console.log("[processGenerateVideo] Engine:", engine, "| useBrandKit:", useBrandKit, "| visualStyleCategory:", visualStyleCategory, "| withAudio:", withAudio, "| hasScript:", !!videoScript, "| hasImage:", !!referenceImageUrl);
 
   // ✅ Support VEO 3.1 pour vidéos premium
   if (engine === "veo_3_1") {
     console.log("[processGenerateVideo] Using VEO 3 FAST engine for premium video");
     
-    // ✅ Utiliser buildVideoPrompt pour un prompt purement visuel (sans texte à afficher)
+    // ✅ Utiliser buildVideoPrompt adapté selon visualStyleCategory
     const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : null;
-    const videoPrompt = buildVideoPrompt(payload, useBrandKit, brandMini);
+    let videoPrompt: string;
+    
+    if (visualStyleCategory === 'character') {
+      // Mode PERSONNAGE: vidéo avec avatar/personnage animé
+      const characterStyle = brandMini?.visual_types?.includes('avatars_flat') 
+        ? 'animated 2D illustrated character'
+        : '3D Pixar-style animated character';
+      videoPrompt = `${characterStyle} in motion. ${prompt || 'Professional scene'}. ${brandMini?.niche || 'business'} context. Smooth animation, expressive movements. NO TEXT, NO LETTERS, NO WORDS visible. Pure cinematic footage.`;
+    } else if (visualStyleCategory === 'product' && referenceImageUrl) {
+      // Mode PRODUIT: vidéo de mise en scène produit
+      videoPrompt = `Product showcase video. Smooth camera movement around the product. Professional ${brandMini?.niche || 'e-commerce'} setting. Premium lighting, subtle motion. NO TEXT, NO PRICES, NO LABELS. Pure visual footage.`;
+    } else {
+      // Mode FOND/NORMAL
+      videoPrompt = buildVideoPrompt(payload, useBrandKit, brandMini);
+    }
 
     // ✅ Appeler generate-video avec provider "veo3" et timeout 6 minutes
     const veoResult = await callFn<any>("generate-video", {
@@ -1191,6 +1209,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       brandId,
       orderId,
       imageUrl: referenceImageUrl, // ✅ Image de référence pour animation
+      visualStyleCategory, // ✅ NEW: Passer le style visuel
     }, 360_000); // ✅ 6 minutes timeout pour VEO 3
 
     const videoUrl = veoResult?.videoUrl || veoResult?.output || veoResult?.url;
