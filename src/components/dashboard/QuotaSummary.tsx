@@ -132,7 +132,7 @@ export function QuotaSummary({ activeBrandId }: QuotaSummaryProps) {
   const isUnlimited = quota.is_admin || quota.woofs_quota >= 1_000_000_000;
 
   return (
-    <Card className="bg-muted/30 border-primary/10 shadow-strong">
+    <Card data-tour-id="quotas" className="bg-muted/30 border-primary/10 shadow-strong">
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="flex items-center gap-2">
           <Gauge className="h-5 w-5 text-primary" />
