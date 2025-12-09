@@ -15,6 +15,7 @@ export interface BrandKit {
   name?: string;
   palette: string[];
   logo_url?: string;
+  avatar_url?: string; // ✅ V10: Avatar/mascotte distinct du logo
   fonts?: {
     primary?: string;
     secondary?: string;
@@ -47,6 +48,7 @@ interface Brand {
   user_id: string;
   palette: any;
   logo_url?: string | null;
+  avatar_url?: string | null; // ✅ V10: Avatar/mascotte distinct du logo
   fonts?: any;
   voice?: string | null;
   niche?: string | null;

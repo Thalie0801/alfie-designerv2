@@ -62,6 +62,7 @@ export default function BrandKit() {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false); // ✅ V10
 
   // Handle logo file upload
   const handleLogoDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -105,6 +106,46 @@ export default function BrandKit() {
     }
   }, [brandKit?.id]);
 
+  // ✅ V10: Handle avatar file upload
+  const handleAvatarDrop = useCallback(async (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file || !brandKit?.id) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Seules les images sont acceptées (PNG, JPG, WEBP)');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Le fichier est trop lourd (max 2 Mo)');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+      const path = `brand-avatars/${brandKit.id}/${Date.now()}.${ext}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('chat-uploads')
+        .upload(path, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat-uploads')
+        .getPublicUrl(path);
+
+      setFormData(prev => ({ ...prev, avatar_url: publicUrl }));
+      toast.success('Avatar uploadé !');
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error('Erreur lors de l\'upload');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }, [brandKit?.id]);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: handleLogoDrop,
     accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp', '.gif'] },
@@ -112,12 +153,25 @@ export default function BrandKit() {
     disabled: uploadingLogo
   });
 
+  // ✅ V10: Dropzone for avatar
+  const { getRootProps: getAvatarRootProps, getInputProps: getAvatarInputProps, isDragActive: isAvatarDragActive } = useDropzone({
+    onDrop: handleAvatarDrop,
+    accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp', '.gif'] },
+    maxFiles: 1,
+    disabled: uploadingAvatar
+  });
+
   const handleRemoveLogo = () => {
     setFormData(prev => ({ ...prev, logo_url: '' }));
+  };
+
+  const handleRemoveAvatar = () => {
+    setFormData(prev => ({ ...prev, avatar_url: '' }));
   };
   const [formData, setFormData] = useState({
     name: '',
     logo_url: '',
+    avatar_url: '', // ✅ V10: Avatar distinct du logo
     niche: '',
     voice: '',
     font_primary: '',
@@ -153,6 +207,7 @@ export default function BrandKit() {
       setFormData({
         name: brandKit.name || '',
         logo_url: brandKit.logo_url || '',
+        avatar_url: (brandKit as any).avatar_url || '', // ✅ V10
         niche: brandKit.niche || '',
         voice: brandKit.voice || '',
         font_primary: brandKit.fonts?.primary || '',
@@ -240,6 +295,7 @@ export default function BrandKit() {
         .update({
           name: formData.name,
           logo_url: formData.logo_url || null,
+          avatar_url: formData.avatar_url || null, // ✅ V10: Avatar distinct
           niche: formData.niche || null,
           voice: formData.voice || null,
           palette: formData.colors,
@@ -413,7 +469,91 @@ export default function BrandKit() {
             </div>
           </div>
 
-          {/* Niche */}
+          {/* ✅ V10: Avatar / Mascotte - DISTINCT du logo */}
+          <div className="space-y-4">
+            <div>
+              <Label>🧑 Avatar / Mascotte</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Personnage ou mascotte utilisé pour les visuels avec protagonistes (distinct du logo commercial)
+              </p>
+            </div>
+            
+            {/* Preview */}
+            {formData.avatar_url && (
+              <div className="flex items-start gap-4 p-4 border rounded-lg bg-muted/30">
+                <img
+                  src={formData.avatar_url}
+                  alt="Avatar preview"
+                  className="h-24 w-24 object-contain rounded-lg border bg-background"
+                  onError={(e) => {
+                    e.currentTarget.src = '/placeholder.svg';
+                  }}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium mb-1">Avatar actuel</p>
+                  <p className="text-xs text-muted-foreground truncate">{formData.avatar_url}</p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleRemoveAvatar}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+
+            {/* Upload zone */}
+            <div
+              {...getAvatarRootProps()}
+              className={cn(
+                "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors",
+                isAvatarDragActive && "border-primary bg-primary/5",
+                uploadingAvatar && "opacity-50 cursor-not-allowed",
+                !isAvatarDragActive && "border-border hover:border-primary/50"
+              )}
+            >
+              <input {...getAvatarInputProps()} />
+              {uploadingAvatar ? (
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Upload en cours...</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <Upload className="h-8 w-8 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    {isAvatarDragActive ? "Dépose ton avatar ici" : "Glisse ton avatar/mascotte ou clique pour parcourir"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">PNG, JPG, WEBP • Max 2 Mo</p>
+                </div>
+              )}
+            </div>
+
+            {/* Separator */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">ou URL externe</span>
+              </div>
+            </div>
+
+            {/* URL input */}
+            <div className="flex items-center gap-2">
+              <Link className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <Input
+                id="avatar_url"
+                type="url"
+                placeholder="https://example.com/avatar.png"
+                value={formData.avatar_url}
+                onChange={(e) => setFormData({ ...formData, avatar_url: e.target.value })}
+              />
+            </div>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="niche">Niche / Secteur d'activité</Label>
             <Input
