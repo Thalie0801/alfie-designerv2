@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { X, Image, Film, Grid3x3, AlertCircle, Volume2, VolumeX, Upload } from "lucide-react";
+import { X, Image, Film, Grid3x3, AlertCircle, Volume2, VolumeX, Upload, Pencil } from "lucide-react";
 import type { AlfiePack, PackAsset } from "@/types/alfiePack";
 import { calculatePackWoofCost, safeWoofs } from "@/lib/woofs";
 import { getWoofCost } from "@/types/alfiePack";
@@ -622,15 +622,34 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 border-t safe-bottom">
           <button
             onClick={onClose}
-            className="order-2 sm:order-1 px-4 py-3 sm:py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors touch-target"
+            className="order-3 sm:order-1 px-4 py-3 sm:py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors touch-target"
             disabled={isGenerating}
           >
             Annuler
           </button>
+          
+          {/* Bouton Éditer dans le Studio */}
+          <button
+            onClick={() => {
+              onClose();
+              navigate("/studio", { 
+                state: { 
+                  pack: localPack, 
+                  brief: pack.summary 
+                } 
+              });
+            }}
+            className="order-2 px-4 py-3 sm:py-2 text-sm font-medium rounded-lg border border-border hover:bg-muted transition-colors flex items-center justify-center gap-2 touch-target"
+            disabled={isGenerating}
+          >
+            <Pencil className="w-4 h-4" />
+            Éditer dans le Studio
+          </button>
+          
           <button
             onClick={handleGenerate}
             disabled={isGenerating || selectedAssetIds.size === 0}
-            className="order-1 sm:order-2 px-4 py-3 sm:py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-target"
+            className="order-1 sm:order-3 px-4 py-3 sm:py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-target"
           >
             {isGenerating ? "Alfie prépare tes visuels..." : "Créer ce pack avec Alfie"}
           </button>
