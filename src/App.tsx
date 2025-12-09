@@ -31,7 +31,7 @@ import Templates from "./pages/Templates";
 import Library from "./pages/Library";
 import CloudinaryTest from "./pages/CloudinaryTest";
 import Creator from "./pages/Creator";
-import UserGuide from "./pages/UserGuide";
+import Documentation from "./pages/Documentation";
 
 import ActivateAccess from "./pages/onboarding/Activate";
 import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
@@ -56,15 +56,17 @@ const AppRoutes = () => {
         <Route path="/legal" element={<Legal />} />
         <Route path="/faq" element={<FAQ />} />
         <Route
-          path="/guide"
+          path="/documentation"
           element={
             <ProtectedRoute>
               <AppLayoutWithSidebar>
-                <UserGuide />
+                <Documentation />
               </AppLayoutWithSidebar>
             </ProtectedRoute>
           }
         />
+        {/* Legacy /guide route redirects to Documentation */}
+        <Route path="/guide" element={<Navigate to="/documentation" replace />} />
 
         <Route
           path="/brand-kit-questionnaire"
