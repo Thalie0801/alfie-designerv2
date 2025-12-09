@@ -8,6 +8,9 @@ export type Platform = 'instagram' | 'linkedin' | 'tiktok' | 'youtube' | 'facebo
 export type Ratio = '1:1' | '4:5' | '9:16' | '16:9';
 export type Goal = 'education' | 'vente' | 'lead' | 'engagement' | 'notoriete';
 
+// ✅ NEW: Visual style category for adaptive generation
+export type VisualStyleCategory = 'background' | 'character' | 'product';
+
 // Visual styles for image generation
 export type VisualStyle = 
   | 'photorealistic' 
@@ -40,6 +43,7 @@ export interface UnifiedAlfieIntent {
   generatedTexts?: GeneratedTexts;
   useBrandKit?: boolean;
   visualStyle?: VisualStyle; // Style visuel pour la génération d'images
+  visualStyleCategory?: VisualStyleCategory; // ✅ NEW: Fond/Personnage/Produit
   campaign?: string;
   copyBrief?: string; // Brief libre optionnel
 }

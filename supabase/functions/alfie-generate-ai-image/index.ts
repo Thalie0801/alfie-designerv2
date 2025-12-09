@@ -63,7 +63,8 @@ interface GenerateRequest {
   seed?: string;
   negativePrompt?: string;
   useBrandKit?: boolean;
-  userPlan?: string; // ✅ AJOUT : Plan utilisateur pour sélection du modèle IA
+  userPlan?: string;
+  visualStyleCategory?: 'background' | 'character' | 'product'; // ✅ NEW: Style visuel adaptatif
 }
 
 /* --------------------------- Small helpers -------------------------- */
@@ -105,6 +106,7 @@ function buildMainPrompt(input: GenerateRequest): string {
     seed,
     negativePrompt,
     useBrandKit,
+    visualStyleCategory,
   } = input;
 
   const res = clampRes(resolution);
@@ -116,8 +118,34 @@ function buildMainPrompt(input: GenerateRequest): string {
   if (backgroundOnly) {
     fullPrompt = buildBackgroundOnlyPrompt(shouldApplyBrand ? brandKit : undefined);
   } else {
+    // ✅ NEW: Adapter le prompt selon visualStyleCategory
+    if (visualStyleCategory === 'character') {
+      // Mode PERSONNAGE: générer des avatars/personnages 3D
+      const characterStyle = brandKit?.visual_types?.includes('avatars_flat') 
+        ? 'flat 2D illustrated character, modern vector style'
+        : brandKit?.visual_types?.includes('mascotte')
+        ? 'cute brand mascot character, friendly cartoon figure'
+        : '3D cartoon character in Pixar/Disney style, expressive, professional appearance';
+      
+      fullPrompt = `Create a marketing image featuring a CHARACTER.
+CHARACTER: ${characterStyle}
+SCENE: ${prompt || 'professional setting'}
+CONTEXT: ${brandKit?.niche || 'business'} industry
+MOOD: modern, engaging, professional
+CRITICAL: Character must be central. NO TEXT whatsoever - no letters, words, labels.`;
+    } else if (visualStyleCategory === 'product') {
+      // Mode PRODUIT: mise en scène du produit
+      fullPrompt = `Create a professional PRODUCT SHOWCASE image.
+PRODUCT: Featured prominently in center
+SCENE: Professional ${brandKit?.niche || 'e-commerce'} product photography setting
+BACKGROUND: Clean, premium lighting, subtle gradients
+CRITICAL: Product must be central subject. NO TEXT whatsoever - no letters, prices, labels.
+${prompt ? `Content: ${prompt}` : ''}`;
+    }
+    // else: mode normal avec le prompt original
+
     // Mode normal : intégration native du texte par Gemini 3 Pro
-    if (overlayText) {
+    if (overlayText && visualStyleCategory !== 'character' && visualStyleCategory !== 'product') {
       fullPrompt += `\n\n--- TEXTE À INTÉGRER NATIVEMENT DANS L'IMAGE ---`;
       fullPrompt += `\nIntègre ce texte français EXACTEMENT tel quel dans l'image :`;
       fullPrompt += `\n« ${overlayText} »`;

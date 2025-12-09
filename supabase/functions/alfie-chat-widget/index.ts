@@ -122,6 +122,34 @@ Exemple pour citations :
   ]
 }
 
+--- DÉTECTION AUTOMATIQUE DU STYLE VISUEL ---
+
+Pour CHAQUE asset du pack, tu DOIS inclure le champ "visualStyleCategory" avec une de ces 3 valeurs :
+
+🧑 "character" - Détecte automatiquement si le prompt mentionne :
+  - "personnage", "avatar", "mascotte", "character", "Pixar"
+  - Demande de scènes avec des gens stylisés, des avatars 3D
+  - Exemples : "un coach qui explique", "personnage 3D qui montre"
+
+📦 "product" - Détecte automatiquement si le prompt mentionne :
+  - "produit", "mise en scène", "product shot", "packshot"
+  - Demande de mettre en avant un article/objet spécifique
+  - Une image de référence fournie comme produit
+
+🎨 "background" - PAR DÉFAUT si aucun indice clair :
+  - Fonds colorés, abstraits, géométriques, gradients
+  - Pas de personnage explicite demandé
+
+⚠️ RÈGLE : Si tu ne détectes PAS d'indice clair → utilise "background" par défaut.
+
+Exemple JSON avec visualStyleCategory :
+{
+  "id": "car-coaching-001",
+  "kind": "carousel",
+  "visualStyleCategory": "character",
+  "prompt": "Carrousel avec personnage 3D style Pixar qui explique..."
+}
+
 --- RÈGLE PRIORITAIRE : ASSISTANCE PROACTIVE ---
 
 ⚠️ L'utilisatrice vient te voir parce qu'elle a BESOIN D'AIDE.

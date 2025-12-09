@@ -8,7 +8,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Switch } from "@/components/ui/switch";
 
 interface PackPreparationModalProps {
   pack: AlfiePack;
@@ -67,12 +66,14 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
     new Set(pack.assets.map((a) => a.id))
   );
   const [isGenerating, setIsGenerating] = useState(false);
-  const [useBrandKit, setUseBrandKit] = useState(true); // ✅ Phase 2: Toggle Brand Kit
-  // carouselMode supprimé - carrousels ont maintenant un coût fixe de 10 Woofs
-  const [colorMode, setColorMode] = useState<'vibrant' | 'pastel'>('vibrant'); // ✅ Toggle Coloré/Pastel
-  const [visualStyle, setVisualStyle] = useState<'background' | 'character' | 'product'>('background'); // ✅ NEW: Style visuel adaptatif
+  const [useBrandKit, setUseBrandKit] = useState(true);
+  const [colorMode, setColorMode] = useState<'vibrant' | 'pastel'>('vibrant');
+  const [visualStyle, setVisualStyle] = useState<'background' | 'character' | 'product'>(() => {
+    // ✅ Auto-detect from first asset's AI-detected visualStyleCategory
+    const firstAsset = pack.assets[0];
+    return (firstAsset as any)?.visualStyleCategory || 'background';
+  });
   const [audioSettings, setAudioSettings] = useState<Record<string, boolean>>(() => {
-    // Par défaut, audio activé pour toutes les vidéos
     const initial: Record<string, boolean> = {};
     pack.assets.filter(a => a.kind === 'video_premium').forEach(a => {
       initial[a.id] = true;
@@ -84,8 +85,12 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
   const { profile } = useAuth();
   const navigate = useNavigate();
   
-  // Vérifie si le pack contient des carrousels
-  const hasCarousels = pack.assets.some(a => a.kind === 'carousel');
+  // ✅ Detect if pack has hints for character/product style
+  const hasCharacterHint = pack.assets.some(a => 
+    /personnage|avatar|mascotte|character|pixar/i.test(a.prompt || '') ||
+    (a as any)?.visualStyleCategory === 'character'
+  );
+  const hasProductImage = pack.assets.some(a => a.referenceImageUrl);
   
   // Toggle audio pour une vidéo spécifique
   const toggleAudio = (assetId: string) => {
@@ -521,111 +526,52 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
             <span className="font-bold text-lg text-primary">{totalWoofs} Woofs 🐶</span>
           </div>
 
-          {/* ✅ Phase 2: Toggle useBrandKit */}
-          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-            <div>
-              <span className="font-medium text-sm">Utiliser le Brand Kit</span>
-              <p className="text-xs text-muted-foreground">Adapter le ton et le style à ta marque</p>
-            </div>
-            <Switch checked={useBrandKit} onCheckedChange={setUseBrandKit} />
-          </div>
-
-          {/* Note: Les carrousels ont un coût fixe de 10 Woofs */}
-          {hasCarousels && (
-            <div className="p-3 bg-muted/30 rounded-lg">
-              <p className="text-sm font-medium">📱 Carrousel : 10 Woofs</p>
-              <p className="text-xs text-muted-foreground">5 slides texte + images de fond</p>
-            </div>
-          )}
-
-          {/* ✅ Toggle Coloré/Pastel */}
-          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-            <div>
-              <span className="font-medium text-sm">Style couleurs</span>
-              <p className="text-xs text-muted-foreground">Choisir le style de couleurs des visuels</p>
-            </div>
-            <div className="flex gap-1">
+          {/* ✅ NEW: Chips compacts pour options (remplace les toggles) */}
+          <div className="flex flex-wrap gap-2 p-3 bg-muted/30 rounded-lg">
+            {/* Chip Brand Kit */}
+            <button 
+              type="button"
+              onClick={() => setUseBrandKit(!useBrandKit)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                useBrandKit 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-background border border-border hover:bg-muted'
+              }`}
+            >
+              🏢 Brand Kit {useBrandKit && '✓'}
+            </button>
+            
+            {/* Chip Coloré/Pastel */}
+            <button 
+              type="button"
+              onClick={() => setColorMode(prev => prev === 'vibrant' ? 'pastel' : 'vibrant')}
+              className="px-3 py-1.5 rounded-full text-xs font-medium bg-background border border-border hover:bg-muted transition-all flex items-center gap-1.5"
+            >
+              {colorMode === 'vibrant' ? '🌈 Coloré' : '🎀 Pastel'}
+            </button>
+            
+            {/* Chip Style visuel - visible si hint détecté */}
+            {(hasCharacterHint || hasProductImage || visualStyle !== 'background') && (
               <button 
                 type="button"
-                onClick={() => setColorMode('vibrant')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-l-md transition-colors flex items-center gap-1 ${
-                  colorMode === 'vibrant' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-muted hover:bg-muted/80'
-                }`}
+                onClick={() => setVisualStyle(prev => 
+                  prev === 'background' ? 'character' : 
+                  prev === 'character' ? 'product' : 'background'
+                )}
+                className="px-3 py-1.5 rounded-full text-xs font-medium bg-background border border-border hover:bg-muted transition-all flex items-center gap-1.5"
               >
-                🌈 Coloré
+                {visualStyle === 'background' && '🎨 Fond'}
+                {visualStyle === 'character' && '🧑 Personnage'}
+                {visualStyle === 'product' && '📦 Produit'}
               </button>
-              <button 
-                type="button"
-                onClick={() => setColorMode('pastel')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-r-md transition-colors flex items-center gap-1 ${
-                  colorMode === 'pastel' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-muted hover:bg-muted/80'
-                }`}
-              >
-                🎀 Pastel
-              </button>
-            </div>
+            )}
           </div>
 
-          {/* ✅ NEW: Toggle Style visuel adaptatif (fond/personnage/produit) */}
-          {hasCarousels && (
-            <div className="p-3 bg-muted/30 rounded-lg space-y-3">
-              <div>
-                <span className="font-medium text-sm">Style de visuels</span>
-                <p className="text-xs text-muted-foreground">Choisir le type de visuel pour tes carrousels</p>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <button 
-                  type="button"
-                  onClick={() => setVisualStyle('background')}
-                  className={`p-3 text-center rounded-lg border transition-all ${
-                    visualStyle === 'background' 
-                      ? 'bg-primary/10 border-primary text-primary' 
-                      : 'bg-background border-border hover:bg-muted/50'
-                  }`}
-                >
-                  <span className="text-xl block mb-1">🎨</span>
-                  <span className="text-xs font-medium">Fond abstrait</span>
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => setVisualStyle('character')}
-                  className={`p-3 text-center rounded-lg border transition-all ${
-                    visualStyle === 'character' 
-                      ? 'bg-primary/10 border-primary text-primary' 
-                      : 'bg-background border-border hover:bg-muted/50'
-                  }`}
-                >
-                  <span className="text-xl block mb-1">🧑</span>
-                  <span className="text-xs font-medium">Personnage</span>
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => setVisualStyle('product')}
-                  className={`p-3 text-center rounded-lg border transition-all ${
-                    visualStyle === 'product' 
-                      ? 'bg-primary/10 border-primary text-primary' 
-                      : 'bg-background border-border hover:bg-muted/50'
-                  }`}
-                >
-                  <span className="text-xl block mb-1">📦</span>
-                  <span className="text-xs font-medium">Produit</span>
-                </button>
-              </div>
-              {visualStyle === 'product' && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  💡 Ajoute une image de ton produit pour chaque asset pour de meilleurs résultats
-                </p>
-              )}
-              {visualStyle === 'character' && (
-                <p className="text-xs text-muted-foreground">
-                  Génère des personnages 3D style Pixar selon ton Brand Kit
-                </p>
-              )}
-            </div>
+          {/* Warning si produit sans image */}
+          {visualStyle === 'product' && !hasProductImage && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 px-3">
+              💡 Ajoute une image de ton produit pour de meilleurs résultats
+            </p>
           )}
 
           {/* Warning si pas assez de Woofs */}
