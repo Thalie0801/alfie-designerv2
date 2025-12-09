@@ -13,6 +13,7 @@ import { Users, Activity, ArrowLeft, Sparkles, Plus, ExternalLink, Trash2, Edit2
 import { toast } from 'sonner';
 import { NewsManager } from '@/components/NewsManager';
 import { VideoDiagnostic } from '@/components/VideoDiagnostic';
+import { MaskableEmail } from '@/components/MaskableEmail';
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -609,7 +610,7 @@ export default function Admin() {
                             </Badge>
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
+                        <p className="text-sm text-muted-foreground"><MaskableEmail email={user.email} /></p>
                         <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
                           <span>📊 {user.quota_visuals_per_month || 0} visuels/mois</span>
                           <span>🎨 {user.quota_brands || 0} marques</span>
@@ -697,7 +698,7 @@ export default function Admin() {
                                  status === 'mentor' ? '🎯 Mentor' : '🌱 Créateur'}
                               </Badge>
                             </div>
-                            <p className="text-sm text-muted-foreground">{affiliate.email}</p>
+                            <p className="text-sm text-muted-foreground"><MaskableEmail email={affiliate.email} /></p>
                             <p className="text-xs text-muted-foreground">
                               {referrals} filleul{referrals > 1 ? 's' : ''} actif{referrals > 1 ? 's' : ''}
                               {referrals === 2 && status === 'creator' && (
@@ -780,7 +781,7 @@ export default function Admin() {
                         className="flex items-center justify-between p-3 rounded-lg border hover:shadow-sm transition text-sm"
                       >
                         <div>
-                          <p className="font-medium">{affiliate?.email || click.affiliate_id.substring(0, 8) + '...'}</p>
+                          <p className="font-medium"><MaskableEmail email={affiliate?.email || click.affiliate_id.substring(0, 8) + '...'} /></p>
                           <p className="text-xs text-muted-foreground">
                             {new Date(click.created_at).toLocaleString('fr-FR')}
                             {click.utm_source && ` • Source: ${click.utm_source}`}
@@ -821,10 +822,10 @@ export default function Admin() {
                       >
                         <div>
                           <p className="font-medium">
-                            Client: {user?.email || conversion.user_id.substring(0, 8) + '...'}
+                            Client: <MaskableEmail email={user?.email || conversion.user_id.substring(0, 8) + '...'} />
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            Affilié: {affiliate?.email || conversion.affiliate_id.substring(0, 8) + '...'}
+                            Affilié: <MaskableEmail email={affiliate?.email || conversion.affiliate_id.substring(0, 8) + '...'} />
                           </p>
                           <p className="text-xs text-muted-foreground">
                             Plan: {conversion.plan} • {new Date(conversion.created_at).toLocaleDateString('fr-FR')}
