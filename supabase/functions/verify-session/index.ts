@@ -237,6 +237,21 @@ async function handleAffiliateConversion(
 
   console.log("[verify-session] Conversion created successfully:", conversionData);
 
+  // Auto-lier le nouvel utilisateur comme filleul de l'affilié
+  console.log("[verify-session] Auto-linking user as referral:", { userId, affiliateId });
+  
+  const { error: linkError } = await (supabase
+    .from("affiliates") as any)
+    .update({ parent_id: affiliateId })
+    .eq("id", userId)
+    .is("parent_id", null); // Ne pas écraser si déjà lié
+
+  if (linkError) {
+    console.error("[verify-session] Error auto-linking referral:", linkError);
+  } else {
+    console.log("[verify-session] User auto-linked as referral successfully");
+  }
+
   if (conversionData) {
     const conversionId = (conversionData as any).id as string;
     
