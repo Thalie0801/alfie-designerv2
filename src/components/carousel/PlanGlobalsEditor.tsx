@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
-export type AspectRatio = '4:5' | '1:1' | '9:16' | '16:9';
+export type AspectRatio = '4:5' | '1:1' | '9:16' | '16:9' | 'yt-thumb';
 
 export interface CarouselGlobals {
   aspect_ratio: AspectRatio;
@@ -25,6 +25,7 @@ const ASPECT_RATIOS: { value: AspectRatio; label: string }[] = [
   { value: '1:1', label: '1:1 (Carré)' },
   { value: '9:16', label: '9:16 (Story/Reel)' },
   { value: '16:9', label: '16:9 (Paysage)' },
+  { value: 'yt-thumb', label: '🎬 YT Thumb (1280×720)' },
 ];
 
 const LOCALES = [
