@@ -158,15 +158,15 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
         // Miniatures YouTube = type 'image' avec resolution 1280x720 (format yt-thumb)
         query = query
           .eq('type', 'image')
-          .is('metadata->carousel_id', null)
-          .eq('metadata->resolution', '1280x720');
+          .is('metadata->>carousel_id', null)
+          .eq('metadata->>resolution', '1280x720');
       } else if (type === 'images') {
         // Images = type 'image' uniquement, PAS les carousel_slide, PAS les legacy Ken Burns, PAS les miniatures YT
         query = query
           .eq('type', 'image')
-          .is('metadata->carousel_id', null)
+          .is('metadata->>carousel_id', null)
           .not('output_url', 'like', '%animated_base_%')
-          .neq('metadata->resolution', '1280x720'); // ✅ Exclure miniatures YouTube
+          .neq('metadata->>resolution', '1280x720'); // ✅ Exclure miniatures YouTube
       } else if (type === 'videos') {
         // Vidéos: toutes les vidéos (type='video'), incluant Replicate AI
         const { data: videoData, error: videoError } = await supabase
