@@ -44,6 +44,11 @@ export default function Admin() {
     max_redemptions: '',
   });
   const [creatingWoofsProducts, setCreatingWoofsProducts] = useState(false);
+  
+  // Affiliate linking state
+  const [linkAffiliateEmail, setLinkAffiliateEmail] = useState('');
+  const [linkParentEmail, setLinkParentEmail] = useState('');
+  const [linkingAffiliate, setLinkingAffiliate] = useState(false);
 
   useEffect(() => {
     loadAdminData();
@@ -379,6 +384,36 @@ export default function Admin() {
     }
   };
 
+  const handleLinkAffiliate = async () => {
+    if (!linkAffiliateEmail || !linkParentEmail) {
+      toast.error('Les deux emails sont requis');
+      return;
+    }
+
+    setLinkingAffiliate(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-link-affiliate', {
+        body: {
+          affiliate_email: linkAffiliateEmail,
+          parent_email: linkParentEmail
+        }
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast.success(`${linkAffiliateEmail} lié(e) à ${linkParentEmail}`);
+      setLinkAffiliateEmail('');
+      setLinkParentEmail('');
+      loadAdminData();
+    } catch (error: any) {
+      console.error('Link affiliate error:', error);
+      toast.error(error.message || 'Erreur lors de la liaison');
+    } finally {
+      setLinkingAffiliate(false);
+    }
+  };
+
   const filteredUsers = users.filter(user =>
     user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -639,6 +674,55 @@ export default function Admin() {
 
         {/* Affiliates Tab */}
         <TabsContent value="affiliates" className="space-y-4">
+          {/* Affiliate Linking Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>🔗 Lier un affilié à un parrain</CardTitle>
+              <CardDescription>Associer un affilié existant comme filleul direct d'un autre affilié</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <Label htmlFor="affiliate-email" className="text-sm mb-1 block">Email du filleul</Label>
+                  <Input
+                    id="affiliate-email"
+                    placeholder="filleul@exemple.com"
+                    value={linkAffiliateEmail}
+                    onChange={(e) => setLinkAffiliateEmail(e.target.value)}
+                  />
+                </div>
+                <div className="flex-1">
+                  <Label htmlFor="parent-email" className="text-sm mb-1 block">Email du parrain</Label>
+                  <Input
+                    id="parent-email"
+                    placeholder="parrain@exemple.com"
+                    value={linkParentEmail}
+                    onChange={(e) => setLinkParentEmail(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button 
+                    onClick={handleLinkAffiliate}
+                    disabled={linkingAffiliate || !linkAffiliateEmail || !linkParentEmail}
+                    className="gap-2"
+                  >
+                    {linkingAffiliate ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Liaison...
+                      </>
+                    ) : (
+                      <>
+                        <UserCheck className="h-4 w-4" />
+                        Lier
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Affiliés</CardTitle>
