@@ -23,13 +23,16 @@ export default function Library() {
   const orderIdFromQuery = new URLSearchParams(location.search).get('order');
   
   // Si ?order= est présent, afficher l'onglet carrousels par défaut
-  const [activeTab, setActiveTab] = useState<'images' | 'videos' | 'carousels'>(
+  const [activeTab, setActiveTab] = useState<'images' | 'videos' | 'carousels' | 'thumbnails'>(
     orderIdFromQuery ? 'carousels' : 'images'
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Map tab to asset type for hook
+  const assetTypeForHook = activeTab === 'carousels' ? 'images' : activeTab;
+  
   const { 
     assets, 
     loading, 
@@ -39,7 +42,7 @@ export default function Library() {
     downloadMultiple,
     cleanupProcessingVideos,
     refetch
-  } = useLibraryAssets(user?.id, activeTab === 'carousels' ? 'images' : activeTab);
+  } = useLibraryAssets(user?.id, assetTypeForHook);
 
   // Mobile session check on mount
   useEffect(() => {
@@ -158,9 +161,10 @@ export default function Library() {
       )}
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'images' | 'videos' | 'carousels')}>
-        <TabsList>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'images' | 'videos' | 'carousels' | 'thumbnails')}>
+        <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="images">🖼️ Images</TabsTrigger>
+          <TabsTrigger value="thumbnails">📺 Miniatures YT</TabsTrigger>
           <TabsTrigger value="videos">🎬 Vidéos</TabsTrigger>
           <TabsTrigger value="carousels">📱 Carrousels</TabsTrigger>
         </TabsList>
@@ -307,6 +311,37 @@ export default function Library() {
         {/* Carousels Tab */}
         <TabsContent value="carousels" className="mt-6">
           <CarouselsTab orderId={orderIdFromQuery} />
+        </TabsContent>
+
+        {/* YouTube Thumbnails Tab */}
+        <TabsContent value="thumbnails" className="mt-6">
+          {loading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+              {[...Array(8)].map((_, i) => (
+                <Skeleton key={i} className="h-48 rounded-lg" />
+              ))}
+            </div>
+          ) : filteredAssets.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Aucune miniature YouTube pour l'instant.</p>
+              <p className="text-sm">Générez depuis le Studio au format "Miniature YouTube (16:9)"</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+              {filteredAssets.map(asset => (
+                <AssetCard
+                  key={asset.id}
+                  asset={asset}
+                  selected={selectedAssets.includes(asset.id)}
+                  onSelect={() => handleSelectAsset(asset.id)}
+                  onDownload={() => downloadAsset(asset.id)}
+                  onDelete={() => deleteAsset(asset.id)}
+                  daysUntilExpiry={getDaysUntilExpiry(asset.expires_at)}
+                />
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
