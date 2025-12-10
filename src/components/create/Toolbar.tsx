@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 export type GeneratorMode = "auto" | "image" | "video" | "text";
-export type RatioOption = "1:1" | "9:16" | "16:9" | "3:4" | "4:5";
+export type RatioOption = "1:1" | "9:16" | "16:9" | "3:4" | "4:5" | "yt-thumb";
 
 interface ToolbarProps {
   mode: GeneratorMode;
@@ -17,7 +17,7 @@ const MODES: { value: GeneratorMode; label: string }[] = [
   { value: "text", label: "Texte" },
 ];
 
-const RATIO_OPTIONS: RatioOption[] = ["1:1", "9:16", "16:9", "3:4", "4:5"];
+const RATIO_OPTIONS: RatioOption[] = ["1:1", "9:16", "16:9", "4:5", "yt-thumb"];
 
 export function Toolbar({ mode, onModeChange, ratio, onRatioChange }: ToolbarProps) {
   const showRatios = mode === "image" || mode === "video";

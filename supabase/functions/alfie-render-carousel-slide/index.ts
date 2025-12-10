@@ -80,10 +80,11 @@ const MODEL_IMAGE_STANDARD = LOVABLE_MODELS.image_standard;
 const MODEL_IMAGE_PREMIUM = LOVABLE_MODELS.image_premium;
 
 const AR_MAP: Record<string, GenSize> = {
-  "1:1":  { w: 1080, h: 1080 },
-  "4:5":  { w: 1080, h: 1350 },
-  "9:16": { w: 1080, h: 1920 },
-  "16:9": { w: 1920, h: 1080 },
+  "1:1":     { w: 1080, h: 1080 },
+  "4:5":     { w: 1080, h: 1350 },
+  "9:16":    { w: 1080, h: 1920 },
+  "16:9":    { w: 1920, h: 1080 },
+  "yt-thumb": { w: 1280, h: 720 },  // YouTube thumbnail
 };
 
 const PIXEL_TO_AR: Record<string, string> = {
@@ -474,23 +475,29 @@ OUTPUT: A stunning, ${colorMode === 'pastel' ? 'pastel' : 'colorful'} abstract b
  * ✅ Texte centré horizontalement et verticalement dans la moitié supérieure
  */
 function createDynamicTemplate(aspectRatio: string, brandKit?: BrandKit | null): SlideTemplate {
-  const [wRatio, hRatio] = aspectRatio.split(':').map(Number);
-  
-  // ✅ Calculer les dimensions selon que le format est portrait ou paysage
   let width: number, height: number;
   
-  if (wRatio > hRatio) {
-    // Format PAYSAGE (16:9) → width = 1920, calculer height
-    width = 1920;
-    height = Math.round(1920 * (hRatio / wRatio)); // 1920 × (9/16) = 1080
-  } else if (hRatio > wRatio) {
-    // Format PORTRAIT (9:16, 4:5) → width = 1080, calculer height
-    width = 1080;
-    height = Math.round(1080 * (hRatio / wRatio));
+  // ✅ Cas spécial: YouTube Thumbnail (format fixe 1280x720)
+  if (aspectRatio === 'yt-thumb') {
+    width = 1280;
+    height = 720;
   } else {
-    // Format CARRÉ (1:1)
-    width = 1080;
-    height = 1080;
+    const [wRatio, hRatio] = aspectRatio.split(':').map(Number);
+    
+    // ✅ Calculer les dimensions selon que le format est portrait ou paysage
+    if (wRatio > hRatio) {
+      // Format PAYSAGE (16:9) → width = 1920, calculer height
+      width = 1920;
+      height = Math.round(1920 * (hRatio / wRatio)); // 1920 × (9/16) = 1080
+    } else if (hRatio > wRatio) {
+      // Format PORTRAIT (9:16, 4:5) → width = 1080, calculer height
+      width = 1080;
+      height = Math.round(1080 * (hRatio / wRatio));
+    } else {
+      // Format CARRÉ (1:1)
+      width = 1080;
+      height = 1080;
+    }
   }
   
   // ✅ Tailles de police adaptatives selon l'aspect ratio

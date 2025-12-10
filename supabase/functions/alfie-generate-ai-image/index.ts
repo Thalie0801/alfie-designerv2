@@ -70,7 +70,7 @@ interface GenerateRequest {
 /* --------------------------- Small helpers -------------------------- */
 const clampRes = (res?: string) => {
   // formats acceptés ; fallback en 1080x1350
-  const ok = ["1080x1350", "1080x1080", "1920x1080", "1080x1920"];
+  const ok = ["1080x1350", "1080x1080", "1920x1080", "1080x1920", "1280x720"];
   return ok.includes(String(res)) ? String(res) : "1080x1350";
 };
 
