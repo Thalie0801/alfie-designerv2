@@ -36,6 +36,8 @@ interface BrandKit {
   avoid_in_visuals?: string;
   palette?: string[];
   fonts?: { primary?: string; secondary?: string }; // ✅ V8: Brand Kit fonts
+  avatar_url?: string | null; // ✅ V10: Avatar/mascotte pour mode character
+  text_color?: string | null; // ✅ V10: Couleur de texte personnalisée
 }
 
 interface SlideRequest {
@@ -221,6 +223,7 @@ OUTPUT: A beautiful, thematic background image with NO text.`
 /**
  * ✅ NEW: Build prompt for CHARACTER mode (avatars, personnages 3D style Pixar)
  * Génère des personnages/avatars selon le Brand Kit
+ * ✅ V10: Si avatar_url fourni, demande de reproduire CE personnage exactement
  */
 function buildImagePromptCharacter(
   userPrompt: string,
@@ -228,13 +231,25 @@ function buildImagePromptCharacter(
   useBrandKit: boolean,
   slideIndex: number,
   totalSlides: number,
-  colorMode: ColorMode = 'vibrant'
+  colorMode: ColorMode = 'vibrant',
+  hasAvatarReference: boolean = false // ✅ NEW: Indique si une image de référence est fournie
 ): string {
   // Déterminer le style de personnage selon le Brand Kit
   let characterStyle = "3D cartoon character in Pixar/Disney animation style, expressive face, friendly appearance";
   let characterDescription = "professional young adult";
   
-  if (useBrandKit && brandKit) {
+  // ✅ V10: Si avatar de référence, instruction de cohérence stricte
+  let referenceInstruction = "";
+  if (hasAvatarReference) {
+    referenceInstruction = `
+REFERENCE CHARACTER (PROVIDED IMAGE):
+- Use the provided reference image as the EXACT character to feature
+- Reproduce this SAME character with IDENTICAL appearance, style, colors, and design
+- The character must be recognizable as the SAME character across all slides
+- Maintain consistent proportions, colors, expressions style, and visual identity`;
+    characterStyle = "the EXACT character from the reference image";
+    characterDescription = "the character shown in the reference, maintaining perfect visual consistency";
+  } else if (useBrandKit && brandKit) {
     const visualType = brandKit.visual_types?.[0];
     if (visualType === "avatars_3d" || visualType === "illustrations_3d") {
       characterStyle = "3D rendered cartoon character in Pixar/Disney style, smooth rendering, expressive features";
@@ -258,7 +273,7 @@ function buildImagePromptCharacter(
   const theme = userPrompt?.trim() || "professional content";
   
   return `Create a social media image featuring a CHARACTER.
-
+${referenceInstruction}
 CHARACTER: ${characterStyle}
 PERSON: ${characterDescription} engaged in activity related to: ${theme}
 MOOD: ${colorScheme}, modern professional aesthetic
@@ -266,6 +281,7 @@ SCENE: Clean background with soft depth, ${slideRole.toLowerCase()}
 
 CRITICAL REQUIREMENTS:
 - Character must be the CENTRAL focus of the image
+${hasAvatarReference ? "- MUST reproduce the EXACT same character from the reference image on EVERY slide" : "- Character should have consistent design and style"}
 - Character should express emotion/energy related to the content
 - Leave space at top for text overlay (added separately)
 - Modern social media aesthetic with professional quality
@@ -275,7 +291,7 @@ ABSOLUTE RULES:
 - Character should be well-lit and clearly visible
 - Background should complement, not distract from character
 
-OUTPUT: A professional image with an expressive character and NO text.`;
+OUTPUT: A professional image with ${hasAvatarReference ? "the EXACT reference character" : "an expressive character"} and NO text.`;
 }
 
 /**
@@ -838,6 +854,9 @@ Deno.serve(async (req) => {
     // ✅ V9: Route le prompt selon visualStyle (background/character/product)
     let enrichedPrompt: string;
     
+    // ✅ V10: Détecter si avatar disponible pour mode character
+    const hasAvatarForCharacter = visualStyle === 'character' && !!brandKit?.avatar_url;
+    
     if (visualStyle === 'character') {
       // ✅ Mode PERSONNAGE: génère un avatar/personnage 3D
       enrichedPrompt = buildImagePromptCharacter(
@@ -846,9 +865,10 @@ Deno.serve(async (req) => {
         useBrandKit,
         slideIndex,
         totalSlides,
-        colorMode as ColorMode
+        colorMode as ColorMode,
+        hasAvatarForCharacter // ✅ V10: Indique si référence avatar fournie
       );
-      console.log(`[render-slide] ${logCtx} 🧑 Using CHARACTER prompt`);
+      console.log(`[render-slide] ${logCtx} 🧑 Using CHARACTER prompt (hasAvatar: ${hasAvatarForCharacter})`);
     } else if (visualStyle === 'product') {
       // ✅ Mode PRODUIT: mise en scène du produit uploadé
       enrichedPrompt = buildImagePromptProduct(
@@ -903,6 +923,28 @@ Deno.serve(async (req) => {
       
       console.log(`[render-slide] ${logCtx} 2/4 Attempt ${imageAttempt + 1}/${maxImageAttempts} with Lovable AI (${selectedModel})...`);
       
+      // ✅ V10: Construire le message utilisateur avec image de référence si avatar disponible en mode character
+      let userMessageContent: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+      
+      if (hasAvatarForCharacter && brandKit?.avatar_url) {
+        // ✅ Message multimodal avec avatar comme référence
+        userMessageContent = [
+          { type: "text", text: currentPrompt },
+          { type: "image_url", image_url: { url: brandKit.avatar_url } }
+        ];
+        console.log(`[render-slide] ${logCtx}   ↳ Including avatar reference: ${brandKit.avatar_url.slice(0, 80)}...`);
+      } else if (visualStyle === 'product' && referenceImageUrl) {
+        // ✅ Mode produit avec image de référence
+        userMessageContent = [
+          { type: "text", text: currentPrompt },
+          { type: "image_url", image_url: { url: referenceImageUrl } }
+        ];
+        console.log(`[render-slide] ${logCtx}   ↳ Including product reference: ${referenceImageUrl.slice(0, 80)}...`);
+      } else {
+        // ✅ Texte simple
+        userMessageContent = currentPrompt;
+      }
+      
       const aiRes = await fetchWithRetries(
         "https://ai.gateway.lovable.dev/v1/chat/completions",
         {
@@ -920,9 +962,10 @@ Deno.serve(async (req) => {
 CRITICAL: Generate a VIBRANT, COLORFUL image - NOT white, NOT blank, NOT empty.
 Always produce ONE high-quality image with rich colors, gradients, and visual depth.
 Output dimensions: ${size.w}x${size.h}.
-NO TEXT whatsoever - no letters, words, numbers, labels in the image.` 
+NO TEXT whatsoever - no letters, words, numbers, labels in the image.
+${hasAvatarForCharacter ? "IMPORTANT: Reproduce the EXACT character from the reference image provided. Same style, colors, proportions." : ""}` 
               },
-              { role: "user", content: currentPrompt }
+              { role: "user", content: userMessageContent }
             ],
             modalities: ["image", "text"],
             size_hint: { width: size.w, height: size.h },
