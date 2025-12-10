@@ -17,7 +17,7 @@ type GeneratedAsset = {
   format: AspectRatio;
 };
 
-type AspectRatio = "1:1" | "16:9" | "9:16" | "4:3" | "3:4" | "4:5";
+type AspectRatio = "1:1" | "16:9" | "9:16" | "4:3" | "3:4" | "4:5" | "yt-thumb";
 type ContentType = "image" | "video";
 
 type UploadedSource = {
@@ -63,6 +63,7 @@ const ASPECT_TO_TW: Record<AspectRatio, string> = {
   "4:3": "aspect-[4/3]",
   "3:4": "aspect-[3/4]",
   "4:5": "aspect-[4/5]",
+  "yt-thumb": "aspect-video", // 1280x720 = 16:9 ratio
 };
 
 const DEFAULT_RESOLUTION = "1080x1350";
@@ -73,6 +74,7 @@ const RATIO_TO_RESOLUTION: Record<AspectRatio, string> = {
   "3:4": "1080x1920",
   "4:3": "1080x1350",
   "4:5": "1080x1350",
+  "yt-thumb": "1280x720",
 };
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
@@ -600,6 +602,7 @@ export function ChatGenerator() {
                   <SelectItem value="4:3">Standard (4:3)</SelectItem>
                   <SelectItem value="3:4">Portrait (3:4)</SelectItem>
                   <SelectItem value="4:5">Feed (4:5)</SelectItem>
+                  <SelectItem value="yt-thumb">🎬 YT Thumb (1280×720)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

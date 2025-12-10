@@ -18,7 +18,7 @@ type GeneratedAsset = {
   type: "image" | "video";
 };
 
-type AspectRatio = "1:1" | "9:16" | "16:9";
+type AspectRatio = "1:1" | "9:16" | "16:9" | "yt-thumb";
 type ContentType = "image" | "video";
 
 type UploadedSource = {
@@ -85,6 +85,7 @@ const ASPECT_TO_TW: Record<AspectRatio, string> = {
   "1:1": "aspect-square",
   "9:16": "aspect-[9/16]",
   "16:9": "aspect-video",
+  "yt-thumb": "aspect-video", // 1280x720 = 16:9 ratio
 };
 
 // const CURRENT_JOB_VERSION = 2; // Temporarily disabled until types regenerate

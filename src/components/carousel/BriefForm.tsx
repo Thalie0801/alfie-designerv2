@@ -9,7 +9,7 @@ import { Plus, X, Sparkles } from "lucide-react";
 import { CharacterCounter } from "./CharacterCounter";
 import { CONTROL_CHARS_REGEX } from "@/lib/safeRender";
 
-export type AspectRatio = "1:1" | "4:5" | "9:16" | "16:9";
+export type AspectRatio = "1:1" | "4:5" | "9:16" | "16:9" | "yt-thumb";
 export type OutputKind = "image" | "carousel" | "video";
 
 export interface BriefFormData {
@@ -57,6 +57,7 @@ const ASPECTS: { value: AspectRatio; label: string }[] = [
   { value: "4:5", label: "4:5 — portrait feed" },
   { value: "9:16", label: "9:16 — story / reel" },
   { value: "16:9", label: "16:9 — paysage" },
+  { value: "yt-thumb", label: "🎬 YT Thumb — 1280×720" },
 ];
 
 const OUTPUTS: { value: OutputKind; label: string }[] = [
