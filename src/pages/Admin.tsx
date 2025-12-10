@@ -805,6 +805,31 @@ export default function Admin() {
                               )}
                             </div>
                             <div className="flex items-center gap-2">
+                              {/* Quick link buttons */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setLinkAffiliateEmail(affiliate.email);
+                                  toast.success(`"${affiliate.name}" défini comme filleul`);
+                                }}
+                                title="Définir comme filleul"
+                                className="text-xs"
+                              >
+                                👤 Filleul
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setLinkParentEmail(affiliate.email);
+                                  toast.success(`"${affiliate.name}" défini comme parrain`);
+                                }}
+                                title="Définir comme parrain"
+                                className="text-xs"
+                              >
+                                👑 Parrain
+                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
