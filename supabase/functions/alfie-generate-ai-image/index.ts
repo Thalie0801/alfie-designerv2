@@ -525,6 +525,17 @@ Deno.serve(async (req) => {
       const slideIdx = typeof body.slideIndex === "number" ? body.slideIndex : null;
       const totalSlides = typeof body.totalSlides === "number" ? body.totalSlides : null;
 
+      // Déterminer l'aspectRatio à partir de la résolution
+      const resValue = clampRes(body.resolution);
+      const resolutionToAspectRatio: Record<string, string> = {
+        "1080x1350": "4:5",
+        "1080x1080": "1:1",
+        "1920x1080": "16:9",
+        "1080x1920": "9:16",
+        "1280x720": "yt-thumb",
+      };
+      const aspectRatioValue = resolutionToAspectRatio[resValue] || "4:5";
+
       const insertPayload = {
         user_id: userId,
         brand_id: brandIdForMetadata,
@@ -536,7 +547,8 @@ Deno.serve(async (req) => {
         thumbnail_url: generatedImageUrl!,
         woofs: 1,
         metadata: {
-          resolution: clampRes(body.resolution),
+          resolution: resValue,
+          aspectRatio: aspectRatioValue, // ✅ Ajout pour filtrage miniatures YouTube
           brandName: body.brandKit?.name ?? null,
           slideIndex: slideIdx,
           totalSlides,

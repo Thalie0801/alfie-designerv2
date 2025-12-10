@@ -104,7 +104,7 @@ export interface LibraryAsset {
   job_id?: string;
 }
 
-export function useLibraryAssets(userId: string | undefined, type: 'images' | 'videos') {
+export function useLibraryAssets(userId: string | undefined, type: 'images' | 'videos' | 'thumbnails') {
   const [assets, setAssets] = useState<LibraryAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
@@ -154,13 +154,20 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
         .select('id, type, status, output_url, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes')
         .eq('user_id', userId);
 
-      if (type === 'images') {
-        // Images = type 'image' uniquement, PAS les carousel_slide, PAS les legacy Ken Burns
+      if (type === 'thumbnails') {
+        // Miniatures YouTube = type 'image' avec resolution 1280x720 (format yt-thumb)
         query = query
           .eq('type', 'image')
           .is('metadata->carousel_id', null)
-          .not('output_url', 'like', '%animated_base_%'); // ✅ Exclure legacy Ken Burns
-      } else {
+          .eq('metadata->resolution', '1280x720');
+      } else if (type === 'images') {
+        // Images = type 'image' uniquement, PAS les carousel_slide, PAS les legacy Ken Burns, PAS les miniatures YT
+        query = query
+          .eq('type', 'image')
+          .is('metadata->carousel_id', null)
+          .not('output_url', 'like', '%animated_base_%')
+          .neq('metadata->resolution', '1280x720'); // ✅ Exclure miniatures YouTube
+      } else if (type === 'videos') {
         // Vidéos: toutes les vidéos (type='video'), incluant Replicate AI
         const { data: videoData, error: videoError } = await supabase
           .from('media_generations')
