@@ -952,6 +952,7 @@ async function processRenderImages(
     "4:5": { w: 1080, h: 1350 },
     "9:16": { w: 1080, h: 1920 },
     "16:9": { w: 1920, h: 1080 },
+    "yt-thumb": { w: 1280, h: 720 },
   };
 
   const resolvedKind = (
@@ -979,7 +980,7 @@ async function processRenderImages(
   let imagesToRender: Array<{
     prompt: string;
     resolution: string;
-    aspectRatio: "1:1" | "4:5" | "9:16" | "16:9";
+    aspectRatio: "1:1" | "4:5" | "9:16" | "16:9" | "yt-thumb";
     brandId?: string;
     briefIndex?: number;
     templateImageUrl?: string;
@@ -1001,7 +1002,7 @@ async function processRenderImages(
     imagesToRender = Array.from({ length: imagesCount }).map((_, index) => ({
       prompt: `${basePrompt}. ${resolvedKind === "carousel" ? `Carousel slide ${index + 1}.` : ""} Format ${ratioToUse}.`,
       resolution: `${w}x${h}`,
-      aspectRatio: (ratioToUse as "1:1" | "4:5" | "9:16" | "16:9") ?? "4:5",
+      aspectRatio: (ratioToUse as "1:1" | "4:5" | "9:16" | "16:9" | "yt-thumb") ?? "4:5",
       brandId: brandId ?? undefined,
       slideIndex: resolvedKind === "carousel" ? index : undefined,
       visualStyleCategory, // ✅ NEW: Propager le style visuel
