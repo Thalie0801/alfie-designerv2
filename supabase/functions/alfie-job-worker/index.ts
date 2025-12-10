@@ -1021,7 +1021,7 @@ async function processRenderImages(
     const stylePrefix = getStylePromptPrefix(visualStyle);
 
     imagesToRender = (briefs || [payload.brief]).map((brief: any, i: number) => {
-      const aspectRatio = (brief?.format?.split(" ")?.[0] as string) || "1:1";
+      const aspectRatio = brief?.ratio || payload.aspectRatio || "1:1";
       const { w, h } = AR_MAP[aspectRatio] || AR_MAP["1:1"];
       
       // ✅ Extraire le contenu du brief (thème utilisateur)
