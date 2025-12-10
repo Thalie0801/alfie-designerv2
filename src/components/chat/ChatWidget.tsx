@@ -535,7 +535,22 @@ export default function ChatWidget() {
 
       // Ideas tracking géré par le LLM maintenant
 
-      const blocks = reply
+      // ✅ Nettoyage défensif : retirer tout résidu <alfie-pack> avant affichage
+      let displayReply = reply;
+      const packStartIdx = displayReply.toLowerCase().indexOf('<alfie-pack>');
+      if (packStartIdx !== -1) {
+        const packEndIdx = displayReply.toLowerCase().indexOf('</alfie-pack>', packStartIdx);
+        if (packEndIdx !== -1) {
+          // Bloc complet → supprimer
+          displayReply = displayReply.slice(0, packStartIdx) + displayReply.slice(packEndIdx + '</alfie-pack>'.length);
+        } else {
+          // Bloc tronqué → supprimer tout depuis <alfie-pack>
+          displayReply = displayReply.slice(0, packStartIdx);
+        }
+      }
+      displayReply = displayReply.trim();
+
+      const blocks = displayReply
         .split(/\n{2,}/)
         .map((block) => block.trim())
         .filter((block) => block.length > 0);

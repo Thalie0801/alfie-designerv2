@@ -705,6 +705,7 @@ function parsePack(text: string): any | null {
 /**
  * Nettoie le texte en retirant le bloc <alfie-pack> et TOUS les astérisques markdown
  * Utilise indexOf/slice pour une extraction robuste (pas de regex)
+ * ✅ Gère aussi les blocs tronqués (sans balise fermante)
  */
 function cleanReply(text: string): string {
   let cleaned = text;
@@ -716,7 +717,11 @@ function cleanReply(text: string): string {
   if (startIdx !== -1) {
     const endIdx = cleaned.toLowerCase().indexOf(endTag.toLowerCase(), startIdx);
     if (endIdx !== -1) {
+      // Cas normal : bloc complet avec balise fermante
       cleaned = cleaned.slice(0, startIdx) + cleaned.slice(endIdx + endTag.length);
+    } else {
+      // ✅ Balise fermante manquante (JSON tronqué) → supprimer depuis <alfie-pack> jusqu'à la fin
+      cleaned = cleaned.slice(0, startIdx);
     }
   }
   
