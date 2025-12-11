@@ -39,6 +39,7 @@ const AR_MAP: Record<string, GenSize> = {
   "4:5": { w: 1024, h: 1280 },
   "9:16": { w: 720, h: 1280 },
   "16:9": { w: 1280, h: 720 },
+  "2:3": { w: 1024, h: 1536 },
 };
 
 const PIXEL_TO_AR: Record<string, string> = {

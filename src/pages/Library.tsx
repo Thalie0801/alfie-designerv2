@@ -23,7 +23,7 @@ export default function Library() {
   const orderIdFromQuery = new URLSearchParams(location.search).get('order');
   
   // Si ?order= est présent, afficher l'onglet carrousels par défaut
-  const [activeTab, setActiveTab] = useState<'images' | 'videos' | 'carousels' | 'thumbnails'>(
+  const [activeTab, setActiveTab] = useState<'images' | 'videos' | 'carousels' | 'thumbnails' | 'pinterest'>(
     orderIdFromQuery ? 'carousels' : 'images'
   );
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,7 +31,7 @@ export default function Library() {
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Map tab to asset type for hook
-  const assetTypeForHook = activeTab === 'carousels' ? 'images' : activeTab;
+  const assetTypeForHook = activeTab === 'carousels' ? 'images' : activeTab === 'pinterest' ? 'pinterest' : activeTab;
   
   const { 
     assets, 
@@ -161,9 +161,10 @@ export default function Library() {
       )}
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'images' | 'videos' | 'carousels' | 'thumbnails')}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'images' | 'videos' | 'carousels' | 'thumbnails' | 'pinterest')}>
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="images">🖼️ Images</TabsTrigger>
+          <TabsTrigger value="pinterest">📌 Pinterest</TabsTrigger>
           <TabsTrigger value="thumbnails">📺 Miniatures YT</TabsTrigger>
           <TabsTrigger value="videos">🎬 Vidéos</TabsTrigger>
           <TabsTrigger value="carousels">📱 Carrousels</TabsTrigger>
@@ -311,6 +312,37 @@ export default function Library() {
         {/* Carousels Tab */}
         <TabsContent value="carousels" className="mt-6">
           <CarouselsTab orderId={orderIdFromQuery} />
+        </TabsContent>
+
+        {/* Pinterest Tab */}
+        <TabsContent value="pinterest" className="mt-6">
+          {loading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+              {[...Array(8)].map((_, i) => (
+                <Skeleton key={i} className="h-80 rounded-lg" />
+              ))}
+            </div>
+          ) : filteredAssets.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Aucune image Pinterest pour l'instant.</p>
+              <p className="text-sm">Générez au format "2:3 Pinterest" depuis le Studio</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+              {filteredAssets.map(asset => (
+                <AssetCard
+                  key={asset.id}
+                  asset={asset}
+                  selected={selectedAssets.includes(asset.id)}
+                  onSelect={() => handleSelectAsset(asset.id)}
+                  onDownload={() => downloadAsset(asset.id)}
+                  onDelete={() => deleteAsset(asset.id)}
+                  daysUntilExpiry={getDaysUntilExpiry(asset.expires_at)}
+                />
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         {/* YouTube Thumbnails Tab */}
