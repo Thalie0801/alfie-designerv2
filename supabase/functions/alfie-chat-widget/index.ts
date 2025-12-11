@@ -122,7 +122,7 @@ Pour cela, utilise le format suivant en fin de ta réponse :
 }
 </alfie-pack>
 
-RÈGLE : kind DOIT être exactement "carousel", "image", "video_basic" ou "video_premium".
+RÈGLE : kind DOIT être exactement "carousel", "image" ou "video_premium".
 
 --- RÈGLE SPÉCIFIQUE POUR carouselType ---
 
@@ -271,7 +271,7 @@ SEULS CES MESSAGES DÉCLENCHENT LA GÉNÉRATION :
    Exemples de demandes COMPLÈTES (générer) :
    - "je veux un carrousel sur l'organisation" → génère pack avec kind: "carousel"
    - "fais-moi une image pour mon offre coaching" → génère pack avec kind: "image"
-   - "j'ai besoin d'une vidéo sur les erreurs à éviter" → génère pack avec kind: "video_basic"
+   - "j'ai besoin d'une vidéo sur les erreurs à éviter" → génère pack avec kind: "video_premium"
 
 2. Pour les CARROUSELS :
    - kind: "carousel"

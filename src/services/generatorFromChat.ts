@@ -208,8 +208,8 @@ async function createAssetJob(
   // Générer un carousel_id unique (UUID valide) pour les carrousels
   const carousel_id = asset.kind === "carousel" ? crypto.randomUUID() : undefined;
 
-  // Vidéos premium uniquement (Veo 3.1)
-  const videoEngine = asset.kind === "video_premium" ? "veo_3_1" : undefined;
+  // Toute vidéo utilise Veo 3.1 (fallback de sécurité)
+  const videoEngine = asset.kind.includes("video") ? "veo_3_1" : undefined;
 
   const { error: jobError } = await supabase.from("job_queue").insert({
     user_id: userId,
