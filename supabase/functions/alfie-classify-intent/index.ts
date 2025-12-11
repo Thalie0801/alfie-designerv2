@@ -5,11 +5,11 @@ interface IntentResponse {
   intent: IntentType;
   confidence: number; // 0..1
   params?: {
-    aspect_ratio?: "1:1" | "4:5" | "9:16" | "16:9";
+    aspect_ratio?: "1:1" | "4:5" | "9:16" | "16:9" | "2:3";
     slides?: number;
     is_approval?: boolean;
     language?: "fr" | "en" | "und"; // best-guess
-    matched?: string; // motif qui a déclenché l’intent
+    matched?: string; // motif qui a déclenché l'intent
     keywords?: string[]; // mots-clés reconnus
   };
   // message brut utile côté debug
@@ -27,7 +27,7 @@ function detectLanguage(msg: string): "fr" | "en" | "und" {
   return "und";
 }
 
-/** Détection d’approbation (OK pour lancer) */
+/** Détection d'approbation (OK pour lancer) */
 function isApproval(msg: string): boolean {
   const m = msg.trim().toLowerCase();
   const terms = [
@@ -54,21 +54,23 @@ function isApproval(msg: string): boolean {
   return terms.some((t) => m === t || m.startsWith(t + " "));
 }
 
-/** Extraction d’un aspect-ratio dans un texte libre */
-function extractAspectRatio(msg: string): "1:1" | "4:5" | "9:16" | "16:9" | undefined {
-  // tolère 1:1, 1/1, 1-1, 1 1 ; idem pour 4:5, 9:16, 16:9
-  const ratioRegex = /\b(1\s*[:\/\-]\s*1|4\s*[:\/\-]\s*5|9\s*[:\/\-]\s*16|16\s*[:\/\-]\s*9)\b/;
+/** Extraction d'un aspect-ratio dans un texte libre */
+function extractAspectRatio(msg: string): "1:1" | "4:5" | "9:16" | "16:9" | "2:3" | undefined {
+  // Détecte "pinterest" comme alias pour 2:3
+  if (/pinterest/i.test(msg)) return "2:3";
+  // tolère 1:1, 1/1, 1-1, 1 1 ; idem pour 4:5, 9:16, 16:9, 2:3
+  const ratioRegex = /\b(1\s*[:\/\-]\s*1|4\s*[:\/\-]\s*5|9\s*[:\/\-]\s*16|16\s*[:\/\-]\s*9|2\s*[:\/\-]\s*3)\b/;
   const m = msg.match(ratioRegex);
   if (!m) return undefined;
   const raw = m[1].replace(/\s+/g, "");
   const norm = raw.replace("/", ":").replace("-", ":");
-  const allowed = ["1:1", "4:5", "9:16", "16:9"] as const;
+  const allowed = ["1:1", "4:5", "9:16", "16:9", "2:3"] as const;
   return (allowed.find((r) => r === norm) as any) ?? undefined;
 }
 
-/** Extraction d’un nombre de slides */
+/** Extraction d'un nombre de slides */
 function extractSlidesCount(msg: string): number | undefined {
-  // “5 slides”, “carrousel 7”, “x5”, “6-pages”, “6 pages”
+  // "5 slides", "carrousel 7", "x5", "6-pages", "6 pages"
   const patterns = [
     /(?:slides?|pages?)\s*:?\s*(\d{1,2})/i,
     /(?:carrousel|carousel)\s*:?\s*(\d{1,2})/i,

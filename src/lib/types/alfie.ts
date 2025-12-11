@@ -5,7 +5,7 @@
 
 export type AssetKind = 'image' | 'carousel' | 'video_premium';
 export type Platform = 'instagram' | 'linkedin' | 'tiktok' | 'youtube' | 'facebook' | 'pinterest' | 'generic';
-export type Ratio = '1:1' | '4:5' | '9:16' | '16:9';
+export type Ratio = '1:1' | '4:5' | '9:16' | '16:9' | '2:3';
 export type Goal = 'education' | 'vente' | 'lead' | 'engagement' | 'notoriete';
 
 // ✅ NEW: Visual style category for adaptive generation

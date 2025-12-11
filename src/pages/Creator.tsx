@@ -14,10 +14,11 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 
-const RATIO_OPTIONS: Array<{ label: string; value: '1:1' | '4:5' | '9:16' }> = [
+const RATIO_OPTIONS: Array<{ label: string; value: '1:1' | '4:5' | '9:16' | '2:3' }> = [
   { label: 'Carré 1:1', value: '1:1' },
   { label: 'Portrait 4:5', value: '4:5' },
   { label: 'Vertical 9:16', value: '9:16' },
+  { label: '📌 Pinterest 2:3', value: '2:3' },
 ];
 
 const PLATFORM_OPTIONS: Array<{ label: string; value: 'instagram' | 'linkedin' | 'tiktok' }> = [

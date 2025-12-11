@@ -8,13 +8,14 @@ export type SlideUrlOptions = {
   body?: string;
   bulletPoints?: string[];
   cta?: string;
-  aspectRatio?: '4:5' | '1:1' | '9:16' | '16:9';
+  aspectRatio?: '4:5' | '1:1' | '9:16' | '16:9' | '2:3';
 };
 
 function dims(ar: SlideUrlOptions['aspectRatio']) {
   if (ar === '9:16') return { w: 1080, h: 1920 };
   if (ar === '16:9') return { w: 1920, h: 1080 };
   if (ar === '1:1') return { w: 1080, h: 1080 };
+  if (ar === '2:3') return { w: 1080, h: 1620 };
   return { w: 1080, h: 1350 }; // 4:5
 }
 
@@ -65,6 +66,8 @@ export function slideUrl(publicId: string, o: SlideUrlOptions): string {
     ? { titleSize: 64, subSize: 38, bulletSize: 32, bodySize: 36 }
     : o.aspectRatio === '1:1'
     ? { titleSize: 72, subSize: 42, bulletSize: 36, bodySize: 40 }
+    : o.aspectRatio === '2:3'
+    ? { titleSize: 76, subSize: 46, bulletSize: 36, bodySize: 40 }
     : { titleSize: 72, subSize: 42, bulletSize: 36, bodySize: 40 }; // 4:5
 
   // Déterminer le mode de layout selon le contenu disponible

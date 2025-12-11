@@ -49,6 +49,7 @@ const RATIO_OPTIONS = [
   { value: "4:5", label: "4:5 (Portrait)" },
   { value: "9:16", label: "9:16 (Story/Reel)" },
   { value: "16:9", label: "16:9 (Paysage)" },
+  { value: "2:3", label: "📌 2:3 (Pinterest)" },
   { value: "yt-thumb", label: "🎬 YT Thumb (1280×720)" },
 ];
 

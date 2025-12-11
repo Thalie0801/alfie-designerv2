@@ -104,7 +104,7 @@ export interface LibraryAsset {
   job_id?: string;
 }
 
-export function useLibraryAssets(userId: string | undefined, type: 'images' | 'videos' | 'thumbnails') {
+export function useLibraryAssets(userId: string | undefined, type: 'images' | 'videos' | 'thumbnails' | 'pinterest') {
   const [assets, setAssets] = useState<LibraryAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
@@ -160,13 +160,20 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
           .eq('type', 'image')
           .is('metadata->>carousel_id', null)
           .eq('metadata->>resolution', '1280x720');
+      } else if (type === 'pinterest') {
+        // Pinterest = type 'image' avec resolution 1080x1620 (format 2:3)
+        query = query
+          .eq('type', 'image')
+          .is('metadata->>carousel_id', null)
+          .eq('metadata->>resolution', '1080x1620');
       } else if (type === 'images') {
-        // Images = type 'image' uniquement, PAS les carousel_slide, PAS les legacy Ken Burns, PAS les miniatures YT
+        // Images = type 'image' uniquement, PAS les carousel_slide, PAS les legacy Ken Burns, PAS les miniatures YT/Pinterest
         query = query
           .eq('type', 'image')
           .is('metadata->>carousel_id', null)
           .not('output_url', 'like', '%animated_base_%')
-          .neq('metadata->>resolution', '1280x720'); // ✅ Exclure miniatures YouTube
+          .neq('metadata->>resolution', '1280x720')  // Exclure miniatures YouTube
+          .neq('metadata->>resolution', '1080x1620'); // Exclure Pinterest
       } else if (type === 'videos') {
         // Vidéos: toutes les vidéos (type='video'), incluant Replicate AI
         const { data: videoData, error: videoError } = await supabase

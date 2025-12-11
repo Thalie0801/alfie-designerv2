@@ -17,7 +17,7 @@ type GeneratedAsset = {
   format: AspectRatio;
 };
 
-type AspectRatio = "1:1" | "16:9" | "9:16" | "4:3" | "3:4" | "4:5" | "yt-thumb";
+type AspectRatio = "1:1" | "16:9" | "9:16" | "4:3" | "3:4" | "4:5" | "2:3" | "yt-thumb";
 type ContentType = "image" | "video";
 
 type UploadedSource = {
@@ -63,6 +63,7 @@ const ASPECT_TO_TW: Record<AspectRatio, string> = {
   "4:3": "aspect-[4/3]",
   "3:4": "aspect-[3/4]",
   "4:5": "aspect-[4/5]",
+  "2:3": "aspect-[2/3]",
   "yt-thumb": "aspect-video", // 1280x720 = 16:9 ratio
 };
 
@@ -74,6 +75,7 @@ const RATIO_TO_RESOLUTION: Record<AspectRatio, string> = {
   "3:4": "1080x1920",
   "4:3": "1080x1350",
   "4:5": "1080x1350",
+  "2:3": "1080x1620",
   "yt-thumb": "1280x720",
 };
 
