@@ -61,12 +61,40 @@ export function HeroVideoSection() {
       {/* Content container - sticky */}
       <div className="sticky top-0 h-screen flex flex-col items-center justify-center px-4 sm:px-6 pt-16">
         
-        {/* CTA Button - positioned ABOVE title */}
+        {/* Title - with animated word cycling */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+          className="text-center mb-6 z-20"
+        >
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 leading-tight pb-4">
+            Crée du contenu qui
+            <span className="relative inline-flex items-baseline ml-2">
+              <motion.span 
+                key={phraseIndex}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+                className="bg-gradient-to-r from-alfie-mint to-alfie-lilac bg-clip-text text-transparent"
+              >
+                {heroAdjectives[phraseIndex]}
+              </motion.span>
+              <span className="ml-1 h-10 w-[3px] animate-pulse bg-alfie-mint rounded-full" />
+            </span>
+          </h1>
+          <p className="text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto mt-6">
+            Génère des visuels pro pour tes réseaux sociaux en quelques clics.
+          </p>
+        </motion.div>
+
+        {/* CTA Button - BELOW title */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="mb-8 z-20"
+          transition={{ duration: 0.8, delay: 0.4 }}
+          className="mb-4 z-20"
         >
           <Button
             size="lg"
@@ -95,34 +123,6 @@ export function HeroVideoSection() {
               className="w-1 h-1.5 bg-slate-400 rounded-full"
             />
           </div>
-        </motion.div>
-
-        {/* Title - with animated word cycling */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.4 }}
-          className="text-center mb-6 z-20"
-        >
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-6 leading-relaxed pb-2">
-            Crée du contenu qui
-            <span className="relative inline-flex items-center ml-2">
-              <motion.span 
-                key={phraseIndex}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-                className="bg-gradient-to-r from-alfie-mint to-alfie-lilac bg-clip-text text-transparent"
-              >
-                {heroAdjectives[phraseIndex]}
-              </motion.span>
-              <span className="ml-1 h-8 w-[3px] animate-pulse bg-alfie-mint rounded-full" />
-            </span>
-          </h1>
-          <p className="text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto mt-4">
-            Génère des visuels pro pour tes réseaux sociaux en quelques clics.
-          </p>
         </motion.div>
 
         {/* Video + 4 floating cards container */}
