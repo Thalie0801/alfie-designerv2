@@ -26,6 +26,74 @@ serve(async (req) => {
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
 
+    // Parse request body for action type
+    let action = "woofs_packs"; // default
+    try {
+      const body = await req.json();
+      action = body.action || "woofs_packs";
+    } catch {
+      // No body or invalid JSON, use default action
+    }
+
+    // Action: Create carousel product (19€ one-off)
+    if (action === "create_carousel_product") {
+      const lookupKey = "price_carousel_10_slides";
+
+      // Check if already exists
+      const existingPrices = await stripe.prices.list({
+        lookup_keys: [lookupKey],
+        limit: 1,
+      });
+
+      if (existingPrices.data.length > 0) {
+        console.log(`Carousel product already exists: ${existingPrices.data[0].id}`);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: "Carousel product already exists",
+            productId: existingPrices.data[0].product,
+            priceId: existingPrices.data[0].id,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Create product
+      const product = await stripe.products.create({
+        name: "Carrousel 10 slides + CSV Canva",
+        description: "10 slides de carrousel personnalisés avec ton Brand Kit + export CSV pour Canva Bulk Create",
+        metadata: {
+          type: "carousel_pack",
+          slides: "10",
+        },
+      });
+
+      // Create price (19€ one-off)
+      const price = await stripe.prices.create({
+        product: product.id,
+        unit_amount: 1900, // 19€ in cents
+        currency: "eur",
+        lookup_key: lookupKey,
+        metadata: {
+          type: "carousel_pack",
+          slides: "10",
+        },
+      });
+
+      console.log(`Created carousel product with price ${price.id}`);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Carousel product created successfully",
+          productId: product.id,
+          priceId: price.id,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Default action: Create Woofs packs
     const createdProducts: Array<{ size: number; productId: string; priceId: string }> = [];
 
     for (const pack of WOOFS_PACKS) {
@@ -88,7 +156,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
-    console.error("Error creating Woofs products:", error);
+    console.error("Error creating products:", error);
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

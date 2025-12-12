@@ -8,8 +8,8 @@ import logo from "@/assets/alfie-logo-black.svg";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-// Price ID for the 19€ carousel pack - needs to be created in Stripe
-const CAROUSEL_PRICE_ID = "price_1SHxxxxCarousel19";
+// Price ID for the 19€ carousel pack - created via Stripe API
+const CAROUSEL_PRICE_ID = "price_1SdTBtQvcbGhgt8Sl6H2R4yx";
 
 export default function CheckoutExpress() {
   const [searchParams] = useSearchParams();
