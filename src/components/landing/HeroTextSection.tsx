@@ -48,14 +48,22 @@ export function HeroTextSection() {
     return () => observer.disconnect();
   }, []);
 
-  const scrollToPricing = () => {
-    if (typeof document === "undefined") return;
-    document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
+  const goToQuiz = () => {
+    console.log("home_cta_primary_click");
+    if (typeof window === "undefined") return;
+    window.location.href = "/quiz";
   };
 
-  const goToDemo = () => {
-    if (typeof window === "undefined") return;
-    window.location.href = "/demo";
+  const scrollToDemo = () => {
+    console.log("home_demo_click");
+    if (typeof document === "undefined") return;
+    document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const scrollToPricing = () => {
+    console.log("home_pricing_click");
+    if (typeof document === "undefined") return;
+    document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
@@ -91,17 +99,24 @@ export function HeroTextSection() {
         <div className="flex w-full flex-col items-center justify-center gap-3 sm:gap-4 px-4">
           <Button
             className="h-11 sm:h-12 w-full sm:w-auto rounded-full bg-alfie-mint px-6 sm:px-8 text-sm sm:text-base text-slate-900 hover:bg-alfie-pink min-w-[200px]"
-            onClick={scrollToPricing}
+            onClick={goToQuiz}
           >
-            Commencer maintenant ✨
+            Créer mon Brand Kit (1 min)
           </Button>
+          <p className="text-xs text-slate-500">+ 3 visuels gratuits en 5 min. Sans carte.</p>
           <Button
             variant="outline"
             className="h-11 sm:h-12 w-full sm:w-auto rounded-full border-slate-200 bg-white/80 px-6 sm:px-8 text-sm sm:text-base text-slate-900 hover:bg-slate-100 min-w-[200px]"
-            onClick={goToDemo}
+            onClick={scrollToDemo}
           >
             Voir la démo →
           </Button>
+          <button
+            onClick={scrollToPricing}
+            className="text-sm text-slate-500 underline underline-offset-2 hover:text-slate-700 transition-colors"
+          >
+            Voir les tarifs
+          </button>
         </div>
 
         <div className="mt-4 sm:mt-8 flex flex-wrap justify-center gap-2 sm:gap-3 px-2">

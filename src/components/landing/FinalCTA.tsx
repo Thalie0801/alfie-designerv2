@@ -1,11 +1,20 @@
 import { Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 
 export function FinalCTA() {
-  const handleScrollToPricing = () => {
+  const navigate = useNavigate();
+
+  const handleCtaClick = () => {
+    console.log("final_cta_click");
+    navigate("/quiz");
+  };
+
+  const scrollToDemo = () => {
+    console.log("final_demo_click");
     if (typeof document === "undefined") return;
-    document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
+    document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
@@ -18,14 +27,22 @@ export function FinalCTA() {
           <p className="mx-auto mt-4 max-w-2xl text-base text-muted-foreground sm:text-lg">
             Rejoins des centaines de créateurs qui utilisent Alfie pour gagner du temps
           </p>
-          <Button
-            size="lg"
-            className="mt-6 w-full rounded-full bg-[#54d7c5] px-8 py-3 text-sm font-semibold text-slate-900 shadow-md hover:bg-[#46c2b1] sm:w-auto"
-            onClick={handleScrollToPricing}
-          >
-            Commencer maintenant ✨
-            <Sparkles className="ml-2 h-5 w-5" />
-          </Button>
+          <div className="mt-6 flex flex-col items-center gap-3">
+            <Button
+              size="lg"
+              className="w-full rounded-full bg-alfie-mint px-8 py-3 text-sm font-semibold text-slate-900 shadow-md hover:bg-alfie-pink sm:w-auto"
+              onClick={handleCtaClick}
+            >
+              <Sparkles className="mr-2 h-5 w-5" />
+              Créer mon Brand Kit (1 min)
+            </Button>
+            <button
+              onClick={scrollToDemo}
+              className="text-sm text-slate-500 underline underline-offset-2 hover:text-slate-700 transition-colors"
+            >
+              Voir la démo
+            </button>
+          </div>
         </div>
       </div>
     </section>

@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyReset from "./pages/VerifyReset";
+import Quiz from "./pages/Quiz";
 
 import Dashboard from "./pages/Dashboard";
 import Billing from "./pages/Billing";
@@ -47,6 +48,7 @@ const AppRoutes = () => {
     <>
       <Routes>
         <Route path="/" element={<Index />} />
+        <Route path="/quiz" element={<Quiz />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/verify-reset" element={<VerifyReset />} />
         <Route path="/reset-password" element={<ResetPassword />} />

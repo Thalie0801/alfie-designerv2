@@ -2,9 +2,10 @@ import { useState } from "react";
 import { LandingHeader } from "@/components/LandingHeader";
 import { HeroTextSection } from "@/components/landing/HeroTextSection";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
+import { DemoSection } from "@/components/landing/DemoSection";
 import { FeaturesSection } from "@/components/landing/FeaturesSection";
+import { FreeTrialBlock } from "@/components/landing/FreeTrialBlock";
 import { PricingSection } from "@/components/landing/PricingSection";
-import { AffiliateSection } from "@/components/landing/AffiliateSection";
 import { FinalCTA } from "@/components/landing/FinalCTA";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { ProspectBubble } from "@/components/ProspectBubble";
@@ -70,9 +71,10 @@ export default function AlfieLanding() {
 
       <HeroTextSection />
       <HowItWorksSection />
+      <DemoSection />
       <FeaturesSection />
+      <FreeTrialBlock />
       <PricingSection />
-      <AffiliateSection />
       <FinalCTA />
       <LandingFooter />
       <ProspectBubble />
