@@ -49,7 +49,7 @@ export function PortalDoorScene({ onFinish }: PortalDoorSceneProps) {
       {/* Video background - the door */}
       <video
         ref={videoRef}
-        src="/videos/hero-demo.mp4"
+        src="/videos/door-opening.mp4"
         muted
         playsInline
         className="absolute inset-0 w-full h-full object-cover z-0"
