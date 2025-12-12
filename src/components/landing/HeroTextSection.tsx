@@ -82,7 +82,7 @@ export function HeroTextSection() {
         <div className="space-y-3 sm:space-y-4">
           <h1 className="text-center text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 leading-tight px-2">
             Crée des designs{" "}
-            <span className="relative inline-flex items-center justify-center min-w-[10ch] sm:min-w-[12ch]">
+            <span className="relative inline-flex items-center justify-center min-w-[14ch]">
               <span className="bg-gradient-to-r from-[#7fdce2] via-[#c99df8] to-[#ff9fd4] bg-clip-text text-transparent transition-opacity duration-300">
                 {typedText || "\u00A0"}
               </span>

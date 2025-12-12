@@ -97,6 +97,9 @@ export function DemoSection() {
                   <img 
                     src={preview.image} 
                     alt={preview.title}
+                    width={400}
+                    height={400}
+                    loading="lazy"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none';
@@ -131,6 +134,9 @@ export function DemoSection() {
                 <img 
                   src={demoGalleryAssets.beforeAfter.before.image} 
                   alt="Sans Brand Kit"
+                  width={400}
+                  height={400}
+                  loading="lazy"
                   className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity"
                   onError={(e) => {
                     e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-slate-400">Image</div>';
@@ -149,6 +155,9 @@ export function DemoSection() {
                 <img 
                   src={demoGalleryAssets.beforeAfter.after.image} 
                   alt="Avec Brand Kit"
+                  width={400}
+                  height={400}
+                  loading="lazy"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                   onError={(e) => {
                     e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-alfie-mint">Image</div>';
