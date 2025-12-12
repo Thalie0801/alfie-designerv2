@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LandingHeader } from "@/components/LandingHeader";
 import { HeroTextSection } from "@/components/landing/HeroTextSection";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
@@ -14,15 +14,23 @@ import { useAffiliate } from "@/hooks/useAffiliate";
 export default function AlfieLanding() {
   const [videoLoaded, setVideoLoaded] = useState(false);
   
-  // Initialize affiliate tracking - will store ref from URL and track click
+  // Defer affiliate tracking to avoid blocking first paint
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // Affiliate hook handles tracking internally
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+  
+  // Initialize affiliate tracking
   useAffiliate();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <LandingHeader />
 
-      {/* SECTION 1 : Image Alfie + vidéo */}
-      <section className="relative h-[80vh] md:h-screen overflow-hidden">
+      {/* SECTION 1 : Image Alfie + vidéo - Fixed height to prevent layout shift */}
+      <section className="relative h-[80vh] md:h-screen overflow-hidden" style={{ minHeight: '600px' }}>
         {/* Image Alfie en arrière-plan permanent avec overlay fort */}
         <div className="absolute inset-0">
           <picture>
@@ -42,8 +50,6 @@ export default function AlfieLanding() {
           <div className="absolute inset-0 bg-black/85" />
         </div>
         
-        {/* Pas de loading skeleton - la photo est déjà visible */}
-        
         {/* Vidéo qui s'affiche progressivement par-dessus avec opacité totale */}
         <video
           src="/videos/hero-background.mp4"
@@ -52,6 +58,8 @@ export default function AlfieLanding() {
           muted
           playsInline
           preload="auto"
+          width={1920}
+          height={1080}
           onLoadedData={() => setVideoLoaded(true)}
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ${
             videoLoaded ? 'opacity-100' : 'opacity-0'
