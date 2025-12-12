@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/utils/trackEvent";
 import logo from "@/assets/alfie-logo-black.svg";
 
@@ -18,11 +17,9 @@ export function LandingHeader() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Check auth only on click, not on render - prevents layout shifts
-  const handleOpenApp = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    trackEvent("click_open_app", { isLoggedIn: !!session?.user });
-    navigate(session?.user ? "/studio" : "/start");
+  const handleAuth = useCallback(() => {
+    trackEvent("click_header_auth");
+    navigate("/auth");
   }, [navigate]);
 
   return (
@@ -37,10 +34,10 @@ export function LandingHeader() {
         {/* Boutons à droite */}
         <div className="flex items-center gap-2 sm:gap-3">
           <Button 
-            onClick={handleOpenApp}
+            onClick={handleAuth}
             className="bg-slate-900 text-white hover:bg-slate-800 text-sm sm:text-base px-3 sm:px-4 h-9 sm:h-10"
           >
-            Ouvrir l'app
+            Se connecter
           </Button>
         </div>
       </div>
