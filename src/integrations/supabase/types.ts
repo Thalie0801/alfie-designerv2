@@ -997,6 +997,45 @@ export type Database = {
           },
         ]
       }
+      email_queue: {
+        Row: {
+          attempts: number
+          created_at: string | null
+          id: string
+          last_error: string | null
+          payload: Json | null
+          run_after: string
+          sent_at: string | null
+          status: string
+          template: string
+          to_email: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string | null
+          id?: string
+          last_error?: string | null
+          payload?: Json | null
+          run_after?: string
+          sent_at?: string | null
+          status?: string
+          template: string
+          to_email: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string | null
+          id?: string
+          last_error?: string | null
+          payload?: Json | null
+          run_after?: string
+          sent_at?: string | null
+          status?: string
+          template?: string
+          to_email?: string
+        }
+        Relationships: []
+      }
       feature_flags: {
         Row: {
           allowed_plans: string[] | null
@@ -1311,6 +1350,36 @@ export type Database = {
           },
         ]
       }
+      leads: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          intent: Json | null
+          last_seen_at: string | null
+          marketing_opt_in: boolean | null
+          source: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          intent?: Json | null
+          last_seen_at?: string | null
+          marketing_opt_in?: boolean | null
+          source?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          intent?: Json | null
+          last_seen_at?: string | null
+          marketing_opt_in?: boolean | null
+          source?: string | null
+        }
+        Relationships: []
+      }
       library_assets: {
         Row: {
           brand_id: string | null
@@ -1591,34 +1660,46 @@ export type Database = {
           brand_id: string | null
           brief_json: Json
           campaign_name: string
+          canva_url: string | null
           created_at: string | null
+          customer_email: string | null
           id: string
+          lead_id: string | null
           metadata: Json | null
           status: string
           updated_at: string | null
           user_id: string
+          zip_url: string | null
         }
         Insert: {
           brand_id?: string | null
           brief_json?: Json
           campaign_name: string
+          canva_url?: string | null
           created_at?: string | null
+          customer_email?: string | null
           id?: string
+          lead_id?: string | null
           metadata?: Json | null
           status?: string
           updated_at?: string | null
           user_id: string
+          zip_url?: string | null
         }
         Update: {
           brand_id?: string | null
           brief_json?: Json
           campaign_name?: string
+          canva_url?: string | null
           created_at?: string | null
+          customer_email?: string | null
           id?: string
+          lead_id?: string | null
           metadata?: Json | null
           status?: string
           updated_at?: string | null
           user_id?: string
+          zip_url?: string | null
         }
         Relationships: [
           {
@@ -1634,6 +1715,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_brand_quota_current"
             referencedColumns: ["brand_id"]
+          },
+          {
+            foreignKeyName: "orders_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "orders_user_id_fkey"

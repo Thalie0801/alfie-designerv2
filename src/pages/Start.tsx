@@ -10,6 +10,7 @@ import { EquipmentScene } from '@/components/start/scenes/EquipmentScene';
 import { QuestScene } from '@/components/start/scenes/QuestScene';
 import { CraftingScene } from '@/components/start/scenes/CraftingScene';
 import { LootChestScene } from '@/components/start/scenes/LootChestScene';
+import { EmailGateScene } from '@/components/start/scenes/EmailGateScene';
 
 import type { StylePreset, Intent, FlowStep } from '@/lib/types/startFlow';
 import { DEFAULT_INTENT } from '@/lib/types/startFlow';
@@ -42,7 +43,14 @@ export default function Start() {
 
   const handleWizardComplete = useCallback(() => setFlowStep('recap'), []);
   
-  const handleGenerate = useCallback(() => setFlowStep('generating'), []);
+  const handleGenerate = useCallback(() => setFlowStep('email_gate'), []);
+  
+  const handleEmailGateContinue = useCallback((email?: string) => {
+    if (email) {
+      toast.success('Email sauvegardé !');
+    }
+    setFlowStep('generating');
+  }, []);
   
   const handleGenerationComplete = useCallback(() => setFlowStep('delivery'), []);
   
@@ -81,6 +89,14 @@ export default function Start() {
             intent={intent}
             onUpdate={handleIntentUpdate}
             onComplete={handleGenerate}
+          />
+        )}
+        
+        {flowStep === 'email_gate' && (
+          <EmailGateScene
+            key="email_gate"
+            intent={intent}
+            onContinue={handleEmailGateContinue}
           />
         )}
         
