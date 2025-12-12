@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
@@ -71,19 +72,38 @@ export function PricingSection() {
   };
 
   return (
-    <section id="pricing" className="bg-muted/30 px-4 py-8 sm:py-12 md:py-16 lg:py-24 sm:px-6 lg:px-8">
+    <motion.section 
+      id="pricing" 
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
+      viewport={{ once: true, margin: "-100px" }}
+      transition={{ duration: 0.6 }}
+      className="bg-muted/30 px-4 py-8 sm:py-12 md:py-16 lg:py-24 sm:px-6 lg:px-8"
+    >
       <div className="mx-auto max-w-6xl">
         {/* "Pas sûr" banner */}
-        <div className="mb-8 text-center">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+          className="mb-8 text-center"
+        >
           <div className="inline-flex items-center gap-2 bg-alfie-mint/20 rounded-full px-4 py-2 text-sm text-slate-700">
             <span>Pas sûr ?</span>
             <Link to="/start" className="font-medium underline underline-offset-2 hover:text-slate-900">
               Commence par le Brand Kit + pack gratuit (sans carte)
             </Link>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="mb-8 md:mb-16 text-center">
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="mb-8 md:mb-16 text-center"
+        >
           <Badge className="mb-3 md:mb-4 border border-alfie-mint/40 bg-alfie-mintSoft text-slate-700 text-xs md:text-sm" variant="secondary">
             Tarifs
           </Badge>
@@ -111,30 +131,43 @@ export function PricingSection() {
               <span className="ml-2 text-xs">-20%</span>
             </button>
           </div>
-        </div>
+        </motion.div>
 
         <div className="mx-auto grid max-w-6xl gap-6 md:gap-8 grid-cols-1 md:grid-cols-3">
-          {plans.map((plan) => (
-            <PriceCard
+          {plans.map((plan, idx) => (
+            <motion.div
               key={plan.title}
-              title={plan.title}
-              monthlyPrice={plan.monthlyPrice}
-              isAnnual={isAnnual}
-              calculatePrice={(price) => calculatePrice(price, isAnnual)}
-              calculateOriginalAnnualPrice={calculateOriginalAnnualPrice}
-              getPriceLabel={() => getPriceLabel(isAnnual)}
-              features={plan.features}
-              plan={plan.plan}
-              popular={plan.popular}
-              aiTier={plan.aiTier}
-              onSelectPlan={handleSelectPlan}
-            />
+              initial={{ opacity: 0, y: 40, scale: 0.95 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: idx * 0.1 }}
+            >
+              <PriceCard
+                title={plan.title}
+                monthlyPrice={plan.monthlyPrice}
+                isAnnual={isAnnual}
+                calculatePrice={(price) => calculatePrice(price, isAnnual)}
+                calculateOriginalAnnualPrice={calculateOriginalAnnualPrice}
+                getPriceLabel={() => getPriceLabel(isAnnual)}
+                features={plan.features}
+                plan={plan.plan}
+                popular={plan.popular}
+                aiTier={plan.aiTier}
+                onSelectPlan={handleSelectPlan}
+              />
+            </motion.div>
           ))}
         </div>
-        <p className="text-center text-sm text-muted-foreground mt-6">
+        <motion.p 
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          className="text-center text-sm text-muted-foreground mt-6"
+        >
           Crée ton compte Alfie, puis choisis ton plan et finalise le paiement dans ton espace sécurisé.
-        </p>
+        </motion.p>
       </div>
-    </section>
+    </motion.section>
   );
 }

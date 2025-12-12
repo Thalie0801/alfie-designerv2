@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { Clock, Target, Palette, TrendingUp, Shield, Heart } from "lucide-react";
 
 const reasons = [
@@ -35,9 +36,21 @@ const reasons = [
 
 export function WhyAlfieSection() {
   return (
-    <section className="px-4 py-16 sm:py-24 sm:px-6 lg:px-8 bg-white">
+    <motion.section 
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
+      viewport={{ once: true, margin: "-100px" }}
+      transition={{ duration: 0.6 }}
+      className="px-4 py-16 sm:py-24 sm:px-6 lg:px-8 bg-white"
+    >
       <div className="mx-auto max-w-6xl">
-        <div className="text-center mb-12">
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-12"
+        >
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-4">
             Pourquoi choisir{" "}
             <span className="bg-gradient-to-r from-alfie-mint to-alfie-lilac bg-clip-text text-transparent">
@@ -48,12 +61,16 @@ export function WhyAlfieSection() {
           <p className="text-lg text-slate-600 max-w-2xl mx-auto">
             Plus qu'un outil, un vrai partenaire pour ta création de contenu.
           </p>
-        </div>
+        </motion.div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {reasons.map((reason, idx) => (
-            <div
+            <motion.div
               key={idx}
+              initial={{ opacity: 0, y: 30, scale: 0.95 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: idx * 0.1 }}
               className="group p-6 rounded-2xl bg-slate-50 border border-slate-200 hover:bg-slate-100 hover:border-alfie-mint/50 transition-all"
             >
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-alfie-mint/30 to-alfie-lilac/30 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -63,10 +80,10 @@ export function WhyAlfieSection() {
               <p className="text-slate-600 text-sm leading-relaxed">
                 {reason.description}
               </p>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
-    </section>
+    </motion.section>
   );
 }

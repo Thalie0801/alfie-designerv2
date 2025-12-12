@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
@@ -11,23 +11,39 @@ import story16x9 from "@/assets/demo/story-16-9.png";
 import carouselSlide1 from "@/assets/demo/carousel/slide-01.png";
 import carouselSlide2 from "@/assets/demo/carousel/slide-02.png";
 
+const heroAdjectives = ["convertit", "impacte", "engage"];
+
 export function HeroVideoSection() {
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
+  const [phraseIndex, setPhraseIndex] = useState(0);
+  
+  // Word cycling animation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPhraseIndex((prev) => (prev + 1) % heroAdjectives.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, []);
   
   const { scrollYProgress } = useScroll({
     target: containerRef,
     offset: ["start start", "end start"]
   });
 
-  // Animations au scroll - cards disparaissent, vidéo s'agrandit
+  // Animations au scroll - cards disparaissent, vidéo descend et s'agrandit
   const card1X = useTransform(scrollYProgress, [0, 0.4], [0, -300]);
   const card2X = useTransform(scrollYProgress, [0, 0.4], [0, 300]);
   const card3X = useTransform(scrollYProgress, [0, 0.4], [0, -250]);
   const card4X = useTransform(scrollYProgress, [0, 0.4], [0, 250]);
   const cardsOpacity = useTransform(scrollYProgress, [0, 0.3], [1, 0]);
-  const videoScale = useTransform(scrollYProgress, [0, 0.5], [0.5, 1]);
-  const videoY = useTransform(scrollYProgress, [0, 0.5], [0, -50]);
+  
+  // Video: descend et s'agrandit (inversé)
+  const videoScale = useTransform(scrollYProgress, [0, 0.5], [0.6, 1.3]);
+  const videoY = useTransform(scrollYProgress, [0, 0.5], [0, 150]);
+  
+  // Scroll indicator fade out
+  const scrollIndicatorOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
 
   const handleCta = () => {
     trackEvent("hero_cta_click");
@@ -44,7 +60,7 @@ export function HeroVideoSection() {
       
       {/* Content container - sticky */}
       <div className="sticky top-0 h-screen flex flex-col items-center justify-center px-4 sm:px-6 pt-20">
-        {/* Title - visible and well positioned */}
+        {/* Title - with animated word cycling */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -53,7 +69,19 @@ export function HeroVideoSection() {
         >
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-4 leading-tight">
             Crée du contenu qui
-            <span className="bg-gradient-to-r from-alfie-mint to-alfie-lilac bg-clip-text text-transparent"> convertit</span>
+            <span className="relative inline-flex items-center ml-2">
+              <motion.span 
+                key={phraseIndex}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+                className="bg-gradient-to-r from-alfie-mint to-alfie-lilac bg-clip-text text-transparent"
+              >
+                {heroAdjectives[phraseIndex]}
+              </motion.span>
+              <span className="ml-1 h-8 w-[3px] animate-pulse bg-alfie-mint rounded-full" />
+            </span>
           </h1>
           <p className="text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto">
             Génère des visuels pro pour tes réseaux sociaux en quelques clics.
@@ -110,7 +138,7 @@ export function HeroVideoSection() {
             <div className="absolute bottom-1 left-1 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded">Pinterest</div>
           </motion.div>
 
-          {/* Center video - Alfie original */}
+          {/* Center video - descends and scales up */}
           <motion.div
             style={{ scale: videoScale, y: videoY }}
             className="relative w-full max-w-3xl aspect-video rounded-2xl overflow-hidden shadow-2xl z-10 ring-1 ring-slate-200"
@@ -148,11 +176,12 @@ export function HeroVideoSection() {
         </motion.div>
       </div>
 
-      {/* Scroll indicator - positioned at very bottom */}
+      {/* Scroll indicator - positioned higher with fade out */}
       <motion.div
+        style={{ opacity: scrollIndicatorOpacity }}
         animate={{ y: [0, 10, 0] }}
         transition={{ duration: 2, repeat: Infinity }}
-        className="fixed bottom-6 left-1/2 -translate-x-1/2 text-slate-400 flex flex-col items-center gap-2 z-30"
+        className="fixed bottom-28 left-1/2 -translate-x-1/2 text-slate-400 flex flex-col items-center gap-2 z-30"
       >
         <span className="text-xs">Scroll</span>
         <div className="w-5 h-8 border-2 border-slate-300 rounded-full flex items-start justify-center p-1">
