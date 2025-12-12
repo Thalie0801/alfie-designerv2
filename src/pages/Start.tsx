@@ -1,14 +1,16 @@
 import { useState, useCallback } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useLocalStorageState } from '@/lib/useLocalStorageState';
-import { StartGateIntro } from '@/components/start/StartGateIntro';
-import { BrandKitQuickPick } from '@/components/start/BrandKitQuickPick';
-import { QuickStartWizard } from '@/components/start/QuickStartWizard';
-import { StartIntentPanel } from '@/components/start/StartIntentPanel';
-import { LivePreviewPane } from '@/components/start/LivePreviewPane';
-import { JobConsoleMock } from '@/components/start/JobConsoleMock';
-import { DeliveryHubMock } from '@/components/start/DeliveryHubMock';
 import { toast } from 'sonner';
+
+// Game components
+import { GameShell } from '@/components/start/game/GameShell';
+import { PortalDoorScene } from '@/components/start/scenes/PortalDoorScene';
+import { EquipmentScene } from '@/components/start/scenes/EquipmentScene';
+import { QuestScene } from '@/components/start/scenes/QuestScene';
+import { CraftingScene } from '@/components/start/scenes/CraftingScene';
+import { LootChestScene } from '@/components/start/scenes/LootChestScene';
+
 import type { StylePreset, Intent, FlowStep } from '@/lib/types/startFlow';
 import { DEFAULT_INTENT } from '@/lib/types/startFlow';
 
@@ -16,7 +18,6 @@ export default function Start() {
   const [, setStylePreset] = useLocalStorageState<StylePreset>('alfie-start-preset', 'pop');
   const [intent, setIntent] = useLocalStorageState<Intent>('alfie-start-intent', DEFAULT_INTENT);
   const [flowStep, setFlowStep] = useState<FlowStep>('gate');
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
   const handleGateFinish = useCallback((preset: StylePreset) => {
     setStylePreset(preset);
@@ -28,7 +29,9 @@ export default function Start() {
     setIntent((prev) => ({
       ...prev,
       brandKitId: brandKitId ?? undefined,
-      brandLocks: brandKitId ? { palette: true, fonts: true, logo: true } : { palette: false, fonts: false, logo: false },
+      brandLocks: brandKitId 
+        ? { palette: true, fonts: true, logo: true } 
+        : { palette: false, fonts: false, logo: false },
     }));
     setFlowStep('wizard');
   }, [setIntent]);
@@ -38,38 +41,61 @@ export default function Start() {
   }, [setIntent]);
 
   const handleWizardComplete = useCallback(() => setFlowStep('recap'), []);
+  
   const handleGenerate = useCallback(() => setFlowStep('generating'), []);
+  
   const handleGenerationComplete = useCallback(() => setFlowStep('delivery'), []);
-  const handleVariation = useCallback(() => { toast.info('Génération d\'une variation...'); setFlowStep('generating'); }, []);
-  const handleSavePreset = useCallback(() => toast.success('Preset sauvegardé !'), []);
-
-  const showLivePreview = !isMobile && (flowStep === 'wizard' || flowStep === 'recap');
+  
+  const handleVariation = useCallback(() => {
+    toast.info('🔄 Génération d\'une variation...');
+    setFlowStep('generating');
+  }, []);
+  
+  const handleSavePreset = useCallback(() => {
+    toast.success('💾 Preset sauvegardé !');
+  }, []);
 
   return (
-    <div className="relative">
+    <GameShell currentStep={flowStep} intent={intent} showHUD={flowStep !== 'gate'}>
       <AnimatePresence mode="wait">
-        {flowStep === 'gate' && <StartGateIntro key="gate" onFinish={handleGateFinish} />}
-        {flowStep === 'brand' && <BrandKitQuickPick key="brand" onSelect={handleBrandSelect} />}
+        {flowStep === 'gate' && (
+          <PortalDoorScene key="gate" onFinish={handleGateFinish} />
+        )}
+        
+        {flowStep === 'brand' && (
+          <EquipmentScene key="brand" onSelect={handleBrandSelect} />
+        )}
+        
         {flowStep === 'wizard' && (
-          <div key="wizard" className="flex">
-            <div className={showLivePreview ? 'flex-1' : 'w-full'}>
-              <QuickStartWizard intent={intent} onUpdate={handleIntentUpdate} onComplete={handleWizardComplete} />
-            </div>
-            {showLivePreview && <div className="hidden md:block w-80 p-8"><LivePreviewPane intent={intent} /></div>}
-          </div>
+          <QuestScene
+            key="wizard"
+            intent={intent}
+            onUpdate={handleIntentUpdate}
+            onComplete={handleWizardComplete}
+          />
         )}
+        
         {flowStep === 'recap' && (
-          <div key="recap" className="flex">
-            <div className={showLivePreview ? 'flex-1' : 'w-full'}>
-              <StartIntentPanel intent={intent} onUpdate={handleIntentUpdate} onGenerate={handleGenerate} />
-            </div>
-            {showLivePreview && <div className="hidden md:block w-80 p-8"><LivePreviewPane intent={intent} /></div>}
-          </div>
+          <QuestScene
+            key="recap"
+            intent={intent}
+            onUpdate={handleIntentUpdate}
+            onComplete={handleGenerate}
+          />
         )}
-        {flowStep === 'generating' && <JobConsoleMock key="generating" onComplete={handleGenerationComplete} />}
-        {flowStep === 'delivery' && <DeliveryHubMock key="delivery" onVariation={handleVariation} onSavePreset={handleSavePreset} />}
+        
+        {flowStep === 'generating' && (
+          <CraftingScene key="generating" onComplete={handleGenerationComplete} />
+        )}
+        
+        {flowStep === 'delivery' && (
+          <LootChestScene
+            key="delivery"
+            onVariation={handleVariation}
+            onSavePreset={handleSavePreset}
+          />
+        )}
       </AnimatePresence>
-      {isMobile && (flowStep === 'wizard' || flowStep === 'recap') && <LivePreviewPane intent={intent} isMobile />}
-    </div>
+    </GameShell>
   );
 }
