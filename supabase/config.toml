@@ -56,3 +56,9 @@ verify_jwt = false
 
 [functions.verify-express-payment]
 verify_jwt = false
+
+[functions.capture-lead]
+verify_jwt = false
+
+[functions.email-worker]
+verify_jwt = false

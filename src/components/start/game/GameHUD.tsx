@@ -6,11 +6,12 @@ const STEP_LABELS: Record<FlowStep, string> = {
   brand: 'Équipement',
   wizard: 'Quête',
   recap: 'Préparation',
+  email_gate: 'Checkpoint',
   generating: 'Forge',
   delivery: 'Loot',
 };
 
-const STEP_ORDER: FlowStep[] = ['gate', 'brand', 'wizard', 'recap', 'generating', 'delivery'];
+const STEP_ORDER: FlowStep[] = ['gate', 'brand', 'wizard', 'recap', 'email_gate', 'generating', 'delivery'];
 
 interface GameHUDProps {
   currentStep: FlowStep;

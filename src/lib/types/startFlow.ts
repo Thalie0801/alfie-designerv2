@@ -15,7 +15,7 @@ export type Intent = {
   brandLocks: { palette: boolean; fonts: boolean; logo: boolean };
 };
 
-export type FlowStep = 'gate' | 'brand' | 'wizard' | 'recap' | 'generating' | 'delivery';
+export type FlowStep = 'gate' | 'brand' | 'wizard' | 'recap' | 'email_gate' | 'generating' | 'delivery';
 
 export const DEFAULT_INTENT: Intent = {
   kind: 'pack',
