@@ -109,11 +109,12 @@ export default function Start() {
 
     try {
       // Check if user exists, if not create account
+      let userId: string | null = null;
       const { data: existingUser } = await supabase.auth.getSession();
       
       if (!existingUser.session) {
         // Sign up with email (will auto-confirm)
-        const { error: signUpError } = await supabase.auth.signUp({
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email,
           password: crypto.randomUUID(), // Temporary password, user can reset later
           options: {
@@ -123,6 +124,66 @@ export default function Start() {
         
         if (signUpError && !signUpError.message.includes("already registered")) {
           console.error("Signup error:", signUpError);
+        }
+        userId = signUpData?.user?.id || null;
+      } else {
+        userId = existingUser.session.user.id;
+      }
+
+      // Create brand in database
+      let brandId: string | null = null;
+      if (userId) {
+        // Upload logo if provided
+        let logoUrl: string | null = null;
+        if (logoFile) {
+          const fileExt = logoFile.name.split('.').pop();
+          const filePath = `${userId}/logo-${Date.now()}.${fileExt}`;
+          const { data: uploadData } = await supabase.storage
+            .from('chat-uploads')
+            .upload(filePath, logoFile);
+          
+          if (uploadData) {
+            const { data: publicUrl } = supabase.storage
+              .from('chat-uploads')
+              .getPublicUrl(filePath);
+            logoUrl = publicUrl.publicUrl;
+          }
+        }
+
+        // Get color palette from preset
+        const colorPresetMap: Record<string, string[]> = {
+          warm: ["#FF6B6B", "#FFA500", "#FFD93D"],
+          cool: ["#4ECDC4", "#45B7D1", "#96E6A1"],
+          pastel: ["#FFB5BA", "#B5D8FF", "#E8D5FF"],
+          bold: ["#FF0080", "#7928CA", "#0070F3"],
+          neutral: ["#1A1A1A", "#6B7280", "#F5F5F5"],
+          auto: ["#96E6A1", "#D4A5FF", "#FFB5BA"],
+        };
+
+        const { data: brandData, error: brandError } = await supabase
+          .from('brands')
+          .insert({
+            user_id: userId,
+            name: brandName,
+            niche: sector,
+            voice: selectedStyles.join(", "),
+            palette: colorPresetMap[colorChoice] || colorPresetMap.auto,
+            fonts: { primary: fontChoice },
+            logo_url: logoUrl,
+            adjectives: selectedStyles,
+            is_default: true,
+          })
+          .select('id')
+          .single();
+
+        if (!brandError && brandData) {
+          brandId = brandData.id;
+          
+          // Update profile with active brand
+          await supabase
+            .from('profiles')
+            .update({ active_brand_id: brandId })
+            .eq('id', userId);
         }
       }
 
@@ -135,7 +196,9 @@ export default function Start() {
           colorChoice, 
           fontChoice, 
           objective,
-          email 
+          email,
+          userId,
+          brandId,
         } 
       });
     } catch (error) {
