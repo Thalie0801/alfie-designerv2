@@ -248,7 +248,7 @@ export default function Library() {
         </div>
 
         {/* Images Tab */}
-        <TabsContent value="images" className="mt-6">
+        <TabsContent value="images" className="mt-6 min-h-[300px]">
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {[...Array(8)].map((_, i) => (
@@ -279,7 +279,7 @@ export default function Library() {
         </TabsContent>
 
         {/* Videos Tab */}
-        <TabsContent value="videos" className="mt-6">
+        <TabsContent value="videos" className="mt-6 min-h-[300px]">
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {[...Array(6)].map((_, i) => (
@@ -310,12 +310,12 @@ export default function Library() {
         </TabsContent>
 
         {/* Carousels Tab */}
-        <TabsContent value="carousels" className="mt-6">
+        <TabsContent value="carousels" className="mt-6 min-h-[300px]">
           <CarouselsTab orderId={orderIdFromQuery} />
         </TabsContent>
 
         {/* Pinterest Tab */}
-        <TabsContent value="pinterest" className="mt-6">
+        <TabsContent value="pinterest" className="mt-6 min-h-[300px]">
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {[...Array(8)].map((_, i) => (
@@ -346,7 +346,7 @@ export default function Library() {
         </TabsContent>
 
         {/* YouTube Thumbnails Tab */}
-        <TabsContent value="thumbnails" className="mt-6">
+        <TabsContent value="thumbnails" className="mt-6 min-h-[300px]">
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {[...Array(8)].map((_, i) => (
