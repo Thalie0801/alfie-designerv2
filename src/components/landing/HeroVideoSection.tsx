@@ -59,15 +59,52 @@ export function HeroVideoSection() {
       <div className="absolute inset-0 bg-gradient-to-br from-alfie-mint/5 via-transparent to-alfie-lilac/5 pointer-events-none" />
       
       {/* Content container - sticky */}
-      <div className="sticky top-0 h-screen flex flex-col items-center justify-center px-4 sm:px-6 pt-20">
+      <div className="sticky top-0 h-screen flex flex-col items-center justify-center px-4 sm:px-6 pt-16">
+        
+        {/* CTA Button - positioned ABOVE title */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+          className="mb-8 z-20"
+        >
+          <Button
+            size="lg"
+            className="rounded-full bg-alfie-mint px-8 py-4 text-lg font-semibold text-slate-900 shadow-lg hover:bg-alfie-pink hover:scale-105 transition-all"
+            onClick={handleCta}
+          >
+            <Sparkles className="mr-2 h-5 w-5" />
+            Créer mon Brand Kit
+          </Button>
+          <p className="text-center text-sm text-slate-500 mt-3">
+            Gratuit · 1 minute · Sans carte bancaire
+          </p>
+        </motion.div>
+
+        {/* Scroll indicator - below CTA */}
+        <motion.div
+          style={{ opacity: scrollIndicatorOpacity }}
+          animate={{ y: [0, 8, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          className="mb-6 text-slate-400 flex flex-col items-center gap-1 z-20"
+        >
+          <div className="w-5 h-7 border-2 border-slate-300 rounded-full flex items-start justify-center p-1">
+            <motion.div
+              animate={{ y: [0, 8, 0] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+              className="w-1 h-1.5 bg-slate-400 rounded-full"
+            />
+          </div>
+        </motion.div>
+
         {/* Title - with animated word cycling */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="text-center mb-8 z-20"
+          transition={{ duration: 0.8, delay: 0.4 }}
+          className="text-center mb-6 z-20"
         >
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-4 leading-tight">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-6 leading-relaxed pb-2">
             Crée du contenu qui
             <span className="relative inline-flex items-center ml-2">
               <motion.span 
@@ -83,19 +120,19 @@ export function HeroVideoSection() {
               <span className="ml-1 h-8 w-[3px] animate-pulse bg-alfie-mint rounded-full" />
             </span>
           </h1>
-          <p className="text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto">
+          <p className="text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto mt-4">
             Génère des visuels pro pour tes réseaux sociaux en quelques clics.
           </p>
         </motion.div>
 
         {/* Video + 4 floating cards container */}
-        <div className="relative w-full max-w-6xl mx-auto flex items-center justify-center h-[50vh]">
+        <div className="relative w-full max-w-6xl mx-auto flex items-center justify-center h-[45vh]">
           {/* Card 1: Story (back-left) */}
           <motion.div
             style={{ x: card1X, opacity: cardsOpacity }}
             initial={{ opacity: 0, x: -50 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
+            transition={{ duration: 0.6, delay: 0.5 }}
             className="absolute left-0 sm:left-8 lg:left-16 top-1/2 -translate-y-1/2 w-20 sm:w-28 lg:w-36 aspect-[9/16] rounded-xl overflow-hidden shadow-xl z-0 hidden sm:block border border-slate-200"
           >
             <img src={story16x9} alt="Story" className="w-full h-full object-cover" />
@@ -107,7 +144,7 @@ export function HeroVideoSection() {
             style={{ x: card2X, opacity: cardsOpacity }}
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
             className="absolute right-0 sm:right-8 lg:right-16 top-1/2 -translate-y-1/2 w-20 sm:w-28 lg:w-36 aspect-square rounded-xl overflow-hidden shadow-xl z-0 hidden sm:block border border-slate-200"
           >
             <img src={postInstagram} alt="Post" className="w-full h-full object-cover" />
@@ -119,7 +156,7 @@ export function HeroVideoSection() {
             style={{ x: card3X, opacity: cardsOpacity }}
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
+            transition={{ duration: 0.6, delay: 0.7 }}
             className="absolute left-8 sm:left-20 lg:left-32 top-[60%] -translate-y-1/2 w-16 sm:w-24 lg:w-32 aspect-[4/5] rounded-xl overflow-hidden shadow-2xl z-5 hidden sm:block border-2 border-white"
           >
             <img src={carouselSlide1} alt="Carousel" className="w-full h-full object-cover" />
@@ -131,14 +168,14 @@ export function HeroVideoSection() {
             style={{ x: card4X, opacity: cardsOpacity }}
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.5 }}
+            transition={{ duration: 0.6, delay: 0.8 }}
             className="absolute right-8 sm:right-20 lg:right-32 top-[60%] -translate-y-1/2 w-16 sm:w-24 lg:w-32 aspect-[2/3] rounded-xl overflow-hidden shadow-2xl z-5 hidden sm:block border-2 border-white"
           >
             <img src={carouselSlide2} alt="Pinterest" className="w-full h-full object-cover" />
             <div className="absolute bottom-1 left-1 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded">Pinterest</div>
           </motion.div>
 
-          {/* Center video - descends and scales up */}
+          {/* Center video - descends and scales up to fullscreen */}
           <motion.div
             style={{ scale: videoScale, y: videoY }}
             className="relative w-full max-w-3xl aspect-video rounded-2xl overflow-hidden shadow-2xl z-10 ring-1 ring-slate-200"
@@ -154,44 +191,7 @@ export function HeroVideoSection() {
             <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none" />
           </motion.div>
         </div>
-
-        {/* CTA Button - positioned clearly below */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.6 }}
-          className="mt-8 z-20"
-        >
-          <Button
-            size="lg"
-            className="rounded-full bg-alfie-mint px-8 py-4 text-lg font-semibold text-slate-900 shadow-lg hover:bg-alfie-pink hover:scale-105 transition-all"
-            onClick={handleCta}
-          >
-            <Sparkles className="mr-2 h-5 w-5" />
-            Créer mon Brand Kit
-          </Button>
-          <p className="text-center text-sm text-slate-500 mt-3">
-            Gratuit · 1 minute · Sans carte bancaire
-          </p>
-        </motion.div>
       </div>
-
-      {/* Scroll indicator - positioned higher with fade out */}
-      <motion.div
-        style={{ opacity: scrollIndicatorOpacity }}
-        animate={{ y: [0, 10, 0] }}
-        transition={{ duration: 2, repeat: Infinity }}
-        className="fixed bottom-28 left-1/2 -translate-x-1/2 text-slate-400 flex flex-col items-center gap-2 z-30"
-      >
-        <span className="text-xs">Scroll</span>
-        <div className="w-5 h-8 border-2 border-slate-300 rounded-full flex items-start justify-center p-1">
-          <motion.div
-            animate={{ y: [0, 10, 0] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-            className="w-1 h-2 bg-slate-400 rounded-full"
-          />
-        </div>
-      </motion.div>
     </section>
   );
 }
