@@ -1,46 +1,27 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Sparkles, X } from "lucide-react";
+import { Play, Sparkles, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { trackEvent } from "@/utils/trackEvent";
 
-// Configuration des assets de la galerie
-const demoGalleryAssets = {
-  previews: [
-    { 
-      title: "Post Instagram", 
-      ratio: "1:1", 
-      image: "/images/hero-preview.jpg",
-      label: "Généré avec Alfie + Brand Kit"
-    },
-    { 
-      title: "Story", 
-      ratio: "9:16", 
-      image: "/images/reel-preview.jpg",
-      label: "Généré avec Alfie + Brand Kit"
-    },
-    { 
-      title: "Carrousel", 
-      ratio: "4:5", 
-      image: "/images/carousel-preview.jpg",
-      label: "Généré avec Alfie + Brand Kit"
-    },
-  ],
-  beforeAfter: {
-    before: { 
-      image: "/images/insight-preview.jpg", 
-      label: "Sans Brand Kit" 
-    },
-    after: { 
-      image: "/images/hero-visual.jpg", 
-      label: "Avec Brand Kit" 
-    },
-  }
-};
+// Imports des images
+import postInstagram from "@/assets/demo/post-instagram.png";
+import story16x9 from "@/assets/demo/story-16-9.png";
+import avantImage from "@/assets/demo/avant.png";
+import apresImage from "@/assets/demo/apres.png";
+
+// Images du carousel (à remplacer avec les vraies images du ZIP)
+const carouselSlides = [
+  { id: 1, image: story16x9, alt: "Slide 1" },
+  { id: 2, image: postInstagram, alt: "Slide 2" },
+  { id: 3, image: avantImage, alt: "Slide 3" },
+  { id: 4, image: apresImage, alt: "Slide 4" },
+];
 
 export function DemoSection() {
   const navigate = useNavigate();
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const carouselRef = useRef<HTMLDivElement>(null);
 
   const handleCtaClick = () => {
     trackEvent("demo_cta_click");
@@ -53,6 +34,16 @@ export function DemoSection() {
 
   const closeLightbox = () => {
     setLightboxImage(null);
+  };
+
+  const scrollCarousel = (direction: 'left' | 'right') => {
+    if (carouselRef.current) {
+      const scrollAmount = 300;
+      carouselRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
   };
 
   return (
@@ -77,46 +68,130 @@ export function DemoSection() {
               <span className="text-sm">Démo vidéo (bientôt)</span>
             </div>
           </div>
-          {/* Gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
         </div>
 
-        {/* Gallery of real results */}
+        {/* Gallery of real results - New Layout */}
         <div className="mb-12">
           <h3 className="text-lg font-semibold text-slate-900 text-center mb-6">
             Exemples de résultats
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            {demoGalleryAssets.previews.map((preview) => (
-              <div
-                key={preview.title}
-                onClick={() => openLightbox(preview.image)}
-                className="group cursor-pointer bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all"
-              >
-                <div className="aspect-square bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 relative overflow-hidden">
-                  <img 
-                    src={preview.image} 
-                    alt={preview.title}
-                    width={400}
-                    height={400}
-                    loading="lazy"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity text-white text-sm font-medium bg-black/50 px-3 py-1 rounded-full">
-                      Voir en grand
-                    </span>
-                  </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Image 2: Story en 16:9 */}
+            <div
+              onClick={() => openLightbox(story16x9)}
+              className="group cursor-pointer bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all"
+            >
+              <div className="aspect-video bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 relative overflow-hidden">
+                <img 
+                  src={story16x9} 
+                  alt="Story 16:9"
+                  loading="lazy"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+                {/* Made with Alfie badge */}
+                <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
+                  Made with Alfie
                 </div>
-                <div className="p-4">
-                  <p className="font-medium text-slate-900">{preview.title}</p>
-                  <p className="text-xs text-slate-500 mt-1">{preview.label}</p>
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                  <span className="opacity-0 group-hover:opacity-100 transition-opacity text-white text-sm font-medium bg-black/50 px-3 py-1 rounded-full">
+                    Voir en grand
+                  </span>
                 </div>
               </div>
-            ))}
+              <div className="p-4">
+                <p className="font-medium text-slate-900">Story (16:9)</p>
+                <p className="text-xs text-slate-500 mt-1">Généré avec Alfie + Brand Kit</p>
+              </div>
+            </div>
+
+            {/* Image 1: Post Instagram */}
+            <div
+              onClick={() => openLightbox(postInstagram)}
+              className="group cursor-pointer bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all"
+            >
+              <div className="aspect-square bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 relative overflow-hidden">
+                <img 
+                  src={postInstagram} 
+                  alt="Post Instagram"
+                  loading="lazy"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+                {/* Made with Alfie badge */}
+                <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
+                  Made with Alfie
+                </div>
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                  <span className="opacity-0 group-hover:opacity-100 transition-opacity text-white text-sm font-medium bg-black/50 px-3 py-1 rounded-full">
+                    Voir en grand
+                  </span>
+                </div>
+              </div>
+              <div className="p-4">
+                <p className="font-medium text-slate-900">Post Instagram</p>
+                <p className="text-xs text-slate-500 mt-1">Généré avec Alfie + Brand Kit</p>
+              </div>
+            </div>
+
+            {/* Carousel Card with swipeable images */}
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all">
+              <div className="aspect-[4/5] bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 relative overflow-hidden">
+                {/* Carousel container */}
+                <div 
+                  ref={carouselRef}
+                  className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide h-full"
+                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
+                  {carouselSlides.map((slide) => (
+                    <div 
+                      key={slide.id}
+                      className="flex-shrink-0 w-full h-full snap-center relative cursor-pointer"
+                      onClick={() => openLightbox(slide.image)}
+                    >
+                      <img 
+                        src={slide.image} 
+                        alt={slide.alt}
+                        loading="lazy"
+                        className="w-full h-full object-cover"
+                      />
+                      {/* Made with Alfie badge */}
+                      <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
+                        Made with Alfie
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Navigation arrows */}
+                <button 
+                  onClick={(e) => { e.stopPropagation(); scrollCarousel('left'); }}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1.5 shadow-md transition-colors"
+                >
+                  <ChevronLeft className="h-5 w-5 text-slate-700" />
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); scrollCarousel('right'); }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1.5 shadow-md transition-colors"
+                >
+                  <ChevronRight className="h-5 w-5 text-slate-700" />
+                </button>
+
+                {/* Dots indicator */}
+                <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex gap-1.5">
+                  {carouselSlides.map((_, idx) => (
+                    <div 
+                      key={idx}
+                      className="w-2 h-2 rounded-full bg-white/60"
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="p-4">
+                <p className="font-medium text-slate-900">Carrousel</p>
+                <p className="text-xs text-slate-500 mt-1">Glisse pour voir les slides →</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -126,46 +201,47 @@ export function DemoSection() {
             Avant / Après Brand Kit
           </h3>
           <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto">
+            {/* Image 4: Avant */}
             <div
-              onClick={() => openLightbox(demoGalleryAssets.beforeAfter.before.image)}
+              onClick={() => openLightbox(avantImage)}
               className="cursor-pointer group"
             >
               <div className="aspect-square rounded-xl overflow-hidden border-2 border-slate-300 bg-slate-100 relative">
                 <img 
-                  src={demoGalleryAssets.beforeAfter.before.image} 
-                  alt="Sans Brand Kit"
-                  width={400}
-                  height={400}
+                  src={avantImage} 
+                  alt="Avant - Sans Brand Kit"
                   loading="lazy"
                   className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity"
-                  onError={(e) => {
-                    e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-slate-400">Image</div>';
-                  }}
                 />
+                {/* Made with Alfie badge */}
+                <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
+                  Made with Alfie
+                </div>
               </div>
               <p className="text-center text-sm text-slate-500 mt-2 font-medium">
-                {demoGalleryAssets.beforeAfter.before.label}
+                Sans Brand Kit
               </p>
             </div>
+            
+            {/* Image 5: Après */}
             <div
-              onClick={() => openLightbox(demoGalleryAssets.beforeAfter.after.image)}
+              onClick={() => openLightbox(apresImage)}
               className="cursor-pointer group"
             >
               <div className="aspect-square rounded-xl overflow-hidden border-2 border-alfie-mint bg-alfie-mint/10 relative">
                 <img 
-                  src={demoGalleryAssets.beforeAfter.after.image} 
-                  alt="Avec Brand Kit"
-                  width={400}
-                  height={400}
+                  src={apresImage} 
+                  alt="Après - Avec Brand Kit"
                   loading="lazy"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                  onError={(e) => {
-                    e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-alfie-mint">Image</div>';
-                  }}
                 />
+                {/* Made with Alfie badge */}
+                <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
+                  Made with Alfie
+                </div>
               </div>
               <p className="text-center text-sm text-alfie-mint mt-2 font-semibold">
-                {demoGalleryAssets.beforeAfter.after.label} ✨
+                Avec Brand Kit ✨
               </p>
             </div>
           </div>
