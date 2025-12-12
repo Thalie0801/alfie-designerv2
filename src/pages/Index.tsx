@@ -32,7 +32,8 @@ export default function AlfieLanding() {
               alt="Alfie Golden Retriever"
               className="h-full w-full object-cover"
               loading="eager"
-              fetchPriority="high"
+              // @ts-expect-error - fetchpriority is valid HTML but React types don't recognize it
+              fetchpriority="high"
             />
           </picture>
           {/* Overlay sombre très fort sur l'image pour qu'elle soit subtile */}
