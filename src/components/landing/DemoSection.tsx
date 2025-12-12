@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Play, Sparkles, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -54,19 +55,38 @@ export function DemoSection() {
   };
 
   return (
-    <section id="demo" className="px-4 py-16 sm:py-24 sm:px-6 lg:px-8 bg-gradient-to-b from-slate-50 to-white">
+    <motion.section 
+      id="demo" 
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
+      viewport={{ once: true, margin: "-100px" }}
+      transition={{ duration: 0.6 }}
+      className="px-4 py-16 sm:py-24 sm:px-6 lg:px-8 bg-gradient-to-b from-slate-50 to-white"
+    >
       <div className="mx-auto max-w-6xl">
-        <div className="text-center mb-12">
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-12"
+        >
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-4">
             Une démo rapide (30 sec)
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Regarde comment Alfie transforme une idée en visuels brandés.
           </p>
-        </div>
+        </motion.div>
 
         {/* Video placeholder */}
-        <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800 aspect-video mb-12 shadow-xl">
+        <motion.div 
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800 aspect-video mb-12 shadow-xl"
+        >
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="flex flex-col items-center gap-4 text-white/80">
               <div className="h-20 w-20 rounded-full bg-white/10 backdrop-blur flex items-center justify-center border border-white/20 cursor-pointer hover:bg-white/20 transition-colors">
@@ -76,17 +96,27 @@ export function DemoSection() {
             </div>
           </div>
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
-        </div>
+        </motion.div>
 
         {/* Gallery of real results - New Layout */}
-        <div className="mb-12">
+        <motion.div 
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="mb-12"
+        >
           <h3 className="text-lg font-semibold text-slate-900 text-center mb-6">
             Exemples de résultats
           </h3>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Image 2: Story en 9:16 - format portrait */}
-            <div
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.1 }}
               onClick={() => openLightbox(story16x9)}
               className="group cursor-pointer bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all"
             >
@@ -97,7 +127,6 @@ export function DemoSection() {
                   loading="lazy"
                   className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                 />
-                {/* Made with Alfie badge */}
                 <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
                   Made with Alfie
                 </div>
@@ -111,10 +140,14 @@ export function DemoSection() {
                 <p className="font-medium text-slate-900">Story (9:16)</p>
                 <p className="text-xs text-slate-500 mt-1">Généré avec Alfie + Brand Kit</p>
               </div>
-            </div>
+            </motion.div>
 
             {/* Image 1: Post Instagram */}
-            <div
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.2 }}
               onClick={() => openLightbox(postInstagram)}
               className="group cursor-pointer bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all"
             >
@@ -125,7 +158,6 @@ export function DemoSection() {
                   loading="lazy"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
-                {/* Made with Alfie badge */}
                 <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
                   Made with Alfie
                 </div>
@@ -139,12 +171,17 @@ export function DemoSection() {
                 <p className="font-medium text-slate-900">Post Instagram</p>
                 <p className="text-xs text-slate-500 mt-1">Généré avec Alfie + Brand Kit</p>
               </div>
-            </div>
+            </motion.div>
 
             {/* Carousel Card with swipeable images */}
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all"
+            >
               <div className="aspect-[4/5] bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 relative overflow-hidden">
-                {/* Carousel container */}
                 <div 
                   ref={carouselRef}
                   className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide h-full"
@@ -162,7 +199,6 @@ export function DemoSection() {
                         loading="lazy"
                         className="w-full h-full object-cover"
                       />
-                      {/* Made with Alfie badge */}
                       <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
                         Made with Alfie
                       </div>
@@ -170,7 +206,6 @@ export function DemoSection() {
                   ))}
                 </div>
                 
-                {/* Navigation arrows */}
                 <button 
                   onClick={(e) => { e.stopPropagation(); scrollCarousel('left'); }}
                   className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1.5 shadow-md transition-colors"
@@ -184,7 +219,6 @@ export function DemoSection() {
                   <ChevronRight className="h-5 w-5 text-slate-700" />
                 </button>
 
-                {/* Dots indicator */}
                 <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex gap-1.5">
                   {carouselSlides.map((_, idx) => (
                     <div 
@@ -198,18 +232,27 @@ export function DemoSection() {
                 <p className="font-medium text-slate-900">Carrousel</p>
                 <p className="text-xs text-slate-500 mt-1">Glisse pour voir les slides →</p>
               </div>
-            </div>
+            </motion.div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Before/After */}
-        <div className="mb-12">
+        <motion.div 
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.3 }}
+          className="mb-12"
+        >
           <h3 className="text-lg font-semibold text-slate-900 text-center mb-6">
             Avant / Après Brand Kit
           </h3>
           <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto">
-            {/* Image 4: Avant */}
-            <div
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
               onClick={() => openLightbox(avantImage)}
               className="cursor-pointer group"
             >
@@ -220,7 +263,6 @@ export function DemoSection() {
                   loading="lazy"
                   className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity"
                 />
-                {/* Made with Alfie badge */}
                 <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
                   Made with Alfie
                 </div>
@@ -228,10 +270,13 @@ export function DemoSection() {
               <p className="text-center text-sm text-slate-500 mt-2 font-medium">
                 Sans Brand Kit
               </p>
-            </div>
+            </motion.div>
             
-            {/* Image 5: Après */}
-            <div
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
               onClick={() => openLightbox(apresImage)}
               className="cursor-pointer group"
             >
@@ -242,7 +287,6 @@ export function DemoSection() {
                   loading="lazy"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                 />
-                {/* Made with Alfie badge */}
                 <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
                   Made with Alfie
                 </div>
@@ -250,12 +294,18 @@ export function DemoSection() {
               <p className="text-center text-sm text-alfie-mint mt-2 font-semibold">
                 Avec Brand Kit ✨
               </p>
-            </div>
+            </motion.div>
           </div>
-        </div>
+        </motion.div>
 
         {/* CTA */}
-        <div className="text-center">
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="text-center"
+        >
           <Button
             size="lg"
             className="rounded-full bg-alfie-mint px-8 py-3 text-base font-semibold text-slate-900 shadow-md hover:bg-alfie-pink"
@@ -267,7 +317,7 @@ export function DemoSection() {
           <p className="text-xs text-slate-500 mt-3">
             3 visuels gratuits en 5 min. Sans carte.
           </p>
-        </div>
+        </motion.div>
       </div>
 
       {/* Lightbox Modal */}
@@ -290,6 +340,6 @@ export function DemoSection() {
           />
         </div>
       )}
-    </section>
+    </motion.section>
   );
 }

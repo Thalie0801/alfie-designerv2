@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Image, Video, Layers, Layout, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -58,23 +59,45 @@ export function CategoryGallerySection() {
   };
 
   return (
-    <section className="px-4 py-16 sm:py-24 sm:px-6 lg:px-8 bg-white">
+    <motion.section 
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
+      viewport={{ once: true, margin: "-100px" }}
+      transition={{ duration: 0.6 }}
+      className="px-4 py-16 sm:py-24 sm:px-6 lg:px-8 bg-white"
+    >
       <div className="mx-auto max-w-6xl">
-        <div className="text-center mb-12">
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-12"
+        >
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-4">
             Tout ce que tu peux créer
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Images, vidéos, carrousels, stories... Alfie génère tout pour toi.
           </p>
-        </div>
+        </motion.div>
 
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar categories */}
-          <div className="lg:w-48 flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0">
-            {categories.map((cat) => (
-              <button
+          <motion.div 
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="lg:w-48 flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0"
+          >
+            {categories.map((cat, idx) => (
+              <motion.button
                 key={cat.id}
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: idx * 0.1 }}
                 onClick={() => setActiveCategory(cat.id)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all whitespace-nowrap ${
                   activeCategory === cat.id
@@ -84,15 +107,19 @@ export function CategoryGallerySection() {
               >
                 <cat.icon className="h-5 w-5 flex-shrink-0" />
                 <span className="font-medium">{cat.label}</span>
-              </button>
+              </motion.button>
             ))}
-          </div>
+          </motion.div>
 
           {/* Gallery grid */}
           <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {galleryItems[activeCategory].map((item, idx) => (
-              <div
+              <motion.div
                 key={idx}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: idx * 0.05 }}
                 className="group bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-xl hover:border-alfie-mint/50 transition-all"
               >
                 {/* Placeholder image */}
@@ -121,11 +148,11 @@ export function CategoryGallerySection() {
                     Essayer <ArrowRight className="ml-1 h-4 w-4" />
                   </Button>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
       </div>
-    </section>
+    </motion.section>
   );
 }

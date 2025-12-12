@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import {
   Accordion,
   AccordionContent,
@@ -42,34 +43,53 @@ const faqs = [
 
 export function FAQSection() {
   return (
-    <section className="px-4 py-16 sm:py-24 sm:px-6 lg:px-8 bg-slate-50">
+    <motion.section 
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
+      viewport={{ once: true, margin: "-100px" }}
+      transition={{ duration: 0.6 }}
+      className="px-4 py-16 sm:py-24 sm:px-6 lg:px-8 bg-slate-50"
+    >
       <div className="mx-auto max-w-3xl">
-        <div className="text-center mb-12">
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-12"
+        >
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-4">
             Questions fréquentes
           </h2>
           <p className="text-lg text-muted-foreground">
             Tout ce que tu veux savoir sur Alfie Designer.
           </p>
-        </div>
+        </motion.div>
 
         <Accordion type="single" collapsible className="space-y-4">
           {faqs.map((faq, idx) => (
-            <AccordionItem
+            <motion.div
               key={idx}
-              value={`item-${idx}`}
-              className="bg-white rounded-xl border border-slate-200 px-6 overflow-hidden"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: idx * 0.05 }}
             >
-              <AccordionTrigger className="text-left font-semibold text-slate-900 hover:text-alfie-mint py-5">
-                {faq.question}
-              </AccordionTrigger>
-              <AccordionContent className="text-slate-600 pb-5 leading-relaxed">
-                {faq.answer}
-              </AccordionContent>
-            </AccordionItem>
+              <AccordionItem
+                value={`item-${idx}`}
+                className="bg-white rounded-xl border border-slate-200 px-6 overflow-hidden"
+              >
+                <AccordionTrigger className="text-left font-semibold text-slate-900 hover:text-alfie-mint py-5">
+                  {faq.question}
+                </AccordionTrigger>
+                <AccordionContent className="text-slate-600 pb-5 leading-relaxed">
+                  {faq.answer}
+                </AccordionContent>
+              </AccordionItem>
+            </motion.div>
           ))}
         </Accordion>
       </div>
-    </section>
+    </motion.section>
   );
 }

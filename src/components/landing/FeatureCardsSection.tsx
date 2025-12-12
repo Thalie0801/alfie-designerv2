@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Palette, Zap, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -36,21 +37,37 @@ export function FeatureCardsSection() {
   };
 
   return (
-    <section className="px-4 py-16 sm:py-24 sm:px-6 lg:px-8 bg-gradient-to-b from-white to-slate-50">
+    <motion.section 
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
+      viewport={{ once: true, margin: "-100px" }}
+      transition={{ duration: 0.6 }}
+      className="px-4 py-16 sm:py-24 sm:px-6 lg:px-8 bg-gradient-to-b from-white to-slate-50"
+    >
       <div className="mx-auto max-w-5xl">
-        <div className="text-center mb-12">
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-12"
+        >
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-4">
             Simple. Rapide. Puissant.
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Tout ce dont tu as besoin pour créer du contenu qui convertit.
           </p>
-        </div>
+        </motion.div>
 
         <div className="space-y-6">
           {features.map((feature, idx) => (
-            <div
+            <motion.div
               key={idx}
+              initial={{ opacity: 0, x: idx % 2 === 0 ? -40 : 40 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: idx * 0.15 }}
               className={`group flex flex-col sm:flex-row items-stretch gap-6 p-6 rounded-3xl bg-gradient-to-r ${feature.gradient} border border-slate-200/50 hover:shadow-xl transition-all`}
             >
               {/* Image placeholder */}
@@ -79,10 +96,10 @@ export function FeatureCardsSection() {
                   </Button>
                 </div>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
-    </section>
+    </motion.section>
   );
 }
