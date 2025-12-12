@@ -95,7 +95,7 @@ export function DemoSection() {
                   src={story16x9} 
                   alt="Story 16:9"
                   loading="lazy"
-                  className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+                  className="w-full h-full object-cover object-[center_15%] group-hover:scale-105 transition-transform duration-300"
                 />
                 {/* Made with Alfie badge */}
                 <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
