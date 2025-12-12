@@ -10,12 +10,19 @@ import story16x9 from "@/assets/demo/story-16-9.png";
 import avantImage from "@/assets/demo/avant.png";
 import apresImage from "@/assets/demo/apres.png";
 
-// Images du carousel (à remplacer avec les vraies images du ZIP)
+// Images du carousel
+import carouselSlide1 from "@/assets/demo/carousel/slide-01.png";
+import carouselSlide2 from "@/assets/demo/carousel/slide-02.png";
+import carouselSlide3 from "@/assets/demo/carousel/slide-03.png";
+import carouselSlide4 from "@/assets/demo/carousel/slide-04.png";
+import carouselSlide5 from "@/assets/demo/carousel/slide-05.png";
+
 const carouselSlides = [
-  { id: 1, image: story16x9, alt: "Slide 1" },
-  { id: 2, image: postInstagram, alt: "Slide 2" },
-  { id: 3, image: avantImage, alt: "Slide 3" },
-  { id: 4, image: apresImage, alt: "Slide 4" },
+  { id: 1, image: carouselSlide1, alt: "Slide 1" },
+  { id: 2, image: carouselSlide2, alt: "Slide 2" },
+  { id: 3, image: carouselSlide3, alt: "Slide 3" },
+  { id: 4, image: carouselSlide4, alt: "Slide 4" },
+  { id: 5, image: carouselSlide5, alt: "Slide 5" },
 ];
 
 export function DemoSection() {
