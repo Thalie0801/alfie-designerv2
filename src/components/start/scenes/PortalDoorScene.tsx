@@ -17,7 +17,6 @@ export function PortalDoorScene({ onFinish }: PortalDoorSceneProps) {
   const handleSelect = useCallback((preset: StylePreset) => {
     if (isOpening) return;
     
-    setSelectedPreset(preset);
     setIsOpening(true);
     
     if (prefersReducedMotion) {
