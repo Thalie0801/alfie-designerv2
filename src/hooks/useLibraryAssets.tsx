@@ -174,7 +174,7 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
           .not('output_url', 'like', '%animated_base_%')
           .neq('metadata->>resolution', '1280x720')  // Exclure miniatures YouTube
           .neq('metadata->>resolution', '1080x1620') // Exclure Pinterest
-          .neq('metadata->>ratio', '2:3');  // Exclure Pinterest par ratio
+          .or('metadata->>ratio.is.null,metadata->>ratio.neq.2:3');  // Inclure NULL ou différent de 2:3
       } else if (type === 'videos') {
         // Vidéos: toutes les vidéos (type='video'), incluant Replicate AI
         const { data: videoData, error: videoError } = await supabase
