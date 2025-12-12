@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import type { StylePreset } from '@/lib/types/startFlow';
@@ -11,6 +11,15 @@ export function PortalDoorScene({ onFinish }: PortalDoorSceneProps) {
   const prefersReducedMotion = useReducedMotion();
   const [isOpening, setIsOpening] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<StylePreset | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Pause video at door-closed frame on mount
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0.5; // Start at closed door frame
+      videoRef.current.pause();
+    }
+  }, []);
 
   const handleSelect = useCallback((preset: StylePreset) => {
     if (isOpening) return;
@@ -18,10 +27,15 @@ export function PortalDoorScene({ onFinish }: PortalDoorSceneProps) {
     setSelectedPreset(preset);
     setIsOpening(true);
     
+    // Play the door opening video
+    if (videoRef.current) {
+      videoRef.current.play();
+    }
+    
     if (prefersReducedMotion) {
       onFinish(preset);
     } else {
-      setTimeout(() => onFinish(preset), 1500);
+      setTimeout(() => onFinish(preset), 2500);
     }
   }, [isOpening, prefersReducedMotion, onFinish]);
 
@@ -30,10 +44,22 @@ export function PortalDoorScene({ onFinish }: PortalDoorSceneProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen w-full flex flex-col items-center justify-center p-4 relative overflow-hidden bg-gradient-to-b from-[hsl(25,30%,12%)] via-[hsl(25,25%,8%)] to-[hsl(220,30%,6%)]"
+      className="min-h-screen w-full flex flex-col items-center justify-center p-4 relative overflow-hidden"
     >
+      {/* Video background - the door */}
+      <video
+        ref={videoRef}
+        src="/videos/hero-demo.mp4"
+        muted
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover z-0"
+      />
+      
+      {/* Overlay gradient for better text visibility */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60 z-5 pointer-events-none" />
+
       {/* Ambient torchlight flicker */}
-      <div className="absolute inset-0 pointer-events-none">
+      <div className="absolute inset-0 pointer-events-none z-10">
         <motion.div
           className="absolute top-10 left-10 w-32 h-32 rounded-full bg-amber-500/20 blur-3xl"
           animate={{ opacity: [0.3, 0.6, 0.4, 0.5] }}
@@ -44,20 +70,6 @@ export function PortalDoorScene({ onFinish }: PortalDoorSceneProps) {
           animate={{ opacity: [0.4, 0.3, 0.5, 0.4] }}
           transition={{ duration: 2.5, repeat: Infinity }}
         />
-      </div>
-
-      {/* Castle Door Frame */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        {/* Stone archway */}
-        <div className="relative w-full max-w-3xl h-full max-h-[90vh] mx-auto">
-          {/* Stone texture overlay */}
-          <div 
-            className="absolute inset-0 opacity-30"
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.4'/%3E%3C/svg%3E")`,
-            }}
-          />
-        </div>
       </div>
 
       {/* Door panels - z-10 so cards can be above */}
