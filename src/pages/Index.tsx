@@ -24,11 +24,16 @@ export default function AlfieLanding() {
       <section className="relative h-[80vh] md:h-screen overflow-hidden">
         {/* Image Alfie en arrière-plan permanent avec overlay fort */}
         <div className="absolute inset-0">
-          <img
-            src="/images/alfie-hero-background.jpeg"
-            alt="Alfie Golden Retriever"
-            className="h-full w-full object-cover"
-          />
+          <picture>
+            <source srcSet="/images/alfie-hero-background.webp" type="image/webp" />
+            <img
+              src="/images/alfie-hero-background.jpeg"
+              alt="Alfie Golden Retriever"
+              className="h-full w-full object-cover"
+              loading="eager"
+              fetchPriority="high"
+            />
+          </picture>
           {/* Overlay sombre très fort sur l'image pour qu'elle soit subtile */}
           <div className="absolute inset-0 bg-black/85" />
         </div>
