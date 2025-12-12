@@ -35,17 +35,17 @@ const reasons = [
 
 export function WhyAlfieSection() {
   return (
-    <section className="px-4 py-16 sm:py-24 sm:px-6 lg:px-8 bg-slate-900 text-white">
+    <section className="px-4 py-16 sm:py-24 sm:px-6 lg:px-8 bg-white">
       <div className="mx-auto max-w-6xl">
         <div className="text-center mb-12">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-4">
             Pourquoi choisir{" "}
             <span className="bg-gradient-to-r from-alfie-mint to-alfie-lilac bg-clip-text text-transparent">
               Alfie Designer
             </span>{" "}
             ?
           </h2>
-          <p className="text-lg text-white/60 max-w-2xl mx-auto">
+          <p className="text-lg text-slate-600 max-w-2xl mx-auto">
             Plus qu'un outil, un vrai partenaire pour ta création de contenu.
           </p>
         </div>
@@ -54,13 +54,13 @@ export function WhyAlfieSection() {
           {reasons.map((reason, idx) => (
             <div
               key={idx}
-              className="group p-6 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-alfie-mint/30 transition-all"
+              className="group p-6 rounded-2xl bg-slate-50 border border-slate-200 hover:bg-slate-100 hover:border-alfie-mint/50 transition-all"
             >
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-alfie-mint/30 to-alfie-lilac/30 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <reason.icon className="h-6 w-6 text-alfie-mint" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">{reason.title}</h3>
-              <p className="text-white/60 text-sm leading-relaxed">
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">{reason.title}</h3>
+              <p className="text-slate-600 text-sm leading-relaxed">
                 {reason.description}
               </p>
             </div>

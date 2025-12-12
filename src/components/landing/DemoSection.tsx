@@ -85,17 +85,17 @@ export function DemoSection() {
           </h3>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Image 2: Story en 16:9 */}
+            {/* Image 2: Story en 9:16 - format portrait */}
             <div
               onClick={() => openLightbox(story16x9)}
               className="group cursor-pointer bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all"
             >
-              <div className="aspect-video bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 relative overflow-hidden">
+              <div className="aspect-[9/16] max-h-[400px] bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 relative overflow-hidden">
                 <img 
                   src={story16x9} 
-                  alt="Story 16:9"
+                  alt="Story 9:16"
                   loading="lazy"
-                  className="w-full h-full object-cover object-[center_15%] group-hover:scale-105 transition-transform duration-300"
+                  className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                 />
                 {/* Made with Alfie badge */}
                 <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
@@ -108,7 +108,7 @@ export function DemoSection() {
                 </div>
               </div>
               <div className="p-4">
-                <p className="font-medium text-slate-900">Story (16:9)</p>
+                <p className="font-medium text-slate-900">Story (9:16)</p>
                 <p className="text-xs text-slate-500 mt-1">Généré avec Alfie + Brand Kit</p>
               </div>
             </div>
