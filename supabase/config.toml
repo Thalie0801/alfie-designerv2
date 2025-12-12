@@ -44,3 +44,15 @@ verify_jwt = true
 
 [functions.export-user-data]
 verify_jwt = true
+
+[functions.generate-free-pack]
+verify_jwt = false
+
+[functions.generate-carousel-pack]
+verify_jwt = false
+
+[functions.send-pack-email]
+verify_jwt = false
+
+[functions.verify-express-payment]
+verify_jwt = false

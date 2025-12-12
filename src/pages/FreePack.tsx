@@ -1,45 +1,138 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { trackEvent } from "@/utils/trackEvent";
-import { Download, Sparkles, ArrowRight, Check } from "lucide-react";
+import { Download, Sparkles, ArrowRight, Check, Loader2 } from "lucide-react";
 import logo from "@/assets/alfie-logo-black.svg";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+interface GeneratedAsset {
+  title: string;
+  ratio: string;
+  url: string;
+  thumbnailUrl?: string;
+}
 
 export default function FreePack() {
   const location = useLocation();
   const navigate = useNavigate();
   const [isGenerating, setIsGenerating] = useState(true);
   const [progress, setProgress] = useState(0);
+  const [generatedAssets, setGeneratedAssets] = useState<GeneratedAsset[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  
   const brandData = location.state as {
     brandName?: string;
     sector?: string;
     styles?: string[];
     colorChoice?: string;
+    fontChoice?: string;
+    objective?: string;
+    email?: string;
+    userId?: string;
+    brandId?: string;
   } | null;
 
-  useEffect(() => {
-    trackEvent("free_pack_generated", { brandData });
-    
-    // Simulate generation progress
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsGenerating(false);
-          return 100;
-        }
-        return prev + Math.random() * 15;
+  const generatePack = useCallback(async () => {
+    if (!brandData?.userId || !brandData?.brandId || !brandData?.email) {
+      // Use placeholders if no data
+      setProgress(100);
+      setIsGenerating(false);
+      setGeneratedAssets([
+        { title: "Post Instagram", ratio: "1:1", url: "/images/hero-preview.jpg" },
+        { title: "Story", ratio: "9:16", url: "/images/reel-preview.jpg" },
+        { title: "Cover", ratio: "4:5", url: "/images/carousel-preview.jpg" },
+      ]);
+      return;
+    }
+
+    try {
+      // Simulate progress while generating
+      const progressInterval = setInterval(() => {
+        setProgress(prev => Math.min(prev + 5, 90));
+      }, 1000);
+
+      const { data, error: genError } = await supabase.functions.invoke("generate-free-pack", {
+        body: {
+          userId: brandData.userId,
+          brandId: brandData.brandId,
+          email: brandData.email,
+          brandData: {
+            brandName: brandData.brandName || "Ma marque",
+            sector: brandData.sector || "other",
+            styles: brandData.styles || ["Moderne"],
+            colorChoice: brandData.colorChoice || "auto",
+            fontChoice: brandData.fontChoice || "modern",
+            objective: brandData.objective || "grow",
+          },
+        },
       });
-    }, 500);
 
-    return () => clearInterval(interval);
-  }, []);
+      clearInterval(progressInterval);
 
-  const handleDownload = () => {
+      if (genError) {
+        console.error("Generation error:", genError);
+        setError("Erreur lors de la génération. On utilise des visuels de démo.");
+        setGeneratedAssets([
+          { title: "Post Instagram", ratio: "1:1", url: "/images/hero-preview.jpg" },
+          { title: "Story", ratio: "9:16", url: "/images/reel-preview.jpg" },
+          { title: "Cover", ratio: "4:5", url: "/images/carousel-preview.jpg" },
+        ]);
+      } else if (data?.assets) {
+        setGeneratedAssets(data.assets);
+        toast.success("Ton pack est prêt !");
+      }
+
+      setProgress(100);
+      setIsGenerating(false);
+      trackEvent("free_pack_generated", { brandData: brandData?.brandName });
+    } catch (err) {
+      console.error("Error:", err);
+      setProgress(100);
+      setIsGenerating(false);
+      setGeneratedAssets([
+        { title: "Post Instagram", ratio: "1:1", url: "/images/hero-preview.jpg" },
+        { title: "Story", ratio: "9:16", url: "/images/reel-preview.jpg" },
+        { title: "Cover", ratio: "4:5", url: "/images/carousel-preview.jpg" },
+      ]);
+    }
+  }, [brandData]);
+
+  useEffect(() => {
+    generatePack();
+  }, [generatePack]);
+
+  const handleDownload = async () => {
     trackEvent("free_pack_download");
-    // TODO: Implement actual ZIP download
-    alert("Téléchargement du pack (fonctionnalité à implémenter)");
+    
+    // For real assets, trigger download
+    if (generatedAssets.length > 0 && generatedAssets[0].url.startsWith("http")) {
+      toast.info("Préparation du téléchargement...");
+      
+      // Download each image
+      for (const asset of generatedAssets) {
+        try {
+          const response = await fetch(asset.url);
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${brandData?.brandName || "pack"}-${asset.title.toLowerCase().replace(" ", "-")}.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+        } catch (e) {
+          console.error("Download error:", e);
+        }
+      }
+      
+      toast.success("Téléchargement terminé !");
+    } else {
+      toast.info("Les visuels de démo ne peuvent pas être téléchargés. Crée ton Brand Kit pour des visuels personnalisés !");
+    }
   };
 
   const handleUpgrade = () => {
@@ -51,25 +144,6 @@ export default function FreePack() {
     trackEvent("pricing_plan_clicked", { from: "free-pack" });
     navigate("/billing");
   };
-
-  // Placeholder assets
-  const assets = [
-    {
-      title: "Post Instagram",
-      ratio: "1:1",
-      preview: "/images/hero-preview.jpg",
-    },
-    {
-      title: "Story",
-      ratio: "9:16",
-      preview: "/images/reel-preview.jpg",
-    },
-    {
-      title: "Cover",
-      ratio: "4:5",
-      preview: "/images/carousel-preview.jpg",
-    },
-  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-alfie-peach/20 via-white to-alfie-lilac/20">
@@ -87,14 +161,14 @@ export default function FreePack() {
         {isGenerating ? (
           /* Loading state */
           <div className="text-center py-16 space-y-6">
-            <div className="w-20 h-20 mx-auto rounded-full bg-alfie-mint/20 flex items-center justify-center animate-pulse">
-              <span className="text-4xl">🐕</span>
+            <div className="w-20 h-20 mx-auto rounded-full bg-alfie-mint/20 flex items-center justify-center">
+              <Loader2 className="h-10 w-10 text-alfie-mint animate-spin" />
             </div>
             <h1 className="text-2xl font-bold text-slate-900">
               Alfie génère tes visuels...
             </h1>
             <p className="text-slate-600">
-              Ça prend environ 2-3 minutes. Reste sur cette page !
+              Ça prend environ 1-2 minutes. Reste sur cette page !
             </p>
             <div className="max-w-xs mx-auto">
               <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
@@ -106,6 +180,12 @@ export default function FreePack() {
               <p className="text-sm text-slate-500 mt-2">
                 {Math.round(Math.min(progress, 100))}% terminé
               </p>
+            </div>
+            <div className="text-sm text-slate-500 animate-pulse">
+              {progress < 30 && "🎨 Analyse de ton Brand Kit..."}
+              {progress >= 30 && progress < 60 && "✨ Génération des visuels..."}
+              {progress >= 60 && progress < 90 && "🖼️ Finalisation..."}
+              {progress >= 90 && "📦 Préparation du pack..."}
             </div>
           </div>
         ) : (
@@ -122,22 +202,27 @@ export default function FreePack() {
               <p className="text-slate-600">
                 {brandData?.brandName ? `Pour ${brandData.brandName}` : "Voici tes 3 visuels personnalisés"}
               </p>
+              {error && (
+                <p className="text-sm text-amber-600 bg-amber-50 px-4 py-2 rounded-lg inline-block">
+                  {error}
+                </p>
+              )}
             </div>
 
             {/* Assets grid */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {assets.map((asset) => (
+              {generatedAssets.map((asset) => (
                 <div
                   key={asset.title}
-                  className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm"
+                  className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                 >
-                  <div className="aspect-square bg-gradient-to-br from-alfie-mint/30 to-alfie-lilac/30 flex items-center justify-center">
+                  <div className="aspect-square bg-gradient-to-br from-alfie-mint/30 to-alfie-lilac/30 flex items-center justify-center relative overflow-hidden">
                     <img 
-                      src={asset.preview} 
+                      src={asset.url} 
                       alt={asset.title}
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.src = "/images/hero-preview.jpg";
                       }}
                     />
                   </div>
@@ -201,7 +286,7 @@ export default function FreePack() {
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
                 <p className="text-xs text-slate-500">
-                  Paiement unique · Livraison immédiate
+                  Paiement unique · Livraison immédiate par email
                 </p>
               </div>
             </div>
