@@ -162,12 +162,12 @@ export default function Library() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'images' | 'videos' | 'carousels' | 'thumbnails' | 'pinterest')}>
-        <TabsList className="flex-wrap h-auto gap-1">
-          <TabsTrigger value="images">🖼️ Images</TabsTrigger>
-          <TabsTrigger value="pinterest">📌 Pinterest</TabsTrigger>
-          <TabsTrigger value="thumbnails">📺 Miniatures YT</TabsTrigger>
-          <TabsTrigger value="videos">🎬 Vidéos</TabsTrigger>
-          <TabsTrigger value="carousels">📱 Carrousels</TabsTrigger>
+        <TabsList className="flex-wrap h-auto min-h-[4.5rem] sm:min-h-10 gap-1 justify-start w-full">
+          <TabsTrigger value="images" className="text-xs sm:text-sm shrink-0">🖼️ Images</TabsTrigger>
+          <TabsTrigger value="pinterest" className="text-xs sm:text-sm shrink-0">📌 Pinterest</TabsTrigger>
+          <TabsTrigger value="thumbnails" className="text-xs sm:text-sm shrink-0">📺 Miniatures YT</TabsTrigger>
+          <TabsTrigger value="videos" className="text-xs sm:text-sm shrink-0">🎬 Vidéos</TabsTrigger>
+          <TabsTrigger value="carousels" className="text-xs sm:text-sm shrink-0">📱 Carrousels</TabsTrigger>
         </TabsList>
 
         {/* Toolbar */}
