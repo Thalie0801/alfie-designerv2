@@ -2,17 +2,18 @@ import { Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
+import { trackEvent } from "@/utils/trackEvent";
 
 export function FinalCTA() {
   const navigate = useNavigate();
 
   const handleCtaClick = () => {
-    console.log("final_cta_click");
-    navigate("/quiz");
+    trackEvent("final_cta_click");
+    navigate("/start");
   };
 
   const scrollToDemo = () => {
-    console.log("final_demo_click");
+    trackEvent("final_demo_click");
     if (typeof document === "undefined") return;
     document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" });
   };

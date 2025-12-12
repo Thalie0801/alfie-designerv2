@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Globe, Palette, Zap } from "lucide-react";
+import { trackEvent } from "@/utils/trackEvent";
 
 const featurePills = [
   { icon: Zap, label: "IA ultra-rapide" },
@@ -15,6 +17,7 @@ export function HeroTextSection() {
   const sectionRef = useRef<HTMLElement | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [phraseIndex, setPhraseIndex] = useState(0);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -48,20 +51,19 @@ export function HeroTextSection() {
     return () => observer.disconnect();
   }, []);
 
-  const goToQuiz = () => {
-    console.log("home_cta_primary_click");
-    if (typeof window === "undefined") return;
-    window.location.href = "/quiz";
+  const goToStart = () => {
+    trackEvent("home_cta_primary_click");
+    navigate("/start");
   };
 
   const scrollToDemo = () => {
-    console.log("home_demo_click");
+    trackEvent("home_demo_click");
     if (typeof document === "undefined") return;
     document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" });
   };
 
   const scrollToPricing = () => {
-    console.log("home_pricing_click");
+    trackEvent("home_pricing_click");
     if (typeof document === "undefined") return;
     document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
   };
@@ -99,17 +101,17 @@ export function HeroTextSection() {
         <div className="flex w-full flex-col items-center justify-center gap-3 sm:gap-4 px-4">
           <Button
             className="h-11 sm:h-12 w-full sm:w-auto rounded-full bg-alfie-mint px-6 sm:px-8 text-sm sm:text-base text-slate-900 hover:bg-alfie-pink min-w-[200px]"
-            onClick={goToQuiz}
+            onClick={goToStart}
           >
             Créer mon Brand Kit (1 min)
           </Button>
-          <p className="text-xs text-slate-500">+ 3 visuels gratuits en 5 min. Sans carte.</p>
+          <p className="text-xs text-slate-500">3 visuels gratuits en 5 min. Sans carte. Livraison ZIP + CSV Canva.</p>
           <Button
             variant="outline"
             className="h-11 sm:h-12 w-full sm:w-auto rounded-full border-slate-200 bg-white/80 px-6 sm:px-8 text-sm sm:text-base text-slate-900 hover:bg-slate-100 min-w-[200px]"
             onClick={scrollToDemo}
           >
-            Voir la démo →
+            Voir la démo (30 sec) →
           </Button>
           <button
             onClick={scrollToPricing}

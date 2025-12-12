@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
 import { PriceCard, type BillingPlan } from "@/components/landing/PriceCard";
+import { trackEvent } from "@/utils/trackEvent";
 
 const plans = [
   {
@@ -63,6 +65,7 @@ export function PricingSection() {
   const [isAnnual, setIsAnnual] = useState(false);
   
   const handleSelectPlan = (plan: BillingPlan) => {
+    trackEvent("pricing_plan_clicked", { plan });
     // Rediriger vers /auth avec le plan en paramètre
     window.location.href = `/auth?plan=${plan}`;
   };
@@ -70,6 +73,16 @@ export function PricingSection() {
   return (
     <section id="pricing" className="bg-muted/30 px-4 py-8 sm:py-12 md:py-16 lg:py-24 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
+        {/* "Pas sûr" banner */}
+        <div className="mb-8 text-center">
+          <div className="inline-flex items-center gap-2 bg-alfie-mint/20 rounded-full px-4 py-2 text-sm text-slate-700">
+            <span>Pas sûr ?</span>
+            <Link to="/start" className="font-medium underline underline-offset-2 hover:text-slate-900">
+              Commence par le Brand Kit + pack gratuit (sans carte)
+            </Link>
+          </div>
+        </div>
+
         <div className="mb-8 md:mb-16 text-center">
           <Badge className="mb-3 md:mb-4 border border-alfie-mint/40 bg-alfie-mintSoft text-slate-700 text-xs md:text-sm" variant="secondary">
             Tarifs

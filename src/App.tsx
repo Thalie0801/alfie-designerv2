@@ -10,6 +10,9 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyReset from "./pages/VerifyReset";
 import Quiz from "./pages/Quiz";
+import Start from "./pages/Start";
+import FreePack from "./pages/FreePack";
+import CheckoutExpress from "./pages/CheckoutExpress";
 
 import Dashboard from "./pages/Dashboard";
 import Billing from "./pages/Billing";
@@ -49,6 +52,9 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/quiz" element={<Quiz />} />
+        <Route path="/start" element={<Start />} />
+        <Route path="/free-pack" element={<FreePack />} />
+        <Route path="/checkout/express" element={<CheckoutExpress />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/verify-reset" element={<VerifyReset />} />
         <Route path="/reset-password" element={<ResetPassword />} />
