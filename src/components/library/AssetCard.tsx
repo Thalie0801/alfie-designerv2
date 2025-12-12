@@ -155,7 +155,7 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
           {asset.woofs > 0 && <Badge className="bg-purple-500 text-white text-xs">{asset.woofs} 🐕</Badge>}
         </div>
 
-        {/* Preview */}
+        {/* Preview - Container avec dimensions fixes pour éviter CLS */}
         <div className="relative aspect-[4/5] bg-muted overflow-hidden rounded-t-lg">
           {/* ✅ VIDÉO avec aperçu thumbnail + overlay play */}
           {asset.type === "video" ? (
@@ -168,6 +168,9 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
                       src={videoThumbnail}
                       alt="Aperçu vidéo"
                       className="w-full h-full object-cover absolute inset-0"
+                      width={400}
+                      height={500}
+                      loading="lazy"
                       onError={handleImageError}
                     />
                   )}
@@ -216,6 +219,8 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
                   src={asset.output_url}
                   alt="Création"
                   className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                  width={400}
+                  height={500}
                   onError={handleImageError}
                   loading="lazy"
                 />
@@ -224,6 +229,8 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
                   src={asset.thumbnail_url}
                   alt="Miniature"
                   className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                  width={400}
+                  height={500}
                   onError={handleImageError}
                   loading="lazy"
                 />

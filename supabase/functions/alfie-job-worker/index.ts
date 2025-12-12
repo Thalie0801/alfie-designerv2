@@ -981,11 +981,12 @@ async function processRenderImages(
   let imagesToRender: Array<{
     prompt: string;
     resolution: string;
-    aspectRatio: "1:1" | "4:5" | "9:16" | "16:9" | "yt-thumb";
+    aspectRatio: "1:1" | "4:5" | "9:16" | "16:9" | "2:3" | "yt-thumb";  // ✅ Ajout 2:3 Pinterest
     brandId?: string;
     briefIndex?: number;
     templateImageUrl?: string;
     slideIndex?: number;
+    visualStyleCategory?: string;
   }> = [];
 
   if (payload.images) {
