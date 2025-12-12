@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
-import type { Intent } from '@/pages/Start';
+import type { Intent } from '@/lib/types/startFlow';
 
 // Default Alfie candy palette
 const DEFAULT_PALETTE = ['#7EE2E0', '#FF8BC2', '#E0C9FF', '#FFD4B8', '#FFF9C4'];

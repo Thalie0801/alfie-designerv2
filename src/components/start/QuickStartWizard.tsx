@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Sparkles, Lightbulb, Package, LayoutGrid, Square, Smartphone, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { Intent } from '@/pages/Start';
+import type { Intent } from '@/lib/types/startFlow';
 
 const TOPIC_IDEAS = [
   "Je perds trop de temps sur Canva (et ça me saoule).",

@@ -10,7 +10,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import type { Intent } from '@/pages/Start';
+import type { Intent } from '@/lib/types/startFlow';
 
 const KIND_ICONS: Record<Intent['kind'], React.ElementType> = {
   pack: Package,
