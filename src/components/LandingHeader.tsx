@@ -1,13 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/utils/trackEvent";
 import logo from "@/assets/alfie-logo-black.svg";
 
 export function LandingHeader() {
   const [scrolled, setScrolled] = useState(false);
-  const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -19,14 +18,12 @@ export function LandingHeader() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const handleOpenApp = () => {
-    trackEvent("click_open_app", { isLoggedIn: !!user });
-    if (user) {
-      navigate("/studio");
-    } else {
-      navigate("/start");
-    }
-  };
+  // Check auth only on click, not on render - prevents layout shifts
+  const handleOpenApp = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    trackEvent("click_open_app", { isLoggedIn: !!session?.user });
+    navigate(session?.user ? "/studio" : "/start");
+  }, [navigate]);
 
   return (
     <header className={["fixed inset-x-0 top-0 z-40 transition-all duration-300", scrolled ? "bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm" : "bg-transparent border-b border-transparent"].join(" ")}>
