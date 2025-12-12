@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Palette, Check, ChevronDown } from 'lucide-react';
+import { Shield, Check, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -18,7 +18,6 @@ interface BrandKit {
   logoUrl?: string;
 }
 
-// Mock brand kits
 const MOCK_BRAND_KITS: BrandKit[] = [
   {
     id: 'kit-1',
@@ -34,55 +33,61 @@ const MOCK_BRAND_KITS: BrandKit[] = [
     fontDisplay: 'Montserrat',
     fontBody: 'Open Sans',
   },
-  {
-    id: 'kit-3',
-    name: 'Side project',
-    palette: ['#1F2937', '#374151', '#6B7280', '#D1D5DB', '#F9FAFB'],
-    fontDisplay: 'Space Grotesk',
-    fontBody: 'DM Sans',
-  },
 ];
 
-interface BrandKitQuickPickProps {
+interface EquipmentSceneProps {
   onSelect: (brandKitId: string | null) => void;
 }
 
-export function BrandKitQuickPick({ onSelect }: BrandKitQuickPickProps) {
+export function EquipmentScene({ onSelect }: EquipmentSceneProps) {
   const [selectedKit, setSelectedKit] = useState<BrandKit>(MOCK_BRAND_KITS[0]);
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -30 }}
       className="min-h-screen w-full flex items-center justify-center p-4"
-      style={{
-        background: 'linear-gradient(135deg, #E3FBF9 0%, #FFE4EC 25%, #E8D5FF 50%, #FFD4B8 75%, #FFF9C4 100%)',
-      }}
     >
       <div className="max-w-md w-full">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.1 }}
-          className="bg-white/90 backdrop-blur-sm rounded-3xl p-8 shadow-xl"
+          className="bg-background/90 backdrop-blur-md rounded-3xl p-8 shadow-2xl border border-border/50"
         >
           {/* Icon */}
-          <div className="w-16 h-16 mx-auto mb-6 bg-gradient-to-br from-alfie-mint to-alfie-lilac rounded-2xl flex items-center justify-center">
-            <Palette className="w-8 h-8 text-white" />
-          </div>
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: 'spring' }}
+            className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-alfie-mint to-alfie-lilac flex items-center justify-center shadow-lg"
+          >
+            <Shield className="w-10 h-10 text-white" />
+          </motion.div>
 
           {/* Title */}
           <h2 className="text-2xl font-bold text-center text-foreground mb-2">
-            On utilise ta marque ?
+            🛡️ Équipe ta marque
           </h2>
           <p className="text-center text-muted-foreground mb-6">
-            Couleurs, typos, logo — je verrouille tout.
+            Couleurs, typos, logo — on verrouille tout.
           </p>
 
-          {/* Selected Kit Preview */}
-          <div className="bg-muted/50 rounded-2xl p-4 mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <span className="font-medium text-foreground">{selectedKit.name}</span>
+          {/* Inventory Slot Style Preview */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="relative bg-muted/50 rounded-2xl p-5 mb-6 border-2 border-dashed border-border"
+          >
+            {/* Slot decoration */}
+            <div className="absolute -top-2 left-4 px-2 bg-background text-xs font-medium text-muted-foreground">
+              ÉQUIPEMENT
+            </div>
+
+            <div className="flex items-center justify-between mb-4">
+              <span className="font-bold text-foreground">{selectedKit.name}</span>
               {MOCK_BRAND_KITS.length > 1 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -108,37 +113,47 @@ export function BrandKitQuickPick({ onSelect }: BrandKitQuickPickProps) {
                 </DropdownMenu>
               )}
             </div>
-            {/* Palette Preview */}
-            <div className="flex gap-1 mb-3">
+
+            {/* Palette as "potions" */}
+            <div className="flex gap-2 mb-4">
               {selectedKit.palette.map((color, i) => (
-                <div
+                <motion.div
                   key={i}
-                  className="flex-1 h-8 rounded-lg first:rounded-l-xl last:rounded-r-xl"
-                  style={{ backgroundColor: color }}
+                  whileHover={{ scale: 1.1, y: -3 }}
+                  className="flex-1 h-10 rounded-xl shadow-md cursor-pointer"
+                  style={{
+                    backgroundColor: color,
+                    boxShadow: `0 4px 12px ${color}60`,
+                  }}
                 />
               ))}
             </div>
+
             {/* Fonts */}
-            <div className="flex gap-4 text-sm text-muted-foreground">
-              <span>Display: {selectedKit.fontDisplay}</span>
-              <span>Body: {selectedKit.fontBody}</span>
+            <div className="flex gap-3 text-sm">
+              <span className="px-3 py-1.5 rounded-lg bg-background text-foreground font-medium">
+                🔤 {selectedKit.fontDisplay}
+              </span>
+              <span className="px-3 py-1.5 rounded-lg bg-background text-muted-foreground">
+                📝 {selectedKit.fontBody}
+              </span>
             </div>
-          </div>
+          </motion.div>
 
           {/* Actions */}
           <div className="space-y-3">
             <Button
               onClick={() => onSelect(selectedKit.id)}
-              className="w-full h-12 text-base rounded-xl bg-gradient-to-r from-alfie-mint to-alfie-lilac hover:opacity-90 text-foreground font-semibold"
+              className="w-full h-14 text-base rounded-xl bg-gradient-to-r from-alfie-mint to-alfie-lilac hover:opacity-90 text-foreground font-bold shadow-lg"
             >
-              Oui, mon Brand Kit
+              ⚔️ Équiper ce Brand Kit
             </Button>
             <Button
               variant="outline"
               onClick={() => onSelect(null)}
               className="w-full h-12 text-base rounded-xl"
             >
-              Mode démo
+              🎲 Mode démo
             </Button>
           </div>
         </motion.div>
