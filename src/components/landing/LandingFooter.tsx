@@ -28,7 +28,7 @@ export function LandingFooter() {
             <h4 className="mb-4 font-semibold">Produit</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <a href="/demo" className="transition-colors hover:text-foreground">
+                <a href="#demo" className="transition-colors hover:text-foreground">
                   Démo
                 </a>
               </li>
@@ -40,6 +40,11 @@ export function LandingFooter() {
               <li>
                 <a href="/dashboard" className="transition-colors hover:text-foreground">
                   Dashboard
+                </a>
+              </li>
+              <li>
+                <a href="/devenir-partenaire" className="transition-colors hover:text-foreground">
+                  Devenir partenaire
                 </a>
               </li>
             </ul>
