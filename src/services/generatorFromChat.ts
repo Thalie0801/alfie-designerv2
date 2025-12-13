@@ -97,16 +97,18 @@ export async function sendPackToGenerator({
   try {
   const results = await Promise.all(
       selectedAssets.map((asset) => {
-        // ✅ DEBUG LOG : Vérifier generatedTexts
-        console.log(`[Pack] Creating job for asset ${asset.id}:`, {
+        // ✅ DEBUG TRACE: Vérifier referenceImageUrl avant création du job
+        console.log(`[Pack] 🔍 Creating job for asset ${asset.id}:`, {
           kind: asset.kind,
-          referenceImageUrl: asset.referenceImageUrl || "❌ MISSING",
-          title: asset.title,
+          referenceImageUrl: asset.referenceImageUrl 
+            ? `✅ ${asset.referenceImageUrl.slice(0, 60)}...` 
+            : "❌ MISSING - Video generation may use fallback",
+          title: asset.title?.slice(0, 30),
           carouselMode: asset.kind === 'carousel' ? carouselMode : undefined,
           hasGeneratedTexts: !!asset.generatedTexts,
           slidesCount: asset.generatedTexts?.slides?.length || 0,
-          slidesPreview: asset.generatedTexts?.slides?.slice(0, 2).map((s: any) => ({ title: s.title?.slice(0, 30), hasBody: !!s.body })),
           visualStyle,
+          prompt: asset.prompt?.slice(0, 50),
         });
         return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, useLogo, userPlan, carouselMode, colorMode, visualStyle);
       })

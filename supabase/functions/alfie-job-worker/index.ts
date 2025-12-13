@@ -265,17 +265,27 @@ function buildContentPrompt(payload: any): string {
 /**
  * Construit un prompt PUREMENT VISUEL pour les vidéos (sans texte à afficher)
  * Le script vidéo (hook, script, cta) est stocké séparément pour overlay Canva
+ * ✅ V2: Prompts cinématiques descriptifs, pas le niche littéral
  */
 function buildVideoPrompt(payload: any, useBrandKit: boolean, brand?: any): string {
-  // ✅ PRIORITÉ : Le prompt direct (description visuelle pure)
+  console.log("[buildVideoPrompt] 🎬 Input:", { 
+    prompt: payload.prompt?.slice(0, 50), 
+    topic: payload.brief?.topic?.slice(0, 50),
+    campaign: payload.campaign?.slice(0, 50),
+    useBrandKit, 
+    brandNiche: brand?.niche,
+    brandPalette: brand?.palette?.slice(0, 2)
+  });
+  
+  // ✅ PRIORITÉ 1 : Le prompt direct de l'utilisateur (description visuelle pure)
   let visualPrompt = payload.prompt || "";
   
-  // Si pas de prompt visuel, utiliser le brief
+  // ✅ PRIORITÉ 2 : Utiliser le brief si pas de prompt direct
   if (!visualPrompt.trim()) {
-    visualPrompt = payload.brief?.topic || payload.campaign || "Professional video footage";
+    visualPrompt = payload.brief?.topic || payload.campaign || "";
   }
   
-  // ✅ Nettoyer les références au texte
+  // ✅ Nettoyer les références au texte (regex éprouvées)
   visualPrompt = visualPrompt
     .replace(/texte\s*(anim|:\s*)/gi, '')
     .replace(/bouton\s*cta/gi, '')
@@ -283,12 +293,25 @@ function buildVideoPrompt(payload: any, useBrandKit: boolean, brand?: any): stri
     .replace(/\s+/g, ' ')
     .trim();
   
-  // ✅ Ajouter le style si Brand Kit activé
-  const stylePrefix = useBrandKit && brand?.niche 
-    ? `Professional ${brand.niche} style, ` 
-    : 'Professional modern style, ';
-    
-  return `${stylePrefix}${visualPrompt}. Cinematic quality, smooth motion, no text or writing visible.`;
+  // ✅ FALLBACK visuel si le prompt est vide ou trop court
+  if (!visualPrompt || visualPrompt.length < 10) {
+    visualPrompt = "Abstract flowing shapes with smooth motion, dynamic energy, professional atmosphere";
+    console.log("[buildVideoPrompt] ⚠️ Using visual fallback - original prompt was too short");
+  }
+  
+  // ✅ Style visuel basé sur les COULEURS de la marque (PAS le niche littéral!)
+  let colorStyle = "";
+  if (useBrandKit && brand?.palette?.length) {
+    const colorNames = brand.palette.slice(0, 2).map(hexToColorName);
+    colorStyle = `Color palette: ${colorNames.join(" and ")} tones. `;
+    console.log("[buildVideoPrompt] 🎨 Brand colors applied:", colorNames);
+  }
+  
+  // ✅ Prompt final cinématique avec instructions anti-texte
+  const finalPrompt = `${colorStyle}${visualPrompt}. Cinematic quality, smooth camera movement, professional lighting. NO TEXT, NO LETTERS, NO WORDS visible on screen.`;
+  
+  console.log("[buildVideoPrompt] ✅ Final prompt:", finalPrompt.slice(0, 150) + "...");
+  return finalPrompt;
 }
 
 /**
@@ -1170,9 +1193,20 @@ ${imageTexts.cta ? `CTA : "${imageTexts.cta}"` : ""}`;
 }
 
 async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; order_id?: string; job_id?: string; use_brand_kit?: boolean }) {
-  console.log("🎥 [processGenerateVideo]", payload?.orderId);
+  console.log("🎥 [processGenerateVideo] START", {
+    orderId: payload?.orderId,
+    jobId: jobMeta?.job_id,
+  });
 
   const { userId, brandId, orderId, aspectRatio, duration, prompt, engine, referenceImageUrl, generatedTexts } = payload;
+  
+  // ✅ DEBUG TRACE: Vérifier que referenceImageUrl est bien reçu
+  console.log("[processGenerateVideo] 📸 referenceImageUrl DEBUG:", {
+    fromPayload: referenceImageUrl ? `✅ ${referenceImageUrl.slice(0, 80)}...` : "❌ MISSING",
+    payloadKeys: Object.keys(payload),
+    promptPreview: prompt?.slice(0, 50),
+  });
+  
   const cloudName = Deno.env.get("CLOUDINARY_CLOUD_NAME");
 
   if (!cloudName) {
@@ -1181,13 +1215,21 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
 
   const durationSec = duration || payload.durationSeconds || 5;
   const useBrandKit = resolveUseBrandKit(payload, jobMeta);
-  const visualStyleCategory = payload.visualStyleCategory || payload.visualStyle || 'background'; // ✅ NEW
+  const visualStyleCategory = payload.visualStyleCategory || payload.visualStyle || 'background';
   // ✅ Vidéos TOUJOURS sans audio (sera ajouté via Canva plus tard)
   const withAudio = false;
   
   // ✅ Extraire le script vidéo s'il existe (pour stockage metadata uniquement)
   const videoScript = generatedTexts?.video || null;
-  console.log("[processGenerateVideo] Engine:", engine, "| useBrandKit:", useBrandKit, "| visualStyleCategory:", visualStyleCategory, "| withAudio:", withAudio, "| hasScript:", !!videoScript, "| hasImage:", !!referenceImageUrl);
+  console.log("[processGenerateVideo] ⚙️ Config:", {
+    engine,
+    useBrandKit,
+    visualStyleCategory,
+    withAudio,
+    hasScript: !!videoScript,
+    hasReferenceImage: !!referenceImageUrl,
+    durationSec,
+  });
 
   // ✅ Support VEO 3.1 pour vidéos premium
   if (engine === "veo_3_1") {
