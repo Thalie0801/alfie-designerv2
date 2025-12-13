@@ -10,7 +10,7 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyReset from "./pages/VerifyReset";
 import Quiz from "./pages/Quiz";
-// import Start from "./pages/Start"; // Masqué temporairement
+import Start from "./pages/Start";
 import FreePack from "./pages/FreePack";
 import CheckoutExpress from "./pages/CheckoutExpress";
 
@@ -52,7 +52,7 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/quiz" element={<Quiz />} />
-        <Route path="/start" element={<Navigate to="/" replace />} />
+        <Route path="/start" element={<ProtectedRoute requireAdmin><Start /></ProtectedRoute>} />
         <Route path="/free-pack" element={<FreePack />} />
         <Route path="/checkout/express" element={<CheckoutExpress />} />
         <Route path="/auth" element={<Auth />} />
