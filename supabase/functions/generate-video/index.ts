@@ -268,6 +268,12 @@ Deno.serve(async (req) => {
       }
     }
     const imageUrl = typeof body?.imageUrl === "string" ? body.imageUrl : undefined;
+    
+    // ✅ DEBUG TRACE: Log imageUrl dès réception
+    console.log("[generate-video] 📸 imageUrl received:", imageUrl 
+      ? `✅ ${imageUrl.slice(0, 80)}...` 
+      : "❌ MISSING - Will generate text-to-video only");
+    
     const publicBaseUrl = typeof body?.publicBaseUrl === "string" ? body.publicBaseUrl : undefined;
     const generationId = typeof body?.generationId === "string" ? body.generationId : undefined;
     const jobId = typeof body?.jobId === "string" ? body.jobId : undefined;
