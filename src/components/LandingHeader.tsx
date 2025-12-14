@@ -35,7 +35,7 @@ export function LandingHeader() {
         <div className="flex items-center gap-2 sm:gap-3">
           <Button 
             onClick={handleAuth}
-            className="bg-slate-900 text-white hover:bg-slate-800 text-sm sm:text-base px-3 sm:px-4 h-9 sm:h-10"
+            className="bg-slate-900 text-white hover:bg-slate-800 text-sm sm:text-base px-4 sm:px-5 h-10 sm:h-11 min-w-[100px] sm:min-w-[120px]"
           >
             Se connecter
           </Button>

@@ -110,7 +110,7 @@ export function DemoSection() {
             Exemples de résultats
           </h3>
           
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
             {/* Image 2: Story en 9:16 - format portrait */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -118,27 +118,22 @@ export function DemoSection() {
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.1 }}
               onClick={() => openLightbox(story16x9)}
-              className="group cursor-pointer bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all"
+              className="group cursor-pointer bg-white rounded-xl sm:rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all"
             >
-              <div className="aspect-[9/16] max-h-[400px] bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 relative overflow-hidden">
+              <div className="aspect-[9/16] max-h-[280px] sm:max-h-[400px] bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 relative overflow-hidden">
                 <img 
                   src={story16x9} 
                   alt="Story 9:16"
                   loading="lazy"
-                  className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+                  className="w-full h-full object-cover object-[center_15%] group-hover:scale-105 transition-transform duration-300"
                 />
-                <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
+                <div className="absolute bottom-1 right-1 sm:bottom-2 sm:right-2 bg-black/60 backdrop-blur-sm text-white text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
                   Made with Alfie
                 </div>
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                  <span className="opacity-0 group-hover:opacity-100 transition-opacity text-white text-sm font-medium bg-black/50 px-3 py-1 rounded-full">
-                    Voir en grand
-                  </span>
-                </div>
               </div>
-              <div className="p-4">
-                <p className="font-medium text-slate-900">Story (9:16)</p>
-                <p className="text-xs text-slate-500 mt-1">Généré avec Alfie + Brand Kit</p>
+              <div className="p-2 sm:p-4">
+                <p className="font-medium text-slate-900 text-sm sm:text-base">Story (9:16)</p>
+                <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1 hidden sm:block">Généré avec Alfie + Brand Kit</p>
               </div>
             </motion.div>
 
@@ -149,7 +144,7 @@ export function DemoSection() {
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.2 }}
               onClick={() => openLightbox(postInstagram)}
-              className="group cursor-pointer bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all"
+              className="group cursor-pointer bg-white rounded-xl sm:rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all"
             >
               <div className="aspect-square bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 relative overflow-hidden">
                 <img 
@@ -158,18 +153,13 @@ export function DemoSection() {
                   loading="lazy"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
-                <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
+                <div className="absolute bottom-1 right-1 sm:bottom-2 sm:right-2 bg-black/60 backdrop-blur-sm text-white text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
                   Made with Alfie
                 </div>
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                  <span className="opacity-0 group-hover:opacity-100 transition-opacity text-white text-sm font-medium bg-black/50 px-3 py-1 rounded-full">
-                    Voir en grand
-                  </span>
-                </div>
               </div>
-              <div className="p-4">
-                <p className="font-medium text-slate-900">Post Instagram</p>
-                <p className="text-xs text-slate-500 mt-1">Généré avec Alfie + Brand Kit</p>
+              <div className="p-2 sm:p-4">
+                <p className="font-medium text-slate-900 text-sm sm:text-base">Post Instagram</p>
+                <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1 hidden sm:block">Généré avec Alfie + Brand Kit</p>
               </div>
             </motion.div>
 
@@ -179,9 +169,9 @@ export function DemoSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.3 }}
-              className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all"
+              className="col-span-2 lg:col-span-1 bg-white rounded-xl sm:rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all"
             >
-              <div className="aspect-[4/5] bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 relative overflow-hidden">
+              <div className="aspect-[4/5] max-h-[280px] sm:max-h-none bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 relative overflow-hidden">
                 <div 
                   ref={carouselRef}
                   className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide h-full"
@@ -199,7 +189,7 @@ export function DemoSection() {
                         loading="lazy"
                         className="w-full h-full object-cover"
                       />
-                      <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
+                      <div className="absolute bottom-1 right-1 sm:bottom-2 sm:right-2 bg-black/60 backdrop-blur-sm text-white text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
                         Made with Alfie
                       </div>
                     </div>
@@ -208,29 +198,29 @@ export function DemoSection() {
                 
                 <button 
                   onClick={(e) => { e.stopPropagation(); scrollCarousel('left'); }}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1.5 shadow-md transition-colors"
+                  className="absolute left-1 sm:left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-2 sm:p-2.5 shadow-md transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
                 >
-                  <ChevronLeft className="h-5 w-5 text-slate-700" />
+                  <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6 text-slate-700" />
                 </button>
                 <button 
                   onClick={(e) => { e.stopPropagation(); scrollCarousel('right'); }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-1.5 shadow-md transition-colors"
+                  className="absolute right-1 sm:right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-2 sm:p-2.5 shadow-md transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
                 >
-                  <ChevronRight className="h-5 w-5 text-slate-700" />
+                  <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6 text-slate-700" />
                 </button>
 
-                <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex gap-1.5">
+                <div className="absolute bottom-6 sm:bottom-10 left-1/2 -translate-x-1/2 flex gap-1.5">
                   {carouselSlides.map((_, idx) => (
                     <div 
                       key={idx}
-                      className="w-2 h-2 rounded-full bg-white/60"
+                      className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white/60"
                     />
                   ))}
                 </div>
               </div>
-              <div className="p-4">
-                <p className="font-medium text-slate-900">Carrousel</p>
-                <p className="text-xs text-slate-500 mt-1">Glisse pour voir les slides →</p>
+              <div className="p-2 sm:p-4">
+                <p className="font-medium text-slate-900 text-sm sm:text-base">Carrousel</p>
+                <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1">Glisse pour voir les slides →</p>
               </div>
             </motion.div>
           </div>
@@ -247,7 +237,7 @@ export function DemoSection() {
           <h3 className="text-lg font-semibold text-slate-900 text-center mb-6">
             Avant / Après Brand Kit
           </h3>
-          <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto">
+          <div className="grid grid-cols-2 gap-2 sm:gap-4 max-w-2xl mx-auto">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -256,18 +246,18 @@ export function DemoSection() {
               onClick={() => openLightbox(avantImage)}
               className="cursor-pointer group"
             >
-              <div className="aspect-square rounded-xl overflow-hidden border-2 border-slate-300 bg-slate-100 relative">
+              <div className="aspect-square rounded-lg sm:rounded-xl overflow-hidden border-2 border-slate-300 bg-slate-100 relative">
                 <img 
                   src={avantImage} 
                   alt="Avant - Sans Brand Kit"
                   loading="lazy"
                   className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity"
                 />
-                <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
+                <div className="absolute bottom-1 right-1 sm:bottom-2 sm:right-2 bg-black/60 backdrop-blur-sm text-white text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
                   Made with Alfie
                 </div>
               </div>
-              <p className="text-center text-sm text-slate-500 mt-2 font-medium">
+              <p className="text-center text-xs sm:text-sm text-slate-500 mt-1 sm:mt-2 font-medium">
                 Sans Brand Kit
               </p>
             </motion.div>
@@ -280,18 +270,18 @@ export function DemoSection() {
               onClick={() => openLightbox(apresImage)}
               className="cursor-pointer group"
             >
-              <div className="aspect-square rounded-xl overflow-hidden border-2 border-alfie-mint bg-alfie-mint/10 relative">
+              <div className="aspect-square rounded-lg sm:rounded-xl overflow-hidden border-2 border-alfie-mint bg-alfie-mint/10 relative">
                 <img 
                   src={apresImage} 
                   alt="Après - Avec Brand Kit"
                   loading="lazy"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                 />
-                <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
+                <div className="absolute bottom-1 right-1 sm:bottom-2 sm:right-2 bg-black/60 backdrop-blur-sm text-white text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
                   Made with Alfie
                 </div>
               </div>
-              <p className="text-center text-sm text-alfie-mint mt-2 font-semibold">
+              <p className="text-center text-xs sm:text-sm text-alfie-mint mt-1 sm:mt-2 font-semibold">
                 Avec Brand Kit ✨
               </p>
             </motion.div>
