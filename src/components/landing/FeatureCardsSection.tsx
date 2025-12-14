@@ -60,7 +60,7 @@ export function FeatureCardsSection() {
           </p>
         </motion.div>
 
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {features.map((feature, idx) => (
             <motion.div
               key={idx}
@@ -68,28 +68,29 @@ export function FeatureCardsSection() {
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: idx * 0.15 }}
-              className={`group flex flex-col sm:flex-row items-stretch gap-6 p-6 rounded-3xl bg-gradient-to-r ${feature.gradient} border border-slate-200/50 hover:shadow-xl transition-all`}
+              onClick={() => handleTry(feature.title)}
+              className={`group flex flex-row items-center gap-3 sm:gap-6 p-3 sm:p-6 rounded-2xl sm:rounded-3xl bg-gradient-to-r ${feature.gradient} border border-slate-200/50 hover:shadow-xl transition-all cursor-pointer`}
             >
               {/* Image placeholder */}
-              <div className="sm:w-48 lg:w-64 aspect-square sm:aspect-auto flex-shrink-0 rounded-2xl bg-white shadow-lg overflow-hidden flex items-center justify-center">
-                <div className={`w-20 h-20 rounded-2xl ${feature.iconBg} flex items-center justify-center`}>
-                  <feature.icon className="h-10 w-10" />
+              <div className="w-16 h-16 sm:w-48 lg:w-64 sm:aspect-auto flex-shrink-0 rounded-xl sm:rounded-2xl bg-white shadow-lg overflow-hidden flex items-center justify-center">
+                <div className={`w-10 h-10 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl ${feature.iconBg} flex items-center justify-center`}>
+                  <feature.icon className="h-5 w-5 sm:h-10 sm:w-10" />
                 </div>
               </div>
 
               {/* Content */}
-              <div className="flex-1 flex flex-col justify-center">
-                <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">
+              <div className="flex-1 flex flex-col justify-center min-w-0">
+                <h3 className="text-base sm:text-xl lg:text-2xl font-bold text-slate-900 mb-0.5 sm:mb-2">
                   {feature.title}
                 </h3>
-                <p className="text-slate-600 mb-4 leading-relaxed">
+                <p className="text-slate-600 text-xs sm:text-base leading-relaxed line-clamp-2 sm:line-clamp-none mb-0 sm:mb-4">
                   {feature.description}
                 </p>
-                <div>
+                <div className="hidden sm:block">
                   <Button
                     variant="ghost"
                     className="text-slate-900 hover:text-alfie-mint hover:bg-white/50 p-0 h-auto font-semibold group/btn"
-                    onClick={() => handleTry(feature.title)}
+                    onClick={(e) => { e.stopPropagation(); handleTry(feature.title); }}
                   >
                     Essayer maintenant 
                     <ArrowRight className="ml-2 h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />

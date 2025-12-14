@@ -68,9 +68,9 @@ export function HeroVideoSection() {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="text-center mb-6 z-20"
         >
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 leading-tight pb-4">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-slate-900 leading-tight pb-2 sm:pb-4">
             Crée du contenu qui
-            <span className="relative inline-flex items-baseline ml-2">
+            <span className="relative inline-flex items-baseline ml-1 sm:ml-2">
               <motion.span 
                 key={phraseIndex}
                 initial={{ opacity: 0, y: 20 }}
@@ -81,10 +81,10 @@ export function HeroVideoSection() {
               >
                 {heroAdjectives[phraseIndex]}
               </motion.span>
-              <span className="ml-1 h-10 w-[3px] animate-pulse bg-alfie-mint rounded-full" />
+              <span className="ml-1 h-6 sm:h-10 w-[2px] sm:w-[3px] animate-pulse bg-alfie-mint rounded-full" />
             </span>
           </h1>
-          <p className="text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto mt-6">
+          <p className="text-base sm:text-lg md:text-xl text-slate-600 max-w-2xl mx-auto mt-3 sm:mt-6 px-2">
             Génère des visuels pro pour tes réseaux sociaux en quelques clics.
           </p>
         </motion.div>
@@ -126,32 +126,32 @@ export function HeroVideoSection() {
         </motion.div>
 
         {/* Video + 4 floating cards container */}
-        <div className="relative w-full max-w-6xl mx-auto flex items-center justify-center h-[45vh]">
-          {/* Card 1: Story (back-left) */}
+        <div className="relative w-full max-w-6xl mx-auto flex items-center justify-center h-[40vh] sm:h-[45vh]">
+          {/* Card 1: Story (back-left) - visible on mobile */}
           <motion.div
             style={{ x: card1X, opacity: cardsOpacity }}
             initial={{ opacity: 0, x: -50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.5 }}
-            className="absolute left-0 sm:left-8 lg:left-16 top-1/2 -translate-y-1/2 w-20 sm:w-28 lg:w-36 aspect-[9/16] rounded-xl overflow-hidden shadow-xl z-0 hidden sm:block border border-slate-200"
+            className="absolute left-1 sm:left-8 lg:left-16 top-1/2 -translate-y-1/2 w-12 sm:w-28 lg:w-36 aspect-[9/16] rounded-lg sm:rounded-xl overflow-hidden shadow-lg sm:shadow-xl z-0 border border-slate-200"
           >
             <img src={story16x9} alt="Story" className="w-full h-full object-cover" />
-            <div className="absolute bottom-1 left-1 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded">Story</div>
+            <div className="absolute bottom-0.5 left-0.5 sm:bottom-1 sm:left-1 bg-black/50 text-white text-[8px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded">Story</div>
           </motion.div>
 
-          {/* Card 2: Post (back-right) */}
+          {/* Card 2: Post (back-right) - visible on mobile */}
           <motion.div
             style={{ x: card2X, opacity: cardsOpacity }}
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.6 }}
-            className="absolute right-0 sm:right-8 lg:right-16 top-1/2 -translate-y-1/2 w-20 sm:w-28 lg:w-36 aspect-square rounded-xl overflow-hidden shadow-xl z-0 hidden sm:block border border-slate-200"
+            className="absolute right-1 sm:right-8 lg:right-16 top-1/2 -translate-y-1/2 w-12 sm:w-28 lg:w-36 aspect-square rounded-lg sm:rounded-xl overflow-hidden shadow-lg sm:shadow-xl z-0 border border-slate-200"
           >
             <img src={postInstagram} alt="Post" className="w-full h-full object-cover" />
-            <div className="absolute bottom-1 left-1 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded">Post</div>
+            <div className="absolute bottom-0.5 left-0.5 sm:bottom-1 sm:left-1 bg-black/50 text-white text-[8px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded">Post</div>
           </motion.div>
 
-          {/* Card 3: Carousel (front-left, overlapping) */}
+          {/* Card 3: Carousel (front-left, overlapping) - hidden on mobile */}
           <motion.div
             style={{ x: card3X, opacity: cardsOpacity }}
             initial={{ opacity: 0, y: 30 }}
@@ -163,7 +163,7 @@ export function HeroVideoSection() {
             <div className="absolute bottom-1 left-1 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded">Carousel</div>
           </motion.div>
 
-          {/* Card 4: Pinterest (front-right, overlapping) */}
+          {/* Card 4: Pinterest (front-right, overlapping) - hidden on mobile */}
           <motion.div
             style={{ x: card4X, opacity: cardsOpacity }}
             initial={{ opacity: 0, y: 30 }}

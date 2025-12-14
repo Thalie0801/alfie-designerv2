@@ -133,37 +133,47 @@ export function PricingSection() {
           </div>
         </motion.div>
 
-        <div className="mx-auto grid max-w-6xl gap-6 md:gap-8 grid-cols-1 md:grid-cols-3">
-          {plans.map((plan, idx) => (
-            <motion.div
-              key={plan.title}
-              initial={{ opacity: 0, y: 40, scale: 0.95 }}
-              whileInView={{ opacity: 1, y: 0, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: idx * 0.1 }}
-            >
-              <PriceCard
-                title={plan.title}
-                monthlyPrice={plan.monthlyPrice}
-                isAnnual={isAnnual}
-                calculatePrice={(price) => calculatePrice(price, isAnnual)}
-                calculateOriginalAnnualPrice={calculateOriginalAnnualPrice}
-                getPriceLabel={() => getPriceLabel(isAnnual)}
-                features={plan.features}
-                plan={plan.plan}
-                popular={plan.popular}
-                aiTier={plan.aiTier}
-                onSelectPlan={handleSelectPlan}
-              />
-            </motion.div>
-          ))}
+        {/* Horizontal scroll on mobile, grid on desktop */}
+        <div className="mx-auto max-w-6xl">
+          <div className="flex md:grid md:grid-cols-3 gap-4 md:gap-8 overflow-x-auto snap-x snap-mandatory pb-4 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {plans.map((plan, idx) => (
+              <motion.div
+                key={plan.title}
+                initial={{ opacity: 0, y: 40, scale: 0.95 }}
+                whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: idx * 0.1 }}
+                className="flex-shrink-0 w-[85vw] sm:w-[70vw] md:w-auto snap-center"
+              >
+                <PriceCard
+                  title={plan.title}
+                  monthlyPrice={plan.monthlyPrice}
+                  isAnnual={isAnnual}
+                  calculatePrice={(price) => calculatePrice(price, isAnnual)}
+                  calculateOriginalAnnualPrice={calculateOriginalAnnualPrice}
+                  getPriceLabel={() => getPriceLabel(isAnnual)}
+                  features={plan.features}
+                  plan={plan.plan}
+                  popular={plan.popular}
+                  aiTier={plan.aiTier}
+                  onSelectPlan={handleSelectPlan}
+                />
+              </motion.div>
+            ))}
+          </div>
+          {/* Scroll indicator for mobile */}
+          <div className="flex justify-center gap-1.5 mt-4 md:hidden">
+            {plans.map((_, idx) => (
+              <div key={idx} className="w-2 h-2 rounded-full bg-slate-300" />
+            ))}
+          </div>
         </div>
         <motion.p 
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.3 }}
-          className="text-center text-sm text-muted-foreground mt-6"
+          className="text-center text-xs sm:text-sm text-muted-foreground mt-4 sm:mt-6 px-4"
         >
           Crée ton compte Alfie, puis choisis ton plan et finalise le paiement dans ton espace sécurisé.
         </motion.p>
