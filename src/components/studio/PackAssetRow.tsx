@@ -112,31 +112,32 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
   };
 
   return (
-    <Card className="p-4 hover:shadow-md transition-shadow">
+    <Card className="p-3 sm:p-4 hover:shadow-md transition-shadow">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 space-y-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-lg">{platformEmoji[asset.platform]}</span>
-              <h3 className="font-semibold">{asset.title}</h3>
-              <Badge variant="secondary">
+        <div className="flex items-start justify-between gap-2 sm:gap-4">
+          <div className="flex-1 min-w-0 space-y-1.5 sm:space-y-2">
+            {/* Ligne 1: Titre + badges essentiels */}
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <span className="text-base sm:text-lg">{platformEmoji[asset.platform]}</span>
+              <h3 className="font-semibold text-sm sm:text-base truncate max-w-[120px] sm:max-w-none">{asset.title}</h3>
+              <Badge variant="secondary" className="text-[10px] sm:text-xs py-0 px-1.5 sm:px-2">
                 {assetKindLabel[asset.kind] || asset.kind}
               </Badge>
               {asset.kind === "carousel" && (
-                <Badge variant="outline">{asset.count} slides</Badge>
+                <Badge variant="outline" className="text-[10px] sm:text-xs py-0 px-1.5 sm:px-2 hidden sm:inline-flex">{asset.count} slides</Badge>
               )}
-              <Badge variant="outline" className="bg-orange-50 text-orange-700">
+              <Badge variant="outline" className="bg-orange-50 text-orange-700 text-[10px] sm:text-xs py-0 px-1.5 sm:px-2">
                 {totalCost} 🐾
               </Badge>
             </div>
             
-            <p className="text-xs text-muted-foreground">
+            {/* Description - cachée sur mobile */}
+            <p className="text-xs text-muted-foreground hidden sm:block">
               {goalDescriptions[asset.goal] || goalDescriptions.default}
             </p>
 
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>{asset.platform}</span>
-              <span>•</span>
+            {/* Métadonnées compactes */}
+            <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-muted-foreground">
               <span>{asset.format}</span>
               <span>•</span>
               <span>{asset.ratio}</span>
@@ -146,25 +147,30 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
                   <span>{asset.durationSeconds}s</span>
                 </>
               )}
+              {asset.kind === "carousel" && (
+                <span className="sm:hidden">• {asset.count} slides</span>
+              )}
             </div>
 
-
-            <div className="flex items-center gap-2 text-xs">
-              <Badge variant="outline">{asset.goal}</Badge>
-              <span className="text-muted-foreground">{asset.tone}</span>
+            {/* Goal badge - compact sur mobile */}
+            <div className="flex items-center gap-1.5 sm:gap-2 text-xs">
+              <Badge variant="outline" className="text-[10px] sm:text-xs py-0">{asset.goal}</Badge>
+              <span className="text-muted-foreground text-[10px] sm:text-xs truncate max-w-[80px] sm:max-w-none">{asset.tone}</span>
             </div>
 
           </div>
 
-          <div className="flex items-center gap-1">
+          {/* Boutons d'action - plus grands sur mobile pour les touch targets */}
+          <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8">
                 {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </Button>
             </CollapsibleTrigger>
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
+              className="h-9 w-9 sm:h-8 sm:w-8"
               onClick={() => onDuplicate(asset)}
               title="Dupliquer"
             >
@@ -172,9 +178,9 @@ export function PackAssetRow({ asset, onDuplicate, onDelete, onEdit }: PackAsset
             </Button>
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
+              className="h-9 w-9 sm:h-8 sm:w-8 text-destructive hover:text-destructive"
               onClick={() => onDelete(asset.id)}
-              className="text-destructive hover:text-destructive"
               title="Supprimer"
             >
               <Trash2 className="h-4 w-4" />

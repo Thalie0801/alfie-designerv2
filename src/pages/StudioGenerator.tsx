@@ -648,24 +648,40 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
     <TourProvider steps={STUDIO_STEPS} options={{ userEmail: user?.email }}>
       <StudioTourAutoStart />
       
-      <div className="min-h-screen bg-background pb-20 lg:pb-8">
-        <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
-          {/* Header */}
-          <div data-tour-id="studio-header" className="mb-6 sm:mb-8 text-center">
-            <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-              <Sparkles className="w-6 h-6 sm:w-8 sm:h-8 text-alfie-pink" />
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">Studio Alfie</h1>
+      <div className="min-h-screen bg-background pb-24 lg:pb-8">
+        {/* Barre sticky mobile - Récap Woofs */}
+        <div className="lg:hidden sticky top-0 z-40 bg-background/95 backdrop-blur border-b px-3 py-2">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <span className="font-medium">{woofsAvailable} 🐾</span>
+              <span className="text-muted-foreground">disponibles</span>
             </div>
-            <p className="text-muted-foreground text-sm sm:text-base md:text-lg">
+            {pack.assets.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Ce pack:</span>
+                <span className="font-medium text-primary">{calculatePackWoofCost(pack)} 🐾</span>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-8">
+          {/* Header - plus compact sur mobile */}
+          <div data-tour-id="studio-header" className="mb-4 sm:mb-8 text-center">
+            <div className="flex items-center justify-center gap-2 sm:gap-3 mb-1 sm:mb-3">
+              <Sparkles className="w-5 h-5 sm:w-8 sm:h-8 text-alfie-pink" />
+              <h1 className="text-xl sm:text-3xl md:text-4xl font-bold">Studio Alfie</h1>
+            </div>
+            <p className="text-muted-foreground text-xs sm:text-base md:text-lg hidden sm:block">
               Crée ton pack de visuels sur mesure 🎬
             </p>
           </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 pb-20 sm:pb-0">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-6 pb-20 sm:pb-0">
           {/* Colonne 1 : Brief global */}
-          <div className="lg:col-span-3 space-y-4">
-            {/* Card Brief de campagne */}
-            <Card data-tour-id="studio-brief" className="p-4 space-y-4">
+          <div className="lg:col-span-3 space-y-3 sm:space-y-4">
+            {/* Card Brief de campagne - Collapsible sur mobile */}
+            <Card data-tour-id="studio-brief" className="p-3 sm:p-4 space-y-3 sm:space-y-4">
               <div>
                 <h3 className="font-semibold mb-2 text-sm">Nom de la campagne</h3>
                 <Input
@@ -686,8 +702,8 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
               </div>
             </Card>
 
-            {/* Card Brand Kit - SÉPARÉE */}
-            <Card data-tour-id="studio-brandkit" className="p-4 space-y-3">
+            {/* Card Brand Kit - SÉPARÉE - Compact sur mobile */}
+            <Card data-tour-id="studio-brandkit" className="p-3 sm:p-4 space-y-2 sm:space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-sm">Brand Kit</h3>
                 <Switch
@@ -789,7 +805,7 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
             </Card>
 
             {/* Toggle Style Couleurs */}
-            <Card className="p-4 space-y-3">
+            <Card className="p-3 sm:p-4 space-y-2 sm:space-y-3">
               <h3 className="font-semibold text-sm">Style couleurs</h3>
               <div className="flex gap-1">
                 <button 
@@ -822,40 +838,46 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
               </p>
             </Card>
 
-            <Card className="p-4">
-              <h3 className="font-semibold mb-3 text-sm">Packs prédéfinis</h3>
-              <div className="space-y-2">
+            <Card className="p-3 sm:p-4">
+              <h3 className="font-semibold mb-2 sm:mb-3 text-sm">Packs prédéfinis</h3>
+              <div className="grid grid-cols-3 lg:grid-cols-1 gap-1 sm:gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full justify-start"
+                  className="w-full justify-center lg:justify-start text-xs sm:text-sm px-2 sm:px-3"
                   onClick={() => loadPreset("lancement")}
                 >
-                  🚀 Pack de lancement
+                  <span className="lg:inline">🚀</span>
+                  <span className="hidden lg:inline ml-1">Pack de lancement</span>
+                  <span className="lg:hidden">Lancement</span>
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full justify-start"
+                  className="w-full justify-center lg:justify-start text-xs sm:text-sm px-2 sm:px-3"
                   onClick={() => loadPreset("evergreen")}
                 >
-                  🌲 Pack evergreen
+                  <span className="lg:inline">🌲</span>
+                  <span className="hidden lg:inline ml-1">Pack evergreen</span>
+                  <span className="lg:hidden">Evergreen</span>
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full justify-start"
+                  className="w-full justify-center lg:justify-start text-xs sm:text-sm px-2 sm:px-3"
                   onClick={() => loadPreset("promo")}
                 >
-                  🔥 Pack promo express
+                  <span className="lg:inline">🔥</span>
+                  <span className="hidden lg:inline ml-1">Pack promo express</span>
+                  <span className="lg:hidden">Promo</span>
                 </Button>
               </div>
             </Card>
           </div>
 
           {/* Colonne 2 : Pack d'assets */}
-          <div className="lg:col-span-6 space-y-4">
-            <Card data-tour-id="studio-assets" className="p-4">
+          <div className="lg:col-span-6 space-y-3 sm:space-y-4">
+            <Card data-tour-id="studio-assets" className="p-3 sm:p-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold">Visuels de ta campagne ({pack.assets.length})</h3>
                 <DropdownMenu>
@@ -979,26 +1001,34 @@ Mix attendu : au moins 1 carrousel (5 slides) + 2-3 images + 1 option animée/vi
         </div>
       </div>
       
-      {/* Footer sticky mobile - juste le bouton */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 p-3 bg-background border-t z-30">
-        <Button
-          onClick={launchGeneration}
-          disabled={pack.assets.length === 0 || isLaunching}
-          className="w-full"
-          size="lg"
-        >
-          {isLaunching ? (
-            <>
-              <Sparkles className="mr-2 h-4 w-4 animate-spin" />
-              Alfie prépare tes visuels...
-            </>
-          ) : (
-            <>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Créer mes visuels ({calculatePackWoofCost(pack)} 🐾)
-            </>
-          )}
-        </Button>
+      {/* Footer sticky mobile - bouton + récap Woofs */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 p-3 bg-background/95 backdrop-blur border-t z-30 safe-area-bottom">
+        <div className="flex items-center gap-3">
+          {/* Récap compact */}
+          <div className="flex-shrink-0 text-center">
+            <div className="text-lg font-bold">{woofsAvailable - calculatePackWoofCost(pack)}</div>
+            <div className="text-[10px] text-muted-foreground leading-tight">après création</div>
+          </div>
+          
+          {/* Bouton principal */}
+          <Button
+            onClick={launchGeneration}
+            disabled={pack.assets.length === 0 || isLaunching || woofsAvailable < calculatePackWoofCost(pack)}
+            className="flex-1 h-12"
+          >
+            {isLaunching ? (
+              <>
+                <Sparkles className="mr-2 h-4 w-4 animate-spin" />
+                <span className="text-sm">Génération...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                <span className="text-sm">Créer ({calculatePackWoofCost(pack)} 🐾)</span>
+              </>
+            )}
+          </Button>
+        </div>
       </div>
       
       {/* Help Launcher Button */}
