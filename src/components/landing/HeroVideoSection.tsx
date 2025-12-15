@@ -126,53 +126,53 @@ export function HeroVideoSection() {
         </motion.div>
 
         {/* Video + 4 floating cards container */}
-        <div className="relative w-full max-w-6xl mx-auto flex items-center justify-center h-[40vh] sm:h-[45vh]">
-          {/* Card 1: Story (back-left) - visible on mobile */}
+        <div className="relative w-full max-w-6xl mx-auto flex items-center justify-center h-[35vh] sm:h-[45vh]">
+          {/* Card 1: Story (top-left) */}
           <motion.div
             style={{ x: card1X, opacity: cardsOpacity }}
             initial={{ opacity: 0, x: -50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.5 }}
-            className="absolute left-1 sm:left-8 lg:left-16 top-1/2 -translate-y-1/2 w-12 sm:w-28 lg:w-36 aspect-[9/16] rounded-lg sm:rounded-xl overflow-hidden shadow-lg sm:shadow-xl z-0 border border-slate-200"
+            className="absolute left-2 sm:left-8 lg:left-16 top-[20%] sm:top-1/2 sm:-translate-y-1/2 w-14 sm:w-28 lg:w-36 aspect-[9/16] rounded-lg sm:rounded-xl overflow-hidden shadow-lg sm:shadow-xl z-0 border border-slate-200 -rotate-3 sm:rotate-0"
           >
             <img src={story16x9} alt="Story" className="w-full h-full object-cover" />
-            <div className="absolute bottom-0.5 left-0.5 sm:bottom-1 sm:left-1 bg-black/50 text-white text-[8px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded">Story</div>
+            <div className="absolute bottom-0.5 left-0.5 sm:bottom-1 sm:left-1 bg-black/50 text-white text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded">Story</div>
           </motion.div>
 
-          {/* Card 2: Post (back-right) - visible on mobile */}
+          {/* Card 2: Post (top-right) */}
           <motion.div
             style={{ x: card2X, opacity: cardsOpacity }}
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.6 }}
-            className="absolute right-1 sm:right-8 lg:right-16 top-1/2 -translate-y-1/2 w-12 sm:w-28 lg:w-36 aspect-square rounded-lg sm:rounded-xl overflow-hidden shadow-lg sm:shadow-xl z-0 border border-slate-200"
+            className="absolute right-2 sm:right-8 lg:right-16 top-[20%] sm:top-1/2 sm:-translate-y-1/2 w-14 sm:w-28 lg:w-36 aspect-square rounded-lg sm:rounded-xl overflow-hidden shadow-lg sm:shadow-xl z-0 border border-slate-200 rotate-3 sm:rotate-0"
           >
             <img src={postInstagram} alt="Post" className="w-full h-full object-cover" />
-            <div className="absolute bottom-0.5 left-0.5 sm:bottom-1 sm:left-1 bg-black/50 text-white text-[8px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded">Post</div>
+            <div className="absolute bottom-0.5 left-0.5 sm:bottom-1 sm:left-1 bg-black/50 text-white text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded">Post</div>
           </motion.div>
 
-          {/* Card 3: Carousel (front-left, overlapping) - hidden on mobile */}
+          {/* Card 3: Carousel (bottom-left, overlapping) */}
           <motion.div
             style={{ x: card3X, opacity: cardsOpacity }}
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.7 }}
-            className="absolute left-8 sm:left-20 lg:left-32 top-[60%] -translate-y-1/2 w-16 sm:w-24 lg:w-32 aspect-[4/5] rounded-xl overflow-hidden shadow-2xl z-5 hidden sm:block border-2 border-white"
+            className="absolute left-6 sm:left-20 lg:left-32 top-[55%] sm:top-[60%] -translate-y-1/2 w-12 sm:w-24 lg:w-32 aspect-[4/5] rounded-lg sm:rounded-xl overflow-hidden shadow-xl sm:shadow-2xl z-5 border-2 border-white -rotate-6 sm:rotate-0"
           >
             <img src={carouselSlide1} alt="Carousel" className="w-full h-full object-cover" />
-            <div className="absolute bottom-1 left-1 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded">Carousel</div>
+            <div className="absolute bottom-0.5 left-0.5 sm:bottom-1 sm:left-1 bg-black/50 text-white text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded">Carousel</div>
           </motion.div>
 
-          {/* Card 4: Pinterest (front-right, overlapping) - hidden on mobile */}
+          {/* Card 4: Pinterest (bottom-right, overlapping) */}
           <motion.div
             style={{ x: card4X, opacity: cardsOpacity }}
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.8 }}
-            className="absolute right-8 sm:right-20 lg:right-32 top-[60%] -translate-y-1/2 w-16 sm:w-24 lg:w-32 aspect-[2/3] rounded-xl overflow-hidden shadow-2xl z-5 hidden sm:block border-2 border-white"
+            className="absolute right-6 sm:right-20 lg:right-32 top-[55%] sm:top-[60%] -translate-y-1/2 w-12 sm:w-24 lg:w-32 aspect-[2/3] rounded-lg sm:rounded-xl overflow-hidden shadow-xl sm:shadow-2xl z-5 border-2 border-white rotate-6 sm:rotate-0"
           >
             <img src={carouselSlide2} alt="Pinterest" className="w-full h-full object-cover" />
-            <div className="absolute bottom-1 left-1 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded">Pinterest</div>
+            <div className="absolute bottom-0.5 left-0.5 sm:bottom-1 sm:left-1 bg-black/50 text-white text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded">Pinterest</div>
           </motion.div>
 
           {/* Center video - descends and scales up to fullscreen */}
