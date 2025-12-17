@@ -93,7 +93,7 @@ function extractImageUrl(response: any): string | null {
   return null;
 }
 
-async function callFn<T = unknown>(name: string, body: unknown, timeoutMs = 60_000): Promise<T> {
+async function callFn<T = unknown>(name: string, body: unknown, timeoutMs = 90_000): Promise<T> {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error(`Missing Supabase configuration for ${name}`);
   }
