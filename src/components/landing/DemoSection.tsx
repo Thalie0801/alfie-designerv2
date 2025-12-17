@@ -110,7 +110,7 @@ export function DemoSection() {
             Exemples de résultats
           </h3>
           
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 items-start">
             {/* Image 2: Story en 9:16 - format portrait */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -120,20 +120,20 @@ export function DemoSection() {
               onClick={() => openLightbox(story16x9)}
               className="group cursor-pointer bg-white rounded-xl sm:rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all"
             >
-              <div className="aspect-[9/16] max-h-[280px] sm:max-h-[400px] bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 relative overflow-hidden">
+              <div className="aspect-[9/16] bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 relative overflow-hidden">
                 <img 
                   src={story16x9} 
                   alt="Story 9:16"
                   loading="lazy"
-                  className="w-full h-full object-cover object-[center_15%] group-hover:scale-105 transition-transform duration-300"
+                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
                 />
                 <div className="absolute bottom-1 right-1 sm:bottom-2 sm:right-2 bg-black/60 backdrop-blur-sm text-white text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
                   Made with Alfie
                 </div>
               </div>
-              <div className="p-2 sm:p-4">
+              <div className="p-2">
                 <p className="font-medium text-slate-900 text-sm sm:text-base">Story (9:16)</p>
-                <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1 hidden sm:block">Généré avec Alfie + Brand Kit</p>
+                <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 hidden sm:block">Généré avec Alfie + Brand Kit</p>
               </div>
             </motion.div>
 
@@ -157,9 +157,9 @@ export function DemoSection() {
                   Made with Alfie
                 </div>
               </div>
-              <div className="p-2 sm:p-4">
+              <div className="p-2">
                 <p className="font-medium text-slate-900 text-sm sm:text-base">Post Instagram</p>
-                <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1 hidden sm:block">Généré avec Alfie + Brand Kit</p>
+                <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 hidden sm:block">Généré avec Alfie + Brand Kit</p>
               </div>
             </motion.div>
 
@@ -171,7 +171,7 @@ export function DemoSection() {
               transition={{ duration: 0.5, delay: 0.3 }}
               className="col-span-2 lg:col-span-1 bg-white rounded-xl sm:rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all"
             >
-              <div className="aspect-[4/5] max-h-[280px] sm:max-h-none bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 relative overflow-hidden">
+              <div className="aspect-[4/5] bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 relative overflow-hidden">
                 <div 
                   ref={carouselRef}
                   className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide h-full"
