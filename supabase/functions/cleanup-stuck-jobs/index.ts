@@ -3,6 +3,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from "../_shared/cors.ts";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
 
+const MAX_RETRIES = 3;
+const STUCK_THRESHOLD_MINUTES = 5;
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response("ok", { headers: corsHeaders });
@@ -14,17 +17,17 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    // Réinitialiser les jobs en "running" depuis plus de 5 minutes
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const cutoffTime = new Date(Date.now() - STUCK_THRESHOLD_MINUTES * 60 * 1000).toISOString();
     
-    console.log(`[Cleanup] Cutoff time: ${fiveMinutesAgo}`);
+    console.log(`[Cleanup] Cutoff time: ${cutoffTime}`);
     console.log(`[Cleanup] Looking for jobs stuck in 'running' state...`);
     
+    // Sélectionner les jobs bloqués
     const { data: stuckJobs, error: selectError } = await supabase
       .from('job_queue')
-      .select('id, order_id, user_id, created_at, updated_at')
+      .select('id, order_id, user_id, created_at, updated_at, retry_count')
       .eq('status', 'running')
-      .lt('updated_at', fiveMinutesAgo);
+      .lt('updated_at', cutoffTime);
 
     if (selectError) {
       console.error('❌ [Cleanup] Failed to select stuck jobs:', selectError);
@@ -35,6 +38,8 @@ Deno.serve(async (req) => {
       console.log('✅ [Cleanup] No stuck jobs found - system healthy');
       return new Response(JSON.stringify({ 
         cleaned: 0,
+        retried: 0,
+        failed: 0,
         message: 'No stuck jobs found',
         timestamp: new Date().toISOString()
       }), {
@@ -43,32 +48,65 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log(`⚠️ [Cleanup] Found ${stuckJobs.length} stuck jobs:`, 
-      stuckJobs.map(j => ({ id: j.id.slice(0, 8), order: j.order_id?.slice(0, 8), updated: j.updated_at })));
+    console.log(`⚠️ [Cleanup] Found ${stuckJobs.length} stuck jobs`);
 
-    // Marquer comme failed avec message explicite
-    const { data: updatedJobs, error: updateError } = await supabase
-      .from('job_queue')
-      .update({ 
-        status: 'failed',
-        error: 'Timeout - exceeded 5 minutes in running state',
-        updated_at: new Date().toISOString()
-      })
-      .in('id', stuckJobs.map(j => j.id))
-      .select('id');
+    // Séparer les jobs qui peuvent être retentés de ceux qui doivent échouer
+    const retriableJobs = stuckJobs.filter(j => (j.retry_count || 0) < MAX_RETRIES);
+    const failedJobs = stuckJobs.filter(j => (j.retry_count || 0) >= MAX_RETRIES);
 
-    if (updateError) {
-      console.error('❌ [Cleanup] Failed to update stuck jobs:', updateError);
-      throw updateError;
+    let retriedCount = 0;
+    let failedCount = 0;
+
+    // ✅ RETRY : Remettre en queue les jobs qui peuvent être retentés
+    if (retriableJobs.length > 0) {
+      console.log(`🔄 [Cleanup] Retrying ${retriableJobs.length} jobs (retry_count < ${MAX_RETRIES})`);
+      
+      const { data: retriedJobs, error: retryError } = await supabase
+        .from('job_queue')
+        .update({ 
+          status: 'queued',
+          error: null,
+          retry_count: retriableJobs[0].retry_count ? retriableJobs[0].retry_count + 1 : 1,
+          updated_at: new Date().toISOString()
+        })
+        .in('id', retriableJobs.map(j => j.id))
+        .select('id');
+
+      if (retryError) {
+        console.error('❌ [Cleanup] Failed to retry jobs:', retryError);
+      } else {
+        retriedCount = retriedJobs?.length || 0;
+        console.log(`✅ [Cleanup] Re-queued ${retriedCount} jobs for retry`);
+      }
     }
 
-    console.log(`✅ [Cleanup] Marked ${updatedJobs?.length || 0} jobs as failed`);
+    // ❌ FAIL : Marquer comme failed les jobs qui ont dépassé le max de retries
+    if (failedJobs.length > 0) {
+      console.log(`💀 [Cleanup] Failing ${failedJobs.length} jobs (retry_count >= ${MAX_RETRIES})`);
+      
+      const { data: markedFailed, error: failError } = await supabase
+        .from('job_queue')
+        .update({ 
+          status: 'failed',
+          error: `Timeout - exceeded ${STUCK_THRESHOLD_MINUTES} minutes in running state after ${MAX_RETRIES} retries`,
+          updated_at: new Date().toISOString()
+        })
+        .in('id', failedJobs.map(j => j.id))
+        .select('id');
 
-    // Mettre à jour les statuts des orders affectés
-    const orderIds = [...new Set(stuckJobs.map(j => j.order_id).filter(Boolean))];
-    console.log(`📦 [Cleanup] Updating ${orderIds.length} affected orders...`);
+      if (failError) {
+        console.error('❌ [Cleanup] Failed to mark jobs as failed:', failError);
+      } else {
+        failedCount = markedFailed?.length || 0;
+        console.log(`✅ [Cleanup] Marked ${failedCount} jobs as failed`);
+      }
+    }
+
+    // Mettre à jour les statuts des orders affectés par les jobs définitivement failed
+    const failedOrderIds = [...new Set(failedJobs.map(j => j.order_id).filter(Boolean))];
+    console.log(`📦 [Cleanup] Updating ${failedOrderIds.length} affected orders...`);
     
-    for (const orderId of orderIds) {
+    for (const orderId of failedOrderIds) {
       const { data: allJobs } = await supabase
         .from('job_queue')
         .select('status')
@@ -95,10 +133,12 @@ Deno.serve(async (req) => {
     
     return new Response(JSON.stringify({ 
       success: true,
-      cleaned: updatedJobs?.length || 0,
-      ordersUpdated: orderIds.length,
+      retried: retriedCount,
+      failed: failedCount,
+      ordersUpdated: failedOrderIds.length,
       details: {
-        jobs: updatedJobs?.map(j => j.id.slice(0, 8) + '...'),
+        retriedJobs: retriableJobs.map(j => j.id.slice(0, 8) + '...'),
+        failedJobs: failedJobs.map(j => j.id.slice(0, 8) + '...'),
         timestamp: new Date().toISOString()
       }
     }), {
