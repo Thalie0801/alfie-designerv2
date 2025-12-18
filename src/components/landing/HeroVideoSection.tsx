@@ -6,10 +6,10 @@ import { useNavigate } from "react-router-dom";
 import { trackEvent } from "@/utils/trackEvent";
 
 // Demo images
-import postInstagram from "@/assets/demo/post-instagram.png";
-import story16x9 from "@/assets/demo/story-16-9.png";
-import carouselSlide1 from "@/assets/demo/carousel/slide-01.png";
-import carouselSlide2 from "@/assets/demo/carousel/slide-02.png";
+import storyCreator from "@/assets/demo/story-creator.jpeg";
+import postParfum from "@/assets/demo/post-parfum-alfie.png";
+import carouselParfum from "@/assets/demo/carousel-parfum.png";
+import pinterestKoi from "@/assets/demo/pinterest-koi.jpeg";
 
 const heroAdjectives = ["convertit", "impacte", "engage"];
 
@@ -135,7 +135,7 @@ export function HeroVideoSection() {
             transition={{ duration: 0.6, delay: 0.5 }}
             className="absolute left-2 sm:left-8 lg:left-16 top-[20%] sm:top-1/2 sm:-translate-y-1/2 w-14 sm:w-28 lg:w-36 aspect-[9/16] rounded-lg sm:rounded-xl overflow-hidden shadow-lg sm:shadow-xl z-0 border border-slate-200 -rotate-3 sm:rotate-0"
           >
-            <img src={story16x9} alt="Story" className="w-full h-full object-cover" />
+            <img src={storyCreator} alt="Story" className="w-full h-full object-cover" />
             <div className="absolute bottom-0.5 left-0.5 sm:bottom-1 sm:left-1 bg-black/50 text-white text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded">Story</div>
           </motion.div>
 
@@ -147,7 +147,7 @@ export function HeroVideoSection() {
             transition={{ duration: 0.6, delay: 0.6 }}
             className="absolute right-2 sm:right-8 lg:right-16 top-[20%] sm:top-1/2 sm:-translate-y-1/2 w-14 sm:w-28 lg:w-36 aspect-square rounded-lg sm:rounded-xl overflow-hidden shadow-lg sm:shadow-xl z-0 border border-slate-200 rotate-3 sm:rotate-0"
           >
-            <img src={postInstagram} alt="Post" className="w-full h-full object-cover" />
+            <img src={postParfum} alt="Post" className="w-full h-full object-cover" />
             <div className="absolute bottom-0.5 left-0.5 sm:bottom-1 sm:left-1 bg-black/50 text-white text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded">Post</div>
           </motion.div>
 
@@ -159,7 +159,7 @@ export function HeroVideoSection() {
             transition={{ duration: 0.6, delay: 0.7 }}
             className="absolute left-6 sm:left-20 lg:left-32 top-[55%] sm:top-[60%] -translate-y-1/2 w-12 sm:w-24 lg:w-32 aspect-[4/5] rounded-lg sm:rounded-xl overflow-hidden shadow-xl sm:shadow-2xl z-5 border-2 border-white -rotate-6 sm:rotate-0"
           >
-            <img src={carouselSlide1} alt="Carousel" className="w-full h-full object-cover" />
+            <img src={carouselParfum} alt="Carousel" className="w-full h-full object-cover" />
             <div className="absolute bottom-0.5 left-0.5 sm:bottom-1 sm:left-1 bg-black/50 text-white text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded">Carousel</div>
           </motion.div>
 
@@ -171,7 +171,7 @@ export function HeroVideoSection() {
             transition={{ duration: 0.6, delay: 0.8 }}
             className="absolute right-6 sm:right-20 lg:right-32 top-[55%] sm:top-[60%] -translate-y-1/2 w-12 sm:w-24 lg:w-32 aspect-[2/3] rounded-lg sm:rounded-xl overflow-hidden shadow-xl sm:shadow-2xl z-5 border-2 border-white rotate-6 sm:rotate-0"
           >
-            <img src={carouselSlide2} alt="Pinterest" className="w-full h-full object-cover" />
+            <img src={pinterestKoi} alt="Pinterest" className="w-full h-full object-cover" />
             <div className="absolute bottom-0.5 left-0.5 sm:bottom-1 sm:left-1 bg-black/50 text-white text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded">Pinterest</div>
           </motion.div>
 
