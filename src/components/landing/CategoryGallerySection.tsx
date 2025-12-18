@@ -5,6 +5,14 @@ import { Image, Video, Layers, Layout, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { trackEvent } from "@/utils/trackEvent";
 
+// Gallery images
+import galleryFoodArt from "@/assets/demo/gallery-food-art.png";
+import galleryMoodboard from "@/assets/demo/gallery-moodboard.png";
+import galleryMariage from "@/assets/demo/gallery-mariage.jpeg";
+import galleryAlfieNoel from "@/assets/demo/gallery-alfie-noel.png";
+import storyBusiness from "@/assets/demo/story-business.png";
+import postParfum from "@/assets/demo/post-parfum-alfie.png";
+
 type Category = "images" | "videos" | "carousels" | "stories";
 
 const categories = [
@@ -13,6 +21,14 @@ const categories = [
   { id: "carousels" as Category, label: "Carrousels", icon: Layers },
   { id: "stories" as Category, label: "Stories", icon: Layout },
 ];
+
+// Mapping des images par catégorie et index
+const categoryImages: Record<Category, (string | null)[]> = {
+  images: [galleryFoodArt, postParfum, null, null, galleryAlfieNoel, null],
+  videos: [null, null, null, null, null, null],
+  carousels: [galleryMoodboard, null, null, null, null, null],
+  stories: [storyBusiness, null, null, null, galleryMariage, null],
+};
 
 const galleryItems: Record<Category, { title: string; description: string }[]> = {
   images: [
@@ -123,17 +139,32 @@ export function CategoryGallerySection() {
                 onClick={() => handleTry(item.title)}
                 className="group bg-white border border-slate-200 rounded-xl sm:rounded-2xl overflow-hidden hover:shadow-xl hover:border-alfie-mint/50 transition-all cursor-pointer"
               >
-                {/* Placeholder image */}
+                {/* Image ou placeholder */}
                 <div className="aspect-[4/3] bg-gradient-to-br from-slate-100 to-slate-50 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-alfie-mint/20 via-transparent to-alfie-lilac/20" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-10 h-10 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-white/80 shadow-lg flex items-center justify-center">
-                      {activeCategory === "images" && <Image className="h-5 w-5 sm:h-8 sm:w-8 text-slate-400" />}
-                      {activeCategory === "videos" && <Video className="h-5 w-5 sm:h-8 sm:w-8 text-slate-400" />}
-                      {activeCategory === "carousels" && <Layers className="h-5 w-5 sm:h-8 sm:w-8 text-slate-400" />}
-                      {activeCategory === "stories" && <Layout className="h-5 w-5 sm:h-8 sm:w-8 text-slate-400" />}
-                    </div>
-                  </div>
+                  {categoryImages[activeCategory][idx] ? (
+                    <>
+                      <img 
+                        src={categoryImages[activeCategory][idx]!} 
+                        alt={item.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute bottom-1 right-1 sm:bottom-2 sm:right-2 bg-black/60 backdrop-blur-sm text-white text-[9px] sm:text-xs px-1 sm:px-2 py-0.5 rounded-full">
+                        Made with Alfie
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="absolute inset-0 bg-gradient-to-br from-alfie-mint/20 via-transparent to-alfie-lilac/20" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-10 h-10 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-white/80 shadow-lg flex items-center justify-center">
+                          {activeCategory === "images" && <Image className="h-5 w-5 sm:h-8 sm:w-8 text-slate-400" />}
+                          {activeCategory === "videos" && <Video className="h-5 w-5 sm:h-8 sm:w-8 text-slate-400" />}
+                          {activeCategory === "carousels" && <Layers className="h-5 w-5 sm:h-8 sm:w-8 text-slate-400" />}
+                          {activeCategory === "stories" && <Layout className="h-5 w-5 sm:h-8 sm:w-8 text-slate-400" />}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Content */}

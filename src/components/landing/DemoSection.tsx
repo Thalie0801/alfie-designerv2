@@ -6,8 +6,8 @@ import { useNavigate } from "react-router-dom";
 import { trackEvent } from "@/utils/trackEvent";
 
 // Imports des images
-import postInstagram from "@/assets/demo/post-instagram.png";
-import story16x9 from "@/assets/demo/story-16-9.png";
+import postParfumAlfie from "@/assets/demo/post-parfum-alfie.png";
+import storyBusiness from "@/assets/demo/story-business.png";
 import avantImage from "@/assets/demo/avant.png";
 import apresImage from "@/assets/demo/apres.png";
 
@@ -117,12 +117,12 @@ export function DemoSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.1 }}
-              onClick={() => openLightbox(story16x9)}
+              onClick={() => openLightbox(storyBusiness)}
               className="group cursor-pointer bg-white rounded-xl sm:rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all"
             >
               <div className="aspect-[9/16] bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 relative overflow-hidden">
                 <img 
-                  src={story16x9} 
+                  src={storyBusiness} 
                   alt="Story 9:16"
                   loading="lazy"
                   className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
@@ -143,12 +143,12 @@ export function DemoSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              onClick={() => openLightbox(postInstagram)}
+              onClick={() => openLightbox(postParfumAlfie)}
               className="group cursor-pointer bg-white rounded-xl sm:rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all"
             >
               <div className="aspect-square bg-gradient-to-br from-alfie-mint/20 to-alfie-lilac/20 relative overflow-hidden">
                 <img 
-                  src={postInstagram} 
+                  src={postParfumAlfie} 
                   alt="Post Instagram"
                   loading="lazy"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
