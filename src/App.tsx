@@ -31,12 +31,7 @@ import FAQ from "./pages/FAQ";
 import BrandKitQuestionnaire from "./pages/BrandKitQuestionnaire";
 import BrandKit from "./pages/BrandKit";
 import NotFound from "./pages/NotFound";
-import Templates from "./
-  import Gate from "./pages/Gate";
-import Village from "./pages/Village";
-import Quest from "./pages/Quest";
-import Result from "./pages/Result";
-
+import Templates from "./pages/Templates";
 import Library from "./pages/Library";
 import CloudinaryTest from "./pages/CloudinaryTest";
 import Creator from "./pages/Creator";
@@ -264,11 +259,6 @@ const AppRoutes = () => {
             <ProtectedRoute allowPending requireActivePlan={false}>
               <AppLayoutWithSidebar>
                 <ActivateAccess />
-        <Route path="/gate" element={<Gate />} />
-      <Route path="/village" element={<Village />} />
-      <Route path="/quest/:house" element={<Quest />} />
-      <Route path="/result/:house" element={<Result />} />
-
               </AppLayoutWithSidebar>
             </ProtectedRoute>
           }
