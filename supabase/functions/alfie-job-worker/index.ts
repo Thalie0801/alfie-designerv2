@@ -854,30 +854,8 @@ async function processRenderImage(payload: any) {
     throw new Error('SECURITY: base64 URLs are forbidden. Use Cloudinary URLs only.');
   }
 
-  const expiresAt = new Date(Date.now() + THIRTY_DAYS_MS).toISOString();
-
-  const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
-    user_id: userId,
-    brand_id: brandId,
-    type: "image",
-    status: "completed",
-    output_url: imageUrl,
-    thumbnail_url: imageUrl,
-    metadata: { prompt, sourceUrl, orderId },
-    expires_at: expiresAt,
-  });
-  if (mediaErr) throw new Error(mediaErr.message);
-
-  const { error: libErr } = await supabaseAdmin.from("library_assets").insert({
-    user_id: userId,
-    brand_id: brandId,
-    order_id: orderId,
-    type: "image",
-    cloudinary_url: imageUrl,
-    tags: ["studio", "auto"],
-    metadata: { prompt, sourceUrl, orderId },
-  } as any);
-  if (libErr) throw new Error(libErr.message);
+  // ✅ alfie-render-image handles ALL database insertions (media_generations + library_assets)
+  // DO NOT duplicate inserts here - this was causing 2 images per 1 woof consumed
 
   return { imageUrl };
 }
