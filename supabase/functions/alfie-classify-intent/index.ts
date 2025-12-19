@@ -7,6 +7,7 @@ interface IntentResponse {
   params?: {
     aspect_ratio?: "1:1" | "4:5" | "9:16" | "16:9" | "2:3";
     slides?: number;
+    carousels_count?: number; // ✅ NEW: Nombre de carrousels demandés (ex: "5 carrousels" → 5)
     is_approval?: boolean;
     language?: "fr" | "en" | "und"; // best-guess
     matched?: string; // motif qui a déclenché l'intent
@@ -73,7 +74,6 @@ function extractSlidesCount(msg: string): number | undefined {
   // "5 slides", "carrousel 7", "x5", "6-pages", "6 pages"
   const patterns = [
     /(?:slides?|pages?)\s*:?\s*(\d{1,2})/i,
-    /(?:carrousel|carousel)\s*:?\s*(\d{1,2})/i,
     /\bx\s*(\d{1,2})\b/i,
     /\b(\d{1,2})\s*(slides?|pages?)\b/i,
   ];
@@ -81,7 +81,24 @@ function extractSlidesCount(msg: string): number | undefined {
     const m = msg.match(re);
     if (m?.[1]) {
       const n = parseInt(m[1], 10);
-      if (Number.isFinite(n) && n > 0 && n <= 20) return n; // borne soft
+      if (Number.isFinite(n) && n > 0 && n <= 20) return n;
+    }
+  }
+  return undefined;
+}
+
+/** ✅ NEW: Extraction du nombre de CARROUSELS demandés (ex: "5 carrousels" → 5) */
+function extractCarouselsCount(msg: string): number | undefined {
+  // "5 carrousels", "3 carousels", "fais-moi 10 carrousels"
+  const patterns = [
+    /(\d{1,2})\s*carrousels?/i,
+    /(\d{1,2})\s*carousels?/i,
+  ];
+  for (const re of patterns) {
+    const m = msg.match(re);
+    if (m?.[1]) {
+      const n = parseInt(m[1], 10);
+      if (Number.isFinite(n) && n >= 2 && n <= 20) return n; // >= 2 pour différencier de "1 carrousel"
     }
   }
   return undefined;
@@ -124,6 +141,7 @@ Deno.serve(async (req) => {
     const approval = isApproval(msg);
     const ratio = extractAspectRatio(msg);
     const slides = extractSlidesCount(msg);
+    const carouselsCount = extractCarouselsCount(msg); // ✅ NEW
 
     // Dictionnaires de mots clés
     const k = {
@@ -182,10 +200,11 @@ Deno.serve(async (req) => {
       keywords = [...keywords, "templates"];
     }
 
-    // Bonus de confiance si ratio/slide count présents pour carousel
+    // Bonus de confiance si ratio/slide count/carousels count présents pour carousel
     if (intent === "carousel") {
       if (ratio) confidence += 0.03;
       if (typeof slides === "number") confidence += 0.03;
+      if (typeof carouselsCount === "number") confidence += 0.05; // ✅ Bonus pour carrousels multiples
       confidence = Math.min(confidence, 0.95);
     }
 
@@ -201,6 +220,7 @@ Deno.serve(async (req) => {
       params: {
         aspect_ratio: ratio,
         slides,
+        carousels_count: carouselsCount, // ✅ NEW
         is_approval: approval,
         language: lang,
         matched: matched || undefined,
