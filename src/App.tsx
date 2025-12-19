@@ -31,8 +31,8 @@ import FAQ from "./pages/FAQ";
 import BrandKitQuestionnaire from "./pages/BrandKitQuestionnaire";
 import BrandKit from "./pages/BrandKit";
 import NotFound from "./pages/NotFound";
-import Templates from "./
-  import Gate from "./pages/Gate";
+import Templates from "./pages/Templates";
+import Gate from "./pages/Gate";
 import Village from "./pages/Village";
 import Quest from "./pages/Quest";
 import Result from "./pages/Result";
