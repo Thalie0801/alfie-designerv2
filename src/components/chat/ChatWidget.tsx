@@ -41,6 +41,45 @@ function enrichPackWithWoofCostType(pack: AlfiePack): AlfiePack {
   };
 }
 
+/**
+ * Parse le bloc <alfie-learn> depuis la réponse pour extraire les termes à apprendre
+ */
+function parseAlfieLearnBlock(text: string): { term: string; definition: string; template?: any } | null {
+  const startTag = '<alfie-learn>';
+  const endTag = '</alfie-learn>';
+  
+  const startIdx = text.toLowerCase().indexOf(startTag.toLowerCase());
+  if (startIdx === -1) return null;
+  
+  const endIdx = text.toLowerCase().indexOf(endTag.toLowerCase(), startIdx);
+  if (endIdx === -1) return null;
+  
+  const jsonContent = text.slice(startIdx + startTag.length, endIdx).trim();
+  
+  try {
+    return JSON.parse(jsonContent);
+  } catch {
+    console.warn("Failed to parse alfie-learn block:", jsonContent.substring(0, 100));
+    return null;
+  }
+}
+
+/**
+ * Nettoie le texte en retirant le bloc <alfie-learn>
+ */
+function cleanAlfieLearnBlock(text: string): string {
+  const startTag = '<alfie-learn>';
+  const endTag = '</alfie-learn>';
+  
+  const startIdx = text.toLowerCase().indexOf(startTag.toLowerCase());
+  if (startIdx === -1) return text;
+  
+  const endIdx = text.toLowerCase().indexOf(endTag.toLowerCase(), startIdx);
+  if (endIdx === -1) return text.slice(0, startIdx);
+  
+  return (text.slice(0, startIdx) + text.slice(endIdx + endTag.length)).trim();
+}
+
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -533,10 +572,24 @@ export default function ChatWidget() {
         }
       }
 
-      // Ideas tracking géré par le LLM maintenant
+      // ✅ Détecter et traiter les blocs <alfie-learn> pour l'apprentissage de termes
+      const learnedTerm = parseAlfieLearnBlock(reply);
+      if (learnedTerm && activeBrandId) {
+        // Sauvegarder le terme appris via edge function
+        try {
+          const { error: learnError } = await supabase.functions.invoke("alfie-learn-term", {
+            body: { brandId: activeBrandId, term: learnedTerm },
+          });
+          if (!learnError) {
+            toast.success(`J'ai appris le terme "${learnedTerm.term}" !`);
+          }
+        } catch (e) {
+          console.warn("Failed to save learned term:", e);
+        }
+      }
 
-      // ✅ Nettoyage défensif : retirer tout résidu <alfie-pack> avant affichage
-      let displayReply = reply;
+      // ✅ Nettoyage défensif : retirer tout résidu <alfie-pack> et <alfie-learn> avant affichage
+      let displayReply = cleanAlfieLearnBlock(reply);
       const packStartIdx = displayReply.toLowerCase().indexOf('<alfie-pack>');
       if (packStartIdx !== -1) {
         const packEndIdx = displayReply.toLowerCase().indexOf('</alfie-pack>', packStartIdx);

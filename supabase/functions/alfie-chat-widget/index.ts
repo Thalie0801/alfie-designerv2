@@ -20,7 +20,8 @@ async function callLLM(
   woofsRemaining?: number,
   useBrandKit: boolean = true,
   briefContext?: string,
-  userPlan?: string
+  userPlan?: string,
+  customTerms?: Record<string, { definition: string; template?: any }>
 ): Promise<string> {
   // ✅ Utiliser la fonction d'enrichissement du module externe
   const enrichedPrompt = getEnrichedPrompt(
@@ -29,7 +30,8 @@ async function callLLM(
     brandContext,
     woofsRemaining,
     briefContext,
-    paletteToDescriptions
+    paletteToDescriptions,
+    customTerms
   );
 
 // 1. Essayer Vertex AI si configuré (avec retry si format invalide)
@@ -246,6 +248,32 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ✅ Récupérer les termes personnalisés depuis alfie_memory
+    let customTerms: Record<string, { definition: string; template?: any }> | undefined;
+    if (SUPABASE_URL && SUPABASE_ANON_KEY && authHeader) {
+      try {
+        const memoryResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/alfie_memory?brand_id=eq.${brandId}&select=custom_terms`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': authHeader
+            }
+          }
+        );
+        
+        if (memoryResponse.ok) {
+          const memoryData = await memoryResponse.json();
+          if (memoryData && memoryData.length > 0 && memoryData[0].custom_terms) {
+            customTerms = memoryData[0].custom_terms;
+            console.log("📚 Custom terms loaded:", Object.keys(customTerms || {}).length);
+          }
+        }
+      } catch (error) {
+        console.warn("Could not fetch custom terms:", error);
+      }
+    }
+
     // Ajouter le brief au contexte si fourni
     let briefContext = "";
     if (brief && Object.keys(brief).length > 0) {
@@ -263,8 +291,8 @@ Deno.serve(async (req) => {
       briefContext += `\n\nIMPORTANT : Utilise TOUTES ces informations du brief pour générer le pack. Ne redemande PAS ce qui est déjà renseigné ci-dessus.`;
     }
 
-    // Appeler le LLM avec le system prompt unique et le plan utilisateur
-    const rawReply = await callLLM(messages, SYSTEM_PROMPT, brandContext, woofsRemaining, useBrandKit, briefContext, userPlan);
+    // Appeler le LLM avec le system prompt unique, le plan utilisateur et les termes personnalisés
+    const rawReply = await callLLM(messages, SYSTEM_PROMPT, brandContext, woofsRemaining, useBrandKit, briefContext, userPlan, customTerms);
 
     // Parser le pack si présent
     const pack = parsePack(rawReply);

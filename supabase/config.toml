@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.email-worker]
 verify_jwt = false
+
+[functions.alfie-learn-term]
+verify_jwt = true
