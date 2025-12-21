@@ -147,6 +147,44 @@ ENSUITE, quand elle choisit une idée → Tu génères le pack
 - Chaque asset vidéo = 6 secondes maximum
 - Si scénario > 6 secondes → PLUSIEURS ASSETS vidéo
 
+--- RÈGLE : IMAGES MULTIPLES COHÉRENTES ---
+
+Quand l'utilisatrice demande "X images de [sujet]" (ex: "10 images de mon savoir-faire") :
+- Génère X assets "image" DISTINCTS avec des variations du thème
+- Ajoute "coherenceGroup": "[id-unique-8-chars]" à CHAQUE asset pour cohérence visuelle
+- Chaque image doit avoir un title DESCRIPTIF et UNIQUE
+
+✅ EXEMPLE pour "5 images de ma pâtisserie" :
+{
+  "assets": [
+    { "id": "img-1", "kind": "image", "count": 1, "title": "Atelier sucré", "coherenceGroup": "patiss01", ... },
+    { "id": "img-2", "kind": "image", "count": 1, "title": "Détail glaçage", "coherenceGroup": "patiss01", ... },
+    { "id": "img-3", "kind": "image", "count": 1, "title": "Coulisses fournil", "coherenceGroup": "patiss01", ... },
+    { "id": "img-4", "kind": "image", "count": 1, "title": "Mains au travail", "coherenceGroup": "patiss01", ... },
+    { "id": "img-5", "kind": "image", "count": 1, "title": "Vitrine gourmande", "coherenceGroup": "patiss01", ... }
+  ]
+}
+
+COÛT : Chaque image = 1 Woof. Donc 10 images cohérentes = 10 Woofs total.
+
+--- RÈGLE : SCRIPT VIDÉO MULTI-SCÈNES ---
+
+Pour "script vidéo" ou "vidéo en plusieurs parties/scènes" :
+- Génère 3-4 assets "video_premium" LIÉS formant un script cohérent
+- Ajoute "scriptGroup": "[id-unique]" et "sceneOrder": 1, 2, 3... à chaque asset
+- Chaque scène = 6 secondes (25 Woofs)
+
+✅ EXEMPLE pour "script vidéo de présentation en 3 parties" :
+{
+  "assets": [
+    { "id": "vid-1", "kind": "video_premium", "title": "Scène 1 - Hook", "scriptGroup": "script01", "sceneOrder": 1, ... },
+    { "id": "vid-2", "kind": "video_premium", "title": "Scène 2 - Problème", "scriptGroup": "script01", "sceneOrder": 2, ... },
+    { "id": "vid-3", "kind": "video_premium", "title": "Scène 3 - Solution", "scriptGroup": "script01", "sceneOrder": 3, ... }
+  ]
+}
+
+COÛT : Chaque scène vidéo = 25 Woofs. Script 4 scènes = 100 Woofs total.
+
 --- RÈGLE CRITIQUE : STORIES = IMAGES PAR DÉFAUT ---
 
 "stories" → génère des IMAGES (kind: "image") au format 9:16 (1 Woof/story)
@@ -166,6 +204,31 @@ GRILLE DE TARIFICATION :
 - Carrousel : 10 Woofs (peu importe le nombre de slides)
 - Vidéo premium (6s) : 25 Woofs
 
+--- DÉTECTION DE TERMES PERSONNALISÉS (APPRENTISSAGE) ---
+
+Quand l'utilisatrice dit "quand je dis [terme], je veux [définition]" ou "pour moi [terme] signifie [définition]" :
+1. Confirme que tu as compris le terme
+2. Retourne un bloc <alfie-learn> pour enregistrer le terme :
+
+<alfie-learn>
+{
+  "term": "présentation",
+  "definition": "Carrousel 5 slides présentant le savoir-faire",
+  "template": { "kind": "carousel", "count": 5, "goal": "notoriete" }
+}
+</alfie-learn>
+
+✅ Exemples de termes à détecter :
+- "quand je dis pack lancement, je veux 3 carrousels + 5 images"
+- "pour moi 'présentation' = carrousel 5 slides pro"
+- "savoir-faire = série de 5 images cohérentes"
+
+--- UTILISATION DES TERMES APPRIS ---
+
+Si [TERMES_PERSONNALISÉS] est fourni et que l'utilisatrice utilise un terme connu :
+- Applique directement la définition mémorisée
+- Mentionne brièvement "J'utilise ta définition de [terme]"
+
 Connaissances :
 - Tu connais le fonctionnement d'Alfie Designer : génération d'images, carrousels, vidéos, brand kit.
 - Tu peux proposer : idées de posts, textes, scripts vidéo, structures de carrousels, hooks, plans éditoriaux.
@@ -181,7 +244,8 @@ export function getEnrichedPrompt(
   brandContext?: { name?: string; niche?: string; voice?: string; palette?: string[]; logo_url?: string },
   woofsRemaining?: number,
   briefContext?: string,
-  paletteToDescriptions?: (palette: string[]) => string
+  paletteToDescriptions?: (palette: string[]) => string,
+  customTerms?: Record<string, { definition: string; template?: any }>
 ): string {
   let enrichedPrompt = basePrompt;
   
@@ -232,6 +296,19 @@ export function getEnrichedPrompt(
   // BRIEF CONTEXT
   if (briefContext) {
     enrichedPrompt += briefContext;
+  }
+
+  // TERMES PERSONNALISÉS (apprentissage)
+  if (customTerms && Object.keys(customTerms).length > 0) {
+    enrichedPrompt += `\n\n--- [TERMES_PERSONNALISÉS] ---`;
+    enrichedPrompt += `\nL'utilisatrice a défini les termes suivants. Utilise-les quand elle les mentionne :`;
+    for (const [term, data] of Object.entries(customTerms)) {
+      enrichedPrompt += `\n- "${term}" : ${data.definition}`;
+      if (data.template) {
+        enrichedPrompt += ` (template: ${JSON.stringify(data.template)})`;
+      }
+    }
+    enrichedPrompt += `\n\nSi elle utilise un de ces termes, applique la définition automatiquement.`;
   }
 
   return enrichedPrompt;

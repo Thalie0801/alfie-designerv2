@@ -43,9 +43,13 @@ export interface UnifiedAlfieIntent {
   generatedTexts?: GeneratedTexts;
   useBrandKit?: boolean;
   visualStyle?: VisualStyle; // Style visuel pour la génération d'images
-  visualStyleCategory?: VisualStyleCategory; // ✅ NEW: Fond/Personnage/Produit
+  visualStyleCategory?: VisualStyleCategory; // Fond/Personnage/Produit
   campaign?: string;
   copyBrief?: string; // Brief libre optionnel
+  // ✅ NEW: Cohérence et scripts multi-assets
+  coherenceGroup?: string; // Pour lier visuellement des images multiples
+  scriptGroup?: string; // Pour lier des scènes vidéo
+  sceneOrder?: number; // Ordre de la scène dans un script vidéo
 }
 
 // Legacy aliases for backward compatibility

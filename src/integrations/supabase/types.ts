@@ -354,6 +354,7 @@ export type Database = {
         Row: {
           brand_id: string | null
           created_at: string | null
+          custom_terms: Json | null
           default_cta: string | null
           default_language: string | null
           default_platform: string | null
@@ -363,6 +364,7 @@ export type Database = {
           id: string
           last_format: string | null
           last_topic: string | null
+          learned_shortcuts: Json | null
           preferred_goals: string[] | null
           updated_at: string | null
           user_id: string
@@ -370,6 +372,7 @@ export type Database = {
         Insert: {
           brand_id?: string | null
           created_at?: string | null
+          custom_terms?: Json | null
           default_cta?: string | null
           default_language?: string | null
           default_platform?: string | null
@@ -379,6 +382,7 @@ export type Database = {
           id?: string
           last_format?: string | null
           last_topic?: string | null
+          learned_shortcuts?: Json | null
           preferred_goals?: string[] | null
           updated_at?: string | null
           user_id: string
@@ -386,6 +390,7 @@ export type Database = {
         Update: {
           brand_id?: string | null
           created_at?: string | null
+          custom_terms?: Json | null
           default_cta?: string | null
           default_language?: string | null
           default_platform?: string | null
@@ -395,6 +400,7 @@ export type Database = {
           id?: string
           last_format?: string | null
           last_topic?: string | null
+          learned_shortcuts?: Json | null
           preferred_goals?: string[] | null
           updated_at?: string | null
           user_id?: string
