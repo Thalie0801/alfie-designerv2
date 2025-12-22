@@ -34,7 +34,14 @@ async function callLLM(
     customTerms
   );
 
-// 1. Essayer Vertex AI si configuré (avec retry si format invalide)
+  // Détecter si le message utilisateur demande du contenu (carrousel, images, vidéo)
+  const lastUserMessage = messages.filter(m => m.role === 'user').pop()?.content?.toLowerCase() || '';
+  const isContentRequest = /(carrousel|carousel|image|images|visuel|vidéo|video|slides?|créer?|génère|fais-?moi|je veux)/i.test(lastUserMessage);
+  const isConfirmation = /^(ok|oui|c'est bon|on y va|lance|parfait|go|d'accord|da)[\s!.,]*$/i.test(lastUserMessage.trim());
+
+  console.log(`📝 User message analysis: isContentRequest=${isContentRequest}, isConfirmation=${isConfirmation}`);
+
+  // 1. Essayer Vertex AI si configuré (avec retry si format invalide)
   const vertexConfigured = Deno.env.get("VERTEX_PROJECT_ID") && Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
   if (vertexConfigured) {
     try {
@@ -46,18 +53,27 @@ async function callLLM(
         console.log("✅ Vertex AI responded successfully with valid pack format");
         return vertexResponse;
       } else if (vertexResponse && vertexResponse.length > 100) {
-        // Réponse longue mais sans pack - RETRY avec instruction plus stricte
-        console.warn("⚠️ Vertex AI response without <alfie-pack>, attempting retry with stricter prompt...");
+        // Réponse longue mais sans pack
+        const promisesPack = /(voici le pack|je te propose|voici ta|voilà le pack|prêt à générer)/i.test(vertexResponse);
         
-        const retryPrompt = enrichedPrompt + `\n\n⚠️ RAPPEL CRITIQUE FINAL : Tu DOIS ABSOLUMENT terminer ta réponse avec un bloc <alfie-pack>{...JSON valide...}</alfie-pack>. C'est OBLIGATOIRE pour que la génération fonctionne. Sans ce bloc, l'utilisateur verra une erreur.`;
-        
-        const retryResponse = await callVertexChat(messages, retryPrompt);
-        
-        if (retryResponse && retryResponse.includes("<alfie-pack>")) {
-          console.log("✅ Retry succeeded with valid pack format");
-          return retryResponse;
+        if (promisesPack || isContentRequest) {
+          // La réponse promet un pack OU l'utilisateur demandait du contenu → RETRY
+          console.warn("⚠️ Vertex AI response promises pack but missing <alfie-pack>, retrying...");
+          
+          const retryPrompt = enrichedPrompt + `\n\n⚠️ RAPPEL CRITIQUE FINAL : L'utilisateur attend un pack de génération. Tu DOIS ABSOLUMENT inclure un bloc <alfie-pack>{...JSON valide...}</alfie-pack> dans ta réponse. Sans ce bloc, rien ne sera généré et l'utilisateur verra une erreur.`;
+          
+          const retryResponse = await callVertexChat(messages, retryPrompt);
+          
+          if (retryResponse && retryResponse.includes("<alfie-pack>")) {
+            console.log("✅ Retry succeeded with valid pack format");
+            return retryResponse;
+          } else {
+            console.warn("⚠️ Retry also failed to include <alfie-pack>, falling back to Lovable AI");
+          }
         } else {
-          console.warn("⚠️ Retry also failed to include <alfie-pack>, falling back to Lovable AI");
+          // Réponse conversationnelle normale (pas de demande de contenu)
+          console.log("✅ Vertex AI conversational response (no pack expected)");
+          return vertexResponse;
         }
       } else {
         console.warn("⚠️ Vertex AI returned empty/short response, falling back to Lovable AI");
@@ -100,7 +116,43 @@ async function callLLM(
   }
 
   const data = await response.json();
-  return data.choices?.[0]?.message?.content || "";
+  const lovableResponse = data.choices?.[0]?.message?.content || "";
+
+  // ✅ RETRY LOGIC pour Lovable AI aussi si demande contenu mais pas de pack
+  const promisesPackLovable = /(voici le pack|je te propose|voici ta|voilà le pack|prêt à générer)/i.test(lovableResponse);
+  
+  if ((isContentRequest || promisesPackLovable) && !lovableResponse.includes("<alfie-pack>") && lovableResponse.length > 50) {
+    console.warn("⚠️ Lovable AI response missing <alfie-pack> for content request, retrying...");
+    
+    const retryResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: models.text,
+        messages: [
+          { role: "system", content: enrichedPrompt + `\n\n⚠️ RAPPEL CRITIQUE : Tu DOIS inclure un bloc <alfie-pack>{JSON}}</alfie-pack> pour que la génération fonctionne.` },
+          ...messages,
+        ],
+        temperature: 0.7,
+        max_tokens: 4096,
+      }),
+    });
+    
+    if (retryResponse.ok) {
+      const retryData = await retryResponse.json();
+      const retryContent = retryData.choices?.[0]?.message?.content || "";
+      if (retryContent.includes("<alfie-pack>")) {
+        console.log("✅ Lovable AI retry succeeded with pack");
+        return retryContent;
+      }
+    }
+    console.warn("⚠️ Lovable AI retry also failed, returning original response");
+  }
+  
+  return lovableResponse;
 }
 
 /**
