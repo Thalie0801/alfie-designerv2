@@ -538,6 +538,15 @@ export default function ChatWidget() {
         return buildLocalReply(intent, mergedBrief);
       }
 
+      // ✅ DÉTECTION DE PROMESSE NON TENUE : pack annoncé mais absent
+      const promisesPack = /(voici le pack|je te propose|voici ta|voilà le pack|prêt à générer)/i.test(reply);
+      const hasContentRequest = /(carrousel|carousel|image|images|visuel|vidéo|video)/i.test(raw);
+      
+      if (promisesPack && !pack && hasContentRequest) {
+        console.warn("⚠️ AI promised a pack but none was generated");
+        toast.error("Oups ! Une erreur s'est produite. Essaie de reformuler ta demande avec plus de détails.");
+      }
+
       // ✅ MULTI-INTENT PARSING : Supporter plusieurs packs dans la réponse
       let finalPack: AlfiePack | null = null;
       
