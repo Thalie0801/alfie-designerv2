@@ -19,44 +19,41 @@ export function handleVideoGenerationError(error: VideoGenerationError) {
   const errorMessage = error?.message || "";
   const errorDetails = error?.details || "";
   
-  // Erreur de politique de contenu (marques, personnes réelles, célébrités)
+  // Erreur de politique de contenu (célébrités interdites)
   if (errorCode === "CONTENT_POLICY_VIOLATION") {
-    // Message personnalisé si des célébrités sont détectées
     const celebNames = error.detectedNames?.slice(0, 3).join(", ");
     const description = celebNames 
-      ? `Les noms suivants ne sont pas autorisés : ${celebNames}. Reformule avec des descriptions génériques.`
-      : error.message || "Ton prompt contient des éléments non autorisés. Reformule avec des descriptions génériques.";
+      ? `Célébrités non autorisées : ${celebNames}. Utilise des descriptions génériques à la place.`
+      : error.message || "Contenu non autorisé détecté.";
     
     toast({
-      title: "⚠️ Contenu non autorisé",
+      title: "⚠️ Célébrités non autorisées",
       description,
       variant: "destructive",
     });
     
-    // Afficher les suggestions si disponibles
-    if (error.suggestions?.length) {
-      setTimeout(() => {
-        toast({
-          title: "💡 Conseils",
-          description: error.suggestions!.slice(0, 2).join(" • "),
-        });
-      }, 1500);
-    }
+    // Message positif sur ce qui est possible
+    setTimeout(() => {
+      toast({
+        title: "💡 Ce qui fonctionne",
+        description: "Descriptions génériques OK ('une femme dynamique'). Photos = inspiration de style, pas reproduction du visage.",
+      });
+    }, 1500);
     return true;
   }
   
-  // Pas de vidéo retournée par VEO 3 (erreur silencieuse)
+  // Pas de vidéo retournée par VEO 3
   if (errorCode === "NO_VIDEO_URI" || errorMessage.includes("No video URI") || errorDetails.includes("No video URI")) {
     toast({
       title: "❌ Génération échouée",
-      description: "VEO 3 n'a pas pu créer la vidéo. Essaie de reformuler ton prompt sans célébrités ni personnes réelles.",
+      description: "VEO 3 n'a pas pu créer la vidéo. Vérifie que ton prompt ne mentionne pas de célébrités.",
       variant: "destructive",
     });
     
     setTimeout(() => {
       toast({
-        title: "💡 Astuce",
-        description: "Utilise des descriptions génériques comme 'une femme élégante' au lieu de noms de célébrités.",
+        title: "💡 Rappel",
+        description: "✅ Personnes génériques OK • ✅ Photos = inspiration de style • ❌ Célébrités interdites",
       });
     }, 1500);
     return true;
