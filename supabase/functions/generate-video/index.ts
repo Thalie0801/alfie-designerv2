@@ -1062,11 +1062,11 @@ async function generateGcsSignedUrl(
           console.error(`[generate-video] 🚨 VEO 3 silent content policy violation detected`);
           return jsonResponse({
             error: "CONTENT_POLICY_VIOLATION",
-            message: "VEO 3 n'a pas pu générer la vidéo. Le prompt peut contenir des éléments non autorisés (célébrités, marques, etc.).",
+            message: "VEO 3 n'a pas pu générer la vidéo. Le prompt contient probablement des éléments non autorisés.",
             suggestions: [
-              "Reformule ton prompt sans célébrités ni personnes réelles",
-              "Utilise des descriptions génériques au lieu de noms propres",
-              "Évite les références à des photos de personnes"
+              "❌ Les célébrités et personnes connues sont interdites",
+              "✅ Les descriptions génériques sont OK : 'une femme dynamique', 'un artisan passionné'",
+              "✅ Les photos servent d'inspiration de style/ambiance, pas de reproduction fidèle du visage"
             ],
             details: errorMsg
           }, { status: 400 });
