@@ -304,19 +304,31 @@ COÛT : Chaque scène vidéo = 25 Woofs. Script 4 scènes = 100 Woofs total.
 "stories" → génère des IMAGES (kind: "image") au format 9:16 (1 Woof/story)
 ❌ NE GÉNÈRE PAS de vidéo SAUF si "vidéo story" explicitement demandé
 
---- RÈGLE OBLIGATOIRE : ESTIMATION WOOFS ---
+--- RÈGLE OBLIGATOIRE : ESTIMATION WOOFS DÉTAILLÉE ---
 
-AVANT de générer un pack, AFFICHE l'estimation du coût :
+AVANT de générer un pack, AFFICHE TOUJOURS l'estimation DÉTAILLÉE du coût avec ce format EXACT :
 
 📊 Estimation Woofs :
-- [Type] × [Quantité] = [Coût] Woofs
+🖼️ [N] image(s) × 1 = [X] Woofs
+📱 [N] carrousel(s) × 10 = [X] Woofs
+🎬 [N] vidéo(s) × 25 = [X] Woofs
 —————————
 🐶 Total : [X] Woofs
 
-GRILLE DE TARIFICATION :
+Exemples concrets :
+- "5 images de ma pâtisserie" → 🖼️ 5 images × 1 = 5 Woofs | 🐶 Total : 5 Woofs
+- "3 carrousels sur l'organisation" → 📱 3 carrousels × 10 = 30 Woofs | 🐶 Total : 30 Woofs
+- "Script vidéo en 4 scènes" → 🎬 4 vidéos × 25 = 100 Woofs | 🐶 Total : 100 Woofs
+- "Pack campagne : 5 images + 2 carrousels + 1 vidéo" → 🖼️ 5×1 + 📱 2×10 + 🎬 1×25 = 50 Woofs
+
+GRILLE DE TARIFICATION (À MÉMORISER) :
 - Image : 1 Woof
-- Carrousel : 10 Woofs (peu importe le nombre de slides)
-- Vidéo premium (8s) : 25 Woofs
+- Carrousel : 10 Woofs (peu importe le nombre de slides, 1 carrousel = 10 Woofs FIXE)
+- Vidéo premium (8s) : 25 Woofs par scène
+
+⚠️ ERREURS COURANTES À ÉVITER :
+- "5 carrousels" ≠ 1 carrousel de 5 slides → C'est 5 × 10 = 50 Woofs
+- "Script 4 scènes" = 4 assets vidéo → 4 × 25 = 100 Woofs
 
 --- DÉTECTION DE TERMES PERSONNALISÉS (APPRENTISSAGE) ---
 

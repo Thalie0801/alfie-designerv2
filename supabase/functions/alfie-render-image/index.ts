@@ -18,6 +18,8 @@ export default {
       // ✅ Check internal secret FIRST (before JWT)
       const internalSecret = req.headers.get("x-internal-secret");
       const isInternalCall = internalSecret && internalSecret === INTERNAL_FN_SECRET;
+      
+      console.log(`[alfie-render-image] 🔍 isInternalCall=${isInternalCall}, Woofs consumption will be ${isInternalCall ? 'SKIPPED' : 'PROCESSED'}`);
 
       // JWT required ONLY if not internal call
       if (!isInternalCall && !jwt) {
@@ -133,10 +135,11 @@ export default {
           throw woofsCheckError;
         }
       } else {
-        console.log("[alfie-render-image] ⏭️ Skipping Woofs check", {
+        console.log("[alfie-render-image] ⏭️ Skipping Woofs check (Woofs already consumed by pack flow):", {
           isInternalCall,
           hasBrand: !!brand_id,
           isAdmin,
+          reason: isInternalCall ? "INTERNAL_CALL - pack flow already consumed Woofs" : isAdmin ? "ADMIN_USER" : "NO_BRAND_ID"
         });
       }
 

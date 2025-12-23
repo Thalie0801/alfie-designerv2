@@ -50,10 +50,23 @@ export async function sendPackToGenerator({
   colorMode = 'vibrant', // ✅ Mode Coloré/Pastel
   visualStyle = 'background', // ✅ NEW: Style visuel adaptatif
 }: SendPackParams): Promise<SendPackResult> {
-  // 1. Calculer le coût total Woofs
+  // 1. Calculer le coût total Woofs avec détail par type
+  const assetsToProcess = pack.assets.filter((a) => selectedAssetIds.includes(a.id));
   const totalWoofs = calculatePackWoofCost(pack, selectedAssetIds);
-
-  console.log(`[Pack] Coût total: ${totalWoofs} Woofs pour ${selectedAssetIds.length} assets`);
+  
+  // ✅ LOG DÉTAILLÉ : Calcul par type d'asset
+  const costBreakdown = {
+    images: assetsToProcess.filter(a => a.kind === 'image').length,
+    carousels: assetsToProcess.filter(a => a.kind === 'carousel').length,
+    videos: assetsToProcess.filter(a => a.kind === 'video_premium').length,
+  };
+  
+  console.log(`[Pack] 📊 Détail coûts Woofs:`, {
+    images: `${costBreakdown.images} × 1 = ${costBreakdown.images} Woofs`,
+    carousels: `${costBreakdown.carousels} × 10 = ${costBreakdown.carousels * 10} Woofs`,
+    videos: `${costBreakdown.videos} × 25 = ${costBreakdown.videos * 25} Woofs`,
+    total: `${totalWoofs} Woofs pour ${selectedAssetIds.length} assets`,
+  });
 
   // 2. Vérifier + consommer les Woofs via woofs-check-consume
   // ⚠️ APPELÉ UNIQUEMENT ICI, PAS PENDANT LE SIMPLE CHAT
@@ -65,6 +78,7 @@ export async function sendPackToGenerator({
       metadata: { 
         packTitle: pack.title, 
         assetsCount: selectedAssetIds.length,
+        costBreakdown,
         userId 
       },
     },
@@ -77,7 +91,7 @@ export async function sendPackToGenerator({
       : errorObj?.message || "Quota verification failed";
     const errorCode = typeof errorObj === 'object' ? errorObj?.code : undefined;
 
-    console.error("[Pack] Quota check failed:", { errorCode, errorMessage, errorObj });
+    console.error("[Pack] ❌ Quota check failed:", { errorCode, errorMessage, errorObj });
     
     if (errorCode === "INSUFFICIENT_WOOFS" || 
         (typeof errorMessage === 'string' && errorMessage.includes("quota"))) {
@@ -89,7 +103,7 @@ export async function sendPackToGenerator({
     throw new Error(errorMessage);
   }
 
-  console.log(`[Pack] Quota OK, remaining Woofs: ${quotaCheck.data.remaining_woofs}`);
+  console.log(`[Pack] ✅ Quota validé, Woofs consommés: ${totalWoofs}, restants: ${quotaCheck.data.data?.remaining_woofs}`);
 
   // 3. Créer les orders/jobs pour chaque asset sélectionné
   const selectedAssets = pack.assets.filter((a) => selectedAssetIds.includes(a.id));
