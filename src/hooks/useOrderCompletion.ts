@@ -8,6 +8,7 @@ interface VideoGenerationError {
   message?: string;
   suggestions?: string[];
   details?: string;
+  detectedNames?: string[];
 }
 
 /**
@@ -15,12 +16,20 @@ interface VideoGenerationError {
  */
 export function handleVideoGenerationError(error: VideoGenerationError) {
   const errorCode = error?.error;
+  const errorMessage = error?.message || "";
+  const errorDetails = error?.details || "";
   
-  // Erreur de politique de contenu (marques, personnes réelles)
+  // Erreur de politique de contenu (marques, personnes réelles, célébrités)
   if (errorCode === "CONTENT_POLICY_VIOLATION") {
+    // Message personnalisé si des célébrités sont détectées
+    const celebNames = error.detectedNames?.slice(0, 3).join(", ");
+    const description = celebNames 
+      ? `Les noms suivants ne sont pas autorisés : ${celebNames}. Reformule avec des descriptions génériques.`
+      : error.message || "Ton prompt contient des éléments non autorisés. Reformule avec des descriptions génériques.";
+    
     toast({
       title: "⚠️ Contenu non autorisé",
-      description: error.message || "Ton prompt contient des éléments non autorisés. Reformule avec des descriptions génériques.",
+      description,
       variant: "destructive",
     });
     
@@ -31,8 +40,25 @@ export function handleVideoGenerationError(error: VideoGenerationError) {
           title: "💡 Conseils",
           description: error.suggestions!.slice(0, 2).join(" • "),
         });
-      }, 1000);
+      }, 1500);
     }
+    return true;
+  }
+  
+  // Pas de vidéo retournée par VEO 3 (erreur silencieuse)
+  if (errorCode === "NO_VIDEO_URI" || errorMessage.includes("No video URI") || errorDetails.includes("No video URI")) {
+    toast({
+      title: "❌ Génération échouée",
+      description: "VEO 3 n'a pas pu créer la vidéo. Essaie de reformuler ton prompt sans célébrités ni personnes réelles.",
+      variant: "destructive",
+    });
+    
+    setTimeout(() => {
+      toast({
+        title: "💡 Astuce",
+        description: "Utilise des descriptions génériques comme 'une femme élégante' au lieu de noms de célébrités.",
+      });
+    }, 1500);
     return true;
   }
   

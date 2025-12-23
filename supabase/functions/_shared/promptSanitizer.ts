@@ -117,14 +117,61 @@ const PERSON_REFERENCE_PATTERNS = [
   /(?:from|in|with)\s+(?:the\s+)?(?:attached|uploaded|provided|reference|my)\s+(?:photo|image|picture)/gi,
   /(?:person|man|woman|people|face)\s+(?:from|in)\s+(?:the\s+)?(?:photo|image|picture)/gi,
   /(?:like|as|resembling)\s+(?:the\s+)?(?:attached|provided|uploaded)\s+(?:person|face|photo)/gi,
-  /(?:celebrity|famous|star|actor|actress|singer|politician|president)/gi,
-  // Célébrités spécifiques (liste non exhaustive)
+  /(?:celebrity|famous|star|actor|actress|singer|politician|president|influencer|youtuber|tiktoker)/gi,
+  
+  // === CÉLÉBRITÉS INTERNATIONALES (liste exhaustive) ===
+  
+  // Tech & Business
   /\b(?:elon\s*musk|donald\s*trump|joe\s*biden|emmanuel\s*macron|barack\s*obama)\b/gi,
-  /\b(?:beyoncé|beyonce|taylor\s*swift|kim\s*kardashian|kanye\s*west|rihanna)\b/gi,
+  /\b(?:jeff\s*bezos|mark\s*zuckerberg|bill\s*gates|steve\s*jobs|tim\s*cook)\b/gi,
+  /\b(?:warren\s*buffett|oprah\s*winfrey|richard\s*branson|bernard\s*arnault)\b/gi,
+  
+  // Musique internationale
+  /\b(?:beyoncé?|taylor\s*swift|kim\s*kardashian|kanye\s*west|rihanna|drake)\b/gi,
+  /\b(?:lady\s*gaga|ariana\s*grande|justin\s*bieber|selena\s*gomez|miley\s*cyrus)\b/gi,
+  /\b(?:dua\s*lipa|billie\s*eilish|the\s*weeknd|post\s*malone|ed\s*sheeran)\b/gi,
+  /\b(?:adele|bruno\s*mars|cardi\s*b|nicki\s*minaj|megan\s*thee\s*stallion)\b/gi,
+  /\b(?:kendrick\s*lamar|jay[\s-]*z|eminem|50\s*cent|snoop\s*dogg)\b/gi,
+  /\b(?:shakira|jennifer\s*lopez|j\.?\s*lo|madonna|britney\s*spears)\b/gi,
+  /\b(?:zendaya|doja\s*cat|olivia\s*rodrigo|harry\s*styles|lil\s*nas\s*x)\b/gi,
+  
+  // Acteurs & Actrices Hollywood
   /\b(?:brad\s*pitt|angelina\s*jolie|tom\s*cruise|leonardo\s*dicaprio|johnny\s*depp)\b/gi,
-  /\b(?:cristiano\s*ronaldo|lionel\s*messi|lebron\s*james|michael\s*jordan)\b/gi,
-  /\b(?:jeff\s*bezos|mark\s*zuckerberg|bill\s*gates|steve\s*jobs)\b/gi,
-  /\b(?:oprah\s*winfrey|ellen\s*degeneres|jimmy\s*fallon|joe\s*rogan)\b/gi
+  /\b(?:scarlett\s*johansson|jennifer\s*lawrence|jennifer\s*aniston|anne\s*hathaway)\b/gi,
+  /\b(?:chris\s*hemsworth|chris\s*evans|chris\s*pratt|ryan\s*reynolds|ryan\s*gosling)\b/gi,
+  /\b(?:margot\s*robbie|emma\s*watson|emma\s*stone|natalie\s*portman|gal\s*gadot)\b/gi,
+  /\b(?:dwayne\s*johnson|the\s*rock|vin\s*diesel|jason\s*statham|keanu\s*reeves)\b/gi,
+  /\b(?:will\s*smith|samuel\s*l\.?\s*jackson|denzel\s*washington|morgan\s*freeman)\b/gi,
+  /\b(?:timothée\s*chalamet|tom\s*holland|robert\s*downey\s*jr\.?|benedict\s*cumberbatch)\b/gi,
+  /\b(?:meryl\s*streep|julia\s*roberts|sandra\s*bullock|cate\s*blanchett)\b/gi,
+  /\b(?:florence\s*pugh|sydney\s*sweeney|anya\s*taylor[\s-]*joy|millie\s*bobby\s*brown)\b/gi,
+  
+  // Influenceurs & YouTubers
+  /\b(?:mr\.?\s*beast|pewdiepie|ksi|logan\s*paul|jake\s*paul)\b/gi,
+  /\b(?:david\s*dobrik|emma\s*chamberlain|charli\s*d'?amelio|addison\s*rae)\b/gi,
+  /\b(?:kylie\s*jenner|kendall\s*jenner|khloe\s*kardashian|kourtney\s*kardashian)\b/gi,
+  /\b(?:squeezie|cyprien|norman|mcfly\s*(?:et|&)?\s*carlito|tibo\s*inshape)\b/gi,
+  /\b(?:lena\s*situations?|caroline\s*receveur|nabilla)\b/gi,
+  
+  // Sport
+  /\b(?:cristiano\s*ronaldo|lionel\s*messi|kylian\s*mbappé?|neymar)\b/gi,
+  /\b(?:lebron\s*james|michael\s*jordan|stephen\s*curry|kevin\s*durant)\b/gi,
+  /\b(?:serena\s*williams|roger\s*federer|rafael\s*nadal|novak\s*djokovic)\b/gi,
+  /\b(?:usain\s*bolt|mike\s*tyson|muhammad\s*ali|floyd\s*mayweather)\b/gi,
+  /\b(?:tiger\s*woods|lewis\s*hamilton|tom\s*brady|conor\s*mcgregor)\b/gi,
+  
+  // Célébrités françaises
+  /\b(?:jean[\s-]*paul\s*belmondo|alain\s*delon|catherine\s*deneuve|brigitte\s*bardot)\b/gi,
+  /\b(?:omar\s*sy|jean\s*dujardin|gad\s*elmaleh|jamel\s*debbouze|kev\s*adams)\b/gi,
+  /\b(?:marion\s*cotillard|léa\s*seydoux|audrey\s*tautou|mélanie\s*laurent)\b/gi,
+  /\b(?:stromae|angèle|aya\s*nakamura|jul|pnl|orelsan|nekfeu|ninho)\b/gi,
+  /\b(?:zinedine\s*zidane|karim\s*benzema|antoine\s*griezmann|paul\s*pogba)\b/gi,
+  /\b(?:david\s*guetta|daft\s*punk|martin\s*solveig)\b/gi,
+  
+  // TV Hosts & Journalists
+  /\b(?:ellen\s*degeneres|jimmy\s*fallon|jimmy\s*kimmel|stephen\s*colbert)\b/gi,
+  /\b(?:joe\s*rogan|howard\s*stern|oprah|trevor\s*noah|john\s*oliver)\b/gi,
+  /\b(?:cyril\s*hanouna|arthur|nagui|jean[\s-]*pierre\s*pernaut|michel\s*drucker)\b/gi
 ];
 
 // Texte de remplacement pour les références aux personnes
@@ -242,6 +289,52 @@ export function isContentPolicyViolation(errorText: string): boolean {
     lowerError.includes("content policy") ||
     lowerError.includes("could not be submitted") ||
     lowerError.includes("inappropriate") ||
-    lowerError.includes("not allowed")
+    lowerError.includes("not allowed") ||
+    lowerError.includes("no video uri") ||
+    lowerError.includes("celebrity") ||
+    lowerError.includes("person") ||
+    lowerError.includes("real person")
   );
+}
+
+/**
+ * Détecte si un prompt contient des célébrités AVANT l'envoi à VEO 3
+ * Retourne null si OK, ou un objet erreur si problème détecté
+ */
+export function detectCelebrityViolation(prompt: string): {
+  error: string;
+  message: string;
+  suggestions: string[];
+  detectedNames: string[];
+} | null {
+  const detectedNames: string[] = [];
+  
+  for (const pattern of PERSON_REFERENCE_PATTERNS) {
+    pattern.lastIndex = 0; // Reset for global patterns
+    const matches = prompt.match(pattern);
+    if (matches) {
+      for (const match of matches) {
+        if (!detectedNames.includes(match.toLowerCase())) {
+          detectedNames.push(match.toLowerCase());
+        }
+      }
+    }
+  }
+  
+  if (detectedNames.length === 0) {
+    return null; // Pas de problème
+  }
+  
+  console.log(`[promptSanitizer] 🚨 Celebrity/person reference detected:`, detectedNames);
+  
+  return {
+    error: "CONTENT_POLICY_VIOLATION",
+    message: `Ton prompt contient des références à des personnes réelles : ${detectedNames.slice(0, 3).join(", ")}${detectedNames.length > 3 ? "..." : ""}. VEO 3 ne peut pas générer de vidéos avec des célébrités ou personnes identifiables.`,
+    suggestions: [
+      "Remplace les noms de célébrités par des descriptions génériques (ex: 'une chanteuse pop' au lieu de 'Beyoncé')",
+      "Utilise des personnages fictifs ou des silhouettes",
+      "Décris le style ou l'ambiance au lieu de citer des personnes"
+    ],
+    detectedNames
+  };
 }
