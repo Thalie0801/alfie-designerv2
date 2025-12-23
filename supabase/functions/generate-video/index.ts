@@ -215,6 +215,7 @@ Deno.serve(async (req) => {
     
     if (isInternalCall) {
       // Internal call from job worker - get userId from body
+      console.log(`[generate-video] 🔍 isInternalCall=true, Woofs consumption will be SKIPPED`);
       userId = body.userId;
       if (!userId) {
         return jsonResponse({ error: "Missing userId in internal call" }, { status: 400 });
@@ -464,9 +465,11 @@ async function generateGcsSignedUrl(
         return jsonResponse({ error: 'Failed to consume Woofs' }, { status: 500 });
       }
 
-      console.log(`[generate-video] ✅ Consumed ${woofsCost} Woofs, remaining: ${woofsData.data.remaining_woofs}`);
+      console.log(`[generate-video] ✅ Consumed ${woofsCost} Woofs for EXTERNAL call, remaining: ${woofsData.data.remaining_woofs}`);
     } else if (isInternalCall) {
-      console.log(`[generate-video] ⏭️ Skipping Woofs check for internal call (already consumed in pack flow)`);
+      console.log(`[generate-video] ⏭️ Skipping Woofs check for INTERNAL call (Woofs already consumed by generatorFromChat pack flow)`);
+    } else {
+      console.log(`[generate-video] ⏭️ Skipping Woofs check: no brandId or status check`);
     }
 
     if (isStatusCheck) {

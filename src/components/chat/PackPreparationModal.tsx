@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { X, Image, Film, Grid3x3, AlertCircle, Volume2, VolumeX, Upload, Pencil } from "lucide-react";
 import type { AlfiePack, PackAsset } from "@/types/alfiePack";
-import { calculatePackWoofCost, safeWoofs } from "@/lib/woofs";
+// Import removed - costBreakdown now calculated locally
 import { getWoofCost } from "@/types/alfiePack";
 import { sendPackToGenerator, InsufficientWoofsError } from "@/services/generatorFromChat";
 import { useAuth } from "@/hooks/useAuth";
@@ -159,15 +159,25 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
   // Calculer le coût dynamique selon la sélection (utilise localAssets)
   const localPack = useMemo(() => ({ ...pack, assets: localAssets }), [pack, localAssets]);
   
+  // ✅ Calcul détaillé par type d'asset
+  const costBreakdown = useMemo(() => {
+    const selectedAssets = localAssets.filter(a => selectedAssetIds.has(a.id));
+    const images = selectedAssets.filter(a => a.kind === 'image').length;
+    const carousels = selectedAssets.filter(a => a.kind === 'carousel').length;
+    const videos = selectedAssets.filter(a => a.kind === 'video_premium').length;
+    return {
+      images,
+      carousels,
+      videos,
+      imagesWoofs: images * 1,
+      carouselsWoofs: carousels * 10,
+      videosWoofs: videos * 25,
+      total: images * 1 + carousels * 10 + videos * 25,
+    };
+  }, [localAssets, selectedAssetIds]);
+  
   // Calculer le coût - carrousel = 10 Woofs fixe
-  const totalWoofs = useMemo(() => {
-    const assetsWithMode = localAssets.map(asset => ({
-      ...asset,
-      woofCostType: asset.kind === 'carousel' ? 'carousel' as const : asset.woofCostType,
-    }));
-    const packWithMode = { ...pack, assets: assetsWithMode };
-    return safeWoofs(calculatePackWoofCost(packWithMode, Array.from(selectedAssetIds)));
-  }, [localAssets, pack, selectedAssetIds]);
+  const totalWoofs = costBreakdown.total;
 
   // Toggle checkbox
   const toggleAsset = (assetId: string) => {
@@ -399,6 +409,27 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
           <div>
             <h3 className="font-medium text-sm mb-1">{pack.title}</h3>
             <p className="text-xs text-muted-foreground">{pack.summary}</p>
+            
+            {/* ✅ Détail des coûts par type */}
+            {selectedAssetIds.size > 0 && (
+              <div className="mt-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                <p className="text-xs font-medium text-primary mb-2">📊 Estimation Woofs</p>
+                <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
+                  {costBreakdown.images > 0 && (
+                    <span>🖼️ {costBreakdown.images} image{costBreakdown.images > 1 ? 's' : ''} × 1 = {costBreakdown.imagesWoofs}</span>
+                  )}
+                  {costBreakdown.carousels > 0 && (
+                    <span>📱 {costBreakdown.carousels} carrousel{costBreakdown.carousels > 1 ? 's' : ''} × 10 = {costBreakdown.carouselsWoofs}</span>
+                  )}
+                  {costBreakdown.videos > 0 && (
+                    <span>🎬 {costBreakdown.videos} vidéo{costBreakdown.videos > 1 ? 's' : ''} × 25 = {costBreakdown.videosWoofs}</span>
+                  )}
+                </div>
+                <div className="mt-2 pt-2 border-t border-primary/10 text-sm font-semibold text-primary">
+                  🐶 Total : {totalWoofs} Woofs
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Liste des assets */}
