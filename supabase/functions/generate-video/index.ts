@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { WOOF_COSTS } from "../_shared/woofsCosts.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { getAccessToken } from "../_shared/vertexAuth.ts";
-import { sanitizeVideoPrompt, isContentPolicyViolation, type SanitizeResult } from "../_shared/promptSanitizer.ts";
+import { sanitizeVideoPrompt, isContentPolicyViolation, detectCelebrityViolation, type SanitizeResult } from "../_shared/promptSanitizer.ts";
 const REPLICATE_API = "https://api.replicate.com/v1/predictions";
 // ✅ Image-to-video optimisé : Stable Video Diffusion
 const DEFAULT_REPLICATE_MODEL = "stability-ai/stable-video-diffusion:3f0457e4619daac51203dedb472816fd4af51f3149fa7a9e0b5ffcf1b8172438";
@@ -254,6 +254,13 @@ Deno.serve(async (req) => {
     const providerRawForSanitize = typeof body?.provider === "string" ? body.provider.toLowerCase() : "replicate";
     
     if (rawPrompt && (providerRawForSanitize === "veo3" || providerRawForSanitize === "veo" || providerRawForSanitize === "veo_3_1")) {
+      // ✅ PRÉ-VALIDATION : Détecter les célébrités AVANT de consommer les Woofs
+      const celebrityViolation = detectCelebrityViolation(rawPrompt);
+      if (celebrityViolation) {
+        console.error(`[generate-video] 🚨 Celebrity violation detected BEFORE generation:`, celebrityViolation.detectedNames);
+        return jsonResponse(celebrityViolation, { status: 400 });
+      }
+      
       sanitizeResult = sanitizeVideoPrompt(rawPrompt);
       prompt = sanitizeResult.sanitizedPrompt;
       
@@ -1034,10 +1041,40 @@ async function generateGcsSignedUrl(
         result?.response?.videos?.[0]?.gcsUri ||                // Format REST API doc
         result?.response?.generatedSamples?.[0]?.video?.uri;    // Fallback legacy
       
+      // ✅ LOGGING DÉTAILLÉ pour debug
+      console.log(`[generate-video] VEO 3 response structure:`, {
+        hasResponse: !!result?.response,
+        hasGeneratedVideos: !!result?.response?.generatedVideos,
+        generatedVideosLength: result?.response?.generatedVideos?.length || 0,
+        hasError: !!result?.error,
+        errorMessage: result?.error?.message || null,
+        fullResultKeys: result ? Object.keys(result) : [],
+        responseKeys: result?.response ? Object.keys(result.response) : []
+      });
+      
       if (!videoUri || typeof videoUri !== "string") {
-        console.error(`[generate-video] No valid VEO 3 video URI. Full result:`, JSON.stringify(result, null, 2));
+        console.error(`[generate-video] ❌ No valid VEO 3 video URI. Full result:`, JSON.stringify(result, null, 2));
+        
+        // ✅ Détecter si c'est une erreur de politique de contenu silencieuse
+        const resultString = JSON.stringify(result || {});
+        if (isContentPolicyViolation(resultString) || result?.error) {
+          const errorMsg = result?.error?.message || "VEO 3 n'a pas pu générer la vidéo";
+          console.error(`[generate-video] 🚨 VEO 3 silent content policy violation detected`);
+          return jsonResponse({
+            error: "CONTENT_POLICY_VIOLATION",
+            message: "VEO 3 n'a pas pu générer la vidéo. Le prompt peut contenir des éléments non autorisés (célébrités, marques, etc.).",
+            suggestions: [
+              "Reformule ton prompt sans célébrités ni personnes réelles",
+              "Utilise des descriptions génériques au lieu de noms propres",
+              "Évite les références à des photos de personnes"
+            ],
+            details: errorMsg
+          }, { status: 400 });
+        }
+        
         return jsonResponse({
-          error: "No video URI in VEO 3 response",
+          error: "NO_VIDEO_URI",
+          message: "VEO 3 n'a pas retourné de vidéo. Cela peut arriver avec certains prompts. Essaie de reformuler.",
           response: result?.response
         }, { status: 500 });
       }
