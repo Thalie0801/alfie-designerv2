@@ -3,8 +3,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Download, Trash2, PlayCircle, Image as ImageIcon, AlertCircle, ExternalLink } from "lucide-react";
-import { CanvaButton } from "@/components/ui/CanvaButton";
+import { Download, Trash2, PlayCircle, Image as ImageIcon, AlertCircle } from "lucide-react";
 import { LibraryAsset } from "@/hooks/useLibraryAssets";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -276,21 +275,6 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
           <Download className="h-4 w-4 sm:mr-2" />
           <span className="hidden sm:inline">{asset.type === "video" && !asset.output_url ? "En génération…" : "Télécharger"}</span>
         </Button>
-        
-        {/* Bouton Canva - uniquement pour les images */}
-        {asset.type !== "video" && asset.output_url && (
-          <CanvaButton
-            imageUrl={asset.output_url}
-            size="sm"
-            variant="outline"
-            className="touch-target min-h-[44px] min-w-[44px] sm:min-w-0 sm:px-3"
-            label=""
-            showToast={true}
-          >
-            <ExternalLink className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Canva</span>
-          </CanvaButton>
-        )}
         
         <Button
           size="sm"
