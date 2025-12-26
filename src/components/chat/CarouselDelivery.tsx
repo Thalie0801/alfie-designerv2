@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { generateCarouselVideoFromJobSet } from "@/lib/cloudinary/carouselToVideo";
+import { CanvaButton } from "@/components/ui/CanvaButton";
 
 interface CarouselDeliveryProps {
   jobSetId: string;
@@ -282,17 +283,24 @@ export function CarouselDelivery({ jobSetId }: CarouselDeliveryProps) {
             </Button>
           )}
 
+          {/* Bouton Canva dynamique basé sur les slides */}
+          {jobs.length > 0 && jobs[0]?.output_url && (
+            <CanvaButton 
+              imageUrl={jobs[0].output_url} 
+              label="Ouvrir dans Canva"
+              variant="outline"
+            />
+          )}
+
           {meta.canvaUrl && (
             <Button asChild variant="outline">
               <a href={meta.canvaUrl as string} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="h-4 w-4 mr-2" />
-                Ouvrir dans Canva
+                Template Canva
               </a>
             </Button>
           )}
         </div>
-
-        {/* Caption prête à publier */}
         {meta.caption && typeof meta.caption === "string" && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
