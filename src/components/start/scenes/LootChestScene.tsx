@@ -4,13 +4,16 @@ import { ExternalLink, Download, Copy, RefreshCw, Save, Check } from 'lucide-rea
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { ParticleField } from '../game/ParticleField';
+import { generateCanvaImportUrl } from '@/services/canvaLinker';
 
 interface LootChestSceneProps {
   onVariation: () => void;
   onSavePreset: () => void;
+  /** URL de l'image générée pour l'ouverture dans Canva */
+  generatedImageUrl?: string;
 }
 
-export function LootChestScene({ onVariation, onSavePreset }: LootChestSceneProps) {
+export function LootChestScene({ onVariation, onSavePreset, generatedImageUrl }: LootChestSceneProps) {
   const [copied, setCopied] = useState(false);
   const [chestOpened, setChestOpened] = useState(false);
   const prefersReducedMotion = useReducedMotion();
@@ -46,8 +49,15 @@ Slide 5: CTA - Testez gratuitement maintenant !`;
       icon: ExternalLink,
       gradient: 'from-blue-400 to-purple-500',
       action: () => {
-        toast.success('Ouverture Canva... 🎨');
-        window.open('#', '_blank');
+        if (generatedImageUrl) {
+          const canvaLink = generateCanvaImportUrl(generatedImageUrl);
+          window.open(canvaLink, '_blank');
+          toast.success('Ouverture dans Canva... 🎨', {
+            description: 'Connectez-vous à votre compte Canva pour éditer',
+          });
+        } else {
+          toast.error('Aucune image disponible');
+        }
       },
     },
     {
