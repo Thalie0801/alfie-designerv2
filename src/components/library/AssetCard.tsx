@@ -3,7 +3,8 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Download, Trash2, PlayCircle, Image as ImageIcon, AlertCircle } from "lucide-react";
+import { Download, Trash2, PlayCircle, Image as ImageIcon, AlertCircle, ExternalLink } from "lucide-react";
+import { CanvaButton } from "@/components/ui/CanvaButton";
 import { LibraryAsset } from "@/hooks/useLibraryAssets";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -262,19 +263,35 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
         </div>
       </CardContent>
 
-      <CardFooter className="p-3 pt-0 gap-2">
+      <CardFooter className="p-3 pt-0 flex flex-wrap gap-2">
         <Button
           size="sm"
           variant="outline"
-          className="flex-1 touch-target min-h-[44px]"
+          className="flex-1 min-w-[100px] touch-target min-h-[44px]"
           onClick={onDownload}
           disabled={asset.type === "video" && !asset.output_url}
           title={asset.type === "video" && !asset.output_url ? "Vidéo en cours de génération" : "Télécharger"}
           aria-disabled={(asset.type === "video" && !asset.output_url) || undefined}
         >
-          <Download className="h-4 w-4 mr-2" />
+          <Download className="h-4 w-4 sm:mr-2" />
           <span className="hidden sm:inline">{asset.type === "video" && !asset.output_url ? "En génération…" : "Télécharger"}</span>
         </Button>
+        
+        {/* Bouton Canva - uniquement pour les images */}
+        {asset.type !== "video" && asset.output_url && (
+          <CanvaButton
+            imageUrl={asset.output_url}
+            size="sm"
+            variant="outline"
+            className="touch-target min-h-[44px] min-w-[44px] sm:min-w-0 sm:px-3"
+            label=""
+            showToast={true}
+          >
+            <ExternalLink className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Canva</span>
+          </CanvaButton>
+        )}
+        
         <Button
           size="sm"
           variant="ghost"
