@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import type { LibraryAsset } from "@/types/chat";
 import { getAspectClass } from "@/types/chat";
 import { cn } from "@/lib/utils";
-import { CanvaButton } from "@/components/ui/CanvaButton";
 
 interface OrderResultsProps {
   assets: LibraryAsset[];
@@ -112,8 +111,7 @@ export function OrderResults({ assets, total, orderId }: OrderResultsProps) {
                             loading="lazy"
                           />
                         </div>
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors rounded-lg flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                          <CanvaButton imageUrl={img.url} label="" size="sm" showToast />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
                           <Button size="sm" onClick={() => window.open(img.url, "_blank")}>
                             <Download className="h-4 w-4" />
                           </Button>
@@ -202,9 +200,8 @@ export function OrderResults({ assets, total, orderId }: OrderResultsProps) {
                           </div>
                         </div>
 
-                        {/* Boutons au hover */}
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors rounded-lg flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
-                          <CanvaButton imageUrl={slide.url} label="" size="sm" showToast className="h-7 w-7 p-0" />
+                        {/* Bouton télécharger au hover */}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
                           <Button size="sm" className="h-7 w-7 p-0" onClick={() => window.open(slide.url, "_blank")}>
                             <Download className="h-3 w-3" />
                           </Button>
