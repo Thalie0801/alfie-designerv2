@@ -472,6 +472,68 @@ export default function ChatWidget() {
     return packs;
   }
 
+  
+  /**
+   * Construit un pack de fallback quand le LLM ne renvoie pas <alfie-pack>
+   * mais que la demande utilisateur est clairement une demande de contenu
+   */
+  function buildFallbackPack(userMessage: string, mergedBrief: Brief): AlfiePack | null {
+    const text = userMessage.toLowerCase();
+    
+    // Détecter le format
+    const isVideo = /(vidéo|video|reel|clip)/i.test(text);
+    const isCarousel = /(carrousel|carousel|slides?)/i.test(text);
+    
+    // Détecter le nombre d'assets
+    const countMatch = text.match(/(\d+)\s*(assets?|clips?|scènes?|scenes?|visuels?|images?)/i);
+    let assetCount = countMatch ? Math.min(10, Math.max(1, parseInt(countMatch[1]))) : 1;
+    
+    // Pour les carrousels, le count est le nombre de slides, pas d'assets
+    if (isCarousel) {
+      assetCount = 1; // 1 carrousel avec N slides
+    }
+    
+    // Construire le format et le kind
+    const kind = isVideo ? 'video_premium' : isCarousel ? 'carousel' : 'image';
+    
+    // Utiliser les valeurs du brief ou des valeurs par défaut
+    const ratio = mergedBrief.ratio || (isVideo ? '9:16' : '4:5');
+    const platform = mergedBrief.platform || 'instagram';
+    const tone = mergedBrief.tone || 'professionnel';
+    const topic = mergedBrief.topic || userMessage.substring(0, 100);
+    
+    // Générer un ID unique pour le groupe de cohérence
+    const coherenceGroup = `fallback-${Date.now()}`;
+    
+    // Créer les assets (on omet woofCostType et brandId car enrichPackWithWoofCostType les ajoutera)
+    const assets: any[] = [];
+    
+    for (let i = 0; i < assetCount; i++) {
+      assets.push({
+        id: `fallback-${Date.now()}-${i}`,
+        kind: kind,
+        title: assetCount > 1 ? `${isVideo ? 'Clip' : 'Visuel'} ${i + 1}` : (topic || 'Contenu'),
+        prompt: topic || userMessage,
+        ratio: ratio,
+        platform: platform,
+        tone: tone,
+        goal: 'engagement',
+        count: isCarousel ? (mergedBrief.slides || 5) : 1,
+        durationSeconds: isVideo ? 6 : undefined,
+        coherenceGroup: assetCount > 1 ? coherenceGroup : undefined,
+        scriptGroup: assetCount > 1 ? coherenceGroup : undefined,
+        brandId: profile?.active_brand_id || '',
+      });
+    }
+    
+    if (assets.length === 0) return null;
+    
+    return {
+      title: `Pack ${kind === 'video_premium' ? 'vidéo' : kind === 'carousel' ? 'carrousel' : 'image'} - ${topic?.substring(0, 30) || 'Contenu'}`,
+      summary: userMessage.substring(0, 200),
+      assets: assets as PackAsset[],
+    };
+  }
 
   async function replyContentWithAI(raw: string): Promise<AssistantReply> {
     const { intent, mergedBrief } = applyIntent(raw);
@@ -590,6 +652,15 @@ export default function ChatWidget() {
             summary: parsedFromReply.map(p => p.summary).join(' + '),
             assets: parsedFromReply.flatMap(p => p.assets),
           };
+        }
+      }
+
+      // ✅ FALLBACK PACK BUILDER: Si toujours pas de pack mais demande de contenu claire
+      if (!finalPack && hasContentRequest) {
+        console.log("🔧 Building fallback pack from user request");
+        finalPack = buildFallbackPack(raw, mergedBrief);
+        if (finalPack) {
+          toast.info("Pack construit à partir de ta demande ✅");
         }
       }
 
