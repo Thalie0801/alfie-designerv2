@@ -158,25 +158,72 @@ async function callLLM(
 /**
  * Parse le bloc <alfie-pack>{...}</alfie-pack> depuis la réponse LLM
  * Utilise indexOf/slice au lieu de regex pour un parsing robuste du JSON imbriqué
+ * ✅ AMÉLIORÉ : Gère les variantes fréquentes et nettoie le JSON
  */
 function parsePack(text: string): any | null {
+  // ✅ Normaliser les variantes de balise : <alfie-pack >, <ALFIE-PACK>, etc.
+  let normalizedText = text;
+  
+  // Remplacer les variantes par la forme canonique
+  normalizedText = normalizedText.replace(/<alfie-pack\s*>/gi, '<alfie-pack>');
+  normalizedText = normalizedText.replace(/<\/alfie-pack\s*>/gi, '</alfie-pack>');
+  
   const startTag = '<alfie-pack>';
   const endTag = '</alfie-pack>';
   
-  const startIdx = text.toLowerCase().indexOf(startTag.toLowerCase());
-  if (startIdx === -1) return null;
+  const startIdx = normalizedText.toLowerCase().indexOf(startTag.toLowerCase());
+  if (startIdx === -1) {
+    console.log("📦 No <alfie-pack> tag found in response");
+    return null;
+  }
   
-  const endIdx = text.toLowerCase().indexOf(endTag.toLowerCase(), startIdx);
-  if (endIdx === -1 || endIdx <= startIdx) return null;
+  const endIdx = normalizedText.toLowerCase().indexOf(endTag.toLowerCase(), startIdx);
+  if (endIdx === -1 || endIdx <= startIdx) {
+    console.warn("📦 Found <alfie-pack> but missing closing tag");
+    return null;
+  }
   
-  const jsonContent = text.slice(startIdx + startTag.length, endIdx).trim();
+  let jsonContent = normalizedText.slice(startIdx + startTag.length, endIdx).trim();
+  
+  // ✅ Nettoyer le JSON : retirer les backticks markdown, texte parasite
+  if (jsonContent.startsWith('```json')) {
+    jsonContent = jsonContent.slice(7);
+  } else if (jsonContent.startsWith('```')) {
+    jsonContent = jsonContent.slice(3);
+  }
+  if (jsonContent.endsWith('```')) {
+    jsonContent = jsonContent.slice(0, -3);
+  }
+  jsonContent = jsonContent.trim();
+  
+  // ✅ Tenter de trouver le début du JSON si texte parasite
+  const jsonStartIdx = jsonContent.indexOf('{');
+  if (jsonStartIdx > 0) {
+    console.log("📦 Cleaning preamble text before JSON");
+    jsonContent = jsonContent.slice(jsonStartIdx);
+  }
   
   try {
     const parsed = JSON.parse(jsonContent);
     console.log("📦 Pack parsed successfully, assets count:", parsed.assets?.length || 0);
     return parsed;
   } catch (error) {
-    console.error("Failed to parse alfie-pack JSON:", error, "Content preview:", jsonContent.substring(0, 300));
+    console.error("📦 Failed to parse alfie-pack JSON:", error);
+    console.error("📦 JSON preview (first 500 chars):", jsonContent.substring(0, 500));
+    
+    // ✅ Tentative de réparation basique : trouver la dernière accolade fermante valide
+    const lastBrace = jsonContent.lastIndexOf('}');
+    if (lastBrace > 0) {
+      const truncatedJson = jsonContent.slice(0, lastBrace + 1);
+      try {
+        const parsed = JSON.parse(truncatedJson);
+        console.log("📦 Pack parsed after truncation repair, assets count:", parsed.assets?.length || 0);
+        return parsed;
+      } catch {
+        console.error("📦 Truncation repair also failed");
+      }
+    }
+    
     return null;
   }
 }
@@ -350,11 +397,20 @@ Deno.serve(async (req) => {
     const pack = parsePack(rawReply);
     const reply = cleanReply(rawReply);
     
-    // Log de debug pour vérifier le parsing
-    console.log("📦 Pack result:", pack ? `assets=${pack.assets?.length || 0}` : "null");
+    // ✅ Log de debug enrichi pour diagnostic
+    const hasPackTag = rawReply.toLowerCase().includes('<alfie-pack>');
+    console.log("📦 Pack result:", pack ? `assets=${pack.assets?.length || 0}` : "null", 
+      "| hasTag:", hasPackTag, 
+      "| rawReplyLength:", rawReply.length);
+    
+    if (hasPackTag && !pack) {
+      console.error("📦 CRITICAL: Found <alfie-pack> tag but parsing failed!");
+      console.error("📦 Raw reply preview:", rawReply.substring(0, 1000));
+    }
 
+    // ✅ Retourner rawReply pour fallback parsing côté frontend
     return new Response(
-      JSON.stringify({ reply, pack }),
+      JSON.stringify({ reply, pack, rawReply }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {

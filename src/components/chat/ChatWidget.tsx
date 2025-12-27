@@ -532,7 +532,7 @@ export default function ChatWidget() {
         return buildLocalReply(intent, mergedBrief);
       }
 
-      const { reply, pack } = response.data as AlfieWidgetResponse;
+      const { reply, pack, rawReply } = response.data as AlfieWidgetResponse & { rawReply?: string };
 
       if (!reply) {
         return buildLocalReply(intent, mergedBrief);
@@ -541,10 +541,20 @@ export default function ChatWidget() {
       // ✅ DÉTECTION DE PROMESSE NON TENUE : pack annoncé mais absent
       const promisesPack = /(voici le pack|je te propose|voici ta|voilà le pack|prêt à générer)/i.test(reply);
       const hasContentRequest = /(carrousel|carousel|image|images|visuel|vidéo|video)/i.test(raw);
+      const hasPackTag = rawReply?.toLowerCase().includes('<alfie-pack>') || reply.toLowerCase().includes('<alfie-pack>');
+      
+      console.log("📦 Frontend received: pack=", pack ? `${pack.assets?.length} assets` : "null", 
+        "| hasPackTag:", hasPackTag, "| rawReplyLength:", rawReply?.length || 0);
       
       if (promisesPack && !pack && hasContentRequest) {
-        console.warn("⚠️ AI promised a pack but none was generated");
-        toast.error("Oups ! Une erreur s'est produite. Essaie de reformuler ta demande avec plus de détails.");
+        console.warn("⚠️ AI promised a pack but none was generated, hasPackTag:", hasPackTag);
+        
+        // ✅ Si le tag existe mais pas de pack → problème de parsing
+        if (hasPackTag) {
+          toast.error("Oups ! J'ai préparé ton pack mais il y a eu un souci technique. Réessaie !");
+        } else {
+          toast.error("Oups ! Une erreur s'est produite. Essaie de reformuler ta demande avec plus de détails.");
+        }
       }
 
       // ✅ MULTI-INTENT PARSING : Supporter plusieurs packs dans la réponse
@@ -553,10 +563,11 @@ export default function ChatWidget() {
       if (pack) {
         // Pack déjà parsé par l'edge function
         finalPack = pack;
-      } else {
-        // Chercher des packs dans la réponse brute (fallback)
-        const parsedPacks = parseMultipleIntents(reply);
+      } else if (rawReply) {
+        // ✅ FALLBACK: Chercher des packs dans rawReply (meilleur que reply nettoyé)
+        const parsedPacks = parseMultipleIntents(rawReply);
         if (parsedPacks.length > 0) {
+          console.log("📦 Frontend fallback parsing succeeded:", parsedPacks.length, "packs");
           // Fusionner tous les packs en un seul
           finalPack = {
             title: parsedPacks.length === 1 
@@ -564,6 +575,20 @@ export default function ChatWidget() {
               : `Pack combiné (${parsedPacks.reduce((sum, p) => sum + p.assets.length, 0)} assets)`,
             summary: parsedPacks.map(p => p.summary).join(' + '),
             assets: parsedPacks.flatMap(p => p.assets),
+          };
+        }
+      }
+      
+      // Fallback sur reply si rawReply pas dispo
+      if (!finalPack) {
+        const parsedFromReply = parseMultipleIntents(reply);
+        if (parsedFromReply.length > 0) {
+          finalPack = {
+            title: parsedFromReply.length === 1 
+              ? parsedFromReply[0].title 
+              : `Pack combiné (${parsedFromReply.reduce((sum, p) => sum + p.assets.length, 0)} assets)`,
+            summary: parsedFromReply.map(p => p.summary).join(' + '),
+            assets: parsedFromReply.flatMap(p => p.assets),
           };
         }
       }
@@ -781,11 +806,79 @@ export default function ChatWidget() {
         userPlan: profile.plan || 'starter', // ✅ Plan utilisateur pour sélection du modèle IA
       });
       
-      toast.success(`${selectedIds.length} asset(s) en cours de génération !`);
+      // ✅ Déterminer si c'est une vidéo
+      const hasVideo = selectedAssets.some(a => 
+        a.kind === 'video_premium' || (a.kind as string) === 'video'
+      );
+      const assetLabel = hasVideo
+        ? (selectedIds.length === 1 ? "vidéo" : "vidéos/visuels")
+        : (selectedIds.length === 1 ? "visuel" : "visuels");
       
-      // ✅ Démarrer le suivi de complétion
+      // ✅ Message de confirmation dans le chat
+      const generationMessage: ChatMessage = {
+        role: "assistant",
+        text: `Génération lancée (${selectedIds.length} ${assetLabel})`,
+        node: assistantCard(
+          <div className="space-y-2 text-sm">
+            <p>✅ <strong>Génération lancée !</strong></p>
+            <p>
+              {selectedIds.length} {assetLabel} en cours de création.
+              {hasVideo && " Les vidéos peuvent prendre quelques minutes."}
+            </p>
+            <p className="text-muted-foreground">
+              Je te préviendrai ici dès que c'est prêt ! 🔔
+            </p>
+          </div>,
+          false,
+        ),
+      };
+      setMsgs((m) => [...m, generationMessage]);
+      
+      toast.success(`${selectedIds.length} ${assetLabel} en cours de génération !`);
+      
+      // ✅ Démarrer le suivi de complétion avec callback
       if (result.orderIds?.length) {
-        trackOrders(result.orderIds);
+        trackOrders(result.orderIds, {
+          isVideo: hasVideo,
+          onComplete: (completed, failed) => {
+            // ✅ Ajouter un message "Terminé" dans le chat
+            const completionMessage: ChatMessage = {
+              role: "assistant",
+              text: completed > 0 
+                ? `Génération terminée ! ${completed} ${assetLabel} prêt(s).`
+                : "La génération a échoué.",
+              node: assistantCard(
+                <div className="space-y-2 text-sm">
+                  {completed > 0 ? (
+                    <>
+                      <p>🎉 <strong>C'est prêt !</strong></p>
+                      <p>{completed} {assetLabel} {completed > 1 ? 'ont été créés' : 'a été créé'} avec succès.</p>
+                      <button
+                        onClick={() => navigate(hasVideo ? '/library?tab=videos' : '/library')}
+                        className="inline-block mt-2 px-4 py-2 rounded-md text-sm font-medium text-white"
+                        style={{ background: `linear-gradient(135deg, ${BRAND.mint}, ${BRAND.mintDark})` }}
+                      >
+                        Ouvrir la bibliothèque →
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p>❌ <strong>Échec de la génération</strong></p>
+                      <p>Désolé, la génération n'a pas abouti. Réessaie ou contacte le support.</p>
+                    </>
+                  )}
+                  {failed > 0 && completed > 0 && (
+                    <p className="text-muted-foreground text-xs">
+                      ⚠️ {failed} asset(s) ont échoué.
+                    </p>
+                  )}
+                </div>,
+                false,
+              ),
+            };
+            setMsgs((m) => [...m, completionMessage]);
+          },
+        });
       }
       setShowIntentPanel(false);
       setPendingPack(null);
