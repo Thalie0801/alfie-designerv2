@@ -72,6 +72,11 @@ export function handleVideoGenerationError(error: VideoGenerationError) {
   return false;
 }
 
+interface TrackOrdersOptions {
+  isVideo?: boolean;
+  onComplete?: (completedCount: number, failedCount: number) => void;
+}
+
 export function useOrderCompletion() {
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -82,11 +87,13 @@ export function useOrderCompletion() {
     }
   }, []);
 
-  const trackOrders = useCallback((orderIds: string[]) => {
+  const trackOrders = useCallback((orderIds: string[], options?: TrackOrdersOptions) => {
     if (!orderIds.length) return;
 
+    const { isVideo = false, onComplete } = options || {};
     const startTime = Date.now();
-    const maxDuration = 5 * 60 * 1000; // 5 minutes max
+    // ✅ Timeout étendu pour les vidéos (15 min) vs images (5 min)
+    const maxDuration = isVideo ? 15 * 60 * 1000 : 5 * 60 * 1000;
     const pollInterval = 5000; // 5 secondes
 
     const checkStatus = async () => {
@@ -130,18 +137,25 @@ export function useOrderCompletion() {
         // Tous terminés (succès ou échec)
         if (completed + failed === total) {
           stopPolling();
+          
+          // ✅ Appeler le callback onComplete
+          if (onComplete) {
+            onComplete(completed, failed);
+          }
 
           if (failed === 0) {
             // ✅ Succès total
             toast({
               title: "✅ Génération terminée !",
-              description: "Retrouve tes visuels dans la bibliothèque 🎨",
+              description: isVideo 
+                ? "Ta vidéo est prête ! Retrouve-la dans la bibliothèque 🎬" 
+                : "Retrouve tes visuels dans la bibliothèque 🎨",
             });
           } else if (completed > 0) {
             // ⚠️ Succès partiel
             toast({
               title: "⚠️ Génération partiellement terminée",
-              description: `${completed}/${total} visuels générés. Certains ont échoué.`,
+              description: `${completed}/${total} ${isVideo ? 'vidéo(s)' : 'visuels'} générés. Certains ont échoué.`,
               variant: "destructive",
             });
           } else {
