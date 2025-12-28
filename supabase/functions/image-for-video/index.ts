@@ -28,12 +28,26 @@ interface ImageForVideoRequest {
   brandId?: string;
   useBrandKit?: boolean;
   userId?: string;
+  overlayLines?: string[]; // ✅ Texte à afficher directement sur l'image (Nano Banana)
 }
 
 /**
  * Traduit un prompt FR en prompt EN optimisé pour image
+ * Si overlayLines fourni, inclut le texte dans le prompt au lieu de l'interdire
  */
-async function translatePromptToEnglish(frenchPrompt: string): Promise<string> {
+async function translatePromptToEnglish(frenchPrompt: string, overlayLines?: string[]): Promise<string> {
+  // ✅ Déterminer l'instruction texte selon overlayLines
+  const hasTextToDisplay = overlayLines && overlayLines.length > 0 && overlayLines.some(l => l.trim());
+  
+  let textInstruction: string;
+  if (hasTextToDisplay) {
+    const textToDisplay = overlayLines!.filter(l => l.trim()).join(" | ");
+    textInstruction = `IMPORTANT: Display this text prominently on the image, large bold readable font, centered, white text with subtle shadow for mobile readability: "${textToDisplay}". Maximum 2 lines.`;
+    console.log("[image-for-video] 📝 Text overlay requested:", textToDisplay);
+  } else {
+    textInstruction = "VISUAL ONLY, no text, no letters, no words visible.";
+  }
+
   try {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -48,7 +62,7 @@ async function translatePromptToEnglish(frenchPrompt: string): Promise<string> {
             role: "system",
             content: `You are a professional translator. Translate the following French image description to English. 
 Keep it concise and visual. Output ONLY the English translation, nothing else.
-Add "VISUAL ONLY, no text, no letters, no words visible" at the end.`,
+${hasTextToDisplay ? 'Do NOT add any "no text" instruction.' : 'Add "VISUAL ONLY, no text, no letters, no words visible" at the end.'}`,
           },
           { role: "user", content: frenchPrompt },
         ],
@@ -58,15 +72,17 @@ Add "VISUAL ONLY, no text, no letters, no words visible" at the end.`,
 
     if (!response.ok) {
       console.warn("[image-for-video] Translation failed, using original prompt");
-      return `${frenchPrompt}. VISUAL ONLY, no text, no letters, no words visible.`;
+      return `${frenchPrompt}. ${textInstruction}`;
     }
 
     const data = await response.json();
-    const translated = data.choices?.[0]?.message?.content?.trim();
-    return translated || `${frenchPrompt}. VISUAL ONLY, no text, no letters, no words visible.`;
+    let translated = data.choices?.[0]?.message?.content?.trim() || frenchPrompt;
+    
+    // ✅ Ajouter l'instruction texte appropriée
+    return `${translated}. ${textInstruction}`;
   } catch (error) {
     console.error("[image-for-video] Translation error:", error);
-    return `${frenchPrompt}. VISUAL ONLY, no text, no letters, no words visible.`;
+    return `${frenchPrompt}. ${textInstruction}`;
   }
 }
 
@@ -181,7 +197,13 @@ Deno.serve(async (req) => {
 
   try {
     const body: ImageForVideoRequest = await req.json();
-    const { renderId, prompt, aspectRatio = "9:16", brandId, useBrandKit = true, userId } = body;
+    const { renderId, prompt, aspectRatio = "9:16", brandId, useBrandKit = true, userId, overlayLines } = body;
+    
+    console.log("[image-for-video] 📋 Request:", { 
+      hasOverlayLines: !!(overlayLines?.length), 
+      overlayLinesPreview: overlayLines?.slice(0, 2),
+      promptPreview: prompt?.slice(0, 50) 
+    });
 
     if (!prompt) {
       return jsonResponse({ error: "Missing prompt" }, 400);
@@ -240,9 +262,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 2. Translate FR → EN
-    const englishPrompt = await translatePromptToEnglish(enrichedPrompt);
-    console.log("[image-for-video] 🌐 English prompt:", englishPrompt.slice(0, 100));
+    // 2. Translate FR → EN (avec support overlayLines)
+    const englishPrompt = await translatePromptToEnglish(enrichedPrompt, overlayLines);
+    console.log("[image-for-video] 🌐 English prompt:", englishPrompt.slice(0, 150));
 
     // 3. Add aspect ratio hint
     const aspectHint = aspectRatio === "9:16" 
