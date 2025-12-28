@@ -1,7 +1,7 @@
 /**
  * Edge Function: image-for-video
  * Génère une image de référence pour le pipeline "Image First → Video"
- * Utilise Gemini 2.5 Flash Image via Lovable AI Gateway
+ * Utilise Nano Banana Pro (Gemini 3 Pro Image) via Lovable AI Gateway
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
@@ -90,7 +90,7 @@ ${hasTextToDisplay ? 'Do NOT add any "no text" instruction.' : 'Add "VISUAL ONLY
  * Génère une image via Gemini 2.5 Flash Image
  */
 async function generateImageWithGemini(prompt: string): Promise<string | null> {
-  console.log("[image-for-video] 🎨 Generating image with Gemini Flash Image...");
+  console.log("[image-for-video] 🎨 Generating image with Nano Banana Pro...");
   
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -99,7 +99,7 @@ async function generateImageWithGemini(prompt: string): Promise<string | null> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash-image-preview",
+      model: "google/gemini-3-pro-image-preview",
       messages: [
         {
           role: "user",
