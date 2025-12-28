@@ -7,17 +7,17 @@ export const CONFIG_VERSION = '2025-10-31.1';
 
 // Feature flags (produit)
 export const FEATURE_FLAGS = {
-  VEO3_ENABLED: false,
+  VEO3_ENABLED: true, // ✅ Veo 3.1 FAST activé par défaut
   CANVA_API_ENABLED: false,
-  VIDEO_GENERATION_ENABLED: true, // ✅ Réactivé avec fallback Sora2 → Seededance → Kling
+  VIDEO_GENERATION_ENABLED: true,
 } as const;
 
 export const SYSTEM_CONFIG = {
-  // Coûts vidéo en Woofs (coût unifié pour tous les providers)
-  VEO3_WOOF_FACTOR: 4,
-  SORA_WOOF_FACTOR: 1,
-  SEEDEDANCE_WOOF_FACTOR: 1, // ByteDance Seededance (Replicate)
-  KLING_WOOF_FACTOR: 1, // Kling v2.5-turbo-pro (Replicate)
+  // Coûts vidéo en Woofs - Veo 3.1 est le moteur principal
+  VEO3_WOOF_FACTOR: 25, // ✅ 25 Woofs par vidéo Veo 3.1 (6-8 secondes, 1080p, audio optionnel)
+  SORA_WOOF_FACTOR: 1,  // Deprecated
+  SEEDEDANCE_WOOF_FACTOR: 1, // Deprecated
+  KLING_WOOF_FACTOR: 1, // Deprecated
 
   // Vidéo (qualité/latence)
   VIDEO: {

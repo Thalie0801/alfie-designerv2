@@ -5,7 +5,7 @@ import { SYSTEM_CONFIG } from '@/config/systemConfig';
 export const VEO3_WOOF_FACTOR = SYSTEM_CONFIG.VEO3_WOOF_FACTOR;
 export const SORA_WOOF_FACTOR = SYSTEM_CONFIG.SORA_WOOF_FACTOR;
 
-export type VideoEngine = 'sora' | 'veo3';
+export type VideoEngine = 'veo3' | 'sora';
 
 export interface VideoRoutingDecision {
   engine: VideoEngine;
@@ -23,16 +23,16 @@ export interface VideoRequest {
  * Détermine quel moteur vidéo utiliser selon les règles produit
  * 
  * Règles actuelles:
- * - Sora2 uniquement pour l'instant (via Kie AI)
- * - Veo 3 sera activé quand FEATURE_FLAGS.VEO3_ENABLED=true
+ * - Veo 3.1 FAST via Vertex AI (moteur principal depuis janvier 2025)
+ * - 6-8 secondes, 1080p, audio généré automatiquement
+ * - 25 Woofs par vidéo
  */
 export function routeVideoEngine(_request: VideoRequest): VideoRoutingDecision {
-  // Sora 2 via Kie AI (disponible depuis décembre 2024)
-  // TODO: Activer Veo 3 quand FEATURE_FLAGS.VEO3_ENABLED=true
+  // ✅ Veo 3.1 FAST via Vertex AI (moteur principal)
   return {
-    engine: 'sora',
-    woofCost: SORA_WOOF_FACTOR,
-    reason: 'Sora 2 via Kie AI (disponible depuis décembre 2024)'
+    engine: 'veo3',
+    woofCost: VEO3_WOOF_FACTOR,
+    reason: 'Veo 3.1 FAST via Vertex AI (1080p, 6-8s, audio)'
   };
 }
 
