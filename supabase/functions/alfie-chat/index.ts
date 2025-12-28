@@ -67,6 +67,31 @@ function hasExplicitTopic(message: string): boolean {
   return hasTopic;
 }
 
+/**
+ * Détecte le mode carrousel demandé par l'utilisateur.
+ * Retourne 'background_only' si l'utilisateur veut juste les fonds,
+ * 'standard' s'il veut le carrousel complet avec texte,
+ * null si pas de préférence détectée.
+ */
+function detectCarouselMode(message: string): 'background_only' | 'standard' | null {
+  const lower = (message || "").toLowerCase();
+  
+  // Patterns pour "background only" / fonds seuls
+  if (/(fond[s]?\s+seul|background|juste\s+les?\s+fond|sans\s+texte|que\s+les?\s+fond|fonds?\s+uniquement)/i.test(lower)) {
+    console.log("[detectCarouselMode] Détecté: background_only");
+    return 'background_only';
+  }
+  
+  // Patterns pour "carrousel complet" avec texte
+  if (/(complet|avec\s+texte|texte\s+intégré|carrousel\s+complet|visuels?\s+complet)/i.test(lower)) {
+    console.log("[detectCarouselMode] Détecté: standard");
+    return 'standard';
+  }
+  
+  console.log("[detectCarouselMode] Aucune préférence détectée");
+  return null;
+}
+
 // --- AI config (ASCII only) ---
 const AI_CONFIG = {
   model: env("ALFIE_AI_MODEL") ?? "google/gemini-2.5-flash",
@@ -264,9 +289,16 @@ Pour TOUTE demande de création, tu DOIS appeler un tool :
 - **Brand Kit** → show_brandkit
 
 🚨 **CARROUSEL - INFORMATIONS OBLIGATOIRES AVANT plan_carousel :**
-Si l'utilisateur demande un carrousel SANS préciser le sujet/thème :
-1) Demande OBLIGATOIREMENT : "🎠 Super ! Sur quel **thème/sujet** tu veux ton carrousel ? Et c'est pour quel réseau (Instagram, LinkedIn...) ?"
-2) NE JAMAIS appeler plan_carousel tant que le **sujet** n'est pas clairement défini
+Si l'utilisateur demande un carrousel SANS préciser toutes les infos, demande OBLIGATOIREMENT :
+1) Le **thème/sujet** du carrousel
+2) Le **réseau** cible (Instagram, LinkedIn, TikTok...)
+3) Le **style** : "Fonds seuls 🖼️" (pour ajouter son texte) ou "Carrousel complet ✨" (avec texte intégré)
+
+NE JAMAIS appeler plan_carousel tant que ces 3 infos ne sont pas connues.
+
+**Interprétation des réponses style :**
+- "fonds seuls" / "background" / "juste les fonds" / "sans texte" → carouselMode = "background_only"
+- "complet" / "avec texte" / "carrousel complet" → carouselMode = "standard"
 
 ❌ INTERDIT : Appeler plan_carousel avec un sujet vague comme "un carrousel" ou "mon contenu"
 ✅ VALIDE : Appeler plan_carousel avec "5 erreurs SEO à éviter" ou "Comment augmenter tes ventes"
@@ -719,14 +751,20 @@ Utilise **classify_intent** en premier !`;
             if (!hasExplicitTopic(lastUserMessage)) {
               console.log("[Synthetic] Carousel demandé mais sujet vague → demande de précision");
               
-              // Demander le sujet au lieu de lancer plan_carousel directement
+              // Demander le sujet + style au lieu de lancer plan_carousel directement
               return new Response(
                 JSON.stringify({
                   choices: [
                     {
                       message: {
                         role: "assistant",
-                        content: "🎠 Super choix le carrousel ! Sur quel **thème/sujet** tu veux qu'on travaille ? Et c'est pour quel réseau (Instagram, LinkedIn, TikTok...) ?",
+                        content: `🎠 Super choix le carrousel ! J'ai besoin de quelques infos :
+
+1️⃣ **Thème/Sujet** : Sur quoi porte ton carrousel ?
+2️⃣ **Réseau** : Instagram, LinkedIn, TikTok... ?
+3️⃣ **Style** : Tu préfères :
+   • **Fonds seuls** 🖼️ (pour ajouter ton texte toi-même)
+   • **Carrousel complet** ✨ (avec texte intégré dans les visuels)`,
                       },
                     },
                   ],
@@ -738,10 +776,20 @@ Utilise **classify_intent** en premier !`;
             console.log("[Synthetic] Injecting plan_carousel...");
 
             try {
+              // Détecter le mode carrousel demandé
+              const detectedMode = detectCarouselMode(lastUserMessage);
+              const carouselMode = detectedMode || 'standard'; // Par défaut: carrousel complet
+              console.log("[Synthetic] carouselMode détecté:", carouselMode);
+
               const { data: planData } = await supabase.functions.invoke(
                 "alfie-plan-carousel",
                 {
-                  body: { prompt: lastUserMessage, slideCount: 5, brandKit: brandKit },
+                  body: { 
+                    prompt: lastUserMessage, 
+                    slideCount: 5, 
+                    brandKit: brandKit,
+                    carouselMode: carouselMode 
+                  },
                   headers: functionHeaders,
                 },
               );
