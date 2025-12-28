@@ -31,6 +31,42 @@ function isApproval(message: string): boolean {
   );
 }
 
+/**
+ * Vérifie si le message contient un sujet/thème explicite pour un carrousel.
+ * Retourne false si le message est trop vague (ex: "fais-moi un carrousel")
+ */
+function hasExplicitTopic(message: string): boolean {
+  const lower = (message || "").toLowerCase().trim();
+  
+  // Patterns trop vagues qui nécessitent plus de détails
+  const vaguePatterns = [
+    /^(fais|crée|génère|fait|créer|générer)(-|\s+)?(moi\s+)?(un|une|des|le|la|les)?\s*(carrousel|carousel)s?\s*$/i,
+    /^(je\s+veux|j'aimerais|je\s+voudrais)\s+(un|une|des)?\s*(carrousel|carousel)s?\s*$/i,
+    /^(carrousel|carousel)\s*$/i,
+    /^(un|une|des)?\s*(carrousel|carousel)s?\s*(svp|stp|please)?\s*$/i,
+  ];
+  
+  // Si le message match un pattern vague → pas de sujet clair
+  if (vaguePatterns.some(p => p.test(lower))) {
+    console.log("[hasExplicitTopic] Message trop vague:", lower);
+    return false;
+  }
+  
+  // Retirer les mots-clés carrousel pour voir ce qui reste
+  const withoutCarousel = lower
+    .replace(/(carrousel|carousel|slides?|diapositives?)/gi, '')
+    .replace(/(fais|crée|génère|fait|créer|générer|je\s+veux|j'aimerais)/gi, '')
+    .replace(/(un|une|des|le|la|les|moi)/gi, '')
+    .replace(/(\d+)\s*(slides?)?/gi, '') // Retirer "5 slides"
+    .replace(/(pour|sur|de|à|avec)/gi, '')
+    .trim();
+  
+  // Il faut au moins 10 caractères de contenu significatif pour considérer qu'il y a un sujet
+  const hasTopic = withoutCarousel.length >= 10;
+  console.log("[hasExplicitTopic] Contenu restant:", withoutCarousel, "→ hasTopic:", hasTopic);
+  return hasTopic;
+}
+
 // --- AI config (ASCII only) ---
 const AI_CONFIG = {
   model: env("ALFIE_AI_MODEL") ?? "google/gemini-2.5-flash",
@@ -221,11 +257,19 @@ ${fontsText || "Non définie"}
 
 🚨 **RÈGLE ABSOLUE : TOUJOURS UTILISER LES TOOLS**
 Pour TOUTE demande de création, tu DOIS appeler un tool :
-- **Carrousel** → classify_intent → plan_carousel → (après validation) create_carousel
+- **Carrousel** → classify_intent → **DEMANDER LE SUJET SI MANQUANT** → plan_carousel → (après validation) create_carousel
 - **Image** → classify_intent → generate_image
 - **Vidéo** → classify_intent → generate_video
 - **Crédits** → show_usage
 - **Brand Kit** → show_brandkit
+
+🚨 **CARROUSEL - INFORMATIONS OBLIGATOIRES AVANT plan_carousel :**
+Si l'utilisateur demande un carrousel SANS préciser le sujet/thème :
+1) Demande OBLIGATOIREMENT : "🎠 Super ! Sur quel **thème/sujet** tu veux ton carrousel ? Et c'est pour quel réseau (Instagram, LinkedIn...) ?"
+2) NE JAMAIS appeler plan_carousel tant que le **sujet** n'est pas clairement défini
+
+❌ INTERDIT : Appeler plan_carousel avec un sujet vague comme "un carrousel" ou "mon contenu"
+✅ VALIDE : Appeler plan_carousel avec "5 erreurs SEO à éviter" ou "Comment augmenter tes ventes"
 
 ⛔ **INTERDIT :** Répondre en texte seul pour les demandes de création.
 
@@ -659,7 +703,7 @@ Utilise **classify_intent** en premier !`;
           continue;
         }
 
-        // Injection synthétique #2 (iteration 3) → plan_carousel si intent carousel
+        // Injection synthétique #2 (iteration 3) → plan_carousel si intent carousel ET sujet explicite
         if (iterationCount === 3 && syntheticInjectionDone) {
           const lastUser = conversationMessages.filter((m) => m.role === "user").pop();
           const lastUserMessage =
@@ -671,6 +715,26 @@ Utilise **classify_intent** en premier !`;
           const detected = detectIntent(lastUserMessage);
 
           if (detected === "carousel") {
+            // Vérifier si le sujet est assez précis avant de lancer plan_carousel
+            if (!hasExplicitTopic(lastUserMessage)) {
+              console.log("[Synthetic] Carousel demandé mais sujet vague → demande de précision");
+              
+              // Demander le sujet au lieu de lancer plan_carousel directement
+              return new Response(
+                JSON.stringify({
+                  choices: [
+                    {
+                      message: {
+                        role: "assistant",
+                        content: "🎠 Super choix le carrousel ! Sur quel **thème/sujet** tu veux qu'on travaille ? Et c'est pour quel réseau (Instagram, LinkedIn, TikTok...) ?",
+                      },
+                    },
+                  ],
+                }),
+                { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+              );
+            }
+
             console.log("[Synthetic] Injecting plan_carousel...");
 
             try {
