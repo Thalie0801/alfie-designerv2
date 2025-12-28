@@ -1191,14 +1191,28 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
     throw new Error("CLOUDINARY_CLOUD_NAME not configured");
   }
 
-  const durationSec = duration || payload.durationSeconds || 5;
+  const durationSec = duration || payload.durationSeconds || 8; // ✅ 8s par défaut pour Veo 3.1
   const useBrandKit = resolveUseBrandKit(payload, jobMeta);
   const visualStyleCategory = payload.visualStyleCategory || payload.visualStyle || 'background';
-  // ✅ Vidéos TOUJOURS sans audio (sera ajouté via Canva plus tard)
-  const withAudio = false;
+  
+  // ✅ Veo 3.1 supporte l'audio généré automatiquement (musique d'ambiance)
+  // Respecter le choix utilisateur, sinon ON par défaut pour les vidéos premium
+  const withAudio = payload.withAudio !== false;
   
   // ✅ Extraire le script vidéo s'il existe (pour stockage metadata uniquement)
   const videoScript = generatedTexts?.video || null;
+  
+  // ✅ Charger le brand kit tôt pour le diagnostic
+  const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : null;
+  
+  console.log("[processGenerateVideo] 🏢 Brand Kit check:", {
+    useBrandKit,
+    hasBrandMini: !!brandMini,
+    brandNiche: brandMini?.niche,
+    brandPalette: brandMini?.palette?.slice(0, 2),
+    brandVisualMood: brandMini?.visual_mood,
+  });
+  
   console.log("[processGenerateVideo] ⚙️ Config:", {
     engine,
     useBrandKit,
@@ -1231,11 +1245,16 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       videoPrompt = buildVideoPrompt(payload, useBrandKit, brandMini);
     }
 
+    // ✅ Enrichir le prompt avec des indices de musique si audio activé
+    if (withAudio) {
+      videoPrompt += " Background music matching the mood. Ambient soundtrack appropriate for the scene.";
+    }
+
     // ✅ Appeler generate-video avec provider "veo3" et timeout 6 minutes
     const veoResult = await callFn<any>("generate-video", {
       prompt: videoPrompt,
       aspectRatio: aspectRatio || "9:16",
-      withAudio: false, // ✅ TOUJOURS sans audio
+      withAudio, // ✅ Propager le choix utilisateur (true par défaut)
       duration: durationSec,
       provider: "veo3", // ✅ Explicite: VEO 3 FAST
       userId,

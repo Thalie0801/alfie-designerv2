@@ -46,7 +46,9 @@ export interface UnifiedAlfieIntent {
   visualStyleCategory?: VisualStyleCategory; // Fond/Personnage/Produit
   campaign?: string;
   copyBrief?: string; // Brief libre optionnel
-  // ✅ NEW: Cohérence et scripts multi-assets
+  withAudio?: boolean; // ✅ Audio pour vidéos Veo 3.1 (musique d'ambiance)
+  engine?: string; // ✅ Moteur vidéo (veo_3_1, etc.)
+  // ✅ Cohérence et scripts multi-assets
   coherenceGroup?: string; // Pour lier visuellement des images multiples
   scriptGroup?: string; // Pour lier des scènes vidéo
   sceneOrder?: number; // Ordre de la scène dans un script vidéo
