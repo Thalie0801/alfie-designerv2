@@ -482,7 +482,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
                         }
                       </p>
                       
-                      {/* ✅ Toggle audio pour les vidéos */}
+                      {/* ✅ Toggle audio pour les vidéos Veo 3.1 (musique générée automatiquement) */}
                       {asset.kind === 'video_premium' && (
                         <button
                           type="button"
@@ -491,16 +491,16 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
                             e.stopPropagation();
                             toggleAudio(asset.id);
                           }}
-                          className={`flex items-center gap-1.5 mt-2 px-2 py-1 rounded text-xs transition-colors ${
+                          className={`flex items-center gap-1.5 mt-2 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
                             audioSettings[asset.id] 
-                              ? 'bg-primary/20 text-primary' 
-                              : 'bg-muted text-muted-foreground'
+                              ? 'bg-primary/20 text-primary border border-primary/30' 
+                              : 'bg-muted text-muted-foreground border border-transparent'
                           }`}
                         >
                           {audioSettings[asset.id] ? (
-                            <><Volume2 className="w-3 h-3" /> Avec son</>
+                            <><Volume2 className="w-3.5 h-3.5" /> Musique auto 🎵</>
                           ) : (
-                            <><VolumeX className="w-3 h-3" /> Sans son</>
+                            <><VolumeX className="w-3.5 h-3.5" /> Sans audio</>
                           )}
                         </button>
                       )}

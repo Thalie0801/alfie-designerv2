@@ -860,12 +860,12 @@ export default function ChatWidget() {
       // ✅ ÉTAPE 3 : Envoyer le pack AVEC les textes générés
       const packWithTexts = { ...pendingPack, assets: assetsWithTexts };
       
-      // Vidéos toujours sans audio (sera ajouté via Canva plus tard)
+      // ✅ Veo 3.1 supporte l'audio généré automatiquement (musique d'ambiance)
       const finalPack = {
         ...packWithTexts,
         assets: packWithTexts.assets.map(a => ({
           ...a,
-          withAudio: false, // ✅ Toujours sans audio - sera ajouté via Canva
+          withAudio: a.kind === 'video_premium' ? (a.withAudio ?? true) : undefined, // ✅ Audio ON par défaut pour vidéos Veo 3.1
         }))
       };
       
