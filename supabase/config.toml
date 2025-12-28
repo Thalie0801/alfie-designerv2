@@ -65,3 +65,9 @@ verify_jwt = false
 
 [functions.alfie-learn-term]
 verify_jwt = true
+
+[functions.image-for-video]
+verify_jwt = false
+
+[functions.tts-and-render-final]
+verify_jwt = false

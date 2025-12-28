@@ -2230,6 +2230,105 @@ export type Database = {
         }
         Relationships: []
       }
+      video_renders: {
+        Row: {
+          aspect_ratio: string | null
+          brand_id: string | null
+          cloudinary_audio_id: string | null
+          cloudinary_base_id: string | null
+          cloudinary_final_id: string | null
+          cloudinary_final_url: string | null
+          created_at: string | null
+          duration_seconds: number | null
+          error: string | null
+          error_step: string | null
+          id: string
+          order_id: string | null
+          overlay_spec: Json | null
+          reference_cloudinary_id: string | null
+          reference_image_url: string | null
+          srt: string | null
+          status: string
+          updated_at: string | null
+          user_id: string
+          veo_base_url: string | null
+          veo_operation: string | null
+          visual_prompt: string
+          visual_prompt_en: string | null
+          voiceover_text: string | null
+          with_audio: boolean | null
+        }
+        Insert: {
+          aspect_ratio?: string | null
+          brand_id?: string | null
+          cloudinary_audio_id?: string | null
+          cloudinary_base_id?: string | null
+          cloudinary_final_id?: string | null
+          cloudinary_final_url?: string | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          error?: string | null
+          error_step?: string | null
+          id?: string
+          order_id?: string | null
+          overlay_spec?: Json | null
+          reference_cloudinary_id?: string | null
+          reference_image_url?: string | null
+          srt?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id: string
+          veo_base_url?: string | null
+          veo_operation?: string | null
+          visual_prompt: string
+          visual_prompt_en?: string | null
+          voiceover_text?: string | null
+          with_audio?: boolean | null
+        }
+        Update: {
+          aspect_ratio?: string | null
+          brand_id?: string | null
+          cloudinary_audio_id?: string | null
+          cloudinary_base_id?: string | null
+          cloudinary_final_id?: string | null
+          cloudinary_final_url?: string | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          error?: string | null
+          error_step?: string | null
+          id?: string
+          order_id?: string | null
+          overlay_spec?: Json | null
+          reference_cloudinary_id?: string | null
+          reference_image_url?: string | null
+          srt?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+          veo_base_url?: string | null
+          veo_operation?: string | null
+          visual_prompt?: string
+          visual_prompt_en?: string | null
+          voiceover_text?: string | null
+          with_audio?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_renders_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_renders_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
+          },
+        ]
+      }
       video_segments: {
         Row: {
           created_at: string | null
