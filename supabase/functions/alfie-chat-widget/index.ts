@@ -224,8 +224,121 @@ function parsePack(text: string): any | null {
       }
     }
     
-    return null;
+  return null;
   }
+}
+
+/**
+ * ✅ AUTO-SPLIT MULTI-CLIPS : Détecte "CLIP 1, CLIP 2..." et transforme en N assets distincts
+ * Si le pack contient 1 seul video_premium mais la demande contient N clips → split en N assets
+ */
+function autoSplitMultiClips(pack: any, userMessage: string): any {
+  if (!pack || !pack.assets || !userMessage) return pack;
+  
+  // Compter les videos dans le pack actuel
+  const videoAssets = pack.assets.filter((a: any) => a.kind === 'video_premium');
+  if (videoAssets.length !== 1) {
+    // Déjà 0 ou plusieurs vidéos → pas de split nécessaire
+    return pack;
+  }
+  
+  // Détecter le pattern "CLIP X" dans le message utilisateur
+  const clipMatches = userMessage.match(/CLIP\s*\d+/gi);
+  const clipCount = clipMatches ? new Set(clipMatches.map(m => m.toUpperCase())).size : 0;
+  
+  // Alternative: détecter "X clips séparés" ou "générer X clips"
+  const numericClipMatch = userMessage.match(/(\d+)\s*(clips?|vidéos?|reels?)\s*(séparés?|distincts?|différents?)?/i);
+  const requestedCount = numericClipMatch ? parseInt(numericClipMatch[1], 10) : 0;
+  
+  const targetCount = Math.max(clipCount, requestedCount);
+  
+  if (targetCount <= 1) {
+    // Pas de demande multi-clips détectée
+    return pack;
+  }
+  
+  console.log(`🎬 AUTO-SPLIT: Detected ${targetCount} clips request, splitting single video into ${targetCount} assets`);
+  
+  // Extraire les infos de chaque clip depuis le message
+  const clipInfos = extractClipInfos(userMessage, targetCount);
+  
+  // Récupérer le template de l'asset vidéo existant
+  const templateAsset = videoAssets[0];
+  
+  // Créer N assets distincts
+  const newVideoAssets = clipInfos.map((info, idx) => ({
+    id: `vid-${idx + 1}`,
+    kind: 'video_premium' as const,
+    title: info.title || `Clip ${idx + 1}`,
+    prompt: info.prompt || templateAsset.prompt || `Clip ${idx + 1} - ${info.title}`,
+    ratio: templateAsset.ratio || '9:16',
+    platform: templateAsset.platform || 'instagram',
+    goal: templateAsset.goal || 'engagement',
+    tone: templateAsset.tone,
+    durationSeconds: info.duration || 2,
+    postProdMode: true, // ✅ Toujours activer la post-prod
+    overlayLines: info.overlayLines.length > 0 ? info.overlayLines : ['Texte', 'ici'],
+    withAudio: true,
+    scriptGroup: `clips-${Date.now()}`, // Lier pour assemblage optionnel
+    sceneOrder: idx + 1,
+  }));
+  
+  // Remplacer l'unique vidéo par les N vidéos
+  const otherAssets = pack.assets.filter((a: any) => a.kind !== 'video_premium');
+  pack.assets = [...otherAssets, ...newVideoAssets];
+  
+  console.log(`🎬 AUTO-SPLIT: Pack now has ${pack.assets.length} assets (${newVideoAssets.length} videos)`);
+  
+  return pack;
+}
+
+/**
+ * Extrait les informations de chaque clip depuis le message utilisateur
+ */
+function extractClipInfos(message: string, count: number): Array<{
+  title: string;
+  prompt: string;
+  duration: number;
+  overlayLines: string[];
+}> {
+  const infos: Array<{ title: string; prompt: string; duration: number; overlayLines: string[] }> = [];
+  
+  // Essayer de parser les blocs CLIP X
+  const clipBlocks = message.split(/CLIP\s*\d+\s*[:\-–—]?\s*/i).filter(b => b.trim());
+  
+  for (let i = 0; i < count; i++) {
+    const block = clipBlocks[i] || '';
+    
+    // Extraire la durée (ex: "2s", "3 sec")
+    const durationMatch = block.match(/(\d+(?:\.\d+)?)\s*s(?:ec(?:ondes?)?)?/i);
+    const duration = durationMatch ? Math.min(Math.max(parseFloat(durationMatch[1]), 1), 8) : 2;
+    
+    // Extraire le titre (ex: "Hook", "CTA", parenthèses)
+    const titleMatch = block.match(/\(([^)]+)\)/);
+    const title = titleMatch ? titleMatch[1].trim() : `Clip ${i + 1}`;
+    
+    // Extraire les textes entre guillemets pour overlayLines
+    const textMatches = block.match(/["«"]([^"»"]+)["»"]/g) || [];
+    const overlayLines = textMatches
+      .map(t => t.replace(/["«»""]/g, '').trim())
+      .filter(t => t.length > 0 && t.length < 50)
+      .slice(0, 3); // Max 3 lignes par clip
+    
+    // Générer un prompt basé sur le contenu du bloc
+    const cleanBlock = block
+      .replace(/["«"]([^"»"]+)["»"]/g, '') // Retirer les guillemets
+      .replace(/\(\d+(?:\.\d+)?s?\)/g, '') // Retirer les durées entre parenthèses
+      .replace(/\d+(?:\.\d+)?\s*s(?:ec)?/gi, '') // Retirer les durées
+      .trim();
+    
+    const prompt = cleanBlock.length > 10 
+      ? cleanBlock.substring(0, 200) 
+      : `${title} - animation dynamique`;
+    
+    infos.push({ title, prompt, duration, overlayLines });
+  }
+  
+  return infos;
 }
 
 /**
@@ -394,8 +507,12 @@ Deno.serve(async (req) => {
     const rawReply = await callLLM(messages, SYSTEM_PROMPT, brandContext, woofsRemaining, useBrandKit, briefContext, userPlan, customTerms);
 
     // Parser le pack si présent
-    const pack = parsePack(rawReply);
+    let pack = parsePack(rawReply);
     const reply = cleanReply(rawReply);
+    
+    // ✅ AUTO-SPLIT: Détecter demande multi-clips et normaliser
+    const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop()?.content || '';
+    pack = autoSplitMultiClips(pack, lastUserMessage);
     
     // ✅ Log de debug enrichi pour diagnostic
     const hasPackTag = rawReply.toLowerCase().includes('<alfie-pack>');
