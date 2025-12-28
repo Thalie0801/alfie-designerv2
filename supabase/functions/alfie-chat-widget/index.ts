@@ -157,14 +157,11 @@ async function callLLM(
 
 /**
  * Parse le bloc <alfie-pack>{...}</alfie-pack> depuis la réponse LLM
- * Utilise indexOf/slice au lieu de regex pour un parsing robuste du JSON imbriqué
- * ✅ AMÉLIORÉ : Gère les variantes fréquentes et nettoie le JSON
+ * ✅ ULTRA-ROBUSTE : Tolère les JSON cassés, les newlines dans les strings, les balises manquantes
  */
 function parsePack(text: string): any | null {
   // ✅ Normaliser les variantes de balise : <alfie-pack >, <ALFIE-PACK>, etc.
   let normalizedText = text;
-  
-  // Remplacer les variantes par la forme canonique
   normalizedText = normalizedText.replace(/<alfie-pack\s*>/gi, '<alfie-pack>');
   normalizedText = normalizedText.replace(/<\/alfie-pack\s*>/gi, '</alfie-pack>');
   
@@ -177,15 +174,18 @@ function parsePack(text: string): any | null {
     return null;
   }
   
-  const endIdx = normalizedText.toLowerCase().indexOf(endTag.toLowerCase(), startIdx);
+  let endIdx = normalizedText.toLowerCase().indexOf(endTag.toLowerCase(), startIdx);
+  let jsonContent: string;
+  
   if (endIdx === -1 || endIdx <= startIdx) {
-    console.warn("📦 Found <alfie-pack> but missing closing tag");
-    return null;
+    // ✅ ROBUSTESSE : Balise fermante manquante → prendre jusqu'à la fin
+    console.warn("📦 Found <alfie-pack> but missing closing tag, attempting recovery...");
+    jsonContent = normalizedText.slice(startIdx + startTag.length).trim();
+  } else {
+    jsonContent = normalizedText.slice(startIdx + startTag.length, endIdx).trim();
   }
   
-  let jsonContent = normalizedText.slice(startIdx + startTag.length, endIdx).trim();
-  
-  // ✅ Nettoyer le JSON : retirer les backticks markdown, texte parasite
+  // ✅ Nettoyer le JSON : retirer les backticks markdown
   if (jsonContent.startsWith('```json')) {
     jsonContent = jsonContent.slice(7);
   } else if (jsonContent.startsWith('```')) {
@@ -196,22 +196,29 @@ function parsePack(text: string): any | null {
   }
   jsonContent = jsonContent.trim();
   
-  // ✅ Tenter de trouver le début du JSON si texte parasite
+  // ✅ Trouver le début du JSON si texte parasite
   const jsonStartIdx = jsonContent.indexOf('{');
   if (jsonStartIdx > 0) {
     console.log("📦 Cleaning preamble text before JSON");
     jsonContent = jsonContent.slice(jsonStartIdx);
   }
   
+  // ✅ SANITIZATION : Remplacer les vraies newlines dans les strings JSON (cause #1 d'échec)
+  // On remplace \r\n et \n par un espace (sauf ceux déjà échappés \\n)
+  jsonContent = jsonContent.replace(/(?<!\\)\r?\n/g, ' ');
+  
+  // ✅ Nettoyer les espaces multiples
+  jsonContent = jsonContent.replace(/\s+/g, ' ');
+  
   try {
     const parsed = JSON.parse(jsonContent);
     console.log("📦 Pack parsed successfully, assets count:", parsed.assets?.length || 0);
     return parsed;
   } catch (error) {
-    console.error("📦 Failed to parse alfie-pack JSON:", error);
-    console.error("📦 JSON preview (first 500 chars):", jsonContent.substring(0, 500));
+    console.error("📦 First parse attempt failed:", error);
+    console.error("📦 JSON preview (first 300 chars):", jsonContent.substring(0, 300));
     
-    // ✅ Tentative de réparation basique : trouver la dernière accolade fermante valide
+    // ✅ Tentative 2 : Trouver la dernière accolade fermante valide
     const lastBrace = jsonContent.lastIndexOf('}');
     if (lastBrace > 0) {
       const truncatedJson = jsonContent.slice(0, lastBrace + 1);
@@ -219,28 +226,47 @@ function parsePack(text: string): any | null {
         const parsed = JSON.parse(truncatedJson);
         console.log("📦 Pack parsed after truncation repair, assets count:", parsed.assets?.length || 0);
         return parsed;
-      } catch {
-        console.error("📦 Truncation repair also failed");
+      } catch (e2) {
+        console.error("📦 Truncation repair also failed:", e2);
       }
     }
     
-  return null;
+    // ✅ Tentative 3 : Extraire manuellement les champs essentiels (fallback ultime)
+    try {
+      const titleMatch = jsonContent.match(/"title"\s*:\s*"([^"]+)"/);
+      const assetsMatch = jsonContent.match(/"assets"\s*:\s*\[/);
+      if (titleMatch && assetsMatch) {
+        console.log("📦 Attempting minimal pack extraction...");
+        // Trouver le tableau assets
+        const assetsStart = jsonContent.indexOf('"assets"');
+        const bracketStart = jsonContent.indexOf('[', assetsStart);
+        let bracketCount = 1;
+        let bracketEnd = bracketStart + 1;
+        while (bracketCount > 0 && bracketEnd < jsonContent.length) {
+          if (jsonContent[bracketEnd] === '[') bracketCount++;
+          if (jsonContent[bracketEnd] === ']') bracketCount--;
+          bracketEnd++;
+        }
+        const assetsJson = jsonContent.slice(bracketStart, bracketEnd);
+        const minimalPack = `{"title":"${titleMatch[1]}","summary":"","assets":${assetsJson}}`;
+        const parsed = JSON.parse(minimalPack);
+        console.log("📦 Minimal pack extraction succeeded, assets count:", parsed.assets?.length || 0);
+        return parsed;
+      }
+    } catch (e3) {
+      console.error("📦 Minimal extraction also failed");
+    }
+    
+    return null;
   }
 }
 
 /**
- * ✅ AUTO-SPLIT MULTI-CLIPS : Détecte "CLIP 1, CLIP 2..." et transforme en N assets distincts
- * Si le pack contient 1 seul video_premium mais la demande contient N clips → split en N assets
+ * ✅ FORCE MULTI-CLIPS : Si "CLIP 1..N" ou "X clips", GARANTIT N assets video_premium
+ * Fonctionne même si pack est null ou contient 0/1 vidéo
  */
-function autoSplitMultiClips(pack: any, userMessage: string): any {
-  if (!pack || !pack.assets || !userMessage) return pack;
-  
-  // Compter les videos dans le pack actuel
-  const videoAssets = pack.assets.filter((a: any) => a.kind === 'video_premium');
-  if (videoAssets.length !== 1) {
-    // Déjà 0 ou plusieurs vidéos → pas de split nécessaire
-    return pack;
-  }
+function forceMultiClips(pack: any, userMessage: string): any {
+  if (!userMessage) return pack;
   
   // Détecter le pattern "CLIP X" dans le message utilisateur
   const clipMatches = userMessage.match(/CLIP\s*\d+/gi);
@@ -257,15 +283,25 @@ function autoSplitMultiClips(pack: any, userMessage: string): any {
     return pack;
   }
   
-  console.log(`🎬 AUTO-SPLIT: Detected ${targetCount} clips request, splitting single video into ${targetCount} assets`);
+  // Compter les videos dans le pack actuel
+  const currentVideos = pack?.assets?.filter((a: any) => a.kind === 'video_premium') || [];
+  
+  if (currentVideos.length === targetCount) {
+    // Déjà le bon nombre → rien à faire
+    console.log(`🎬 MULTI-CLIPS: Pack already has ${targetCount} videos, no change needed`);
+    return pack;
+  }
+  
+  console.log(`🎬 FORCE MULTI-CLIPS: Requested ${targetCount} clips, current=${currentVideos.length}, forcing creation...`);
   
   // Extraire les infos de chaque clip depuis le message
   const clipInfos = extractClipInfos(userMessage, targetCount);
   
-  // Récupérer le template de l'asset vidéo existant
-  const templateAsset = videoAssets[0];
+  // Récupérer le template de l'asset vidéo existant (s'il y en a un)
+  const templateAsset = currentVideos[0] || {};
   
   // Créer N assets distincts
+  const scriptGroupId = `clips-${Date.now()}`;
   const newVideoAssets = clipInfos.map((info, idx) => ({
     id: `vid-${idx + 1}`,
     kind: 'video_premium' as const,
@@ -274,20 +310,30 @@ function autoSplitMultiClips(pack: any, userMessage: string): any {
     ratio: templateAsset.ratio || '9:16',
     platform: templateAsset.platform || 'instagram',
     goal: templateAsset.goal || 'engagement',
-    tone: templateAsset.tone,
+    tone: templateAsset.tone || 'dynamique',
     durationSeconds: info.duration || 2,
     postProdMode: true, // ✅ Toujours activer la post-prod
-    overlayLines: info.overlayLines.length > 0 ? info.overlayLines : ['Texte', 'ici'],
+    overlayLines: info.overlayLines.length > 0 ? info.overlayLines : [],
     withAudio: true,
-    scriptGroup: `clips-${Date.now()}`, // Lier pour assemblage optionnel
+    scriptGroup: scriptGroupId, // Lier pour assemblage optionnel
     sceneOrder: idx + 1,
+    woofCostType: 'video_premium' as const,
   }));
   
-  // Remplacer l'unique vidéo par les N vidéos
-  const otherAssets = pack.assets.filter((a: any) => a.kind !== 'video_premium');
-  pack.assets = [...otherAssets, ...newVideoAssets];
+  // Construire ou mettre à jour le pack
+  if (!pack) {
+    pack = {
+      title: `${targetCount} Clips Vidéo`,
+      summary: `Pack de ${targetCount} clips séparés`,
+      assets: newVideoAssets,
+    };
+  } else {
+    // Remplacer les vidéos existantes par les N vidéos
+    const otherAssets = pack.assets?.filter((a: any) => a.kind !== 'video_premium') || [];
+    pack.assets = [...otherAssets, ...newVideoAssets];
+  }
   
-  console.log(`🎬 AUTO-SPLIT: Pack now has ${pack.assets.length} assets (${newVideoAssets.length} videos)`);
+  console.log(`🎬 FORCE MULTI-CLIPS: Pack now has ${pack.assets.length} assets (${newVideoAssets.length} videos)`);
   
   return pack;
 }
@@ -510,9 +556,9 @@ Deno.serve(async (req) => {
     let pack = parsePack(rawReply);
     const reply = cleanReply(rawReply);
     
-    // ✅ AUTO-SPLIT: Détecter demande multi-clips et normaliser
+    // ✅ FORCE MULTI-CLIPS: Garantir N vidéos si "CLIP 1..N" même si pack null/incomplet
     const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop()?.content || '';
-    pack = autoSplitMultiClips(pack, lastUserMessage);
+    pack = forceMultiClips(pack, lastUserMessage);
     
     // ✅ Log de debug enrichi pour diagnostic
     const hasPackTag = rawReply.toLowerCase().includes('<alfie-pack>');
