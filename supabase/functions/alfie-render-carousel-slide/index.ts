@@ -21,7 +21,7 @@ import { SlideTemplate, TextLayer } from "../_shared/slideTemplates.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 type Lang = "FR" | "EN";
 
-type CarouselMode = 'standard' | 'premium';
+type CarouselMode = 'standard' | 'premium' | 'background_only';
 type ColorMode = 'vibrant' | 'pastel';
 type VisualStyle = 'background' | 'character' | 'product'; // ✅ NEW: Style visuel adaptatif
 
@@ -473,6 +473,76 @@ OUTPUT: A stunning, ${colorMode === 'pastel' ? 'pastel' : 'colorful'} abstract b
 }
 
 /**
+ * ✅ NEW: Build prompt for COMPLETE CAROUSEL with integrated text
+ * Nano Banana Pro génère l'image + texte directement (centré)
+ * Pour carouselMode = 'standard' avec texte existant
+ */
+function buildImagePromptWithText(
+  globalStyle: string,
+  prompt: string,
+  slideContent: { title: string; subtitle?: string; body?: string; bullets?: string[] },
+  slideIndex: number,
+  totalSlides: number,
+  brandKit?: BrandKit,
+  colorMode: ColorMode = 'vibrant'
+): string {
+  const slideRole = getSlideRole(slideIndex, totalSlides);
+  const colorModeLabel = colorMode === 'pastel' ? 'soft pastel' : 'vibrant colorful';
+  
+  // Palette du Brand Kit ou fallback
+  const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
+  const colorHint = palette.length > 0 
+    ? `Primary colors: ${palette.join(', ')}` 
+    : 'Use modern gradient colors (blues, purples, pinks)';
+  
+  // Construire le texte à intégrer
+  const textLines: string[] = [];
+  if (slideContent.title) textLines.push(`TITLE: "${slideContent.title}"`);
+  if (slideContent.subtitle) textLines.push(`SUBTITLE: "${slideContent.subtitle}"`);
+  if (slideContent.body) textLines.push(`BODY: "${slideContent.body}"`);
+  if (slideContent.bullets?.length) {
+    textLines.push(`BULLET POINTS:\n${slideContent.bullets.map(b => '• ' + b).join('\n')}`);
+  }
+  
+  // Visual style hint
+  let visualElements = "soft 3D geometric elements, glowing orbs, smooth shapes";
+  if (brandKit?.visual_types?.[0]) {
+    const vt = brandKit.visual_types[0];
+    if (vt === "illustrations_3d") visualElements = "3D rendered objects with depth";
+    else if (vt === "illustrations_2d") visualElements = "flat 2D illustration style";
+  }
+  
+  return `Create a ${colorModeLabel} social media carousel slide with INTEGRATED TEXT.
+
+THEME: ${prompt}
+STYLE: ${globalStyle || 'modern professional'}
+SLIDE: ${slideRole} (${slideIndex + 1}/${totalSlides})
+${colorHint}
+VISUAL ELEMENTS: ${visualElements}
+
+📝 TEXT TO DISPLAY (CENTERED on image):
+${textLines.join('\n')}
+
+CRITICAL REQUIREMENTS:
+- Generate a ${colorModeLabel} background with soft gradients
+- TEXT MUST BE CENTERED horizontally and vertically on the image
+- Title: LARGE bold WHITE text with subtle black shadow for readability
+- Subtitle: medium WHITE text below title
+- Body/Bullets: smaller WHITE text below subtitle
+- Modern social media aesthetic with depth and dimension
+- Leave comfortable margins around text (10% each side)
+
+ABSOLUTE RULES:
+- ALL text MUST be perfectly CENTERED and highly readable
+- Text color: WHITE with soft black shadow/stroke for contrast
+- Background: ${colorMode === 'pastel' ? 'soft pastel tones' : 'vibrant gradients'} - NO white/blank backgrounds
+- Professional typography, clean and modern
+- The text is the MAIN content - it must be clearly legible
+
+OUTPUT: A stunning carousel slide with ${colorModeLabel} background and perfectly centered text.`;
+}
+
+/**
  * Create a dynamic SVG template based on aspect ratio
  * ✅ Texte centré horizontalement et verticalement dans la moitié supérieure
  */
@@ -881,6 +951,10 @@ Deno.serve(async (req) => {
     // ✅ V10: Détecter si avatar disponible pour mode character
     const hasAvatarForCharacter = visualStyle === 'character' && !!brandKit?.avatar_url;
     
+    // ✅ Déterminer si on génère avec texte intégré (standard) ou fond seul (background_only)
+    const isBackgroundOnly = carouselMode === 'background_only';
+    const hasValidText = normTitle && normTitle !== "Titre par défaut" && normTitle.trim().length > 0;
+    
     if (visualStyle === 'character') {
       // ✅ Mode PERSONNAGE: génère un avatar/personnage 3D
       enrichedPrompt = buildImagePromptCharacter(
@@ -905,8 +979,25 @@ Deno.serve(async (req) => {
         colorMode as ColorMode
       );
       console.log(`[render-slide] ${logCtx} 📦 Using PRODUCT prompt (hasRef: ${!!referenceImageUrl})`);
+    } else if (!isBackgroundOnly && hasValidText) {
+      // ✅ NEW: Mode STANDARD COMPLET avec texte intégré par Nano Banana Pro
+      enrichedPrompt = buildImagePromptWithText(
+        globalStyle,
+        prompt,
+        { 
+          title: normTitle, 
+          subtitle: normSubtitle, 
+          body: normBody,
+          bullets: normBullets 
+        },
+        slideIndex,
+        totalSlides,
+        brandKit,
+        colorMode as ColorMode
+      );
+      console.log(`[render-slide] ${logCtx} 📝 Using TEXT-INTEGRATED prompt (complete carousel)`);
     } else {
-      // ✅ Mode BACKGROUND (défaut): fond abstrait
+      // ✅ Mode BACKGROUND ONLY (fond seul, pas de texte) - pour ajout texte manuel
       enrichedPrompt = carouselMode === 'premium'
         ? buildImagePromptPremium(
             prompt,
@@ -927,10 +1018,10 @@ Deno.serve(async (req) => {
             brandKit,
             colorMode as ColorMode
           );
-      console.log(`[render-slide] ${logCtx} 🎨 Using BACKGROUND prompt (mode: ${carouselMode})`);
+      console.log(`[render-slide] ${logCtx} 🎨 Using BACKGROUND-ONLY prompt (mode: ${carouselMode})`);
     }
     
-    console.log(`[render-slide] ${logCtx} 🎨 Mode: ${carouselMode}, Visual: ${visualStyle}, hasText: ${!!normTitle && normTitle !== "Titre par défaut"}, hasRef: ${!!referenceImageUrl}`);
+    console.log(`[render-slide] ${logCtx} 🎨 Mode: ${carouselMode}, Visual: ${visualStyle}, isBackgroundOnly: ${isBackgroundOnly}, hasValidText: ${hasValidText}, hasRef: ${!!referenceImageUrl}`);
 
     let bgUrl: string | null = null;
     let imageAttempt = 0;
@@ -982,12 +1073,21 @@ Deno.serve(async (req) => {
             messages: [
               { 
                 role: "system", 
-                content: `You are an expert image generator for social media.
-CRITICAL: Generate a VIBRANT, COLORFUL image - NOT white, NOT blank, NOT empty.
-Always produce ONE high-quality image with rich colors, gradients, and visual depth.
+                content: isBackgroundOnly
+                  ? `You are an expert image generator for social media.
+CRITICAL: Generate a VIBRANT, COLORFUL background image - NOT white, NOT blank.
+NO TEXT whatsoever - this is a pure background image for user to add their own text.
 Output dimensions: ${size.w}x${size.h}.
-NO TEXT whatsoever - no letters, words, numbers, labels in the image.
-${hasAvatarForCharacter ? "IMPORTANT: Reproduce the EXACT character from the reference image provided. Same style, colors, proportions." : ""}` 
+${hasAvatarForCharacter ? "IMPORTANT: Reproduce the EXACT character from the reference image provided. Same style, colors, proportions." : ""}`
+                  : `You are an expert image generator for social media carousel slides.
+CRITICAL: Generate the image WITH the text integrated and perfectly CENTERED.
+- Title: Large, bold, WHITE text with soft black shadow for readability
+- Subtitle/Body: Smaller, WHITE text below title
+- All text MUST be centered horizontally and vertically
+- Background: Colorful gradients, NOT white
+- Text must be the MAIN FOCUS and clearly legible
+Output dimensions: ${size.w}x${size.h}.
+${hasAvatarForCharacter ? "IMPORTANT: Reproduce the EXACT character from the reference image provided. Same style, colors, proportions." : ""}`
               },
               { role: "user", content: userMessageContent }
             ],
@@ -1128,44 +1228,58 @@ ${hasAvatarForCharacter ? "IMPORTANT: Reproduce the EXACT character from the ref
     // ✅ V9: Couleur de texte du Brand Kit avec fallback blanc
     const brandTextColor = (brandKit as any)?.text_color?.replace('#', '') || 'ffffff';
     
-    console.log(`[render-slide] ${logCtx} 3.5/4 Applying Cloudinary text overlay (${carouselMode} mode, type=${carouselType})`);
-    console.log(`[render-slide] ${logCtx}   ↳ Brand fonts: primary="${brandFonts.primary}", secondary="${brandFonts.secondary}"`);
-    console.log(`[render-slide] ${logCtx}   ↳ Brand colors: primary=#${brandPrimaryColor}, secondary=#${brandSecondaryColor}, text=#${brandTextColor}`);
+    // ✅ STEP 3.5 — Conditional text overlay
+    // - Mode STANDARD (avec texte intégré par IA): PAS d'overlay Cloudinary
+    // - Mode BACKGROUND_ONLY: PAS d'overlay (l'utilisateur ajoute son texte manuellement)
     
-    // Déterminer le type de slide pour l'overlay
-    const slideType = slideIndex === 0 ? 'hero' 
-      : slideIndex === totalSlides - 1 ? 'cta'
-      : slideIndex === 1 ? 'problem'
-      : slideIndex === totalSlides - 2 ? 'solution'
-      : 'impact';
-    
-    // ✅ Pour CITATIONS: forcer subtitle/bullets/body à vide, même si passés
-    const slideData: Slide = {
-      type: slideType,
-      title: normTitle,
-      subtitle: carouselType === 'citations' ? undefined : (normSubtitle || undefined),
-      punchline: carouselType === 'citations' ? undefined : (normBody || undefined), // ✅ Ajout du body/punchline
-      bullets: carouselType === 'citations' ? undefined : (normBullets.length > 0 ? normBullets : undefined),
-      cta: slideType === 'cta' ? normTitle : undefined,
-      author: slideContent.author || undefined, // ✅ Auteur pour les citations
-    };
-    
-    try {
-      // ✅ V9: Apply overlay with Brand Kit fonts, colors AND text color
-      finalUrl = buildCarouselSlideUrl(
-        cloudinaryPublicId,
-        slideData,
-        brandPrimaryColor,    // ✅ Brand Kit primary color
-        brandSecondaryColor,  // ✅ Brand Kit secondary color
-        carouselType,         // ✅ citations or content
-        brandFonts,           // ✅ Brand Kit fonts
-        brandTextColor        // ✅ V9: Brand Kit text color
-      );
-      console.log(`[render-slide] ${logCtx}   ↳ overlay URL: ${finalUrl?.slice(0, 150)}...`);
-    } catch (overlayErr) {
-      console.warn(`[render-slide] ${logCtx} ⚠️ Overlay failed, using base image:`, overlayErr);
-      // En cas d'erreur, utiliser l'image de base
-      finalUrl = cloudinarySecureUrl;
+    if (isBackgroundOnly) {
+      // ✅ Mode BACKGROUND_ONLY: pas d'overlay, l'utilisateur ajoute son texte
+      console.log(`[render-slide] ${logCtx} 3.5/4 Background-only mode: NO text overlay (user adds text manually)`);
+      // finalUrl reste cloudinarySecureUrl
+    } else if (hasValidText) {
+      // ✅ Mode STANDARD COMPLET: texte déjà intégré par l'IA, pas besoin d'overlay Cloudinary
+      console.log(`[render-slide] ${logCtx} 3.5/4 Complete carousel mode: text already integrated by AI (Nano Banana Pro)`);
+      // finalUrl reste cloudinarySecureUrl (l'image contient déjà le texte)
+    } else {
+      // ✅ Fallback: appliquer overlay Cloudinary si nécessaire (ancienne logique)
+      console.log(`[render-slide] ${logCtx} 3.5/4 Fallback: Applying Cloudinary text overlay`);
+      console.log(`[render-slide] ${logCtx}   ↳ Brand fonts: primary="${brandFonts.primary}", secondary="${brandFonts.secondary}"`);
+      console.log(`[render-slide] ${logCtx}   ↳ Brand colors: primary=#${brandPrimaryColor}, secondary=#${brandSecondaryColor}, text=#${brandTextColor}`);
+      
+      // Déterminer le type de slide pour l'overlay
+      const slideType = slideIndex === 0 ? 'hero' 
+        : slideIndex === totalSlides - 1 ? 'cta'
+        : slideIndex === 1 ? 'problem'
+        : slideIndex === totalSlides - 2 ? 'solution'
+        : 'impact';
+      
+      // ✅ Pour CITATIONS: forcer subtitle/bullets/body à vide, même si passés
+      const slideData: Slide = {
+        type: slideType,
+        title: normTitle,
+        subtitle: carouselType === 'citations' ? undefined : (normSubtitle || undefined),
+        punchline: carouselType === 'citations' ? undefined : (normBody || undefined),
+        bullets: carouselType === 'citations' ? undefined : (normBullets.length > 0 ? normBullets : undefined),
+        cta: slideType === 'cta' ? normTitle : undefined,
+        author: slideContent.author || undefined,
+      };
+      
+      try {
+        // ✅ V9: Apply overlay with Brand Kit fonts, colors AND text color
+        finalUrl = buildCarouselSlideUrl(
+          cloudinaryPublicId,
+          slideData,
+          brandPrimaryColor,
+          brandSecondaryColor,
+          carouselType,
+          brandFonts,
+          brandTextColor
+        );
+        console.log(`[render-slide] ${logCtx}   ↳ overlay URL: ${finalUrl?.slice(0, 150)}...`);
+      } catch (overlayErr) {
+        console.warn(`[render-slide] ${logCtx} ⚠️ Overlay failed, using base image:`, overlayErr);
+        finalUrl = cloudinarySecureUrl;
+      }
     }
 
     // =========================================
