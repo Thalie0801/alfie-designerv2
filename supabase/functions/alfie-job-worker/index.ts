@@ -1316,6 +1316,32 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       source: generatedTexts?.video ? "generatedTexts" : "fallback_extraction"
     });
     
+    // ✅ CORRECTION ORTHOGRAPHIQUE des textes vidéo AVANT affichage
+    let correctedHook = textForVideo?.hook;
+    let correctedCta = textForVideo?.cta;
+
+    if (correctedHook || correctedCta) {
+      console.log("[processGenerateVideo] ✏️ Proofreading video texts...");
+      try {
+        const proofResult = await callFn<{ title: string; subtitle: string }>("alfie-proofread-fr", {
+          title: correctedHook || "",
+          subtitle: correctedCta || "",
+        }, 30_000);
+        
+        if (proofResult?.title) correctedHook = proofResult.title;
+        if (proofResult?.subtitle) correctedCta = proofResult.subtitle;
+        
+        console.log("[processGenerateVideo] ✅ Texts proofread:", {
+          hookBefore: textForVideo?.hook?.slice(0, 40),
+          hookAfter: correctedHook?.slice(0, 40),
+          ctaBefore: textForVideo?.cta?.slice(0, 40),
+          ctaAfter: correctedCta?.slice(0, 40),
+        });
+      } catch (proofError) {
+        console.warn("[processGenerateVideo] ⚠️ Proofreading failed, using original texts:", proofError);
+      }
+    }
+
     // ✅ PIPELINE "IMAGE FIRST": Générer l'image de référence SI pas déjà fournie
     let effectiveReferenceImageUrl = referenceImageUrl;
     
@@ -1323,10 +1349,10 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       console.log("[processGenerateVideo] 🖼️ IMAGE FIRST: Generating reference image...");
       
       try {
-        // ✅ Construire overlayLines à partir du videoScript (hook, cta)
+        // ✅ Construire overlayLines avec les textes CORRIGÉS
         const overlayLines: string[] = [];
-        if (textForVideo?.hook) overlayLines.push(textForVideo.hook);
-        if (textForVideo?.cta) overlayLines.push(textForVideo.cta);
+        if (correctedHook) overlayLines.push(correctedHook);
+        if (correctedCta) overlayLines.push(correctedCta);
         
         console.log("[processGenerateVideo] 📝 Passing overlayLines to image-for-video:", overlayLines);
         
