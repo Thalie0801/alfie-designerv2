@@ -262,21 +262,37 @@ function parsePack(text: string): any | null {
 }
 
 /**
- * ✅ FORCE MULTI-CLIPS : Si "CLIP 1..N" ou "X clips", GARANTIT N assets video_premium
+ * ✅ FORCE MULTI-CLIPS : Si "CLIP 1..N" ou "X clips/assets/scènes", GARANTIT N assets video_premium
  * Fonctionne même si pack est null ou contient 0/1 vidéo
  */
 function forceMultiClips(pack: any, userMessage: string): any {
   if (!userMessage) return pack;
   
-  // Détecter le pattern "CLIP X" dans le message utilisateur
+  const msg = userMessage.toLowerCase();
+  
+  // Pattern 1: "CLIP X" explicites dans le message
   const clipMatches = userMessage.match(/CLIP\s*\d+/gi);
   const clipCount = clipMatches ? new Set(clipMatches.map(m => m.toUpperCase())).size : 0;
   
-  // Alternative: détecter "X clips séparés" ou "générer X clips"
-  const numericClipMatch = userMessage.match(/(\d+)\s*(clips?|vidéos?|reels?)\s*(séparés?|distincts?|différents?)?/i);
-  const requestedCount = numericClipMatch ? parseInt(numericClipMatch[1], 10) : 0;
+  // Pattern 2: "X clips/vidéos/assets/scènes (séparés)?"
+  const numericMatch = msg.match(/(\d+)\s*(clips?|vidéos?|reels?|assets?|scènes?|parties?)\s*(séparés?|distincts?|différents?)?/i);
+  const numericCount = numericMatch ? parseInt(numericMatch[1], 10) : 0;
   
-  const targetCount = Math.max(clipCount, requestedCount);
+  // Pattern 3: INVERSÉ "vidéo de X assets" / "montage de X scènes" / "série de X clips"
+  const inverseMatch = msg.match(/(vidéo|montage|série|pack)\s+de\s+(\d+)\s*(assets?|clips?|scènes?|parties?|vidéos?)/i);
+  const inverseCount = inverseMatch ? parseInt(inverseMatch[2], 10) : 0;
+  
+  // Pattern 4: "créer/générer/faire X clips/assets"
+  const createMatch = msg.match(/(créer?|génér|faire|produi)\w*\s+(\d+)\s*(clips?|vidéos?|assets?|scènes?)/i);
+  const createCount = createMatch ? parseInt(createMatch[2], 10) : 0;
+  
+  // Pattern 5: "X clips/vidéos" en début de phrase
+  const startMatch = msg.match(/^(\d+)\s*(clips?|vidéos?|assets?|scènes?)/i);
+  const startCount = startMatch ? parseInt(startMatch[1], 10) : 0;
+  
+  const targetCount = Math.max(clipCount, numericCount, inverseCount, createCount, startCount);
+  
+  console.log(`🎬 MULTI-CLIPS DETECTION: clipCount=${clipCount}, numericCount=${numericCount}, inverseCount=${inverseCount}, createCount=${createCount}, startCount=${startCount} → target=${targetCount}`);
   
   if (targetCount <= 1) {
     // Pas de demande multi-clips détectée
