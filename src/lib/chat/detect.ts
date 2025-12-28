@@ -86,7 +86,7 @@ export function detectPlatformHelp(raw: string) {
     { test: /(profil|compte|email|mot de passe)/, to: "/profile", label: "Profil" },
     { test: /(dashboard|stat|performances?)/, to: "/dashboard", label: "Dashboard" },
     { test: /(affiliation|parrain|ambassadeur)/, to: "/affiliate", label: "Affiliation" },
-    { test: /(contact|support|aide|bug|problème)/, to: "/contact", label: "Contact" },
+    { test: /(contacter\s+(le\s+)?support|page\s+contact|besoin\s+d['']?aide|signaler\s+(un\s+)?bug|j['']?ai\s+un\s+problème|comment\s+vous\s+contacter)/, to: "/contact", label: "Contact" },
     { test: /(admin|job queue|monitor|bloqués?)/, to: "/admin", label: "Admin" },
   ];
 
