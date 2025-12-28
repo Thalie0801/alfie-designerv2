@@ -1,5 +1,130 @@
 // supabase/functions/_shared/multiClipParser.ts
-// Parser pour prompts multi-clips vidéo ET multi-images
+// Parser pour prompts multi-clips vidéo, multi-images ET multi-carrousels
+
+// ==================== MULTI-CAROUSEL PARSING ====================
+
+export interface ParsedCarousel {
+  carouselNumber: number;
+  topic: string;              // Thème du carrousel
+  slideCount: number;         // Nombre de slides (défaut: 5)
+  visualPrompt: string;       // Instructions visuelles
+  textLines: string[];        // Textes à afficher
+}
+
+export interface MultiCarouselResult {
+  isMultiCarousel: boolean;
+  carouselCount: number;
+  globalStyle: string;
+  carousels: ParsedCarousel[];
+}
+
+/**
+ * Détecte si un prompt contient plusieurs carrousels
+ * Patterns: "Carrousel 1:", "3 carrousels de 5 slides", etc.
+ */
+export function isMultiCarouselPrompt(prompt: string): boolean {
+  // Pattern 1: "Carrousel 1", "Carrousel 2", etc.
+  const namedPattern = prompt.match(/Carrousel\s*\d+\s*:/gi);
+  // Pattern 2: "3 carrousels", "créer 2 carrousels", etc.
+  const countPattern = prompt.match(/(\d+)\s*carrousels?/i);
+  
+  return (namedPattern !== null && namedPattern.length >= 2) || 
+         (countPattern !== null && parseInt(countPattern[1]) >= 2);
+}
+
+/**
+ * Parse un prompt multi-carrousels et extrait chaque carrousel avec ses specs
+ */
+export function parseMultiCarouselPrompt(prompt: string): MultiCarouselResult {
+  // Résultat par défaut si pas multi-carrousel
+  if (!isMultiCarouselPrompt(prompt)) {
+    return {
+      isMultiCarousel: false,
+      carouselCount: 1,
+      globalStyle: "",
+      carousels: [{
+        carouselNumber: 1,
+        topic: "",
+        slideCount: 5,
+        visualPrompt: prompt,
+        textLines: extractTextLinesFromSection(prompt),
+      }],
+    };
+  }
+
+  // Extraire le style global (tout avant "Carrousel 1 :")
+  const beforeCarouselsMatch = prompt.match(/^([\s\S]*?)(?=Carrousel\s*1\s*:)/i);
+  const globalSection = beforeCarouselsMatch?.[1] || "";
+  const globalStyle = globalSection.trim();
+
+  // Pattern 1: Carrousels nommés "Carrousel N : ..."
+  const carouselRegex = /Carrousel\s*(\d+)\s*:\s*([\s\S]*?)(?=Carrousel\s*\d+\s*:|$)/gi;
+  const carousels: ParsedCarousel[] = [];
+  let match: RegExpExecArray | null;
+
+  // Essayer de parser les carrousels nommés
+  while ((match = carouselRegex.exec(prompt)) !== null) {
+    const carouselNumber = parseInt(match[1], 10);
+    const carouselContent = match[2]?.trim() || "";
+
+    // Extraire le nombre de slides
+    const slidesMatch = carouselContent.match(/(\d+)\s*(slides?|pages?)/i);
+    const slideCount = slidesMatch ? parseInt(slidesMatch[1], 10) : 5;
+
+    // Extraire le topic (première ligne ou après "Thème:")
+    const topicMatch = carouselContent.match(/(?:Thème|Sujet|Topic)\s*:\s*([^\n]+)/i);
+    const topic = topicMatch?.[1]?.trim() || carouselContent.split('\n')[0]?.trim() || `Carrousel ${carouselNumber}`;
+
+    // Extraire les textes entre guillemets
+    const textLines = extractTextLinesFromSection(carouselContent);
+
+    carousels.push({
+      carouselNumber,
+      topic,
+      slideCount,
+      visualPrompt: carouselContent,
+      textLines,
+    });
+  }
+
+  // Pattern 2: "Créer 3 carrousels de 5 slides sur [topic]"
+  if (carousels.length === 0) {
+    const countMatch = prompt.match(/(\d+)\s*carrousels?\s*(?:de\s*(\d+)\s*slides?)?/i);
+    if (countMatch) {
+      const count = parseInt(countMatch[1], 10);
+      const slidesPerCarousel = countMatch[2] ? parseInt(countMatch[2], 10) : 5;
+      
+      // Extraire les topics de la liste si présents
+      const topicsMatch = prompt.match(/(?:sur|thèmes?|sujets?)\s*:?\s*([\s\S]*?)(?:$)/i);
+      const topicsText = topicsMatch?.[1] || "";
+      
+      // Séparer les topics (par numéros, tirets, ou nouvelles lignes)
+      const topicPatterns = topicsText.match(/(?:\d+[.)\s]*|[-•]\s*)([^\n\d\-•]+)/g) || [];
+      const topics = topicPatterns.map(t => t.replace(/^[\d.)\s\-•]+/, '').trim()).filter(Boolean);
+
+      for (let i = 0; i < count; i++) {
+        carousels.push({
+          carouselNumber: i + 1,
+          topic: topics[i] || `Carrousel ${i + 1}`,
+          slideCount: slidesPerCarousel,
+          visualPrompt: globalStyle,
+          textLines: [],
+        });
+      }
+    }
+  }
+
+  console.log(`[multiClipParser] Parsed ${carousels.length} carousels:`, 
+    carousels.map(c => ({ n: c.carouselNumber, topic: c.topic, slides: c.slideCount }))
+  );
+
+  return {
+    isMultiCarousel: true,
+    carouselCount: carousels.length,
+    globalStyle,
+    carousels,
+  };
+}
 
 // ==================== MULTI-IMAGE PARSING ====================
 
@@ -37,7 +162,7 @@ export function parseMultiImagePrompt(prompt: string): MultiImageResult {
       images: [{
         imageNumber: 1,
         visualPrompt: prompt,
-        textLines: extractTextLines(prompt),
+        textLines: extractTextLinesFromSection(prompt),
       }],
     };
   }
@@ -57,7 +182,7 @@ export function parseMultiImagePrompt(prompt: string): MultiImageResult {
     const imageContent = match[2]?.trim() || "";
 
     // Extraire les lignes de texte (entre guillemets)
-    const textLines = extractTextLines(imageContent);
+    const textLines = extractTextLinesFromSection(imageContent);
 
     // Construire le prompt visuel complet
     // Inclure le style global + instructions spécifiques de l'image
@@ -128,7 +253,7 @@ export function parseMultiClipPrompt(prompt: string): MultiClipResult {
         clipNumber: 1,
         title: "VIDEO",
         keyframe: prompt,
-        textLines: extractTextLines(prompt),
+        textLines: extractTextLinesFromSection(prompt),
         animation: "",
         durationSec: 8,
       }],
@@ -166,7 +291,7 @@ export function parseMultiClipPrompt(prompt: string): MultiClipResult {
     const animation = animationMatch?.[1]?.trim() || "";
 
     // Extraire les lignes de texte (entre guillemets)
-    const textLines = extractTextLines(keyframe);
+    const textLines = extractTextLinesFromSection(keyframe);
 
     clips.push({
       clipNumber,
@@ -193,8 +318,9 @@ export function parseMultiClipPrompt(prompt: string): MultiClipResult {
 
 /**
  * Extrait les lignes de texte entre guillemets d'une section
+ * Export nommé pour le module
  */
-function extractTextLines(section: string): string[] {
+export function extractTextLinesFromSection(section: string): string[] {
   const lines: string[] = [];
   
   // Pattern 1: "Ligne X : ..." dans Keyframe

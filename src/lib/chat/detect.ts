@@ -77,7 +77,7 @@ export function detectPlatformHelp(raw: string) {
   const intents = [
     // Pattern strict : seulement si demande explicite de navigation vers Studio
     { test: /(ouvr(e|ir)\s+(le\s+)?studio|va\s+(sur|dans)\s+(le\s+)?studio|lance\s+(le\s+)?studio|accéder\s+(au\s+)?studio)/, to: "/studio", label: "Ouvrir Studio" },
-    { test: /(template|catalogue|modèles?)/, to: "/templates", label: "Catalogue" },
+    { test: /(voir\s+(les?\s+)?templates?|voir\s+(le\s+)?catalogue|accéder\s+(aux?\s+)?modèles?|ouvrir\s+(le\s+)?catalogue)/, to: "/templates", label: "Catalogue" },
     // IMPORTANT: Retiré "assets?" pour éviter faux positif sur "créer une vidéo de 3 assets"
     // Garder uniquement les termes de navigation explicites
     { test: /(bibliothèque|médias?|mes\s+fichiers?)/, to: "/library", label: "Bibliothèque" },
