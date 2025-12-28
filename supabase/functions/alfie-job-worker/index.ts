@@ -1316,6 +1316,33 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       source: generatedTexts?.video ? "generatedTexts" : "fallback_extraction"
     });
     
+    // ✅ PIPELINE "IMAGE FIRST": Générer l'image de référence SI pas déjà fournie
+    let effectiveReferenceImageUrl = referenceImageUrl;
+    
+    if (!effectiveReferenceImageUrl && prompt) {
+      console.log("[processGenerateVideo] 🖼️ IMAGE FIRST: Generating reference image...");
+      
+      try {
+        const imageResult = await callFn<any>("image-for-video", {
+          prompt,
+          aspectRatio: aspectRatio || "9:16",
+          brandId,
+          useBrandKit,
+          userId,
+        }, 120_000); // 2 minutes timeout pour image
+        
+        if (imageResult?.imageUrl) {
+          effectiveReferenceImageUrl = imageResult.imageUrl;
+          console.log("[processGenerateVideo] ✅ Reference image generated:", effectiveReferenceImageUrl.slice(0, 80));
+        } else {
+          console.warn("[processGenerateVideo] ⚠️ Image generation returned no URL, continuing with text-to-video");
+        }
+      } catch (imageError) {
+        console.warn("[processGenerateVideo] ⚠️ Image generation failed, continuing with text-to-video:", imageError);
+        // Continue without image - Veo 3.1 can do text-to-video
+      }
+    }
+    
     let videoPrompt: string;
     
     if (visualStyleCategory === 'character') {
@@ -1335,7 +1362,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
         textInstruction = " NO TEXT, NO LETTERS, NO WORDS visible.";
       }
       videoPrompt = `${characterStyle} in motion. ${prompt || 'Professional scene'}. ${brandMini?.niche || 'business'} context. Smooth animation, expressive movements.${textInstruction} Pure cinematic footage.`;
-    } else if (visualStyleCategory === 'product' && referenceImageUrl) {
+    } else if (visualStyleCategory === 'product' && effectiveReferenceImageUrl) {
       // Mode PRODUIT: vidéo de mise en scène produit
       let textInstruction = "";
       if (textForVideo?.hook || textForVideo?.cta) {
@@ -1347,6 +1374,10 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
         textInstruction = " NO TEXT, NO PRICES, NO LABELS.";
       }
       videoPrompt = `Product showcase video. Smooth camera movement around the product. Professional ${brandMini?.niche || 'e-commerce'} setting. Premium lighting, subtle motion.${textInstruction} Pure visual footage.`;
+    } else if (effectiveReferenceImageUrl) {
+      // ✅ IMAGE FIRST: Animation d'image - prompt simplifié pour Veo
+      videoPrompt = `Animate this scene smoothly. Cinematic camera motion. Professional quality. ${brandMini?.niche || 'business'} context. NO TEXT, NO LETTERS, NO WORDS visible. Pure visual footage.`;
+      console.log("[processGenerateVideo] 🎬 Image-to-video animation mode");
     } else {
       // Mode FOND/NORMAL - utiliser buildVideoPrompt avec textOverlay
       videoPrompt = buildVideoPrompt(payload, useBrandKit, brandMini, textForVideo);
@@ -1386,7 +1417,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       userId,
       brandId,
       orderId,
-      imageUrl: referenceImageUrl, // ✅ Image de référence pour animation
+      imageUrl: effectiveReferenceImageUrl, // ✅ Image de référence (générée ou fournie)
       visualStyleCategory, // ✅ NEW: Passer le style visuel
     }, 360_000); // ✅ 6 minutes timeout pour VEO 3
 
@@ -1414,7 +1445,8 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
         generator: "veo_3_fast",
         tier: "premium",
         orderId,
-        referenceImageUrl, // ✅ Stocker l'URL de l'image source
+        referenceImageUrl: effectiveReferenceImageUrl, // ✅ Stocker l'URL de l'image source (générée ou fournie)
+        imageFirstPipeline: !referenceImageUrl && !!effectiveReferenceImageUrl, // ✅ Flag pour indiquer génération automatique
         script: videoScript, // ✅ Stocker le script vidéo (hook, script, cta)
       },
     });
