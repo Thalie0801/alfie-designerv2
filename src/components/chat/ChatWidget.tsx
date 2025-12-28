@@ -519,10 +519,11 @@ export default function ChatWidget() {
         tone: tone,
         goal: 'engagement',
         count: isCarousel ? (mergedBrief.slides || 5) : 1,
-        durationSeconds: isVideo ? 6 : undefined,
+        durationSeconds: isVideo ? 8 : undefined, // ✅ Veo 3.1 supporte 6-8s, on prend 8s
         coherenceGroup: assetCount > 1 ? coherenceGroup : undefined,
         scriptGroup: assetCount > 1 ? coherenceGroup : undefined,
         brandId: profile?.active_brand_id || '',
+        engine: isVideo ? 'veo_3_1' : undefined, // ✅ Forcer Veo 3.1 pour les vidéos
       });
     }
     
