@@ -1323,12 +1323,20 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       console.log("[processGenerateVideo] 🖼️ IMAGE FIRST: Generating reference image...");
       
       try {
+        // ✅ Construire overlayLines à partir du videoScript (hook, cta)
+        const overlayLines: string[] = [];
+        if (textForVideo?.hook) overlayLines.push(textForVideo.hook);
+        if (textForVideo?.cta) overlayLines.push(textForVideo.cta);
+        
+        console.log("[processGenerateVideo] 📝 Passing overlayLines to image-for-video:", overlayLines);
+        
         const imageResult = await callFn<any>("image-for-video", {
           prompt,
           aspectRatio: aspectRatio || "9:16",
           brandId,
           useBrandKit,
           userId,
+          overlayLines: overlayLines.length > 0 ? overlayLines : undefined, // ✅ Passer le texte à afficher
         }, 120_000); // 2 minutes timeout pour image
         
         if (imageResult?.imageUrl) {
