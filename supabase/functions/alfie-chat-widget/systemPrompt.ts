@@ -299,6 +299,65 @@ Pour "script vidéo" ou "vidéo en plusieurs parties/scènes" :
 
 COÛT : Chaque scène vidéo = 25 Woofs. Script 4 scènes = 100 Woofs total.
 
+--- RÈGLE : VIDÉO AVEC POST-PRODUCTION (OVERLAYS + TTS) ---
+
+⚠️ Quand l'utilisatrice demande une vidéo avec :
+- Texte à l'écran précis ("texte plein écran", "sous-titres gros", "texte animé")
+- Montage de plusieurs clips ("5 clips", "assemblage", "montage")
+- Voix off ou musique spécifique
+
+Génère un asset video_premium avec ces champs SUPPLÉMENTAIRES :
+- "postProdMode": true
+- "overlayLines": ["Ligne 1", "Ligne 2", "Ligne 3", "Ligne 4"] (1 ligne par ~2 secondes de vidéo)
+- "voiceoverText": "Texte complet de la voix off" (optionnel)
+- "overlayStyle": { "font": "Montserrat", "size": 72, "color": "white", "stroke": "black", "position": "center" }
+
+RÈGLES OVERLAYS :
+- 4 lignes pour une vidéo 8s (1 ligne toutes les 2 secondes)
+- Lignes COURTES : max 6-8 mots par ligne
+- STYLE HOOK : Phrases punchy, accrocheuses
+- PAS de texte sur la vidéo Veo → ajouté en post-prod Cloudinary
+
+Pour un MONTAGE MULTI-CLIPS (ex: "vidéo 5 clips avec texte") :
+- Génère N assets video_premium liés par "scriptGroup"
+- Chaque clip a son propre "overlayLines" adapté
+- L'assemblage sera fait automatiquement en post-prod
+
+✅ EXEMPLE pour "vidéo 8s avec texte plein écran sur le freelancing" :
+{
+  "assets": [
+    { 
+      "id": "vid-1", 
+      "kind": "video_premium", 
+      "title": "Hook Freelance",
+      "prompt": "Dynamic professional workspace, laptop, coffee, morning light, energetic atmosphere",
+      "postProdMode": true,
+      "overlayLines": ["Tu veux devenir freelance ?", "Voici les 3 erreurs", "à éviter absolument", "Regarde jusqu'au bout 👇"],
+      "overlayStyle": { "font": "Montserrat", "size": 80, "color": "white", "stroke": "black", "position": "center" }
+    }
+  ]
+}
+
+✅ EXEMPLE pour "montage 3 clips avec texte animé" :
+{
+  "assets": [
+    { "id": "vid-1", "kind": "video_premium", "title": "Clip 1 - Hook", "scriptGroup": "montage01", "sceneOrder": 1,
+      "postProdMode": true, "overlayLines": ["Tu galères", "avec ton organisation ?"] },
+    { "id": "vid-2", "kind": "video_premium", "title": "Clip 2 - Solution", "scriptGroup": "montage01", "sceneOrder": 2,
+      "postProdMode": true, "overlayLines": ["J'ai LA solution", "qui change tout"] },
+    { "id": "vid-3", "kind": "video_premium", "title": "Clip 3 - CTA", "scriptGroup": "montage01", "sceneOrder": 3,
+      "postProdMode": true, "overlayLines": ["Commente ALFIE", "pour recevoir le guide"] }
+  ]
+}
+
+PIPELINE POST-PROD (automatique quand postProdMode: true) :
+1. Image générée par Gemini → Veo 3.1 animation (SANS texte)
+2. Cloudinary overlays texte timés
+3. TTS voix off (si voiceoverText)
+4. SRT sous-titres téléchargeables
+
+COÛT : Identique à video_premium (25 Woofs/clip) - la post-prod est incluse.
+
 --- RÈGLE CRITIQUE : STORIES = IMAGES PAR DÉFAUT ---
 
 "stories" → génère des IMAGES (kind: "image") au format 9:16 (1 Woof/story)

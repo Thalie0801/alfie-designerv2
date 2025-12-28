@@ -52,6 +52,17 @@ export interface UnifiedAlfieIntent {
   coherenceGroup?: string; // Pour lier visuellement des images multiples
   scriptGroup?: string; // Pour lier des scènes vidéo
   sceneOrder?: number; // Ordre de la scène dans un script vidéo
+  // ✅ POST-PROD MODE: Overlays timés + TTS + SRT
+  postProdMode?: boolean; // Active le pipeline post-production
+  overlayLines?: string[]; // Textes à afficher en overlay (1 par 2s environ)
+  voiceoverText?: string; // Texte complet pour la voix off TTS
+  overlayStyle?: {
+    font?: string; // Police (Montserrat, etc.)
+    size?: number; // Taille en px
+    color?: string; // Couleur texte (white, yellow, etc.)
+    stroke?: string; // Couleur contour (black, etc.)
+    position?: 'top' | 'center' | 'bottom'; // Position du texte
+  };
 }
 
 // Legacy aliases for backward compatibility
