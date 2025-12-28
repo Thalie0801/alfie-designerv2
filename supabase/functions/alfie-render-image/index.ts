@@ -181,6 +181,13 @@ CRITICAL RULES:
 - Use perfect French spelling with proper accents: é, è, ê, à, ç, ù.
 - Maintain high visual hierarchy and readability.
 
+ANTI-HALLUCINATION RULES (CRITICAL):
+- Display ONLY the text that is explicitly provided in quotes in the prompt.
+- NO additional text, NO labels like "Catalogue", "Collection", "Title", etc.
+- NO decorative words that were not requested.
+- NO extra typography or text elements beyond what is specified.
+- If unsure about text, generate NO TEXT rather than wrong text.
+
 CRITICAL FRENCH TYPOGRAPHY RULES:
 - DO NOT include any visible text in the image unless explicitly requested
 - If text must appear, use ONLY correct French spelling:
