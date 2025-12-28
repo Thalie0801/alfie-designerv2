@@ -78,7 +78,9 @@ export function detectPlatformHelp(raw: string) {
     // Pattern strict : seulement si demande explicite de navigation vers Studio
     { test: /(ouvr(e|ir)\s+(le\s+)?studio|va\s+(sur|dans)\s+(le\s+)?studio|lance\s+(le\s+)?studio|accéder\s+(au\s+)?studio)/, to: "/studio", label: "Ouvrir Studio" },
     { test: /(template|catalogue|modèles?)/, to: "/templates", label: "Catalogue" },
-    { test: /(bibliothèque|assets?|médias?)/, to: "/library", label: "Bibliothèque" },
+    // IMPORTANT: Retiré "assets?" pour éviter faux positif sur "créer une vidéo de 3 assets"
+    // Garder uniquement les termes de navigation explicites
+    { test: /(bibliothèque|médias?|mes\s+fichiers?)/, to: "/library", label: "Bibliothèque" },
     { test: /(brand[\s-]?kit|modifier (ma |mon |les )?couleurs|configurer (ma |mes )?typo)/, to: "/brand-kit-questionnaire", label: "Brand Kit" },
     { test: /(factur|abonnement|paiement|pricing|prix|crédit|woofs)/, to: "/billing", label: "Facturation" },
     { test: /(profil|compte|email|mot de passe)/, to: "/profile", label: "Profil" },
@@ -88,12 +90,13 @@ export function detectPlatformHelp(raw: string) {
     { test: /(admin|job queue|monitor|bloqués?)/, to: "/admin", label: "Admin" },
   ];
 
-  // Exclure le routage Studio si c'est une demande de création de contenu
-  const isContentRequest = /(carrousel|carousel|image|visuel|vidéo|video|slides?|génère|crée|fais(-| )?moi)/.test(q);
-
+  // Détecter si c'est une demande de création de contenu (élargi)
+  const isContentRequest = /(carrousel|carousel|image|visuel|vidéo|video|slides?|génère|crée|fais(-| )?moi|clips?|scènes?|assets?\s*\d|\d\s*assets?)/.test(q);
+  
+  // Si création demandée, exclure TOUTES les navigations ambiguës (studio ET library)
   const matches = intents
     .filter((i) => i.test.test(q))
-    .filter((i) => !(i.to === "/studio" && isContentRequest));
+    .filter((i) => !(isContentRequest && (i.to === "/studio" || i.to === "/library")));
 
   const isWhatCanDo =
     /(que|quoi).*(peut|peux).*(faire|proposer)|capacités?|features?|fonctionnalités?|comment (ça|ca) marche|mode d'emploi|help/i.test(q);
