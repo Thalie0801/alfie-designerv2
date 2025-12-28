@@ -1226,8 +1226,56 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
     isExplicitlyFalse: payload.withAudio === false,
   });
   
-  // ✅ Extraire le script vidéo s'il existe (pour stockage metadata uniquement)
-  const videoScript = generatedTexts?.video || null;
+  // ✅ Extraire le script vidéo - avec FALLBACK depuis le prompt brut
+  let videoScript = generatedTexts?.video || null;
+  
+  // ✅ FALLBACK: Si pas de generatedTexts, extraire hook/cta du prompt brut
+  if (!videoScript && prompt) {
+    // Chercher des patterns courants: textes entre guillemets, CTA explicite
+    const hookPatterns = [
+      /Hook\s*:\s*["«]([^"»]+)["»]/i,
+      /Accroche\s*:\s*["«]([^"»]+)["»]/i,
+      /^["«]([^"»]{10,80})["»]/m, // Premier texte entre guillemets (10-80 chars)
+    ];
+    const ctaPatterns = [
+      /CTA\s*:\s*["«]([^"»]+)["»]/i,
+      /Call.?to.?action\s*:\s*["«]([^"»]+)["»]/i,
+      /Commente?\s+["«]?(\w+)["»]?/i, // "Commente ALFIE"
+      /["«]([^"»]{5,30})["»]\s*$/m, // Dernier texte court entre guillemets
+    ];
+    
+    let extractedHook: string | undefined;
+    let extractedCta: string | undefined;
+    
+    for (const pattern of hookPatterns) {
+      const match = prompt.match(pattern);
+      if (match?.[1]) {
+        extractedHook = match[1].trim();
+        break;
+      }
+    }
+    
+    for (const pattern of ctaPatterns) {
+      const match = prompt.match(pattern);
+      if (match?.[1] && match[1] !== extractedHook) {
+        extractedCta = match[1].trim();
+        break;
+      }
+    }
+    
+    if (extractedHook || extractedCta) {
+      videoScript = {
+        hook: extractedHook,
+        cta: extractedCta,
+        script: undefined,
+      };
+      console.log("[processGenerateVideo] 📝 Extracted text from prompt:", {
+        hook: extractedHook?.slice(0, 50),
+        cta: extractedCta?.slice(0, 30),
+        source: "fallback_extraction"
+      });
+    }
+  }
   
   // ✅ Charger le brand kit tôt pour le diagnostic
   const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : null;
@@ -1265,6 +1313,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       hasVideoScript: !!videoScript,
       hook: textForVideo?.hook?.slice(0, 50),
       cta: textForVideo?.cta?.slice(0, 50),
+      source: generatedTexts?.video ? "generatedTexts" : "fallback_extraction"
     });
     
     let videoPrompt: string;
