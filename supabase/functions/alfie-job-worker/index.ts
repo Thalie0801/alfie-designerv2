@@ -263,18 +263,23 @@ function buildContentPrompt(payload: any): string {
 }
 
 /**
- * Construit un prompt PUREMENT VISUEL pour les vidéos (sans texte à afficher)
- * Le script vidéo (hook, script, cta) est stocké séparément pour overlay Canva
- * ✅ V2: Prompts cinématiques descriptifs, pas le niche littéral
+ * Construit un prompt vidéo avec support OPTIONNEL de texte intégré
+ * ✅ V3: Supporte l'affichage de texte (hook/cta) directement via Veo 3.1
  */
-function buildVideoPrompt(payload: any, useBrandKit: boolean, brand?: any): string {
+function buildVideoPrompt(
+  payload: any, 
+  useBrandKit: boolean, 
+  brand?: any,
+  textOverlay?: { hook?: string; cta?: string; } // ✅ NEW: Textes à afficher sur la vidéo
+): string {
   console.log("[buildVideoPrompt] 🎬 Input:", { 
     prompt: payload.prompt?.slice(0, 50), 
     topic: payload.brief?.topic?.slice(0, 50),
     campaign: payload.campaign?.slice(0, 50),
     useBrandKit, 
     brandNiche: brand?.niche,
-    brandPalette: brand?.palette?.slice(0, 2)
+    brandPalette: brand?.palette?.slice(0, 2),
+    hasTextOverlay: !!(textOverlay?.hook || textOverlay?.cta),
   });
   
   // ✅ PRIORITÉ 1 : Le prompt direct de l'utilisateur (description visuelle pure)
@@ -307,10 +312,26 @@ function buildVideoPrompt(payload: any, useBrandKit: boolean, brand?: any): stri
     console.log("[buildVideoPrompt] 🎨 Brand colors applied:", colorNames);
   }
   
-  // ✅ Prompt final cinématique avec instructions anti-texte
-  const finalPrompt = `${colorStyle}${visualPrompt}. Cinematic quality, smooth camera movement, professional lighting. NO TEXT, NO LETTERS, NO WORDS visible on screen.`;
+  // ✅ Instructions de texte: soit afficher le hook/cta, soit interdire tout texte
+  let textInstructions = "";
+  if (textOverlay?.hook || textOverlay?.cta) {
+    const textParts: string[] = [];
+    if (textOverlay.hook) {
+      textParts.push(`Opening animated text appearing in first 2 seconds: "${textOverlay.hook}"`);
+    }
+    if (textOverlay.cta) {
+      textParts.push(`Closing animated text appearing in last 2 seconds: "${textOverlay.cta}"`);
+    }
+    textInstructions = `TEXT TO DISPLAY ON VIDEO: ${textParts.join('. ')}. Use white bold text with elegant animation and subtle shadow for readability.`;
+    console.log("[buildVideoPrompt] 📝 Text overlay requested:", { hook: textOverlay.hook?.slice(0, 30), cta: textOverlay.cta?.slice(0, 30) });
+  } else {
+    textInstructions = "NO TEXT, NO LETTERS, NO WORDS visible on screen.";
+  }
   
-  console.log("[buildVideoPrompt] ✅ Final prompt:", finalPrompt.slice(0, 150) + "...");
+  // ✅ Prompt final cinématique
+  const finalPrompt = `${colorStyle}${visualPrompt}. Cinematic quality, smooth camera movement, professional lighting. ${textInstructions}`;
+  
+  console.log("[buildVideoPrompt] ✅ Final prompt:", finalPrompt.slice(0, 200) + "...");
   return finalPrompt;
 }
 
@@ -1234,6 +1255,18 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
   if (engine === "veo_3_1") {
     console.log("[processGenerateVideo] Using VEO 3 FAST engine for premium video");
     
+    // ✅ Extraire les textes pour overlay vidéo (hook + cta)
+    const textForVideo = videoScript ? { 
+      hook: videoScript.hook || undefined, 
+      cta: videoScript.cta || undefined 
+    } : undefined;
+    
+    console.log("[processGenerateVideo] 📝 Text overlay for Veo 3.1:", {
+      hasVideoScript: !!videoScript,
+      hook: textForVideo?.hook?.slice(0, 50),
+      cta: textForVideo?.cta?.slice(0, 50),
+    });
+    
     let videoPrompt: string;
     
     if (visualStyleCategory === 'character') {
@@ -1241,13 +1274,33 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       const characterStyle = brandMini?.visual_types?.includes('avatars_flat') 
         ? 'animated 2D illustrated character'
         : '3D Pixar-style animated character';
-      videoPrompt = `${characterStyle} in motion. ${prompt || 'Professional scene'}. ${brandMini?.niche || 'business'} context. Smooth animation, expressive movements. NO TEXT, NO LETTERS, NO WORDS visible. Pure cinematic footage.`;
+      
+      // ✅ Construire le prompt avec texte intégré si disponible
+      let textInstruction = "";
+      if (textForVideo?.hook || textForVideo?.cta) {
+        const parts: string[] = [];
+        if (textForVideo.hook) parts.push(`Opening text: "${textForVideo.hook}"`);
+        if (textForVideo.cta) parts.push(`Closing text: "${textForVideo.cta}"`);
+        textInstruction = ` ${parts.join('. ')}. White bold text with animation.`;
+      } else {
+        textInstruction = " NO TEXT, NO LETTERS, NO WORDS visible.";
+      }
+      videoPrompt = `${characterStyle} in motion. ${prompt || 'Professional scene'}. ${brandMini?.niche || 'business'} context. Smooth animation, expressive movements.${textInstruction} Pure cinematic footage.`;
     } else if (visualStyleCategory === 'product' && referenceImageUrl) {
       // Mode PRODUIT: vidéo de mise en scène produit
-      videoPrompt = `Product showcase video. Smooth camera movement around the product. Professional ${brandMini?.niche || 'e-commerce'} setting. Premium lighting, subtle motion. NO TEXT, NO PRICES, NO LABELS. Pure visual footage.`;
+      let textInstruction = "";
+      if (textForVideo?.hook || textForVideo?.cta) {
+        const parts: string[] = [];
+        if (textForVideo.hook) parts.push(`Opening text: "${textForVideo.hook}"`);
+        if (textForVideo.cta) parts.push(`Closing text: "${textForVideo.cta}"`);
+        textInstruction = ` ${parts.join('. ')}. White bold text with animation.`;
+      } else {
+        textInstruction = " NO TEXT, NO PRICES, NO LABELS.";
+      }
+      videoPrompt = `Product showcase video. Smooth camera movement around the product. Professional ${brandMini?.niche || 'e-commerce'} setting. Premium lighting, subtle motion.${textInstruction} Pure visual footage.`;
     } else {
-      // Mode FOND/NORMAL
-      videoPrompt = buildVideoPrompt(payload, useBrandKit, brandMini);
+      // Mode FOND/NORMAL - utiliser buildVideoPrompt avec textOverlay
+      videoPrompt = buildVideoPrompt(payload, useBrandKit, brandMini, textForVideo);
     }
 
     // ✅ ENRICHIR avec Brand Kit (couleurs, niche, mood) directement dans le prompt
