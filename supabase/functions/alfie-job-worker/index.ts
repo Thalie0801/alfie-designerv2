@@ -1195,9 +1195,32 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
   console.log("🎥 [processGenerateVideo] START", {
     orderId: payload?.orderId,
     jobId: jobMeta?.job_id,
+    isMultiClip: !!(payload?.clipIndex),
+    clipIndex: payload?.clipIndex,
+    clipTotal: payload?.clipTotal,
+    clipTextLines: payload?.clipTextLines,
   });
 
   const { userId, brandId, orderId, aspectRatio, duration, prompt, engine, referenceImageUrl, generatedTexts } = payload;
+  
+  // ✅ MULTI-CLIP: Extraire les données spécifiques au clip
+  const isClipJob = payload.clipIndex && payload.clipTotal;
+  const clipIndex = payload.clipIndex || 1;
+  const clipTotal = payload.clipTotal || 1;
+  const clipTextLines: string[] = payload.clipTextLines || [];
+  const clipTitle = payload.clipTitle || "";
+  const clipKeyframe = payload.clipKeyframe || "";
+  const clipAnimation = payload.clipAnimation || "";
+  const globalStyle = payload.globalStyle || "";
+  
+  console.log("[processGenerateVideo] 🎬 Clip data:", {
+    isClipJob,
+    clipIndex,
+    clipTotal,
+    clipTitle,
+    textLinesCount: clipTextLines.length,
+    textLines: clipTextLines,
+  });
   
   // ✅ DEBUG TRACE: Vérifier que referenceImageUrl est bien reçu
   console.log("[processGenerateVideo] 📸 referenceImageUrl DEBUG:", {
@@ -1226,22 +1249,37 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
     isExplicitlyFalse: payload.withAudio === false,
   });
   
-  // ✅ Extraire le script vidéo - avec FALLBACK depuis le prompt brut
-  let videoScript = generatedTexts?.video || null;
+  // ✅ MULTI-CLIP PRIORITY: Utiliser clipTextLines si disponibles
+  let videoScript: { hook?: string; cta?: string; script?: string } | null = null;
   
-  // ✅ FALLBACK: Si pas de generatedTexts, extraire hook/cta du prompt brut
-  if (!videoScript && prompt) {
-    // Chercher des patterns courants: textes entre guillemets, CTA explicite
+  if (isClipJob && clipTextLines.length > 0) {
+    // ✅ Mode MULTI-CLIP: Utiliser les textes EXACTS du clip
+    videoScript = {
+      hook: clipTextLines[0] || undefined,
+      cta: clipTextLines.length > 1 ? clipTextLines[clipTextLines.length - 1] : undefined,
+    };
+    console.log("[processGenerateVideo] 🎬 MULTI-CLIP: Using clipTextLines:", {
+      clipIndex,
+      clipTitle,
+      hook: videoScript.hook,
+      cta: videoScript.cta,
+      allLines: clipTextLines,
+    });
+  } else if (generatedTexts?.video) {
+    // Mode classique: utiliser generatedTexts
+    videoScript = generatedTexts.video;
+  } else if (prompt) {
+    // ✅ FALLBACK: Extraire hook/cta du prompt brut
     const hookPatterns = [
       /Hook\s*:\s*["«]([^"»]+)["»]/i,
       /Accroche\s*:\s*["«]([^"»]+)["»]/i,
-      /^["«]([^"»]{10,80})["»]/m, // Premier texte entre guillemets (10-80 chars)
+      /^["«]([^"»]{10,80})["»]/m,
     ];
     const ctaPatterns = [
       /CTA\s*:\s*["«]([^"»]+)["»]/i,
       /Call.?to.?action\s*:\s*["«]([^"»]+)["»]/i,
-      /Commente?\s+["«]?(\w+)["»]?/i, // "Commente ALFIE"
-      /["«]([^"»]{5,30})["»]\s*$/m, // Dernier texte court entre guillemets
+      /Commente?\s+["«]?(\w+)["»]?/i,
+      /["«]([^"»]{5,30})["»]\s*$/m,
     ];
     
     let extractedHook: string | undefined;
@@ -1264,16 +1302,8 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
     }
     
     if (extractedHook || extractedCta) {
-      videoScript = {
-        hook: extractedHook,
-        cta: extractedCta,
-        script: undefined,
-      };
-      console.log("[processGenerateVideo] 📝 Extracted text from prompt:", {
-        hook: extractedHook?.slice(0, 50),
-        cta: extractedCta?.slice(0, 30),
-        source: "fallback_extraction"
-      });
+      videoScript = { hook: extractedHook, cta: extractedCta };
+      console.log("[processGenerateVideo] 📝 Fallback extraction:", { hook: extractedHook, cta: extractedCta });
     }
   }
   

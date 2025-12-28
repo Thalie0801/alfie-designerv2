@@ -10,6 +10,7 @@ import {
   isSkipResponse,
   detectTopicIntent,
 } from "../_shared/conversationFlow.ts";
+import { isMultiClipPrompt, parseMultiClipPrompt } from "../_shared/multiClipParser.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";
 // ---- Supabase (service role pour la persistance session/ordres/jobs)
@@ -461,6 +462,83 @@ Deno.serve(async (req) => {
           .eq("id", session.id);
       }
 
+      // ✅ MULTI-CLIP DETECTION: Parser le prompt pour détecter plusieurs clips
+      const multiClip = parseMultiClipPrompt(promptText);
+      console.log("[ORCH] 🎬 Multi-clip detection:", { 
+        isMultiClip: multiClip.isMultiClip, 
+        clipCount: multiClip.clipCount,
+        clips: multiClip.clips.map(c => ({ n: c.clipNumber, title: c.title, texts: c.textLines }))
+      });
+
+      if (multiClip.isMultiClip && multiClip.clips.length > 1) {
+        // ✅ MULTI-CLIP MODE: Créer N jobs séparés
+        const jobs = multiClip.clips.map((clip, idx) => ({
+          user_id: user.id,
+          order_id: orderId,
+          type: "generate_video" as const,
+          status: "queued" as const,
+          payload: {
+            userId: user.id,
+            brandId: brand_id,
+            orderId,
+            aspectRatio: v.aspectRatio || "9:16",
+            duration: clip.durationSec || v.durationSec || 8,
+            prompt: promptText, // Prompt complet pour contexte
+            sourceUrl: v.sourceUrl || null,
+            // ✅ CLIP-SPECIFIC DATA
+            clipIndex: idx + 1,
+            clipTotal: multiClip.clipCount,
+            clipTitle: clip.title,
+            clipTextLines: clip.textLines, // Textes EXACTS pour ce clip
+            clipKeyframe: clip.keyframe,
+            clipAnimation: clip.animation,
+            globalStyle: multiClip.globalStyle,
+            globalRules: multiClip.globalRules,
+          },
+        }));
+
+        // Insérer tous les jobs en batch
+        const { error: insertErr } = await sb.from("job_queue").insert(jobs);
+        if (insertErr) {
+          console.error("[ORCH] ❌ Failed to insert multi-clip jobs:", insertErr);
+          return json({ error: "job_insert_failed", details: insertErr.message }, 500);
+        }
+
+        console.log(`[ORCH] ✅ Created ${jobs.length} separate video jobs for multi-clip prompt`);
+
+        // Trigger le worker
+        try {
+          await fetch(`${SUPABASE_URL}/functions/v1/alfie-job-worker`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+              "X-Internal-Secret": INTERNAL_FN_SECRET || "",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ trigger: "video" }),
+          });
+        } catch (workerErr) {
+          console.warn("[ORCH] Worker trigger failed (non-blocking):", workerErr);
+        }
+
+        state = "generating";
+        await sb
+          .from("alfie_conversation_sessions")
+          .update({ conversation_state: state, context_json: context })
+          .eq("id", session.id);
+
+        const responseText = `🚀 ${multiClip.clipCount} clips vidéo lancés ! Je te préviens dès que c'est prêt.`;
+        await appendMessage(session.id, "assistant", responseText);
+        return json({
+          response: responseText,
+          orderId,
+          conversationId: session.id,
+          state,
+          clipCount: multiClip.clipCount,
+        });
+      }
+
+      // ✅ SINGLE CLIP MODE: Comportement classique
       const job = {
         user_id: user.id,
         order_id: orderId,
