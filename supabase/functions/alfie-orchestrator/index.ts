@@ -10,7 +10,7 @@ import {
   isSkipResponse,
   detectTopicIntent,
 } from "../_shared/conversationFlow.ts";
-import { isMultiClipPrompt, parseMultiClipPrompt, isMultiImagePrompt, parseMultiImagePrompt } from "../_shared/multiClipParser.ts";
+import { isMultiClipPrompt, parseMultiClipPrompt, isMultiImagePrompt, parseMultiImagePrompt, isMultiCarouselPrompt, parseMultiCarouselPrompt } from "../_shared/multiClipParser.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";
 // ---- Supabase (service role pour la persistance session/ordres/jobs)
@@ -319,9 +319,14 @@ Deno.serve(async (req) => {
 
     if (forceTool === "render_carousel") {
       const slides = body?.slides;
-      if (!Array.isArray(slides) || slides.length === 0) {
-        return json({ error: "missing_slides" }, 400);
-      }
+      const promptText = (user_message || body?.prompt || "").trim();
+      
+      // ✅ Détection multi-carrousel
+      const multiCarousel = parseMultiCarouselPrompt(promptText);
+      console.log("[ORCH] 🎠 Multi-carousel detection:", { 
+        isMultiCarousel: multiCarousel.isMultiCarousel, 
+        count: multiCarousel.carouselCount 
+      });
 
       let orderId: string | null = session.order_id;
       if (!orderId) {
@@ -331,7 +336,13 @@ Deno.serve(async (req) => {
             user_id: user.id,
             brand_id: brand_id,
             campaign_name: `Carousel_${Date.now()}`,
-            brief_json: { carousel: { slides } },
+            brief_json: { 
+              carousel: { 
+                slides,
+                isMultiCarousel: multiCarousel.isMultiCarousel,
+                carouselCount: multiCarousel.carouselCount,
+              } 
+            },
           })
           .select()
           .single();
@@ -342,18 +353,51 @@ Deno.serve(async (req) => {
 
       const finalOrderId = orderId as string;
 
-      await sb.from("job_queue").insert({
-        user_id: user.id,
-        order_id: finalOrderId,
-        type: "render_carousels",
-        status: "queued",
-        payload: {
-          userId: user.id,
-          brandId: brand_id,
-          orderId: finalOrderId,
-          slides,
-        },
-      });
+      // ✅ Créer N jobs séparés si multi-carrousel, sinon 1 seul job
+      if (multiCarousel.isMultiCarousel) {
+        // Créer un job par carrousel
+        for (const carousel of multiCarousel.carousels) {
+          await sb.from("job_queue").insert({
+            user_id: user.id,
+            order_id: finalOrderId,
+            type: "render_carousels",
+            status: "queued",
+            payload: {
+              userId: user.id,
+              brandId: brand_id,
+              orderId: finalOrderId,
+              carouselIndex: carousel.carouselNumber,
+              totalCarousels: multiCarousel.carouselCount,
+              topic: carousel.topic,
+              slideCount: carousel.slideCount,
+              globalStyle: multiCarousel.globalStyle,
+              slides: slides || carousel.textLines.map((text, i) => ({
+                slideNumber: i + 1,
+                text,
+              })),
+            },
+          });
+        }
+        console.log(`[ORCH] ✅ Created ${multiCarousel.carouselCount} separate carousel jobs`);
+      } else {
+        // 1 seul job (comportement actuel)
+        if (!Array.isArray(slides) || slides.length === 0) {
+          return json({ error: "missing_slides" }, 400);
+        }
+
+        await sb.from("job_queue").insert({
+          user_id: user.id,
+          order_id: finalOrderId,
+          type: "render_carousels",
+          status: "queued",
+          payload: {
+            userId: user.id,
+            brandId: brand_id,
+            orderId: finalOrderId,
+            slides,
+          },
+        });
+      }
 
       try {
         await fetch(`${SUPABASE_URL}/functions/v1/alfie-job-worker`, {
@@ -369,7 +413,9 @@ Deno.serve(async (req) => {
         console.warn("[ORCH] Worker trigger failed (non-blocking):", workerErr);
       }
 
-      const responseText = "🚀 Génération lancée !";
+      const responseText = multiCarousel.isMultiCarousel 
+        ? `🚀 ${multiCarousel.carouselCount} carrousels en cours de génération !`
+        : "🚀 Génération lancée !";
       await appendMessage(session.id, "assistant", responseText);
       await sb
         .from("alfie_conversation_sessions")
@@ -381,6 +427,7 @@ Deno.serve(async (req) => {
         orderId: finalOrderId,
         conversationId: session.id,
         state: "generating",
+        carouselCount: multiCarousel.carouselCount,
       });
     }
 
