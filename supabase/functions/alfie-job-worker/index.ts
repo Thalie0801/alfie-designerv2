@@ -1429,7 +1429,117 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
     // Thumbnail = video URL (VEO 3 génère des vidéos avec couverture)
     const thumbnailUrl = veoResult?.thumbnail_url || videoUrl;
 
-    // Sauvegarder avec script vidéo dans metadata
+    // ✅ POST-PROD MODE: Router vers tts-and-render-final si postProdMode activé
+    const postProdMode = payload.postProdMode === true;
+    const overlayLines = payload.overlayLines;
+    const voiceoverText = payload.voiceoverText;
+    const overlayStyle = payload.overlayStyle;
+    
+    if (postProdMode && overlayLines?.length > 0) {
+      console.log("[processGenerateVideo] 🎬 POST-PROD MODE: Routing to tts-and-render-final...", {
+        overlayLinesCount: overlayLines.length,
+        hasVoiceover: !!voiceoverText,
+        overlayStyle,
+      });
+      
+      try {
+        // Créer l'entrée video_renders pour tracker le pipeline
+        const { data: renderRow, error: renderErr } = await supabaseAdmin
+          .from("video_renders")
+          .insert({
+            user_id: userId,
+            brand_id: brandId,
+            order_id: orderId,
+            visual_prompt: videoPrompt,
+            visual_prompt_en: videoPrompt, // Déjà en anglais
+            aspect_ratio: aspectRatio || "9:16",
+            duration_seconds: durationSec,
+            veo_base_url: videoUrl,
+            voiceover_text: voiceoverText || null,
+            overlay_spec: {
+              lines: overlayLines,
+              style: overlayStyle || { font: "Montserrat", size: 72, color: "white", stroke: "black" },
+            },
+            with_audio: withAudio,
+            status: "postprod_pending",
+          })
+          .select("id")
+          .single();
+        
+        if (renderErr) {
+          console.error("[processGenerateVideo] ⚠️ video_renders insert failed:", renderErr);
+          // Continue sans post-prod si erreur
+        } else {
+          console.log("[processGenerateVideo] 📝 video_renders entry created:", renderRow?.id);
+          
+          // Appeler tts-and-render-final
+          const postProdResult = await callFn<any>("tts-and-render-final", {
+            videoRenderId: renderRow?.id,
+            videoUrl,
+            overlayLines,
+            overlayStyle: overlayStyle || { font: "Montserrat", size: 72, color: "white", stroke: "black" },
+            voiceoverText: voiceoverText || null,
+            aspectRatio: aspectRatio || "9:16",
+            durationSeconds: durationSec,
+            brandId,
+            userId,
+          }, 300_000); // 5 minutes timeout pour post-prod
+          
+          if (postProdResult?.finalVideoUrl) {
+            console.log("[processGenerateVideo] ✅ POST-PROD complete:", postProdResult.finalVideoUrl);
+            
+            // Mettre à jour video_renders avec le résultat final
+            await supabaseAdmin
+              .from("video_renders")
+              .update({
+                cloudinary_final_url: postProdResult.finalVideoUrl,
+                srt: postProdResult.srt || null,
+                status: "completed",
+              })
+              .eq("id", renderRow?.id);
+            
+            // Sauvegarder dans media_generations avec la vidéo finale
+            const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
+              user_id: userId,
+              brand_id: brandId,
+              type: "video",
+              engine: "veo_3_1_postprod",
+              status: "completed",
+              output_url: postProdResult.finalVideoUrl,
+              thumbnail_url: thumbnailUrl,
+              metadata: {
+                prompt: videoPrompt,
+                aspectRatio,
+                duration: durationSec,
+                generator: "veo_3_fast_postprod",
+                tier: "premium",
+                orderId,
+                referenceImageUrl: effectiveReferenceImageUrl,
+                imageFirstPipeline: !referenceImageUrl && !!effectiveReferenceImageUrl,
+                script: videoScript,
+                postProdMode: true,
+                overlayLines,
+                overlayStyle,
+                voiceoverText,
+                srt: postProdResult.srt,
+                rawVideoUrl: videoUrl, // URL vidéo brute avant post-prod
+              },
+            });
+            if (mediaErr) console.error("[processGenerateVideo] ⚠️ media_generations insert failed:", mediaErr);
+            
+            console.log("[processGenerateVideo] ✅ VEO 3 FAST + POST-PROD saved to media_generations");
+            return { videoUrl: postProdResult.finalVideoUrl, rawVideoUrl: videoUrl, srt: postProdResult.srt };
+          } else {
+            console.warn("[processGenerateVideo] ⚠️ POST-PROD failed, returning raw video");
+          }
+        }
+      } catch (postProdErr) {
+        console.error("[processGenerateVideo] ⚠️ POST-PROD pipeline failed:", postProdErr);
+        // Fallback: retourner la vidéo brute si post-prod échoue
+      }
+    }
+
+    // Sauvegarder avec script vidéo dans metadata (mode standard sans post-prod)
     const { error: mediaErr } = await supabaseAdmin.from("media_generations").insert({
       user_id: userId,
       brand_id: brandId,
