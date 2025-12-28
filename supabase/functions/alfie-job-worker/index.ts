@@ -1196,8 +1196,14 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
   const visualStyleCategory = payload.visualStyleCategory || payload.visualStyle || 'background';
   
   // ✅ Veo 3.1 supporte l'audio généré automatiquement (musique d'ambiance)
-  // Respecter le choix utilisateur, sinon ON par défaut pour les vidéos premium
+  // FORCER true par défaut - Seulement false si explicitement demandé
   const withAudio = payload.withAudio !== false;
+  
+  console.log("[processGenerateVideo] 🔊 Audio setting:", {
+    rawPayloadWithAudio: payload.withAudio,
+    resolvedWithAudio: withAudio,
+    isExplicitlyFalse: payload.withAudio === false,
+  });
   
   // ✅ Extraire le script vidéo s'il existe (pour stockage metadata uniquement)
   const videoScript = generatedTexts?.video || null;
@@ -1208,8 +1214,9 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
   console.log("[processGenerateVideo] 🏢 Brand Kit check:", {
     useBrandKit,
     hasBrandMini: !!brandMini,
+    brandName: brandMini?.name,
     brandNiche: brandMini?.niche,
-    brandPalette: brandMini?.palette?.slice(0, 2),
+    brandPalette: brandMini?.palette,
     brandVisualMood: brandMini?.visual_mood,
   });
   
@@ -1227,8 +1234,6 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
   if (engine === "veo_3_1") {
     console.log("[processGenerateVideo] Using VEO 3 FAST engine for premium video");
     
-    // ✅ Utiliser buildVideoPrompt adapté selon visualStyleCategory
-    const brandMini = useBrandKit ? await loadBrandMini(brandId, false) : null;
     let videoPrompt: string;
     
     if (visualStyleCategory === 'character') {
@@ -1245,9 +1250,28 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       videoPrompt = buildVideoPrompt(payload, useBrandKit, brandMini);
     }
 
+    // ✅ ENRICHIR avec Brand Kit (couleurs, niche, mood) directement dans le prompt
+    if (useBrandKit && brandMini) {
+      const brandEnrichment: string[] = [];
+      if (brandMini.palette?.length) {
+        brandEnrichment.push(`Brand colors: ${brandMini.palette.slice(0, 3).join(', ')}`);
+      }
+      if (brandMini.niche) {
+        brandEnrichment.push(`Industry: ${brandMini.niche}`);
+      }
+      if (brandMini.visual_mood?.length) {
+        brandEnrichment.push(`Visual mood: ${brandMini.visual_mood.join(', ')}`);
+      }
+      if (brandEnrichment.length > 0) {
+        videoPrompt += ` ${brandEnrichment.join('. ')}.`;
+      }
+      console.log("[processGenerateVideo] 🎨 Brand Kit enrichment added:", brandEnrichment);
+    }
+
     // ✅ Enrichir le prompt avec des indices de musique si audio activé
     if (withAudio) {
       videoPrompt += " Background music matching the mood. Ambient soundtrack appropriate for the scene.";
+      console.log("[processGenerateVideo] 🎵 Audio cues added to prompt");
     }
 
     // ✅ Appeler generate-video avec provider "veo3" et timeout 6 minutes
