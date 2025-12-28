@@ -223,13 +223,13 @@ async function generateSlideImage(brand: any, index: number, slideText: { title:
     ? `Use these brand colors: ${JSON.stringify(brand.palette)}`
     : "Use harmonious professional colors";
 
-  const prompt = `Generate a beautiful carousel slide background for slide ${index + 1}/10.
+  const prompt = `Generate a beautiful Instagram post background for image ${index + 1}/10.
 
 Brand: ${brand.name}
 Industry: ${brand.niche || "business"}
 ${colorContext}
 
-This is a 4:5 vertical image (1080x1350px) for Instagram carousel.
+This is a 4:5 vertical image (1080x1350px) for Instagram post.
 Create an abstract, modern background that:
 - Has NO TEXT whatsoever - pure visual only
 - Is visually striking and professional

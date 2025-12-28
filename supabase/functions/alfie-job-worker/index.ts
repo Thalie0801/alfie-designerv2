@@ -1024,7 +1024,7 @@ async function processRenderImages(
     const basePrompt = buildFinalPrompt(payload, useBrandKit, brandMini, visualStyle, useLogo); // ✅ Pass useLogo
 
     imagesToRender = Array.from({ length: imagesCount }).map((_, index) => ({
-      prompt: `${basePrompt}. ${resolvedKind === "carousel" ? `Carousel slide ${index + 1}.` : ""} Format ${ratioToUse}.`,
+      prompt: `${basePrompt}. ${resolvedKind === "carousel" ? `Social media post ${index + 1} of ${imagesCount}.` : ""} Format ${ratioToUse}.`,
       resolution: `${w}x${h}`,
       aspectRatio: (ratioToUse as "1:1" | "4:5" | "9:16" | "16:9" | "yt-thumb") ?? "4:5",
       brandId: brandId ?? undefined,
