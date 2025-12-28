@@ -262,7 +262,7 @@ async function createAssetJob(
       colorMode: colorMode, // ✅ Mode Coloré/Pastel
       carouselType: asset.kind === "carousel" ? (asset.carouselType || 'content') : undefined, // ✅ Type: citations ou content
       visualStyle: visualStyle, // ✅ NEW: Style visuel adaptatif (background/character/product)
-      withAudio: asset.withAudio ?? true, // ✅ Audio ON par défaut pour Veo 3.1
+      withAudio: asset.kind === 'video_premium' ? (asset.withAudio !== false) : undefined, // ✅ FORCER true pour vidéos sauf si explicitement false
       engine: videoEngine,
       durationSeconds: asset.durationSeconds || 5,
       aspectRatio: asset.ratio || "4:5",
