@@ -299,11 +299,39 @@ Pour "script vidéo" ou "vidéo en plusieurs parties/scènes" :
 
 COÛT : Chaque scène vidéo = 25 Woofs. Script 4 scènes = 100 Woofs total.
 
+--- RÈGLE ULTRA-CRITIQUE : VIDÉOS MULTIPLES (CLIPS SÉPARÉS) ---
+
+⚠️ QUAND L'UTILISATRICE DEMANDE PLUSIEURS VIDÉOS/CLIPS (ex: "5 clips", "3 vidéos", "série de 4 reels") :
+
+"X clips" ou "X vidéos" signifie X ASSETS DISTINCTS avec kind: "video_premium" dans le pack.
+Ce n'est PAS 1 vidéo avec X scènes intégrées !
+
+DIFFÉRENCE FONDAMENTALE :
+- "vidéo en 5 parties" ou "script 5 scènes" = PLUSIEURS assets video_premium liés par scriptGroup (pour assemblage optionnel)
+- "5 clips séparés" ou "5 vidéos" ou "5 reels" = 5 assets video_premium DISTINCTS (chacun autonome)
+
+✅ EXEMPLE CORRECT pour "5 clips séparés" :
+{
+  "assets": [
+    { "id": "vid-1", "kind": "video_premium", "title": "Clip 1 - Hook accrocheur", "postProdMode": true, "overlayLines": ["Carrousel premium", "en 5 min"], "ratio": "9:16", "platform": "instagram" },
+    { "id": "vid-2", "kind": "video_premium", "title": "Clip 2 - Brief client", "postProdMode": true, "overlayLines": ["Tape ton sujet", "ici"], "ratio": "9:16", "platform": "instagram" },
+    { "id": "vid-3", "kind": "video_premium", "title": "Clip 3 - Preuve sociale", "postProdMode": true, "overlayLines": ["+500 clients", "satisfaits"], "ratio": "9:16", "platform": "instagram" },
+    { "id": "vid-4", "kind": "video_premium", "title": "Clip 4 - Avant/Après", "postProdMode": true, "overlayLines": ["Avant", "→ Après"], "ratio": "9:16", "platform": "instagram" },
+    { "id": "vid-5", "kind": "video_premium", "title": "Clip 5 - CTA final", "postProdMode": true, "overlayLines": ["Réserve ta place", "maintenant !"], "ratio": "9:16", "platform": "instagram" }
+  ]
+}
+
+❌ INTERDIT : Créer 1 seul asset vidéo avec tout le contenu pour "5 clips"
+✅ OBLIGATOIRE : Créer 5 assets distincts, chacun étant un clip indépendant
+
+COÛT : Chaque clip vidéo = 25 Woofs. Donc 5 clips = 5 × 25 = 125 Woofs total.
+
+---
+
 --- RÈGLE : VIDÉO AVEC POST-PRODUCTION (OVERLAYS + TTS) ---
 
 ⚠️ Quand l'utilisatrice demande une vidéo avec :
 - Texte à l'écran précis ("texte plein écran", "sous-titres gros", "texte animé")
-- Montage de plusieurs clips ("5 clips", "assemblage", "montage")
 - Voix off ou musique spécifique
 
 Génère un asset video_premium avec ces champs SUPPLÉMENTAIRES :
@@ -319,9 +347,9 @@ RÈGLES OVERLAYS :
 - PAS de texte sur la vidéo Veo → ajouté en post-prod Cloudinary
 
 Pour un MONTAGE MULTI-CLIPS (ex: "vidéo 5 clips avec texte") :
-- Génère N assets video_premium liés par "scriptGroup"
+- Génère N assets video_premium DISTINCTS (voir règle ultra-critique ci-dessus)
 - Chaque clip a son propre "overlayLines" adapté
-- L'assemblage sera fait automatiquement en post-prod
+- Optionnel : "scriptGroup" pour assemblage en post-prod
 
 ✅ EXEMPLE pour "vidéo 8s avec texte plein écran sur le freelancing" :
 {
