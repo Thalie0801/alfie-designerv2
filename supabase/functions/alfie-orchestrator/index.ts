@@ -10,7 +10,7 @@ import {
   isSkipResponse,
   detectTopicIntent,
 } from "../_shared/conversationFlow.ts";
-import { isMultiClipPrompt, parseMultiClipPrompt } from "../_shared/multiClipParser.ts";
+import { isMultiClipPrompt, parseMultiClipPrompt, isMultiImagePrompt, parseMultiImagePrompt } from "../_shared/multiClipParser.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";
 // ---- Supabase (service role pour la persistance session/ordres/jobs)
@@ -208,6 +208,13 @@ Deno.serve(async (req) => {
 
       const sourceUrl = body?.uploadedSourceUrl || null;
 
+      // ✅ Détection multi-image
+      const multiImage = parseMultiImagePrompt(promptText);
+      console.log("[ORCH] 🖼️ Multi-image detection:", { 
+        isMultiImage: multiImage.isMultiImage, 
+        count: multiImage.imageCount 
+      });
+
       let orderId = session.order_id;
       if (!orderId) {
         const { data: order, error: oErr } = await sb
@@ -216,7 +223,14 @@ Deno.serve(async (req) => {
             user_id: user.id,
             brand_id: brand_id,
             campaign_name: `Image_${Date.now()}`,
-            brief_json: { image: { prompt: promptText, sourceUrl } },
+            brief_json: { 
+              image: { 
+                prompt: promptText, 
+                sourceUrl,
+                isMultiImage: multiImage.isMultiImage,
+                imageCount: multiImage.imageCount,
+              } 
+            },
           })
           .select()
           .single();
@@ -227,19 +241,49 @@ Deno.serve(async (req) => {
 
       const finalOrderId = orderId as string;
 
-      await sb.from("job_queue").insert({
-        user_id: user.id,
-        order_id: finalOrderId,
-        type: "render_images",
-        status: "queued",
-        payload: {
-          userId: user.id,
-          brandId: brand_id,
-          orderId: finalOrderId,
-          prompt: promptText,
-          sourceUrl,
-        },
-      });
+      // ✅ Créer N jobs séparés si multi-image, sinon 1 seul job
+      if (multiImage.isMultiImage) {
+        // Créer un job par image
+        for (const img of multiImage.images) {
+          // Combiner style global + prompt spécifique de l'image
+          const fullPrompt = multiImage.globalStyle 
+            ? `${multiImage.globalStyle}\n\n${img.visualPrompt}`
+            : img.visualPrompt;
+
+          await sb.from("job_queue").insert({
+            user_id: user.id,
+            order_id: finalOrderId,
+            type: "render_images",
+            status: "queued",
+            payload: {
+              userId: user.id,
+              brandId: brand_id,
+              orderId: finalOrderId,
+              prompt: fullPrompt,
+              sourceUrl,
+              imageIndex: img.imageNumber,
+              totalImages: multiImage.imageCount,
+              textLines: img.textLines,
+            },
+          });
+        }
+        console.log(`[ORCH] ✅ Created ${multiImage.imageCount} separate image jobs`);
+      } else {
+        // 1 seul job (comportement actuel)
+        await sb.from("job_queue").insert({
+          user_id: user.id,
+          order_id: finalOrderId,
+          type: "render_images",
+          status: "queued",
+          payload: {
+            userId: user.id,
+            brandId: brand_id,
+            orderId: finalOrderId,
+            prompt: promptText,
+            sourceUrl,
+          },
+        });
+      }
 
       try {
         await fetch(`${SUPABASE_URL}/functions/v1/alfie-job-worker`, {
@@ -255,7 +299,9 @@ Deno.serve(async (req) => {
         console.warn("[ORCH] Worker trigger failed (non-blocking):", workerErr);
       }
 
-      const responseText = "🚀 Génération lancée !";
+      const responseText = multiImage.isMultiImage 
+        ? `🚀 ${multiImage.imageCount} images en cours de génération !`
+        : "🚀 Génération lancée !";
       await appendMessage(session.id, "assistant", responseText);
       await sb
         .from("alfie_conversation_sessions")
@@ -267,6 +313,7 @@ Deno.serve(async (req) => {
         orderId: finalOrderId,
         conversationId: session.id,
         state: "generating",
+        imageCount: multiImage.imageCount,
       });
     }
 

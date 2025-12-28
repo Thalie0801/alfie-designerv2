@@ -1,5 +1,91 @@
 // supabase/functions/_shared/multiClipParser.ts
-// Parser pour prompts multi-clips vidéo
+// Parser pour prompts multi-clips vidéo ET multi-images
+
+// ==================== MULTI-IMAGE PARSING ====================
+
+export interface ParsedImage {
+  imageNumber: number;
+  visualPrompt: string;      // Instructions visuelles complètes
+  textLines: string[];       // Textes à afficher (entre guillemets)
+}
+
+export interface MultiImageResult {
+  isMultiImage: boolean;
+  imageCount: number;
+  globalStyle: string;       // Style commun (règles communes)
+  images: ParsedImage[];
+}
+
+/**
+ * Détecte si un prompt contient plusieurs sections "Image N :"
+ */
+export function isMultiImagePrompt(prompt: string): boolean {
+  const imageMatches = prompt.match(/Image\s*\d+\s*:/gi);
+  return imageMatches !== null && imageMatches.length >= 2;
+}
+
+/**
+ * Parse un prompt multi-images et extrait chaque image avec ses specs
+ */
+export function parseMultiImagePrompt(prompt: string): MultiImageResult {
+  // Résultat par défaut si pas multi-image
+  if (!isMultiImagePrompt(prompt)) {
+    return {
+      isMultiImage: false,
+      imageCount: 1,
+      globalStyle: "",
+      images: [{
+        imageNumber: 1,
+        visualPrompt: prompt,
+        textLines: extractTextLines(prompt),
+      }],
+    };
+  }
+
+  // Extraire le style global (tout avant "Image 1 :")
+  const beforeImagesMatch = prompt.match(/^([\s\S]*?)(?=Image\s*1\s*:)/i);
+  const globalSection = beforeImagesMatch?.[1] || "";
+  const globalStyle = globalSection.trim();
+
+  // Diviser par "Image N :"
+  const imageRegex = /Image\s*(\d+)\s*:\s*([\s\S]*?)(?=Image\s*\d+\s*:|$)/gi;
+  const images: ParsedImage[] = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = imageRegex.exec(prompt)) !== null) {
+    const imageNumber = parseInt(match[1], 10);
+    const imageContent = match[2]?.trim() || "";
+
+    // Extraire les lignes de texte (entre guillemets)
+    const textLines = extractTextLines(imageContent);
+
+    // Construire le prompt visuel complet
+    // Inclure le style global + instructions spécifiques de l'image
+    let visualPrompt = imageContent;
+    
+    // Ajouter instruction anti-hallucination
+    visualPrompt += `\n\nCRITICAL: Display ONLY the text provided in quotes. NO additional text, NO labels like 'Catalogue', NO decorative words, NO extra typography.`;
+
+    images.push({
+      imageNumber,
+      visualPrompt,
+      textLines,
+    });
+  }
+
+  console.log(`[multiClipParser] Parsed ${images.length} images:`, 
+    images.map(i => ({ n: i.imageNumber, texts: i.textLines.length }))
+  );
+
+  return {
+    isMultiImage: true,
+    imageCount: images.length,
+    globalStyle,
+    images,
+  };
+}
+
+// ==================== MULTI-CLIP VIDEO PARSING ====================
 
 export interface ParsedClip {
   clipNumber: number;
