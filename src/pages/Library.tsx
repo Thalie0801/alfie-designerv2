@@ -31,8 +31,11 @@ export default function Library() {
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Map tab to asset type for hook
-  const assetTypeForHook = activeTab === 'carousels' ? 'images' : activeTab === 'pinterest' ? 'pinterest' : activeTab;
+  // Map tab to asset type for hook (video-batches uses its own hook, default to 'images')
+  const assetTypeForHook: 'images' | 'videos' | 'thumbnails' | 'pinterest' = 
+    activeTab === 'carousels' || activeTab === 'video-batches' ? 'images' 
+    : activeTab === 'pinterest' ? 'pinterest' 
+    : activeTab;
   
   const { 
     assets, 
