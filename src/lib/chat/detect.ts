@@ -82,7 +82,7 @@ export function detectPlatformHelp(raw: string) {
     // Garder uniquement les termes de navigation explicites
     { test: /(bibliothèque|médias?|mes\s+fichiers?)/, to: "/library", label: "Bibliothèque" },
     { test: /(brand[\s-]?kit|modifier (ma |mon |les )?couleurs|configurer (ma |mes )?typo)/, to: "/brand-kit-questionnaire", label: "Brand Kit" },
-    { test: /(factur|abonnement|paiement|pricing|prix|crédit|woofs)/, to: "/billing", label: "Facturation" },
+    { test: /\b(factur|abonnement|paiement|pricing|prix|crédit|woofs)\b/, to: "/billing", label: "Facturation" },
     { test: /(profil|compte|email|mot de passe)/, to: "/profile", label: "Profil" },
     { test: /(dashboard|stat|performances?)/, to: "/dashboard", label: "Dashboard" },
     { test: /(affiliation|parrain|ambassadeur)/, to: "/affiliate", label: "Affiliation" },
@@ -96,7 +96,7 @@ export function detectPlatformHelp(raw: string) {
   // Si création demandée, exclure TOUTES les navigations ambiguës (studio ET library)
   const matches = intents
     .filter((i) => i.test.test(q))
-    .filter((i) => !(isContentRequest && (i.to === "/studio" || i.to === "/library")));
+    .filter((i) => !(isContentRequest && (i.to === "/studio" || i.to === "/library" || i.to === "/billing")));
 
   const isWhatCanDo =
     /(que|quoi).*(peut|peux).*(faire|proposer)|capacités?|features?|fonctionnalités?|comment (ça|ca) marche|mode d'emploi|help/i.test(q);
