@@ -55,7 +55,7 @@ const jobQueueService = {
     return job || null;
   },
 
-  completeJob: (jobId: string, result?: any): boolean => {
+  completeJob: (jobId: string, _result?: any): boolean => {
     const job = mockJobQueue.find(j => j.id === jobId);
     if (job) {
       job.status = 'completed';
