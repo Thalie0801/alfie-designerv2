@@ -264,8 +264,13 @@ function parsePack(text: string): any | null {
 /**
  * ✅ FORCE MULTI-CLIPS : Si "CLIP 1..N" ou "X clips/assets/scènes", GARANTIT N assets video_premium
  * Fonctionne même si pack est null ou contient 0/1 vidéo
+ * @param brandContext - Brand Kit du client pour enrichir les prompts (niche, palette, visual_types, voice)
  */
-function forceMultiClips(pack: any, userMessage: string): any {
+function forceMultiClips(
+  pack: any, 
+  userMessage: string,
+  brandContext?: { niche?: string; palette?: string[] | any; visual_types?: string[]; voice?: string }
+): any {
   if (!userMessage) return pack;
   
   const msg = userMessage.toLowerCase();
@@ -310,8 +315,8 @@ function forceMultiClips(pack: any, userMessage: string): any {
   
   console.log(`🎬 FORCE MULTI-CLIPS: Requested ${targetCount} clips, current=${currentVideos.length}, forcing creation...`);
   
-  // Extraire les infos de chaque clip depuis le message
-  const clipInfos = extractClipInfos(userMessage, targetCount);
+  // Extraire les infos de chaque clip depuis le message (avec Brand Kit pour enrichissement)
+  const clipInfos = extractClipInfos(userMessage, targetCount, brandContext);
   
   // Récupérer le template de l'asset vidéo existant (s'il y en a un)
   const templateAsset = currentVideos[0] || {};
@@ -355,9 +360,113 @@ function forceMultiClips(pack: any, userMessage: string): any {
 }
 
 /**
- * Extrait les informations de chaque clip depuis le message utilisateur
+ * Extrait les instructions globales du message utilisateur (STYLE, MASCOTTE, INTERDIT, TEXT LOCK)
  */
-function extractClipInfos(message: string, count: number): Array<{
+function extractGlobalInstructions(message: string): {
+  style: string;
+  character: string;
+  rules: string[];
+} {
+  // Extraire le STYLE global (jusqu'au premier saut de ligne ou point)
+  const styleMatch = message.match(/STYLE\s*:?\s*([^\n.]+(?:\.[^\n]+)?)/i);
+  const style = styleMatch?.[1]?.trim() || '';
+  
+  // Extraire MASCOTTE ou CHARACTER
+  const mascotteMatch = message.match(/MASCOTTE\s*:?\s*([^\n.]+)/i);
+  const characterMatch = message.match(/CHARACTER\s*:?\s*([^\n.]+)/i);
+  const character = (mascotteMatch?.[1] || characterMatch?.[1] || '').trim();
+  
+  // Extraire les règles (INTERDIT, TEXT LOCK, PROCESS)
+  const rules: string[] = [];
+  
+  const interditMatch = message.match(/INTERDIT(?:\s+ABSOLU)?\s*:?\s*([^\n.]+)/i);
+  if (interditMatch) rules.push(`FORBIDDEN: ${interditMatch[1].trim()}`);
+  
+  const textLockMatch = message.match(/TEXT\s*LOCK\s*:?\s*([^\n.]+)/i);
+  if (textLockMatch) rules.push(`TEXT LOCK: ${textLockMatch[1].trim()}`);
+  
+  const processMatch = message.match(/PROCESS\s*:?\s*([^\n.]+)/i);
+  if (processMatch) rules.push(`PROCESS: ${processMatch[1].trim()}`);
+  
+  return { style, character, rules };
+}
+
+/**
+ * Construit un prompt enrichi avec le contenu du clip + instructions globales + Brand Kit
+ * GÉNÉRIQUE : fonctionne pour tous les clients, pas juste pour un cas spécifique
+ */
+function buildEnrichedClipPrompt(
+  clipContent: string,
+  globalInstructions: { style: string; character: string; rules: string[] },
+  brandKit?: { niche?: string; palette?: string[] | any; visual_types?: string[]; voice?: string }
+): string {
+  const parts: string[] = [];
+  
+  // ✅ CONTENU SPÉCIFIQUE DU CLIP (PAS DE TRONCATURE!)
+  parts.push(clipContent.trim());
+  
+  // ✅ STYLE GLOBAL du message (si présent dans le prompt utilisateur)
+  if (globalInstructions.style) {
+    parts.push(`\nGLOBAL STYLE: ${globalInstructions.style}`);
+  }
+  
+  // ✅ PERSONNAGE/MASCOTTE (si présent dans le prompt utilisateur)
+  if (globalInstructions.character) {
+    parts.push(`\nCHARACTER/MASCOT: ${globalInstructions.character}`);
+  }
+  
+  // ✅ BRAND KIT (GÉNÉRIQUE - fonctionne pour tous les clients)
+  if (brandKit) {
+    if (brandKit.niche) {
+      parts.push(`\nINDUSTRY CONTEXT: ${brandKit.niche}`);
+    }
+    
+    // Palette de couleurs (peut être array ou objet)
+    const paletteColors = Array.isArray(brandKit.palette) 
+      ? brandKit.palette 
+      : (brandKit.palette?.colors || []);
+    if (paletteColors.length > 0) {
+      parts.push(`\nBRAND COLORS: ${paletteColors.slice(0, 4).join(', ')}`);
+    }
+    
+    // Visual types → déduire le style visuel
+    if (brandKit.visual_types?.length) {
+      const types = brandKit.visual_types;
+      let styleHint = 'professional cinematic style';
+      if (types.includes('3d_renders') || types.includes('3d')) {
+        styleHint = '3D Pixar-style, smooth CGI rendering';
+      } else if (types.includes('2d_illustrations') || types.includes('2d')) {
+        styleHint = '2D animated illustration style, flat design';
+      } else if (types.includes('photos') || types.includes('photo')) {
+        styleHint = 'photorealistic, cinematic photography';
+      } else if (types.includes('avatars_flat')) {
+        styleHint = 'flat avatar style, minimalist';
+      }
+      parts.push(`\nVISUAL APPROACH: ${styleHint}`);
+    }
+    
+    if (brandKit.voice) {
+      parts.push(`\nTONE OF VOICE: ${brandKit.voice}`);
+    }
+  }
+  
+  // ✅ RÈGLES GLOBALES (INTERDIT, TEXT LOCK, PROCESS)
+  if (globalInstructions.rules.length > 0) {
+    parts.push(`\nRULES: ${globalInstructions.rules.join('. ')}`);
+  }
+  
+  return parts.join('');
+}
+
+/**
+ * Extrait les informations de chaque clip depuis le message utilisateur
+ * Enrichit avec le Brand Kit du client pour un rendu personnalisé
+ */
+function extractClipInfos(
+  message: string, 
+  count: number,
+  brandKit?: { niche?: string; palette?: string[] | any; visual_types?: string[]; voice?: string }
+): Array<{
   title: string;
   prompt: string;
   duration: number;
@@ -365,37 +474,36 @@ function extractClipInfos(message: string, count: number): Array<{
 }> {
   const infos: Array<{ title: string; prompt: string; duration: number; overlayLines: string[] }> = [];
   
+  // ✅ Extraire les instructions globales UNE SEULE FOIS
+  const globalInstructions = extractGlobalInstructions(message);
+  console.log('🎬 Global instructions extracted:', JSON.stringify(globalInstructions, null, 2));
+  
   // Essayer de parser les blocs CLIP X
   const clipBlocks = message.split(/CLIP\s*\d+\s*[:\-–—]?\s*/i).filter(b => b.trim());
   
   for (let i = 0; i < count; i++) {
     const block = clipBlocks[i] || '';
     
-    // Extraire la durée (ex: "2s", "3 sec")
+    // Extraire la durée (ex: "8s", "8 secondes", "EXACTEMENT 8 secondes")
     const durationMatch = block.match(/(\d+(?:\.\d+)?)\s*s(?:ec(?:ondes?)?)?/i);
-    const duration = durationMatch ? Math.min(Math.max(parseFloat(durationMatch[1]), 1), 8) : 2;
+    const duration = durationMatch ? Math.min(Math.max(parseFloat(durationMatch[1]), 1), 8) : 8;
     
-    // Extraire le titre (ex: "Hook", "CTA", parenthèses)
-    const titleMatch = block.match(/\(([^)]+)\)/);
-    const title = titleMatch ? titleMatch[1].trim() : `Clip ${i + 1}`;
+    // Extraire le titre (ex: "HOOK", "CTA", texte entre parenthèses après CLIP)
+    const titleMatch = block.match(/^\s*[—–-]?\s*([A-Z]+(?:\s+\d+[-–]\d+)?)/);
+    const parenMatch = block.match(/\(([^)]+)\)/);
+    const title = titleMatch?.[1]?.trim() || parenMatch?.[1]?.trim() || `Clip ${i + 1}`;
     
     // Extraire les textes entre guillemets pour overlayLines
     const textMatches = block.match(/["«"]([^"»"]+)["»"]/g) || [];
     const overlayLines = textMatches
       .map(t => t.replace(/["«»""]/g, '').trim())
-      .filter(t => t.length > 0 && t.length < 50)
-      .slice(0, 3); // Max 3 lignes par clip
+      .filter(t => t.length > 0 && t.length < 80) // ✅ Augmenté pour textes plus longs
+      .slice(0, 5); // ✅ Max 5 lignes par clip
     
-    // Générer un prompt basé sur le contenu du bloc
-    const cleanBlock = block
-      .replace(/["«"]([^"»"]+)["»"]/g, '') // Retirer les guillemets
-      .replace(/\(\d+(?:\.\d+)?s?\)/g, '') // Retirer les durées entre parenthèses
-      .replace(/\d+(?:\.\d+)?\s*s(?:ec)?/gi, '') // Retirer les durées
-      .trim();
+    // ✅ NOUVEAU: Construire le prompt COMPLET avec enrichissement Brand Kit
+    const prompt = buildEnrichedClipPrompt(block, globalInstructions, brandKit);
     
-    const prompt = cleanBlock.length > 10 
-      ? cleanBlock.substring(0, 200) 
-      : `${title} - animation dynamique`;
+    console.log(`🎬 Clip ${i + 1}: title="${title}", duration=${duration}s, overlayLines=${overlayLines.length}, promptLength=${prompt.length}`);
     
     infos.push({ title, prompt, duration, overlayLines });
   }
@@ -470,7 +578,7 @@ Deno.serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
     
-    let brandContext: { name?: string; niche?: string; voice?: string; palette?: string[]; logo_url?: string } | undefined;
+    let brandContext: { name?: string; niche?: string; voice?: string; palette?: string[] | any; logo_url?: string; visual_types?: string[] } | undefined;
     
     if (SUPABASE_URL && SUPABASE_ANON_KEY) {
       try {
@@ -488,8 +596,8 @@ Deno.serve(async (req) => {
           );
         }
 
-        // ✅ Vérifier que l'utilisateur possède la brand + récupérer logo_url
-        const brandResponse = await fetch(`${SUPABASE_URL}/rest/v1/brands?id=eq.${brandId}&select=user_id,name,niche,voice,palette,logo_url`, {
+        // ✅ Vérifier que l'utilisateur possède la brand + récupérer logo_url, palette, visual_types
+        const brandResponse = await fetch(`${SUPABASE_URL}/rest/v1/brands?id=eq.${brandId}&select=user_id,name,niche,voice,palette,logo_url,visual_types`, {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
             'Authorization': authHeader
@@ -508,7 +616,9 @@ Deno.serve(async (req) => {
             brandContext = {
               niche: brands[0].niche,
               voice: brands[0].voice,
-              logo_url: brands[0].logo_url, // ✅ NEW: Include logo_url
+              logo_url: brands[0].logo_url,
+              palette: brands[0].palette, // ✅ NEW: Include palette for video prompts
+              visual_types: brands[0].visual_types, // ✅ NEW: Include visual_types for style detection
             };
           } else {
             return new Response(
@@ -574,7 +684,7 @@ Deno.serve(async (req) => {
     
     // ✅ FORCE MULTI-CLIPS: Garantir N vidéos si "CLIP 1..N" même si pack null/incomplet
     const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop()?.content || '';
-    pack = forceMultiClips(pack, lastUserMessage);
+    pack = forceMultiClips(pack, lastUserMessage, brandContext);
     
     // ✅ Log de debug enrichi pour diagnostic
     const hasPackTag = rawReply.toLowerCase().includes('<alfie-pack>');
