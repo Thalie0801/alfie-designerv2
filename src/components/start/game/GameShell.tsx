@@ -22,12 +22,10 @@ export function GameShell({ children, currentStep, intent, showHUD = true }: Gam
       <ParticleField count={25} speed="slow" />
 
       {/* HUD */}
-      {showHUD && currentStep !== 'gate' && (
-        <GameHUD currentStep={currentStep} intent={intent} />
-      )}
+      {showHUD && <GameHUD currentStep={currentStep} intent={intent} />}
 
       {/* Main Scene */}
-      <div className={`relative z-10 ${showHUD && currentStep !== 'gate' ? 'pt-20' : ''}`}>
+      <div className={`relative z-10 ${showHUD ? 'pt-20' : ''}`}>
         {children}
       </div>
     </div>
