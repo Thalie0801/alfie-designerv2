@@ -52,7 +52,7 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/quiz" element={<Quiz />} />
-        <Route path="/start" element={<ProtectedRoute requireAdmin><Start /></ProtectedRoute>} />
+        <Route path="/start" element={<Start />} />
         <Route path="/free-pack" element={<FreePack />} />
         <Route path="/checkout/express" element={<CheckoutExpress />} />
         <Route path="/auth" element={<Auth />} />

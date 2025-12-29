@@ -2,16 +2,13 @@ import { motion } from 'framer-motion';
 import type { Intent, FlowStep } from '@/lib/types/startFlow';
 
 const STEP_LABELS: Record<FlowStep, string> = {
-  gate: 'Portail',
-  brand: 'Équipement',
   wizard: 'Quête',
-  recap: 'Préparation',
   email_gate: 'Checkpoint',
   generating: 'Forge',
   delivery: 'Loot',
 };
 
-const STEP_ORDER: FlowStep[] = ['gate', 'brand', 'wizard', 'recap', 'email_gate', 'generating', 'delivery'];
+const STEP_ORDER: FlowStep[] = ['wizard', 'email_gate', 'generating', 'delivery'];
 
 interface GameHUDProps {
   currentStep: FlowStep;

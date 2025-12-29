@@ -5,45 +5,23 @@ import { toast } from 'sonner';
 
 // Game components
 import { GameShell } from '@/components/start/game/GameShell';
-import { PortalDoorScene } from '@/components/start/scenes/PortalDoorScene';
-import { EquipmentScene } from '@/components/start/scenes/EquipmentScene';
 import { QuestScene } from '@/components/start/scenes/QuestScene';
 import { CraftingScene } from '@/components/start/scenes/CraftingScene';
 import { LootChestScene } from '@/components/start/scenes/LootChestScene';
 import { EmailGateScene } from '@/components/start/scenes/EmailGateScene';
 
-import type { StylePreset, Intent, FlowStep } from '@/lib/types/startFlow';
+import type { Intent, FlowStep } from '@/lib/types/startFlow';
 import { DEFAULT_INTENT } from '@/lib/types/startFlow';
 
 export default function Start() {
-  const [, setStylePreset] = useLocalStorageState<StylePreset>('alfie-start-preset', 'pop');
   const [intent, setIntent] = useLocalStorageState<Intent>('alfie-start-intent', DEFAULT_INTENT);
-  const [flowStep, setFlowStep] = useState<FlowStep>('gate');
-
-  const handleGateFinish = useCallback((preset: StylePreset) => {
-    setStylePreset(preset);
-    setIntent((prev) => ({ ...prev, stylePreset: preset }));
-    setFlowStep('brand');
-  }, [setStylePreset, setIntent]);
-
-  const handleBrandSelect = useCallback((brandKitId: string | null) => {
-    setIntent((prev) => ({
-      ...prev,
-      brandKitId: brandKitId ?? undefined,
-      brandLocks: brandKitId 
-        ? { palette: true, fonts: true, logo: true } 
-        : { palette: false, fonts: false, logo: false },
-    }));
-    setFlowStep('wizard');
-  }, [setIntent]);
+  const [flowStep, setFlowStep] = useState<FlowStep>('wizard');
 
   const handleIntentUpdate = useCallback((updates: Partial<Intent>) => {
     setIntent((prev) => ({ ...prev, ...updates }));
   }, [setIntent]);
 
-  const handleWizardComplete = useCallback(() => setFlowStep('recap'), []);
-  
-  const handleGenerate = useCallback(() => setFlowStep('email_gate'), []);
+  const handleWizardComplete = useCallback(() => setFlowStep('email_gate'), []);
   
   const handleEmailGateContinue = useCallback((email?: string) => {
     if (email) {
@@ -64,31 +42,14 @@ export default function Start() {
   }, []);
 
   return (
-    <GameShell currentStep={flowStep} intent={intent} showHUD={flowStep !== 'gate'}>
+    <GameShell currentStep={flowStep} intent={intent} showHUD>
       <AnimatePresence mode="wait">
-        {flowStep === 'gate' && (
-          <PortalDoorScene key="gate" onFinish={handleGateFinish} />
-        )}
-        
-        {flowStep === 'brand' && (
-          <EquipmentScene key="brand" onSelect={handleBrandSelect} />
-        )}
-        
         {flowStep === 'wizard' && (
           <QuestScene
             key="wizard"
             intent={intent}
             onUpdate={handleIntentUpdate}
             onComplete={handleWizardComplete}
-          />
-        )}
-        
-        {flowStep === 'recap' && (
-          <QuestScene
-            key="recap"
-            intent={intent}
-            onUpdate={handleIntentUpdate}
-            onComplete={handleGenerate}
           />
         )}
         
