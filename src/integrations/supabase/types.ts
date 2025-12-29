@@ -562,6 +562,62 @@ export type Database = {
           },
         ]
       }
+      batch_clips: {
+        Row: {
+          anchor_prompt: string | null
+          anchor_public_id: string | null
+          anchor_url: string | null
+          clip_index: number
+          clip_public_id: string | null
+          clip_url: string | null
+          created_at: string
+          duration_seconds: number
+          error: string | null
+          id: string
+          status: string
+          veo_prompt: string | null
+          video_id: string
+        }
+        Insert: {
+          anchor_prompt?: string | null
+          anchor_public_id?: string | null
+          anchor_url?: string | null
+          clip_index: number
+          clip_public_id?: string | null
+          clip_url?: string | null
+          created_at?: string
+          duration_seconds?: number
+          error?: string | null
+          id?: string
+          status?: string
+          veo_prompt?: string | null
+          video_id: string
+        }
+        Update: {
+          anchor_prompt?: string | null
+          anchor_public_id?: string | null
+          anchor_url?: string | null
+          clip_index?: number
+          clip_public_id?: string | null
+          clip_url?: string | null
+          created_at?: string
+          duration_seconds?: number
+          error?: string | null
+          id?: string
+          status?: string
+          veo_prompt?: string | null
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_clips_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "batch_videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       batch_requests: {
         Row: {
           created_at: string | null
@@ -599,6 +655,97 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      batch_video_texts: {
+        Row: {
+          caption: string | null
+          clip1_subtitle: string | null
+          clip1_title: string | null
+          clip2_subtitle: string | null
+          clip2_title: string | null
+          clip3_subtitle: string | null
+          clip3_title: string | null
+          created_at: string
+          cta: string | null
+          id: string
+          video_id: string
+        }
+        Insert: {
+          caption?: string | null
+          clip1_subtitle?: string | null
+          clip1_title?: string | null
+          clip2_subtitle?: string | null
+          clip2_title?: string | null
+          clip3_subtitle?: string | null
+          clip3_title?: string | null
+          created_at?: string
+          cta?: string | null
+          id?: string
+          video_id: string
+        }
+        Update: {
+          caption?: string | null
+          clip1_subtitle?: string | null
+          clip1_title?: string | null
+          clip2_subtitle?: string | null
+          clip2_title?: string | null
+          clip3_subtitle?: string | null
+          clip3_title?: string | null
+          created_at?: string
+          cta?: string | null
+          id?: string
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_video_texts_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "batch_videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      batch_videos: {
+        Row: {
+          batch_id: string
+          created_at: string
+          error: string | null
+          id: string
+          status: string
+          title: string | null
+          updated_at: string
+          video_index: number
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          status?: string
+          title?: string | null
+          updated_at?: string
+          video_index: number
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          status?: string
+          title?: string | null
+          updated_at?: string
+          video_index?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_videos_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "video_batches"
             referencedColumns: ["id"]
           },
         ]
@@ -2229,6 +2376,57 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      video_batches: {
+        Row: {
+          brand_id: string | null
+          created_at: string
+          error: string | null
+          id: string
+          input_prompt: string
+          settings: Json | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          input_prompt: string
+          settings?: Json | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          input_prompt?: string
+          settings?: Json | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_batches_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_batches_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
+          },
+        ]
       }
       video_renders: {
         Row: {

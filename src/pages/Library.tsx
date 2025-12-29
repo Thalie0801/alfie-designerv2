@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { AccessGuard } from '@/components/AccessGuard';
 import { CarouselsTab } from '@/components/library/CarouselsTab';
+import { VideoBatchesTab } from '@/components/library/VideoBatchesTab';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 
@@ -23,7 +24,7 @@ export default function Library() {
   const orderIdFromQuery = new URLSearchParams(location.search).get('order');
   
   // Si ?order= est présent, afficher l'onglet carrousels par défaut
-  const [activeTab, setActiveTab] = useState<'images' | 'videos' | 'carousels' | 'thumbnails' | 'pinterest'>(
+  const [activeTab, setActiveTab] = useState<'images' | 'videos' | 'carousels' | 'thumbnails' | 'pinterest' | 'video-batches'>(
     orderIdFromQuery ? 'carousels' : 'images'
   );
   const [searchQuery, setSearchQuery] = useState('');
@@ -161,13 +162,14 @@ export default function Library() {
       )}
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'images' | 'videos' | 'carousels' | 'thumbnails' | 'pinterest')}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'images' | 'videos' | 'carousels' | 'thumbnails' | 'pinterest' | 'video-batches')}>
         <TabsList className="flex-wrap h-auto min-h-[4.5rem] sm:min-h-10 gap-1 justify-start w-full">
           <TabsTrigger value="images" className="text-xs sm:text-sm shrink-0">🖼️ Images</TabsTrigger>
           <TabsTrigger value="pinterest" className="text-xs sm:text-sm shrink-0">📌 Pinterest</TabsTrigger>
           <TabsTrigger value="thumbnails" className="text-xs sm:text-sm shrink-0">📺 Miniatures YT</TabsTrigger>
           <TabsTrigger value="videos" className="text-xs sm:text-sm shrink-0">🎬 Vidéos</TabsTrigger>
           <TabsTrigger value="carousels" className="text-xs sm:text-sm shrink-0">📱 Carrousels</TabsTrigger>
+          <TabsTrigger value="video-batches" className="text-xs sm:text-sm shrink-0">🎬 Batches Vidéo</TabsTrigger>
         </TabsList>
 
         {/* Toolbar */}
@@ -312,6 +314,11 @@ export default function Library() {
         {/* Carousels Tab */}
         <TabsContent value="carousels" className="mt-6 min-h-[300px]">
           <CarouselsTab orderId={orderIdFromQuery} />
+        </TabsContent>
+
+        {/* Video Batches Tab */}
+        <TabsContent value="video-batches" className="mt-6 min-h-[300px]">
+          <VideoBatchesTab orderId={orderIdFromQuery} />
         </TabsContent>
 
         {/* Pinterest Tab */}
