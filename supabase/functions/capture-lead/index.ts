@@ -40,48 +40,53 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log("[capture-lead] Processing:", { email: normalizedEmail, source });
 
-    // Upsert lead (update if exists, insert if not)
-    const { data: lead, error: leadError } = await supabase
+    // Check if lead already exists
+    const { data: existingLead } = await supabase
       .from("leads")
-      .upsert(
-        {
+      .select("id")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
+
+    let leadId: string | undefined;
+
+    if (existingLead) {
+      // Update existing lead
+      const { error: updateError } = await supabase
+        .from("leads")
+        .update({
+          intent,
+          marketing_opt_in: marketingOptIn,
+          last_seen_at: new Date().toISOString(),
+        })
+        .eq("id", existingLead.id);
+      
+      if (updateError) {
+        console.error("[capture-lead] Lead update error:", updateError);
+      } else {
+        console.log("[capture-lead] Lead updated:", existingLead.id);
+      }
+      leadId = existingLead.id;
+    } else {
+      // Insert new lead
+      const { data: newLead, error: insertError } = await supabase
+        .from("leads")
+        .insert({
           email: normalizedEmail,
           source,
           intent,
           marketing_opt_in: marketingOptIn,
           last_seen_at: new Date().toISOString(),
-        },
-        {
-          onConflict: "email",
-          ignoreDuplicates: false,
-        }
-      )
-      .select("id")
-      .single();
-
-    if (leadError) {
-      console.error("[capture-lead] Lead upsert error:", leadError);
-      // Try to get existing lead
-      const { data: existingLead } = await supabase
-        .from("leads")
+        })
         .select("id")
-        .eq("email", normalizedEmail)
         .single();
-      
-      if (existingLead) {
-        // Update existing lead
-        await supabase
-          .from("leads")
-          .update({
-            intent,
-            marketing_opt_in: marketingOptIn,
-            last_seen_at: new Date().toISOString(),
-          })
-          .eq("id", existingLead.id);
+
+      if (insertError) {
+        console.error("[capture-lead] Lead insert error:", insertError);
+      } else {
+        console.log("[capture-lead] Lead created:", newLead?.id);
+        leadId = newLead?.id;
       }
     }
-
-    const leadId = lead?.id;
 
     // Enqueue "start" email (Je lance ton pack)
     const { error: queueError } = await supabase.from("email_queue").insert({
