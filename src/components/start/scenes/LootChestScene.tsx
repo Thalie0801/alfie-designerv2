@@ -1,17 +1,21 @@
 import { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Download, Copy, RefreshCw, Save, Check } from 'lucide-react';
+import { Download, Copy, RefreshCw, Save, Check, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { ParticleField } from '../game/ParticleField';
+import { downloadAssetsAsZip } from '@/lib/downloadZip';
+import type { GeneratedAsset } from '@/lib/types/startFlow';
 
 interface LootChestSceneProps {
+  assets: GeneratedAsset[];
   onVariation: () => void;
   onSavePreset: () => void;
 }
 
-export function LootChestScene({ onVariation, onSavePreset }: LootChestSceneProps) {
+export function LootChestScene({ assets, onVariation, onSavePreset }: LootChestSceneProps) {
   const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [chestOpened, setChestOpened] = useState(false);
   const prefersReducedMotion = useReducedMotion();
 
@@ -20,6 +24,24 @@ export function LootChestScene({ onVariation, onSavePreset }: LootChestSceneProp
     const timer = setTimeout(() => setChestOpened(true), 500);
     return () => clearTimeout(timer);
   });
+
+  const handleDownloadZip = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    
+    try {
+      await downloadAssetsAsZip(
+        assets.map(a => ({ title: a.title, url: a.url })),
+        'alfie-pack.zip'
+      );
+      toast.success('Pack téléchargé ! 📦');
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Erreur lors du téléchargement');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const handleCopyTexts = () => {
     const mockTexts = `Slide 1: Hook - Attention ! Vous perdez 3h par semaine sur Canva ?
@@ -38,24 +60,7 @@ Slide 5: CTA - Testez gratuitement maintenant !`;
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const lootCards = [
-    {
-      id: 'zip',
-      title: 'Télécharger ZIP',
-      description: 'Fichiers HD',
-      icon: Download,
-      gradient: 'from-alfie-mint to-alfie-lilac',
-      action: () => toast.success('Téléchargement démarré ! 📦'),
-    },
-    {
-      id: 'texts',
-      title: 'Copier textes',
-      description: 'Hooks + CTAs',
-      icon: copied ? Check : Copy,
-      gradient: 'from-alfie-pink to-orange-400',
-      action: handleCopyTexts,
-    },
-  ];
+  const hasRealAssets = assets.some(a => !a.url.startsWith('/images/'));
 
   return (
     <motion.div
@@ -127,45 +132,83 @@ Slide 5: CTA - Testez gratuitement maintenant !`;
             Loot débloqué ! 🎉
           </h1>
           <p className="text-lg text-muted-foreground">
-            Ton pack est prêt. Choisis comment le récupérer.
+            {hasRealAssets 
+              ? 'Tes visuels sont prêts. Télécharge-les maintenant !'
+              : 'Ton pack est prêt. Choisis comment le récupérer.'}
           </p>
         </motion.div>
 
-        {/* Loot Cards */}
-        <div className="grid sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
-          {lootCards.map((card, index) => {
-            const Icon = card.icon;
-            return (
-              <motion.button
-                key={card.id}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 + index * 0.1 }}
-                whileHover={prefersReducedMotion ? {} : { scale: 1.03, y: -5 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={card.action}
-                className="bg-background/90 backdrop-blur-md rounded-3xl p-6 shadow-2xl border border-border/50 text-center group hover:shadow-xl transition-shadow"
+        {/* Generated Assets Preview */}
+        {hasRealAssets && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="grid grid-cols-3 gap-3 sm:gap-4 mb-8"
+          >
+            {assets.map((asset, index) => (
+              <motion.div
+                key={asset.title}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.6 + index * 0.1 }}
+                className="relative group"
               >
-                {/* Icon with glow */}
-                <motion.div
-                  className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br ${card.gradient} mb-4 shadow-lg`}
-                  whileHover={prefersReducedMotion ? {} : { rotate: [0, -10, 10, 0] }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Icon className="w-8 h-8 text-white" />
-                </motion.div>
+                <div className="aspect-square bg-muted rounded-2xl overflow-hidden border border-border/50">
+                  <img
+                    src={asset.thumbnailUrl}
+                    alt={asset.title}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/images/hero-preview.jpg';
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-center text-muted-foreground mt-2">{asset.title}</p>
+                
+                {/* Hover overlay with open button */}
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center">
+                  <a
+                    href={asset.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
+                  >
+                    <ExternalLink className="w-5 h-5 text-white" />
+                  </a>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
 
-                <h3 className="font-bold text-foreground text-lg mb-1">{card.title}</h3>
-                <p className="text-sm text-muted-foreground">{card.description}</p>
-
-                {/* Hover glow effect */}
-                <div
-                  className={`absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-20 transition-opacity bg-gradient-to-br ${card.gradient} pointer-events-none`}
-                />
-              </motion.button>
-            );
-          })}
-        </div>
+        {/* Action Buttons */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="flex flex-col sm:flex-row justify-center gap-4 mb-8"
+        >
+          <Button
+            onClick={handleDownloadZip}
+            disabled={downloading}
+            size="lg"
+            className="gap-2 bg-gradient-to-r from-alfie-mint to-alfie-lilac text-foreground font-bold rounded-xl"
+          >
+            <Download className="w-5 h-5" />
+            {downloading ? 'Téléchargement...' : 'Télécharger ZIP'}
+          </Button>
+          
+          <Button
+            onClick={handleCopyTexts}
+            variant="outline"
+            size="lg"
+            className="gap-2 rounded-xl"
+          >
+            {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+            {copied ? 'Copié !' : 'Copier textes'}
+          </Button>
+        </motion.div>
 
         {/* Secondary Actions */}
         <motion.div
@@ -175,20 +218,20 @@ Slide 5: CTA - Testez gratuitement maintenant !`;
           className="flex flex-wrap justify-center gap-3"
         >
           <Button
-            variant="outline"
+            variant="ghost"
             onClick={onVariation}
-            className="rounded-xl gap-2 bg-background/80"
+            className="rounded-xl gap-2"
           >
             <RefreshCw className="w-4 h-4" />
-            🔄 Re-roll (variation)
+            Re-roll (variation)
           </Button>
           <Button
-            variant="outline"
+            variant="ghost"
             onClick={onSavePreset}
-            className="rounded-xl gap-2 bg-background/80"
+            className="rounded-xl gap-2"
           >
             <Save className="w-4 h-4" />
-            💾 Sauvegarder preset
+            Sauvegarder preset
           </Button>
         </motion.div>
 

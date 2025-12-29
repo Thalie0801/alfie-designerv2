@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { LootCard } from '../ui/LootCard';
 import { CraftingPreview } from '../ui/CraftingPreview';
 import { InventoryDrawer } from '../ui/InventoryDrawer';
+import { useIsMobile } from '@/hooks/use-mobile';
 import type { Intent } from '@/lib/types/startFlow';
 
 const TOPIC_IDEAS = [
@@ -50,7 +51,7 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
   const [step, setStep] = useState(1);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const prefersReducedMotion = useReducedMotion();
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const isMobile = useIsMobile();
 
   const handleFormatSelect = (format: typeof FORMAT_OPTIONS[0]) => {
     onUpdate({
@@ -82,21 +83,36 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
   return (
     <div className="min-h-screen w-full flex">
       {/* Main Content */}
-      <div className={`flex-1 flex items-center justify-center p-4 ${!isMobile ? 'pr-80' : ''}`}>
+      <div className={`flex-1 flex flex-col items-center justify-center p-4 ${!isMobile ? 'pr-80' : ''}`}>
         <div className="max-w-2xl w-full">
-          {/* Quest Header */}
+          {/* Welcome Header */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-6 text-center"
+            className="text-center mb-6"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-background/80 backdrop-blur-sm mb-4">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
+              Crée ton pack en 90 secondes ⚡
+            </h1>
+            <p className="text-muted-foreground text-sm sm:text-base">
+              Réponds à 3 questions, Alfie fait le reste
+            </p>
+          </motion.div>
+
+          {/* Quest Progress */}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="mb-6"
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-background/80 backdrop-blur-sm mx-auto block text-center">
               <span className="text-lg">⚔️</span>
               <span className="font-bold text-foreground">Niveau {step}/3</span>
             </div>
             
             {/* XP Bar */}
-            <div className="max-w-xs mx-auto">
+            <div className="max-w-xs mx-auto mt-3">
               <div className="h-3 bg-muted rounded-full overflow-hidden">
                 <motion.div
                   className="h-full rounded-full"
@@ -119,16 +135,16 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
                 initial={{ opacity: 0, x: 30 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -30 }}
-                className="bg-background/90 backdrop-blur-md rounded-3xl p-6 sm:p-8 shadow-2xl border border-border/50"
+                className="bg-background/90 backdrop-blur-md rounded-3xl p-4 sm:p-8 shadow-2xl border border-border/50"
               >
-                <h2 className="text-2xl font-bold text-foreground mb-2 text-center">
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2 text-center">
                   🎁 Choisis ton loot
                 </h2>
-                <p className="text-muted-foreground text-center mb-6">
+                <p className="text-muted-foreground text-center mb-6 text-sm sm:text-base">
                   Quel format tu veux générer ?
                 </p>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
                   {FORMAT_OPTIONS.map((format) => (
                     <LootCard
                       key={format.kind}
@@ -152,12 +168,12 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
                 initial={{ opacity: 0, x: 30 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -30 }}
-                className="bg-background/90 backdrop-blur-md rounded-3xl p-6 sm:p-8 shadow-2xl border border-border/50"
+                className="bg-background/90 backdrop-blur-md rounded-3xl p-4 sm:p-8 shadow-2xl border border-border/50"
               >
-                <h2 className="text-2xl font-bold text-foreground mb-2 text-center">
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2 text-center">
                   🪄 Lance ton sort
                 </h2>
-                <p className="text-muted-foreground text-center mb-6">
+                <p className="text-muted-foreground text-center mb-6 text-sm sm:text-base">
                   C'est quoi le sujet ?
                 </p>
 
@@ -182,7 +198,7 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
                   <Button
                     variant="outline"
                     onClick={handleRandomIdea}
-                    className="rounded-xl gap-2"
+                    className="rounded-xl gap-2 w-full sm:w-auto"
                   >
                     <Lightbulb className="w-4 h-4" />
                     🎲 Idée aléatoire
@@ -214,12 +230,12 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
                 initial={{ opacity: 0, x: 30 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -30 }}
-                className="bg-background/90 backdrop-blur-md rounded-3xl p-6 sm:p-8 shadow-2xl border border-border/50"
+                className="bg-background/90 backdrop-blur-md rounded-3xl p-4 sm:p-8 shadow-2xl border border-border/50"
               >
-                <h2 className="text-2xl font-bold text-foreground mb-2 text-center">
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2 text-center">
                   ⚡ Choisis tes skills
                 </h2>
-                <p className="text-muted-foreground text-center mb-6">
+                <p className="text-muted-foreground text-center mb-6 text-sm sm:text-base">
                   Objectif + action finale
                 </p>
 
@@ -235,7 +251,7 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
                           key={goal.value}
                           onClick={() => onUpdate({ goal: goal.value })}
                           className={`
-                            px-4 py-2.5 rounded-xl text-sm font-medium transition-all
+                            px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all min-h-[44px]
                             ${intent.goal === goal.value
                               ? 'bg-alfie-mint text-foreground shadow-lg scale-105'
                               : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -259,7 +275,7 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
                           key={cta.value}
                           onClick={() => onUpdate({ cta: cta.value })}
                           className={`
-                            px-4 py-2.5 rounded-xl text-sm font-medium transition-all
+                            px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all min-h-[44px]
                             ${intent.cta === cta.value
                               ? 'bg-alfie-pink text-foreground shadow-lg scale-105'
                               : 'bg-muted text-muted-foreground hover:bg-muted/80'

@@ -17,6 +17,13 @@ export type Intent = {
 
 export type FlowStep = 'wizard' | 'email_gate' | 'generating' | 'delivery';
 
+export type GeneratedAsset = {
+  title: string;
+  ratio: string;
+  url: string;
+  thumbnailUrl: string;
+};
+
 export const DEFAULT_INTENT: Intent = {
   kind: 'pack',
   ratio: '4:5',
