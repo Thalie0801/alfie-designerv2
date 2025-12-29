@@ -82,7 +82,8 @@ export function detectPlatformHelp(raw: string) {
     // Garder uniquement les termes de navigation explicites
     { test: /(bibliothèque|médias?|mes\s+fichiers?)/, to: "/library", label: "Bibliothèque" },
     { test: /(brand[\s-]?kit|modifier (ma |mon |les )?couleurs|configurer (ma |mes )?typo)/, to: "/brand-kit-questionnaire", label: "Brand Kit" },
-    { test: /\b(factur|abonnement|paiement|pricing|prix|crédit|woofs)\b/, to: "/billing", label: "Facturation" },
+    // Facturation : intention explicite requise (verbe + sujet) OU mot-clé seul dans message court
+    { test: /(ouvr(e|ir)|voir|accéder|aller|va|lance|gérer|mon|ma|mes)\s*(à |au |la |le |les )?(facturation|abonnement|paiement|pricing|crédits?|woofs)|^(facturation|abonnement|crédits?|woofs)$/i, to: "/billing", label: "Facturation" },
     { test: /(profil|compte|email|mot de passe)/, to: "/profile", label: "Profil" },
     { test: /(dashboard|stat|performances?)/, to: "/dashboard", label: "Dashboard" },
     { test: /(affiliation|parrain|ambassadeur)/, to: "/affiliate", label: "Affiliation" },
