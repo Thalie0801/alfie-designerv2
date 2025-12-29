@@ -1,25 +1,34 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, Loader2, AlertCircle } from 'lucide-react';
 import { ParticleField } from '../game/ParticleField';
+import { supabase } from '@/integrations/supabase/client';
+import type { Intent, GeneratedAsset } from '@/lib/types/startFlow';
 
 const CRAFTING_STEPS = [
-  { id: 1, label: '🔥 Forge les hooks', duration: 1500 },
-  { id: 2, label: '🔨 Assemble les slides', duration: 1800 },
-  { id: 3, label: '✨ Poli le design', duration: 2000 },
-  { id: 4, label: '📦 Emballe le loot', duration: 1500 },
-  { id: 5, label: '🔍 Loot check', duration: 1200 },
+  { id: 1, label: '🔥 Forge les hooks', duration: 2500 },
+  { id: 2, label: '🔨 Assemble les slides', duration: 3000 },
+  { id: 3, label: '✨ Poli le design', duration: 3500 },
+  { id: 4, label: '📦 Emballe le loot', duration: 2000 },
+  { id: 5, label: '🔍 Loot check', duration: 1500 },
 ];
 
 interface CraftingSceneProps {
-  onComplete: () => void;
+  intent: Intent;
+  email?: string;
+  onComplete: (assets: GeneratedAsset[]) => void;
 }
 
-export function CraftingScene({ onComplete }: CraftingSceneProps) {
+export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const prefersReducedMotion = useReducedMotion();
+  const generationStarted = useRef(false);
+  const animationComplete = useRef(false);
+  const generatedAssets = useRef<GeneratedAsset[]>([]);
 
+  // Start animation
   useEffect(() => {
     let stepIndex = 0;
     let progressValue = 0;
@@ -44,7 +53,11 @@ export function CraftingScene({ onComplete }: CraftingSceneProps) {
         } else {
           setTimeout(() => {
             setProgress(100);
-            setTimeout(onComplete, 800);
+            animationComplete.current = true;
+            // Check if generation already finished
+            if (generatedAssets.current.length > 0) {
+              onComplete(generatedAssets.current);
+            }
           }, CRAFTING_STEPS[stepIndex - 1].duration);
         }
       }
@@ -58,6 +71,69 @@ export function CraftingScene({ onComplete }: CraftingSceneProps) {
       clearTimeout(startTimeout);
     };
   }, [onComplete]);
+
+  // Start generation
+  useEffect(() => {
+    if (generationStarted.current) return;
+    generationStarted.current = true;
+
+    const generatePack = async () => {
+      try {
+        console.log('[CraftingScene] Starting generation with intent:', intent);
+
+        // Get or create a temporary user/brand for the free pack
+        const leadData = localStorage.getItem('alfie-start-lead');
+        const parsedLead = leadData ? JSON.parse(leadData) : null;
+
+        const { data, error: fnError } = await supabase.functions.invoke('generate-free-pack', {
+          body: {
+            userId: parsedLead?.id || 'anonymous',
+            brandId: parsedLead?.brandId || 'temp-brand',
+            email: email || parsedLead?.email || '',
+            brandData: {
+              brandName: 'Mon Business',
+              sector: 'coach',
+              styles: [intent.tone, intent.density],
+              colorChoice: intent.stylePreset === 'pro' ? 'neutral' : 'bold',
+              fontChoice: 'modern',
+              objective: intent.goal,
+            },
+          },
+        });
+
+        if (fnError) {
+          console.error('[CraftingScene] Generation error:', fnError);
+          setError('Erreur lors de la génération. Réessaie.');
+          return;
+        }
+
+        console.log('[CraftingScene] Generation result:', data);
+
+        if (data?.success && data?.assets) {
+          generatedAssets.current = data.assets;
+          // If animation already complete, trigger onComplete
+          if (animationComplete.current) {
+            onComplete(data.assets);
+          }
+        } else {
+          // Use fallback assets if generation failed
+          generatedAssets.current = [
+            { title: 'Post Instagram', ratio: '1:1', url: '/images/hero-preview.jpg', thumbnailUrl: '/images/hero-preview.jpg' },
+            { title: 'Story', ratio: '9:16', url: '/images/hero-preview.jpg', thumbnailUrl: '/images/hero-preview.jpg' },
+            { title: 'Cover', ratio: '4:5', url: '/images/hero-preview.jpg', thumbnailUrl: '/images/hero-preview.jpg' },
+          ];
+          if (animationComplete.current) {
+            onComplete(generatedAssets.current);
+          }
+        }
+      } catch (err) {
+        console.error('[CraftingScene] Unexpected error:', err);
+        setError('Erreur inattendue. Réessaie.');
+      }
+    };
+
+    generatePack();
+  }, [intent, email, onComplete]);
 
   return (
     <motion.div
@@ -97,6 +173,18 @@ export function CraftingScene({ onComplete }: CraftingSceneProps) {
           <p className="text-center text-muted-foreground mb-8">
             Quelques secondes et c'est prêt !
           </p>
+
+          {/* Error State */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-xl flex items-center gap-3"
+            >
+              <AlertCircle className="w-5 h-5 text-destructive" />
+              <p className="text-sm text-destructive">{error}</p>
+            </motion.div>
+          )}
 
           {/* Crafting Progress Bar */}
           <div className="mb-8">

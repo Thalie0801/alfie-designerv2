@@ -10,12 +10,14 @@ import { CraftingScene } from '@/components/start/scenes/CraftingScene';
 import { LootChestScene } from '@/components/start/scenes/LootChestScene';
 import { EmailGateScene } from '@/components/start/scenes/EmailGateScene';
 
-import type { Intent, FlowStep } from '@/lib/types/startFlow';
+import type { Intent, FlowStep, GeneratedAsset } from '@/lib/types/startFlow';
 import { DEFAULT_INTENT } from '@/lib/types/startFlow';
 
 export default function Start() {
   const [intent, setIntent] = useLocalStorageState<Intent>('alfie-start-intent', DEFAULT_INTENT);
   const [flowStep, setFlowStep] = useState<FlowStep>('wizard');
+  const [email, setEmail] = useState<string | undefined>();
+  const [generatedAssets, setGeneratedAssets] = useState<GeneratedAsset[]>([]);
 
   const handleIntentUpdate = useCallback((updates: Partial<Intent>) => {
     setIntent((prev) => ({ ...prev, ...updates }));
@@ -23,14 +25,18 @@ export default function Start() {
 
   const handleWizardComplete = useCallback(() => setFlowStep('email_gate'), []);
   
-  const handleEmailGateContinue = useCallback((email?: string) => {
-    if (email) {
+  const handleEmailGateContinue = useCallback((capturedEmail?: string) => {
+    if (capturedEmail) {
+      setEmail(capturedEmail);
       toast.success('Email sauvegardé !');
     }
     setFlowStep('generating');
   }, []);
   
-  const handleGenerationComplete = useCallback(() => setFlowStep('delivery'), []);
+  const handleGenerationComplete = useCallback((assets: GeneratedAsset[]) => {
+    setGeneratedAssets(assets);
+    setFlowStep('delivery');
+  }, []);
   
   const handleVariation = useCallback(() => {
     toast.info('🔄 Génération d\'une variation...');
@@ -62,12 +68,18 @@ export default function Start() {
         )}
         
         {flowStep === 'generating' && (
-          <CraftingScene key="generating" onComplete={handleGenerationComplete} />
+          <CraftingScene 
+            key="generating" 
+            intent={intent}
+            email={email}
+            onComplete={handleGenerationComplete} 
+          />
         )}
         
         {flowStep === 'delivery' && (
           <LootChestScene
             key="delivery"
+            assets={generatedAssets}
             onVariation={handleVariation}
             onSavePreset={handleSavePreset}
           />
