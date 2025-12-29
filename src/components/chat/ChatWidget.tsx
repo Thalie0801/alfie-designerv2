@@ -169,15 +169,28 @@ export default function ChatWidget() {
 
   function isNoIdeaMessage(raw: string): boolean {
     const text = raw.toLowerCase();
-    return (
+    
+    // Si le message contient une demande de contenu, ce n'est PAS un message "pas d'idées"
+    const contentKeywords = /(carrousel|carousel|vidéo|video|image|visuel|slides?|reel|story|post|créer?|génère|faire|format\s*4:5|format\s*9:16|format\s*16:9|format\s*1:1)/i;
+    if (contentKeywords.test(text)) {
+      return false; // C'est une demande de génération, pas une plainte
+    }
+    
+    // Un vrai message "pas d'idées" est généralement court (<100 caractères)
+    const isShortMessage = text.length < 100;
+    
+    const noIdeaPatterns = (
       text.includes("pas d'idée") ||
-      text.includes("pas d’idée") ||
+      text.includes("pas d'idées") ||
       text.includes("aucune idée") ||
       text.includes("plus d'idée") ||
-      text.includes("plus d’idée") ||
+      text.includes("plus d'idées") ||
       text.includes("je n'ai pas d'idée") ||
       text.includes("je ne sais pas quoi poster")
     );
+    
+    // Ne matcher que si c'est un message court ET contient un pattern "pas d'idées"
+    return isShortMessage && noIdeaPatterns;
   }
 
   // Fonction pour détecter un message de confirmation (vs nouvelle demande de contenu)
