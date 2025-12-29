@@ -168,16 +168,20 @@ export default function ChatWidget() {
   }
 
   function isNoIdeaMessage(raw: string): boolean {
+    // BYPASS IMMÉDIAT : Les prompts détaillés (>50 chars) ne sont jamais "pas d'idées"
+    if (raw.length > 50) {
+      console.log("[isNoIdeaMessage] BYPASS - Message too long:", raw.length, "chars");
+      return false;
+    }
+    
     const text = raw.toLowerCase();
     
     // Si le message contient une demande de contenu, ce n'est PAS un message "pas d'idées"
     const contentKeywords = /(carrousel|carousel|vidéo|video|image|visuel|slides?|reel|story|post|créer?|génère|faire|format\s*4:5|format\s*9:16|format\s*16:9|format\s*1:1)/i;
     if (contentKeywords.test(text)) {
-      return false; // C'est une demande de génération, pas une plainte
+      console.log("[isNoIdeaMessage] BYPASS - Content keyword detected");
+      return false;
     }
-    
-    // Un vrai message "pas d'idées" est généralement court (<100 caractères)
-    const isShortMessage = text.length < 100;
     
     const noIdeaPatterns = (
       text.includes("pas d'idée") ||
@@ -189,8 +193,8 @@ export default function ChatWidget() {
       text.includes("je ne sais pas quoi poster")
     );
     
-    // Ne matcher que si c'est un message court ET contient un pattern "pas d'idées"
-    return isShortMessage && noIdeaPatterns;
+    console.log("[isNoIdeaMessage] Result:", noIdeaPatterns);
+    return noIdeaPatterns;
   }
 
   // Fonction pour détecter un message de confirmation (vs nouvelle demande de contenu)
