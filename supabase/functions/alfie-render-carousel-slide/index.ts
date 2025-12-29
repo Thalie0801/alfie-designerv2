@@ -532,14 +532,16 @@ CRITICAL REQUIREMENTS:
 - Modern social media aesthetic with depth and dimension
 - Leave comfortable margins around text (10% each side)
 
-ABSOLUTE RULES:
+ABSOLUTE RULES (MANDATORY):
+- The image MUST contain the EXACT text provided above. If text is missing, the output is INVALID.
 - ALL text MUST be perfectly CENTERED and highly readable
 - Text color: WHITE with soft black shadow/stroke for contrast
 - Background: ${colorMode === 'pastel' ? 'soft pastel tones' : 'vibrant gradients'} - NO white/blank backgrounds
-- Professional typography, clean and modern
-- The text is the MAIN content - it must be clearly legible
+- NO placeholder text, NO additional words beyond what is specified
+- Professional typography, clean and modern, large font sizes
+- The text is the MAIN content - it must be clearly legible and prominent
 
-OUTPUT: A stunning carousel slide with ${colorModeLabel} background and perfectly centered text.`;
+OUTPUT: A stunning carousel slide with ${colorModeLabel} background and perfectly centered, prominent text.`;
 }
 
 /**
@@ -1029,7 +1031,17 @@ Deno.serve(async (req) => {
 
     // ✅ LOVABLE AI avec validation anti-images blanches et retry
     while (imageAttempt < maxImageAttempts && !bgUrl) {
-      const selectedModel = carouselMode === 'premium' ? MODEL_IMAGE_PREMIUM : MODEL_IMAGE_STANDARD;
+      // ✅ FIX: Forcer le modèle PREMIUM quand texte intégré est requis
+      // Le modèle standard (gemini-2.5-flash) est faible pour le rendu de texte
+      // Le modèle premium (gemini-3-pro-image-preview) gère bien le texte intégré
+      const integratedTextRequested = !isBackgroundOnly && hasValidText;
+      const selectedModel = integratedTextRequested 
+        ? MODEL_IMAGE_PREMIUM  // ✅ Forcer Premium pour texte intégré
+        : (carouselMode === 'premium' ? MODEL_IMAGE_PREMIUM : MODEL_IMAGE_STANDARD);
+      
+      if (integratedTextRequested) {
+        console.log(`[render-slide] ${logCtx} ✅ integratedTextRequested=true → forcing MODEL_IMAGE_PREMIUM (${MODEL_IMAGE_PREMIUM})`);
+      }
       
       // ✅ Utiliser prompt de secours si première tentative a échoué
       const currentPrompt = imageAttempt === 0 
