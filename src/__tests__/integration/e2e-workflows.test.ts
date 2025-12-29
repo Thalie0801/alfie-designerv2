@@ -196,8 +196,6 @@ describe('E2E: Video Batch workflow', () => {
 
   it('3 vidéos batch: créer batch → 3 videos × 3 clips → 9 jobs', async () => {
     const videoCount = 3;
-    const clipsPerVideo = 3;
-    const _totalClips = videoCount * clipsPerVideo;
     
     mockClient._mockInvoke.mockResolvedValueOnce({
       data: mockVideoBatchCreate.success('batch-123', videoCount).data,
