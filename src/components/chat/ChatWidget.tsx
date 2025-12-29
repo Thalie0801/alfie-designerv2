@@ -768,6 +768,19 @@ export default function ChatWidget() {
       return buildAeditusReply();
     }
 
+    // ✅ PRIORITÉ ABSOLUE : Détecter les demandes de contenu AVANT la navigation
+    // Cela évite que des mots-clés comme "abonnement", "crédits", etc. dans un prompt
+    // de génération ne déclenchent une redirection vers /billing
+    const intent = detectContentIntent(cleaned);
+    const isContentGeneration = intent.explicitMode || 
+      /(carrousel|carousel|slides?|vidéo|video|reels?|clips?|scènes?|image|visuel|miniature|vignette)/i.test(cleaned);
+
+    // Si c'est une demande de contenu, on saute complètement replyPlatform
+    if (isContentGeneration) {
+      return await replyContentWithAI(cleaned);
+    }
+
+    // Sinon, on vérifie si c'est une demande de navigation/aide
     const concierge = replyPlatform(cleaned);
     if (concierge) return concierge;
 
