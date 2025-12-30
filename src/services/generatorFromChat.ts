@@ -22,7 +22,7 @@ export interface SendPackParams {
   useBrandKit?: boolean;
   useLogo?: boolean; // ✅ NEW: Option logo
   userPlan?: string;
-  carouselMode?: 'standard' | 'premium'; // ✅ Mode Standard/Premium pour carrousels
+  carouselMode?: 'standard' | 'background_only'; // ✅ Mode Standard/Fond seul pour carrousels
   colorMode?: 'vibrant' | 'pastel'; // ✅ Mode Coloré/Pastel
   visualStyle?: 'background' | 'character' | 'product'; // ✅ NEW: Style visuel adaptatif
 }
@@ -180,7 +180,7 @@ async function createAssetJob(
   useBrandKit: boolean = true,
   useLogo: boolean = false, // ✅ NEW: Option logo
   userPlan: string = 'starter',
-  carouselMode: 'standard' | 'premium' = 'standard',
+  carouselMode: 'standard' | 'background_only' = 'standard',
   colorMode: 'vibrant' | 'pastel' = 'vibrant',
   visualStyle: 'background' | 'character' | 'product' = 'background' // ✅ NEW
 ): Promise<{ orderId: string }> {

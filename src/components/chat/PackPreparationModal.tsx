@@ -70,6 +70,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
   const [useLogo, setUseLogo] = useState(false); // ✅ NEW: Option logo
   const [brandLogoUrl, setBrandLogoUrl] = useState<string | null>(null); // ✅ NEW: Logo URL from brand
   const [colorMode, setColorMode] = useState<'vibrant' | 'pastel'>('vibrant');
+  const [backgroundOnly, setBackgroundOnly] = useState(false); // ✅ Toggle fond seul (sans texte)
   const [visualStyle, setVisualStyle] = useState<'background' | 'character' | 'product'>(() => {
     // ✅ Auto-detect from first asset's AI-detected visualStyleCategory
     const firstAsset = pack.assets[0];
@@ -350,6 +351,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         userPlan: profile.plan || 'starter',
         colorMode,
         visualStyle, // ✅ NEW: Style visuel adaptatif
+        carouselMode: backgroundOnly ? 'background_only' : 'standard', // ✅ Toggle fond seul
       });
 
       toast.success("C'est parti ! Alfie prépare ton pack de visuels 🎬");
@@ -612,6 +614,19 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
               className="px-3 py-1.5 rounded-full text-xs font-medium bg-background border border-border hover:bg-muted transition-all flex items-center gap-1.5"
             >
               {colorMode === 'vibrant' ? '🌈 Coloré' : '🎀 Pastel'}
+            </button>
+            
+            {/* ✅ NEW: Chip Fond seul (background_only) */}
+            <button 
+              type="button"
+              onClick={() => setBackgroundOnly(!backgroundOnly)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                backgroundOnly 
+                  ? 'bg-amber-500 text-white' 
+                  : 'bg-background border border-border hover:bg-muted'
+              }`}
+            >
+              🖼️ Fond seul {backgroundOnly && '✓'}
             </button>
             
             {/* Chip Style visuel - visible si hint détecté */}
