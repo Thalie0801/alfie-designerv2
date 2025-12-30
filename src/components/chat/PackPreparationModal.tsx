@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { X, Image, Film, Grid3x3, AlertCircle, Volume2, VolumeX, Upload, Pencil } from "lucide-react";
+import { X, Image, Film, Grid3x3, AlertCircle, Volume2, VolumeX, Upload, Pencil, Mic, Music } from "lucide-react";
 import type { AlfiePack, PackAsset } from "@/types/alfiePack";
 // Import removed - costBreakdown now calculated locally
 import { getWoofCost } from "@/types/alfiePack";
@@ -8,6 +8,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+
+// ✅ Voix ElevenLabs françaises disponibles
+const FRENCH_VOICES = [
+  { id: 'lily-fr', name: 'Lily', description: 'Féminine, douce' },
+  { id: 'daniel-fr', name: 'Daniel', description: 'Masculin, pro' },
+  { id: 'charlotte-fr', name: 'Charlotte', description: 'Féminine, énergique' },
+  { id: 'thomas-fr', name: 'Thomas', description: 'Masculin, chaleureux' },
+] as const;
 
 interface PackPreparationModalProps {
   pack: AlfiePack;
@@ -84,6 +92,12 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
     });
     return initial;
   });
+  
+  // ✅ ElevenLabs Audio Options
+  const [useVoiceover, setUseVoiceover] = useState(false);
+  const [useUnifiedMusic, setUseUnifiedMusic] = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState<string>('lily-fr');
+  
   const [uploadingForId, setUploadingForId] = useState<string | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const { profile } = useAuth();
@@ -314,6 +328,11 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
           useBrandKit,
           woofCostType: asset.kind === 'carousel' ? 'carousel' as const : asset.woofCostType,
           withAudio: asset.kind === 'video_premium' ? audioSettings[asset.id] : undefined,
+          // ✅ ElevenLabs Audio Options
+          audioMode: asset.kind === 'video_premium' && (useVoiceover || useUnifiedMusic) ? 'elevenlabs' : 'veo',
+          voiceId: asset.kind === 'video_premium' && useVoiceover ? selectedVoice : undefined,
+          useVoiceover: asset.kind === 'video_premium' ? useVoiceover : undefined,
+          useUnifiedMusic: asset.kind === 'video_premium' ? useUnifiedMusic : undefined,
         }));
       } else if (textsError || !textsData?.texts) {
         console.warn("[PackPreparationModal] Text generation failed, using fallback texts:", textsError);
@@ -324,6 +343,11 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
           useBrandKit,
           woofCostType: asset.kind === 'carousel' ? 'carousel' as const : asset.woofCostType,
           withAudio: asset.kind === 'video_premium' ? audioSettings[asset.id] : undefined,
+          // ✅ ElevenLabs Audio Options
+          audioMode: asset.kind === 'video_premium' && (useVoiceover || useUnifiedMusic) ? 'elevenlabs' : 'veo',
+          voiceId: asset.kind === 'video_premium' && useVoiceover ? selectedVoice : undefined,
+          useVoiceover: asset.kind === 'video_premium' ? useVoiceover : undefined,
+          useUnifiedMusic: asset.kind === 'video_premium' ? useUnifiedMusic : undefined,
           generatedTexts: generateFallbackTexts(asset, localPack.title),
         }));
         
@@ -335,6 +359,11 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
           useBrandKit,
           woofCostType: asset.kind === 'carousel' ? 'carousel' as const : asset.woofCostType,
           withAudio: asset.kind === 'video_premium' ? audioSettings[asset.id] : undefined,
+          // ✅ ElevenLabs Audio Options
+          audioMode: asset.kind === 'video_premium' && (useVoiceover || useUnifiedMusic) ? 'elevenlabs' : 'veo',
+          voiceId: asset.kind === 'video_premium' && useVoiceover ? selectedVoice : undefined,
+          useVoiceover: asset.kind === 'video_premium' ? useVoiceover : undefined,
+          useUnifiedMusic: asset.kind === 'video_premium' ? useUnifiedMusic : undefined,
           generatedTexts: textsData.texts?.[asset.id] || generateFallbackTexts(asset, localPack.title),
         }));
       }
@@ -646,6 +675,80 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
               </button>
             )}
           </div>
+          
+          {/* ✅ Section Audio ElevenLabs pour vidéos */}
+          {localAssets.some(a => a.kind === 'video_premium' && selectedAssetIds.has(a.id)) && (
+            <div className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 rounded-lg space-y-3 border border-purple-200/50 dark:border-purple-800/50">
+              <h4 className="text-xs font-semibold flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                <Music className="w-4 h-4" />
+                Audio des vidéos (ElevenLabs)
+              </h4>
+              
+              <div className="flex flex-wrap gap-2">
+                {/* Chip Voix-off */}
+                <button
+                  type="button"
+                  onClick={() => setUseVoiceover(!useVoiceover)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                    useVoiceover 
+                      ? 'bg-purple-500 text-white' 
+                      : 'bg-background border border-border hover:bg-muted'
+                  }`}
+                >
+                  <Mic className="w-3.5 h-3.5" />
+                  Voix-off {useVoiceover && '✓'}
+                </button>
+                
+                {/* Chip Musique unifiée */}
+                <button
+                  type="button"
+                  onClick={() => setUseUnifiedMusic(!useUnifiedMusic)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                    useUnifiedMusic 
+                      ? 'bg-pink-500 text-white' 
+                      : 'bg-background border border-border hover:bg-muted'
+                  }`}
+                >
+                  <Music className="w-3.5 h-3.5" />
+                  Musique unifiée {useUnifiedMusic && '✓'}
+                </button>
+              </div>
+              
+              {/* Sélecteur de voix si voix-off activée */}
+              {useVoiceover && (
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground">Choix de la voix :</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {FRENCH_VOICES.map((voice) => (
+                      <button
+                        key={voice.id}
+                        type="button"
+                        onClick={() => setSelectedVoice(voice.id)}
+                        className={`px-2.5 py-1 rounded-full text-xs transition-all ${
+                          selectedVoice === voice.id
+                            ? 'bg-purple-500 text-white'
+                            : 'bg-background border border-border hover:bg-muted'
+                        }`}
+                      >
+                        {voice.name} <span className="opacity-70">({voice.description})</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Info sur les options */}
+              {(useVoiceover || useUnifiedMusic) && (
+                <p className="text-xs text-purple-600 dark:text-purple-400">
+                  {useVoiceover && useUnifiedMusic 
+                    ? '🎙️ Voix-off du script + 🎵 musique de fond unifiée'
+                    : useVoiceover 
+                    ? '🎙️ Le script sera lu par une voix professionnelle'
+                    : '🎵 Une musique d\'ambiance sera générée pour toutes les vidéos'}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Warning si produit sans image */}
           {visualStyle === 'product' && !hasProductImage && (
