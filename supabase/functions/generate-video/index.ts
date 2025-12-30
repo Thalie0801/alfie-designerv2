@@ -833,7 +833,12 @@ async function generateGcsSignedUrl(
 
       // 2. Configuration VEO 3
       const VEO3_MODEL = "veo-3.0-fast-generate-001";
-      const veo3AspectRatio = aspectRatio === "4:5" ? "9:16" : aspectRatio; // VEO supporte 9:16 ou 16:9
+      // VEO 3 only supports 9:16 and 16:9 - convert all other ratios to 9:16
+      const VEO3_SUPPORTED_RATIOS = ["9:16", "16:9"];
+      const veo3AspectRatio = VEO3_SUPPORTED_RATIOS.includes(aspectRatio) ? aspectRatio : "9:16";
+      if (aspectRatio !== veo3AspectRatio) {
+        console.log(`[generate-video] Converted ratio ${aspectRatio} -> ${veo3AspectRatio} (VEO 3 compatible)`);
+      }
       const durationSeconds = 8; // Vidéos premium : 8 secondes max (VEO 3 supporte 4, 6, ou 8)
       
       // 3. Appeler VEO 3 API (long-running operation)
