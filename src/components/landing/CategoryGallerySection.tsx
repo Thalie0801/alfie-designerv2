@@ -67,7 +67,7 @@ const galleryItems: Record<Category, { title: string; description: string }[]> =
     { title: "Miniature YouTube", description: "Accroche visuelle 16:9" },
     { title: "Pinterest Pin", description: "Format vertical 2:3" },
     { title: "Facebook Cover", description: "Image de couverture" },
-    { title: "Twitter Header", description: "Bannière de profil" },
+    { title: "Pinterest Cover", description: "Bannière de profil" },
   ],
   videos: [
     { title: "Reel Instagram", description: "Vidéo courte 9:16" },
