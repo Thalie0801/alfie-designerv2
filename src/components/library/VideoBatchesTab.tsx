@@ -91,8 +91,12 @@ function VideoCard({
         className="max-w-[200px] mx-auto"
       />
 
-      {/* Clips status */}
-      <div className="grid grid-cols-3 gap-2">
+      {/* Clips status - dynamic grid */}
+      <div className={cn(
+        "grid gap-2",
+        video.totalClips <= 4 ? `grid-cols-${video.totalClips}` : 
+        video.totalClips <= 6 ? "grid-cols-3" : "grid-cols-4"
+      )}>
         {video.clips.map((clip) => (
           <div 
             key={clip.id} 
@@ -229,6 +233,7 @@ export function VideoBatchesTab({ orderId: _orderId }: VideoBatchesTabProps) {
               <h3 className="font-semibold">Batch {batch.id.slice(0, 8)}</h3>
               {getStatusBadge(batch.status)}
               <Badge variant="secondary">{batch.videos.length} vidéos</Badge>
+              <Badge variant="outline">{batch.settings?.clips_per_video || 3} clips/vidéo</Badge>
               <Badge variant="outline">{batch.settings?.ratio || "9:16"}</Badge>
             </div>
 
@@ -314,39 +319,42 @@ export function VideoBatchesTab({ orderId: _orderId }: VideoBatchesTabProps) {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-16">Vidéo</TableHead>
-                      <TableHead>Clip 1</TableHead>
-                      <TableHead>Clip 2</TableHead>
-                      <TableHead>Clip 3</TableHead>
+                      {/* Dynamic clip headers based on clips_per_video */}
+                      {Array.from({ length: batch.settings?.clips_per_video || 3 }, (_, i) => (
+                        <TableHead key={i}>Clip {i + 1}</TableHead>
+                      ))}
                       <TableHead>CTA</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {batch.videos.map((video) => (
-                      <TableRow key={video.id}>
-                        <TableCell className="font-medium">{video.video_index}</TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            <p className="font-medium">{video.texts?.clip1Title || "-"}</p>
-                            <p className="text-muted-foreground text-xs">{video.texts?.clip1Subtitle || ""}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            <p className="font-medium">{video.texts?.clip2Title || "-"}</p>
-                            <p className="text-muted-foreground text-xs">{video.texts?.clip2Subtitle || ""}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            <p className="font-medium">{video.texts?.clip3Title || "-"}</p>
-                            <p className="text-muted-foreground text-xs">{video.texts?.clip3Subtitle || ""}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm">{video.texts?.cta || "-"}</span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {batch.videos.map((video) => {
+                      const clipsPerVideo = batch.settings?.clips_per_video || 3;
+                      return (
+                        <TableRow key={video.id}>
+                          <TableCell className="font-medium">{video.video_index}</TableCell>
+                          {/* Dynamic clip cells */}
+                          {Array.from({ length: clipsPerVideo }, (_, i) => {
+                            const clipIndex = i + 1;
+                            // Support both new format (clips array) and legacy format
+                            const clipTitle = video.texts?.clips?.[i]?.title || 
+                                            (video.texts as Record<string, unknown>)?.[`clip${clipIndex}Title`] as string || "-";
+                            const clipSubtitle = video.texts?.clips?.[i]?.subtitle ||
+                                                (video.texts as Record<string, unknown>)?.[`clip${clipIndex}Subtitle`] as string || "";
+                            return (
+                              <TableCell key={i}>
+                                <div className="text-sm">
+                                  <p className="font-medium">{clipTitle}</p>
+                                  <p className="text-muted-foreground text-xs">{clipSubtitle}</p>
+                                </div>
+                              </TableCell>
+                            );
+                          })}
+                          <TableCell>
+                            <span className="text-sm">{video.texts?.cta || "-"}</span>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
