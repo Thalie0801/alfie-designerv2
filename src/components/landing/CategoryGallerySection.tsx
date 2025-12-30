@@ -5,14 +5,6 @@ import { Image, Video, Layers, Layout, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { trackEvent } from "@/utils/trackEvent";
 
-// Gallery images
-import galleryFoodArt from "@/assets/demo/gallery-food-art.png";
-import galleryMoodboard from "@/assets/demo/gallery-moodboard.png";
-import galleryMariage from "@/assets/demo/gallery-mariage.jpeg";
-import galleryAlfieNoel from "@/assets/demo/gallery-alfie-noel.png";
-import storyBusiness from "@/assets/demo/story-business.png";
-import postParfum from "@/assets/demo/post-parfum-alfie.png";
-
 type Category = "images" | "videos" | "carousels" | "stories";
 
 const categories = [
@@ -22,12 +14,33 @@ const categories = [
   { id: "stories" as Category, label: "Stories", icon: Layout },
 ];
 
-// Mapping des images par catégorie et index
+// Mapping des images par catégorie - URLs Cloudinary réelles
 const categoryImages: Record<Category, (string | null)[]> = {
-  images: [galleryFoodArt, postParfum, null, null, galleryAlfieNoel, null],
+  images: [
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767028880/alfie/leads/k8txjmj8-jkud-r5gx/slide_05.png",
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767028871/alfie/leads/k8txjmj8-jkud-r5gx/slide_01.png",
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1766001057/alfie/leads/veo84uyb-4y6c-t9xw/slide_10.png",
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1766499323/alfie/leads/xnlhvvwn-7aaq-a5ch/slide_03.png",
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1765803609/alfie/leads/vd8qrtc1-2oe0-j9l8/slide_02.png",
+    null,
+  ],
   videos: [null, null, null, null, null, null],
-  carousels: [galleryMoodboard, null, null, null, null, null],
-  stories: [storyBusiness, null, null, null, galleryMariage, null],
+  carousels: [
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767095332/alfie/leads/lz33xvlp-bnpi-a5wm/slide_04.png",
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767080601/alfie/leads/xq3x91zl-hc6b-w0j9/slide_04.png",
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767089553/alfie/leads/l8vtyhxk-tg5r-u1k7/slide_01.png",
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767077415/alfie/leads/oqotwzqf-rpqn-c55s/slide_05.png",
+    null,
+    null,
+  ],
+  stories: [
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125489/alfie/leads/wfvvxo0h-jl9w-a9ve/slide_05.png",
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125476/alfie/leads/wfvvxo0h-jl9w-a9ve/slide_01.png",
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125476/alfie/leads/wfvvxo0h-jl9w-a9ve/slide_02.png",
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125476/alfie/leads/wfvvxo0h-jl9w-a9ve/slide_03.png",
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125477/alfie/leads/wfvvxo0h-jl9w-a9ve/slide_04.png",
+    null,
+  ],
 };
 
 const galleryItems: Record<Category, { title: string; description: string }[]> = {
