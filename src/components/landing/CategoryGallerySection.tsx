@@ -13,6 +13,14 @@ import galleryCoiffeur from "@/assets/gallery/gallery-coiffeur.png";
 import galleryCafe from "@/assets/gallery/gallery-cafe.jpeg";
 import galleryDecor from "@/assets/gallery/gallery-decor.png";
 
+// Carrousels locaux
+import carouselSkincare from "@/assets/gallery/carousel-skincare.jpeg";
+import carouselCandle from "@/assets/gallery/carousel-candle.png";
+import carouselCoffee from "@/assets/gallery/carousel-coffee.png";
+import carouselSpa from "@/assets/gallery/carousel-spa.png";
+import carouselWatch from "@/assets/gallery/carousel-watch.png";
+import carouselFurniture from "@/assets/gallery/carousel-furniture.png";
+
 type Category = "images" | "videos" | "carousels" | "stories";
 
 const categories = [
@@ -34,16 +42,12 @@ const categoryImages: Record<Category, (string | null)[]> = {
   ],
   videos: [null, null, null, null, null, null],
   carousels: [
-    // Carrousel éducatif 4:5
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767095332/alfie/8af3b633-6e99-4f6b-84c6-306904158feb/5b7df40d-dcd6-423a-b065-b199322e0783/slides/slide_04.png",
-    // Carrousel produit 4:5
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767080601/alfie/4944d11f-0fce-45ec-9756-067b3a7363c3/a75dbe68-0a64-4c55-a792-e0e94aaca5ab/slides/slide_04.png",
-    // Carrousel tips 4:5
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767089553/alfie/8af3b633-6e99-4f6b-84c6-306904158feb/59608400-ff50-4f83-b30d-3cdfc982b8aa/slides/slide_01.png",
-    // Carrousel story 4:5
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767077415/alfie/4944d11f-0fce-45ec-9756-067b3a7363c3/5ebcf38f-7ceb-4e38-9a5f-088bef0606b2/slides/slide_05.png",
-    null,
-    null,
+    carouselSkincare,   // Crème hydratante
+    carouselCandle,     // Bougie parfumée
+    carouselCoffee,     // Café premium
+    carouselSpa,        // Spa bien-être
+    carouselWatch,      // Montre luxe
+    carouselFurniture,  // Mobilier design
   ],
   stories: [
     // Story promo 9:16
@@ -78,12 +82,12 @@ const galleryItems: Record<Category, { title: string; description: string }[]> =
     { title: "Promo produit", description: "Mise en valeur animée" },
   ],
   carousels: [
-    { title: "Carrousel éducatif", description: "5-10 slides pédagogiques" },
-    { title: "Carrousel produit", description: "Showcase de produits" },
-    { title: "Carrousel tips", description: "Conseils en slides" },
-    { title: "Carrousel story", description: "Narration visuelle" },
-    { title: "Carrousel before/after", description: "Transformation" },
-    { title: "Carrousel liste", description: "Top 5, Top 10..." },
+    { title: "Carrousel Skincare", description: "Crème & soins visage" },
+    { title: "Carrousel Candles", description: "Bougies parfumées" },
+    { title: "Carrousel Coffee", description: "Café de spécialité" },
+    { title: "Carrousel Spa", description: "Bien-être & relaxation" },
+    { title: "Carrousel Watches", description: "Montres de luxe" },
+    { title: "Carrousel Furniture", description: "Mobilier design" },
   ],
   stories: [
     { title: "Story promo", description: "Annonce flash" },
