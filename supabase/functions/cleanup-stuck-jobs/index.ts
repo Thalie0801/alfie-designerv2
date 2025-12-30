@@ -58,25 +58,28 @@ Deno.serve(async (req) => {
     let failedCount = 0;
 
     // ✅ RETRY : Remettre en queue les jobs qui peuvent être retentés
+    // FIX: Update each job individually to correctly increment its own retry_count
     if (retriableJobs.length > 0) {
       console.log(`🔄 [Cleanup] Retrying ${retriableJobs.length} jobs (retry_count < ${MAX_RETRIES})`);
       
-      const { data: retriedJobs, error: retryError } = await supabase
-        .from('job_queue')
-        .update({ 
-          status: 'queued',
-          error: null,
-          retry_count: retriableJobs[0].retry_count ? retriableJobs[0].retry_count + 1 : 1,
-          updated_at: new Date().toISOString()
-        })
-        .in('id', retriableJobs.map(j => j.id))
-        .select('id');
+      for (const job of retriableJobs) {
+        const newRetryCount = (job.retry_count || 0) + 1;
+        const { error: retryError } = await supabase
+          .from('job_queue')
+          .update({ 
+            status: 'queued',
+            error: null,
+            retry_count: newRetryCount,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', job.id);
 
-      if (retryError) {
-        console.error('❌ [Cleanup] Failed to retry jobs:', retryError);
-      } else {
-        retriedCount = retriedJobs?.length || 0;
-        console.log(`✅ [Cleanup] Re-queued ${retriedCount} jobs for retry`);
+        if (retryError) {
+          console.error(`❌ [Cleanup] Failed to retry job ${job.id.slice(0, 8)}:`, retryError);
+        } else {
+          retriedCount++;
+          console.log(`✅ [Cleanup] Re-queued job ${job.id.slice(0, 8)} (retry ${newRetryCount}/${MAX_RETRIES})`);
+        }
       }
     }
 
