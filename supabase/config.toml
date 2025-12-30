@@ -86,3 +86,12 @@ verify_jwt = true
 
 [functions.video-clip-retry]
 verify_jwt = true
+
+[functions.elevenlabs-tts]
+verify_jwt = false
+
+[functions.elevenlabs-music]
+verify_jwt = false
+
+[functions.mix-audio-video]
+verify_jwt = false
