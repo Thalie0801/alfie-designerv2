@@ -34,7 +34,7 @@ export const SLIDE_TEMPLATES: Record<string, SlideTemplate> = {
     optionalFields: ['subtitle', 'punchline', 'badge'],
     charLimits: {
       title: { min: 10, max: 40 },
-      subtitle: { min: 20, max: 70 },
+      subtitle: { min: 20, max: 60 },  // ✅ Réduit de 70 à 60 pour cohérence
       punchline: { min: 20, max: 60 },
       cta_primary: { min: 8, max: 22 },
       badge: { min: 5, max: 30 },
@@ -206,7 +206,7 @@ export const SLIDE_TEMPLATES: Record<string, SlideTemplate> = {
     optionalFields: ['subtitle', 'cta_secondary', 'note'],
     charLimits: {
       title: { min: 10, max: 40 },
-      subtitle: { min: 20, max: 70 },
+      subtitle: { min: 20, max: 60 },  // ✅ Réduit de 70 à 60 pour cohérence
       cta_primary: { min: 8, max: 22 },
       cta_secondary: { min: 8, max: 22 },
       note: { min: 50, max: 120 },

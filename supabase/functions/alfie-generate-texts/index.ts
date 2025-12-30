@@ -179,15 +179,18 @@ Slide 1 : Accroche / Hook percutant (titre + sous-titre court)
 Slides 2-4 : Titre + Sous-titre + Body explicatif
 Slide 5 : Call-to-Action (titre + body court)
 
-⚠️ CONTRAINTES DE CARACTÈRES OBLIGATOIRES (pour compatibilité Canva) :
-- title : MAXIMUM 40 caractères (obligatoire pour chaque slide)
-- subtitle : MAXIMUM 60 caractères (obligatoire pour chaque slide)  
-- body : MAXIMUM 120 caractères (1-2 phrases courtes, obligatoire pour slides 2-5)
+⚠️ CONTRAINTES DE CARACTÈRES ABSOLUES - AUCUN DÉPASSEMENT TOLÉRÉ :
+- title : MAXIMUM 40 caractères (ex: "La magie des fêtes" ✓, "La magie des fêtes : Faites une pause..." ✗)
+- subtitle : MAXIMUM 60 caractères (1 phrase courte UNIQUEMENT)  
+- body : MAXIMUM 120 caractères (1-2 phrases courtes)
 - bullets : max 3 par slide, max 20 caractères chacun
 
+⚠️ SI UN TEXTE DÉPASSE LA LIMITE, NE PAS TRONQUER MAIS RÉÉCRIRE EN PLUS COURT.
+NE JAMAIS couper un mot ou une phrase au milieu.
+
 RÈGLES CRITIQUES :
+- COMPTER LES CARACTÈRES avant de finaliser chaque texte
 - CHAQUE SLIDE DOIT AVOIR title, subtitle ET body remplis (même la slide 1)
-- Respecter STRICTEMENT les limites de caractères ci-dessus
 - LE BRIEF EST PRIORITAIRE sur le Brand Kit
 - Français PARFAIT, sans aucune faute d'orthographe
 - Le body est un texte explicatif court de 1-2 phrases
@@ -423,22 +426,40 @@ Deno.serve(async (req) => {
           }
           
           // ✅ Normalisation avec limites de caractères strictes pour compatibilité Canva
+          // ✅ Utilisation de smartTruncate au lieu de slice brutal
           validSlides = validSlides.map((slide: any, idx: number) => {
             const rawTitle = typeof slide.title === 'string' ? slide.title.replace(/\n/g, ' ').trim() : "";
             const rawSubtitle = typeof slide.subtitle === 'string' ? slide.subtitle.trim() : "";
             const rawBody = typeof slide.body === 'string' ? slide.body.trim() : "";
             
-            // Appliquer les limites strictes
-            const title = rawTitle.slice(0, 40);
-            const subtitle = rawSubtitle.slice(0, 60);
+            // ✅ Troncature intelligente au dernier mot complet
+            const smartTruncate = (text: string, maxLen: number): string => {
+              if (text.length <= maxLen) return text;
+              const truncated = text.slice(0, maxLen);
+              const lastSpace = truncated.lastIndexOf(' ');
+              if (lastSpace > maxLen * 0.6) {
+                return truncated.slice(0, lastSpace).trim();
+              }
+              return truncated.trim();
+            };
+            
+            // ✅ Appliquer les limites strictes avec troncature intelligente
+            const title = smartTruncate(rawTitle, 40);
+            const subtitle = smartTruncate(rawSubtitle, 60);
+            
             // Si body vide et subtitle trop long, utiliser le surplus comme body
-            let body = rawBody.slice(0, 120);
+            let body = smartTruncate(rawBody, 120);
             if (!body && rawSubtitle.length > 60) {
-              body = rawSubtitle.slice(60, 180).trim();
+              body = smartTruncate(rawSubtitle.slice(60).trim(), 120);
             }
             // Fallback minimal pour body sur slides 2-5
             if (!body && idx > 0) {
               body = subtitle || title || "";
+            }
+            
+            // ✅ Log si dépassement détecté (pour monitoring)
+            if (rawTitle.length > 40 || rawSubtitle.length > 60) {
+              console.warn(`[alfie-generate-texts] ⚠️ Slide ${idx + 1} text too long: title=${rawTitle.length}/40, subtitle=${rawSubtitle.length}/60`);
             }
             
             return {
@@ -446,7 +467,7 @@ Deno.serve(async (req) => {
               subtitle,
               body,
               bullets: Array.isArray(slide.bullets) 
-                ? slide.bullets.slice(0, 3).map((b: string) => String(b).slice(0, 20)) 
+                ? slide.bullets.slice(0, 3).map((b: string) => smartTruncate(String(b), 20)) 
                 : [],
               author: slide.author || undefined,
             };

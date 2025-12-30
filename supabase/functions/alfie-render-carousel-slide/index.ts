@@ -625,9 +625,9 @@ function createDynamicTemplate(aspectRatio: string, brandKit?: BrandKit | null):
     requiredFields: ['title'],
     optionalFields: ['subtitle', 'punchline', 'bullets'],
     charLimits: {
-      title: { min: 5, max: 60 },
-      subtitle: { min: 10, max: 120 },
-      punchline: { min: 10, max: 200 },
+      title: { min: 5, max: 40 },      // ✅ Réduit de 60 à 40 pour cohérence
+      subtitle: { min: 10, max: 60 },  // ✅ Réduit de 120 à 60 pour cohérence
+      punchline: { min: 10, max: 120 }, // ✅ Réduit de 200 à 120 pour cohérence
     },
     layout: { 
       width, 
