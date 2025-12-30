@@ -1,5 +1,5 @@
 // supabase/functions/video-batch-create/index.ts
-// POST /video-batches - Creates a batch of videos with 3 clips each
+// POST /video-batches - Creates a batch of videos with configurable clips (1-10)
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -7,27 +7,32 @@ import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
 
 interface BatchSettings {
   videos_count: number;
+  clips_per_video?: number; // NEW - default 3, max 10
   ratio: string;
   language: string;
   sfx_transition: string;
   style_lock?: string;
 }
 
+interface VideoTextItem {
+  title: string;
+  caption?: string;
+  cta?: string;
+  clips?: Array<{ title?: string; subtitle?: string }>; // Dynamic clips text
+  // Legacy 3-clip format support
+  clip1_title?: string;
+  clip1_subtitle?: string;
+  clip2_title?: string;
+  clip2_subtitle?: string;
+  clip3_title?: string;
+  clip3_subtitle?: string;
+}
+
 interface CreateBatchRequest {
   prompt: string;
   brandId?: string;
   settings: BatchSettings;
-  videoTexts?: Array<{
-    title: string;
-    clip1_title: string;
-    clip1_subtitle: string;
-    clip2_title: string;
-    clip2_subtitle: string;
-    clip3_title: string;
-    clip3_subtitle: string;
-    caption: string;
-    cta: string;
-  }>;
+  videoTexts?: VideoTextItem[];
 }
 
 const supabaseAdmin = createClient(
@@ -56,6 +61,13 @@ Animate the provided reference image with high fidelity. Keep character identity
 Motion: subtle blink, tiny head tilt, gentle movement, soft floating particles, slow camera push-in 3%.
 No on-screen text, no subtitles, no typography, no logos.`;
 
+// Get clip role based on index and total clips
+function getClipRole(clipIndex: number, totalClips: number): string {
+  if (clipIndex === 1) return "hook";
+  if (clipIndex === totalClips) return "cta";
+  return `content_${clipIndex - 1}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -83,8 +95,9 @@ Deno.serve(async (req) => {
     }
 
     const videosCount = Math.min(Math.max(1, settings.videos_count), 10); // Limit 1-10 videos
+    const clipsPerVideo = Math.min(Math.max(1, settings.clips_per_video || 3), 10); // Limit 1-10 clips, default 3
 
-    console.log(`[video-batch-create] Creating batch for user ${user.id} with ${videosCount} videos`);
+    console.log(`[video-batch-create] Creating batch for user ${user.id} with ${videosCount} videos × ${clipsPerVideo} clips`);
 
     // 1. Create the batch
     const { data: batch, error: batchError } = await supabaseAdmin
@@ -95,6 +108,7 @@ Deno.serve(async (req) => {
         input_prompt: prompt,
         settings: {
           videos_count: videosCount,
+          clips_per_video: clipsPerVideo,
           ratio: settings.ratio || "9:16",
           language: settings.language || "fr",
           sfx_transition: settings.sfx_transition || "whoosh",
@@ -113,7 +127,7 @@ Deno.serve(async (req) => {
     const batchId = batch.id;
     console.log(`[video-batch-create] Created batch ${batchId}`);
 
-    // 2. Create N videos with 3 clips each
+    // 2. Create N videos with M clips each
     const videoIds: string[] = [];
     
     for (let videoIndex = 1; videoIndex <= videosCount; videoIndex++) {
@@ -137,15 +151,15 @@ Deno.serve(async (req) => {
       videoIds.push(video.id);
       console.log(`[video-batch-create] Created video ${video.id} (index ${videoIndex})`);
 
-      // Create 3 clips for this video
+      // Create M clips for this video
       const clips = [];
-      for (let clipIndex = 1; clipIndex <= 3; clipIndex++) {
-        const clipRole = clipIndex === 1 ? "hook" : clipIndex === 2 ? "content" : "cta";
+      for (let clipIndex = 1; clipIndex <= clipsPerVideo; clipIndex++) {
+        const clipRole = getClipRole(clipIndex, clipsPerVideo);
         
         clips.push({
           video_id: video.id,
           clip_index: clipIndex,
-          anchor_prompt: `${prompt} - ${clipRole} scene ${clipIndex}/3. ${settings.style_lock || "Professional, modern style."}`,
+          anchor_prompt: `${prompt} - ${clipRole} scene ${clipIndex}/${clipsPerVideo}. ${settings.style_lock || "Professional, modern style."}`,
           veo_prompt: `${BASE_VEO_PROMPT} Scene: ${clipRole}. ${prompt}`,
           status: "queued",
           duration_seconds: 8,
@@ -160,19 +174,29 @@ Deno.serve(async (req) => {
         console.error(`[video-batch-create] Clips creation error for video ${video.id}:`, clipsError);
       }
 
-      // Create video texts if provided
+      // Create video texts if provided (support both new and legacy format)
       const textData = videoTexts?.[videoIndex - 1];
       if (textData) {
+        // Build dynamic clip texts
+        const clipTexts: Record<string, string> = {};
+        
+        for (let i = 1; i <= clipsPerVideo; i++) {
+          // Check new format first (clips array)
+          const newFormatClip = textData.clips?.[i - 1];
+          // Fallback to legacy format (clip1_title, clip2_title, etc.)
+          const textDataAny = textData as unknown as Record<string, string | undefined>;
+          const legacyTitle = textDataAny[`clip${i}_title`];
+          const legacySubtitle = textDataAny[`clip${i}_subtitle`];
+          
+          clipTexts[`clip${i}_title`] = newFormatClip?.title || legacyTitle || "";
+          clipTexts[`clip${i}_subtitle`] = newFormatClip?.subtitle || legacySubtitle || "";
+        }
+
         const { error: textsError } = await supabaseAdmin
           .from("batch_video_texts")
           .insert({
             video_id: video.id,
-            clip1_title: textData.clip1_title || "",
-            clip1_subtitle: textData.clip1_subtitle || "",
-            clip2_title: textData.clip2_title || "",
-            clip2_subtitle: textData.clip2_subtitle || "",
-            clip3_title: textData.clip3_title || "",
-            clip3_subtitle: textData.clip3_subtitle || "",
+            ...clipTexts,
             caption: textData.caption || "",
             cta: textData.cta || "",
           });
@@ -200,7 +224,7 @@ Deno.serve(async (req) => {
 
       const videoIndexMap = new Map(videos?.map(v => [v.id, v.video_index]) || []);
 
-      // Sort clips: video 1 clips 1-3, then video 2 clips 1-3, etc.
+      // Sort clips: video 1 clips 1-N, then video 2 clips 1-N, etc.
       const sortedClips = allClips.sort((a, b) => {
         const aVideoIndex = videoIndexMap.get(a.video_id) || 0;
         const bVideoIndex = videoIndexMap.get(b.video_id) || 0;
@@ -221,7 +245,7 @@ Deno.serve(async (req) => {
               clipId: clip.id,
               clipIndex: clip.clip_index,
               brandId: brandId || null,
-              settings,
+              settings: { ...settings, clips_per_video: clipsPerVideo },
             },
           });
       }
@@ -229,14 +253,18 @@ Deno.serve(async (req) => {
       console.log(`[video-batch-create] Enqueued ${sortedClips.length} clip jobs`);
     }
 
+    const totalClips = videosCount * clipsPerVideo;
+    const woofsCost = totalClips * 25;
+
     return ok({
       batchId,
       videoIds,
       videosCount,
-      clipsPerVideo: 3,
-      totalClips: videosCount * 3,
+      clipsPerVideo,
+      totalClips,
+      woofsCost,
       status: "queued",
-      message: `Batch créé avec ${videosCount} vidéos (${videosCount * 3} clips). Génération séquentielle en cours...`,
+      message: `Batch créé avec ${videosCount} vidéos × ${clipsPerVideo} clips (${totalClips} clips total, ${woofsCost} Woofs). Génération séquentielle en cours...`,
     });
 
   } catch (error) {

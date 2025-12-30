@@ -15,13 +15,22 @@ export interface BatchClip {
   durationSeconds: number;
 }
 
+export interface ClipText {
+  title?: string;
+  subtitle?: string;
+}
+
 export interface BatchVideoTexts {
+  // Dynamic clips (1-10)
+  clips?: ClipText[];
+  // Legacy format support
   clip1Title?: string;
   clip1Subtitle?: string;
   clip2Title?: string;
   clip2Subtitle?: string;
   clip3Title?: string;
   clip3Subtitle?: string;
+  // Common fields
   caption?: string;
   cta?: string;
 }
@@ -44,6 +53,7 @@ export interface VideoBatch {
   inputPrompt: string;
   settings: {
     videos_count: number;
+    clips_per_video?: number; // NEW - default 3, max 10
     ratio: string;
     language: string;
     sfx_transition: string;
@@ -271,9 +281,10 @@ export function useVideoBatches(userId?: string, brandId?: string) {
     }
   }, []);
 
-  // Copy all texts
+  // Copy all texts (supports dynamic N clips)
   const copyAllTexts = useCallback((batch: VideoBatch) => {
-    let allTexts = `📹 BATCH VIDÉOS - ${batch.videos.length} vidéos\n`;
+    const clipsPerVideo = batch.settings?.clips_per_video || 3;
+    let allTexts = `📹 BATCH VIDÉOS - ${batch.videos.length} vidéos × ${clipsPerVideo} clips\n`;
     allTexts += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
     for (const video of batch.videos) {
@@ -288,9 +299,14 @@ export function useVideoBatches(userId?: string, brandId?: string) {
       }
 
       allTexts += `Clips:\n`;
-      allTexts += `1. ${video.texts?.clip1Title || '-'} | ${video.texts?.clip1Subtitle || '-'}\n`;
-      allTexts += `2. ${video.texts?.clip2Title || '-'} | ${video.texts?.clip2Subtitle || '-'}\n`;
-      allTexts += `3. ${video.texts?.clip3Title || '-'} | ${video.texts?.clip3Subtitle || '-'}\n`;
+      // Dynamic clips support
+      for (let i = 1; i <= clipsPerVideo; i++) {
+        const clipTitle = video.texts?.clips?.[i - 1]?.title || 
+                         (video.texts as Record<string, unknown>)?.[`clip${i}Title`] as string || '-';
+        const clipSubtitle = video.texts?.clips?.[i - 1]?.subtitle || 
+                            (video.texts as Record<string, unknown>)?.[`clip${i}Subtitle`] as string || '-';
+        allTexts += `${i}. ${clipTitle} | ${clipSubtitle}\n`;
+      }
       allTexts += `\n---\n\n`;
     }
 

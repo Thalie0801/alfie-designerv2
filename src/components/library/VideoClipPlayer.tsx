@@ -1,5 +1,5 @@
 // src/components/library/VideoClipPlayer.tsx
-// Sequential player for 3 video clips (playlist)
+// Sequential player for N video clips (1-10 clips, playlist)
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Play, Pause, RotateCcw, Volume2, VolumeX } from "lucide-react";
