@@ -566,8 +566,15 @@ export async function uploadTextAsRaw(
     throw new Error('Cloudinary credentials not configured');
   }
 
-  const publicId = `brands/${metadata.brandId}/${metadata.campaign}/texts/carr_${metadata.carouselId}_v${metadata.textVersion}`;
-  const tags = [metadata.brandId, metadata.campaign, 'text', 'carousel'];
+  // ✅ Nettoyer le campaign pour éviter les espaces/caractères spéciaux dans publicId
+  const safeCampaign = (metadata.campaign || 'default')
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9_\-àâäéèêëïîôùûüç]/gi, '')
+    .substring(0, 50); // Limiter la longueur
+
+  const publicId = `brands/${metadata.brandId}/${safeCampaign}/texts/carr_${metadata.carouselId}_v${metadata.textVersion}`;
+  const tags = [metadata.brandId, safeCampaign, 'text', 'carousel'];
   
   const timestamp = Math.round(Date.now() / 1000);
   
