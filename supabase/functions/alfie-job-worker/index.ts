@@ -1825,12 +1825,12 @@ Slide ${index + 1} of ${carouselSlides.length}.`;
           campaign: payload.campaign || payload.brief?.campaign || "carousel",
           language: payload.language || "FR",
           useBrandKit,
-          carouselMode: "background_only", // ✅ FORCER mode fond uniquement
+          carouselMode, // ✅ Mode depuis payload (standard/background_only)
           carouselType,
           colorMode,
           visualStyle, // ✅ NEW: Passer le style visuel adaptatif
           referenceImageUrl: payload.referenceImageUrl || null,
-          backgroundOnly: true, // ✅ Flag explicite: pas d'overlays texte
+          backgroundOnly: carouselMode === 'background_only', // ✅ Flag dynamique selon mode
         });
 
         return { success: true, slideIndex: index, result: slideResult };

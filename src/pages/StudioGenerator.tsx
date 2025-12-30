@@ -209,7 +209,7 @@ export function StudioGenerator() {
   const [isGeneratingFromBrief, setIsGeneratingFromBrief] = useState(false);
   const [briefGenerationError, setBriefGenerationError] = useState<string | null>(null);
   const [useBrandKitForPack, setUseBrandKitForPack] = useState(true);
-  const [carouselMode] = useState<'standard' | 'premium'>('standard');
+  const [carouselMode] = useState<'standard' | 'background_only'>('standard');
   const [colorMode, setColorMode] = useState<'vibrant' | 'pastel'>('vibrant');
 
   // Charger les Woofs disponibles
