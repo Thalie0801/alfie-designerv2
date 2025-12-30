@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Image, Video, Layers, Layout, ArrowRight } from "lucide-react";
+import { Image, Layers, Layout, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { trackEvent } from "@/utils/trackEvent";
 
@@ -29,11 +29,10 @@ import storySpa from "@/assets/gallery/story-spa.png";
 import storyRing from "@/assets/gallery/story-ring.png";
 import storySilk from "@/assets/gallery/story-silk.png";
 
-type Category = "images" | "videos" | "carousels" | "stories";
+type Category = "images" | "carousels" | "stories";
 
 const categories = [
   { id: "images" as Category, label: "Images", icon: Image },
-  { id: "videos" as Category, label: "Vidéos", icon: Video },
   { id: "carousels" as Category, label: "Carrousels", icon: Layers },
   { id: "stories" as Category, label: "Stories", icon: Layout },
 ];
@@ -48,7 +47,7 @@ const categoryImages: Record<Category, (string | null)[]> = {
     galleryCafe,          // Coffee shop
     galleryDecor,         // Promo mobilier
   ],
-  videos: [null, null, null, null, null, null],
+  
   carousels: [
     carouselSkincare,   // Crème hydratante
     carouselCandle,     // Bougie parfumée
@@ -75,14 +74,6 @@ const galleryItems: Record<Category, { title: string; description: string }[]> =
     { title: "Pinterest Pin", description: "Format vertical 2:3" },
     { title: "Facebook Cover", description: "Image de couverture" },
     { title: "Pinterest Cover", description: "Bannière de profil" },
-  ],
-  videos: [
-    { title: "Reel Instagram", description: "Vidéo courte 9:16" },
-    { title: "Story animée", description: "Motion design percutant" },
-    { title: "TikTok", description: "Format vertical engageant" },
-    { title: "Shorts YouTube", description: "Contenu snackable" },
-    { title: "Intro vidéo", description: "Branding animé" },
-    { title: "Promo produit", description: "Mise en valeur animée" },
   ],
   carousels: [
     { title: "Carrousel Skincare", description: "Crème & soins visage" },
@@ -195,7 +186,7 @@ export function CategoryGallerySection() {
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="w-10 h-10 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-white/80 shadow-lg flex items-center justify-center">
                           {activeCategory === "images" && <Image className="h-5 w-5 sm:h-8 sm:w-8 text-slate-400" />}
-                          {activeCategory === "videos" && <Video className="h-5 w-5 sm:h-8 sm:w-8 text-slate-400" />}
+                          
                           {activeCategory === "carousels" && <Layers className="h-5 w-5 sm:h-8 sm:w-8 text-slate-400" />}
                           {activeCategory === "stories" && <Layout className="h-5 w-5 sm:h-8 sm:w-8 text-slate-400" />}
                         </div>
