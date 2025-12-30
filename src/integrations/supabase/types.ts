@@ -1507,8 +1507,11 @@ export type Database = {
         Row: {
           created_at: string | null
           email: string
+          generation_count: number | null
           id: string
           intent: Json | null
+          ip_address: string | null
+          last_generation_at: string | null
           last_seen_at: string | null
           marketing_opt_in: boolean | null
           source: string | null
@@ -1516,8 +1519,11 @@ export type Database = {
         Insert: {
           created_at?: string | null
           email: string
+          generation_count?: number | null
           id?: string
           intent?: Json | null
+          ip_address?: string | null
+          last_generation_at?: string | null
           last_seen_at?: string | null
           marketing_opt_in?: boolean | null
           source?: string | null
@@ -1525,8 +1531,11 @@ export type Database = {
         Update: {
           created_at?: string | null
           email?: string
+          generation_count?: number | null
           id?: string
           intent?: Json | null
+          ip_address?: string | null
+          last_generation_at?: string | null
           last_seen_at?: string | null
           marketing_opt_in?: boolean | null
           source?: string | null

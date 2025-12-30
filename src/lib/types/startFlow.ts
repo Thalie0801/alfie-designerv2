@@ -6,6 +6,7 @@ export type Intent = {
   ratio: '4:5' | '1:1' | '9:16';
   slides: number;
   topic: string;
+  brandName: string;
   goal: 'Convertir' | 'Éduquer' | 'Autorité' | 'Engagement' | 'Story';
   cta: 'Commenter' | 'DM' | 'Lien bio' | 'Télécharger' | 'Prendre RDV';
   tone: 'Fun' | 'Pro' | 'Luxe' | 'Cute';
@@ -29,6 +30,7 @@ export const DEFAULT_INTENT: Intent = {
   ratio: '4:5',
   slides: 5,
   topic: '',
+  brandName: '',
   goal: 'Convertir',
   cta: 'DM',
   tone: 'Fun',

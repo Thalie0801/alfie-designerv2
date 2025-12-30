@@ -91,7 +91,7 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
             brandId: parsedLead?.brandId || 'temp-brand',
             email: email || parsedLead?.email || '',
             brandData: {
-              brandName: 'Mon Business',
+              brandName: intent.brandName || 'Mon Business',
               sector: 'coach',
               styles: [intent.tone, intent.density],
               colorChoice: intent.stylePreset === 'pro' ? 'neutral' : 'bold',
