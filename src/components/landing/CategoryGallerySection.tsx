@@ -5,6 +5,14 @@ import { Image, Video, Layers, Layout, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { trackEvent } from "@/utils/trackEvent";
 
+// Images locales de la galerie
+import gallerySpecialFetes from "@/assets/gallery/gallery-special-fetes.png";
+import galleryZenitude from "@/assets/gallery/gallery-zenitude.png";
+import gallerySenteurs from "@/assets/gallery/gallery-senteurs.png";
+import galleryCoiffeur from "@/assets/gallery/gallery-coiffeur.png";
+import galleryCafe from "@/assets/gallery/gallery-cafe.jpeg";
+import galleryDecor from "@/assets/gallery/gallery-decor.png";
+
 type Category = "images" | "videos" | "carousels" | "stories";
 
 const categories = [
@@ -14,20 +22,15 @@ const categories = [
   { id: "stories" as Category, label: "Stories", icon: Layout },
 ];
 
-// Mapping des images par catégorie - URLs Cloudinary réelles vérifiées
+// Mapping des images par catégorie
 const categoryImages: Record<Category, (string | null)[]> = {
   images: [
-    // Post Instagram 1:1
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767028880/alfie/4944d11f-0fce-45ec-9756-067b3a7363c3/8039c8af-0e95-41a8-9e4d-44b9ff850d01/slides/slide_05.png",
-    // Bannière LinkedIn 1:1
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767028871/alfie/4944d11f-0fce-45ec-9756-067b3a7363c3/8039c8af-0e95-41a8-9e4d-44b9ff850d01/slides/slide_01.png",
-    // Autre 1:1
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1766499323/alfie/4944d11f-0fce-45ec-9756-067b3a7363c3/0d195074-ed3e-4b28-ae20-4f3552358894/slides/slide_03.png",
-    // Autre 1:1
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1766393642/alfie/4944d11f-0fce-45ec-9756-067b3a7363c3/654b04be-da7b-44ab-aeac-bf665c48fc4c/slides/slide_03.png",
-    // Autre 1:1
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1766252698/alfie/5258b72a-d81f-4ac1-8943-7edd44e6c26c/0591442c-64eb-453e-81ff-0820232874d0/slides/slide_01.png",
-    null,
+    gallerySpecialFetes,  // Promo épilation
+    galleryZenitude,      // Spa bien-être
+    gallerySenteurs,      // Bougies parfumées
+    galleryCoiffeur,      // Salon coiffure
+    galleryCafe,          // Coffee shop
+    galleryDecor,         // Promo mobilier
   ],
   videos: [null, null, null, null, null, null],
   carousels: [
