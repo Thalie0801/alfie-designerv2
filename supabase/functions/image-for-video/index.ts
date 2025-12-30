@@ -42,8 +42,16 @@ async function translatePromptToEnglish(frenchPrompt: string, overlayLines?: str
   let textInstruction: string;
   if (hasTextToDisplay) {
     const textToDisplay = overlayLines!.filter(l => l.trim()).join(" | ");
-    textInstruction = `IMPORTANT: Display this text prominently on the image, large bold readable font, centered, white text with subtle shadow for mobile readability: "${textToDisplay}". Maximum 2 lines.`;
-    console.log("[image-for-video] 📝 Text overlay requested:", textToDisplay);
+    // ✅ RENFORCÉ: Instructions CRITIQUES pour éviter les caractères asiatiques
+    textInstruction = `CRITICAL TEXT INSTRUCTION: Display EXACTLY this French text on the image (copy character by character, use ONLY Latin alphabet A-Z, a-z, accents like é, è, à, ç allowed):
+"${textToDisplay}"
+- Large bold white sans-serif font (Montserrat or similar)
+- Centered on image, maximum 2 lines
+- Subtle black shadow for mobile readability
+- NEVER use Japanese, Chinese, Korean, or ANY Asian characters
+- NEVER translate or modify the text
+- If unsure about any character, use the closest Latin equivalent`;
+    console.log("[image-for-video] 📝 Text overlay requested (Latin only):", textToDisplay);
   } else {
     textInstruction = "VISUAL ONLY, no text, no letters, no words visible.";
   }
@@ -62,7 +70,10 @@ async function translatePromptToEnglish(frenchPrompt: string, overlayLines?: str
             role: "system",
             content: `You are a professional translator. Translate the following French image description to English. 
 Keep it concise and visual. Output ONLY the English translation, nothing else.
-${hasTextToDisplay ? 'Do NOT add any "no text" instruction.' : 'Add "VISUAL ONLY, no text, no letters, no words visible" at the end.'}`,
+${hasTextToDisplay ? `CRITICAL: When text must appear on the image, use ONLY Latin alphabet (A-Z, a-z, French accents).
+NEVER generate Japanese, Chinese, Korean, or any non-Latin characters.
+The displayed text MUST remain in French using Latin letters only.
+Do NOT add any "no text" instruction.` : 'Add "VISUAL ONLY, no text, no letters, no words visible" at the end.'}`,
           },
           { role: "user", content: frenchPrompt },
         ],

@@ -76,6 +76,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
     const firstAsset = pack.assets[0];
     return (firstAsset as any)?.visualStyleCategory || 'background';
   });
+  
   const [audioSettings, setAudioSettings] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     pack.assets.filter(a => a.kind === 'video_premium').forEach(a => {
