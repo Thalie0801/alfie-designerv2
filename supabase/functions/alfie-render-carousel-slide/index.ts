@@ -489,13 +489,13 @@ function buildImagePromptWithText(
   const slideRole = getSlideRole(slideIndex, totalSlides);
   const colorModeLabel = colorMode === 'pastel' ? 'soft pastel' : 'vibrant colorful';
   
-  // Palette du Brand Kit ou fallback
+  // ✅ Palette du Brand Kit ou fallback
   const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
   const colorHint = palette.length > 0 
     ? `Primary colors: ${palette.join(', ')}` 
     : 'Use modern gradient colors (blues, purples, pinks)';
   
-  // Construire le texte à intégrer
+  // ✅ Construire le texte à intégrer
   const textLines: string[] = [];
   if (slideContent.title) textLines.push(`TITLE: "${slideContent.title}"`);
   if (slideContent.subtitle) textLines.push(`SUBTITLE: "${slideContent.subtitle}"`);
@@ -504,13 +504,40 @@ function buildImagePromptWithText(
     textLines.push(`BULLET POINTS:\n${slideContent.bullets.map(b => '• ' + b).join('\n')}`);
   }
   
-  // Visual style hint
+  // ✅ NEW: Adapter le style typographique selon le Brand Kit visual_types
+  const visualType = brandKit?.visual_types?.[0] || 'modern';
+  let typographyStyle = "clean, modern sans-serif typography with soft shadow";
   let visualElements = "soft 3D geometric elements, glowing orbs, smooth shapes";
-  if (brandKit?.visual_types?.[0]) {
-    const vt = brandKit.visual_types[0];
-    if (vt === "illustrations_3d") visualElements = "3D rendered objects with depth";
-    else if (vt === "illustrations_2d") visualElements = "flat 2D illustration style";
+  
+  if (visualType === "illustrations_3d" || visualType === "3d_pixar_style") {
+    typographyStyle = "3D BUBBLE LETTERS - puffy, rounded, inflated look with soft shadows and highlights. Pixar/Disney cartoon style text";
+    visualElements = "3D rendered objects with depth, organic 3D shapes, Pixar-style backgrounds";
+  } else if (visualType === "illustrations_2d") {
+    typographyStyle = "flat 2D illustration style text, bold colors, clean lines";
+    visualElements = "flat 2D illustration elements, bold shapes, vector-style graphics";
+  } else if (visualType === "doodle") {
+    typographyStyle = "hand-drawn, playful typography with organic strokes, sketch-style letters";
+    visualElements = "hand-drawn doodles, sketchy elements, playful illustrations";
+  } else if (visualType === "photorealistic") {
+    typographyStyle = "elegant serif or modern sans-serif typography with subtle shadow for readability";
+    visualElements = "realistic textures, professional photography style backgrounds";
+  } else if (visualType === "mockup" || visualType === "corporate") {
+    typographyStyle = "clean, professional corporate typography, minimal and refined";
+    visualElements = "clean geometric shapes, professional business aesthetic";
   }
+  
+  // ✅ Couleur de texte du Brand Kit ou blanc par défaut
+  const textColor = brandKit?.text_color || '#FFFFFF';
+  const textColorName = textColor.toLowerCase() === '#ffffff' ? 'WHITE' : textColor;
+  
+  // ✅ Mood visuel du Brand Kit
+  const visualMood = brandKit?.visual_mood?.join(', ') || colorModeLabel;
+  
+  // ✅ Adjectives pour le ton général
+  const brandPersonality = brandKit?.adjectives?.join(', ') || 'professional, modern';
+  
+  // ✅ Éléments à éviter
+  const avoid = brandKit?.avoid_in_visuals || '';
   
   return `Create a ${colorModeLabel} social media carousel slide with INTEGRATED TEXT.
 
@@ -518,30 +545,36 @@ THEME: ${prompt}
 STYLE: ${globalStyle || 'modern professional'}
 SLIDE: ${slideRole} (${slideIndex + 1}/${totalSlides})
 ${colorHint}
-VISUAL ELEMENTS: ${visualElements}
+VISUAL MOOD: ${visualMood}
+BRAND PERSONALITY: ${brandPersonality}
 
 📝 TEXT TO DISPLAY (CENTERED on image):
 ${textLines.join('\n')}
 
+TYPOGRAPHY STYLE (CRITICAL - follow exactly):
+${typographyStyle}
+- Text color: ${textColorName} with contrasting shadow/stroke for readability
+- Title: LARGE, bold, prominent
+- Subtitle/Body: Smaller, below title
+- ALL text MUST be perfectly CENTERED horizontally and vertically
+
+VISUAL ELEMENTS: ${visualElements}
+
 CRITICAL REQUIREMENTS:
-- Generate a ${colorModeLabel} background with soft gradients
+- Generate a ${colorModeLabel} background - NO white/blank backgrounds
 - TEXT MUST BE CENTERED horizontally and vertically on the image
-- Title: LARGE bold WHITE text with subtle black shadow for readability
-- Subtitle: medium WHITE text below title
-- Body/Bullets: smaller WHITE text below subtitle
+- Text is the MAIN FOCUS - clearly legible and prominent
 - Modern social media aesthetic with depth and dimension
 - Leave comfortable margins around text (10% each side)
 
 ABSOLUTE RULES (MANDATORY):
 - The image MUST contain the EXACT text provided above. If text is missing, the output is INVALID.
-- ALL text MUST be perfectly CENTERED and highly readable
-- Text color: WHITE with soft black shadow/stroke for contrast
-- Background: ${colorMode === 'pastel' ? 'soft pastel tones' : 'vibrant gradients'} - NO white/blank backgrounds
+- Follow the TYPOGRAPHY STYLE instructions exactly
+- Background: ${colorMode === 'pastel' ? 'soft pastel tones' : 'vibrant gradients'}
 - NO placeholder text, NO additional words beyond what is specified
-- Professional typography, clean and modern, large font sizes
-- The text is the MAIN content - it must be clearly legible and prominent
+${avoid ? `- AVOID: ${avoid}` : ''}
 
-OUTPUT: A stunning carousel slide with ${colorModeLabel} background and perfectly centered, prominent text.`;
+OUTPUT: A stunning carousel slide with ${colorModeLabel} background, ${typographyStyle.split(' - ')[0]} text, perfectly centered and prominent.`;
 }
 
 /**
