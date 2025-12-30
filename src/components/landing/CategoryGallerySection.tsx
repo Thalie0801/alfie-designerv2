@@ -14,31 +14,45 @@ const categories = [
   { id: "stories" as Category, label: "Stories", icon: Layout },
 ];
 
-// Mapping des images par catégorie - URLs Cloudinary réelles
+// Mapping des images par catégorie - URLs Cloudinary réelles vérifiées
 const categoryImages: Record<Category, (string | null)[]> = {
   images: [
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767028880/alfie/leads/k8txjmj8-jkud-r5gx/slide_05.png",
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767028871/alfie/leads/k8txjmj8-jkud-r5gx/slide_01.png",
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1766001057/alfie/leads/veo84uyb-4y6c-t9xw/slide_10.png",
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1766499323/alfie/leads/xnlhvvwn-7aaq-a5ch/slide_03.png",
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1765803609/alfie/leads/vd8qrtc1-2oe0-j9l8/slide_02.png",
+    // Post Instagram 1:1
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767028880/alfie/4944d11f-0fce-45ec-9756-067b3a7363c3/8039c8af-0e95-41a8-9e4d-44b9ff850d01/slides/slide_05.png",
+    // Bannière LinkedIn 1:1
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767028871/alfie/4944d11f-0fce-45ec-9756-067b3a7363c3/8039c8af-0e95-41a8-9e4d-44b9ff850d01/slides/slide_01.png",
+    // Autre 1:1
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1766499323/alfie/4944d11f-0fce-45ec-9756-067b3a7363c3/0d195074-ed3e-4b28-ae20-4f3552358894/slides/slide_03.png",
+    // Autre 1:1
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1766393642/alfie/4944d11f-0fce-45ec-9756-067b3a7363c3/654b04be-da7b-44ab-aeac-bf665c48fc4c/slides/slide_03.png",
+    // Autre 1:1
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1766252698/alfie/5258b72a-d81f-4ac1-8943-7edd44e6c26c/0591442c-64eb-453e-81ff-0820232874d0/slides/slide_01.png",
     null,
   ],
   videos: [null, null, null, null, null, null],
   carousels: [
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767095332/alfie/leads/lz33xvlp-bnpi-a5wm/slide_04.png",
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767080601/alfie/leads/xq3x91zl-hc6b-w0j9/slide_04.png",
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767089553/alfie/leads/l8vtyhxk-tg5r-u1k7/slide_01.png",
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767077415/alfie/leads/oqotwzqf-rpqn-c55s/slide_05.png",
+    // Carrousel éducatif 4:5
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767095332/alfie/8af3b633-6e99-4f6b-84c6-306904158feb/5b7df40d-dcd6-423a-b065-b199322e0783/slides/slide_04.png",
+    // Carrousel produit 4:5
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767080601/alfie/4944d11f-0fce-45ec-9756-067b3a7363c3/a75dbe68-0a64-4c55-a792-e0e94aaca5ab/slides/slide_04.png",
+    // Carrousel tips 4:5
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767089553/alfie/8af3b633-6e99-4f6b-84c6-306904158feb/59608400-ff50-4f83-b30d-3cdfc982b8aa/slides/slide_01.png",
+    // Carrousel story 4:5
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767077415/alfie/4944d11f-0fce-45ec-9756-067b3a7363c3/5ebcf38f-7ceb-4e38-9a5f-088bef0606b2/slides/slide_05.png",
     null,
     null,
   ],
   stories: [
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125489/alfie/leads/wfvvxo0h-jl9w-a9ve/slide_05.png",
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125476/alfie/leads/wfvvxo0h-jl9w-a9ve/slide_01.png",
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125476/alfie/leads/wfvvxo0h-jl9w-a9ve/slide_02.png",
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125476/alfie/leads/wfvvxo0h-jl9w-a9ve/slide_03.png",
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125477/alfie/leads/wfvvxo0h-jl9w-a9ve/slide_04.png",
+    // Story promo 9:16
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125489/alfie/8af3b633-6e99-4f6b-84c6-306904158feb/89bac616-f323-4dcf-bc95-16f99d8e2ee5/slides/slide_05.png",
+    // Story Q&A 9:16
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125476/alfie/8af3b633-6e99-4f6b-84c6-306904158feb/89bac616-f323-4dcf-bc95-16f99d8e2ee5/slides/slide_01.png",
+    // Story sondage 9:16
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125476/alfie/8af3b633-6e99-4f6b-84c6-306904158feb/89bac616-f323-4dcf-bc95-16f99d8e2ee5/slides/slide_02.png",
+    // Story teaser 9:16
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125476/alfie/8af3b633-6e99-4f6b-84c6-306904158feb/89bac616-f323-4dcf-bc95-16f99d8e2ee5/slides/slide_03.png",
+    // Story behind 9:16
+    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125477/alfie/8af3b633-6e99-4f6b-84c6-306904158feb/89bac616-f323-4dcf-bc95-16f99d8e2ee5/slides/slide_04.png",
     null,
   ],
 };
