@@ -1393,6 +1393,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
           useBrandKit,
           userId,
           overlayLines: overlayLines.length > 0 ? overlayLines : undefined, // ✅ Passer le texte à afficher
+          useLipSync: payload.useLipSync === true, // ✅ Propager le mode Lip-Sync
         }, 120_000); // 2 minutes timeout pour image
         
         if (imageResult?.imageUrl) {
@@ -1469,6 +1470,29 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
     if (withAudio) {
       videoPrompt += " Background music matching the mood. Ambient soundtrack appropriate for the scene.";
       console.log("[processGenerateVideo] 🎵 Audio cues added to prompt");
+    }
+    
+    // ✅ LIP-SYNC NATIF VEO 3.1: Injecter instructions spécifiques pour personnages parlants
+    const useLipSync = payload.useLipSync === true;
+    
+    if (useLipSync && visualStyleCategory === 'character') {
+      const LIPSYNC_INSTRUCTIONS = `
+        LIPSYNC MODE - CRITICAL CAMERA AND FACE REQUIREMENTS:
+        - Frontal or 3/4 face view (NO profile, NO back of head)
+        - Face clearly visible and stable throughout the video
+        - Mouth movements synchronized with speech
+        - Character speaking directly to camera (talking head style)
+        - Stable camera with minimal movement
+        - Professional studio lighting on face
+        - Clear articulation of words visible on lips
+      `;
+      videoPrompt = `${videoPrompt} ${LIPSYNC_INSTRUCTIONS}`;
+      console.log("[processGenerateVideo] 👄 Lip-Sync instructions injected for character mode");
+    } else if (useLipSync) {
+      // Lip-sync demandé mais pas en mode character - ajouter quand même des instructions de base
+      const BASIC_LIPSYNC = "Character facing camera with visible face and natural mouth movements. Talking head style.";
+      videoPrompt = `${videoPrompt} ${BASIC_LIPSYNC}`;
+      console.log("[processGenerateVideo] 👄 Basic Lip-Sync instructions added (non-character mode)");
     }
 
     // ✅ Appeler generate-video avec provider "veo3" et timeout 6 minutes
