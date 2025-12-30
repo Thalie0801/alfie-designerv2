@@ -1489,9 +1489,114 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
     if (!videoUrl) throw new Error("VEO 3 FAST failed to generate video");
 
     console.log("[processGenerateVideo] ✅ VEO 3 FAST video created:", videoUrl);
+    
+    // ✅ ELEVENLABS AUDIO PIPELINE: Voix-off + Musique unifiée
+    let finalVideoUrl = videoUrl;
+    let voiceoverUrl: string | undefined;
+    let musicUrl: string | undefined;
+    
+    const audioMode = payload.audioMode || 'veo';
+    const useVoiceover = payload.useVoiceover === true;
+    const useUnifiedMusic = payload.useUnifiedMusic === true;
+    const voiceId = payload.voiceId || 'lily-fr';
+    
+    console.log("[processGenerateVideo] 🔊 Audio mode check:", {
+      audioMode,
+      useVoiceover,
+      useUnifiedMusic,
+      voiceId,
+      hasVideoScript: !!videoScript,
+    });
+    
+    if (audioMode === 'elevenlabs' && (useVoiceover || useUnifiedMusic)) {
+      console.log("[processGenerateVideo] 🎙️ ElevenLabs audio mode - generating professional audio...");
+      
+      // 1. Générer la voix-off à partir du script
+      if (useVoiceover && videoScript) {
+        const voiceoverText = [
+          videoScript.hook,
+          videoScript.script,
+          videoScript.cta,
+        ].filter(Boolean).join('. ');
+        
+        if (voiceoverText.trim()) {
+          console.log("[processGenerateVideo] 🎤 Generating voiceover:", voiceoverText.slice(0, 80));
+          
+          try {
+            const ttsResult = await callFn<any>("elevenlabs-tts", {
+              text: voiceoverText,
+              voiceName: voiceId,
+              uploadToCloudinary: true,
+              folder: `voiceovers/${orderId}`,
+            }, 60_000);
+            
+            voiceoverUrl = ttsResult?.audioUrl;
+            console.log("[processGenerateVideo] ✅ Voiceover generated:", voiceoverUrl?.slice(0, 60));
+          } catch (ttsError) {
+            console.error("[processGenerateVideo] ⚠️ TTS failed, continuing without voiceover:", ttsError);
+          }
+        }
+      }
+      
+      // 2. Générer ou réutiliser la musique de fond unifiée
+      if (useUnifiedMusic) {
+        // Vérifier si une musique batch existe déjà dans le payload
+        musicUrl = payload.batchMusicUrl;
+        
+        if (!musicUrl) {
+          // Générer une nouvelle musique basée sur le brand/niche
+          const musicPrompt = [
+            brandMini?.niche || 'professional business',
+            brandMini?.visual_mood?.join(' ') || 'modern',
+            'background music',
+          ].join(' ');
+          
+          console.log("[processGenerateVideo] 🎵 Generating background music:", musicPrompt);
+          
+          try {
+            const musicResult = await callFn<any>("elevenlabs-music", {
+              prompt: musicPrompt,
+              durationSeconds: 30,
+              folder: `music/${orderId}`,
+            }, 90_000);
+            
+            musicUrl = musicResult?.audioUrl;
+            console.log("[processGenerateVideo] ✅ Music generated:", musicUrl?.slice(0, 60));
+          } catch (musicError) {
+            console.error("[processGenerateVideo] ⚠️ Music generation failed:", musicError);
+          }
+        } else {
+          console.log("[processGenerateVideo] 🎵 Using existing batch music:", musicUrl.slice(0, 60));
+        }
+      }
+      
+      // 3. Mixer audio + vidéo via Cloudinary si on a du contenu audio
+      if (voiceoverUrl || musicUrl) {
+        console.log("[processGenerateVideo] 🎬 Mixing audio with video...");
+        
+        try {
+          const mixResult = await callFn<any>("mix-audio-video", {
+            videoUrl: finalVideoUrl,
+            voiceoverUrl,
+            musicUrl,
+            voiceoverVolume: 100,
+            musicVolume: 35,
+          }, 60_000);
+          
+          if (mixResult?.mixedVideoUrl) {
+            finalVideoUrl = mixResult.mixedVideoUrl;
+            console.log("[processGenerateVideo] ✅ Audio mixed successfully:", finalVideoUrl.slice(0, 60));
+          } else {
+            console.warn("[processGenerateVideo] ⚠️ Mix returned no URL, using original video");
+          }
+        } catch (mixError) {
+          console.error("[processGenerateVideo] ⚠️ Audio mixing failed, using original video:", mixError);
+        }
+      }
+    }
 
     // Thumbnail = video URL (VEO 3 génère des vidéos avec couverture)
-    const thumbnailUrl = veoResult?.thumbnail_url || videoUrl;
+    const thumbnailUrl = veoResult?.thumbnail_url || finalVideoUrl;
 
     // ✅ POST-PROD MODE: Router vers tts-and-render-final si postProdMode activé
     const postProdMode = payload.postProdMode === true;
@@ -1608,26 +1713,36 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       user_id: userId,
       brand_id: brandId,
       type: "video",
-      engine: "veo_3_1",
+      engine: audioMode === 'elevenlabs' ? "veo_3_1_elevenlabs" : "veo_3_1",
       status: "completed",
-      output_url: videoUrl,
+      output_url: finalVideoUrl,
       thumbnail_url: thumbnailUrl,
       metadata: {
         prompt: videoPrompt,
         aspectRatio,
         duration: durationSec,
-        generator: "veo_3_fast",
+        generator: audioMode === 'elevenlabs' ? "veo_3_fast_elevenlabs" : "veo_3_fast",
         tier: "premium",
         orderId,
         referenceImageUrl: effectiveReferenceImageUrl, // ✅ Stocker l'URL de l'image source (générée ou fournie)
         imageFirstPipeline: !referenceImageUrl && !!effectiveReferenceImageUrl, // ✅ Flag pour indiquer génération automatique
         script: videoScript, // ✅ Stocker le script vidéo (hook, script, cta)
+        // ✅ ElevenLabs Audio Metadata
+        audioMode,
+        voiceId: useVoiceover ? voiceId : undefined,
+        voiceoverUrl,
+        musicUrl,
+        elevenLabsAudio: audioMode === 'elevenlabs',
       },
     });
     if (mediaErr) throw new Error(mediaErr.message);
 
-    console.log("[processGenerateVideo] ✅ VEO 3 FAST video saved to media_generations");
-    return { videoUrl };
+    console.log("[processGenerateVideo] ✅ VEO 3 FAST video saved to media_generations", {
+      audioMode,
+      hasVoiceover: !!voiceoverUrl,
+      hasMusic: !!musicUrl,
+    });
+    return { videoUrl: finalVideoUrl, rawVideoUrl: videoUrl, voiceoverUrl, musicUrl };
   }
 
   // Pas de fallback - uniquement Veo 3.1 premium

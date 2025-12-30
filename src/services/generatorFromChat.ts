@@ -263,6 +263,12 @@ async function createAssetJob(
       carouselType: asset.kind === "carousel" ? (asset.carouselType || 'content') : undefined, // ✅ Type: citations ou content
       visualStyle: visualStyle, // ✅ NEW: Style visuel adaptatif (background/character/product)
       withAudio: asset.kind === 'video_premium' ? (asset.withAudio !== false) : undefined, // ✅ FORCER true pour vidéos sauf si explicitement false
+      // ✅ ElevenLabs Audio Options
+      audioMode: asset.kind === 'video_premium' ? (asset.audioMode || 'veo') : undefined,
+      voiceId: asset.kind === 'video_premium' ? (asset.voiceId || undefined) : undefined,
+      useVoiceover: asset.kind === 'video_premium' ? (asset.useVoiceover || false) : undefined,
+      useUnifiedMusic: asset.kind === 'video_premium' ? (asset.useUnifiedMusic || false) : undefined,
+      batchMusicUrl: asset.kind === 'video_premium' ? (asset.batchMusicUrl || undefined) : undefined,
       engine: videoEngine,
       durationSeconds: asset.durationSeconds || 5,
       aspectRatio: asset.ratio || "4:5",

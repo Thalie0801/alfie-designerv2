@@ -42,16 +42,22 @@ async function translatePromptToEnglish(frenchPrompt: string, overlayLines?: str
   let textInstruction: string;
   if (hasTextToDisplay) {
     const textToDisplay = overlayLines!.filter(l => l.trim()).join(" | ");
-    // ✅ RENFORCÉ: Instructions CRITIQUES pour éviter les caractères asiatiques
-    textInstruction = `CRITICAL TEXT INSTRUCTION: Display EXACTLY this French text on the image (copy character by character, use ONLY Latin alphabet A-Z, a-z, accents like é, è, à, ç allowed):
-"${textToDisplay}"
-- Large bold white sans-serif font (Montserrat or similar)
-- Centered on image, maximum 2 lines
-- Subtle black shadow for mobile readability
-- NEVER use Japanese, Chinese, Korean, or ANY Asian characters
-- NEVER translate or modify the text
-- If unsure about any character, use the closest Latin equivalent`;
-    console.log("[image-for-video] 📝 Text overlay requested (Latin only):", textToDisplay);
+    // ✅ MEGA RENFORCÉ: Instructions CRITIQUES pour éviter les caractères asiatiques
+    textInstruction = `CRITICAL TEXT REQUIREMENT - READ CAREFULLY:
+1. Display EXACTLY this French text on the image: "${textToDisplay}"
+2. MANDATORY: Use ONLY Latin/Roman alphabet (A-Z, a-z)
+3. French accents ARE ALLOWED: é, è, ê, ë, à, â, ç, ù, û, ü, î, ï, ô, œ
+4. FORBIDDEN CHARACTERS - NEVER USE:
+   - Japanese hiragana/katakana (あ, ア, etc.)
+   - Chinese hanzi (中, 文, etc.)
+   - Korean hangul (한, 글, etc.)
+   - Arabic, Hebrew, Thai, or ANY non-Latin script
+5. Large bold white sans-serif font (Montserrat/Arial style)
+6. Centered text, maximum 2 lines
+7. Subtle black shadow for mobile readability
+8. If you cannot render Latin text correctly, display NO TEXT AT ALL
+9. Copy each French character EXACTLY - do not translate or modify`;
+    console.log("[image-for-video] 📝 Text overlay requested (Latin alphabet ONLY):", textToDisplay);
   } else {
     textInstruction = "VISUAL ONLY, no text, no letters, no words visible.";
   }
