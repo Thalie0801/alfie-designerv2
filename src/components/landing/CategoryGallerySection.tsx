@@ -21,6 +21,14 @@ import carouselSpa from "@/assets/gallery/carousel-spa.png";
 import carouselWatch from "@/assets/gallery/carousel-watch.png";
 import carouselFurniture from "@/assets/gallery/carousel-furniture.png";
 
+// Stories locales
+import storyFurniture from "@/assets/gallery/story-furniture.png";
+import storyCandle from "@/assets/gallery/story-candle.png";
+import storyCoffee from "@/assets/gallery/story-coffee.png";
+import storySpa from "@/assets/gallery/story-spa.png";
+import storyRing from "@/assets/gallery/story-ring.png";
+import storySilk from "@/assets/gallery/story-silk.png";
+
 type Category = "images" | "videos" | "carousels" | "stories";
 
 const categories = [
@@ -50,17 +58,12 @@ const categoryImages: Record<Category, (string | null)[]> = {
     carouselFurniture,  // Mobilier design
   ],
   stories: [
-    // Story promo 9:16
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125489/alfie/8af3b633-6e99-4f6b-84c6-306904158feb/89bac616-f323-4dcf-bc95-16f99d8e2ee5/slides/slide_05.png",
-    // Story Q&A 9:16
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125476/alfie/8af3b633-6e99-4f6b-84c6-306904158feb/89bac616-f323-4dcf-bc95-16f99d8e2ee5/slides/slide_01.png",
-    // Story sondage 9:16
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125476/alfie/8af3b633-6e99-4f6b-84c6-306904158feb/89bac616-f323-4dcf-bc95-16f99d8e2ee5/slides/slide_02.png",
-    // Story teaser 9:16
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125476/alfie/8af3b633-6e99-4f6b-84c6-306904158feb/89bac616-f323-4dcf-bc95-16f99d8e2ee5/slides/slide_03.png",
-    // Story behind 9:16
-    "https://res.cloudinary.com/dcuvvilto/image/upload/v1767125477/alfie/8af3b633-6e99-4f6b-84c6-306904158feb/89bac616-f323-4dcf-bc95-16f99d8e2ee5/slides/slide_04.png",
-    null,
+    storyFurniture,  // Mobilier moderne
+    storyCandle,     // Bougie parfumée
+    storyCoffee,     // Café premium
+    storySpa,        // Spa bien-être
+    storyRing,       // Bijou tech
+    storySilk,       // Foulard soie
   ],
 };
 
@@ -90,12 +93,12 @@ const galleryItems: Record<Category, { title: string; description: string }[]> =
     { title: "Carrousel Furniture", description: "Mobilier design" },
   ],
   stories: [
-    { title: "Story promo", description: "Annonce flash" },
-    { title: "Story Q&A", description: "Questions interactives" },
-    { title: "Story sondage", description: "Engagement poll" },
-    { title: "Story teaser", description: "Avant-première" },
-    { title: "Story behind", description: "Coulisses" },
-    { title: "Story citation", description: "Quote inspirante" },
+    { title: "Story Furniture", description: "Mobilier moderne" },
+    { title: "Story Candle", description: "Bougie parfumée" },
+    { title: "Story Coffee", description: "Café de spécialité" },
+    { title: "Story Spa", description: "Bien-être & relaxation" },
+    { title: "Story Ring", description: "Bijou tech lumineux" },
+    { title: "Story Silk", description: "Foulard édition limitée" },
   ],
 };
 
