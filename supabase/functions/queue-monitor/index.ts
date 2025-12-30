@@ -107,16 +107,47 @@ Deno.serve(async (req) => {
       scope: "user",
     };
 
-    // Auto-kick the worker when we detect a backlog with nothing running
+    // Auto-kick logic: trigger worker if queued jobs exist AND:
+    // - No active workers, OR
+    // - There are stuck running jobs, OR
+    // - Oldest queued job is older than 2 minutes (backlog building up)
     const activeWorkers = (counts.running ?? 0) + (counts.processing ?? 0);
+    const BACKLOG_THRESHOLD_SEC = 120; // 2 minutes
+    const shouldKick = counts.queued > 0 && (
+      activeWorkers === 0 ||
+      runningStuckCount > 0 ||
+      (oldestQueuedAgeSec !== null && oldestQueuedAgeSec > BACKLOG_THRESHOLD_SEC)
+    );
 
-    if (counts.queued > 0 && activeWorkers === 0) {
-      console.warn("[queue-monitor] Detected queued jobs with no worker running – triggering worker");
+    if (shouldKick) {
+      const kickReason = activeWorkers === 0 
+        ? "no_active_workers" 
+        : runningStuckCount > 0 
+          ? "stuck_jobs_detected" 
+          : "backlog_timeout";
+      
+      console.warn(`[queue-monitor] Auto-kick triggered: ${kickReason}`, {
+        queued: counts.queued,
+        activeWorkers,
+        runningStuckCount,
+        oldestQueuedAgeSec,
+      });
+
+      // If stuck jobs, also invoke cleanup first
+      if (runningStuckCount > 0) {
+        try {
+          console.log("[queue-monitor] Cleaning stuck jobs before worker kick...");
+          await supabase.functions.invoke("cleanup-stuck-jobs");
+        } catch (cleanupErr) {
+          console.error("[queue-monitor] cleanup-stuck-jobs failed:", cleanupErr);
+        }
+      }
 
       const triggerPayload = {
-        reason: "queue-monitor-auto-kick",
+        reason: `queue-monitor-auto-kick:${kickReason}`,
         oldestQueuedAgeSec: oldestQueuedAgeSec ?? null,
         queued: counts.queued,
+        runningStuckCount,
       };
 
       if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
