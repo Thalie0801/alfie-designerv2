@@ -18,6 +18,10 @@ interface FreePackRequest {
   };
 }
 
+// Rate limit constants
+const MAX_PACKS_PER_EMAIL = 1;
+const MAX_PACKS_PER_IP_24H = 3;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -29,6 +33,61 @@ Deno.serve(async (req) => {
     console.log("[generate-free-pack] Starting generation for", { userId, brandId, email });
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get IP address for rate-limiting
+    const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() 
+      || req.headers.get("x-real-ip") 
+      || "unknown";
+
+    // ANTI-ABUSE CHECK 1: Check if email already generated a pack
+    if (email) {
+      const { data: existingLead } = await supabase
+        .from("leads")
+        .select("id, generation_count, last_generation_at")
+        .eq("email", email.trim().toLowerCase())
+        .maybeSingle();
+
+      if (existingLead && existingLead.generation_count >= MAX_PACKS_PER_EMAIL) {
+        console.log("[generate-free-pack] Rate limit hit for email:", email);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: "RATE_LIMIT_EMAIL",
+            message: "Tu as déjà reçu ton pack gratuit ! Vérifie tes emails ou connecte-toi pour en créer plus.",
+          }),
+          {
+            status: 429,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+
+    // ANTI-ABUSE CHECK 2: Check IP-based rate limit (3 per 24h)
+    if (ipAddress && ipAddress !== "unknown") {
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      
+      const { count } = await supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .eq("ip_address", ipAddress)
+        .gte("last_generation_at", twentyFourHoursAgo);
+
+      if (count && count >= MAX_PACKS_PER_IP_24H) {
+        console.log("[generate-free-pack] Rate limit hit for IP:", ipAddress, "count:", count);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: "RATE_LIMIT_IP",
+            message: "Trop de générations depuis cette connexion. Réessaie dans quelques heures.",
+          }),
+          {
+            status: 429,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
 
     // Define the 3 assets to generate
     const assets = [

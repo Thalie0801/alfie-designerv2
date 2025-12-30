@@ -48,7 +48,7 @@ interface QuestSceneProps {
 }
 
 export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const prefersReducedMotion = useReducedMotion();
   const isMobile = useIsMobile();
@@ -68,12 +68,15 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
   };
 
   const canProceed = () => {
+    if (step === 0) return intent.brandName.trim().length > 0;
     if (step === 2) return intent.topic.trim().length > 0;
     return true;
   };
 
   const handleNext = () => {
-    if (step < 3) {
+    if (step === 0) {
+      setStep(1);
+    } else if (step < 3) {
       setStep(step + 1);
     } else {
       onComplete();
@@ -95,7 +98,7 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
               Crée ton pack en 90 secondes ⚡
             </h1>
             <p className="text-muted-foreground text-sm sm:text-base">
-              Réponds à 3 questions, Alfie fait le reste
+              Réponds à 4 questions, Alfie fait le reste
             </p>
           </motion.div>
 
@@ -108,7 +111,7 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
           >
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-background/80 backdrop-blur-sm mx-auto block text-center">
               <span className="text-lg">⚔️</span>
-              <span className="font-bold text-foreground">Niveau {step}/3</span>
+              <span className="font-bold text-foreground">Niveau {step + 1}/4</span>
             </div>
             
             {/* XP Bar */}
@@ -120,7 +123,7 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
                     background: 'linear-gradient(90deg, hsl(var(--alfie-mint)), hsl(var(--alfie-pink)), hsl(var(--alfie-lilac)))',
                   }}
                   initial={{ width: 0 }}
-                  animate={{ width: `${(step / 3) * 100}%` }}
+                  animate={{ width: `${((step + 1) / 4) * 100}%` }}
                   transition={{ duration: 0.5 }}
                 />
               </div>
@@ -128,6 +131,55 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
           </motion.div>
 
           <AnimatePresence mode="wait">
+            {/* Step 0: Brand Name */}
+            {step === 0 && (
+              <motion.div
+                key="step-0"
+                initial={{ opacity: 0, x: 30 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -30 }}
+                className="bg-background/90 backdrop-blur-md rounded-3xl p-4 sm:p-8 shadow-2xl border border-border/50"
+              >
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2 text-center">
+                  👋 C'est quoi ton business ?
+                </h2>
+                <p className="text-muted-foreground text-center mb-6 text-sm sm:text-base">
+                  Donne-moi le nom de ta marque ou ton activité
+                </p>
+
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Input
+                      value={intent.brandName}
+                      onChange={(e) => onUpdate({ brandName: e.target.value })}
+                      placeholder="Ex : Studio Léa, Coach Thomas, La Pâtisserie..."
+                      className="h-14 text-base rounded-xl border-2 focus:border-primary pr-12 bg-background"
+                      autoFocus
+                    />
+                    <motion.span
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-xl"
+                      animate={!prefersReducedMotion ? { scale: [1, 1.2, 1] } : {}}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      🏷️
+                    </motion.span>
+                  </div>
+                </div>
+
+                {/* Navigation */}
+                <div className="flex justify-end mt-8">
+                  <Button
+                    onClick={handleNext}
+                    disabled={!canProceed()}
+                    className="gap-2 bg-gradient-to-r from-alfie-mint to-alfie-lilac text-foreground font-bold"
+                  >
+                    Suivant
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
             {/* Step 1: Format (Loot Selection) */}
             {step === 1 && (
               <motion.div
@@ -157,6 +209,14 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
                       onClick={() => handleFormatSelect(format)}
                     />
                   ))}
+                </div>
+
+                {/* Back button */}
+                <div className="flex justify-start mt-8">
+                  <Button variant="ghost" onClick={() => setStep(0)} className="gap-2">
+                    <ArrowLeft className="w-4 h-4" />
+                    Retour
+                  </Button>
                 </div>
               </motion.div>
             )}

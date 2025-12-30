@@ -27,6 +27,11 @@ serve(async (req: Request): Promise<Response> => {
     const body: CaptureLeadRequest = await req.json();
     const { email, intent = {}, marketingOptIn = false, source = "start_game" } = body;
 
+    // Get IP address for rate-limiting
+    const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() 
+      || req.headers.get("x-real-ip") 
+      || "unknown";
+
     // Validate email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email || !emailRegex.test(email)) {
@@ -38,25 +43,28 @@ serve(async (req: Request): Promise<Response> => {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    console.log("[capture-lead] Processing:", { email: normalizedEmail, source });
+    console.log("[capture-lead] Processing:", { email: normalizedEmail, source, ip: ipAddress });
 
     // Check if lead already exists
     const { data: existingLead } = await supabase
       .from("leads")
-      .select("id")
+      .select("id, generation_count")
       .eq("email", normalizedEmail)
       .maybeSingle();
 
     let leadId: string | undefined;
 
     if (existingLead) {
-      // Update existing lead
+      // Update existing lead and increment generation count
       const { error: updateError } = await supabase
         .from("leads")
         .update({
           intent,
           marketing_opt_in: marketingOptIn,
           last_seen_at: new Date().toISOString(),
+          generation_count: (existingLead.generation_count || 0) + 1,
+          last_generation_at: new Date().toISOString(),
+          ip_address: ipAddress,
         })
         .eq("id", existingLead.id);
       
@@ -67,7 +75,7 @@ serve(async (req: Request): Promise<Response> => {
       }
       leadId = existingLead.id;
     } else {
-      // Insert new lead
+      // Insert new lead with initial generation count
       const { data: newLead, error: insertError } = await supabase
         .from("leads")
         .insert({
@@ -76,6 +84,9 @@ serve(async (req: Request): Promise<Response> => {
           intent,
           marketing_opt_in: marketingOptIn,
           last_seen_at: new Date().toISOString(),
+          generation_count: 1,
+          last_generation_at: new Date().toISOString(),
+          ip_address: ipAddress,
         })
         .select("id")
         .single();
