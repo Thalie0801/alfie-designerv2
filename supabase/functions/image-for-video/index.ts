@@ -29,6 +29,7 @@ interface ImageForVideoRequest {
   useBrandKit?: boolean;
   userId?: string;
   overlayLines?: string[]; // ✅ Texte à afficher directement sur l'image (Nano Banana)
+  useLipSync?: boolean; // ✅ Mode Lip-Sync: générer un personnage de face
 }
 
 /**
@@ -214,12 +215,13 @@ Deno.serve(async (req) => {
 
   try {
     const body: ImageForVideoRequest = await req.json();
-    const { renderId, prompt, aspectRatio = "9:16", brandId, useBrandKit = true, userId, overlayLines } = body;
+    const { renderId, prompt, aspectRatio = "9:16", brandId, useBrandKit = true, userId, overlayLines, useLipSync = false } = body;
     
     console.log("[image-for-video] 📋 Request:", { 
       hasOverlayLines: !!(overlayLines?.length), 
       overlayLinesPreview: overlayLines?.slice(0, 2),
-      promptPreview: prompt?.slice(0, 50) 
+      promptPreview: prompt?.slice(0, 50),
+      useLipSync 
     });
 
     if (!prompt) {
@@ -290,7 +292,14 @@ Deno.serve(async (req) => {
         ? "Horizontal landscape format (16:9 aspect ratio)."
         : "Square format (1:1 aspect ratio).";
     
-    const finalPrompt = `${englishPrompt} ${aspectHint} Ultra high quality, photorealistic, cinematic lighting.`;
+    // ✅ LIP-SYNC MODE: Ajouter instructions pour personnage de face
+    let lipSyncHint = "";
+    if (useLipSync) {
+      lipSyncHint = " Character facing camera directly with clearly visible face and mouth. Frontal view portrait style, ready for lip-sync animation. Natural expression, clear face visibility.";
+      console.log("[image-for-video] 👄 Lip-Sync mode: adding frontal face instructions");
+    }
+    
+    const finalPrompt = `${englishPrompt} ${aspectHint}${lipSyncHint} Ultra high quality, photorealistic, cinematic lighting.`;
 
     // 4. Generate image with Gemini
     const base64Image = await generateImageWithGemini(finalPrompt);

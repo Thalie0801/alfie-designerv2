@@ -98,6 +98,9 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
   const [useUnifiedMusic, setUseUnifiedMusic] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState<string>('lily-fr');
   
+  // ✅ Lip-Sync natif VEO 3.1
+  const [useLipSync, setUseLipSync] = useState(false);
+  
   const [uploadingForId, setUploadingForId] = useState<string | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const { profile } = useAuth();
@@ -333,6 +336,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
           voiceId: asset.kind === 'video_premium' && useVoiceover ? selectedVoice : undefined,
           useVoiceover: asset.kind === 'video_premium' ? useVoiceover : undefined,
           useUnifiedMusic: asset.kind === 'video_premium' ? useUnifiedMusic : undefined,
+          useLipSync: asset.kind === 'video_premium' ? useLipSync : undefined,
         }));
       } else if (textsError || !textsData?.texts) {
         console.warn("[PackPreparationModal] Text generation failed, using fallback texts:", textsError);
@@ -348,6 +352,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
           voiceId: asset.kind === 'video_premium' && useVoiceover ? selectedVoice : undefined,
           useVoiceover: asset.kind === 'video_premium' ? useVoiceover : undefined,
           useUnifiedMusic: asset.kind === 'video_premium' ? useUnifiedMusic : undefined,
+          useLipSync: asset.kind === 'video_premium' ? useLipSync : undefined,
           generatedTexts: generateFallbackTexts(asset, localPack.title),
         }));
         
@@ -364,6 +369,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
           voiceId: asset.kind === 'video_premium' && useVoiceover ? selectedVoice : undefined,
           useVoiceover: asset.kind === 'video_premium' ? useVoiceover : undefined,
           useUnifiedMusic: asset.kind === 'video_premium' ? useUnifiedMusic : undefined,
+          useLipSync: asset.kind === 'video_premium' ? useLipSync : undefined,
           generatedTexts: textsData.texts?.[asset.id] || generateFallbackTexts(asset, localPack.title),
         }));
       }
@@ -711,6 +717,19 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
                 >
                   <Music className="w-3.5 h-3.5" />
                   Musique unifiée {useUnifiedMusic && '✓'}
+                </button>
+                
+                {/* ✅ Chip Lip-Sync natif VEO 3.1 */}
+                <button
+                  type="button"
+                  onClick={() => setUseLipSync(!useLipSync)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                    useLipSync 
+                      ? 'bg-emerald-500 text-white' 
+                      : 'bg-background border border-border hover:bg-muted'
+                  }`}
+                >
+                  👄 Lip-Sync {useLipSync && '✓'}
                 </button>
               </div>
               

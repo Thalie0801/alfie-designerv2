@@ -269,6 +269,7 @@ async function createAssetJob(
       useVoiceover: asset.kind === 'video_premium' ? (asset.useVoiceover || false) : undefined,
       useUnifiedMusic: asset.kind === 'video_premium' ? (asset.useUnifiedMusic || false) : undefined,
       batchMusicUrl: asset.kind === 'video_premium' ? (asset.batchMusicUrl || undefined) : undefined,
+      useLipSync: asset.kind === 'video_premium' ? (asset.useLipSync || false) : undefined,
       engine: videoEngine,
       durationSeconds: asset.durationSeconds || 5,
       aspectRatio: asset.ratio || "4:5",
