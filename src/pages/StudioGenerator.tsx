@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { useBrandKit } from "@/hooks/useBrandKit";
 import { useAuth } from "@/hooks/useAuth";
 import type { AlfiePack, PackAsset } from "@/types/alfiePack";
+import type { Ratio } from "@/lib/types/alfie";
 import { OrderStatusList } from "@/components/studio/OrderStatusList";
 import { sendPackToGenerator, InsufficientWoofsError } from "@/services/generatorFromChat";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,14 +23,26 @@ import { useOrderCompletion } from "@/hooks/useOrderCompletion";
 import { QueueStatus } from "@/components/chat/QueueStatus";
 
 type AssetType = "image" | "carousel" | "video";
-type Platform = "instagram" | "tiktok" | "linkedin" | "pinterest";
-type Ratio = "1:1" | "4:5" | "9:16" | "16:9";
+type Platform = "instagram" | "tiktok" | "linkedin" | "pinterest" | "youtube";
 
 const PLATFORM_RATIOS: Record<Platform, Ratio[]> = {
   instagram: ["4:5", "1:1", "9:16"],
   tiktok: ["9:16"],
   linkedin: ["1:1", "16:9"],
-  pinterest: ["4:5", "9:16"],
+  pinterest: ["2:3", "4:5", "9:16"],
+  youtube: ["16:9", "yt-thumb"],
+};
+
+const getRatioLabel = (r: Ratio): string => {
+  switch (r) {
+    case "9:16": return "📱 Story (9:16)";
+    case "1:1": return "⬛ Carré (1:1)";
+    case "4:5": return "📐 Portrait (4:5)";
+    case "16:9": return "🖥️ Paysage (16:9)";
+    case "2:3": return "📌 Pinterest (2:3)";
+    case "yt-thumb": return "🎬 Miniature YT (1280×720)";
+    default: return r;
+  }
 };
 
 const ASSET_CONFIG = {
@@ -362,6 +375,7 @@ export function StudioGenerator() {
                       <SelectItem value="tiktok">🎵 TikTok</SelectItem>
                       <SelectItem value="linkedin">💼 LinkedIn</SelectItem>
                       <SelectItem value="pinterest">📌 Pinterest</SelectItem>
+                      <SelectItem value="youtube">🎬 YouTube</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -375,7 +389,7 @@ export function StudioGenerator() {
                     <SelectContent>
                       {PLATFORM_RATIOS[platform].map((r) => (
                         <SelectItem key={r} value={r}>
-                          {r === "9:16" ? "📱 Story (9:16)" : r === "1:1" ? "⬛ Carré (1:1)" : r === "4:5" ? "📐 Portrait (4:5)" : "🖥️ Paysage (16:9)"}
+                          {getRatioLabel(r)}
                         </SelectItem>
                       ))}
                     </SelectContent>
