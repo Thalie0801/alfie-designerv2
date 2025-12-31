@@ -133,11 +133,36 @@ function enrichInputWithPreviousOutputs(
 // STEP HANDLERS
 // =====================================================
 
-async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { visualPrompt, identityAnchorId, ratio, userId, brandId } = input;
+// Helper: Charger le Brand Kit depuis la DB
+async function loadBrandKit(brandId: string): Promise<Record<string, unknown> | null> {
+  if (!brandId) return null;
   
-  console.log(`[gen_keyframe] userId: ${userId}, brandId: ${brandId}`);
+  const { data, error } = await supabaseAdmin
+    .from('brands')
+    .select('id, name, palette, logo_url, fonts, voice, niche, pitch, adjectives, tagline, tone_sliders, person, language_level, visual_types, visual_mood, avoid_in_visuals, text_color')
+    .eq('id', brandId)
+    .single();
+  
+  if (error || !data) {
+    console.warn(`[video-step-runner] Could not load brandKit for ${brandId}:`, error?.message);
+    return null;
+  }
+  
+  return data;
+}
+
+async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { visualPrompt, identityAnchorId, ratio, userId, brandId, useBrandKit } = input;
+  
+  console.log(`[gen_keyframe] userId: ${userId}, brandId: ${brandId}, useBrandKit: ${useBrandKit}`);
   console.log(`[gen_keyframe] Generating keyframe with prompt: ${String(visualPrompt).substring(0, 100)}...`);
+  
+  // Charger le Brand Kit si activé
+  let brandKit: Record<string, unknown> | null = null;
+  if (useBrandKit !== false && brandId) {
+    brandKit = await loadBrandKit(String(brandId));
+    console.log(`[gen_keyframe] Loaded brandKit: ${brandKit?.name || 'none'}`);
+  }
   
   // Récupérer l'anchor si défini
   let anchorConstraints = '';
@@ -178,6 +203,8 @@ Aspect ratio: ${ratio || '9:16'}`;
     body: JSON.stringify({
       userId,
       brandId,
+      brandKit,          // Passer le Brand Kit complet
+      useBrandKit,       // Flag pour activer l'enrichissement
       prompt: imagePrompt,
       ratio: ratio || '9:16',
       referenceImageUrl: refImageUrl,

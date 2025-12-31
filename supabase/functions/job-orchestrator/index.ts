@@ -122,6 +122,7 @@ const JobSpecV1 = z.object({
   render: RenderConfig.optional(),
   campaign_name: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  use_brand_kit: z.boolean().default(true),  // Brand Kit toggle
 });
 
 type JobSpecV1Type = z.infer<typeof JobSpecV1>;
@@ -562,6 +563,7 @@ Deno.serve(async (req) => {
         jobId: job.id,
         userId: user.id,
         brandId: spec.brandkit_id,
+        useBrandKit: spec.use_brand_kit,  // Propager le flag Brand Kit
       },
       status: index === 0 ? 'queued' : 'pending', // First step is queued
       attempt: 0,
