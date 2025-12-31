@@ -103,7 +103,7 @@ export default function PromptOptimizer() {
         </CardHeader>
         <CardContent className="space-y-6">
           <Textarea
-            placeholder="Ex: Un chien golden retriever qui joue dans un parc ensoleillé..."
+            placeholder="Ex: Une image minimaliste pour promouvoir notre nouvelle offre coaching, avec texte 'Transforme ta vie' en overlay sur fond dégradé moderne..."
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             className="min-h-[120px] text-base"
