@@ -77,6 +77,7 @@ export default function StudioMulti() {
       contentType?: 'mini-film' | 'carousel' | 'video' | 'image';
       scenes?: MiniFilmScene[];
       referenceImages?: string[];
+      suggestedRatio?: string;
     } | null;
     
     if (!state) return;
@@ -107,8 +108,13 @@ export default function StudioMulti() {
       setActiveTab('mini-film');
     }
     
+    // Apply suggested ratio if provided
+    if (state.suggestedRatio) {
+      setRatioMaster(state.suggestedRatio as Ratio);
+    }
+    
     // Clear state to prevent re-fill on navigation
-    if (state.prefillPrompt || state.scenes || state.referenceImages?.length) {
+    if (state.prefillPrompt || state.scenes || state.referenceImages?.length || state.suggestedRatio) {
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
