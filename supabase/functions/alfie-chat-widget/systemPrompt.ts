@@ -139,6 +139,7 @@ Format du pack (à placer EN FIN de réponse) :
       "goal": "engagement",
       "tone": "professionnel",
       "prompt": "Sujet global du carrousel",
+      "visualStyleCategory": "character",
       "useBrandKit": true,
       "campaign": "Nom de campagne",
       "generatedTexts": {
@@ -172,23 +173,25 @@ Pose plutôt une question de clarification.
 - "content" : Carrousel de conseils, astuces, tutoriels
 - "citations" : Carrousel de citations inspirantes (champ "author" OBLIGATOIRE)
 
---- DÉTECTION AUTOMATIQUE DU STYLE VISUEL (INTELLIGENTE) ---
+--- DÉTECTION AUTOMATIQUE DU STYLE VISUEL (ULTRA-CRITIQUE) ---
 
-Pour CHAQUE asset, inclure "visualStyleCategory" basé sur le CONTEXTE :
+⚠️ CHAMP visualStyleCategory OBLIGATOIRE pour CHAQUE asset :
 
-1. Si le sujet concerne une PERSONNE, un expert, un coach, un avatar → visualStyleCategory: "character"
-   Exemples : "mon savoir-faire", "mon expertise", "ma méthode", portraits, coaching
+1. visualStyleCategory: "character" → Personnages 3D Pixar/avatars
+   Quand : expertise personnelle, coaching, portrait, mascotte, "ma méthode", "mon savoir-faire"
+   
+2. visualStyleCategory: "product" → Mise en scène de produits
+   Quand : produits physiques, créations, pâtisseries, packshots, "mes créations", e-commerce
 
-2. Si le sujet concerne un PRODUIT, un service concret, un résultat tangible → visualStyleCategory: "product"
-   Exemples : "mes pâtisseries", "mes créations", "mon offre", packshots, mockups
+3. visualStyleCategory: "background" → Fonds abstraits SEULEMENT
+   Quand : citations, concepts purs, listes génériques sans contexte personnel
 
-3. Si le sujet est ABSTRAIT ou conceptuel (citations, idées, concepts) → visualStyleCategory: "background"
-   Exemples : citations, listes de conseils génériques, concepts abstraits
+⚠️ ERREUR FRÉQUENTE À ÉVITER :
+- Une pâtissière demande un carrousel → visualStyleCategory: "product" (ses gâteaux, pas des fonds abstraits !)
+- Un coach demande un carrousel → visualStyleCategory: "character" (son avatar, pas des fonds !)
+- Seules les citations pures ou concepts abstraits → "background"
 
-⚠️ IMPORTANT : Utilise le [BRAND_KIT] niche/secteur pour deviner le bon style :
-- Pâtissière → product (photos de gâteaux, pas de fonds abstraits)
-- Coach business → character (avatar/silhouette, pas de packshots)
-- Designer → product ou character selon le contexte
+Utilise [BRAND_KIT] niche pour deviner le bon style. Par défaut préfère "character" ou "product" plutôt que "background".
 
 --- RÈGLE PRIORITAIRE : ASSISTANCE PROACTIVE ---
 

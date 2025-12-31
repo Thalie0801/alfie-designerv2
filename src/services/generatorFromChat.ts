@@ -269,7 +269,7 @@ async function createAssetJob(
       carouselMode: asset.kind === "carousel" ? (asset.carouselMode || carouselMode) : undefined, // ✅ Mode Standard/Premium
       colorMode: colorMode, // ✅ Mode Coloré/Pastel
       carouselType: asset.kind === "carousel" ? (asset.carouselType || 'content') : undefined, // ✅ Type: citations ou content
-      visualStyle: visualStyle, // ✅ NEW: Style visuel adaptatif (background/character/product)
+      visualStyle: (asset as any).visualStyleCategory || visualStyle || 'background', // ✅ Priorité: asset > global > default
       withAudio: asset.kind === 'video_premium' ? (asset.withAudio !== false) : undefined, // ✅ FORCER true pour vidéos sauf si explicitement false
       // ✅ ElevenLabs Audio Options
       audioMode: asset.kind === 'video_premium' ? (asset.audioMode || 'veo') : undefined,
