@@ -88,6 +88,7 @@ const AudioConfig = z.object({
   sfx_enabled: z.boolean().default(false),
   ducking_enabled: z.boolean().default(true),
   voice_lufs_target: z.number().default(-16),
+  lip_sync_enabled: z.boolean().default(false),
 }).partial();
 
 const RenderConfig = z.object({
@@ -266,6 +267,7 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
         ratio: spec.ratio_master,
         identityAnchorId: spec.character_anchor_id,
         locks: spec.locks,
+        useLipSync: spec.audio?.lip_sync_enabled || false,
       },
     });
   }
@@ -281,6 +283,7 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
         durationSeconds: spec.beats?.[i]?.durationSec || 8,
         ratio: spec.ratio_master,
         identityAnchorId: spec.character_anchor_id,
+        useLipSync: spec.audio?.lip_sync_enabled || false,
       },
     });
   }

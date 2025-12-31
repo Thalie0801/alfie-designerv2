@@ -72,6 +72,7 @@ export const AudioConfig = z.object({
   sfx_enabled: z.boolean().default(false),
   ducking_enabled: z.boolean().default(true),
   voice_lufs_target: z.number().default(-16),
+  lip_sync_enabled: z.boolean().default(false),
 }).partial();
 
 // Configuration rendu

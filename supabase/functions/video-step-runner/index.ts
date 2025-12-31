@@ -152,9 +152,9 @@ async function loadBrandKit(brandId: string): Promise<Record<string, unknown> | 
 }
 
 async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { visualPrompt, identityAnchorId, ratio, userId, brandId, useBrandKit } = input;
+  const { visualPrompt, identityAnchorId, ratio, userId, brandId, useBrandKit, useLipSync } = input;
   
-  console.log(`[gen_keyframe] userId: ${userId}, brandId: ${brandId}, useBrandKit: ${useBrandKit}`);
+  console.log(`[gen_keyframe] userId: ${userId}, brandId: ${brandId}, useBrandKit: ${useBrandKit}, useLipSync: ${useLipSync}`);
   console.log(`[gen_keyframe] Generating keyframe with prompt: ${String(visualPrompt).substring(0, 100)}...`);
   
   // Charger le Brand Kit si activé
@@ -184,9 +184,14 @@ async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record
     }
   }
 
+  // Instructions Lip-Sync pour personnage de face
+  const lipSyncInstructions = useLipSync 
+    ? `\n\nLIP-SYNC MODE:\n- Character must be facing the camera DIRECTLY (frontal view)\n- Full face visible, mouth clearly visible\n- Eyes looking at camera\n- Professional lighting on face\n- Ready for lip synchronization animation` 
+    : '';
+
   // Prompt pour générer l'image keyframe
   const imagePrompt = `${visualPrompt}
-
+${lipSyncInstructions}
 ${anchorConstraints ? `IDENTITY LOCK:\n${anchorConstraints}` : ''}
 
 CRITICAL: Generate a single, clean image suitable as a video keyframe. No text, no split screens.
@@ -226,10 +231,10 @@ Aspect ratio: ${ratio || '9:16'}`;
 }
 
 async function handleAnimateClip(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { keyframeUrl, visualPrompt, identityAnchorId, ratio, durationSeconds, sceneIndex, userId, brandId } = input;
+  const { keyframeUrl, visualPrompt, identityAnchorId, ratio, durationSeconds, sceneIndex, userId, brandId, useLipSync } = input;
   
   console.log(`[animate_clip] Animating scene ${sceneIndex} with VEO 3.1`);
-  console.log(`[animate_clip] userId: ${userId}, brandId: ${brandId}`);
+  console.log(`[animate_clip] userId: ${userId}, brandId: ${brandId}, useLipSync: ${useLipSync}`);
   console.log(`[animate_clip] keyframe: ${keyframeUrl}`);
 
   if (!keyframeUrl) {
@@ -256,9 +261,14 @@ async function handleAnimateClip(input: Record<string, unknown>): Promise<Record
     }
   }
 
+  // Instructions Lip-Sync pour VEO
+  const lipSyncInstructions = useLipSync 
+    ? `\n\nLIP-SYNC ANIMATION:\n- Character speaks directly to camera\n- Realistic mouth movements synchronized with speech\n- Natural facial expressions while talking\n- Maintain frontal camera angle throughout\n- Eyes engaged with viewer` 
+    : '';
+
   // Enrichir le prompt pour VEO
   const enrichedPrompt = `${visualPrompt}
-
+${lipSyncInstructions}
 ${anchorPrompt}
 
 CRITICAL FRAME RULES:

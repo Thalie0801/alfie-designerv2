@@ -153,6 +153,8 @@ export default function StudioMulti() {
   
   // Options avancées
   const [voiceoverEnabled, setVoiceoverEnabled] = useState(true);
+  const [musicEnabled, setMusicEnabled] = useState(true);
+  const [lipSyncEnabled, setLipSyncEnabled] = useState(false);
   const [safeZone, setSafeZone] = useState(false);
 
   // Reference images (1-3)
@@ -243,6 +245,8 @@ export default function StudioMulti() {
         },
         audio: {
           voiceover_enabled: voiceoverEnabled,
+          music_enabled: musicEnabled,
+          lip_sync_enabled: lipSyncEnabled,
           music_volume_db: -20,
           sfx_enabled: false,
         },
@@ -617,11 +621,27 @@ export default function StudioMulti() {
               </div>
               <div className="flex items-center space-x-2">
                 <Checkbox
+                  id="musicEnabled"
+                  checked={musicEnabled}
+                  onCheckedChange={(checked) => setMusicEnabled(checked === true)}
+                />
+                <Label htmlFor="musicEnabled">Musique de fond</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="lipSync"
+                  checked={lipSyncEnabled}
+                  onCheckedChange={(checked) => setLipSyncEnabled(checked === true)}
+                />
+                <Label htmlFor="lipSync">Lip-Sync (personnage de face)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
                   id="safeZone"
                   checked={safeZone}
                   onCheckedChange={(checked) => setSafeZone(checked === true)}
                 />
-                <Label htmlFor="safeZone">Zone de sécurité (éviter les bords)</Label>
+                <Label htmlFor="safeZone">Zone de sécurité</Label>
               </div>
             </CardContent>
           </Card>
