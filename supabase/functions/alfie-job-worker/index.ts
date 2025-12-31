@@ -2028,9 +2028,9 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   // ========================================
   console.log(`[processRenderCarousels] 🎨 Rendering ${carouselSlides.length} slides...`);
 
-  // ✅ Extraire visualStyle du payload (background/character/product)
-  const visualStyle = payload.visualStyle || 'background';
-  console.log(`[processRenderCarousels] 🎨 Visual style: ${visualStyle}`);
+  // ✅ Extraire visualStyle du payload (background/character/product) - fallback visualStyleCategory
+  const visualStyle = payload.visualStyle || payload.visualStyleCategory || 'background';
+  console.log(`[processRenderCarousels] 🎨 Visual style: ${visualStyle} (from payload.visualStyle=${payload.visualStyle}, visualStyleCategory=${payload.visualStyleCategory})`);
 
   const slidePromises = carouselSlides.map(async (slide: CarouselSlide, index: number) => {
     console.log(`[processRenderCarousels] 📄 Slide ${index + 1}/${carouselSlides.length}: "${slide.title_on_image}"`);

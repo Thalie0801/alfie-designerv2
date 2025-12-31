@@ -342,6 +342,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         assetsWithTexts = localAssets.map((asset) => ({
           ...asset,
           useBrandKit,
+          visualStyleCategory: (asset as any).visualStyleCategory || visualStyle, // ✅ FIX: Propager visualStyle par asset
           woofCostType: asset.kind === 'carousel' ? 'carousel' as const : asset.woofCostType,
           withAudio: asset.kind === 'video_premium' ? audioSettings[asset.id] : undefined,
           // ✅ ElevenLabs Audio Options
@@ -362,6 +363,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         assetsWithTexts = localAssets.map((asset) => ({
           ...asset,
           useBrandKit,
+          visualStyleCategory: (asset as any).visualStyleCategory || visualStyle, // ✅ FIX: Propager visualStyle par asset
           woofCostType: asset.kind === 'carousel' ? 'carousel' as const : asset.woofCostType,
           withAudio: asset.kind === 'video_premium' ? audioSettings[asset.id] : undefined,
           // ✅ ElevenLabs Audio Options
@@ -383,6 +385,7 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
         assetsWithTexts = localAssets.map((asset) => ({
           ...asset,
           useBrandKit,
+          visualStyleCategory: (asset as any).visualStyleCategory || visualStyle, // ✅ FIX: Propager visualStyle par asset
           woofCostType: asset.kind === 'carousel' ? 'carousel' as const : asset.woofCostType,
           withAudio: asset.kind === 'video_premium' ? audioSettings[asset.id] : undefined,
           // ✅ ElevenLabs Audio Options
