@@ -78,7 +78,7 @@ export function PricingSection() {
       whileInView={{ opacity: 1 }}
       viewport={{ once: true, margin: "-100px" }}
       transition={{ duration: 0.6 }}
-      className="bg-muted/30 px-4 py-8 sm:py-12 md:py-16 lg:py-24 sm:px-6 lg:px-8"
+      className="bg-gradient-to-b from-slate-50 to-white px-4 py-8 sm:py-12 md:py-16 lg:py-24 sm:px-6 lg:px-8"
     >
       <div className="mx-auto max-w-6xl">
         {/* "Pas sûr" banner */}
