@@ -166,6 +166,8 @@ export default function StudioMulti() {
         deliverables: selectedDeliverables as JobSpecV1Type['deliverables'],
         use_brand_kit: useBrandKitToggle,
         reference_images: referenceImages.length > 0 ? referenceImages : undefined,
+        campaign_name: campaignName,
+        tags: ['studio_multi'], // ✅ Tag pour identifier la source
         locks: {
           palette_lock: useBrandKitToggle,
           light_mode: false,
@@ -227,6 +229,8 @@ export default function StudioMulti() {
         deliverables: ['zip'] as JobSpecV1Type['deliverables'],
         use_brand_kit: useBrandKitToggle,
         reference_images: referenceImages.length > 0 ? referenceImages : undefined,
+        campaign_name: campaignName,
+        tags: ['studio_multi'], // ✅ Tag pour identifier la source
         locks: {
           palette_lock: useBrandKitToggle,
           light_mode: false,

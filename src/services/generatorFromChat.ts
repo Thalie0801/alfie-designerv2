@@ -31,6 +31,7 @@ export interface SendPackParams {
   carouselMode?: 'standard' | 'background_only'; // ✅ Mode Standard/Fond seul pour carrousels
   colorMode?: 'vibrant' | 'pastel'; // ✅ Mode Coloré/Pastel
   visualStyle?: 'background' | 'character' | 'product'; // ✅ NEW: Style visuel adaptatif
+  source?: 'studio_solo' | 'studio_multi' | 'alfie_chat_pack'; // ✅ Source de génération
 }
 
 export interface SendPackResult {
@@ -55,6 +56,7 @@ export async function sendPackToGenerator({
   carouselMode = 'standard', // ✅ Mode Standard/Premium pour carrousels
   colorMode = 'vibrant', // ✅ Mode Coloré/Pastel
   visualStyle = 'background', // ✅ NEW: Style visuel adaptatif
+  source = 'alfie_chat_pack', // ✅ Source par défaut
 }: SendPackParams): Promise<SendPackResult> {
   // 1. Calculer le coût total Woofs avec détail par type
   const assetsToProcess = pack.assets.filter((a) => selectedAssetIds.includes(a.id));
@@ -137,7 +139,7 @@ export async function sendPackToGenerator({
           scriptGroup: asset.scriptGroup,
           clipTotal: videoAssets.length,
         });
-        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, useLogo, userPlan, carouselMode, colorMode, visualStyle, videoAssets);
+        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, useLogo, userPlan, carouselMode, colorMode, visualStyle, videoAssets, source);
       })
     );
 
@@ -196,7 +198,8 @@ async function createAssetJob(
   carouselMode: 'standard' | 'background_only' = 'standard',
   colorMode: 'vibrant' | 'pastel' = 'vibrant',
   visualStyle: 'background' | 'character' | 'product' = 'background', // ✅ NEW
-  allVideoAssets: any[] = [] // ✅ Pour calculer clipTotal
+  allVideoAssets: any[] = [], // ✅ Pour calculer clipTotal
+  source: string = 'alfie_chat_pack' // ✅ Source de génération
 ): Promise<{ orderId: string }> {
   // Créer un order pour cet asset
   const { data: order, error: orderError } = await supabase
@@ -217,7 +220,7 @@ async function createAssetJob(
         durationSeconds: asset.durationSeconds,
       },
       metadata: {
-        source: "alfie_chat_pack",
+        source: source,
         packTitle,
         assetKind: asset.kind,
       },

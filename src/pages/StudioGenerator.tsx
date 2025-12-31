@@ -223,6 +223,7 @@ export function StudioGenerator() {
         selectedAssetIds: [assetId],
         useBrandKit: useBrandKitToggle,
         userPlan: profile?.plan || "starter",
+        source: 'studio_solo',
       });
 
       toast.success(`${ASSET_CONFIG[selectedType].emoji} Génération lancée !`);

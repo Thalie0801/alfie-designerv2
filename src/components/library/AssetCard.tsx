@@ -3,7 +3,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Download, Trash2, PlayCircle, Image as ImageIcon, AlertCircle } from "lucide-react";
+import { Download, Trash2, PlayCircle, Image as ImageIcon, AlertCircle, MessageCircle, Target, Film, Sparkles } from "lucide-react";
 import { LibraryAsset } from "@/hooks/useLibraryAssets";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -36,6 +36,31 @@ function safeTimeAgo(dateISO?: string | null) {
   const d = new Date(dateISO);
   if (isNaN(d.getTime())) return "";
   return formatDistanceToNow(d, { addSuffix: true, locale: fr });
+}
+
+// Helper pour détecter la source de l'asset
+function getAssetSource(metadata: any): { label: string; color: string; icon: React.ReactNode } | null {
+  const source = metadata?.source;
+  
+  if (source === 'alfie_chat_pack' || source === 'alfie_chat') {
+    return { label: 'Chat', color: 'bg-pink-500 text-white', icon: <MessageCircle className="h-3 w-3" /> };
+  }
+  if (source === 'studio_multi' || metadata?.scriptGroup || metadata?.batchId || metadata?.multi_clip) {
+    return { label: 'Multi', color: 'bg-purple-500 text-white', icon: <Film className="h-3 w-3" /> };
+  }
+  if (source === 'studio_solo') {
+    return { label: 'Solo', color: 'bg-blue-500 text-white', icon: <Target className="h-3 w-3" /> };
+  }
+  // Pas de badge si pas de source identifiable
+  return null;
+}
+
+// Helper pour détecter si l'asset est récent (< 24h)
+function isAssetNew(createdAt?: string | null): boolean {
+  if (!createdAt) return false;
+  const created = new Date(createdAt);
+  if (isNaN(created.getTime())) return false;
+  return (Date.now() - created.getTime()) < 24 * 60 * 60 * 1000;
 }
 
 export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, daysUntilExpiry }: AssetCardProps) {
@@ -142,6 +167,21 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
         {/* Badges en haut à droite */}
         <div className="absolute top-2 right-2 z-10 flex flex-col gap-1 items-end">
           {expiryBadge}
+          {/* Badge Nouveau (< 24h) */}
+          {isAssetNew(asset.created_at) && (
+            <Badge className="bg-green-500 text-white text-[10px]">
+              <Sparkles className="h-3 w-3 mr-0.5" /> Nouveau
+            </Badge>
+          )}
+          {/* Badge Source (Solo/Multi/Chat) */}
+          {(() => {
+            const sourceInfo = getAssetSource(asset.metadata);
+            return sourceInfo ? (
+              <Badge className={`text-[10px] ${sourceInfo.color} flex items-center gap-1`}>
+                {sourceInfo.icon} {sourceInfo.label}
+              </Badge>
+            ) : null;
+          })()}
           {asset.is_source_upload && (
             <Badge variant="outline" className="bg-background/90 backdrop-blur text-xs">
               Source
@@ -254,11 +294,17 @@ export function AssetCard({ asset, selected, onSelect, onDownload, onDelete, day
         </div>
 
         {/* Info */}
-        <div className="p-3 space-y-2">
+        <div className="p-3 space-y-1">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>{createdAgo}</span>
             {fileSize && <span>{fileSize}</span>}
           </div>
+          {/* Nom de campagne si disponible */}
+          {(asset.metadata?.campaign || asset.metadata?.campaign_name) && (
+            <p className="text-xs text-muted-foreground truncate">
+              📁 {asset.metadata.campaign || asset.metadata.campaign_name}
+            </p>
+          )}
         </div>
       </CardContent>
 
