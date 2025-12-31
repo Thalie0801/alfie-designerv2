@@ -1725,13 +1725,17 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
         console.log("[processGenerateVideo] 🎬 Mixing audio with video (stripping VEO audio)...");
         
         try {
+          // ✅ Pro Video Pipeline: Utiliser les paramètres du payload
+          const userMusicVolume = payload.musicVolume ?? 15;
+          
           const mixResult = await callFn<any>("mix-audio-video", {
             videoUrl: finalVideoUrl,
             voiceoverUrl,
             musicUrl,
             voiceoverVolume: 100,
-            musicVolume: 15, // ✅ Réduit à 15 pour meilleur équilibre voix/musique
+            musicVolume: userMusicVolume, // ✅ Utiliser le volume défini par l'utilisateur
             originalVideoVolume: 0, // ✅ FIX: STRIP audio VEO natif pour éviter doublon
+            duckingEnabled: payload.duckingEnabled ?? true, // ✅ Ducking activé par défaut
           }, 60_000);
           
           if (mixResult?.mixedVideoUrl) {

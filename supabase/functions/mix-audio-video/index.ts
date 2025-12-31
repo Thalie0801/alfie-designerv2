@@ -14,8 +14,34 @@ interface MixAudioVideoRequest {
   musicUrl?: string;          // URL musique de fond (optionnel)
   voiceoverVolume?: number;   // 0-100 (défaut: 100)
   musicVolume?: number;       // 0-100 (défaut: 20)
-  originalVideoVolume?: number; // 0-100 (défaut: 30) - Volume audio VEO natif
+  originalVideoVolume?: number; // 0-100 (défaut: 0) - Volume audio VEO natif (défaut: mute)
+  duckingEnabled?: boolean;   // ✅ NEW: Ducking audio (défaut: true)
   outputFormat?: string;      // mp4, webm, etc.
+}
+
+/**
+ * Génère un hash unique pour identifier un mix audio spécifique (anti-doublon)
+ */
+function generateAudioMixHash(
+  videoUrl: string,
+  voiceoverUrl?: string,
+  musicUrl?: string,
+  settings?: Record<string, unknown>
+): string {
+  const data = JSON.stringify({
+    video: videoUrl,
+    voice: voiceoverUrl || null,
+    music: musicUrl || null,
+    settings: settings || {}
+  });
+  // Simple hash basé sur le contenu
+  let hash = 0;
+  for (let i = 0; i < data.length; i++) {
+    const char = data.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return `mix_${Math.abs(hash).toString(36)}`;
 }
 
 const jsonResponse = (data: unknown, status = 200) =>
@@ -107,6 +133,14 @@ Deno.serve(async (req) => {
     if (!voiceoverUrl && !musicUrl) {
       return jsonResponse({ error: "At least voiceoverUrl or musicUrl is required" }, 400);
     }
+    
+    // ✅ Générer l'audio_mix_hash pour éviter les doublons
+    const audioMixHash = generateAudioMixHash(videoUrl, voiceoverUrl, musicUrl, {
+      voiceoverVolume,
+      musicVolume,
+      originalVideoVolume,
+      duckingEnabled: (body as any).duckingEnabled ?? true,
+    });
 
     console.log("[mix-audio-video] 🎬 START", {
       hasVideo: !!videoUrl,
@@ -115,6 +149,7 @@ Deno.serve(async (req) => {
       voiceoverVolume,
       musicVolume,
       originalVideoVolume,
+      audioMixHash,
     });
 
     // Extraire les public_ids
@@ -150,6 +185,7 @@ Deno.serve(async (req) => {
     return jsonResponse({
       success: true,
       mixedVideoUrl,
+      audioMixHash, // ✅ Retourner le hash pour traçabilité
       components: {
         video: videoPublicId,
         voiceover: voiceoverPublicId || null,
