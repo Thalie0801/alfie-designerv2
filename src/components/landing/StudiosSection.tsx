@@ -18,7 +18,7 @@ const studios = [
     borderColor: "border-alfie-mint/40",
     badgeColor: "bg-alfie-mint text-slate-900",
     cta: "Essayer Solo",
-    link: "/studio",
+    link: "/start",
   },
   {
     badge: "Multi",
@@ -33,7 +33,7 @@ const studios = [
     borderColor: "border-alfie-lilac/40",
     badgeColor: "bg-alfie-lilac text-slate-900",
     cta: "Essayer Multi",
-    link: "/studio/multi",
+    link: "/start",
   },
 ];
 

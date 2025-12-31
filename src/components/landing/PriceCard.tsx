@@ -39,8 +39,8 @@ export function PriceCard({
   
   return (
     <Card
-      className={`relative border-border/50 bg-card/50 backdrop-blur-sm transition-all hover:shadow-2xl ${
-        popular ? "border-alfie-mint shadow-xl scale-105" : ""
+      className={`relative border-slate-200 bg-white shadow-lg transition-all hover:shadow-2xl ${
+        popular ? "border-alfie-mint border-2 shadow-xl scale-105" : ""
       }`}
     >
       {popular && (
