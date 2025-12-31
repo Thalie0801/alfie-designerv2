@@ -42,7 +42,7 @@ import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 import { ChatGenerator } from "@/features/studio";
 import { StudioGenerator } from "@/pages/StudioGenerator";
 import ChatWidget from "./components/chat/ChatWidget";
-import Campaigns from "./pages/Campaigns";
+import StudioMulti from "./pages/StudioMulti";
 import JobConsolePage from "./pages/JobConsolePage";
 
 const queryClient = new QueryClient();
@@ -134,11 +134,11 @@ const AppRoutes = () => {
         />
 
         <Route
-          path="/studio/campaigns"
+          path="/studio/multi"
           element={
             <ProtectedRoute>
               <AppLayoutWithSidebar>
-                <Campaigns />
+                <StudioMulti />
               </AppLayoutWithSidebar>
             </ProtectedRoute>
           }
