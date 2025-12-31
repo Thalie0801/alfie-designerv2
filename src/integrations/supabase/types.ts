@@ -1300,6 +1300,102 @@ export type Database = {
         }
         Relationships: []
       }
+      identity_anchors: {
+        Row: {
+          anchor_type: string
+          brand_id: string | null
+          constraints_json: Json | null
+          created_at: string
+          id: string
+          name: string
+          ref_image_url: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          anchor_type?: string
+          brand_id?: string | null
+          constraints_json?: Json | null
+          created_at?: string
+          id?: string
+          name: string
+          ref_image_url: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          anchor_type?: string
+          brand_id?: string | null
+          constraints_json?: Json | null
+          created_at?: string
+          id?: string
+          name?: string
+          ref_image_url?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "identity_anchors_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "identity_anchors_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
+          },
+        ]
+      }
+      job_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          job_id: string
+          message: string | null
+          metadata: Json | null
+          step_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          job_id: string
+          message?: string | null
+          metadata?: Json | null
+          step_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          job_id?: string
+          message?: string | null
+          metadata?: Json | null
+          step_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_events_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "job_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_events_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "job_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_queue: {
         Row: {
           attempts: number
@@ -1437,6 +1533,65 @@ export type Database = {
             columns: ["style_ref_asset_id"]
             isOneToOne: false
             referencedRelation: "media_generations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_steps: {
+        Row: {
+          attempt: number
+          created_at: string
+          ended_at: string | null
+          error: string | null
+          id: string
+          input_json: Json | null
+          job_id: string
+          max_attempts: number
+          output_json: Json | null
+          started_at: string | null
+          status: string
+          step_index: number
+          step_type: string
+          updated_at: string
+        }
+        Insert: {
+          attempt?: number
+          created_at?: string
+          ended_at?: string | null
+          error?: string | null
+          id?: string
+          input_json?: Json | null
+          job_id: string
+          max_attempts?: number
+          output_json?: Json | null
+          started_at?: string | null
+          status?: string
+          step_index?: number
+          step_type: string
+          updated_at?: string
+        }
+        Update: {
+          attempt?: number
+          created_at?: string
+          ended_at?: string | null
+          error?: string | null
+          id?: string
+          input_json?: Json | null
+          job_id?: string
+          max_attempts?: number
+          output_json?: Json | null
+          started_at?: string | null
+          status?: string
+          step_index?: number
+          step_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_steps_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "job_queue"
             referencedColumns: ["id"]
           },
         ]
@@ -3053,8 +3208,22 @@ export type Database = {
           user_id: string
         }[]
       }
+      claim_next_step: {
+        Args: { p_job_id?: string }
+        Returns: {
+          input_json: Json
+          job_id: string
+          step_id: string
+          step_index: number
+          step_type: string
+        }[]
+      }
       cleanup_expired_assets: { Args: never; Returns: undefined }
       cleanup_old_password_reset_requests: { Args: never; Returns: undefined }
+      complete_step_and_queue_next: {
+        Args: { p_output_json?: Json; p_step_id: string }
+        Returns: boolean
+      }
       consume_visuals: {
         Args: {
           brand_id_param: string
@@ -3076,6 +3245,10 @@ export type Database = {
           p_woofs?: number
         }
         Returns: undefined
+      }
+      fail_step: {
+        Args: { p_error: string; p_step_id: string }
+        Returns: string
       }
       generate_affiliate_slug: {
         Args: { affiliate_id: string; affiliate_name: string }
