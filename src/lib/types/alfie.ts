@@ -40,6 +40,7 @@ export interface UnifiedAlfieIntent {
   prompt: string;
   durationSeconds?: number; // vidéos uniquement
   referenceImageUrl?: string;
+  referenceImages?: string[]; // 1-3 reference images for style guidance
   generatedTexts?: GeneratedTexts;
   useBrandKit?: boolean;
   visualStyle?: VisualStyle; // Style visuel pour la génération d'images

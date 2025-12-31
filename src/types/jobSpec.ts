@@ -98,6 +98,9 @@ export const JobSpecV1 = z.object({
   // Format master
   ratio_master: z.enum(['9:16', '1:1', '16:9', '4:5', '2:3', 'yt-thumb']).default('9:16'),
 
+  // Images de référence (1-3 URLs)
+  reference_images: z.array(z.string().url()).max(3).optional(),
+
   // Pour vidéos
   duration_total: z.number().optional(),
   clip_count: z.number().optional(),

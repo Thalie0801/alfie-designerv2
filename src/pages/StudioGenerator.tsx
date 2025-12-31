@@ -23,6 +23,7 @@ import { WOOF_COSTS } from "@/lib/woofs";
 import { useQueueMonitor } from "@/hooks/useQueueMonitor";
 import { useOrderCompletion } from "@/hooks/useOrderCompletion";
 import { QueueStatus } from "@/components/chat/QueueStatus";
+import { ReferenceImageUploader } from "@/components/studio/ReferenceImageUploader";
 
 type AssetType = "image" | "carousel" | "video";
 type Platform = "instagram" | "tiktok" | "linkedin" | "pinterest" | "youtube";
@@ -96,11 +97,15 @@ export function StudioGenerator() {
   const [visualStyleCategory, setVisualStyleCategory] = useState<'background' | 'character' | 'product'>('character');
   const [backgroundOnly, setBackgroundOnly] = useState(false);
 
+  // Reference images (1-3)
+  const [referenceImages, setReferenceImages] = useState<string[]>([]);
+
   // Pré-remplir depuis PromptOptimizer ou autre source
   useEffect(() => {
     const state = location.state as { 
       prefillPrompt?: string; 
       contentType?: AssetType;
+      referenceImages?: string[];
     } | null;
     
     if (state?.prefillPrompt) {
@@ -110,9 +115,13 @@ export function StudioGenerator() {
     if (state?.contentType) {
       setSelectedType(state.contentType);
     }
+
+    if (state?.referenceImages?.length) {
+      setReferenceImages(state.referenceImages);
+    }
     
     // Nettoyer le state pour éviter de re-remplir si l'utilisateur revient
-    if (state?.prefillPrompt || state?.contentType) {
+    if (state?.prefillPrompt || state?.contentType || state?.referenceImages?.length) {
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
@@ -191,6 +200,9 @@ export function StudioGenerator() {
         useBrandKit: useBrandKitToggle,
         visualStyle,
         durationSeconds: selectedType === "video" ? 6 : undefined,
+        // Reference images
+        referenceImageUrl: referenceImages[0], // Primary reference
+        referenceImages, // All references
         // Options carrousels
         ...(selectedType === "carousel" && {
           visualStyleCategory,
@@ -404,7 +416,12 @@ export function StudioGenerator() {
                 />
               </div>
 
-              {/* Platform, Ratio & Style */}
+              {/* Reference Images */}
+              <ReferenceImageUploader
+                images={referenceImages}
+                onImagesChange={setReferenceImages}
+                maxImages={3}
+              />
               <div className="grid grid-cols-2 gap-4">
                 <div data-tour-id="studio-platform-select">
                   <label className="font-semibold text-sm block mb-2">Plateforme</label>
