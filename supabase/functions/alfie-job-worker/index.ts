@@ -1472,6 +1472,29 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       console.log("[processGenerateVideo] 🎵 Audio cues added to prompt");
     }
     
+    // ✅ LANGUAGE INSTRUCTIONS: Injecter la langue du personnage (français par défaut pour utilisateurs FR)
+    const language = payload.language || 'French';
+    const presenterGender = payload.presenterGender || null;
+    
+    if (language === 'French') {
+      const LANGUAGE_INSTRUCTIONS = 'The character speaks in French language. French dialogue only. Parler en français. Voix française native.';
+      videoPrompt = `${videoPrompt} ${LANGUAGE_INSTRUCTIONS}`;
+      console.log("[processGenerateVideo] 🇫🇷 French language instructions injected");
+    } else if (language === 'English') {
+      const LANGUAGE_INSTRUCTIONS = 'The character speaks in English. English dialogue only.';
+      videoPrompt = `${videoPrompt} ${LANGUAGE_INSTRUCTIONS}`;
+      console.log("[processGenerateVideo] 🇬🇧 English language instructions injected");
+    }
+    
+    // ✅ PRESENTER GENDER: Injecter le genre du présentateur si spécifié
+    if (presenterGender === 'woman') {
+      videoPrompt = `${videoPrompt} Female presenter, woman character speaking.`;
+      console.log("[processGenerateVideo] 👩 Female presenter instructions injected");
+    } else if (presenterGender === 'man') {
+      videoPrompt = `${videoPrompt} Male presenter, man character speaking.`;
+      console.log("[processGenerateVideo] 👨 Male presenter instructions injected");
+    }
+    
     // ✅ LIP-SYNC NATIF VEO 3.1: Injecter instructions spécifiques pour personnages parlants
     const useLipSync = payload.useLipSync === true;
     
@@ -1604,7 +1627,8 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
             voiceoverUrl,
             musicUrl,
             voiceoverVolume: 100,
-            musicVolume: 35,
+            musicVolume: 20, // ✅ Réduit de 35 à 20 pour un meilleur équilibre
+            originalVideoVolume: 30, // ✅ Réduit le volume audio VEO natif (voix personnage + musique)
           }, 60_000);
           
           if (mixResult?.mixedVideoUrl) {
