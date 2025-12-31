@@ -844,8 +844,8 @@ async function generateGcsSignedUrl(
       // 3. Appeler VEO 3 API (long-running operation)
       const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${VEO3_MODEL}:predictLongRunning`;
 
-      // ✅ Negative prompts pour éviter le texte généré dans la vidéo
-      const VEO_NEGATIVE_PROMPT = "No text, no letters, no words, no paragraphs, no subtitles, no UI labels, no watermark, no logo, no writing, no captions, no numbers on screen. Only pure visual footage.";
+      // ✅ Negative prompts pour éviter le texte ET le split-screen
+      const VEO_NEGATIVE_PROMPT = "Single full-screen shot only. NO split-screen, NO collage, NO multi-panel, NO stacked scenes, NO triptych, NO picture-in-picture. No text, no letters, no words, no paragraphs, no subtitles, no UI labels, no watermark, no logo, no writing, no captions, no numbers on screen. Only pure visual footage.";
       
       // ✅ Nettoyer le prompt des références au texte
       let cleanPrompt = (prompt || "")

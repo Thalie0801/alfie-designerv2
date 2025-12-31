@@ -1373,8 +1373,32 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
     }
 
     // ✅ PIPELINE "IMAGE FIRST": Générer l'image de référence SI pas déjà fournie
+    // ✅ FIX: IDENTITY ANCHOR CACHE - Réutiliser l'image du clip 1 pour les clips suivants (cohérence personnage)
     let effectiveReferenceImageUrl = referenceImageUrl;
     
+    // 1. Chercher une identity anchor en cache si multi-clip (clip 2+)
+    if (!effectiveReferenceImageUrl && payload.scriptGroup && payload.clipIndex > 1) {
+      console.log("[processGenerateVideo] 🔄 Multi-clip mode (clip", payload.clipIndex, ") - checking identity anchor cache...");
+      try {
+        const cacheKey = `identity:${payload.scriptGroup}`;
+        const { data: cached } = await supabaseAdmin
+          .from("alfie_cache")
+          .select("response")
+          .eq("prompt_hash", cacheKey)
+          .eq("prompt_type", "identity_anchor")
+          .maybeSingle();
+        
+        const cachedUrl = (cached?.response as any)?.imageUrl;
+        if (typeof cachedUrl === "string" && cachedUrl.startsWith("http")) {
+          effectiveReferenceImageUrl = cachedUrl;
+          console.log("[processGenerateVideo] ✅ Using cached identity anchor:", cachedUrl.slice(0, 80));
+        }
+      } catch (e) {
+        console.warn("[processGenerateVideo] ⚠️ Identity anchor cache lookup failed:", e);
+      }
+    }
+    
+    // 2. Générer une nouvelle image si pas déjà fournie
     if (!effectiveReferenceImageUrl && prompt) {
       console.log("[processGenerateVideo] 🖼️ IMAGE FIRST: Generating reference image...");
       
@@ -1399,6 +1423,23 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
         if (imageResult?.imageUrl) {
           effectiveReferenceImageUrl = imageResult.imageUrl;
           console.log("[processGenerateVideo] ✅ Reference image generated:", effectiveReferenceImageUrl.slice(0, 80));
+          
+          // 3. Stocker en cache si c'est le premier clip d'un batch multi-clip
+          if (payload.scriptGroup && payload.clipIndex === 1) {
+            console.log("[processGenerateVideo] 📦 Storing identity anchor in cache for scriptGroup:", payload.scriptGroup);
+            try {
+              const cacheKey = `identity:${payload.scriptGroup}`;
+              await supabaseAdmin.from("alfie_cache").upsert({
+                prompt_hash: cacheKey,
+                prompt_type: "identity_anchor",
+                response: { imageUrl: effectiveReferenceImageUrl, orderId },
+                usage_count: 1,
+              }, { onConflict: "prompt_hash" });
+              console.log("[processGenerateVideo] ✅ Identity anchor cached for future clips");
+            } catch (e) {
+              console.warn("[processGenerateVideo] ⚠️ Identity anchor cache write failed:", e);
+            }
+          }
         } else {
           console.warn("[processGenerateVideo] ⚠️ Image generation returned no URL, continuing with text-to-video");
         }
@@ -1440,12 +1481,26 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       }
       videoPrompt = `Product showcase video. Smooth camera movement around the product. Professional ${brandMini?.niche || 'e-commerce'} setting. Premium lighting, subtle motion.${textInstruction} Pure visual footage.`;
     } else if (effectiveReferenceImageUrl) {
-      // ✅ IMAGE FIRST: Animation d'image - prompt simplifié pour Veo
-      videoPrompt = `Animate this scene smoothly. Cinematic camera motion. Professional quality. ${brandMini?.niche || 'business'} context. NO TEXT, NO LETTERS, NO WORDS visible. Pure visual footage.`;
+      // ✅ IMAGE FIRST: Animation d'image - prompt simplifié pour Veo + ANTI SPLIT-SCREEN
+      videoPrompt = `SINGLE CONTINUOUS SHOT. Animate this scene smoothly. Cinematic camera motion. Professional quality. ${brandMini?.niche || 'business'} context. NO split-screen, NO collage, NO multi-panel layout. NO TEXT, NO LETTERS, NO WORDS visible. Pure visual footage.`;
       console.log("[processGenerateVideo] 🎬 Image-to-video animation mode");
     } else {
       // Mode FOND/NORMAL - utiliser buildVideoPrompt avec textOverlay
       videoPrompt = buildVideoPrompt(payload, useBrandKit, brandMini, textForVideo);
+    }
+    
+    // ✅ ANTI SPLIT-SCREEN: Ajouter systématiquement l'instruction single-shot à tous les prompts
+    if (!videoPrompt.includes("SINGLE CONTINUOUS SHOT")) {
+      videoPrompt = `SINGLE CONTINUOUS SHOT. ${videoPrompt}`;
+    }
+    if (!videoPrompt.includes("NO split-screen")) {
+      videoPrompt += " NO split-screen, NO collage, NO multi-panel, NO stacked scenes.";
+    }
+    
+    // ✅ IDENTITY LOCK: Ajouter instruction de cohérence personnage si multi-clip
+    if (payload.scriptGroup && payload.clipIndex > 1 && effectiveReferenceImageUrl) {
+      videoPrompt += " Strict identity lock: match the reference image exactly. Same person, same outfit, same setting.";
+      console.log("[processGenerateVideo] 🔒 Identity lock instruction added for clip", payload.clipIndex);
     }
 
     // ✅ ENRICHIR avec Brand Kit (couleurs, niche, mood) directement dans le prompt
@@ -1665,8 +1720,9 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       }
       
       // 3. Mixer audio + vidéo via Cloudinary si on a du contenu audio
+      // ✅ FIX: STRIP VEO AUDIO - Mettre originalVideoVolume à 0 pour éviter le doublon audio
       if (voiceoverUrl || musicUrl) {
-        console.log("[processGenerateVideo] 🎬 Mixing audio with video...");
+        console.log("[processGenerateVideo] 🎬 Mixing audio with video (stripping VEO audio)...");
         
         try {
           const mixResult = await callFn<any>("mix-audio-video", {
@@ -1674,13 +1730,13 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
             voiceoverUrl,
             musicUrl,
             voiceoverVolume: 100,
-            musicVolume: 20, // ✅ Réduit de 35 à 20 pour un meilleur équilibre
-            originalVideoVolume: 30, // ✅ Réduit le volume audio VEO natif (voix personnage + musique)
+            musicVolume: 15, // ✅ Réduit à 15 pour meilleur équilibre voix/musique
+            originalVideoVolume: 0, // ✅ FIX: STRIP audio VEO natif pour éviter doublon
           }, 60_000);
           
           if (mixResult?.mixedVideoUrl) {
             finalVideoUrl = mixResult.mixedVideoUrl;
-            console.log("[processGenerateVideo] ✅ Audio mixed successfully:", finalVideoUrl.slice(0, 60));
+            console.log("[processGenerateVideo] ✅ Audio mixed successfully (VEO audio stripped):", finalVideoUrl.slice(0, 60));
           } else {
             console.warn("[processGenerateVideo] ⚠️ Mix returned no URL, using original video");
           }

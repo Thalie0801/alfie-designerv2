@@ -48,15 +48,19 @@ function buildMixedVideoUrl(
   voiceoverPublicId?: string,
   musicPublicId?: string,
   voiceoverVolume: number = 100,
-  musicVolume: number = 20,
-  originalVideoVolume: number = 30,
+  musicVolume: number = 15,
+  originalVideoVolume: number = 0, // ✅ FIX: Default to 0 (strip VEO audio) to avoid doubled audio
   format: string = "mp4"
 ): string {
   const baseUrl = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/video/upload`;
   const transformations: string[] = [];
 
-  // ✅ Réduire le volume audio de la vidéo source (VEO natif: voix personnage + musique)
-  if (originalVideoVolume < 100) {
+  // ✅ FIX: Strip ou réduire l'audio de la vidéo source (VEO natif)
+  if (originalVideoVolume === 0) {
+    // MUTE completement l'audio VEO pour éviter le doublon
+    transformations.push(`ac_none`);
+    console.log("[buildMixedVideoUrl] 🔇 Stripping VEO audio completely (ac_none)");
+  } else if (originalVideoVolume < 100) {
     transformations.push(`e_volume:${originalVideoVolume}`);
   }
 
