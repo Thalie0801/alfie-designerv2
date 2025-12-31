@@ -176,7 +176,8 @@ export function getStepTypesForKind(kind: JobKindType): string[] {
   }
 }
 
-// Helper pour calculer le coût en Woofs
+// Helper pour calculer le coût en Woofs (aligné sur src/lib/woofs.ts)
+// image = 1 Woof, carousel = 10 Woofs, video_premium = 25 Woofs
 export function calculateWoofsCost(spec: JobSpecV1Type): number {
   let cost = 0;
 
@@ -185,29 +186,24 @@ export function calculateWoofsCost(spec: JobSpecV1Type): number {
       cost = 1;
       break;
     case 'multi_image':
-      cost = spec.image_count || spec.prompts?.length || 1;
+      cost = (spec.image_count || spec.prompts?.length || 1) * 1;
       break;
     case 'carousel':
-      cost = Math.ceil((spec.slides_count || spec.slides?.length || 5) / 2);
+      // Coût fixe de 10 Woofs par carrousel (aligné sur WOOF_COSTS.carousel)
+      cost = 10;
       break;
     case 'multi_clip_video':
+      // 25 Woofs par clip vidéo (aligné sur WOOF_COSTS.video_premium)
       const clipCount = spec.clip_count || spec.beats?.length || 1;
-      const durationPerClip = spec.beats?.[0]?.durationSec || 8;
-      // 1 woof pour ≤8s, 2 pour ≤15s, 4 pour ≤30s, 8 pour ≤60s
-      const woofPerClip = durationPerClip <= 8 ? 1 : durationPerClip <= 15 ? 2 : durationPerClip <= 30 ? 4 : 8;
-      cost = clipCount * woofPerClip;
-      if (spec.audio?.voiceover_enabled) cost += 1;
-      if (spec.audio?.music_enabled) cost += 1;
+      cost = clipCount * 25;
       break;
     case 'campaign_pack':
-      // Base vidéo
-      cost = calculateWoofsCost({ ...spec, kind: 'multi_clip_video' });
-      // + variants
-      const variantCount = spec.deliverables.filter(d => d.startsWith('variant_')).length;
-      cost += variantCount;
-      // + thumbs
-      const thumbCount = spec.deliverables.filter(d => d.startsWith('thumb_')).length;
-      cost += Math.ceil(thumbCount / 3);
+      // Calcul composite: images + carousels + videos
+      const imagesCost = (spec.image_count || 0) * 1;
+      // slides_count / 5 ≈ nombre de carrousels, chacun = 10 Woofs
+      const carouselsCost = Math.ceil((spec.slides_count || 0) / 5) * 10;
+      const videosCost = (spec.clip_count || 0) * 25;
+      cost = imagesCost + carouselsCost + videosCost;
       break;
   }
 
