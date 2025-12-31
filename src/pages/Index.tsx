@@ -2,7 +2,9 @@ import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { LandingHeader } from "@/components/LandingHeader";
 import { HeroVideoSection } from "@/components/landing/HeroVideoSection";
+import { WorkflowSection } from "@/components/landing/WorkflowSection";
 import { DemoSection } from "@/components/landing/DemoSection";
+import { StudiosSection } from "@/components/landing/StudiosSection";
 import { CategoryGallerySection } from "@/components/landing/CategoryGallerySection";
 import { FeatureCardsSection } from "@/components/landing/FeatureCardsSection";
 import { WhyAlfieSection } from "@/components/landing/WhyAlfieSection";
@@ -47,7 +49,9 @@ export default function AlfieLanding() {
         </p>
       </motion.section>
       
+      <WorkflowSection />
       <DemoSection />
+      <StudiosSection />
       <CategoryGallerySection />
       <FeatureCardsSection />
       <WhyAlfieSection />

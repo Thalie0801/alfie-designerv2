@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Image, Layers, Layout, ArrowRight } from "lucide-react";
+import { Image, Layers, Layout, Film, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { trackEvent } from "@/utils/trackEvent";
 
@@ -29,12 +29,13 @@ import storySpa from "@/assets/gallery/story-spa.png";
 import storyRing from "@/assets/gallery/story-ring.png";
 import storySilk from "@/assets/gallery/story-silk.png";
 
-type Category = "images" | "carousels" | "stories";
+type Category = "images" | "carousels" | "stories" | "videos";
 
 const categories = [
   { id: "images" as Category, label: "Images", icon: Image },
   { id: "carousels" as Category, label: "Carrousels", icon: Layers },
   { id: "stories" as Category, label: "Stories", icon: Layout },
+  { id: "videos" as Category, label: "Mini-Films", icon: Film },
 ];
 
 // Mapping des images par catégorie
@@ -64,6 +65,14 @@ const categoryImages: Record<Category, (string | null)[]> = {
     storyRing,       // Bijou tech
     storySilk,       // Foulard soie
   ],
+  videos: [
+    null, // Placeholder - Mini-film Lancement
+    null, // Placeholder - Mini-film Promo
+    null, // Placeholder - Mini-film Evergreen
+    null, // Placeholder - Mini-film Produit
+    null, // Placeholder - Mini-film Témoignage
+    null, // Placeholder - Mini-film Story
+  ],
 };
 
 const galleryItems: Record<Category, { title: string; description: string }[]> = {
@@ -90,6 +99,14 @@ const galleryItems: Record<Category, { title: string; description: string }[]> =
     { title: "Story Spa", description: "Bien-être & relaxation" },
     { title: "Story Ring", description: "Bijou tech lumineux" },
     { title: "Story Silk", description: "Foulard édition limitée" },
+  ],
+  videos: [
+    { title: "Mini-Film Lancement", description: "3 scènes avec lip-sync" },
+    { title: "Mini-Film Promo", description: "Offre spéciale animée" },
+    { title: "Mini-Film Evergreen", description: "Contenu intemporel" },
+    { title: "Mini-Film Produit", description: "Mise en avant produit" },
+    { title: "Mini-Film Témoignage", description: "Social proof animé" },
+    { title: "Mini-Film Story", description: "Format 9:16 vertical" },
   ],
 };
 
@@ -186,9 +203,9 @@ export function CategoryGallerySection() {
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="w-10 h-10 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-white/80 shadow-lg flex items-center justify-center">
                           {activeCategory === "images" && <Image className="h-5 w-5 sm:h-8 sm:w-8 text-slate-400" />}
-                          
                           {activeCategory === "carousels" && <Layers className="h-5 w-5 sm:h-8 sm:w-8 text-slate-400" />}
                           {activeCategory === "stories" && <Layout className="h-5 w-5 sm:h-8 sm:w-8 text-slate-400" />}
+                          {activeCategory === "videos" && <Film className="h-5 w-5 sm:h-8 sm:w-8 text-slate-400" />}
                         </div>
                       </div>
                     </>
