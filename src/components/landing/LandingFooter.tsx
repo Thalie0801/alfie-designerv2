@@ -1,6 +1,9 @@
 import logoBlack from "@/assets/alfie-logo-black.svg";
 import logoWhite from "@/assets/alfie-logo-white.svg";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Facebook, MessageCircle } from "lucide-react";
+
+const FACEBOOK_COMMUNITY = "https://www.facebook.com/groups/4851359094985657";
+const WHATSAPP_COMMUNITY = "https://chat.whatsapp.com/HSqUJEeaugS4wVU2gyaJbs";
 
 export function LandingFooter() {
   return (
@@ -11,7 +14,7 @@ export function LandingFooter() {
           <p className="mt-4 text-sm text-white/80">L'agent IA qui transforme tes idées en designs professionnels</p>
         </div>
 
-        <div className="grid gap-8 md:grid-cols-4">
+        <div className="grid gap-8 md:grid-cols-5">
           <div>
             <div className="mb-4 flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-alfie-mint via-alfie-lilac to-alfie-pink">
@@ -67,6 +70,34 @@ export function LandingFooter() {
           </div>
 
           <div>
+            <h4 className="mb-4 font-semibold">Communauté</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>
+                <a 
+                  href={FACEBOOK_COMMUNITY} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 transition-colors hover:text-foreground"
+                >
+                  <Facebook className="h-4 w-4" />
+                  Groupe Facebook
+                </a>
+              </li>
+              <li>
+                <a 
+                  href={WHATSAPP_COMMUNITY} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 transition-colors hover:text-foreground"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  Groupe WhatsApp
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div>
             <h4 className="mb-4 font-semibold">Légal</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
@@ -82,7 +113,6 @@ export function LandingFooter() {
             </ul>
           </div>
         </div>
-
         <div className="border-t border-border/50 pt-8 text-center text-sm text-muted-foreground">
           <div className="flex flex-col items-center gap-4">
             <img src={logoBlack} alt="Alfie Designer" className="h-10 w-auto dark:hidden" />
