@@ -13,6 +13,7 @@ import {
   Sparkles,
   Palette,
   BookOpen,
+  Rocket,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
@@ -49,6 +50,7 @@ export function AppSidebar() {
     tourId?: string;
   }> = [
     { path: "/studio", label: "Studio", icon: Sparkles, tourId: "studio" },
+    { path: "/studio/campaigns", label: "Campagnes", icon: Rocket, badge: "Nouveau" },
     { path: "/brand-kit", label: "Brand Kit", icon: Palette },
     { path: "/templates", label: "Catalogue", icon: Layers, badge: "Bientôt" },
     { path: "/library", label: "Bibliothèque", icon: FolderOpen, tourId: "library" },
