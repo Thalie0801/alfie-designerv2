@@ -226,12 +226,18 @@ Aspect ratio: ${ratio || '9:16'}`;
 }
 
 async function handleAnimateClip(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { keyframeUrl, visualPrompt, identityAnchorId, ratio, durationSeconds, sceneIndex } = input;
+  const { keyframeUrl, visualPrompt, identityAnchorId, ratio, durationSeconds, sceneIndex, userId, brandId } = input;
   
-  console.log(`[animate_clip] Animating scene ${sceneIndex} with VEO 3.1, keyframe: ${keyframeUrl}`);
+  console.log(`[animate_clip] Animating scene ${sceneIndex} with VEO 3.1`);
+  console.log(`[animate_clip] userId: ${userId}, brandId: ${brandId}`);
+  console.log(`[animate_clip] keyframe: ${keyframeUrl}`);
 
   if (!keyframeUrl) {
     throw new Error('Missing keyframeUrl for animate_clip step');
+  }
+
+  if (!userId) {
+    throw new Error('Missing userId for animate_clip step');
   }
 
   // Récupérer les contraintes de l'anchor
@@ -263,6 +269,8 @@ CRITICAL FRAME RULES:
 
   // Appeler generate-video avec provider veo3 (endpoint correct)
   const veoPayload = {
+    userId,
+    brandId,
     prompt: enrichedPrompt,
     referenceImageUrl: keyframeUrl,
     aspectRatio: ratio || '9:16',
@@ -275,6 +283,7 @@ CRITICAL FRAME RULES:
     headers: {
       'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
       'Content-Type': 'application/json',
+      'X-Internal-Secret': INTERNAL_FN_SECRET,
     },
     body: JSON.stringify(veoPayload),
   });
