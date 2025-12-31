@@ -527,9 +527,17 @@ async function executeStep(stepType: string, input: Record<string, unknown>): Pr
 // =====================================================
 
 async function handleGenImage(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { prompt, ratio, visualStyle, identityAnchorId } = input;
+  const { prompt, ratio, visualStyle, identityAnchorId, userId, brandId, useBrandKit } = input;
   
+  console.log(`[gen_image] userId: ${userId}, brandId: ${brandId}, useBrandKit: ${useBrandKit}`);
   console.log(`[gen_image] Generating image with prompt: ${String(prompt).substring(0, 100)}...`);
+
+  // Charger le Brand Kit si activé
+  let brandKit: Record<string, unknown> | null = null;
+  if (useBrandKit !== false && brandId) {
+    brandKit = await loadBrandKit(String(brandId));
+    console.log(`[gen_image] Loaded brandKit: ${brandKit?.name || 'none'}`);
+  }
 
   const response = await fetch(`${SUPABASE_URL}/functions/v1/alfie-generate-ai-image`, {
     method: 'POST',
@@ -539,6 +547,10 @@ async function handleGenImage(input: Record<string, unknown>): Promise<Record<st
       'X-Internal-Secret': INTERNAL_FN_SECRET,
     },
     body: JSON.stringify({
+      userId,
+      brandId,
+      brandKit,
+      useBrandKit,
       prompt,
       ratio: ratio || '9:16',
       visualStyle: visualStyle || 'photorealistic',
@@ -561,9 +573,17 @@ async function handleGenImage(input: Record<string, unknown>): Promise<Record<st
 }
 
 async function handleGenSlide(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { slideIndex, slide, ratio, visualStyle } = input;
+  const { slideIndex, slide, ratio, visualStyle, userId, brandId, useBrandKit } = input;
   
+  console.log(`[gen_slide] userId: ${userId}, brandId: ${brandId}, useBrandKit: ${useBrandKit}`);
   console.log(`[gen_slide] Generating slide ${slideIndex}`);
+
+  // Charger le Brand Kit si activé
+  let brandKit: Record<string, unknown> | null = null;
+  if (useBrandKit !== false && brandId) {
+    brandKit = await loadBrandKit(String(brandId));
+    console.log(`[gen_slide] Loaded brandKit: ${brandKit?.name || 'none'}`);
+  }
 
   const slideData = slide as Record<string, unknown> | undefined;
   const prompt = slideData?.visualPrompt || slideData?.titleOnImage || 'Professional slide background';
@@ -576,6 +596,10 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
       'X-Internal-Secret': INTERNAL_FN_SECRET,
     },
     body: JSON.stringify({
+      userId,
+      brandId,
+      brandKit,
+      useBrandKit,
       prompt,
       slideIndex,
       slide: slideData,
