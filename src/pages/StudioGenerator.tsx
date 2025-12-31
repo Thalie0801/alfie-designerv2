@@ -97,6 +97,10 @@ export function StudioGenerator() {
   const [visualStyleCategory, setVisualStyleCategory] = useState<'background' | 'character' | 'product'>('character');
   const [backgroundOnly, setBackgroundOnly] = useState(false);
 
+  // Video options
+  const [musicEnabled, setMusicEnabled] = useState(true);
+  const [lipSyncEnabled, setLipSyncEnabled] = useState(false);
+
   // Reference images (1-3)
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
 
@@ -549,6 +553,33 @@ export function StudioGenerator() {
                       <p className="text-xs text-muted-foreground">Sans texte intégré</p>
                     </div>
                     <Switch checked={backgroundOnly} onCheckedChange={setBackgroundOnly} />
+                  </div>
+                </div>
+              )}
+
+              {/* Options vidéo uniquement */}
+              {selectedType === "video" && (
+                <div className="space-y-4 p-4 bg-primary/5 rounded-lg border border-primary/20" data-tour-id="studio-video-options">
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    🎬 Options vidéo
+                  </p>
+                  
+                  {/* Toggle Musique */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">Musique de fond</p>
+                      <p className="text-xs text-muted-foreground">Musique générée par ElevenLabs</p>
+                    </div>
+                    <Switch checked={musicEnabled} onCheckedChange={setMusicEnabled} />
+                  </div>
+
+                  {/* Toggle Lip-Sync */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">Lip-Sync</p>
+                      <p className="text-xs text-muted-foreground">Personnage de face, lèvres synchronisées</p>
+                    </div>
+                    <Switch checked={lipSyncEnabled} onCheckedChange={setLipSyncEnabled} />
                   </div>
                 </div>
               )}
