@@ -2,8 +2,9 @@
  * Studio Multi - Page de création pour contenus multi-éléments
  * Tab "Mini-Film" (vidéos multi-clips) et Tab "Pack Campagne" (images + carrousels + vidéos)
  */
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import type { MiniFilmScene } from '@/hooks/usePromptOptimizer';
 import { useAuth } from '@/hooks/useAuth';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { useQueueMonitor } from '@/hooks/useQueueMonitor';
@@ -64,9 +65,53 @@ type DeliverableId = typeof DELIVERABLE_OPTIONS[number]['id'];
 
 export default function StudioMulti() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { activeBrand } = useBrandKit();
   const { data: queueData } = useQueueMonitor(!!user?.id && !!activeBrand?.id);
+
+  // Pre-fill from Prompt Optimizer navigation
+  useEffect(() => {
+    const state = location.state as {
+      prefillPrompt?: string;
+      contentType?: 'mini-film' | 'carousel' | 'video' | 'image';
+      scenes?: MiniFilmScene[];
+      referenceImages?: string[];
+    } | null;
+    
+    if (!state) return;
+    
+    // Pre-fill script with optimized prompt
+    if (state.prefillPrompt) {
+      setScript(state.prefillPrompt);
+    }
+    
+    // If Mini-Film scenes available, pre-fill clip count and duration
+    if (state.scenes?.length) {
+      setClipCount(state.scenes.length);
+      const avgDuration = Math.round(
+        state.scenes.reduce((sum, s) => sum + s.durationSec, 0) / state.scenes.length
+      );
+      if ([5, 8, 10].includes(avgDuration)) {
+        setDurationPerClip(avgDuration);
+      }
+    }
+    
+    // Pre-fill reference images
+    if (state.referenceImages?.length) {
+      setReferenceImages(state.referenceImages);
+    }
+    
+    // Force Mini-Film tab if contentType is mini-film
+    if (state.contentType === 'mini-film') {
+      setActiveTab('mini-film');
+    }
+    
+    // Clear state to prevent re-fill on navigation
+    if (state.prefillPrompt || state.scenes || state.referenceImages?.length) {
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
   
   const [activeTab, setActiveTab] = useState<'mini-film' | 'pack-campagne'>('mini-film');
   const [loading, setLoading] = useState(false);
