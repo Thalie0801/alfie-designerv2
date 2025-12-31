@@ -1481,26 +1481,39 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       }
       videoPrompt = `Product showcase video. Smooth camera movement around the product. Professional ${brandMini?.niche || 'e-commerce'} setting. Premium lighting, subtle motion.${textInstruction} Pure visual footage.`;
     } else if (effectiveReferenceImageUrl) {
-      // ✅ IMAGE FIRST: Animation d'image - prompt simplifié pour Veo + ANTI SPLIT-SCREEN
-      videoPrompt = `SINGLE CONTINUOUS SHOT. Animate this scene smoothly. Cinematic camera motion. Professional quality. ${brandMini?.niche || 'business'} context. NO split-screen, NO collage, NO multi-panel layout. NO TEXT, NO LETTERS, NO WORDS visible. Pure visual footage.`;
-      console.log("[processGenerateVideo] 🎬 Image-to-video animation mode");
+      // ✅ IMAGE FIRST: Animation d'image - prompt simplifié pour Veo + ANTI SPLIT-SCREEN RENFORCÉ
+      videoPrompt = `ONE SINGLE FULL-FRAME SHOT. Animate this scene smoothly. Cinematic camera motion. Professional quality. ${brandMini?.niche || 'business'} context. The ENTIRE video frame shows ONE continuous scene only. NO TEXT, NO LETTERS, NO WORDS visible. Pure visual footage.`;
+      console.log("[processGenerateVideo] 🎬 Image-to-video animation mode (anti-collage)");
     } else {
       // Mode FOND/NORMAL - utiliser buildVideoPrompt avec textOverlay
       videoPrompt = buildVideoPrompt(payload, useBrandKit, brandMini, textForVideo);
     }
     
-    // ✅ ANTI SPLIT-SCREEN: Ajouter systématiquement l'instruction single-shot à tous les prompts
-    if (!videoPrompt.includes("SINGLE CONTINUOUS SHOT")) {
-      videoPrompt = `SINGLE CONTINUOUS SHOT. ${videoPrompt}`;
-    }
-    if (!videoPrompt.includes("NO split-screen")) {
-      videoPrompt += " NO split-screen, NO collage, NO multi-panel, NO stacked scenes.";
+    // ✅ ANTI SPLIT-SCREEN RENFORCÉ: Instructions explicites contre le collage/storyboard
+    const ANTI_COLLAGE_INSTRUCTION = `
+CRITICAL FRAME RULES:
+- ONE SINGLE FULL-FRAME SHOT occupying the entire screen
+- The ENTIRE video is ONE continuous scene, NOT a montage
+- NO split-screen, NO side-by-side panels, NO grid layout
+- NO stacked scenes, NO collage, NO triptych, NO multi-panel
+- NO storyboard layout, NO picture-in-picture, NO embedded frames
+- NO borders, NO dividers between scenes
+- Camera may move but scene is continuous`;
+    
+    if (!videoPrompt.includes("ONE SINGLE FULL-FRAME")) {
+      videoPrompt = `${ANTI_COLLAGE_INSTRUCTION}\n${videoPrompt}`;
     }
     
-    // ✅ IDENTITY LOCK: Ajouter instruction de cohérence personnage si multi-clip
+    // ✅ IDENTITY LOCK (SAFE VERSION): Instructions de cohérence SANS termes interdits par VEO
+    // ÉVITER: "match exactly", "same person", "identical face" → déclenchent CONTENT_POLICY_VIOLATION
     if (payload.scriptGroup && payload.clipIndex > 1 && effectiveReferenceImageUrl) {
-      videoPrompt += " Strict identity lock: match the reference image exactly. Same person, same outfit, same setting.";
-      console.log("[processGenerateVideo] 🔒 Identity lock instruction added for clip", payload.clipIndex);
+      const SAFE_IDENTITY_INSTRUCTIONS = `Maintain visual consistency across scenes:
+        - Keep the same character traits (age range, hairstyle, outfit style, color palette)
+        - Keep the same setting and lighting atmosphere
+        - Maintain wardrobe and accessory continuity
+        - Consistent overall visual style and color grading`;
+      videoPrompt += ` ${SAFE_IDENTITY_INSTRUCTIONS}`;
+      console.log("[processGenerateVideo] 🔒 SAFE identity lock instruction added for clip", payload.clipIndex);
     }
 
     // ✅ ENRICHIR avec Brand Kit (couleurs, niche, mood) directement dans le prompt

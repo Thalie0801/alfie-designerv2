@@ -844,8 +844,18 @@ async function generateGcsSignedUrl(
       // 3. Appeler VEO 3 API (long-running operation)
       const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${VEO3_MODEL}:predictLongRunning`;
 
-      // ✅ Negative prompts pour éviter le texte ET le split-screen
-      const VEO_NEGATIVE_PROMPT = "Single full-screen shot only. NO split-screen, NO collage, NO multi-panel, NO stacked scenes, NO triptych, NO picture-in-picture. No text, no letters, no words, no paragraphs, no subtitles, no UI labels, no watermark, no logo, no writing, no captions, no numbers on screen. Only pure visual footage.";
+      // ✅ NEGATIVE PROMPTS RENFORCÉS pour éviter texte ET split-screen/collage
+      const VEO_NEGATIVE_PROMPT = `
+CRITICAL OUTPUT REQUIREMENTS:
+- ONE SINGLE FULL-FRAME CONTINUOUS SHOT filling the entire screen
+- The ENTIRE video is ONE scene, NOT multiple scenes combined
+- Absolutely NO split-screen, NO side-by-side, NO grid, NO panels
+- NO stacked layout, NO collage, NO triptych, NO multi-view
+- NO storyboard, NO picture-in-picture, NO embedded frames
+- NO borders or dividers between areas
+- Camera may move but scene is continuous and unified
+- No text, no letters, no words, no watermark, no logo, no UI
+Only pure visual footage in one continuous scene.`;
       
       // ✅ Nettoyer le prompt des références au texte
       let cleanPrompt = (prompt || "")
