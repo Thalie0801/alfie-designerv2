@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Sparkles, Image as ImageIcon, LayoutGrid, Video, Info } from "lucide-react";
+import { Sparkles, Image as ImageIcon, LayoutGrid, Video, Info, Palette } from "lucide-react";
+import type { VisualStyle } from "@/lib/types/vision";
+import { VISUAL_STYLE_OPTIONS } from "@/lib/constants/visualStyles";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -86,6 +88,9 @@ export function StudioGenerator() {
   const [isLaunching, setIsLaunching] = useState(false);
   const [woofsAvailable, setWoofsAvailable] = useState(0);
   const [woofsQuota, setWoofsQuota] = useState(0);
+  
+  // Style artistique (pour tous les types)
+  const [visualStyle, setVisualStyle] = useState<VisualStyle>('photorealistic');
   
   // Options carrousels uniquement
   const [visualStyleCategory, setVisualStyleCategory] = useState<'background' | 'character' | 'product'>('character');
@@ -184,6 +189,7 @@ export function StudioGenerator() {
         prompt: brief,
         woofCostType: selectedType === "video" ? "video_premium" : selectedType === "carousel" ? "carousel" : "image",
         useBrandKit: useBrandKitToggle,
+        visualStyle,
         durationSeconds: selectedType === "video" ? 6 : undefined,
         // Options carrousels
         ...(selectedType === "carousel" && {
@@ -398,7 +404,7 @@ export function StudioGenerator() {
                 />
               </div>
 
-              {/* Platform & Ratio */}
+              {/* Platform, Ratio & Style */}
               <div className="grid grid-cols-2 gap-4">
                 <div data-tour-id="studio-platform-select">
                   <label className="font-semibold text-sm block mb-2">Plateforme</label>
@@ -431,6 +437,26 @@ export function StudioGenerator() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              {/* Style artistique */}
+              <div data-tour-id="studio-visual-style">
+                <label className="font-semibold text-sm flex items-center gap-2 mb-2">
+                  <Palette className="w-4 h-4" />
+                  Style artistique
+                </label>
+                <Select value={visualStyle} onValueChange={(v) => setVisualStyle(v as VisualStyle)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VISUAL_STYLE_OPTIONS.map((style) => (
+                      <SelectItem key={style.value} value={style.value}>
+                        {style.label} — <span className="text-muted-foreground">{style.description}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Options carrousels uniquement */}
