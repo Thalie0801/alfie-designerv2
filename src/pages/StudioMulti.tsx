@@ -175,19 +175,30 @@ export default function StudioMulti() {
     );
   };
 
-  const calculateMiniFilmCost = () => {
-    const videoCost = clipCount * 25;
-    const variantCount = selectedDeliverables.filter(d => 
+  // Helper pour compter les variantes (utilisé dans le calcul ET l'affichage)
+  const getVariantCount = () => {
+    return selectedDeliverables.filter(d => 
       d.startsWith('variant_') || d.startsWith('thumb_') || d === 'cover'
     ).length;
-    const variantCost = variantCount * 2;
+  };
+
+  // Helper pour lister les variantes cochées
+  const getVariantLabels = () => {
+    return selectedDeliverables
+      .filter(d => d.startsWith('variant_') || d.startsWith('thumb_') || d === 'cover')
+      .map(d => DELIVERABLE_OPTIONS.find(o => o.id === d)?.label || d);
+  };
+
+  const calculateMiniFilmCost = () => {
+    const videoCost = clipCount * 25;
+    const variantCost = getVariantCount() * 2;
     return videoCost + variantCost;
   };
 
   const calculatePackCost = () => {
     const imageCost = imageCount * 1;
-    const carouselCost = carouselCount * 10; // 10 Woofs par carrousel (aligné sur WOOF_COSTS)
-    const videoCost = videoCount * 25; // 25 Woofs par vidéo
+    const carouselCost = carouselCount * 10;
+    const videoCost = videoCount * 25;
     return imageCost + carouselCost + videoCost;
   };
 
@@ -197,10 +208,15 @@ export default function StudioMulti() {
       return;
     }
 
-    if (!campaignName.trim() || !script.trim()) {
-      toast.error('Veuillez remplir tous les champs');
+    // Validation avec messages précis
+    if (!script.trim()) {
+      toast.error('Script requis', { description: 'Ajoute un script ou une description pour ton mini-film' });
       return;
     }
+
+    // Auto-remplir le nom si vide
+    const finalCampaignName = campaignName.trim() || `Mini-film ${new Date().toLocaleDateString('fr-FR')}`;
+    setCampaignName(finalCampaignName);
 
     setLoading(true);
 
@@ -217,7 +233,7 @@ export default function StudioMulti() {
         deliverables: selectedDeliverables as JobSpecV1Type['deliverables'],
         use_brand_kit: useBrandKitToggle,
         reference_images: referenceImages.length > 0 ? referenceImages : undefined,
-        campaign_name: campaignName,
+        campaign_name: finalCampaignName,
         tags: ['studio_multi'], // ✅ Tag pour identifier la source
         locks: {
           palette_lock: useBrandKitToggle,
@@ -552,12 +568,17 @@ export default function StudioMulti() {
                 <CardDescription>Sélectionnez les formats à générer</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {DELIVERABLE_OPTIONS.map((option) => {
+              <p className="text-xs text-muted-foreground mb-3 p-2 bg-muted/30 rounded">
+                💡 <strong>Variantes</strong> = formats recadrés + miniatures + couverture (×2 Woofs chacune). Master et ZIP ne comptent pas.
+              </p>
+              {DELIVERABLE_OPTIONS.map((option) => {
                   const Icon = option.icon;
+                  const isVariant = option.id.startsWith('variant_') || option.id.startsWith('thumb_') || option.id === 'cover';
                   return (
                     <div 
                       key={option.id}
-                      className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50"
+                      onClick={() => toggleDeliverable(option.id)}
+                      className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer"
                     >
                       <Checkbox
                         id={option.id}
@@ -568,6 +589,7 @@ export default function StudioMulti() {
                       <div className="flex-1">
                         <Label htmlFor={option.id} className="cursor-pointer">
                           {option.label}
+                          {isVariant && <span className="ml-1 text-xs text-primary">(+2)</span>}
                         </Label>
                         <p className="text-xs text-muted-foreground">
                           {option.description}
@@ -604,37 +626,43 @@ export default function StudioMulti() {
             </CardContent>
           </Card>
 
-          <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50 border">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-lg bg-muted/50 border">
             <div>
               <p className="font-medium">Coût estimé</p>
               <p className="text-2xl font-bold text-primary">{calculateMiniFilmCost()} Woofs</p>
               <p className="text-xs text-muted-foreground">
                 {clipCount} clips × 25
-                {(() => {
-                  const variantCount = selectedDeliverables.filter(d => 
-                    d.startsWith('variant_') || d.startsWith('thumb_') || d === 'cover'
-                  ).length;
-                  return variantCount > 0 ? ` + ${variantCount} variante${variantCount > 1 ? 's' : ''} × 2` : '';
-                })()}
+                {getVariantCount() > 0 && ` + ${getVariantCount()} variante${getVariantCount() > 1 ? 's' : ''} × 2`}
               </p>
-            </div>
-            <Button 
-              size="lg" 
-              onClick={handleSubmitMiniFilm}
-              disabled={loading || !campaignName.trim() || !script.trim()}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Création...
-                </>
-              ) : (
-                <>
-                  <Play className="h-4 w-4 mr-2" />
-                  Lancer le mini-film
-                </>
+              {getVariantCount() > 0 && (
+                <p className="text-xs text-muted-foreground/70 mt-1">
+                  Inclus : {getVariantLabels().join(', ')}
+                </p>
               )}
-            </Button>
+            </div>
+            <div className="flex flex-col items-end gap-1 w-full sm:w-auto">
+              <Button 
+                size="lg" 
+                onClick={handleSubmitMiniFilm}
+                disabled={loading}
+                className="w-full sm:w-auto"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Création...
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4 mr-2" />
+                    Lancer le mini-film
+                  </>
+                )}
+              </Button>
+              {!script.trim() && (
+                <p className="text-xs text-destructive">Ajoute un script pour lancer</p>
+              )}
+            </div>
           </div>
         </TabsContent>
 
