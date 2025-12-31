@@ -200,14 +200,77 @@ export default function StudioMulti() {
     }
   };
 
+  // Packs prédéfinis
+  const loadPreset = (type: 'lancement' | 'evergreen' | 'promo') => {
+    const presets = {
+      lancement: { images: 4, carousels: 1, videos: 1, name: 'Pack Lancement' },
+      evergreen: { images: 3, carousels: 2, videos: 0, name: 'Pack Evergreen' },
+      promo: { images: 2, carousels: 0, videos: 1, name: 'Pack Promo Express' },
+    };
+    const preset = presets[type];
+    setImageCount(preset.images);
+    setCarouselCount(preset.carousels);
+    setVideoCount(preset.videos);
+    setCampaignName(preset.name);
+    setActiveTab('pack-campagne');
+    toast.success(`${preset.name} chargé !`);
+  };
+
   return (
     <div className="container max-w-4xl py-8 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Studio Multi</h1>
-        <p className="text-muted-foreground mt-2">
-          Créez des contenus multi-éléments : mini-films ou packs campagne complets
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Studio Multi</h1>
+          <p className="text-muted-foreground mt-2">
+            Créez des contenus multi-éléments : mini-films ou packs campagne complets
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate('/studio')}
+          className="text-xs text-muted-foreground"
+        >
+          ← Studio Solo
+        </Button>
       </div>
+
+      {/* Packs prédéfinis */}
+      <Card className="p-4">
+        <h3 className="font-semibold text-sm mb-3">📦 Packs prédéfinis</h3>
+        <div className="grid grid-cols-3 gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => loadPreset('lancement')}
+            className="flex flex-col h-auto py-3"
+          >
+            <span className="text-lg mb-1">🚀</span>
+            <span className="text-xs font-medium">Lancement</span>
+            <span className="text-[10px] text-muted-foreground">4 img + 1 car + 1 vid</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => loadPreset('evergreen')}
+            className="flex flex-col h-auto py-3"
+          >
+            <span className="text-lg mb-1">🌲</span>
+            <span className="text-xs font-medium">Evergreen</span>
+            <span className="text-[10px] text-muted-foreground">3 img + 2 car</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => loadPreset('promo')}
+            className="flex flex-col h-auto py-3"
+          >
+            <span className="text-lg mb-1">🔥</span>
+            <span className="text-xs font-medium">Promo</span>
+            <span className="text-[10px] text-muted-foreground">2 img + 1 vid</span>
+          </Button>
+        </div>
+      </Card>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
         <TabsList className="grid w-full grid-cols-2">
@@ -532,7 +595,7 @@ export default function StudioMulti() {
               <p className="text-2xl font-bold text-primary">{calculatePackCost()} Woofs</p>
               <p className="text-xs text-muted-foreground">
                 {imageCount > 0 && `${imageCount} images × 1`}
-                {carouselCount > 0 && ` + ${carouselCount} carrousels × 5`}
+                {carouselCount > 0 && ` + ${carouselCount} carrousels × 10`}
                 {videoCount > 0 && ` + ${videoCount} vidéos × 25`}
               </p>
             </div>
