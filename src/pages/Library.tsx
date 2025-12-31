@@ -16,6 +16,8 @@ import { VideoBatchesTab } from '@/components/library/VideoBatchesTab';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 
+type SourceFilter = 'all' | 'solo' | 'multi' | 'chat';
+
 export default function Library() {
   const { user } = useAuth();
   const location = useLocation();
@@ -29,6 +31,7 @@ export default function Library() {
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Map tab to asset type for hook (video-batches uses its own hook, default to 'images')
@@ -93,6 +96,14 @@ export default function Library() {
       if (orderIdFromQuery && activeTab !== 'carousels') {
         const assetOrderId = asset.metadata?.orderId;
         if (assetOrderId !== orderIdFromQuery) return false;
+      }
+      // Filtre par source
+      if (sourceFilter !== 'all') {
+        const meta = asset.metadata;
+        const assetSource = meta?.source;
+        if (sourceFilter === 'solo' && assetSource !== 'studio_solo') return false;
+        if (sourceFilter === 'multi' && assetSource !== 'studio_multi' && !meta?.scriptGroup && !meta?.batchId) return false;
+        if (sourceFilter === 'chat' && assetSource !== 'alfie_chat_pack' && assetSource !== 'alfie_chat') return false;
       }
       // Filtre par recherche
       if (searchQuery && !asset.engine?.toLowerCase().includes(searchQuery.toLowerCase())) {
@@ -176,56 +187,97 @@ export default function Library() {
         </TabsList>
 
         {/* Toolbar */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-4">
-          <div className="w-full sm:flex-1 sm:min-w-[200px]">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Rechercher..." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 text-sm"
-              />
+        <div className="flex flex-col gap-3 mt-4">
+          {/* Ligne 1: Recherche + Actions */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="w-full sm:flex-1 sm:min-w-[200px]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Rechercher..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => {
+                  setSelectedAssets([]);
+                  refetch();
+                }}
+                className="touch-target"
+              >
+                <RefreshCw className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Actualiser</span>
+              </Button>
+
+              {filteredAssets.length > 0 && (
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={handleSelectAll}
+                  className="touch-target"
+                >
+                  {selectedAssets.length === filteredAssets.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                </Button>
+              )}
+
+              {activeTab === 'videos' && (
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={cleanupProcessingVideos}
+                  className="touch-target"
+                >
+                  <Trash2 className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Nettoyer</span>
+                </Button>
+              )}
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={() => {
-                setSelectedAssets([]);
-                refetch();
-              }}
-              className="touch-target"
-            >
-              <RefreshCw className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Actualiser</span>
-            </Button>
-
-            {filteredAssets.length > 0 && (
+          {/* Ligne 2: Filtres par source */}
+          {(activeTab === 'images' || activeTab === 'videos' || activeTab === 'pinterest' || activeTab === 'thumbnails') && (
+            <div className="flex gap-2 flex-wrap">
               <Button 
                 size="sm" 
-                variant="outline"
-                onClick={handleSelectAll}
-                className="touch-target"
+                variant={sourceFilter === 'all' ? 'default' : 'outline'}
+                onClick={() => setSourceFilter('all')}
+                className="text-xs h-8"
               >
-                {selectedAssets.length === filteredAssets.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                Tous
               </Button>
-            )}
-
-            {activeTab === 'videos' && (
               <Button 
                 size="sm" 
-                variant="outline"
-                onClick={cleanupProcessingVideos}
-                className="touch-target"
+                variant={sourceFilter === 'solo' ? 'default' : 'outline'}
+                onClick={() => setSourceFilter('solo')}
+                className="text-xs h-8"
               >
-                <Trash2 className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Nettoyer</span>
+                🎯 Solo
               </Button>
-            )}
-          </div>
+              <Button 
+                size="sm" 
+                variant={sourceFilter === 'multi' ? 'default' : 'outline'}
+                onClick={() => setSourceFilter('multi')}
+                className="text-xs h-8"
+              >
+                🎬 Multi
+              </Button>
+              <Button 
+                size="sm" 
+                variant={sourceFilter === 'chat' ? 'default' : 'outline'}
+                onClick={() => setSourceFilter('chat')}
+                className="text-xs h-8"
+              >
+                💬 Chat
+              </Button>
+            </div>
+          )}
 
           {selectedAssets.length > 0 && (
             <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -264,7 +316,11 @@ export default function Library() {
             <div className="text-center py-12 text-muted-foreground">
               <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>Aucune image pour l'instant.</p>
-              <p className="text-sm">Générez depuis le chat, elles arrivent ici automatiquement.</p>
+              <p className="text-sm">
+                {sourceFilter !== 'all' 
+                  ? `Aucune image générée depuis ${sourceFilter === 'solo' ? 'Studio Solo' : sourceFilter === 'multi' ? 'Studio Multi' : 'le Chat Alfie'}`
+                  : 'Générez depuis le Studio Solo, Multi ou le Chat Alfie'}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -295,7 +351,11 @@ export default function Library() {
             <div className="text-center py-12 text-muted-foreground">
               <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>Aucune vidéo pour l'instant.</p>
-              <p className="text-sm">Générez depuis le chat, elles arrivent ici automatiquement.</p>
+              <p className="text-sm">
+                {sourceFilter !== 'all' 
+                  ? `Aucune vidéo générée depuis ${sourceFilter === 'solo' ? 'Studio Solo' : sourceFilter === 'multi' ? 'Studio Multi' : 'le Chat Alfie'}`
+                  : 'Créez une vidéo depuis le Studio Solo (25 Woofs) ou Multi'}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
@@ -336,7 +396,11 @@ export default function Library() {
             <div className="text-center py-12 text-muted-foreground">
               <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>Aucune image Pinterest pour l'instant.</p>
-              <p className="text-sm">Générez au format "2:3 Pinterest" depuis le Studio</p>
+              <p className="text-sm">
+                {sourceFilter !== 'all' 
+                  ? `Aucun visuel Pinterest depuis ${sourceFilter === 'solo' ? 'Studio Solo' : sourceFilter === 'multi' ? 'Studio Multi' : 'le Chat'}`
+                  : 'Générez au format "2:3 Pinterest" depuis le Studio'}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -367,7 +431,11 @@ export default function Library() {
             <div className="text-center py-12 text-muted-foreground">
               <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>Aucune miniature YouTube pour l'instant.</p>
-              <p className="text-sm">Générez depuis le Studio au format "Miniature YouTube (16:9)"</p>
+              <p className="text-sm">
+                {sourceFilter !== 'all' 
+                  ? `Aucune miniature depuis ${sourceFilter === 'solo' ? 'Studio Solo' : sourceFilter === 'multi' ? 'Studio Multi' : 'le Chat'}`
+                  : 'Générez depuis le Studio au format "Miniature YouTube (16:9)"'}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
