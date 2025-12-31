@@ -44,6 +44,7 @@ import { StudioGenerator } from "@/pages/StudioGenerator";
 import ChatWidget from "./components/chat/ChatWidget";
 import StudioMulti from "./pages/StudioMulti";
 import JobConsolePage from "./pages/JobConsolePage";
+import PromptOptimizer from "./pages/PromptOptimizer";
 
 const queryClient = new QueryClient();
 const PUBLIC_ROUTES_WITH_PROSPECT_BUBBLE = new Set(["/", "/auth"]);
@@ -139,6 +140,17 @@ const AppRoutes = () => {
             <ProtectedRoute>
               <AppLayoutWithSidebar>
                 <StudioMulti />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/prompt-optimizer"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <PromptOptimizer />
               </AppLayoutWithSidebar>
             </ProtectedRoute>
           }

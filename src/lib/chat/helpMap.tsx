@@ -3,6 +3,8 @@ export const HELP = [
   { match: /ouvr(e|ir)\s+(le\s+)?studio|lance\s+(le\s+)?studio|accéder\s+(au\s+)?studio|studio\s*solo/i, to: "/studio", label: "Studio Solo", why: "Créer 1 image, carrousel ou vidéo" },
   // Studio Multi (packs/campagnes)
   { match: /studio\s*multi|pack|campagne|mini.?film|plusieurs?\s+visuels?/i, to: "/studio/multi", label: "Studio Multi", why: "Créer des packs et campagnes" },
+  // Optimiseur de prompts
+  { match: /optimi(s|z)e(r)?.*prompt|prompt.*optimi(s|z)|améliorer.*prompt|prompt.*pro/i, to: "/prompt-optimizer", label: "Optimiseur de Prompts", why: "Transformer tes idées en prompts pro" },
   // Autres routes
   { match: /template|catalogue|modèles?/i, to: "/templates", label: "Catalogue", why: "Parcourir les modèles" },
   { match: /bibli|assets?|médias?/i, to: "/library", label: "Bibliothèque", why: "Retrouver vos visuels" },
