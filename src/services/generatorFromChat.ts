@@ -281,11 +281,15 @@ async function createAssetJob(
       engine: videoEngine,
       durationSeconds: asset.durationSeconds || 5,
       aspectRatio: asset.ratio || "4:5",
-      // ✅ Multi-clip support
-      clipIndex: asset.sceneOrder || undefined,
+      // ✅ Multi-clip support avec fallback robuste
+      clipIndex: asset.sceneOrder || (asset.kind === 'video_premium' && allVideoAssets.length > 1 
+        ? allVideoAssets.findIndex(v => v.id === asset.id) + 1 
+        : undefined),
       clipTotal:
         asset.kind === "video_premium" && allVideoAssets.length > 1 ? allVideoAssets.length : undefined,
-      scriptGroup: asset.scriptGroup || undefined,
+      scriptGroup: asset.scriptGroup || (asset.kind === 'video_premium' && allVideoAssets.length > 1 
+        ? `auto-group-${packTitle?.slice(0,10) || Date.now()}` 
+        : undefined),
       clipTitle: asset.title || undefined,
       // Prefer explicit overlayLines; fallback to generatedTexts.video hook/cta when present
       clipTextLines:

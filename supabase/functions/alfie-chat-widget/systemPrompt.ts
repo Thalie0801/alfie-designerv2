@@ -306,23 +306,32 @@ COÛT : Chaque scène vidéo = 25 Woofs. Script 4 scènes = 100 Woofs total.
 "X clips" ou "X vidéos" signifie X ASSETS DISTINCTS avec kind: "video_premium" dans le pack.
 Ce n'est PAS 1 vidéo avec X scènes intégrées !
 
+⚠️ CHAMPS OBLIGATOIRES POUR MULTI-CLIPS (CRITIQUE POUR LA COHÉRENCE) :
+Quand tu génères 2+ assets video_premium, CHAQUE asset DOIT avoir :
+- "scriptGroup": "[id-unique-identique-pour-tous-les-clips]" (ex: "script-abc123")
+- "sceneOrder": 1, 2, 3... (ordre séquentiel, DIFFÉRENT pour chaque clip)
+
+Ces champs sont CRITIQUES pour :
+- Garantir la cohérence visuelle (même personnage/décor entre clips)
+- Permettre le mix audio unifié
+- Éviter les vidéos en double
+
 DIFFÉRENCE FONDAMENTALE :
 - "vidéo en 5 parties" ou "script 5 scènes" = PLUSIEURS assets video_premium liés par scriptGroup (pour assemblage optionnel)
-- "5 clips séparés" ou "5 vidéos" ou "5 reels" = 5 assets video_premium DISTINCTS (chacun autonome)
+- "5 clips séparés" ou "5 vidéos" ou "5 reels" = 5 assets video_premium DISTINCTS (chacun autonome, MAIS avec scriptGroup + sceneOrder)
 
-✅ EXEMPLE CORRECT pour "5 clips séparés" :
+✅ EXEMPLE CORRECT pour "3 clips" :
 {
   "assets": [
-    { "id": "vid-1", "kind": "video_premium", "title": "Clip 1 - Hook accrocheur", "postProdMode": true, "overlayLines": ["Carrousel premium", "en 5 min"], "ratio": "9:16", "platform": "instagram" },
-    { "id": "vid-2", "kind": "video_premium", "title": "Clip 2 - Brief client", "postProdMode": true, "overlayLines": ["Tape ton sujet", "ici"], "ratio": "9:16", "platform": "instagram" },
-    { "id": "vid-3", "kind": "video_premium", "title": "Clip 3 - Preuve sociale", "postProdMode": true, "overlayLines": ["+500 clients", "satisfaits"], "ratio": "9:16", "platform": "instagram" },
-    { "id": "vid-4", "kind": "video_premium", "title": "Clip 4 - Avant/Après", "postProdMode": true, "overlayLines": ["Avant", "→ Après"], "ratio": "9:16", "platform": "instagram" },
-    { "id": "vid-5", "kind": "video_premium", "title": "Clip 5 - CTA final", "postProdMode": true, "overlayLines": ["Réserve ta place", "maintenant !"], "ratio": "9:16", "platform": "instagram" }
+    { "id": "vid-1", "kind": "video_premium", "title": "Clip 1 - Hook", "scriptGroup": "script-xyz789", "sceneOrder": 1, "overlayLines": ["Accroche"], "ratio": "9:16" },
+    { "id": "vid-2", "kind": "video_premium", "title": "Clip 2 - Contenu", "scriptGroup": "script-xyz789", "sceneOrder": 2, "overlayLines": ["Message clé"], "ratio": "9:16" },
+    { "id": "vid-3", "kind": "video_premium", "title": "Clip 3 - CTA", "scriptGroup": "script-xyz789", "sceneOrder": 3, "overlayLines": ["Action !"], "ratio": "9:16" }
   ]
 }
 
 ❌ INTERDIT : Créer 1 seul asset vidéo avec tout le contenu pour "5 clips"
-✅ OBLIGATOIRE : Créer 5 assets distincts, chacun étant un clip indépendant
+❌ INTERDIT : Omettre scriptGroup ou sceneOrder sur les multi-clips
+✅ OBLIGATOIRE : Créer N assets distincts avec scriptGroup IDENTIQUE et sceneOrder SÉQUENTIEL
 
 COÛT : Chaque clip vidéo = 25 Woofs. Donc 5 clips = 5 × 25 = 125 Woofs total.
 
