@@ -42,6 +42,8 @@ import { AppLayoutWithSidebar } from "./components/AppLayoutWithSidebar";
 import { ChatGenerator } from "@/features/studio";
 import { StudioGenerator } from "@/pages/StudioGenerator";
 import ChatWidget from "./components/chat/ChatWidget";
+import Campaigns from "./pages/Campaigns";
+import JobConsolePage from "./pages/JobConsolePage";
 
 const queryClient = new QueryClient();
 const PUBLIC_ROUTES_WITH_PROSPECT_BUBBLE = new Set(["/", "/auth"]);
@@ -126,6 +128,28 @@ const AppRoutes = () => {
             <ProtectedRoute>
               <AppLayoutWithSidebar>
                 <Creator />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/studio/campaigns"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <Campaigns />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/jobs/:jobId"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <JobConsolePage />
               </AppLayoutWithSidebar>
             </ProtectedRoute>
           }
