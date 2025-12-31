@@ -161,8 +161,10 @@ Mark elements with `data-tour-id` or `data-sidebar-id` attributes:
 </div>
 ```
 
-Current tour targets (in order):
+Current tour targets (Dashboard):
 - `[data-tour-id="nav-dashboard"]` - Dashboard link
+- `[data-sidebar-id="studio"]` - Studio Solo link in sidebar
+- `[data-sidebar-id="studio-multi"]` - Studio Multi link in sidebar
 - `[data-sidebar-id="chat"]` - Chat Alfie link (mode exploration)
 - `[data-tour-id="btn-create"]` - Créateur button (mode expert)
 - `center` - Central bubble for explanations (e.g., Chat vs Créateur)
@@ -174,6 +176,21 @@ Current tour targets (in order):
 - `[data-tour-id="news"]` - News section
 - `[data-tour-id="suggest"]` - Suggestion button
 - `[data-sidebar-id="affiliate"]` - Affiliate link in sidebar
+
+### Studio Solo targets (`/studio`)
+- `[data-tour-id="studio-header"]` - Titre de Studio Solo
+- `[data-tour-id="studio-image-card"]` - Card création image
+- `[data-tour-id="studio-carousel-card"]` - Card création carrousel
+- `[data-tour-id="studio-video-card"]` - Card création vidéo
+- `[data-tour-id="studio-platform-select"]` - Sélecteur de plateforme
+- `[data-tour-id="studio-brandkit-toggle"]` - Toggle Brand Kit
+
+### Studio Multi targets (`/studio/multi`)
+- `[data-tour-id="studio-multi-header"]` - Titre de Studio Multi
+- `[data-tour-id="studio-multi-presets"]` - Packs prédéfinis (Lancement, Evergreen, Promo)
+- `[data-tour-id="studio-multi-tabs"]` - Tabs Mini-Film / Pack Campagne
+- `[data-tour-id="mini-film-tab"]` - Tab Mini-Film
+- `[data-tour-id="pack-campaign-tab"]` - Tab Pack Campagne
 
 ### Custom Tour Steps
 

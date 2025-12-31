@@ -108,8 +108,14 @@ const DASHBOARD_STEPS: TourStep[] = [
   },
   {
     selector: '[data-sidebar-id="studio"]',
-    title: "🎬 Studio",
-    content: "C'est ici que tu crées tes packs de visuels sur mesure : images, carrousels, vidéos… Alfie te guide !",
+    title: "🎬 Studio Solo",
+    content: "Crée **1 élément à la fois** : une image, un carrousel ou une vidéo. Choisis ta plateforme et génère en un clic !",
+    placement: "right",
+  },
+  {
+    selector: '[data-sidebar-id="studio-multi"]',
+    title: "📦 Studio Multi",
+    content: "Crée des **packs et campagnes** : mini-films multi-clips, packs images+carrousels+vidéos. Idéal pour les lancements !",
     placement: "right",
   },
   {

@@ -172,7 +172,8 @@ counters_monthly (
 ### 🖼️ Génération d'Images Simples
 
 #### Points d'entrée
-- **Studio** : `ChatGenerator.tsx` → formulaire structuré
+- **Studio Solo** : `src/pages/StudioGenerator.tsx` → création d'1 élément
+- **Studio Multi** : `src/pages/StudioMulti.tsx` → packs et mini-films
 - **Chat Widget** : `ChatWidget.tsx` → intent détecté
 
 #### Étapes
@@ -236,7 +237,8 @@ counters_monthly (
 ### 🎠 Génération de Carrousels
 
 #### Points d'entrée
-- **Studio** : `ChatGenerator.tsx` avec `format: 'carousel'`
+- **Studio Solo** : `src/pages/StudioGenerator.tsx` avec `format: 'carousel'`
+- **Studio Multi** : `src/pages/StudioMulti.tsx` → Pack Campagne
 - **Legacy** : `chat-create-carousel` (à migrer)
 
 #### Étapes
@@ -303,7 +305,8 @@ counters_monthly (
 ### 🎬 Génération de Vidéos (Reels)
 
 #### Points d'entrée
-- **Studio** : `ChatGenerator.tsx` avec `format: 'video'`
+- **Studio Solo** : `src/pages/StudioGenerator.tsx` avec `format: 'video'`
+- **Studio Multi** : `src/pages/StudioMulti.tsx` → Mini-Film ou Pack Campagne
 - **Legacy** : `chat-generate-video` (à vérifier)
 
 #### Étapes
@@ -466,7 +469,15 @@ console.error(`[alfie-job-worker] Job ${job.id} failed:`, error);
 
 ## 🎨 Frontend - Affichage des Résultats
 
-### `ChatGenerator.tsx`
+### Points d'entrée UI
+
+| Route | Fichier | Description |
+|-------|---------|-------------|
+| `/studio` | `src/pages/StudioGenerator.tsx` | **Studio Solo** - Création d'1 élément (image, carrousel, vidéo) |
+| `/studio/multi` | `src/pages/StudioMulti.tsx` | **Studio Multi** - Packs campagne et mini-films multi-clips |
+| `/library` | `src/pages/Library.tsx` | Bibliothèque d'assets générés |
+
+### `StudioGenerator.tsx` (Studio Solo)
 
 **Récupération des orders** :
 ```typescript

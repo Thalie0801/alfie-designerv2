@@ -1,6 +1,9 @@
 export const HELP = [
-  // Pattern strict : seulement demandes explicites de navigation vers Studio
-  { match: /ouvr(e|ir)\s+(le\s+)?studio|lance\s+(le\s+)?studio|accéder\s+(au\s+)?studio/i, to: "/studio", label: "Ouvrir Studio", why: "Lancer une génération guidée" },
+  // Studio Solo (par défaut)
+  { match: /ouvr(e|ir)\s+(le\s+)?studio|lance\s+(le\s+)?studio|accéder\s+(au\s+)?studio|studio\s*solo/i, to: "/studio", label: "Studio Solo", why: "Créer 1 image, carrousel ou vidéo" },
+  // Studio Multi (packs/campagnes)
+  { match: /studio\s*multi|pack|campagne|mini.?film|plusieurs?\s+visuels?/i, to: "/studio/multi", label: "Studio Multi", why: "Créer des packs et campagnes" },
+  // Autres routes
   { match: /template|catalogue|modèles?/i, to: "/templates", label: "Catalogue", why: "Parcourir les modèles" },
   { match: /bibli|assets?|médias?/i, to: "/library", label: "Bibliothèque", why: "Retrouver vos visuels" },
   { match: /brand.?kit|couleurs|typo/i, to: "/brand-kit", label: "Brand Kit", why: "Couleurs, typographies, ton" },
@@ -18,13 +21,14 @@ export function whatCanDoBlocks() {
         Voici ce que <strong>Alfie Designer</strong> sait faire aujourd'hui :
       </p>
       <ul className="list-disc ml-5 text-sm">
-        <li><strong>Générer</strong> des visuels, carrousels et vidéos à partir d'un brief (via <em>Studio</em>).</li>
+        <li><strong>Studio Solo</strong> : créer <em>1 image, 1 carrousel ou 1 vidéo</em> à la fois.</li>
+        <li><strong>Studio Multi</strong> : créer des <em>packs campagne</em> ou des <em>mini-films multi-clips</em>.</li>
         <li><strong>Appliquer</strong> automatiquement ton <em>Brand Kit</em> (couleurs, typo, ton).</li>
         <li><strong>Gérer</strong> un catalogue de <em>Templates</em> et ta <em>Bibliothèque</em> d'assets.</li>
         <li><strong>Suivre</strong> tes crédits/abonnement, et consulter ton <em>Dashboard</em>.</li>
       </ul>
       <div className="pt-1 flex flex-wrap gap-2">
-        {HELP.slice(0, 6).map((h) => (
+        {HELP.slice(0, 7).map((h) => (
           <a
             key={h.to}
             href={h.to}
