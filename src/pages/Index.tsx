@@ -7,6 +7,7 @@ import { DemoSection } from "@/components/landing/DemoSection";
 import { StudiosSection } from "@/components/landing/StudiosSection";
 import { CategoryGallerySection } from "@/components/landing/CategoryGallerySection";
 import { FeatureCardsSection } from "@/components/landing/FeatureCardsSection";
+import { TestimonialsSection } from "@/components/landing/TestimonialsSection";
 import { WhyAlfieSection } from "@/components/landing/WhyAlfieSection";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { FAQSection } from "@/components/landing/FAQSection";
@@ -54,6 +55,7 @@ export default function AlfieLanding() {
       <StudiosSection />
       <CategoryGallerySection />
       <FeatureCardsSection />
+      <TestimonialsSection />
       <WhyAlfieSection />
       <PricingSection />
       <FAQSection />
