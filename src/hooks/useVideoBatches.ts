@@ -76,7 +76,7 @@ export function useVideoBatches(userId?: string, brandId?: string) {
   const [error, setError] = useState<string | null>(null);
   const mounted = useRef(true);
 
-  // Load all batches for user
+  // Load all batches for user - from video_batches table + scriptGroup from media_generations
   const loadBatches = useCallback(async () => {
     if (!userId) {
       setBatches([]);
@@ -86,7 +86,9 @@ export function useVideoBatches(userId?: string, brandId?: string) {
 
     setLoading(true);
     try {
-      // Get all batches
+      const fullBatches: VideoBatch[] = [];
+
+      // 1. Load batches from video_batches table
       let query = supabase
         .from("video_batches")
         .select("*")
@@ -102,8 +104,6 @@ export function useVideoBatches(userId?: string, brandId?: string) {
       if (batchesError) throw batchesError;
 
       // For each batch, load full status via edge function
-      const fullBatches: VideoBatch[] = [];
-      
       for (const batch of batchesData || []) {
         try {
           const { data, error: statusError } = await supabase.functions.invoke(
@@ -136,6 +136,92 @@ export function useVideoBatches(userId?: string, brandId?: string) {
           console.error(`[useVideoBatches] Failed to load batch ${batch.id}:`, e);
         }
       }
+
+      // 2. Load "virtual batches" from media_generations with scriptGroup
+      let scriptQuery = supabase
+        .from("media_generations")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("type", "video")
+        .not("metadata->>scriptGroup", "is", null)
+        .order("created_at", { ascending: false });
+
+      if (brandId) {
+        scriptQuery = scriptQuery.eq("brand_id", brandId);
+      }
+
+      const { data: scriptGroupVideos, error: scriptError } = await scriptQuery;
+
+      if (scriptError) {
+        console.warn("[useVideoBatches] Script group query error:", scriptError);
+      } else if (scriptGroupVideos && scriptGroupVideos.length > 0) {
+        // Group by scriptGroup
+        const groupedByScript = new Map<string, typeof scriptGroupVideos>();
+        for (const video of scriptGroupVideos) {
+          const scriptGroup = (video.metadata as any)?.scriptGroup;
+          if (scriptGroup) {
+            const existing = groupedByScript.get(scriptGroup) || [];
+            existing.push(video);
+            groupedByScript.set(scriptGroup, existing);
+          }
+        }
+
+        // Convert each group to a virtual batch
+        for (const [scriptGroup, videos] of groupedByScript.entries()) {
+          // Skip if we already have a real batch with this ID
+          if (fullBatches.some(b => b.id === scriptGroup)) continue;
+
+          // Sort videos by sceneOrder or created_at
+          const sortedVideos = videos.sort((a, b) => {
+            const orderA = (a.metadata as any)?.sceneOrder || 0;
+            const orderB = (b.metadata as any)?.sceneOrder || 0;
+            return orderA - orderB;
+          });
+
+          const completedCount = sortedVideos.filter(v => v.status === "completed").length;
+          const errorCount = sortedVideos.filter(v => v.status === "error").length;
+          
+          const virtualBatch: VideoBatch = {
+            id: scriptGroup,
+            inputPrompt: sortedVideos[0]?.prompt || "Multi-clip video",
+            settings: {
+              videos_count: 1,
+              clips_per_video: sortedVideos.length,
+              ratio: (sortedVideos[0]?.metadata as any)?.ratio || "9:16",
+              language: "fr",
+              sfx_transition: "none",
+            },
+            status: errorCount > 0 ? "error" : completedCount === sortedVideos.length ? "done" : "processing",
+            createdAt: sortedVideos[0]?.created_at || new Date().toISOString(),
+            updatedAt: sortedVideos[sortedVideos.length - 1]?.created_at || new Date().toISOString(),
+            videos: [{
+              id: scriptGroup,
+              video_index: 1,
+              title: (sortedVideos[0]?.metadata as any)?.title || "Multi-clip",
+              status: errorCount > 0 ? "error" : completedCount === sortedVideos.length ? "done" : "processing",
+              clips: sortedVideos.map((v, i) => ({
+                id: v.id,
+                clipIndex: i + 1,
+                status: v.status === "completed" ? "done" : v.status === "error" ? "error" : "processing",
+                clipUrl: v.output_url,
+                durationSeconds: v.duration_seconds || 8,
+              })),
+              progress: Math.round((completedCount / sortedVideos.length) * 100),
+              completedClips: completedCount,
+              totalClips: sortedVideos.length,
+            }],
+            progress: Math.round((completedCount / sortedVideos.length) * 100),
+            completedClips: completedCount,
+            errorClips: errorCount,
+            totalClips: sortedVideos.length,
+          };
+
+          fullBatches.push(virtualBatch);
+        }
+      }
+
+      // Sort all batches by date
+      fullBatches.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       if (mounted.current) {
         setBatches(fullBatches);
