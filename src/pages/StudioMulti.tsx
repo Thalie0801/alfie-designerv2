@@ -21,8 +21,10 @@ import { toast } from 'sonner';
 import { createJob } from '@/lib/jobClient';
 import type { JobSpecV1Type } from '@/types/jobSpec';
 import type { Ratio } from '@/lib/types/alfie';
-import { Loader2, Film, Image, Crop, FileArchive, Play, Clapperboard, Package, Palette } from 'lucide-react';
+import { Loader2, Film, Image, Crop, FileArchive, Play, Clapperboard, Package, Palette, Paintbrush } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import type { VisualStyle } from '@/lib/types/vision';
+import { VISUAL_STYLE_OPTIONS } from '@/lib/constants/visualStyles';
 
 type Platform = "instagram" | "tiktok" | "linkedin" | "pinterest" | "youtube";
 
@@ -94,6 +96,9 @@ export default function StudioMulti() {
   const [carouselCount, setCarouselCount] = useState(1);
   const [videoCount, setVideoCount] = useState(1);
   
+  // Style artistique
+  const [visualStyle, setVisualStyle] = useState<VisualStyle>('cinematic_photorealistic');
+  
   // Options avancées
   const [voiceoverEnabled, setVoiceoverEnabled] = useState(true);
   const [safeZone, setSafeZone] = useState(false);
@@ -153,7 +158,7 @@ export default function StudioMulti() {
         duration_total: clipCount * durationPerClip,
         clip_count: clipCount,
         script: script,
-        visual_style: 'cinematic',
+        visual_style: visualStyle,
         deliverables: selectedDeliverables as JobSpecV1Type['deliverables'],
         use_brand_kit: useBrandKitToggle,
         locks: {
@@ -210,7 +215,7 @@ export default function StudioMulti() {
         brandkit_id: useBrandKitToggle ? activeBrand.id : undefined,
         ratio_master: ratioMaster,
         script: script,
-        visual_style: 'cinematic',
+        visual_style: visualStyle,
         image_count: imageCount,
         slides_count: carouselCount * 5, // ~5 slides par carousel
         clip_count: videoCount,
@@ -448,6 +453,28 @@ export default function StudioMulti() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Paintbrush className="w-4 h-4" />
+                    Style artistique
+                  </Label>
+                  <Select 
+                    value={visualStyle} 
+                    onValueChange={(v) => setVisualStyle(v as VisualStyle)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VISUAL_STYLE_OPTIONS.map((style) => (
+                        <SelectItem key={style.value} value={style.value}>
+                          {style.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </CardContent>
             </Card>
 
@@ -666,6 +693,28 @@ export default function StudioMulti() {
                     {PLATFORM_RATIOS[platform].map((r) => (
                       <SelectItem key={r} value={r}>
                         {getRatioLabel(r)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Paintbrush className="w-4 h-4" />
+                  Style artistique
+                </Label>
+                <Select 
+                  value={visualStyle} 
+                  onValueChange={(v) => setVisualStyle(v as VisualStyle)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VISUAL_STYLE_OPTIONS.map((style) => (
+                      <SelectItem key={style.value} value={style.value}>
+                        {style.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
