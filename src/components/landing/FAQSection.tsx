@@ -16,6 +16,18 @@ const faqs = [
     answer: "Environ 5 minutes. 1 minute pour le Brand Kit, et quelques secondes par visuel généré. C'est ultra rapide !",
   },
   {
+    question: "C'est quoi un Mini-Film ?",
+    answer: "Un Mini-Film est une vidéo composée de 2 à 10 scènes avec continuité visuelle. Parfait pour raconter une histoire ou présenter un produit sous plusieurs angles. Chaque scène peut avoir du lip-sync et des transitions fluides.",
+  },
+  {
+    question: "Comment fonctionne l'optimiseur de prompts ?",
+    answer: "Tu écris ton idée en français naturel, et l'IA la transforme en prompt technique optimisé pour la génération. Tu peux aussi ajouter des images de référence (jusqu'à 3) pour guider le style visuel.",
+  },
+  {
+    question: "Quelle est la différence entre Studio Solo et Multi ?",
+    answer: "Studio Solo génère un asset à la fois (image, carousel, clip). Studio Multi permet de créer des Mini-Films multi-scènes ou des Packs Campagne complets (Lancement, Promo, Evergreen).",
+  },
+  {
     question: "Je peux annuler mon abonnement quand je veux ?",
     answer: "Absolument. Pas d'engagement, pas de frais cachés. Tu peux annuler en 1 clic depuis ton espace, et ton abonnement reste actif jusqu'à la fin de la période payée.",
   },
@@ -28,16 +40,12 @@ const faqs = [
     answer: "Alfie utilise les derniers modèles d'IA (Gemini Pro, Veo 3.1) pour générer des visuels HD de qualité professionnelle, optimisés pour chaque plateforme.",
   },
   {
-    question: "Comment fonctionne le Brand Kit ?",
-    answer: "Tu réponds à quelques questions sur ta marque (nom, couleurs, style...) et Alfie mémorise tout. Ensuite, chaque visuel généré respecte automatiquement ton identité.",
-  },
-  {
-    question: "Puis-je utiliser mes propres images ?",
-    answer: "Oui ! Tu peux uploader ton logo, des photos de produits, ou n'importe quelle image de référence. Alfie les intègre dans tes créations.",
+    question: "Puis-je utiliser mes propres images de référence ?",
+    answer: "Oui ! Tu peux uploader 1 à 3 images de référence pour guider le style visuel. Alfie analyse ces images et les utilise pour maintenir la cohérence dans tes créations.",
   },
   {
     question: "C'est quoi les 'Woofs' ?",
-    answer: "Les Woofs sont notre monnaie de génération. Chaque visuel coûte un certain nombre de Woofs selon sa complexité. Ton abonnement te donne un quota mensuel, et tu peux acheter des packs supplémentaires si besoin.",
+    answer: "Les Woofs sont notre monnaie de génération premium. Chaque Mini-Film coûte des Woofs selon le nombre de scènes. Ton abonnement te donne un quota mensuel, et tu peux acheter des packs supplémentaires si besoin.",
   },
 ];
 
