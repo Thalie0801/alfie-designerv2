@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Sparkles, Image as ImageIcon, LayoutGrid, Video, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -73,6 +73,7 @@ export function StudioGenerator() {
   const { user, profile } = useAuth();
   const { activeBrandId, activeBrand, loading: brandLoading } = useBrandKit();
   const navigate = useNavigate();
+  const location = useLocation();
   
   const { data: queueData } = useQueueMonitor(!!user?.id && !!activeBrandId);
   const { trackOrders } = useOrderCompletion();
@@ -89,6 +90,27 @@ export function StudioGenerator() {
   // Options carrousels uniquement
   const [visualStyleCategory, setVisualStyleCategory] = useState<'background' | 'character' | 'product'>('character');
   const [backgroundOnly, setBackgroundOnly] = useState(false);
+
+  // Pré-remplir depuis PromptOptimizer ou autre source
+  useEffect(() => {
+    const state = location.state as { 
+      prefillPrompt?: string; 
+      contentType?: AssetType;
+    } | null;
+    
+    if (state?.prefillPrompt) {
+      setBrief(state.prefillPrompt);
+    }
+    
+    if (state?.contentType) {
+      setSelectedType(state.contentType);
+    }
+    
+    // Nettoyer le state pour éviter de re-remplir si l'utilisateur revient
+    if (state?.prefillPrompt || state?.contentType) {
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   // Charger les Woofs disponibles
   useEffect(() => {
