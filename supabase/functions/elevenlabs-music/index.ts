@@ -39,7 +39,7 @@ async function uploadAudioToCloudinary(
   const base64Audio = `data:audio/mpeg;base64,${btoa(binary)}`;
 
   const timestamp = Math.floor(Date.now() / 1000);
-  const paramsToSign = `folder=${folder}&resource_type=video&timestamp=${timestamp}`;
+  const paramsToSign = `folder=${folder}&timestamp=${timestamp}`;
 
   // Generate signature
   const encoder = new TextEncoder();
