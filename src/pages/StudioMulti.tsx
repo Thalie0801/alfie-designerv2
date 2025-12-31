@@ -87,8 +87,8 @@ export default function StudioMulti() {
 
   const calculatePackCost = () => {
     const imageCost = imageCount * 1;
-    const carouselCost = carouselCount * 5; // 5 slides average
-    const videoCost = videoCount * 25;
+    const carouselCost = carouselCount * 10; // 10 Woofs par carrousel (aligné sur WOOF_COSTS)
+    const videoCost = videoCount * 25; // 25 Woofs par vidéo
     return imageCost + carouselCost + videoCost;
   };
 

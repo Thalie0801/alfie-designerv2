@@ -1,16 +1,18 @@
 type Ratio = "1:1" | "9:16" | "16:9" | "3:4" | "4:5" | "2:3";
 type Platform = "instagram" | "tiktok" | "pinterest" | "linkedin" | "youtube";
-type Mode = "carousel" | "video" | "image";
+type Mode = "carousel" | "video" | "image" | "campaign" | "mini-film";
 type Niche = "ecommerce" | "infopreneur" | "services" | "mlm" | "creator";
 
 export function detectContentIntent(raw: string) {
   const q = raw.toLowerCase().trim();
 
+  const isCampaign = /(campagne|pack\s*(complet|multi)|multi-?(pack|assets?))/.test(q);
+  const isMiniFilm = /(mini-?film|multi-?clip|vidéo\s+multi|plusieurs?\s+clips?)/.test(q);
   const isCarousel = /(carrousel|carousel|slides?)/.test(q);
   const isVideo = /(vidéo|video|shorts?|reels?)/.test(q);
   const isImage = /(image|visuel|post|miniature|vignette)/.test(q);
-  const explicitMode = isCarousel || isVideo || isImage;
-  const mode: Mode = isCarousel ? "carousel" : isVideo ? "video" : "image";
+  const explicitMode = isCampaign || isMiniFilm || isCarousel || isVideo || isImage;
+  const mode: Mode = isCampaign ? "campaign" : isMiniFilm ? "mini-film" : isCarousel ? "carousel" : isVideo ? "video" : "image";
 
   const platform: Platform | null =
     (/(instagram|insta)/.test(q) && "instagram") ||
@@ -68,7 +70,7 @@ export function detectContentIntent(raw: string) {
     return undefined;
   })();
 
-  return { mode, explicitMode, platform, ratio, tone, slides, cta, topic: needTopic ? null : topicRaw, needTopic, niche };
+  return { mode, explicitMode, platform, ratio, tone, slides, cta, topic: needTopic ? null : topicRaw, needTopic, niche, isCampaign, isMiniFilm };
 }
 
 export function detectPlatformHelp(raw: string) {
@@ -89,6 +91,7 @@ export function detectPlatformHelp(raw: string) {
     { test: /(affiliation|parrain|ambassadeur)/, to: "/affiliate", label: "Affiliation" },
     { test: /(contacter\s+(le\s+)?support|page\s+contact|besoin\s+d['']?aide|signaler\s+(un\s+)?bug|j['']?ai\s+un\s+problème|comment\s+vous\s+contacter)/, to: "/contact", label: "Contact" },
     { test: /(admin|job queue|monitor|bloqués?)/, to: "/admin", label: "Admin" },
+    { test: /(studio\s*multi|campagne|mini-?film|pack\s*(complet|multi)|multi-?clip)/, to: "/studio/multi", label: "Studio Multi" },
   ];
 
   // Détecter si c'est une demande de création de contenu (élargi)
