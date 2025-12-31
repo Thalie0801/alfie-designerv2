@@ -95,7 +95,7 @@ export const JobSpecV1 = z.object({
   character_anchor_id: z.string().uuid().optional(),
 
   // Format master
-  ratio_master: z.enum(['9:16', '1:1', '16:9', '4:5']).default('9:16'),
+  ratio_master: z.enum(['9:16', '1:1', '16:9', '4:5', '2:3', 'yt-thumb']).default('9:16'),
 
   // Pour vidéos
   duration_total: z.number().optional(),
