@@ -18,7 +18,8 @@ import { toast } from 'sonner';
 import { createJob } from '@/lib/jobClient';
 import type { JobSpecV1Type } from '@/types/jobSpec';
 import type { Ratio } from '@/lib/types/alfie';
-import { Loader2, Film, Image, Crop, FileArchive, Play, Clapperboard, Package } from 'lucide-react';
+import { Loader2, Film, Image, Crop, FileArchive, Play, Clapperboard, Package, Palette } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 type Platform = "instagram" | "tiktok" | "linkedin" | "pinterest" | "youtube";
 
@@ -62,6 +63,7 @@ export default function StudioMulti() {
   
   const [activeTab, setActiveTab] = useState<'mini-film' | 'pack-campagne'>('mini-film');
   const [loading, setLoading] = useState(false);
+  const [useBrandKitToggle, setUseBrandKitToggle] = useState(true);
   
   // Shared state
   const [campaignName, setCampaignName] = useState('');
@@ -142,18 +144,19 @@ export default function StudioMulti() {
       const spec: JobSpecV1Type = {
         version: 'v1',
         kind: 'multi_clip_video',
-        brandkit_id: activeBrand.id,
+        brandkit_id: useBrandKitToggle ? activeBrand.id : undefined,
         ratio_master: ratioMaster,
         duration_total: clipCount * durationPerClip,
         clip_count: clipCount,
         script: script,
         visual_style: 'cinematic',
         deliverables: selectedDeliverables as JobSpecV1Type['deliverables'],
+        use_brand_kit: useBrandKitToggle,
         locks: {
-          palette_lock: true,
+          palette_lock: useBrandKitToggle,
           light_mode: false,
           safe_zone: safeZone,
-          identity_lock: true,
+          identity_lock: useBrandKitToggle,
         },
         audio: {
           voiceover_enabled: voiceoverEnabled,
@@ -200,7 +203,7 @@ export default function StudioMulti() {
       const spec: JobSpecV1Type = {
         version: 'v1',
         kind: 'campaign_pack',
-        brandkit_id: activeBrand.id,
+        brandkit_id: useBrandKitToggle ? activeBrand.id : undefined,
         ratio_master: ratioMaster,
         script: script,
         visual_style: 'cinematic',
@@ -208,11 +211,12 @@ export default function StudioMulti() {
         slides_count: carouselCount * 5, // ~5 slides par carousel
         clip_count: videoCount,
         deliverables: ['zip'] as JobSpecV1Type['deliverables'],
+        use_brand_kit: useBrandKitToggle,
         locks: {
-          palette_lock: true,
+          palette_lock: useBrandKitToggle,
           light_mode: false,
           safe_zone: safeZone,
-          identity_lock: true,
+          identity_lock: useBrandKitToggle,
         },
       };
 
@@ -267,6 +271,24 @@ export default function StudioMulti() {
           ← Studio Solo
         </Button>
       </div>
+
+      {/* Brand Kit Toggle */}
+      <Card className="p-4" data-tour-id="studio-multi-brandkit">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Palette className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="font-medium text-sm">Utiliser le Brand Kit</p>
+              <p className="text-xs text-muted-foreground">
+                {activeBrand?.name || "Applique le style de ta marque"}
+              </p>
+            </div>
+          </div>
+          <Switch checked={useBrandKitToggle} onCheckedChange={setUseBrandKitToggle} />
+        </div>
+      </Card>
 
       {/* Packs prédéfinis */}
       <Card className="p-4" data-tour-id="studio-multi-presets">

@@ -85,6 +85,10 @@ export function StudioGenerator() {
   const [isLaunching, setIsLaunching] = useState(false);
   const [woofsAvailable, setWoofsAvailable] = useState(0);
   const [woofsQuota, setWoofsQuota] = useState(0);
+  
+  // Options carrousels uniquement
+  const [visualStyleCategory, setVisualStyleCategory] = useState<'background' | 'character' | 'product'>('character');
+  const [backgroundOnly, setBackgroundOnly] = useState(false);
 
   // Charger les Woofs disponibles
   useEffect(() => {
@@ -159,6 +163,11 @@ export function StudioGenerator() {
         woofCostType: selectedType === "video" ? "video_premium" : selectedType === "carousel" ? "carousel" : "image",
         useBrandKit: useBrandKitToggle,
         durationSeconds: selectedType === "video" ? 6 : undefined,
+        // Options carrousels
+        ...(selectedType === "carousel" && {
+          visualStyleCategory,
+          backgroundOnly,
+        }),
       };
 
       const pack: AlfiePack = {
@@ -401,6 +410,44 @@ export function StudioGenerator() {
                   </Select>
                 </div>
               </div>
+
+              {/* Options carrousels uniquement */}
+              {selectedType === "carousel" && (
+                <div className="space-y-4 p-4 bg-primary/5 rounded-lg border border-primary/20" data-tour-id="studio-carousel-options">
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    🎠 Options carrousel
+                  </p>
+                  
+                  {/* Style visuel */}
+                  <div>
+                    <label className="font-medium text-sm block mb-2">Style visuel</label>
+                    <Select value={visualStyleCategory} onValueChange={(v) => setVisualStyleCategory(v as 'background' | 'character' | 'product')}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="background">🎨 Fond abstrait</SelectItem>
+                        <SelectItem value="character">🐕 Personnage / Mascotte</SelectItem>
+                        <SelectItem value="product">📦 Produit / Mockup</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {visualStyleCategory === 'background' && "Dégradés, formes géométriques, textures"}
+                      {visualStyleCategory === 'character' && "Personnage 3D Pixar, mascotte, illustrations"}
+                      {visualStyleCategory === 'product' && "Mise en scène produit, mockups"}
+                    </p>
+                  </div>
+
+                  {/* Toggle fond seul */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">Fond seul</p>
+                      <p className="text-xs text-muted-foreground">Sans texte intégré</p>
+                    </div>
+                    <Switch checked={backgroundOnly} onCheckedChange={setBackgroundOnly} />
+                  </div>
+                </div>
+              )}
 
               {/* Brand Kit Toggle */}
               <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg" data-tour-id="studio-brandkit-toggle">

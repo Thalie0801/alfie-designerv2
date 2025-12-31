@@ -90,9 +90,10 @@ export const JobSpecV1 = z.object({
   kind: JobKind,
 
   // Identité de marque
-  brandkit_id: z.string().uuid(),
+  brandkit_id: z.string().uuid().optional(),
   template_id: z.string().optional(),
   character_anchor_id: z.string().uuid().optional(),
+  use_brand_kit: z.boolean().default(true),
 
   // Format master
   ratio_master: z.enum(['9:16', '1:1', '16:9', '4:5', '2:3', 'yt-thumb']).default('9:16'),
@@ -112,6 +113,8 @@ export const JobSpecV1 = z.object({
   slides: z.array(CarouselSlide).optional(),
   slides_count: z.number().optional(),
   carousel_theme: z.string().optional(),
+  visual_style_category: z.enum(['background', 'character', 'product']).optional(),
+  background_only: z.boolean().optional(),
 
   // Deliverables demandés
   deliverables: z.array(DeliverableType).default(['master_9x16']),
