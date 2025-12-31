@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { usePromptOptimizer } from "@/hooks/usePromptOptimizer";
 import { useBrandKit } from "@/hooks/useBrandKit";
+import { ReferenceImageUploader } from "@/components/studio/ReferenceImageUploader";
 
 const CONTENT_TYPES = [
   { value: "image", label: "🖼️ Image unique" },
@@ -42,6 +43,7 @@ export default function PromptOptimizer() {
   const [useBrandKitToggle, setUseBrandKitToggle] = useState(true);
   const [copied, setCopied] = useState(false);
   const [destination, setDestination] = useState<Destination>("solo");
+  const [referenceImages, setReferenceImages] = useState<string[]>([]);
 
   // Force destination to "multi" when mini-film is selected
   useEffect(() => {
@@ -81,6 +83,7 @@ export default function PromptOptimizer() {
         prefillPrompt: result?.optimizedPrompt,
         contentType,
         scenes: result?.scenes, // For mini-film multi-scene data
+        referenceImages, // Transfer reference images to Studio
       } 
     });
   };
@@ -202,6 +205,13 @@ export default function PromptOptimizer() {
               disabled={!activeBrand}
             />
           </div>
+
+          {/* Reference Images */}
+          <ReferenceImageUploader
+            images={referenceImages}
+            onImagesChange={setReferenceImages}
+            maxImages={3}
+          />
 
           <Button 
             onClick={handleOptimize} 

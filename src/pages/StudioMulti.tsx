@@ -25,6 +25,7 @@ import { Loader2, Film, Image, Crop, FileArchive, Play, Clapperboard, Package, P
 import { Switch } from '@/components/ui/switch';
 import type { VisualStyle } from '@/lib/types/vision';
 import { VISUAL_STYLE_OPTIONS } from '@/lib/constants/visualStyles';
+import { ReferenceImageUploader } from '@/components/studio/ReferenceImageUploader';
 
 type Platform = "instagram" | "tiktok" | "linkedin" | "pinterest" | "youtube";
 
@@ -103,6 +104,9 @@ export default function StudioMulti() {
   const [voiceoverEnabled, setVoiceoverEnabled] = useState(true);
   const [safeZone, setSafeZone] = useState(false);
 
+  // Reference images (1-3)
+  const [referenceImages, setReferenceImages] = useState<string[]>([]);
+
   // Update ratio when platform changes
   const handlePlatformChange = (newPlatform: Platform) => {
     setPlatform(newPlatform);
@@ -161,6 +165,7 @@ export default function StudioMulti() {
         visual_style: visualStyle,
         deliverables: selectedDeliverables as JobSpecV1Type['deliverables'],
         use_brand_kit: useBrandKitToggle,
+        reference_images: referenceImages.length > 0 ? referenceImages : undefined,
         locks: {
           palette_lock: useBrandKitToggle,
           light_mode: false,
@@ -221,6 +226,7 @@ export default function StudioMulti() {
         clip_count: videoCount,
         deliverables: ['zip'] as JobSpecV1Type['deliverables'],
         use_brand_kit: useBrandKitToggle,
+        reference_images: referenceImages.length > 0 ? referenceImages : undefined,
         locks: {
           palette_lock: useBrandKitToggle,
           light_mode: false,
@@ -377,6 +383,13 @@ export default function StudioMulti() {
                     onChange={(e) => setScript(e.target.value)}
                   />
                 </div>
+
+                {/* Reference Images */}
+                <ReferenceImageUploader
+                  images={referenceImages}
+                  onImagesChange={setReferenceImages}
+                  maxImages={3}
+                />
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -592,6 +605,13 @@ export default function StudioMulti() {
                   onChange={(e) => setScript(e.target.value)}
                 />
               </div>
+
+              {/* Reference Images */}
+              <ReferenceImageUploader
+                images={referenceImages}
+                onImagesChange={setReferenceImages}
+                maxImages={3}
+              />
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
