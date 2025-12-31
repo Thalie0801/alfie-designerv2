@@ -275,7 +275,7 @@ export function StudioGenerator() {
 
         <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
           {/* Header */}
-          <div className="mb-6 sm:mb-8 text-center">
+          <div className="mb-6 sm:mb-8 text-center" data-tour-id="studio-header">
             <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2">
               <Sparkles className="w-6 h-6 sm:w-8 sm:h-8 text-alfie-pink" />
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold">Studio Solo</h1>
@@ -300,18 +300,23 @@ export function StudioGenerator() {
                 const config = ASSET_CONFIG[type];
                 const isSelected = selectedType === type;
                 
-                return (
-                  <button
-                    key={type}
-                    onClick={() => setSelectedType(type)}
-                    className={`
-                      relative p-4 sm:p-6 rounded-xl border-2 transition-all text-center
-                      ${isSelected 
-                        ? "border-primary bg-primary/5 shadow-lg" 
-                        : "border-border hover:border-primary/50 hover:bg-muted/50"
-                      }
-                    `}
-                  >
+                  const tourId = type === "image" ? "studio-image-card" 
+                    : type === "carousel" ? "studio-carousel-card" 
+                    : "studio-video-card";
+                  
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => setSelectedType(type)}
+                      data-tour-id={tourId}
+                      className={`
+                        relative p-4 sm:p-6 rounded-xl border-2 transition-all text-center
+                        ${isSelected 
+                          ? "border-primary bg-primary/5 shadow-lg" 
+                          : "border-border hover:border-primary/50 hover:bg-muted/50"
+                        }
+                      `}
+                    >
                     <div className="text-2xl sm:text-3xl mb-2">{config.emoji}</div>
                     <h3 className="font-semibold text-sm sm:text-base">{config.label}</h3>
                     <p className="text-xs text-muted-foreground mt-1 hidden sm:block">
@@ -364,7 +369,7 @@ export function StudioGenerator() {
 
               {/* Platform & Ratio */}
               <div className="grid grid-cols-2 gap-4">
-                <div>
+                <div data-tour-id="studio-platform-select">
                   <label className="font-semibold text-sm block mb-2">Plateforme</label>
                   <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
                     <SelectTrigger>
@@ -398,7 +403,7 @@ export function StudioGenerator() {
               </div>
 
               {/* Brand Kit Toggle */}
-              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg" data-tour-id="studio-brandkit-toggle">
                 <div>
                   <p className="font-medium text-sm">Utiliser le Brand Kit</p>
                   <p className="text-xs text-muted-foreground">

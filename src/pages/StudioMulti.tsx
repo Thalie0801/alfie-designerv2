@@ -251,7 +251,7 @@ export default function StudioMulti() {
 
   return (
     <div className="container max-w-4xl py-8 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between" data-tour-id="studio-multi-header">
         <div>
           <h1 className="text-3xl font-bold">Studio Multi</h1>
           <p className="text-muted-foreground mt-2">
@@ -269,7 +269,7 @@ export default function StudioMulti() {
       </div>
 
       {/* Packs prédéfinis */}
-      <Card className="p-4">
+      <Card className="p-4" data-tour-id="studio-multi-presets">
         <h3 className="font-semibold text-sm mb-3">📦 Packs prédéfinis</h3>
         <div className="grid grid-cols-3 gap-2">
           <Button
@@ -305,13 +305,13 @@ export default function StudioMulti() {
         </div>
       </Card>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} data-tour-id="studio-multi-tabs">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="mini-film" className="flex items-center gap-2">
+          <TabsTrigger value="mini-film" className="flex items-center gap-2" data-tour-id="mini-film-tab">
             <Clapperboard className="h-4 w-4" />
             Mini-Film
           </TabsTrigger>
-          <TabsTrigger value="pack-campagne" className="flex items-center gap-2">
+          <TabsTrigger value="pack-campagne" className="flex items-center gap-2" data-tour-id="pack-campaign-tab">
             <Package className="h-4 w-4" />
             Pack Campagne
           </TabsTrigger>

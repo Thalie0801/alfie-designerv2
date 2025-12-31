@@ -1,52 +1,96 @@
 import type { TourStep } from "./InteractiveTour";
 
-export const STUDIO_STEPS: TourStep[] = [
+/**
+ * Tour étapes pour Studio Solo (/studio)
+ * Guide utilisateur pour la création d'un élément unique
+ */
+export const STUDIO_SOLO_STEPS: TourStep[] = [
   {
-    selector: '[data-tour-id="chat-widget-bubble"]',
-    title: "🎬 Bienvenue dans Alfie !",
-    content: "Alfie est ton assistant créatif IA. Discute avec lui pour créer tes visuels : images, carrousels, vidéos. Je vais te montrer comment ça marche !",
-    placement: "left",
-  },
-  {
-    selector: '[data-tour-id="chat-widget-bubble"]',
-    title: "💬 Comment créer avec Alfie",
-    content: "Décris simplement ce que tu veux créer :\n\n• **\"Crée-moi 3 images pour ma promo de Noël\"**\n• **\"Un carrousel sur mes 5 conseils nutrition\"**\n• **\"Une vidéo teaser pour mon nouveau produit\"**\n\nAlfie comprend ta demande et prépare un pack adapté !",
-    placement: "left",
-  },
-  {
-    selector: '[data-tour-id="chat-widget-bubble"]',
-    title: "🎨 Styles visuels automatiques",
-    content: "Alfie détecte automatiquement le style adapté :\n\n• **Fond** : arrière-plans abstraits, dégradés\n• **Personnage** : mascotte 3D style Pixar\n• **Produit** : mise en valeur de ton produit\n\nTu peux ajuster avant de générer !",
-    placement: "left",
-  },
-  {
-    selector: '[data-sidebar-id="library"]',
-    title: "📚 Ta Bibliothèque",
-    content: "Tous tes visuels générés sont rangés ici, classés par type. Tu peux télécharger, copier les textes, ou exporter en CSV pour Canva !",
-    placement: "right",
-  },
-  {
-    selector: '[data-tour-id="brand-kit"]',
-    title: "🎨 Ton Brand Kit",
-    content: "Configure ta marque ici : couleurs, voix, niche, style visuel… Alfie s'en sert pour personnaliser toutes tes créations automatiquement.",
+    selector: '[data-tour-id="studio-header"]',
+    title: "🎬 Studio Solo",
+    content: "Bienvenue ! Ici tu crées **1 élément à la fois** : une image, un carrousel ou une vidéo.",
     placement: "bottom",
   },
   {
-    selector: '[data-tour-id="quotas"]',
-    title: "🐶 Tes Woofs",
-    content: "Les Woofs sont la monnaie d'Alfie :\n\n• **1 Woof** = 1 image\n• **10 Woofs** = 1 carrousel (5 slides)\n• **25 Woofs** = 1 vidéo (6s)\n\nIls se rechargent chaque mois selon ton plan !",
-    placement: "top",
+    selector: '[data-tour-id="studio-image-card"]',
+    title: "🖼️ Créer une Image",
+    content: "1 image = 1 Woof. Choisis ta plateforme (Instagram, Pinterest, YouTube...) et le format adapté.",
+    placement: "bottom",
   },
   {
-    selector: '[data-sidebar-id="affiliate"]',
-    title: "🤝 Programme Partenaire",
-    content: "Parraine tes amis et gagne 15% de commission sur leurs abonnements. Deviens Créateur, Mentor, puis Leader !",
+    selector: '[data-tour-id="studio-carousel-card"]',
+    title: "🎠 Créer un Carrousel",
+    content: "1 carrousel = 10 Woofs (5 slides). Parfait pour les listes, conseils, tutoriels.",
+    placement: "bottom",
+  },
+  {
+    selector: '[data-tour-id="studio-video-card"]',
+    title: "✨ Créer une Vidéo",
+    content: "1 vidéo = 25 Woofs. Génère un reel animé de 6-8 secondes.",
+    placement: "bottom",
+  },
+  {
+    selector: '[data-tour-id="studio-platform-select"]',
+    title: "📱 Plateforme",
+    content: "Instagram, TikTok, LinkedIn, Pinterest, YouTube... Chaque plateforme a ses formats optimisés.",
+    placement: "bottom",
+  },
+  {
+    selector: '[data-tour-id="studio-brandkit-toggle"]',
+    title: "🎨 Brand Kit",
+    content: "Active cette option pour que tes visuels respectent automatiquement les couleurs et le style de ta marque.",
     placement: "right",
   },
   {
     selector: '[data-tour-id="help-launcher"]',
     title: "✅ C'est parti !",
-    content: "Tu peux relancer ce guide à tout moment en cliquant ici. Maintenant, ouvre le chat et dis à Alfie ce que tu veux créer. Bonne création ! 🚀",
+    content: "Tu peux relancer ce guide à tout moment. Décris ton visuel et lance la génération !",
     placement: "bottom",
   },
 ];
+
+/**
+ * Tour étapes pour Studio Multi (/studio/multi)
+ * Guide utilisateur pour les packs et campagnes
+ */
+export const STUDIO_MULTI_STEPS: TourStep[] = [
+  {
+    selector: '[data-tour-id="studio-multi-header"]',
+    title: "📦 Studio Multi",
+    content: "Bienvenue ! Ici tu crées des **packs complets** : mini-films ou campagnes multi-assets.",
+    placement: "bottom",
+  },
+  {
+    selector: '[data-tour-id="studio-multi-presets"]',
+    title: "🚀 Packs prédéfinis",
+    content: "Utilise les packs prédéfinis (Lancement, Evergreen, Promo) pour gagner du temps !",
+    placement: "bottom",
+  },
+  {
+    selector: '[data-tour-id="studio-multi-tabs"]',
+    title: "🎬 Deux modes",
+    content: "**Mini-Film** : vidéos multi-clips enchaînés.\n\n**Pack Campagne** : mix images + carrousels + vidéos.",
+    placement: "bottom",
+  },
+  {
+    selector: '[data-tour-id="mini-film-tab"]',
+    title: "🎬 Mini-Film",
+    content: "Crée une vidéo avec plusieurs clips enchaînés. Idéal pour les teasers et storytelling.",
+    placement: "bottom",
+  },
+  {
+    selector: '[data-tour-id="pack-campaign-tab"]',
+    title: "📦 Pack Campagne",
+    content: "Combine images + carrousels + vidéos en un seul pack cohérent.",
+    placement: "bottom",
+  },
+  {
+    selector: '[data-tour-id="help-launcher"]',
+    title: "✅ C'est parti !",
+    content: "Tu peux relancer ce guide à tout moment. Bonne création !",
+    placement: "bottom",
+  },
+];
+
+// Legacy export for compatibility
+export const STUDIO_STEPS = STUDIO_SOLO_STEPS;
