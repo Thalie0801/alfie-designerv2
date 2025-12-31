@@ -9,11 +9,12 @@ import { corsHeaders } from "../_shared/cors.ts";
 const CLOUDINARY_CLOUD_NAME = Deno.env.get("CLOUDINARY_CLOUD_NAME")!;
 
 interface MixAudioVideoRequest {
-  videoUrl: string;           // URL vidéo brute (VEO 3.1 sans audio)
+  videoUrl: string;           // URL vidéo brute (VEO 3.1)
   voiceoverUrl?: string;      // URL audio voix-off (optionnel)
   musicUrl?: string;          // URL musique de fond (optionnel)
   voiceoverVolume?: number;   // 0-100 (défaut: 100)
-  musicVolume?: number;       // 0-100 (défaut: 35)
+  musicVolume?: number;       // 0-100 (défaut: 20)
+  originalVideoVolume?: number; // 0-100 (défaut: 30) - Volume audio VEO natif
   outputFormat?: string;      // mp4, webm, etc.
 }
 
@@ -47,11 +48,17 @@ function buildMixedVideoUrl(
   voiceoverPublicId?: string,
   musicPublicId?: string,
   voiceoverVolume: number = 100,
-  musicVolume: number = 35,
+  musicVolume: number = 20,
+  originalVideoVolume: number = 30,
   format: string = "mp4"
 ): string {
   const baseUrl = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/video/upload`;
   const transformations: string[] = [];
+
+  // ✅ Réduire le volume audio de la vidéo source (VEO natif: voix personnage + musique)
+  if (originalVideoVolume < 100) {
+    transformations.push(`e_volume:${originalVideoVolume}`);
+  }
 
   // Ajouter la voix-off si fournie
   if (voiceoverPublicId) {
@@ -83,7 +90,8 @@ Deno.serve(async (req) => {
       voiceoverUrl,
       musicUrl,
       voiceoverVolume = 100,
-      musicVolume = 35,
+      musicVolume = 20,
+      originalVideoVolume = 30,
       outputFormat = "mp4",
     } = body;
 
@@ -102,6 +110,7 @@ Deno.serve(async (req) => {
       hasMusic: !!musicUrl,
       voiceoverVolume,
       musicVolume,
+      originalVideoVolume,
     });
 
     // Extraire les public_ids
@@ -126,6 +135,7 @@ Deno.serve(async (req) => {
       musicPublicId ?? undefined,
       voiceoverVolume,
       musicVolume,
+      originalVideoVolume,
       outputFormat
     );
 
