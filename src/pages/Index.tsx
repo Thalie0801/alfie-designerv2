@@ -11,6 +11,7 @@ import { TestimonialsSection } from "@/components/landing/TestimonialsSection";
 import { WhyAlfieSection } from "@/components/landing/WhyAlfieSection";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { FAQSection } from "@/components/landing/FAQSection";
+import { CommunitySection } from "@/components/landing/CommunitySection";
 import { FinalCTA } from "@/components/landing/FinalCTA";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { ProspectBubble } from "@/components/ProspectBubble";
@@ -59,6 +60,7 @@ export default function AlfieLanding() {
       <WhyAlfieSection />
       <PricingSection />
       <FAQSection />
+      <CommunitySection />
       <FinalCTA />
       <LandingFooter />
       <ProspectBubble />
