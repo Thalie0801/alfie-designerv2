@@ -1,6 +1,12 @@
 /**
  * Service pour envoyer un pack Alfie au générateur
  * Gère la vérification des Woofs et la création des orders/jobs
+ * 
+ * NOTE: Ce service utilise toujours l'ancien workflow orders/job_queue
+ * pour la compatibilité avec le worker alfie-job-worker existant.
+ * 
+ * Pour les nouveaux jobs via JobSpecV1, utiliser directement:
+ * import { createJob } from '@/lib/jobClient';
  */
 
 import type { AlfiePack } from "@/types/alfiePack";

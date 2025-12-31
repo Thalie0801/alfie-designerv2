@@ -72,13 +72,7 @@ verify_jwt = false
 [functions.tts-and-render-final]
 verify_jwt = false
 
-[functions.video-batch-create]
-verify_jwt = true
-
 [functions.video-batch-status]
-verify_jwt = true
-
-[functions.video-batch-csv]
 verify_jwt = true
 
 [functions.video-batch-zip]
