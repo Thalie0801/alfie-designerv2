@@ -17,7 +17,30 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { createJob } from '@/lib/jobClient';
 import type { JobSpecV1Type } from '@/types/jobSpec';
+import type { Ratio } from '@/lib/types/alfie';
 import { Loader2, Film, Image, Crop, FileArchive, Play, Clapperboard, Package } from 'lucide-react';
+
+type Platform = "instagram" | "tiktok" | "linkedin" | "pinterest" | "youtube";
+
+const PLATFORM_RATIOS: Record<Platform, Ratio[]> = {
+  instagram: ["4:5", "1:1", "9:16"],
+  tiktok: ["9:16"],
+  linkedin: ["1:1", "16:9"],
+  pinterest: ["2:3", "4:5", "9:16"],
+  youtube: ["16:9", "yt-thumb"],
+};
+
+const getRatioLabel = (r: Ratio): string => {
+  switch (r) {
+    case "9:16": return "📱 Story (9:16)";
+    case "1:1": return "⬛ Carré (1:1)";
+    case "4:5": return "📐 Portrait (4:5)";
+    case "16:9": return "🖥️ Paysage (16:9)";
+    case "2:3": return "📌 Pinterest (2:3)";
+    case "yt-thumb": return "🎬 Miniature YT (1280×720)";
+    default: return r;
+  }
+};
 
 const DELIVERABLE_OPTIONS = [
   { id: 'master_9x16', label: 'Master 9:16', icon: Film, description: 'Vidéo verticale principale' },
@@ -43,7 +66,8 @@ export default function StudioMulti() {
   // Shared state
   const [campaignName, setCampaignName] = useState('');
   const [script, setScript] = useState('');
-  const [ratioMaster, setRatioMaster] = useState<'9:16' | '1:1' | '16:9'>('9:16');
+  const [platform, setPlatform] = useState<Platform>('instagram');
+  const [ratioMaster, setRatioMaster] = useState<Ratio>('9:16');
   
   // Mini-Film specific
   const [clipCount, setClipCount] = useState(3);
@@ -67,6 +91,15 @@ export default function StudioMulti() {
   // Options avancées
   const [voiceoverEnabled, setVoiceoverEnabled] = useState(true);
   const [safeZone, setSafeZone] = useState(false);
+
+  // Update ratio when platform changes
+  const handlePlatformChange = (newPlatform: Platform) => {
+    setPlatform(newPlatform);
+    const availableRatios = PLATFORM_RATIOS[newPlatform];
+    if (!availableRatios.includes(ratioMaster)) {
+      setRatioMaster(availableRatios[0]);
+    }
+  };
 
   const toggleDeliverable = (id: DeliverableId) => {
     setSelectedDeliverables(prev => 
@@ -353,18 +386,39 @@ export default function StudioMulti() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Format principal</Label>
+                  <Label>Plateforme</Label>
                   <Select 
-                    value={ratioMaster} 
-                    onValueChange={(v) => setRatioMaster(v as typeof ratioMaster)}
+                    value={platform} 
+                    onValueChange={(v) => handlePlatformChange(v as Platform)}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="9:16">9:16 (Vertical - Reels/TikTok)</SelectItem>
-                      <SelectItem value="1:1">1:1 (Carré - Feed)</SelectItem>
-                      <SelectItem value="16:9">16:9 (Horizontal - YouTube)</SelectItem>
+                      <SelectItem value="instagram">📸 Instagram</SelectItem>
+                      <SelectItem value="tiktok">🎵 TikTok</SelectItem>
+                      <SelectItem value="linkedin">💼 LinkedIn</SelectItem>
+                      <SelectItem value="pinterest">📌 Pinterest</SelectItem>
+                      <SelectItem value="youtube">🎬 YouTube</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Format principal</Label>
+                  <Select 
+                    value={ratioMaster} 
+                    onValueChange={(v) => setRatioMaster(v as Ratio)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PLATFORM_RATIOS[platform].map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {getRatioLabel(r)}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -555,18 +609,39 @@ export default function StudioMulti() {
               </div>
 
               <div className="space-y-2">
-                <Label>Format principal</Label>
+                <Label>Plateforme</Label>
                 <Select 
-                  value={ratioMaster} 
-                  onValueChange={(v) => setRatioMaster(v as typeof ratioMaster)}
+                  value={platform} 
+                  onValueChange={(v) => handlePlatformChange(v as Platform)}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="9:16">9:16 (Vertical - Reels/TikTok)</SelectItem>
-                    <SelectItem value="1:1">1:1 (Carré - Feed)</SelectItem>
-                    <SelectItem value="16:9">16:9 (Horizontal - YouTube)</SelectItem>
+                    <SelectItem value="instagram">📸 Instagram</SelectItem>
+                    <SelectItem value="tiktok">🎵 TikTok</SelectItem>
+                    <SelectItem value="linkedin">💼 LinkedIn</SelectItem>
+                    <SelectItem value="pinterest">📌 Pinterest</SelectItem>
+                    <SelectItem value="youtube">🎬 YouTube</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Format principal</Label>
+                <Select 
+                  value={ratioMaster} 
+                  onValueChange={(v) => setRatioMaster(v as Ratio)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PLATFORM_RATIOS[platform].map((r) => (
+                      <SelectItem key={r} value={r}>
+                        {getRatioLabel(r)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
