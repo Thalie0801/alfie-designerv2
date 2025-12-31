@@ -1761,7 +1761,7 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       user_id: userId,
       brand_id: brandId,
       type: "video",
-      engine: audioMode === 'elevenlabs' ? "veo_3_1_elevenlabs" : "veo_3_1",
+      engine: "veo_3_1", // Toujours veo_3_1, ElevenLabs est une couche audio (pas un engine séparé)
       status: "completed",
       output_url: finalVideoUrl,
       thumbnail_url: thumbnailUrl,
