@@ -747,6 +747,26 @@ Deno.serve(async (req) => {
     const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop()?.content || '';
     pack = forceMultiClips(pack, lastUserMessage, brandContext);
     
+    // ✅ FIX CRITICAL: Normaliser sceneOrder/scriptGroup sur TOUS les assets vidéo
+    // Même si le LLM retourne le bon nombre de vidéos, elles peuvent manquer sceneOrder
+    if (pack?.assets) {
+      const videoAssets = pack.assets.filter((a: any) => a.kind === 'video_premium');
+      if (videoAssets.length > 1) {
+        const groupId = videoAssets[0]?.scriptGroup || `script-${Date.now()}`;
+        videoAssets.forEach((v: any, idx: number) => {
+          if (!v.sceneOrder) {
+            v.sceneOrder = idx + 1;
+            console.log(`🔧 [NORMALIZE] Assigned sceneOrder=${idx + 1} to video "${v.title || v.id}"`);
+          }
+          if (!v.scriptGroup) {
+            v.scriptGroup = groupId;
+            console.log(`🔧 [NORMALIZE] Assigned scriptGroup="${groupId}" to video "${v.title || v.id}"`);
+          }
+        });
+        console.log(`✅ [NORMALIZE] ${videoAssets.length} videos normalized with scriptGroup="${groupId}"`);
+      }
+    }
+    
     // ✅ Log de debug enrichi pour diagnostic
     const hasPackTag = rawReply.toLowerCase().includes('<alfie-pack>');
     console.log("📦 Pack result:", pack ? `assets=${pack.assets?.length || 0}` : "null", 
