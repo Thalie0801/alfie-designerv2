@@ -6,6 +6,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useBrandKit } from '@/hooks/useBrandKit';
+import { useQueueMonitor } from '@/hooks/useQueueMonitor';
+import { QueueStatus } from '@/components/chat/QueueStatus';
+import { OrderStatusList } from '@/components/studio/OrderStatusList';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -60,6 +63,7 @@ export default function StudioMulti() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { activeBrand } = useBrandKit();
+  const { data: queueData } = useQueueMonitor(!!user?.id && !!activeBrand?.id);
   
   const [activeTab, setActiveTab] = useState<'mini-film' | 'pack-campagne'>('mini-film');
   const [loading, setLoading] = useState(false);
@@ -716,6 +720,14 @@ export default function StudioMulti() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Queue Status */}
+      {user && activeBrand?.id && (
+        <div className="space-y-4 mt-6">
+          <OrderStatusList brandId={activeBrand.id} userId={user.id} />
+          {queueData && <QueueStatus data={queueData} />}
+        </div>
+      )}
     </div>
   );
 }
