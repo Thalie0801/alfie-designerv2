@@ -440,11 +440,12 @@ async function handleDeliver(input: Record<string, unknown>): Promise<Record<str
 }
 
 // =====================================================
-// STEP ROUTER
+// STEP ROUTER (Unified for all job types)
 // =====================================================
 
 async function executeStep(stepType: string, input: Record<string, unknown>): Promise<Record<string, unknown>> {
   switch (stepType) {
+    // Video pipeline steps
     case 'gen_keyframe':
       return handleGenKeyframe(input);
     case 'animate_clip':
@@ -459,9 +460,234 @@ async function executeStep(stepType: string, input: Record<string, unknown>): Pr
       return handleConcatClips(input);
     case 'deliver':
       return handleDeliver(input);
+    
+    // Image pipeline steps
+    case 'gen_image':
+      return handleGenImage(input);
+    
+    // Carousel pipeline steps
+    case 'gen_slide':
+      return handleGenSlide(input);
+    case 'plan_slides':
+      return handlePlanSlides(input);
+    case 'assemble_carousel':
+      return handleAssembleCarousel(input);
+    
+    // Campaign pack steps
+    case 'render_variant':
+      return handleRenderVariant(input);
+    case 'extract_thumbnails':
+      return handleExtractThumbnails(input);
+    case 'render_cover':
+      return handleRenderCover(input);
+    
+    // Script planning
+    case 'plan_script':
+      return handlePlanScript(input);
+    case 'plan_assets':
+      return handlePlanAssets(input);
+    
     default:
       throw new Error(`Unknown step type: ${stepType}`);
   }
+}
+
+// =====================================================
+// NEW STEP HANDLERS (for unified pipeline)
+// =====================================================
+
+async function handleGenImage(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { prompt, ratio, visualStyle, identityAnchorId } = input;
+  
+  console.log(`[gen_image] Generating image with prompt: ${String(prompt).substring(0, 100)}...`);
+
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/alfie-generate-ai-image`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+      'X-Internal-Secret': INTERNAL_FN_SECRET,
+    },
+    body: JSON.stringify({
+      prompt,
+      ratio: ratio || '9:16',
+      visualStyle: visualStyle || 'photorealistic',
+      identityAnchorId,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Image generation failed: ${errorText}`);
+  }
+
+  const result = await response.json();
+  console.log(`[gen_image] Generated image: ${result.imageUrl}`);
+
+  return {
+    imageUrl: result.imageUrl,
+    imageIndex: input.imageIndex || 0,
+  };
+}
+
+async function handleGenSlide(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { slideIndex, slide, ratio, visualStyle } = input;
+  
+  console.log(`[gen_slide] Generating slide ${slideIndex}`);
+
+  const slideData = slide as Record<string, unknown> | undefined;
+  const prompt = slideData?.visualPrompt || slideData?.titleOnImage || 'Professional slide background';
+
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/alfie-render-carousel-slide`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+      'X-Internal-Secret': INTERNAL_FN_SECRET,
+    },
+    body: JSON.stringify({
+      prompt,
+      slideIndex,
+      slide: slideData,
+      ratio: ratio || '9:16',
+      visualStyle: visualStyle || 'photorealistic',
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Slide generation failed: ${errorText}`);
+  }
+
+  const result = await response.json();
+  console.log(`[gen_slide] Generated slide ${slideIndex}: ${result.slideUrl}`);
+
+  return {
+    slideUrl: result.slideUrl || result.imageUrl,
+    slideIndex,
+  };
+}
+
+async function handlePlanSlides(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { theme, slideCount } = input;
+  
+  console.log(`[plan_slides] Planning ${slideCount} slides for theme: ${theme}`);
+
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/alfie-plan-carousel`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+      'X-Internal-Secret': INTERNAL_FN_SECRET,
+    },
+    body: JSON.stringify({
+      theme,
+      slideCount: slideCount || 5,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Slide planning failed: ${errorText}`);
+  }
+
+  const result = await response.json();
+  console.log(`[plan_slides] Planned ${result.slides?.length || 0} slides`);
+
+  return {
+    slides: result.slides,
+    slideCount: result.slides?.length || slideCount,
+  };
+}
+
+async function handleAssembleCarousel(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  console.log(`[assemble_carousel] Assembling carousel`);
+  
+  // Collect slides from previous outputs
+  // This will be enriched by enrichInputWithPreviousOutputs
+  const slideUrls = input.slideUrls as string[] || [];
+  
+  return {
+    carouselUrls: slideUrls,
+    slideCount: slideUrls.length,
+  };
+}
+
+async function handleRenderVariant(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { targetRatio, variant, videoUrl } = input;
+  
+  console.log(`[render_variant] Rendering ${variant} variant (${targetRatio})`);
+
+  // For now, just pass through - ffmpeg worker will handle actual resizing
+  return {
+    variantUrl: videoUrl, // Placeholder - would be processed by ffmpeg
+    variant,
+    targetRatio,
+  };
+}
+
+async function handleExtractThumbnails(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { timestamps, count, videoUrl } = input;
+  
+  console.log(`[extract_thumbnails] Extracting ${count} thumbnails at ${JSON.stringify(timestamps)}`);
+
+  // For now, return placeholder - ffmpeg worker will handle actual extraction
+  const thumbUrls = (timestamps as number[] || [1, 7, 15]).map((ts, i) => ({
+    timestamp: ts,
+    url: videoUrl, // Placeholder
+    index: i,
+  }));
+
+  return {
+    thumbnails: thumbUrls,
+    count: thumbUrls.length,
+  };
+}
+
+async function handleRenderCover(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { campaignName, videoUrl } = input;
+  
+  console.log(`[render_cover] Rendering cover for: ${campaignName}`);
+
+  // For now, use first thumbnail as cover
+  return {
+    coverUrl: videoUrl, // Placeholder
+    campaignName,
+  };
+}
+
+async function handlePlanScript(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { script, clipCount, durationTotal } = input;
+  
+  console.log(`[plan_script] Planning script for ${clipCount} clips`);
+
+  // Use LLM to break script into beats
+  // For now, return simple split
+  const lines = (script as string || '').split(/[.!?]+/).filter(l => l.trim());
+  const beatsPerClip = Math.ceil(lines.length / (clipCount as number || 3));
+  
+  const beats = [];
+  for (let i = 0; i < (clipCount as number || 3); i++) {
+    const clipLines = lines.slice(i * beatsPerClip, (i + 1) * beatsPerClip);
+    beats.push({
+      sceneIndex: i,
+      visualPrompt: clipLines.join('. ') || `Scene ${i + 1}`,
+      voiceoverText: clipLines.join('. '),
+      durationSec: Math.floor((durationTotal as number || 24) / (clipCount as number || 3)),
+    });
+  }
+
+  return {
+    beats,
+    clipCount: beats.length,
+  };
+}
+
+async function handlePlanAssets(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  console.log(`[plan_assets] Planning campaign assets`);
+  
+  // For campaign packs, reuse plan_script logic
+  return handlePlanScript(input);
 }
 
 // =====================================================
