@@ -108,6 +108,9 @@ export async function sendPackToGenerator({
   // 3. Créer les orders/jobs pour chaque asset sélectionné
   const selectedAssets = pack.assets.filter((a) => selectedAssetIds.includes(a.id));
   
+  // ✅ Filtrer les assets vidéo pour calculer clipTotal
+  const videoAssets = selectedAssets.filter(a => a.kind === 'video_premium');
+  
   try {
   const results = await Promise.all(
       selectedAssets.map((asset) => {
@@ -123,8 +126,12 @@ export async function sendPackToGenerator({
           slidesCount: asset.generatedTexts?.slides?.length || 0,
           visualStyle,
           prompt: asset.prompt?.slice(0, 50),
+          // ✅ Multi-clip debug
+          sceneOrder: asset.sceneOrder,
+          scriptGroup: asset.scriptGroup,
+          clipTotal: videoAssets.length,
         });
-        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, useLogo, userPlan, carouselMode, colorMode, visualStyle);
+        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, useLogo, userPlan, carouselMode, colorMode, visualStyle, videoAssets);
       })
     );
 
@@ -182,7 +189,8 @@ async function createAssetJob(
   userPlan: string = 'starter',
   carouselMode: 'standard' | 'background_only' = 'standard',
   colorMode: 'vibrant' | 'pastel' = 'vibrant',
-  visualStyle: 'background' | 'character' | 'product' = 'background' // ✅ NEW
+  visualStyle: 'background' | 'character' | 'product' = 'background', // ✅ NEW
+  allVideoAssets: any[] = [] // ✅ Pour calculer clipTotal
 ): Promise<{ orderId: string }> {
   // Créer un order pour cet asset
   const { data: order, error: orderError } = await supabase
@@ -273,6 +281,13 @@ async function createAssetJob(
       engine: videoEngine,
       durationSeconds: asset.durationSeconds || 5,
       aspectRatio: asset.ratio || "4:5",
+      // ✅ Multi-clip support
+      clipIndex: asset.sceneOrder || undefined,
+      clipTotal: asset.kind === 'video_premium' && allVideoAssets.length > 1 ? allVideoAssets.length : undefined,
+      scriptGroup: asset.scriptGroup || undefined,
+      clipTitle: asset.title || undefined,
+      clipTextLines: asset.overlayLines || [],
+      clipKeyframe: asset.prompt || undefined,
     },
   });
 
