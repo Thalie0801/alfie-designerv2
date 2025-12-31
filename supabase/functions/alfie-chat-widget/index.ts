@@ -304,19 +304,25 @@ function forceMultiClips(
     return pack;
   }
   
+  // ✅ CORRECTION: Limiter targetCount à 10 max pour éviter les abus
+  const clampedTarget = Math.min(targetCount, 10);
+  if (clampedTarget !== targetCount) {
+    console.log(`🎬 MULTI-CLIPS: Clamped ${targetCount} → ${clampedTarget} (max 10)`);
+  }
+  
   // Compter les videos dans le pack actuel
   const currentVideos = pack?.assets?.filter((a: any) => a.kind === 'video_premium') || [];
   
-  if (currentVideos.length === targetCount) {
-    // Déjà le bon nombre → rien à faire
-    console.log(`🎬 MULTI-CLIPS: Pack already has ${targetCount} videos, no change needed`);
+  // ✅ CORRECTION DUPLICATION: Si déjà le bon nombre ou plus, ne rien faire
+  if (currentVideos.length >= clampedTarget) {
+    console.log(`🎬 MULTI-CLIPS: Pack already has ${currentVideos.length} videos (target=${clampedTarget}), skipping creation`);
     return pack;
   }
   
-  console.log(`🎬 FORCE MULTI-CLIPS: Requested ${targetCount} clips, current=${currentVideos.length}, forcing creation...`);
+  console.log(`🎬 FORCE MULTI-CLIPS: Requested ${clampedTarget} clips, current=${currentVideos.length}, creating ${clampedTarget - currentVideos.length} new...`);
   
   // Extraire les infos de chaque clip depuis le message (avec Brand Kit pour enrichissement)
-  const clipInfos = extractClipInfos(userMessage, targetCount, brandContext);
+  const clipInfos = extractClipInfos(userMessage, clampedTarget, brandContext);
   
   // Récupérer le template de l'asset vidéo existant (s'il y en a un)
   const templateAsset = currentVideos[0] || {};
@@ -333,10 +339,10 @@ function forceMultiClips(
     goal: templateAsset.goal || 'engagement',
     tone: templateAsset.tone || 'dynamique',
     durationSeconds: info.duration || 2,
-    postProdMode: true, // ✅ Toujours activer la post-prod
+    postProdMode: true,
     overlayLines: info.overlayLines.length > 0 ? info.overlayLines : [],
     withAudio: true,
-    scriptGroup: scriptGroupId, // Lier pour assemblage optionnel
+    scriptGroup: scriptGroupId,
     sceneOrder: idx + 1,
     woofCostType: 'video_premium' as const,
   }));
@@ -344,12 +350,12 @@ function forceMultiClips(
   // Construire ou mettre à jour le pack
   if (!pack) {
     pack = {
-      title: `${targetCount} Clips Vidéo`,
-      summary: `Pack de ${targetCount} clips séparés`,
+      title: `${clampedTarget} Clips Vidéo`,
+      summary: `Pack de ${clampedTarget} clips séparés`,
       assets: newVideoAssets,
     };
   } else {
-    // Remplacer les vidéos existantes par les N vidéos
+    // ✅ REMPLACER toutes les vidéos existantes par les N nouvelles vidéos
     const otherAssets = pack.assets?.filter((a: any) => a.kind !== 'video_premium') || [];
     pack.assets = [...otherAssets, ...newVideoAssets];
   }
@@ -459,8 +465,52 @@ function buildEnrichedClipPrompt(
 }
 
 /**
+ * Détecte la langue et le genre demandés dans le message utilisateur
+ * Retourne des instructions à injecter dans chaque prompt de clip
+ */
+function detectLanguageAndPresenter(message: string): {
+  language: string;
+  languageInstruction: string;
+  presenterGender: string | null;
+  presenterInstruction: string;
+  isPresenting: boolean;
+} {
+  const msg = message.toLowerCase();
+  
+  // Détection de la langue
+  const isFrench = /fran[çc]ais|en fran[çc]ais/i.test(message);
+  const language = isFrench ? 'French' : 'English';
+  const languageInstruction = isFrench 
+    ? 'All text, speech and context in French.' 
+    : '';
+  
+  // Détection du genre du présentateur
+  let presenterGender: string | null = null;
+  let presenterInstruction = '';
+  
+  if (/femme|woman|female|présentatrice|une.{0,10}présente/i.test(message)) {
+    presenterGender = 'woman';
+    presenterInstruction = 'Professional woman presenter facing camera, clearly visible.';
+  } else if (/homme|man|male|présentateur|un.{0,10}présente/i.test(message)) {
+    presenterGender = 'man';
+    presenterInstruction = 'Professional man presenter facing camera, clearly visible.';
+  }
+  
+  // Détection si c'est une présentation de produit
+  const isPresenting = /présent(e|ant|ation)|qui présente|montrant|montre le|showing|holds?/i.test(message);
+  if (isPresenting && !presenterInstruction) {
+    presenterInstruction = 'Person presenting product to camera, clearly visible.';
+  }
+  
+  console.log(`🌐 Language/Presenter detection: lang=${language}, gender=${presenterGender}, presenting=${isPresenting}`);
+  
+  return { language, languageInstruction, presenterGender, presenterInstruction, isPresenting };
+}
+
+/**
  * Extrait les informations de chaque clip depuis le message utilisateur
  * Enrichit avec le Brand Kit du client pour un rendu personnalisé
+ * ✅ Détecte et injecte la langue + genre de présentateur demandés
  */
 function extractClipInfos(
   message: string, 
@@ -477,6 +527,9 @@ function extractClipInfos(
   // ✅ Extraire les instructions globales UNE SEULE FOIS
   const globalInstructions = extractGlobalInstructions(message);
   console.log('🎬 Global instructions extracted:', JSON.stringify(globalInstructions, null, 2));
+  
+  // ✅ NOUVEAU: Détecter langue + genre de présentateur
+  const { languageInstruction, presenterInstruction, isPresenting } = detectLanguageAndPresenter(message);
   
   // Essayer de parser les blocs CLIP X
   const clipBlocks = message.split(/CLIP\s*\d+\s*[:\-–—]?\s*/i).filter(b => b.trim());
@@ -497,11 +550,19 @@ function extractClipInfos(
     const textMatches = block.match(/["«"]([^"»"]+)["»"]/g) || [];
     const overlayLines = textMatches
       .map(t => t.replace(/["«»""]/g, '').trim())
-      .filter(t => t.length > 0 && t.length < 80) // ✅ Augmenté pour textes plus longs
-      .slice(0, 5); // ✅ Max 5 lignes par clip
+      .filter(t => t.length > 0 && t.length < 80)
+      .slice(0, 5);
     
-    // ✅ NOUVEAU: Construire le prompt COMPLET avec enrichissement Brand Kit
-    const prompt = buildEnrichedClipPrompt(block, globalInstructions, brandKit);
+    // ✅ Construire le prompt COMPLET avec enrichissement Brand Kit
+    let prompt = buildEnrichedClipPrompt(block, globalInstructions, brandKit);
+    
+    // ✅ INJECTER les instructions de présentation et langue
+    if (presenterInstruction) {
+      prompt = `${presenterInstruction} ${prompt}`;
+    }
+    if (languageInstruction) {
+      prompt = `${prompt} ${languageInstruction}`;
+    }
     
     console.log(`🎬 Clip ${i + 1}: title="${title}", duration=${duration}s, overlayLines=${overlayLines.length}, promptLength=${prompt.length}`);
     

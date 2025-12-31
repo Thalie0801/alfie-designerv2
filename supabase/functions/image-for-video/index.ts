@@ -30,6 +30,8 @@ interface ImageForVideoRequest {
   userId?: string;
   overlayLines?: string[]; // ✅ Texte à afficher directement sur l'image (Nano Banana)
   useLipSync?: boolean; // ✅ Mode Lip-Sync: générer un personnage de face
+  presenterGender?: 'woman' | 'man' | null; // ✅ Genre du présentateur demandé
+  language?: 'French' | 'English'; // ✅ Langue demandée
 }
 
 /**
@@ -215,13 +217,26 @@ Deno.serve(async (req) => {
 
   try {
     const body: ImageForVideoRequest = await req.json();
-    const { renderId, prompt, aspectRatio = "9:16", brandId, useBrandKit = true, userId, overlayLines, useLipSync = false } = body;
+    const { 
+      renderId, 
+      prompt, 
+      aspectRatio = "9:16", 
+      brandId, 
+      useBrandKit = true, 
+      userId, 
+      overlayLines, 
+      useLipSync = false,
+      presenterGender,
+      language = 'French'
+    } = body;
     
     console.log("[image-for-video] 📋 Request:", { 
       hasOverlayLines: !!(overlayLines?.length), 
       overlayLinesPreview: overlayLines?.slice(0, 2),
       promptPreview: prompt?.slice(0, 50),
-      useLipSync 
+      useLipSync,
+      presenterGender,
+      language
     });
 
     if (!prompt) {
@@ -299,7 +314,24 @@ Deno.serve(async (req) => {
       console.log("[image-for-video] 👄 Lip-Sync mode: adding frontal face instructions");
     }
     
-    const finalPrompt = `${englishPrompt} ${aspectHint}${lipSyncHint} Ultra high quality, photorealistic, cinematic lighting.`;
+    // ✅ PRESENTER GENDER: Ajouter instructions de genre si demandé
+    let presenterHint = "";
+    if (presenterGender === 'woman') {
+      presenterHint = " Professional woman presenter facing camera, elegant and confident.";
+      console.log("[image-for-video] 👩 Presenter: woman requested");
+    } else if (presenterGender === 'man') {
+      presenterHint = " Professional man presenter facing camera, confident and engaging.";
+      console.log("[image-for-video] 👨 Presenter: man requested");
+    }
+    
+    // ✅ LANGUAGE CONTEXT: Ajouter contexte linguistique
+    let languageHint = "";
+    if (language === 'French') {
+      languageHint = " French business context, European style.";
+      console.log("[image-for-video] 🇫🇷 Language context: French");
+    }
+    
+    const finalPrompt = `${englishPrompt} ${aspectHint}${presenterHint}${lipSyncHint}${languageHint} Ultra high quality, photorealistic, cinematic lighting.`;
 
     // 4. Generate image with Gemini
     const base64Image = await generateImageWithGemini(finalPrompt);
