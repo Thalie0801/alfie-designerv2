@@ -1150,6 +1150,47 @@ export type Database = {
           },
         ]
       }
+      deliveries: {
+        Row: {
+          created_at: string | null
+          id: string
+          job_id: string
+          meta_json: Json | null
+          status: string | null
+          type: string
+          updated_at: string | null
+          url: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          job_id: string
+          meta_json?: Json | null
+          status?: string | null
+          type: string
+          updated_at?: string | null
+          url?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          job_id?: string
+          meta_json?: Json | null
+          status?: string | null
+          type?: string
+          updated_at?: string | null
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deliveries_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "job_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_queue: {
         Row: {
           attempts: number
@@ -1400,6 +1441,8 @@ export type Database = {
         Row: {
           attempts: number
           brand_id: string | null
+          brandkit_id: string | null
+          character_anchor_id: string | null
           created_at: string
           error: string | null
           finished_at: string | null
@@ -1412,8 +1455,10 @@ export type Database = {
           payload: Json
           result: Json | null
           retry_count: number
+          spec_json: Json | null
           started_at: string | null
           status: string
+          template_id: string | null
           type: string
           updated_at: string
           user_id: string
@@ -1421,6 +1466,8 @@ export type Database = {
         Insert: {
           attempts?: number
           brand_id?: string | null
+          brandkit_id?: string | null
+          character_anchor_id?: string | null
           created_at?: string
           error?: string | null
           finished_at?: string | null
@@ -1433,8 +1480,10 @@ export type Database = {
           payload: Json
           result?: Json | null
           retry_count?: number
+          spec_json?: Json | null
           started_at?: string | null
           status?: string
+          template_id?: string | null
           type: string
           updated_at?: string
           user_id: string
@@ -1442,6 +1491,8 @@ export type Database = {
         Update: {
           attempts?: number
           brand_id?: string | null
+          brandkit_id?: string | null
+          character_anchor_id?: string | null
           created_at?: string
           error?: string | null
           finished_at?: string | null
@@ -1454,13 +1505,36 @@ export type Database = {
           payload?: Json
           result?: Json | null
           retry_count?: number
+          spec_json?: Json | null
           started_at?: string | null
           status?: string
+          template_id?: string | null
           type?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "job_queue_brandkit_id_fkey"
+            columns: ["brandkit_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_queue_brandkit_id_fkey"
+            columns: ["brandkit_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
+          },
+          {
+            foreignKeyName: "job_queue_character_anchor_id_fkey"
+            columns: ["character_anchor_id"]
+            isOneToOne: false
+            referencedRelation: "identity_anchors"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "job_queue_order_id_fkey"
             columns: ["order_id"]
