@@ -609,7 +609,13 @@ export default function StudioMulti() {
               <p className="font-medium">Coût estimé</p>
               <p className="text-2xl font-bold text-primary">{calculateMiniFilmCost()} Woofs</p>
               <p className="text-xs text-muted-foreground">
-                {clipCount} clips × 25 + {selectedDeliverables.filter(d => d !== 'master_9x16' && d !== 'zip').length} variantes × 2
+                {clipCount} clips × 25
+                {(() => {
+                  const variantCount = selectedDeliverables.filter(d => 
+                    d.startsWith('variant_') || d.startsWith('thumb_') || d === 'cover'
+                  ).length;
+                  return variantCount > 0 ? ` + ${variantCount} variante${variantCount > 1 ? 's' : ''} × 2` : '';
+                })()}
               </p>
             </div>
             <Button 
