@@ -484,13 +484,22 @@ Deno.serve(async (req) => {
 
     console.log(`[job-orchestrator] Creating ${spec.kind} job for user ${user.id}, cost: ${woofsCost} woofs`);
 
-    // Check quota via woofs-check-consume
+    // Check quota via woofs-check-consume (internal call with secret)
+    const INTERNAL_FN_SECRET = Deno.env.get('INTERNAL_FN_SECRET');
+    
     const { data: quotaCheck, error: quotaError } = await supabaseAdmin.functions.invoke('woofs-check-consume', {
+      headers: {
+        'x-internal-secret': INTERNAL_FN_SECRET || '',
+      },
       body: {
         userId: user.id,
-        brandId: spec.brandkit_id,
-        woofsRequired: woofsCost,
-        dryRun: false, // Actually consume
+        brand_id: spec.brandkit_id,
+        cost_woofs: woofsCost,
+        reason: `job_${spec.kind}`,
+        metadata: {
+          jobKind: spec.kind,
+          campaignName: spec.campaign_name,
+        },
       },
     });
 
@@ -499,8 +508,16 @@ Deno.serve(async (req) => {
       return err('Failed to check quota', 500);
     }
 
-    if (!quotaCheck?.success) {
-      return err(quotaCheck?.message || 'Insufficient Woofs', 402);
+    // Check response content
+    if (quotaCheck && !quotaCheck.ok) {
+      const errorCode = quotaCheck.error?.code || 'UNKNOWN';
+      const errorMsg = quotaCheck.error?.message || 'Quota check failed';
+      console.error(`[job-orchestrator] Quota denied: ${errorCode} - ${errorMsg}`);
+      
+      if (errorCode === 'INSUFFICIENT_WOOFS') {
+        return err(`Woofs insuffisants: ${quotaCheck.error.remaining} restants, ${woofsCost} requis`, 402);
+      }
+      return err(errorMsg, 403);
     }
 
     // Create the job
