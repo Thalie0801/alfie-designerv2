@@ -176,12 +176,14 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
           .neq('metadata->>resolution', '1080x1620') // Exclure Pinterest
           .or('metadata->>ratio.is.null,metadata->>ratio.neq.2:3');  // Inclure NULL ou différent de 2:3
       } else if (type === 'videos') {
-        // Vidéos: toutes les vidéos (type='video'), incluant Replicate AI
+        // Vidéos SOLO uniquement: exclure celles avec scriptGroup ou batchId (appartenant à un batch)
         const { data: videoData, error: videoError } = await supabase
           .from('media_generations')
           .select('id, type, status, output_url, thumbnail_url, prompt, engine, woofs, created_at, expires_at, metadata, job_id, is_source_upload, brand_id, duration_seconds, file_size_bytes')
           .eq('user_id', userId)
           .eq('type', 'video')
+          .is('metadata->>scriptGroup', null)
+          .is('metadata->>batchId', null)
           .order('created_at', { ascending: false })
           .limit(50);
 
