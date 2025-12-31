@@ -25,6 +25,7 @@ export function whatCanDoBlocks() {
       <ul className="list-disc ml-5 text-sm">
         <li><strong>Studio Solo</strong> : créer <em>1 image, 1 carrousel ou 1 vidéo</em> à la fois.</li>
         <li><strong>Studio Multi</strong> : créer des <em>packs campagne</em> ou des <em>mini-films multi-clips</em>.</li>
+        <li><strong>Optimiseur</strong> : transformer tes idées en <em>prompts professionnels</em> optimisés.</li>
         <li><strong>Appliquer</strong> automatiquement ton <em>Brand Kit</em> (couleurs, typo, ton).</li>
         <li><strong>Gérer</strong> un catalogue de <em>Templates</em> et ta <em>Bibliothèque</em> d'assets.</li>
         <li><strong>Suivre</strong> tes crédits/abonnement, et consulter ton <em>Dashboard</em>.</li>
