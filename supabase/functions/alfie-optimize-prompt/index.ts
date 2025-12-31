@@ -8,7 +8,14 @@ import { callAIWithFallback, enrichPromptWithBrandKit, type AgentContext } from 
 
 import { corsHeaders } from "../_shared/cors.ts";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
-type GenType = "image" | "carousel" | "video";
+type GenType = "image" | "carousel" | "video" | "mini-film";
+
+interface MiniFilmScene {
+  sceneIndex: number;
+  visualPrompt: string;
+  voiceoverText: string;
+  durationSec: number;
+}
 
 interface OptimizationRequest {
   prompt: string;
@@ -24,6 +31,7 @@ interface OptimizationResult {
   suggestedAspectRatio?: string;
   estimatedGenerationTime?: string;
   brandAlignment?: string;
+  scenes?: MiniFilmScene[];
 }
 
 Deno.serve(async (req) => {
@@ -56,8 +64,8 @@ Deno.serve(async (req) => {
     if (!prompt || typeof prompt !== "string") {
       return jsonError("Missing or invalid 'prompt'", 400);
     }
-    if (!type || !["image", "carousel", "video"].includes(type)) {
-      return jsonError("Missing or invalid 'type' (image|carousel|video)", 400);
+    if (!type || !["image", "carousel", "video", "mini-film"].includes(type)) {
+      return jsonError("Missing or invalid 'type' (image|carousel|video|mini-film)", 400);
     }
 
     // --- Load Brand Kit (optional) ---
@@ -219,11 +227,15 @@ function defaultNegativePrompt(type: GenType): string {
   if (type === "video") {
     return "text overlays, shaky cam (unless requested), excessive noise, flicker, banding, compression artifacts, brand logos (3rd-party), watermarks";
   }
+  if (type === "mini-film") {
+    return "discontinuous character design, jarring style shifts between scenes, unrelated visual themes, inconsistent lighting across clips, audio-visual mismatch, abrupt transitions";
+  }
   // carousel (we optimize text-to-visual consistency)
   return "inconsistent style across slides, mismatched colors, illegible typography, excessive clutter, off-brand colors";
 }
 
 function defaultETA(type: GenType): string {
+  if (type === "mini-film") return "≈ 2–5 minutes (multi-scènes)";
   if (type === "video") return "≈ 1–3 minutes (short clip)";
   if (type === "carousel") return "≈ 20–60 seconds (per slide)";
   return "≈ 10–20 seconds";
@@ -244,6 +256,7 @@ function suggestAspectRatio(
   if (/(story|reel|tiktok|short|vertical)/i.test(t)) return "9:16";
   if (/(youtube|banni[eè]re|cover|landscape|widescreen)/i.test(t)) return "16:9";
   if (type === "carousel") return "4:5"; // Instagram carousel meta-friendly
+  if (type === "mini-film") return "9:16"; // Default vertical for social mini-films
   if (type === "video") return "16:9"; // Default for video when unsure
   return "1:1"; // Safe default for images
 }
@@ -303,6 +316,39 @@ VIDEO PROMPTING GUIDELINES (Sora2/Seededance/Kling fallback):
 - Output MUST be a single coherent clip (no collage).
 
 RESPONSE FORMAT: strict JSON with keys: optimizedPrompt, reasoning, negativePrompt, suggestedAspectRatio, estimatedGenerationTime, brandAlignment.
+`
+    );
+  }
+
+  if (type === "mini-film") {
+    return (
+      base +
+      brand +
+      `
+MINI-FILM PROMPTING GUIDELINES (Multi-scene narrative):
+- STRUCTURE: Generate a 3-5 scene script with visual continuity
+- Each scene MUST have: visual_prompt, voiceover_text, duration (6-10 seconds each)
+- NARRATIVE ARC: Hook scene (attention grabber) → Development (value/story) → Climax (peak moment) → CTA (call to action)
+- VISUAL COHERENCE: Same character design, consistent color palette, unified artistic style across ALL scenes
+- CAMERA VARIETY: Use different angles per scene (wide establishing, medium action, close-up emotional)
+- TRANSITIONS: Suggest smooth narrative flow, avoid jarring cuts
+- AUDIO: Include voiceover text in French with engaging, brand-aligned tone
+- PACING: Build tension/interest progressively across scenes
+
+RESPONSE FORMAT: strict JSON with keys:
+{
+  "optimizedPrompt": "global visual direction and style reference for all scenes",
+  "scenes": [
+    { "sceneIndex": 1, "visualPrompt": "detailed visual for scene 1", "voiceoverText": "French voiceover", "durationSec": 8 },
+    { "sceneIndex": 2, "visualPrompt": "detailed visual for scene 2", "voiceoverText": "French voiceover", "durationSec": 8 },
+    ...
+  ],
+  "reasoning": "explain narrative choices and brand alignment",
+  "negativePrompt": "what to avoid across all scenes",
+  "suggestedAspectRatio": "9:16 for social vertical",
+  "estimatedGenerationTime": "2-5 minutes",
+  "brandAlignment": "how scenes use brand colors/voice"
+}
 `
     );
   }

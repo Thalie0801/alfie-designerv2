@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Wand2, Copy, Check, Sparkles, ArrowRight, Lightbulb, AlertCircle } from "lucide-react";
+import { Wand2, Copy, Check, Sparkles, ArrowRight, Lightbulb, AlertCircle, Film, LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,7 +16,8 @@ import { useBrandKit } from "@/hooks/useBrandKit";
 const CONTENT_TYPES = [
   { value: "image", label: "🖼️ Image unique" },
   { value: "carousel", label: "📱 Carrousel" },
-  { value: "video", label: "🎬 Vidéo" },
+  { value: "video", label: "🎬 Vidéo (clip court)" },
+  { value: "mini-film", label: "🎥 Mini-Film (multi-scènes)" },
 ];
 
 const PLATFORMS = [
@@ -27,16 +28,27 @@ const PLATFORMS = [
   { value: "youtube", label: "YouTube Shorts" },
 ];
 
+type ContentType = "image" | "carousel" | "video" | "mini-film";
+type Destination = "solo" | "multi";
+
 export default function PromptOptimizer() {
   const navigate = useNavigate();
   const { optimize, isLoading, result, error, reset } = usePromptOptimizer();
   const { activeBrand } = useBrandKit();
 
   const [prompt, setPrompt] = useState("");
-  const [contentType, setContentType] = useState<"image" | "carousel" | "video">("image");
+  const [contentType, setContentType] = useState<ContentType>("image");
   const [platform, setPlatform] = useState("instagram");
   const [useBrandKitToggle, setUseBrandKitToggle] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [destination, setDestination] = useState<Destination>("solo");
+
+  // Force destination to "multi" when mini-film is selected
+  useEffect(() => {
+    if (contentType === "mini-film") {
+      setDestination("multi");
+    }
+  }, [contentType]);
 
   const handleOptimize = async () => {
     if (!prompt.trim()) {
@@ -63,11 +75,12 @@ export default function PromptOptimizer() {
   };
 
   const handleGoToStudio = () => {
-    const studioPath = contentType === "video" ? "/studio" : "/studio";
+    const studioPath = destination === "multi" ? "/studio/multi" : "/studio";
     navigate(studioPath, { 
       state: { 
         prefillPrompt: result?.optimizedPrompt,
-        contentType 
+        contentType,
+        scenes: result?.scenes, // For mini-film multi-scene data
       } 
     });
   };
@@ -141,6 +154,39 @@ export default function PromptOptimizer() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Destination Selector */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              Destination
+              {contentType === "mini-film" && (
+                <Badge variant="secondary" className="text-xs">Forcé Multi</Badge>
+              )}
+            </Label>
+            <Select 
+              value={destination} 
+              onValueChange={(v) => setDestination(v as Destination)}
+              disabled={contentType === "mini-film"}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="solo">
+                  <div className="flex items-center gap-2">
+                    <LayoutGrid className="h-4 w-4" />
+                    Studio Solo (génération simple)
+                  </div>
+                </SelectItem>
+                <SelectItem value="multi">
+                  <div className="flex items-center gap-2">
+                    <Film className="h-4 w-4" />
+                    Studio Multi (Films / Packs)
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
