@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+export interface MiniFilmScene {
+  sceneIndex: number;
+  visualPrompt: string;
+  voiceoverText: string;
+  durationSec: number;
+}
+
 export interface OptimizationResult {
   optimizedPrompt: string;
   reasoning: string;
@@ -8,11 +15,12 @@ export interface OptimizationResult {
   suggestedAspectRatio: string;
   estimatedGenerationTime: string;
   brandAlignment: string;
+  scenes?: MiniFilmScene[];
 }
 
 interface OptimizeParams {
   prompt: string;
-  type: "image" | "carousel" | "video";
+  type: "image" | "carousel" | "video" | "mini-film";
   brandId?: string;
   aspectRatio?: string;
 }
