@@ -1,9 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const supabaseAdmin = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-);
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
+const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+const INTERNAL_FN_SECRET = Deno.env.get('INTERNAL_FN_SECRET') ?? '';
+
+const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,6 +24,109 @@ function err(message: string, status = 500) {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
+}
+
+// =====================================================
+// COLLECT OUTPUTS FROM PREVIOUS STEPS
+// =====================================================
+
+async function getStepOutputs(jobId: string): Promise<Record<string, unknown>> {
+  const { data: previousSteps } = await supabaseAdmin
+    .from('job_steps')
+    .select('step_type, step_index, output_json')
+    .eq('job_id', jobId)
+    .eq('status', 'completed')
+    .order('step_index', { ascending: true });
+
+  const outputs: Record<string, unknown> = {
+    keyframes: [] as string[],
+    clipUrls: [] as string[],
+  };
+
+  for (const step of previousSteps || []) {
+    const output = step.output_json as Record<string, unknown> | null;
+    if (!output) continue;
+
+    // Collect keyframes
+    if (step.step_type === 'gen_keyframe' && output.keyframeUrl) {
+      (outputs.keyframes as string[]).push(output.keyframeUrl as string);
+    }
+    // Collect animated clips
+    if (step.step_type === 'animate_clip' && output.clipUrl) {
+      (outputs.clipUrls as string[]).push(output.clipUrl as string);
+    }
+    // Collect voiceover
+    if (step.step_type === 'voiceover') {
+      outputs.voiceoverUrl = output.voiceoverUrl;
+    }
+    // Collect music
+    if (step.step_type === 'music') {
+      outputs.musicUrl = output.musicUrl;
+    }
+    // Collect concatenated video
+    if (step.step_type === 'concat_clips') {
+      outputs.finalVideoUrl = output.finalVideoUrl;
+    }
+    // Collect mixed video
+    if (step.step_type === 'mix_audio') {
+      outputs.mixedVideoUrl = output.mixedVideoUrl;
+    }
+  }
+
+  return outputs;
+}
+
+function enrichInputWithPreviousOutputs(
+  stepType: string,
+  input: Record<string, unknown>,
+  previousOutputs: Record<string, unknown>
+): Record<string, unknown> {
+  const enriched = { ...input };
+
+  // For animate_clip: inject corresponding keyframe
+  if (stepType === 'animate_clip') {
+    const sceneIndex = (input.sceneIndex as number) ?? 0;
+    const keyframes = previousOutputs.keyframes as string[];
+    if (keyframes && keyframes[sceneIndex]) {
+      enriched.keyframeUrl = keyframes[sceneIndex];
+    }
+  }
+
+  // For concat_clips: inject all clip URLs
+  if (stepType === 'concat_clips') {
+    const clipUrls = previousOutputs.clipUrls as string[];
+    if (clipUrls && clipUrls.length > 0) {
+      enriched.clipUrls = clipUrls;
+    }
+  }
+
+  // For mix_audio: inject video + voiceover + music
+  if (stepType === 'mix_audio') {
+    if (previousOutputs.finalVideoUrl) {
+      enriched.videoUrl = previousOutputs.finalVideoUrl;
+    } else if ((previousOutputs.clipUrls as string[])?.length > 0) {
+      enriched.videoUrl = (previousOutputs.clipUrls as string[])[0];
+    }
+    if (previousOutputs.voiceoverUrl) {
+      enriched.voiceoverUrl = previousOutputs.voiceoverUrl;
+    }
+    if (previousOutputs.musicUrl) {
+      enriched.musicUrl = previousOutputs.musicUrl;
+    }
+  }
+
+  // For deliver: inject mixed or final video
+  if (stepType === 'deliver') {
+    if (previousOutputs.mixedVideoUrl) {
+      enriched.finalVideoUrl = previousOutputs.mixedVideoUrl;
+    } else if (previousOutputs.finalVideoUrl) {
+      enriched.finalVideoUrl = previousOutputs.finalVideoUrl;
+    } else if ((previousOutputs.clipUrls as string[])?.length > 0) {
+      enriched.finalVideoUrl = (previousOutputs.clipUrls as string[])[0];
+    }
+  }
+
+  return enriched;
 }
 
 // =====================================================
@@ -54,7 +158,7 @@ async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record
     }
   }
 
-  // Appeler Lovable AI pour générer l'image keyframe
+  // Prompt pour générer l'image keyframe
   const imagePrompt = `${visualPrompt}
 
 ${anchorConstraints ? `IDENTITY LOCK:\n${anchorConstraints}` : ''}
@@ -62,12 +166,13 @@ ${anchorConstraints ? `IDENTITY LOCK:\n${anchorConstraints}` : ''}
 CRITICAL: Generate a single, clean image suitable as a video keyframe. No text, no split screens.
 Aspect ratio: ${ratio || '9:16'}`;
 
-  // Utiliser le endpoint Lovable AI
-  const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/alfie-generate-ai-image`, {
+  // Appeler alfie-generate-ai-image avec le header X-Internal-Secret
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/alfie-generate-ai-image`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+      'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
       'Content-Type': 'application/json',
+      'X-Internal-Secret': INTERNAL_FN_SECRET,
     },
     body: JSON.stringify({
       prompt: imagePrompt,
@@ -93,7 +198,11 @@ Aspect ratio: ${ratio || '9:16'}`;
 async function handleAnimateClip(input: Record<string, unknown>): Promise<Record<string, unknown>> {
   const { keyframeUrl, visualPrompt, identityAnchorId, ratio, durationSeconds, sceneIndex } = input;
   
-  console.log(`[animate_clip] Animating scene ${sceneIndex} with VEO 3.1`);
+  console.log(`[animate_clip] Animating scene ${sceneIndex} with VEO 3.1, keyframe: ${keyframeUrl}`);
+
+  if (!keyframeUrl) {
+    throw new Error('Missing keyframeUrl for animate_clip step');
+  }
 
   // Récupérer les contraintes de l'anchor
   let anchorPrompt = '';
@@ -122,19 +231,19 @@ CRITICAL FRAME RULES:
 - Character must remain IDENTICAL throughout the clip
 - Smooth, cinematic motion`;
 
-  // Appeler VEO via le endpoint existant
+  // Appeler generate-video avec provider veo3 (endpoint correct)
   const veoPayload = {
     prompt: enrichedPrompt,
     referenceImageUrl: keyframeUrl,
-    durationSeconds: durationSeconds || 8,
-    ratio: ratio || '9:16',
-    withAudio: false, // L'audio sera ajouté dans les steps suivants
+    aspectRatio: ratio || '9:16',
+    provider: 'veo3',
+    withAudio: false,
   };
 
-  const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-video-veo`, {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-video`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+      'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(veoPayload),
@@ -160,10 +269,10 @@ async function handleVoiceover(input: Record<string, unknown>): Promise<Record<s
   
   console.log(`[voiceover] Generating voiceover for ${String(text).length} characters`);
 
-  const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/elevenlabs-tts`, {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+      'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -192,10 +301,10 @@ async function handleMusic(input: Record<string, unknown>): Promise<Record<strin
   
   console.log(`[music] Generating background music`);
 
-  const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/elevenlabs-music`, {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-music`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+      'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -221,12 +330,16 @@ async function handleMusic(input: Record<string, unknown>): Promise<Record<strin
 async function handleMixAudio(input: Record<string, unknown>): Promise<Record<string, unknown>> {
   const { videoUrl, voiceoverUrl, musicUrl, voiceVolume, musicVolume, originalVideoVolume } = input;
   
-  console.log(`[mix_audio] Mixing audio tracks`);
+  console.log(`[mix_audio] Mixing audio tracks for video: ${videoUrl}`);
 
-  const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/mix-audio-video`, {
+  if (!videoUrl) {
+    throw new Error('Missing videoUrl for mix_audio step');
+  }
+
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/mix-audio-video`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+      'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -256,16 +369,19 @@ async function handleMixAudio(input: Record<string, unknown>): Promise<Record<st
 async function handleConcatClips(input: Record<string, unknown>): Promise<Record<string, unknown>> {
   const { clipUrls } = input as { clipUrls: string[] };
   
-  console.log(`[concat_clips] Concatenating ${clipUrls.length} clips`);
+  console.log(`[concat_clips] Concatenating ${clipUrls?.length || 0} clips`);
 
-  // Utiliser Cloudinary pour la concatenation
-  const cloudName = Deno.env.get('CLOUDINARY_CLOUD_NAME');
-  
+  if (!clipUrls || clipUrls.length === 0) {
+    throw new Error('No clip URLs provided for concatenation');
+  }
+
   if (clipUrls.length === 1) {
     return { finalVideoUrl: clipUrls[0] };
   }
 
   // Pour la concatenation, on utilise l'API Cloudinary
+  const cloudName = Deno.env.get('CLOUDINARY_CLOUD_NAME');
+  
   // Extraire les public_ids des URLs
   const publicIds = clipUrls.map(url => {
     const match = url.match(/\/video\/upload\/[^/]+\/(.+)\.(mp4|webm)/);
@@ -289,7 +405,11 @@ async function handleConcatClips(input: Record<string, unknown>): Promise<Record
 async function handleDeliver(input: Record<string, unknown>): Promise<Record<string, unknown>> {
   const { finalVideoUrl, jobId, userId, brandId } = input;
   
-  console.log(`[deliver] Delivering final video for job ${jobId}`);
+  console.log(`[deliver] Delivering final video for job ${jobId}: ${finalVideoUrl}`);
+
+  if (!finalVideoUrl) {
+    throw new Error('No final video URL to deliver');
+  }
 
   // Sauvegarder dans media_generations
   const { data: media, error: mediaError } = await supabaseAdmin
@@ -390,14 +510,26 @@ Deno.serve(async (req) => {
     }
 
     const step = steps[0];
-    console.log(`[video-step-runner] Processing step ${step.step_id} (${step.step_type})`);
+    console.log(`[video-step-runner] Processing step ${step.step_id} (${step.step_type}) for job ${step.job_id}`);
 
     // Émettre événement de démarrage
     await emitEvent(step.job_id, step.step_id, 'step_started', `Started ${step.step_type}`);
 
     try {
+      // Récupérer les outputs des steps précédents
+      const previousOutputs = await getStepOutputs(step.job_id);
+      console.log(`[video-step-runner] Previous outputs:`, JSON.stringify(previousOutputs, null, 2));
+
+      // Enrichir l'input avec les outputs précédents
+      const enrichedInput = enrichInputWithPreviousOutputs(
+        step.step_type,
+        step.input_json || {},
+        previousOutputs
+      );
+      console.log(`[video-step-runner] Enriched input for ${step.step_type}:`, JSON.stringify(enrichedInput, null, 2));
+
       // Exécuter le step
-      const output = await executeStep(step.step_type, step.input_json);
+      const output = await executeStep(step.step_type, enrichedInput);
 
       // Marquer comme completed et queue le suivant
       const { error: completeError } = await supabaseAdmin.rpc('complete_step_and_queue_next', {
@@ -413,6 +545,15 @@ Deno.serve(async (req) => {
       await emitEvent(step.job_id, step.step_id, 'step_completed', `Completed ${step.step_type}`, output);
 
       console.log(`[video-step-runner] Step ${step.step_id} completed successfully`);
+
+      // Trigger le prochain step (fire and forget)
+      fetch(`${SUPABASE_URL}/functions/v1/video-step-runner`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }).catch(() => {});
 
       return ok({
         success: true,
@@ -435,6 +576,17 @@ Deno.serve(async (req) => {
       await emitEvent(step.job_id, step.step_id, 'step_failed', errorMessage, {
         result: failResult,
       });
+
+      // Si retry, relancer le runner
+      if (failResult === 'retrying') {
+        fetch(`${SUPABASE_URL}/functions/v1/video-step-runner`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }).catch(() => {});
+      }
 
       return ok({
         success: false,
