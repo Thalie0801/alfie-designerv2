@@ -49,8 +49,8 @@ export function AppSidebar() {
     badge?: string;
     tourId?: string;
   }> = [
-    { path: "/studio", label: "Studio", icon: Sparkles, tourId: "studio" },
-    { path: "/studio/campaigns", label: "Campagnes", icon: Rocket, badge: "Nouveau" },
+    { path: "/studio", label: "Studio Solo", icon: Sparkles, tourId: "studio" },
+    { path: "/studio/multi", label: "Studio Multi", icon: Rocket, badge: "Nouveau" },
     { path: "/brand-kit", label: "Brand Kit", icon: Palette },
     { path: "/templates", label: "Catalogue", icon: Layers, badge: "Bientôt" },
     { path: "/library", label: "Bibliothèque", icon: FolderOpen, tourId: "library" },
