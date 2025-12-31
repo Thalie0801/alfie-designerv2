@@ -134,8 +134,9 @@ function enrichInputWithPreviousOutputs(
 // =====================================================
 
 async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { visualPrompt, identityAnchorId, ratio } = input;
+  const { visualPrompt, identityAnchorId, ratio, userId, brandId } = input;
   
+  console.log(`[gen_keyframe] userId: ${userId}, brandId: ${brandId}`);
   console.log(`[gen_keyframe] Generating keyframe with prompt: ${String(visualPrompt).substring(0, 100)}...`);
   
   // Récupérer l'anchor si défini
@@ -175,6 +176,8 @@ Aspect ratio: ${ratio || '9:16'}`;
       'X-Internal-Secret': INTERNAL_FN_SECRET,
     },
     body: JSON.stringify({
+      userId,
+      brandId,
       prompt: imagePrompt,
       ratio: ratio || '9:16',
       referenceImageUrl: refImageUrl,
