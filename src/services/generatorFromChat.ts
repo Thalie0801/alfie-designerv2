@@ -283,10 +283,17 @@ async function createAssetJob(
       aspectRatio: asset.ratio || "4:5",
       // ✅ Multi-clip support
       clipIndex: asset.sceneOrder || undefined,
-      clipTotal: asset.kind === 'video_premium' && allVideoAssets.length > 1 ? allVideoAssets.length : undefined,
+      clipTotal:
+        asset.kind === "video_premium" && allVideoAssets.length > 1 ? allVideoAssets.length : undefined,
       scriptGroup: asset.scriptGroup || undefined,
       clipTitle: asset.title || undefined,
-      clipTextLines: asset.overlayLines || [],
+      // Prefer explicit overlayLines; fallback to generatedTexts.video hook/cta when present
+      clipTextLines:
+        (Array.isArray(asset.overlayLines) && asset.overlayLines.length > 0)
+          ? asset.overlayLines
+          : (asset.generatedTexts?.video?.hook || asset.generatedTexts?.video?.cta)
+            ? [asset.generatedTexts?.video?.hook, asset.generatedTexts?.video?.cta].filter(Boolean)
+            : [],
       clipKeyframe: asset.prompt || undefined,
     },
   });

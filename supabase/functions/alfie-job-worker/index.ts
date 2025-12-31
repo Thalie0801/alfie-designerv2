@@ -1587,33 +1587,80 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       
       // 2. Générer ou réutiliser la musique de fond unifiée
       if (useUnifiedMusic) {
-        // Vérifier si une musique batch existe déjà dans le payload
+        // 2.1 Si une musique batch existe déjà dans le payload, on l’utilise
         musicUrl = payload.batchMusicUrl;
-        
-        if (!musicUrl) {
-          // Générer une nouvelle musique basée sur le brand/niche
-          const musicPrompt = [
-            brandMini?.niche || 'professional business',
-            brandMini?.visual_mood?.join(' ') || 'modern',
-            'background music',
-          ].join(' ');
-          
-          console.log("[processGenerateVideo] 🎵 Generating background music:", musicPrompt);
-          
+
+        // 2.2 Sinon: cache “unifié” par scriptGroup (multi-clip) pour éviter 2x la même musique
+        if (!musicUrl && payload.scriptGroup) {
           try {
-            const musicResult = await callFn<any>("elevenlabs-music", {
-              prompt: musicPrompt,
-              durationSeconds: 30,
-              folder: `music/${orderId}`,
-            }, 90_000);
-            
+            const cacheKey = `music:${payload.scriptGroup}`;
+            const { data: cached } = await supabaseAdmin
+              .from("alfie_cache")
+              .select("response, updated_at, created_at")
+              .eq("prompt_hash", cacheKey)
+              .eq("prompt_type", "elevenlabs_music")
+              .order("updated_at", { ascending: false })
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            const cachedUrl = (cached?.response as any)?.audioUrl;
+            if (typeof cachedUrl === "string" && cachedUrl.startsWith("http")) {
+              musicUrl = cachedUrl;
+              console.log(
+                "[processGenerateVideo] 🎵 Using cached unified music for scriptGroup:",
+                musicUrl.slice(0, 60)
+              );
+            }
+          } catch (e) {
+            console.warn("[processGenerateVideo] ⚠️ Unified music cache lookup failed:", e);
+          }
+        }
+
+        // 2.3 Si toujours rien: générer une nouvelle musique basée sur le brand/niche
+        if (!musicUrl) {
+          const musicPrompt = [
+            brandMini?.niche || "professional business",
+            brandMini?.visual_mood?.join(" ") || "modern",
+            "background music",
+          ].join(" ");
+
+          console.log("[processGenerateVideo] 🎵 Generating background music:", musicPrompt);
+
+          try {
+            const folder = payload.scriptGroup ? `music/${payload.scriptGroup}` : `music/${orderId}`;
+            const musicResult = await callFn<any>(
+              "elevenlabs-music",
+              {
+                prompt: musicPrompt,
+                durationSeconds: 30,
+                folder,
+              },
+              90_000
+            );
+
             musicUrl = musicResult?.audioUrl;
             console.log("[processGenerateVideo] ✅ Music generated:", musicUrl?.slice(0, 60));
+
+            // Stocker en cache si multi-clip
+            if (musicUrl && payload.scriptGroup) {
+              try {
+                const cacheKey = `music:${payload.scriptGroup}`;
+                await supabaseAdmin.from("alfie_cache").insert({
+                  prompt_hash: cacheKey,
+                  prompt_type: "elevenlabs_music",
+                  response: { audioUrl: musicUrl, orderId },
+                  usage_count: 1,
+                });
+              } catch (e) {
+                console.warn("[processGenerateVideo] ⚠️ Unified music cache write failed:", e);
+              }
+            }
           } catch (musicError) {
             console.error("[processGenerateVideo] ⚠️ Music generation failed:", musicError);
           }
         } else {
-          console.log("[processGenerateVideo] 🎵 Using existing batch music:", musicUrl.slice(0, 60));
+          console.log("[processGenerateVideo] 🎵 Using existing batch/unified music:", musicUrl.slice(0, 60));
         }
       }
       

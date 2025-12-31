@@ -97,9 +97,17 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
   const [useVoiceover, setUseVoiceover] = useState(false);
   const [useUnifiedMusic, setUseUnifiedMusic] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState<string>('lily-fr');
-  
+
   // ✅ Lip-Sync natif VEO 3.1
   const [useLipSync, setUseLipSync] = useState(false);
+
+  // ✅ UX: si l’utilisateur active ElevenLabs (musique unifiée), on active aussi la voix-off par défaut
+  // (sinon on obtient souvent “la même musique” sans narration, perçue comme un doublon)
+  useEffect(() => {
+    if (useUnifiedMusic && !useVoiceover) {
+      setUseVoiceover(true);
+    }
+  }, [useUnifiedMusic, useVoiceover]);
   
   const [uploadingForId, setUploadingForId] = useState<string | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
