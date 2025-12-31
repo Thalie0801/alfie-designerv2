@@ -80,9 +80,21 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
   const [colorMode, setColorMode] = useState<'vibrant' | 'pastel'>('vibrant');
   const [backgroundOnly, setBackgroundOnly] = useState(false); // ✅ Toggle fond seul (sans texte)
   const [visualStyle, setVisualStyle] = useState<'background' | 'character' | 'product'>(() => {
-    // ✅ Auto-detect from first asset's AI-detected visualStyleCategory
-    const firstAsset = pack.assets[0];
-    return (firstAsset as any)?.visualStyleCategory || 'background';
+    // ✅ Auto-detect: prefer explicit AI hint, otherwise infer from pack content
+    const firstAsset = pack.assets[0] as any;
+    if (firstAsset?.visualStyleCategory) return firstAsset.visualStyleCategory;
+
+    const hasProduct = pack.assets.some((a) => !!a.referenceImageUrl);
+    if (hasProduct) return 'product';
+
+    const hasCharacter = pack.assets.some(
+      (a) =>
+        /personnage|avatar|mascotte|character|pixar/i.test(a.prompt || '') ||
+        (a as any)?.visualStyleCategory === 'character'
+    );
+    if (hasCharacter) return 'character';
+
+    return 'background';
   });
   
   const [audioSettings, setAudioSettings] = useState<Record<string, boolean>>(() => {
@@ -134,13 +146,9 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
       });
   }, [brandId]);
   
-  // ✅ Detect if pack has hints for character/product style
-  const hasCharacterHint = pack.assets.some(a => 
-    /personnage|avatar|mascotte|character|pixar/i.test(a.prompt || '') ||
-    (a as any)?.visualStyleCategory === 'character'
-  );
-  const hasProductImage = pack.assets.some(a => a.referenceImageUrl);
-  
+  // ✅ Detect pack contents (use localAssets to include uploads)
+  const hasProductImage = localAssets.some((a) => !!a.referenceImageUrl);
+  const hasAnyCarousel = localAssets.some((a) => a.kind === 'carousel');
   // Toggle audio pour une vidéo spécifique
   const toggleAudio = (assetId: string) => {
     setAudioSettings(prev => ({
@@ -693,8 +701,8 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
               🖼️ Fond seul {backgroundOnly && '✓'}
             </button>
             
-            {/* Chip Style visuel - visible si hint détecté */}
-            {(hasCharacterHint || hasProductImage || visualStyle !== 'background') && (
+            {/* Chip Style visuel - toujours visible s'il y a un carrousel (sinon l'utilisateur ne peut pas corriger) */}
+            {hasAnyCarousel && (
               <button 
                 type="button"
                 onClick={() => setVisualStyle(prev => 
