@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useLocalStorageState } from '@/lib/useLocalStorageState';
 import { toast } from 'sonner';
@@ -14,14 +14,31 @@ import type { Intent, FlowStep, GeneratedAsset } from '@/lib/types/startFlow';
 import { DEFAULT_INTENT } from '@/lib/types/startFlow';
 
 export default function Start() {
-  const [intent, setIntent] = useLocalStorageState<Intent>('alfie-start-intent', DEFAULT_INTENT);
+  const [rawIntent, setRawIntent] = useLocalStorageState<Intent>('alfie-start-intent', DEFAULT_INTENT);
   const [flowStep, setFlowStep] = useState<FlowStep>('wizard');
   const [email, setEmail] = useState<string | undefined>();
   const [generatedAssets, setGeneratedAssets] = useState<GeneratedAsset[]>([]);
 
+  // ✅ Hydrate with defaults to handle stale/partial localStorage
+  const intent = useMemo<Intent>(() => ({
+    ...DEFAULT_INTENT,
+    ...rawIntent,
+    brandLocks: { ...DEFAULT_INTENT.brandLocks, ...(rawIntent?.brandLocks ?? {}) },
+  }), [rawIntent]);
+
+  // ✅ Auto-repair localStorage if missing critical fields
+  useEffect(() => {
+    const needsRepair =
+      typeof rawIntent?.brandName !== 'string' ||
+      typeof rawIntent?.topic !== 'string';
+    if (needsRepair) {
+      setRawIntent(intent);
+    }
+  }, [rawIntent, intent, setRawIntent]);
+
   const handleIntentUpdate = useCallback((updates: Partial<Intent>) => {
-    setIntent((prev) => ({ ...prev, ...updates }));
-  }, [setIntent]);
+    setRawIntent((prev) => ({ ...DEFAULT_INTENT, ...prev, ...updates }));
+  }, [setRawIntent]);
 
   const handleWizardComplete = useCallback(() => setFlowStep('email_gate'), []);
   

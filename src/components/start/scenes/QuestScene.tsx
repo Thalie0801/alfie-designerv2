@@ -68,8 +68,8 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
   };
 
   const canProceed = () => {
-    if (step === 0) return intent.brandName.trim().length > 0;
-    if (step === 2) return intent.topic.trim().length > 0;
+    if (step === 0) return (intent.brandName ?? '').trim().length > 0;
+    if (step === 2) return (intent.topic ?? '').trim().length > 0;
     return true;
   };
 
