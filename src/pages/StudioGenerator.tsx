@@ -100,31 +100,69 @@ export function StudioGenerator() {
   // Reference images (1-3)
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
 
-  // Pré-remplir depuis PromptOptimizer ou autre source
+  // Pré-remplir depuis PromptOptimizer, ChatWidget, ou PackPreparationModal
   useEffect(() => {
     const state = location.state as { 
+      // Format PromptOptimizer
       prefillPrompt?: string; 
       contentType?: AssetType;
       referenceImages?: string[];
+      suggestedRatio?: string;
+      // Format ChatWidget
+      prefillBrief?: {
+        format?: string;
+        ratio?: string;
+        topic?: string;
+      };
+      // Format PackPreparationModal
+      pack?: AlfiePack;
+      brief?: string;
     } | null;
     
-    if (state?.prefillPrompt) {
-      setBrief(state.prefillPrompt);
+    if (!state) return;
+    
+    // Prompt (plusieurs sources possibles)
+    const promptValue = state.prefillPrompt 
+      || state.prefillBrief?.topic 
+      || state.brief 
+      || state.pack?.summary;
+    if (promptValue) setBrief(promptValue);
+    
+    // Type de contenu
+    const typeValue = state.contentType || state.prefillBrief?.format as AssetType;
+    if (typeValue && ['image', 'carousel', 'video'].includes(typeValue)) {
+      setSelectedType(typeValue as AssetType);
     }
     
-    if (state?.contentType) {
-      setSelectedType(state.contentType);
+    // Ratio suggéré
+    const ratioValue = state.suggestedRatio || state.prefillBrief?.ratio;
+    if (ratioValue && PLATFORM_RATIOS[platform].includes(ratioValue as Ratio)) {
+      setRatio(ratioValue as Ratio);
     }
-
-    if (state?.referenceImages?.length) {
+    
+    // Images de référence
+    if (state.referenceImages?.length) {
       setReferenceImages(state.referenceImages);
     }
     
-    // Nettoyer le state pour éviter de re-remplir si l'utilisateur revient
-    if (state?.prefillPrompt || state?.contentType || state?.referenceImages?.length) {
-      window.history.replaceState({}, document.title);
+    // Pack complet (depuis PackPreparationModal)
+    if (state.pack?.assets?.length) {
+      const firstAsset = state.pack.assets[0];
+      if (firstAsset.prompt) setBrief(firstAsset.prompt);
+      if (firstAsset.kind) {
+        const kind = firstAsset.kind === 'video_premium' ? 'video' : firstAsset.kind;
+        if (['image', 'carousel', 'video'].includes(kind)) {
+          setSelectedType(kind as AssetType);
+        }
+      }
+      if (firstAsset.ratio && PLATFORM_RATIOS[platform].includes(firstAsset.ratio as Ratio)) {
+        setRatio(firstAsset.ratio as Ratio);
+      }
     }
-  }, [location.state]);
+    
+    // Nettoyer le state pour éviter de re-remplir si l'utilisateur revient
+    window.history.replaceState({}, document.title);
+  }, [location.state, platform]);
 
   // Charger les Woofs disponibles
   useEffect(() => {

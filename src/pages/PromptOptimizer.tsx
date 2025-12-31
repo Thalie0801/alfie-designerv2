@@ -84,6 +84,7 @@ export default function PromptOptimizer() {
         contentType,
         scenes: result?.scenes, // For mini-film multi-scene data
         referenceImages, // Transfer reference images to Studio
+        suggestedRatio: result?.suggestedAspectRatio, // Transfer suggested ratio
       } 
     });
   };
