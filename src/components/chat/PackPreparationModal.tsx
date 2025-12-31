@@ -100,6 +100,11 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
 
   // ✅ Lip-Sync natif VEO 3.1
   const [useLipSync, setUseLipSync] = useState(false);
+  
+  // ✅ NEW: Pro Video Pipeline settings
+  const [videoMode, setVideoMode] = useState<'voiceover' | 'lipsync'>('voiceover');
+  const [musicVolume, setMusicVolume] = useState(15); // 0-30%
+  const [duckingEnabled, setDuckingEnabled] = useState(true);
 
   // ✅ UX: si l’utilisateur active ElevenLabs (musique unifiée), on active aussi la voix-off par défaut
   // (sinon on obtient souvent “la même musique” sans narration, perçue comme un doublon)
@@ -345,6 +350,10 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
           useVoiceover: asset.kind === 'video_premium' ? useVoiceover : undefined,
           useUnifiedMusic: asset.kind === 'video_premium' ? useUnifiedMusic : undefined,
           useLipSync: asset.kind === 'video_premium' ? useLipSync : undefined,
+          // ✅ Pro Video Pipeline settings
+          videoMode: asset.kind === 'video_premium' ? videoMode : undefined,
+          musicVolume: asset.kind === 'video_premium' ? musicVolume : undefined,
+          duckingEnabled: asset.kind === 'video_premium' ? duckingEnabled : undefined,
         }));
       } else if (textsError || !textsData?.texts) {
         console.warn("[PackPreparationModal] Text generation failed, using fallback texts:", textsError);
@@ -361,6 +370,10 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
           useVoiceover: asset.kind === 'video_premium' ? useVoiceover : undefined,
           useUnifiedMusic: asset.kind === 'video_premium' ? useUnifiedMusic : undefined,
           useLipSync: asset.kind === 'video_premium' ? useLipSync : undefined,
+          // ✅ Pro Video Pipeline settings
+          videoMode: asset.kind === 'video_premium' ? videoMode : undefined,
+          musicVolume: asset.kind === 'video_premium' ? musicVolume : undefined,
+          duckingEnabled: asset.kind === 'video_premium' ? duckingEnabled : undefined,
           generatedTexts: generateFallbackTexts(asset, localPack.title),
         }));
         
@@ -378,6 +391,10 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
           useVoiceover: asset.kind === 'video_premium' ? useVoiceover : undefined,
           useUnifiedMusic: asset.kind === 'video_premium' ? useUnifiedMusic : undefined,
           useLipSync: asset.kind === 'video_premium' ? useLipSync : undefined,
+          // ✅ Pro Video Pipeline settings
+          videoMode: asset.kind === 'video_premium' ? videoMode : undefined,
+          musicVolume: asset.kind === 'video_premium' ? musicVolume : undefined,
+          duckingEnabled: asset.kind === 'video_premium' ? duckingEnabled : undefined,
           generatedTexts: textsData.texts?.[asset.id] || generateFallbackTexts(asset, localPack.title),
         }));
       }
@@ -761,7 +778,61 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
                   >
                     👄 Lip-Sync {useLipSync && hasVideoSelected && '✓'}
                   </button>
+                  
+                  {/* ✅ Toggle Mode: Lip-sync vs Voiceover */}
+                  <button
+                    type="button"
+                    onClick={() => hasVideoSelected && setVideoMode(prev => prev === 'voiceover' ? 'lipsync' : 'voiceover')}
+                    disabled={!hasVideoSelected}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                      !hasVideoSelected 
+                        ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                        : videoMode === 'lipsync' 
+                        ? 'bg-cyan-500 text-white' 
+                        : 'bg-background border border-border hover:bg-muted'
+                    }`}
+                  >
+                    {videoMode === 'lipsync' ? '🗣️ Lip-Sync natif' : '🎤 Voiceover'}
+                  </button>
+                  
+                  {/* ✅ Toggle Ducking */}
+                  <button
+                    type="button"
+                    onClick={() => hasVideoSelected && setDuckingEnabled(!duckingEnabled)}
+                    disabled={!hasVideoSelected}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                      !hasVideoSelected 
+                        ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                        : duckingEnabled 
+                        ? 'bg-amber-500 text-white' 
+                        : 'bg-background border border-border hover:bg-muted'
+                    }`}
+                  >
+                    🔊 Ducking {duckingEnabled && hasVideoSelected && '✓'}
+                  </button>
                 </div>
+                
+                {/* ✅ Slider Volume Musique */}
+                {hasVideoSelected && useUnifiedMusic && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground flex items-center justify-between">
+                      <span>Volume musique :</span>
+                      <span className="font-medium">{musicVolume}%</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="30"
+                      value={musicVolume}
+                      onChange={(e) => setMusicVolume(Number(e.target.value))}
+                      className="w-full h-2 bg-pink-200 dark:bg-pink-800 rounded-lg appearance-none cursor-pointer accent-pink-500"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>0%</span>
+                      <span>30%</span>
+                    </div>
+                  </div>
+                )}
                 
                 {/* Sélecteur de voix si voix-off activée */}
                 {useVoiceover && hasVideoSelected && (

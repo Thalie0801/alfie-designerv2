@@ -2437,6 +2437,210 @@ export type Database = {
           },
         ]
       }
+      video_project_audio: {
+        Row: {
+          created_at: string
+          id: string
+          lufs_measured: number | null
+          project_id: string
+          source: string
+          type: string
+          url: string
+          volume_percent: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lufs_measured?: number | null
+          project_id: string
+          source?: string
+          type: string
+          url: string
+          volume_percent?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lufs_measured?: number | null
+          project_id?: string
+          source?: string
+          type?: string
+          url?: string
+          volume_percent?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_project_audio_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_project_clips: {
+        Row: {
+          clip_index: number
+          created_at: string
+          duration_sec: number | null
+          error: string | null
+          id: string
+          project_id: string
+          prompt: string | null
+          status: string
+          updated_at: string
+          veo_job_id: string | null
+          video_url_muted: string | null
+          video_url_raw: string | null
+        }
+        Insert: {
+          clip_index: number
+          created_at?: string
+          duration_sec?: number | null
+          error?: string | null
+          id?: string
+          project_id: string
+          prompt?: string | null
+          status?: string
+          updated_at?: string
+          veo_job_id?: string | null
+          video_url_muted?: string | null
+          video_url_raw?: string | null
+        }
+        Update: {
+          clip_index?: number
+          created_at?: string
+          duration_sec?: number | null
+          error?: string | null
+          id?: string
+          project_id?: string
+          prompt?: string | null
+          status?: string
+          updated_at?: string
+          veo_job_id?: string | null
+          video_url_muted?: string | null
+          video_url_raw?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_project_clips_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_project_renders: {
+        Row: {
+          audio_mix_hash: string | null
+          audio_mixed_at: string | null
+          created_at: string
+          error: string | null
+          final_video_url: string | null
+          id: string
+          project_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          audio_mix_hash?: string | null
+          audio_mixed_at?: string | null
+          created_at?: string
+          error?: string | null
+          final_video_url?: string | null
+          id?: string
+          project_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          audio_mix_hash?: string | null
+          audio_mixed_at?: string | null
+          created_at?: string
+          error?: string | null
+          final_video_url?: string | null
+          id?: string
+          project_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_project_renders_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_projects: {
+        Row: {
+          anchor_face_image_url: string | null
+          anchor_set_image_url: string | null
+          anchor_style_text: string | null
+          brand_id: string | null
+          created_at: string
+          ducking_enabled: boolean
+          id: string
+          mode: string
+          music_volume: number
+          ratio: string
+          style_preset_id: string | null
+          updated_at: string
+          user_id: string
+          voice_lufs_target: number
+        }
+        Insert: {
+          anchor_face_image_url?: string | null
+          anchor_set_image_url?: string | null
+          anchor_style_text?: string | null
+          brand_id?: string | null
+          created_at?: string
+          ducking_enabled?: boolean
+          id?: string
+          mode?: string
+          music_volume?: number
+          ratio?: string
+          style_preset_id?: string | null
+          updated_at?: string
+          user_id: string
+          voice_lufs_target?: number
+        }
+        Update: {
+          anchor_face_image_url?: string | null
+          anchor_set_image_url?: string | null
+          anchor_style_text?: string | null
+          brand_id?: string | null
+          created_at?: string
+          ducking_enabled?: boolean
+          id?: string
+          mode?: string
+          music_volume?: number
+          ratio?: string
+          style_preset_id?: string | null
+          updated_at?: string
+          user_id?: string
+          voice_lufs_target?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_projects_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_projects_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
+          },
+        ]
+      }
       video_renders: {
         Row: {
           aspect_ratio: string | null
