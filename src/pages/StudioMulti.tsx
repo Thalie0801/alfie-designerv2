@@ -22,11 +22,12 @@ import { toast } from 'sonner';
 import { createJob } from '@/lib/jobClient';
 import type { JobSpecV1Type } from '@/types/jobSpec';
 import type { Ratio } from '@/lib/types/alfie';
-import { Loader2, Film, Image, Crop, FileArchive, Play, Clapperboard, Package, Palette, Paintbrush } from 'lucide-react';
+import { Loader2, Film, Image, Crop, FileArchive, Play, Clapperboard, Package, Palette, Paintbrush, User } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import type { VisualStyle } from '@/lib/types/vision';
 import { VISUAL_STYLE_OPTIONS } from '@/lib/constants/visualStyles';
 import { ReferenceImageUploader } from '@/components/studio/ReferenceImageUploader';
+import { SubjectPackSelector } from '@/components/studio/SubjectPackSelector';
 
 type Platform = "instagram" | "tiktok" | "linkedin" | "pinterest" | "youtube";
 
@@ -157,6 +158,10 @@ export default function StudioMulti() {
   const [lipSyncEnabled, setLipSyncEnabled] = useState(false);
   const [safeZone, setSafeZone] = useState(false);
 
+  // Subject Pack
+  const [useDefaultSubject, setUseDefaultSubject] = useState(true);
+  const [selectedSubjectPackId, setSelectedSubjectPackId] = useState<string | null>(null);
+
   // Reference images (1-3)
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
 
@@ -223,6 +228,11 @@ export default function StudioMulti() {
     setLoading(true);
 
     try {
+      // Resolve effective subject pack
+      const effectiveSubjectPackId = useDefaultSubject 
+        ? (activeBrand as any)?.default_subject_pack_id || null
+        : selectedSubjectPackId;
+
       const spec: JobSpecV1Type = {
         version: 'v1',
         kind: 'multi_clip_video',
@@ -236,7 +246,8 @@ export default function StudioMulti() {
         use_brand_kit: useBrandKitToggle,
         reference_images: referenceImages.length > 0 ? referenceImages : undefined,
         campaign_name: finalCampaignName,
-        tags: ['studio_multi'], // ✅ Tag pour identifier la source
+        subject_pack_id: effectiveSubjectPackId || undefined, // ✅ NEW: Subject Pack
+        tags: ['studio_multi'],
         locks: {
           palette_lock: useBrandKitToggle,
           light_mode: false,
@@ -287,6 +298,11 @@ export default function StudioMulti() {
     setLoading(true);
 
     try {
+      // Resolve effective subject pack
+      const effectiveSubjectPackId = useDefaultSubject 
+        ? (activeBrand as any)?.default_subject_pack_id || null
+        : selectedSubjectPackId;
+
       const spec: JobSpecV1Type = {
         version: 'v1',
         kind: 'campaign_pack',
@@ -301,7 +317,8 @@ export default function StudioMulti() {
         use_brand_kit: useBrandKitToggle,
         reference_images: referenceImages.length > 0 ? referenceImages : undefined,
         campaign_name: campaignName,
-        tags: ['studio_multi'], // ✅ Tag pour identifier la source
+        subject_pack_id: effectiveSubjectPackId || undefined, // ✅ NEW: Subject Pack
+        tags: ['studio_multi'],
         locks: {
           palette_lock: useBrandKitToggle,
           light_mode: false,
@@ -377,6 +394,35 @@ export default function StudioMulti() {
             </div>
           </div>
           <Switch checked={useBrandKitToggle} onCheckedChange={setUseBrandKitToggle} />
+        </div>
+      </Card>
+
+      {/* Subject Pack Toggle */}
+      <Card className="p-4">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <User className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium text-sm">Subject / Personnage</p>
+                <p className="text-xs text-muted-foreground">
+                  Utiliser le subject du Brand Kit
+                </p>
+              </div>
+            </div>
+            <Switch checked={useDefaultSubject} onCheckedChange={setUseDefaultSubject} />
+          </div>
+          
+          {!useDefaultSubject && (
+            <SubjectPackSelector
+              value={selectedSubjectPackId}
+              onChange={setSelectedSubjectPackId}
+              brandId={activeBrand?.id}
+              placeholder="Choisir un Subject Pack"
+            />
+          )}
         </div>
       </Card>
 

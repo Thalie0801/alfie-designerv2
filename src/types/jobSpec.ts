@@ -94,6 +94,7 @@ export const JobSpecV1 = z.object({
   brandkit_id: z.string().uuid().optional(),
   template_id: z.string().optional(),
   character_anchor_id: z.string().uuid().optional(),
+  subject_pack_id: z.string().uuid().optional(), // NEW: Subject Pack reference
   use_brand_kit: z.boolean().default(true),
 
   // Format master

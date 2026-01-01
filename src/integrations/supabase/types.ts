@@ -760,6 +760,7 @@ export type Database = {
           canva_refresh_token: string | null
           canva_team_id: string | null
           created_at: string | null
+          default_subject_pack_id: string | null
           fonts: Json | null
           id: string
           images_used: number | null
@@ -798,6 +799,7 @@ export type Database = {
           canva_refresh_token?: string | null
           canva_team_id?: string | null
           created_at?: string | null
+          default_subject_pack_id?: string | null
           fonts?: Json | null
           id?: string
           images_used?: number | null
@@ -836,6 +838,7 @@ export type Database = {
           canva_refresh_token?: string | null
           canva_team_id?: string | null
           created_at?: string | null
+          default_subject_pack_id?: string | null
           fonts?: Json | null
           id?: string
           images_used?: number | null
@@ -866,6 +869,13 @@ export type Database = {
           woofs_used?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "brands_default_subject_pack_id_fkey"
+            columns: ["default_subject_pack_id"]
+            isOneToOne: false
+            referencedRelation: "subject_packs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "brands_user_id_fkey"
             columns: ["user_id"]
@@ -2458,6 +2468,69 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      subject_packs: {
+        Row: {
+          anchor_a_url: string | null
+          anchor_b_url: string | null
+          brand_id: string | null
+          constraints_json: Json | null
+          created_at: string | null
+          id: string
+          identity_prompt: string | null
+          master_image_url: string
+          name: string
+          negative_prompt: string | null
+          pack_type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          anchor_a_url?: string | null
+          anchor_b_url?: string | null
+          brand_id?: string | null
+          constraints_json?: Json | null
+          created_at?: string | null
+          id?: string
+          identity_prompt?: string | null
+          master_image_url: string
+          name: string
+          negative_prompt?: string | null
+          pack_type?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          anchor_a_url?: string | null
+          anchor_b_url?: string | null
+          brand_id?: string | null
+          constraints_json?: Json | null
+          created_at?: string | null
+          id?: string
+          identity_prompt?: string | null
+          master_image_url?: string
+          name?: string
+          negative_prompt?: string | null
+          pack_type?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subject_packs_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subject_packs_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
+          },
+        ]
       }
       templates: {
         Row: {

@@ -11,7 +11,10 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { useBrandKit, ToneSliders } from '@/hooks/useBrandKit';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { Palette, Save, Loader2, X, MessageSquare, Eye, Sparkles, Type, Upload, Trash2, Link } from 'lucide-react';
+import { Palette, Save, Loader2, X, MessageSquare, Eye, Sparkles, Type, Upload, Trash2, Link, User, Plus } from 'lucide-react';
+import { SubjectPackSelector } from '@/components/studio/SubjectPackSelector';
+import { SubjectPackCreateModal } from '@/components/studio/SubjectPackCreateModal';
+// setBrandDefaultSubjectPack available for async updates if needed
 import { useAuth } from '@/hooks/useAuth';
 import { BrandSelector } from '@/components/BrandSelector';
 import { cn } from '@/lib/utils';
@@ -62,6 +65,8 @@ export default function BrandKit() {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [showSubjectPackModal, setShowSubjectPackModal] = useState(false);
+  const [defaultSubjectPackId, setDefaultSubjectPackId] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false); // ✅ V10
 
   // Handle logo file upload
@@ -224,6 +229,8 @@ export default function BrandKit() {
         avoid_in_visuals: brandKit.avoid_in_visuals || '',
         tagline: brandKit.tagline || ''
       });
+      // Load default subject pack
+      setDefaultSubjectPackId((brandKit as any).default_subject_pack_id || null);
     }
   }, [brandKit?.id]);
 
@@ -313,6 +320,7 @@ export default function BrandKit() {
           visual_mood: formData.visual_mood,
           avoid_in_visuals: formData.avoid_in_visuals || null,
           tagline: formData.tagline || null,
+          default_subject_pack_id: defaultSubjectPackId,
           updated_at: new Date().toISOString()
         })
         .eq('id', brandKit.id)
@@ -957,6 +965,48 @@ export default function BrandKit() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Card 4: Subject Pack par défaut */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <User className="h-5 w-5" />
+            <CardTitle>Subject par défaut</CardTitle>
+          </div>
+          <CardDescription>
+            Personnage ou élément récurrent utilisé dans tes contenus
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Subject Pack actif</Label>
+            <SubjectPackSelector
+              value={defaultSubjectPackId}
+              onChange={setDefaultSubjectPackId}
+              brandId={brandKit?.id}
+              placeholder="Aucun subject par défaut"
+            />
+            <p className="text-xs text-muted-foreground">
+              Ce subject sera automatiquement appliqué aux contenus créés avec cette marque
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSubjectPackModal(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Créer un nouveau Subject Pack
+          </Button>
+        </CardContent>
+      </Card>
+
+      <SubjectPackCreateModal
+        open={showSubjectPackModal}
+        onOpenChange={setShowSubjectPackModal}
+        onCreated={(packId) => setDefaultSubjectPackId(packId)}
+      />
 
       {/* Card 4: Exemples */}
       <Card>
