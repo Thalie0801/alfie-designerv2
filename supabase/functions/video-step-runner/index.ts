@@ -151,10 +151,41 @@ async function loadBrandKit(brandId: string): Promise<Record<string, unknown> | 
   return data;
 }
 
+// Helper: Charger un Subject Pack depuis la DB
+interface SubjectPack {
+  id: string;
+  name: string;
+  pack_type: string;
+  master_image_url: string;
+  anchor_a_url: string | null;
+  anchor_b_url: string | null;
+  identity_prompt: string;
+  negative_prompt: string;
+  constraints_json: Record<string, unknown>;
+}
+
+async function loadSubjectPack(packId: string): Promise<SubjectPack | null> {
+  if (!packId) return null;
+  
+  const { data, error } = await supabaseAdmin
+    .from('subject_packs')
+    .select('id, name, pack_type, master_image_url, anchor_a_url, anchor_b_url, identity_prompt, negative_prompt, constraints_json')
+    .eq('id', packId)
+    .single();
+  
+  if (error || !data) {
+    console.warn(`[video-step-runner] Could not load subjectPack for ${packId}:`, error?.message);
+    return null;
+  }
+  
+  return data as SubjectPack;
+}
+
 async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { visualPrompt, identityAnchorId, ratio, userId, brandId, useBrandKit, useLipSync } = input;
+  const { visualPrompt, identityAnchorId, subjectPackId, ratio, userId, brandId, useBrandKit, useLipSync } = input;
   
   console.log(`[gen_keyframe] userId: ${userId}, brandId: ${brandId}, useBrandKit: ${useBrandKit}, useLipSync: ${useLipSync}`);
+  console.log(`[gen_keyframe] subjectPackId: ${subjectPackId}, identityAnchorId: ${identityAnchorId}`);
   console.log(`[gen_keyframe] Generating keyframe with prompt: ${String(visualPrompt).substring(0, 100)}...`);
   
   // Charger le Brand Kit si activé
@@ -164,11 +195,37 @@ async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record
     console.log(`[gen_keyframe] Loaded brandKit: ${brandKit?.name || 'none'}`);
   }
   
-  // Récupérer l'anchor si défini
-  let anchorConstraints = '';
+  // Variables pour le contexte subject/identity
+  let subjectContext = '';
+  let negativeContext = '';
   let refImageUrl: string | null = null;
   
-  if (identityAnchorId) {
+  // Priorité 1: Subject Pack (nouveau système)
+  if (subjectPackId) {
+    const subjectPack = await loadSubjectPack(String(subjectPackId));
+    if (subjectPack) {
+      console.log(`[gen_keyframe] Loaded subjectPack: ${subjectPack.name} (${subjectPack.pack_type})`);
+      
+      // Utiliser l'image master comme référence principale
+      refImageUrl = subjectPack.master_image_url;
+      
+      // Construire le contexte d'identité
+      if (subjectPack.identity_prompt) {
+        subjectContext = `SUBJECT IDENTITY (${subjectPack.pack_type.toUpperCase()}):\n${subjectPack.identity_prompt}\n`;
+      }
+      if (subjectPack.negative_prompt) {
+        negativeContext = `AVOID: ${subjectPack.negative_prompt}\n`;
+      }
+      
+      // Contraintes du pack
+      const constraints = subjectPack.constraints_json || {};
+      if (constraints.face_lock) subjectContext += 'MAINTAIN EXACT face shape, eye color, hair style. ';
+      if (constraints.outfit_lock) subjectContext += 'MAINTAIN EXACT outfit and clothing colors. ';
+      if (constraints.palette_lock) subjectContext += 'MAINTAIN color palette consistency. ';
+    }
+  }
+  // Fallback: Identity Anchor (ancien système)
+  else if (identityAnchorId) {
     const { data: anchor } = await supabaseAdmin
       .from('identity_anchors')
       .select('*')
@@ -178,9 +235,9 @@ async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record
     if (anchor) {
       refImageUrl = anchor.ref_image_url;
       const constraints = anchor.constraints_json as Record<string, boolean> | null;
-      if (constraints?.face_lock) anchorConstraints += 'MAINTAIN EXACT face shape, eye color, hair style. ';
-      if (constraints?.outfit_lock) anchorConstraints += 'MAINTAIN EXACT outfit and clothing colors. ';
-      if (constraints?.palette_lock) anchorConstraints += 'MAINTAIN color palette consistency. ';
+      if (constraints?.face_lock) subjectContext += 'MAINTAIN EXACT face shape, eye color, hair style. ';
+      if (constraints?.outfit_lock) subjectContext += 'MAINTAIN EXACT outfit and clothing colors. ';
+      if (constraints?.palette_lock) subjectContext += 'MAINTAIN color palette consistency. ';
     }
   }
 
@@ -190,9 +247,10 @@ async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record
     : '';
 
   // Prompt pour générer l'image keyframe
-  const imagePrompt = `${visualPrompt}
+  const imagePrompt = `${subjectContext}${visualPrompt}
 ${lipSyncInstructions}
-${anchorConstraints ? `IDENTITY LOCK:\n${anchorConstraints}` : ''}
+${negativeContext}
+${subjectContext ? `IDENTITY LOCK:\n${subjectContext}` : ''}
 
 CRITICAL: Generate a single, clean image suitable as a video keyframe. No text, no split screens.
 Aspect ratio: ${ratio || '9:16'}`;
@@ -231,11 +289,11 @@ Aspect ratio: ${ratio || '9:16'}`;
 }
 
 async function handleAnimateClip(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { keyframeUrl, visualPrompt, identityAnchorId, ratio, durationSeconds, sceneIndex, userId, brandId, useLipSync } = input;
+  const { keyframeUrl, visualPrompt, identityAnchorId, subjectPackId, ratio, durationSeconds, sceneIndex, userId, brandId, useLipSync } = input;
   
   console.log(`[animate_clip] Animating scene ${sceneIndex} with VEO 3.1`);
   console.log(`[animate_clip] userId: ${userId}, brandId: ${brandId}, useLipSync: ${useLipSync}`);
-  console.log(`[animate_clip] keyframe: ${keyframeUrl}`);
+  console.log(`[animate_clip] subjectPackId: ${subjectPackId}, keyframe: ${keyframeUrl}`);
 
   if (!keyframeUrl) {
     throw new Error('Missing keyframeUrl for animate_clip step');
@@ -245,9 +303,26 @@ async function handleAnimateClip(input: Record<string, unknown>): Promise<Record
     throw new Error('Missing userId for animate_clip step');
   }
 
-  // Récupérer les contraintes de l'anchor
-  let anchorPrompt = '';
-  if (identityAnchorId) {
+  // Variables pour le contexte subject/identity
+  let subjectPrompt = '';
+  
+  // Priorité 1: Subject Pack (nouveau système)
+  if (subjectPackId) {
+    const subjectPack = await loadSubjectPack(String(subjectPackId));
+    if (subjectPack) {
+      console.log(`[animate_clip] Loaded subjectPack: ${subjectPack.name}`);
+      
+      if (subjectPack.identity_prompt) {
+        subjectPrompt = `SUBJECT (${subjectPack.pack_type}): ${subjectPack.identity_prompt}\n`;
+      }
+      
+      const constraints = subjectPack.constraints_json || {};
+      if (constraints.face_lock) subjectPrompt += 'MAINTAIN character identity throughout. ';
+      if (constraints.camera_angle_lock) subjectPrompt += 'Keep consistent camera angle. ';
+    }
+  }
+  // Fallback: Identity Anchor (ancien système)
+  else if (identityAnchorId) {
     const { data: anchor } = await supabaseAdmin
       .from('identity_anchors')
       .select('constraints_json')
@@ -256,8 +331,8 @@ async function handleAnimateClip(input: Record<string, unknown>): Promise<Record
     
     if (anchor?.constraints_json) {
       const constraints = anchor.constraints_json as Record<string, boolean>;
-      if (constraints.face_lock) anchorPrompt += 'MAINTAIN character identity throughout. ';
-      if (constraints.camera_angle) anchorPrompt += 'Keep consistent camera angle. ';
+      if (constraints.face_lock) subjectPrompt += 'MAINTAIN character identity throughout. ';
+      if (constraints.camera_angle) subjectPrompt += 'Keep consistent camera angle. ';
     }
   }
 
@@ -267,9 +342,8 @@ async function handleAnimateClip(input: Record<string, unknown>): Promise<Record
     : '';
 
   // Enrichir le prompt pour VEO
-  const enrichedPrompt = `${visualPrompt}
+  const enrichedPrompt = `${subjectPrompt}${visualPrompt}
 ${lipSyncInstructions}
-${anchorPrompt}
 
 CRITICAL FRAME RULES:
 - ONE SINGLE FULL-FRAME SHOT
