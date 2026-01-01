@@ -75,8 +75,9 @@ export default function StudioMulti() {
   useEffect(() => {
     const state = location.state as {
       prefillPrompt?: string;
-      contentType?: 'mini-film' | 'carousel' | 'video' | 'image';
+      contentType?: 'mini-film' | 'carousel' | 'video' | 'image' | 'campaign-pack';
       scenes?: MiniFilmScene[];
+      campaignPack?: { assets: Array<{ type: string; prompt: string }>; globalTheme: string };
       referenceImages?: string[];
       suggestedRatio?: string;
     } | null;
@@ -99,6 +100,24 @@ export default function StudioMulti() {
       }
     }
     
+    // ✅ NEW: Pre-fill from campaignPack
+    if (state.campaignPack?.assets) {
+      const pack = state.campaignPack;
+      const images = pack.assets.filter(a => a.type === 'image');
+      const carousels = pack.assets.filter(a => a.type === 'carousel');
+      const videos = pack.assets.filter(a => a.type === 'video');
+      
+      setImageCount(Math.max(1, images.length));
+      setCarouselCount(Math.max(0, carousels.length));
+      setVideoCount(Math.max(0, videos.length));
+      setActiveTab('pack-campagne');
+      
+      // Use global theme as script if no prefill
+      if (!state.prefillPrompt && pack.globalTheme) {
+        setScript(pack.globalTheme);
+      }
+    }
+    
     // Pre-fill reference images
     if (state.referenceImages?.length) {
       setReferenceImages(state.referenceImages);
@@ -107,6 +126,8 @@ export default function StudioMulti() {
     // Force Mini-Film tab if contentType is mini-film
     if (state.contentType === 'mini-film') {
       setActiveTab('mini-film');
+    } else if (state.contentType === 'campaign-pack') {
+      setActiveTab('pack-campagne');
     }
     
     // Apply suggested ratio if provided
@@ -115,7 +136,7 @@ export default function StudioMulti() {
     }
     
     // Clear state to prevent re-fill on navigation
-    if (state.prefillPrompt || state.scenes || state.referenceImages?.length || state.suggestedRatio) {
+    if (state.prefillPrompt || state.scenes || state.campaignPack || state.referenceImages?.length || state.suggestedRatio) {
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
@@ -311,13 +332,14 @@ export default function StudioMulti() {
         script: script,
         visual_style: visualStyle,
         image_count: imageCount,
-        slides_count: carouselCount * 5, // ~5 slides par carousel
+        carousel_count: carouselCount,     // ✅ NEW: Nombre de carrousels
+        slides_per_carousel: 5,            // ✅ NEW: 5 slides par carrousel
         clip_count: videoCount,
         deliverables: ['zip'] as JobSpecV1Type['deliverables'],
         use_brand_kit: useBrandKitToggle,
         reference_images: referenceImages.length > 0 ? referenceImages : undefined,
         campaign_name: campaignName,
-        subject_pack_id: effectiveSubjectPackId || undefined, // ✅ NEW: Subject Pack
+        subject_pack_id: effectiveSubjectPackId || undefined,
         tags: ['studio_multi'],
         locks: {
           palette_lock: useBrandKitToggle,

@@ -979,9 +979,9 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
 }
 
 async function handlePlanSlides(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { theme, slideCount } = input;
+  const { theme, slideCount, carouselIndex } = input;
   
-  console.log(`[plan_slides] Planning ${slideCount} slides for theme: ${theme}`);
+  console.log(`[plan_slides] Planning ${slideCount} slides for carousel ${carouselIndex ?? 0}, theme: ${theme}`);
 
   const response = await fetch(`${SUPABASE_URL}/functions/v1/alfie-plan-carousel`, {
     method: 'POST',
@@ -993,6 +993,7 @@ async function handlePlanSlides(input: Record<string, unknown>): Promise<Record<
     body: JSON.stringify({
       theme,
       slideCount: slideCount || 5,
+      carouselIndex: carouselIndex ?? 0,
     }),
   });
 
@@ -1002,22 +1003,25 @@ async function handlePlanSlides(input: Record<string, unknown>): Promise<Record<
   }
 
   const result = await response.json();
-  console.log(`[plan_slides] Planned ${result.slides?.length || 0} slides`);
+  console.log(`[plan_slides] Planned ${result.slides?.length || 0} slides for carousel ${carouselIndex ?? 0}`);
 
   return {
     slides: result.slides,
     slideCount: result.slides?.length || slideCount,
+    carouselIndex: carouselIndex ?? 0,
   };
 }
 
 async function handleAssembleCarousel(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  console.log(`[assemble_carousel] Assembling carousel`);
+  const { carouselIndex, slideCount } = input;
+  console.log(`[assemble_carousel] Assembling carousel ${carouselIndex ?? 0} with ${slideCount} slides`);
   
   // Collect slides from previous outputs
   // This will be enriched by enrichInputWithPreviousOutputs
   const slideUrls = input.slideUrls as string[] || [];
   
   return {
+    carouselIndex: carouselIndex ?? 0,
     carouselUrls: slideUrls,
     slideCount: slideUrls.length,
   };

@@ -117,6 +117,8 @@ export const JobSpecV1 = z.object({
   // Pour carousels
   slides: z.array(CarouselSlide).optional(),
   slides_count: z.number().optional(),
+  carousel_count: z.number().optional(),         // ✅ NEW: Nombre de carrousels distincts
+  slides_per_carousel: z.number().optional(),    // ✅ NEW: Slides par carrousel (default 5)
   carousel_theme: z.string().optional(),
   visual_style_category: z.enum(['background', 'character', 'product']).optional(),
   background_only: z.boolean().optional(),

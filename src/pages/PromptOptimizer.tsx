@@ -84,6 +84,7 @@ export default function PromptOptimizer() {
         prefillPrompt: result?.optimizedPrompt,
         contentType,
         scenes: result?.scenes, // For mini-film multi-scene data
+        campaignPack: result?.campaignPack, // ✅ NEW: For campaign-pack pre-fill
         referenceImages, // Transfer reference images to Studio
         suggestedRatio: result?.suggestedAspectRatio, // Transfer suggested ratio
       } 
