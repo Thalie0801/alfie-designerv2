@@ -35,6 +35,8 @@ export interface SendPackParams {
   // ✅ Video options
   useUnifiedMusic?: boolean;
   useLipSync?: boolean;
+  // ✅ Subject Pack
+  subjectPackId?: string;
 }
 
 export interface SendPackResult {
@@ -63,6 +65,8 @@ export async function sendPackToGenerator({
   // ✅ Video options
   useUnifiedMusic,
   useLipSync,
+  // ✅ Subject Pack
+  subjectPackId,
 }: SendPackParams): Promise<SendPackResult> {
   // 1. Calculer le coût total Woofs avec détail par type
   const assetsToProcess = pack.assets.filter((a) => selectedAssetIds.includes(a.id));
@@ -145,7 +149,7 @@ export async function sendPackToGenerator({
           scriptGroup: asset.scriptGroup,
           clipTotal: videoAssets.length,
         });
-        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, useLogo, userPlan, carouselMode, colorMode, visualStyle, videoAssets, source, useUnifiedMusic, useLipSync);
+        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, useLogo, userPlan, carouselMode, colorMode, visualStyle, videoAssets, source, useUnifiedMusic, useLipSync, subjectPackId);
       })
     );
 
@@ -208,6 +212,7 @@ async function createAssetJob(
   source: string = 'alfie_chat_pack', // ✅ Source de génération
   useUnifiedMusic?: boolean, // ✅ Video: musique
   useLipSync?: boolean, // ✅ Video: lip-sync
+  subjectPackId?: string, // ✅ Subject Pack
 ): Promise<{ orderId: string }> {
   // Créer un order pour cet asset
   const { data: order, error: orderError } = await supabase
@@ -316,6 +321,7 @@ async function createAssetJob(
             ? [asset.generatedTexts?.video?.hook, asset.generatedTexts?.video?.cta].filter(Boolean)
             : [],
       clipKeyframe: asset.prompt || undefined,
+      subjectPackId: subjectPackId || undefined,
     },
   });
 

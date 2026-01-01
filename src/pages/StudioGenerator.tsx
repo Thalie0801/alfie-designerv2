@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Sparkles, Image as ImageIcon, LayoutGrid, Video, Info, Palette } from "lucide-react";
+import { Sparkles, Image as ImageIcon, LayoutGrid, Video, Info, Palette, UserCircle } from "lucide-react";
 import type { VisualStyle } from "@/lib/types/vision";
 import { VISUAL_STYLE_OPTIONS } from "@/lib/constants/visualStyles";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,8 @@ import { useQueueMonitor } from "@/hooks/useQueueMonitor";
 import { useOrderCompletion } from "@/hooks/useOrderCompletion";
 import { QueueStatus } from "@/components/chat/QueueStatus";
 import { ReferenceImageUploader } from "@/components/studio/ReferenceImageUploader";
+import { SubjectPackSelector } from "@/components/studio/SubjectPackSelector";
+import { useEffectiveSubjectPack } from "@/hooks/useSubjectPacks";
 
 type AssetType = "image" | "carousel" | "video";
 type Platform = "instagram" | "tiktok" | "linkedin" | "pinterest" | "youtube";
@@ -103,6 +105,17 @@ export function StudioGenerator() {
 
   // Reference images (1-3)
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
+
+  // Subject Pack
+  const [useDefaultSubjectPack, setUseDefaultSubjectPack] = useState(true);
+  const [overrideSubjectPackId, setOverrideSubjectPackId] = useState<string | null>(null);
+  const { effectivePackId: brandDefaultPackId, loading: subjectPackLoading } = useEffectiveSubjectPack(
+    useDefaultSubjectPack, 
+    overrideSubjectPackId
+  );
+  
+  // Compute effective subject pack id
+  const effectiveSubjectPackId = useDefaultSubjectPack ? brandDefaultPackId : overrideSubjectPackId;
 
   // Pré-remplir depuis PromptOptimizer, ChatWidget, ou PackPreparationModal
   useEffect(() => {
@@ -242,6 +255,7 @@ export function StudioGenerator() {
         useBrandKit: useBrandKitToggle,
         visualStyle,
         durationSeconds: selectedType === "video" ? 6 : undefined,
+        // Subject pack handled separately in sendPackToGenerator
         // Reference images
         referenceImageUrl: referenceImages[0], // Primary reference
         referenceImages, // All references
@@ -269,6 +283,8 @@ export function StudioGenerator() {
         // Video options
         useUnifiedMusic: selectedType === "video" ? musicEnabled : undefined,
         useLipSync: selectedType === "video" ? lipSyncEnabled : undefined,
+        // Subject pack
+        subjectPackId: effectiveSubjectPackId || undefined,
       });
 
       toast.success(`${ASSET_CONFIG[selectedType].emoji} Génération lancée !`);
@@ -586,6 +602,39 @@ export function StudioGenerator() {
                   </div>
                 </div>
               )}
+
+              {/* Subject Pack Toggle */}
+              <div className="space-y-3 p-3 bg-muted/30 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <UserCircle className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium text-sm">Subject / Personnage</p>
+                      <p className="text-xs text-muted-foreground">
+                        {useDefaultSubjectPack 
+                          ? (brandDefaultPackId ? "Utilise le Subject du Brand Kit" : "Aucun subject par défaut")
+                          : "Override manuel"
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  <Switch 
+                    checked={useDefaultSubjectPack} 
+                    onCheckedChange={setUseDefaultSubjectPack} 
+                    disabled={subjectPackLoading}
+                  />
+                </div>
+                
+                {/* Override selector when toggle is off */}
+                {!useDefaultSubjectPack && (
+                  <SubjectPackSelector
+                    value={overrideSubjectPackId}
+                    onChange={setOverrideSubjectPackId}
+                    brandId={activeBrandId || undefined}
+                    placeholder="Choisir un Subject Pack"
+                  />
+                )}
+              </div>
 
               {/* Brand Kit Toggle */}
               <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg" data-tour-id="studio-brandkit-toggle">

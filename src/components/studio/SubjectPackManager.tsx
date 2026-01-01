@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { useSubjectPacks } from '@/hooks/useSubjectPacks';
 import { useBrandKit } from '@/hooks/useBrandKit';
 import { SubjectPackCreateModal } from './SubjectPackCreateModal';
+import { setBrandDefaultSubjectPack } from '@/services/subjectPackService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Trash2, User, Dog, Package, Sparkles, Star } from 'lucide-react';
+import { Loader2, Plus, Trash2, User, Dog, Package, Sparkles, Star, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -40,9 +41,10 @@ interface SubjectPackManagerProps {
 
 export function SubjectPackManager({ showHeader = true, onPackSelect }: SubjectPackManagerProps) {
   const { packs, loading, deletePack, refresh } = useSubjectPacks();
-  const { brandKit } = useBrandKit();
+  const { brandKit, loadBrands } = useBrandKit();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
 
   const defaultPackId = (brandKit as any)?.default_subject_pack_id;
 
@@ -62,6 +64,22 @@ export function SubjectPackManager({ showHeader = true, onPackSelect }: SubjectP
   const handleCreated = (packId: string) => {
     refresh();
     onPackSelect?.(packId);
+  };
+
+  const handleSetDefault = async (packId: string) => {
+    if (!brandKit?.id) return;
+    setSettingDefaultId(packId);
+    try {
+      await setBrandDefaultSubjectPack(brandKit.id, packId);
+      await loadBrands(); // Refresh to get updated default
+      onPackSelect?.(packId);
+      toast.success('Subject Pack défini par défaut');
+    } catch (err) {
+      console.error('Set default error:', err);
+      toast.error('Erreur lors de la mise à jour');
+    } finally {
+      setSettingDefaultId(null);
+    }
   };
 
   if (loading) {
@@ -159,47 +177,68 @@ export function SubjectPackManager({ showHeader = true, onPackSelect }: SubjectP
 
               <CardHeader className="p-4 pb-2">
                 <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-base">{pack.name}</CardTitle>
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-base truncate">{pack.name}</CardTitle>
                     <CardDescription className="flex items-center gap-1 mt-1">
                       {PACK_TYPE_ICONS[pack.pack_type]}
                       {PACK_TYPE_LABELS[pack.pack_type]}
                     </CardDescription>
                   </div>
                   
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
+                  <div className="flex items-center gap-1">
+                    {/* Définir par défaut */}
+                    {defaultPackId !== pack.id && (
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                        disabled={deletingId === pack.id}
+                        className="h-8 w-8 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => handleSetDefault(pack.id)}
+                        disabled={settingDefaultId === pack.id}
+                        title="Définir par défaut"
                       >
-                        {deletingId === pack.id ? (
+                        {settingDefaultId === pack.id ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          <Trash2 className="h-4 w-4" />
+                          <Check className="h-4 w-4" />
                         )}
                       </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Supprimer "{pack.name}" ?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Cette action est irréversible. Les projets utilisant ce pack ne seront plus associés à aucun subject.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Annuler</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleDelete(pack.id)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    )}
+                    
+                    {/* Supprimer */}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                          disabled={deletingId === pack.id}
                         >
-                          Supprimer
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                          {deletingId === pack.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Supprimer "{pack.name}" ?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Cette action est irréversible. Les projets utilisant ce pack ne seront plus associés à aucun subject.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Annuler</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDelete(pack.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Supprimer
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </div>
               </CardHeader>
 
