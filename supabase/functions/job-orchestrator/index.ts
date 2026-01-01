@@ -345,6 +345,39 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
     },
   });
 
+  // ✅ NEW: Render variants for multi_clip_video (same as campaign_pack)
+  const variants = spec.deliverables.filter(d => d.startsWith('variant_'));
+  for (const variant of variants) {
+    const ratio = variant.replace('variant_', '').replace('_', ':');
+    steps.push({
+      step_type: 'render_variant',
+      step_index: stepIndex++,
+      input_json: { targetRatio: ratio, variant },
+    });
+  }
+
+  // ✅ NEW: Extract thumbnails for multi_clip_video
+  const thumbs = spec.deliverables.filter(d => d.startsWith('thumb_'));
+  if (thumbs.length > 0) {
+    steps.push({
+      step_type: 'extract_thumbnails',
+      step_index: stepIndex++,
+      input_json: {
+        timestamps: spec.render?.thumbnails_timestamps || [1.0, 7.0, 15.0],
+        count: thumbs.length,
+      },
+    });
+  }
+
+  // ✅ NEW: Render cover for multi_clip_video
+  if (spec.deliverables.includes('cover')) {
+    steps.push({
+      step_type: 'render_cover',
+      step_index: stepIndex++,
+      input_json: { campaignName: spec.campaign_name },
+    });
+  }
+
   // Deliver
   steps.push({
     step_type: 'deliver',
@@ -611,6 +644,12 @@ function calculateWoofsCost(spec: JobSpecV1Type): number {
       cost = clipCount * woofPerClip;
       if (spec.audio?.voiceover_enabled !== false) cost += 1;
       if (spec.audio?.music_enabled !== false) cost += 1;
+      // ✅ NEW: Add variants cost for multi_clip_video
+      const variantCount = spec.deliverables.filter(d => d.startsWith('variant_')).length;
+      cost += variantCount * 2; // 2 Woofs per variant
+      const thumbCount = spec.deliverables.filter(d => d.startsWith('thumb_')).length;
+      cost += Math.ceil(thumbCount / 3); // 1 Woof per 3 thumbnails
+      if (spec.deliverables.includes('cover')) cost += 2; // 2 Woofs for cover
       break;
     }
     case 'campaign_pack': {
