@@ -959,10 +959,10 @@ async function handlePlanScript(input: Record<string, unknown>): Promise<Record<
 
   const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
   
-  // If no API key or no script, fallback to simple split
+  // If no API key or no script, fallback to simple split (with character propagation)
   if (!LOVABLE_API_KEY || !(script as string)?.trim()) {
     console.log(`[plan_script] No API key or empty script, using simple split`);
-    return fallbackPlanScript(script as string, targetClipCount, durationTotal as number);
+    return fallbackPlanScript(script as string, targetClipCount, durationTotal as number, subjectDescription);
   }
 
   const systemPrompt = `Tu es un réalisateur de mini-films publicitaires.
@@ -1034,25 +1034,40 @@ Réponds UNIQUEMENT en JSON valide:
     };
   } catch (error) {
     console.error(`[plan_script] LLM error, falling back to simple split:`, error);
-    return fallbackPlanScript(script as string, targetClipCount, durationTotal as number);
+    return fallbackPlanScript(script as string, targetClipCount, durationTotal as number, subjectDescription);
   }
 }
 
-// Fallback function for simple script splitting
-function fallbackPlanScript(script: string, clipCount: number, durationTotal: number): Record<string, unknown> {
+// Fallback function for simple script splitting (with subject identity propagation)
+function fallbackPlanScript(
+  script: string, 
+  clipCount: number, 
+  durationTotal: number,
+  subjectDescription?: string
+): Record<string, unknown> {
   const lines = (script || '').split(/[.!?]+/).filter(l => l.trim());
-  const beatsPerClip = Math.ceil(lines.length / clipCount);
+  const beatsPerClip = Math.ceil(lines.length / clipCount) || 1;
+  
+  // Character prefix to ensure consistency across all beats
+  const characterPrefix = subjectDescription 
+    ? `${subjectDescription}. ` 
+    : '';
   
   const beats = [];
   for (let i = 0; i < clipCount; i++) {
     const clipLines = lines.slice(i * beatsPerClip, (i + 1) * beatsPerClip);
+    const sceneDescription = clipLines.join('. ') || `Dynamic scene ${i + 1}`;
+    
     beats.push({
       sceneIndex: i,
-      visualPrompt: clipLines.join('. ') || `Scene ${i + 1}`,
+      // ✅ Prefix EVERY visualPrompt with character description for consistency
+      visualPrompt: characterPrefix + sceneDescription,
       voiceoverText: clipLines.join('. '),
       durationSec: Math.floor((durationTotal || 24) / clipCount),
     });
   }
+
+  console.log(`[fallbackPlanScript] Generated ${beats.length} beats with character: "${subjectDescription?.substring(0, 50) || 'none'}..."`);
 
   return {
     beats,
