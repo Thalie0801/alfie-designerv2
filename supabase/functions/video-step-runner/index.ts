@@ -105,7 +105,7 @@ function enrichInputWithPreviousOutputs(
     }
   }
 
-  // For animate_clip: inject corresponding keyframe + visualPrompt from beats
+  // For animate_clip: inject corresponding keyframe + visualPrompt + voiceoverText from beats
   if (stepType === 'animate_clip') {
     const sceneIndex = (input.sceneIndex as number) ?? 0;
     const keyframes = previousOutputs.keyframes as string[];
@@ -117,11 +117,18 @@ function enrichInputWithPreviousOutputs(
       enriched.firstKeyframeUrl = keyframes[0];
       console.log(`[enrichInput] ✅ Injected firstKeyframeUrl as identity anchor for scene ${sceneIndex}`);
     }
-    // ✅ Also inject visualPrompt for animate_clip
-    const plannedBeats = previousOutputs.plannedBeats as Array<{ visualPrompt?: string }>;
-    if (plannedBeats && plannedBeats[sceneIndex]?.visualPrompt && !input.visualPrompt) {
-      enriched.visualPrompt = plannedBeats[sceneIndex].visualPrompt;
-      console.log(`[enrichInput] ✅ Injected visualPrompt for clip scene ${sceneIndex}: ${String(enriched.visualPrompt).substring(0, 80)}...`);
+    // ✅ Inject visualPrompt and voiceoverText from planned beats
+    const plannedBeats = previousOutputs.plannedBeats as Array<{ visualPrompt?: string; voiceoverText?: string }>;
+    if (plannedBeats && plannedBeats[sceneIndex]) {
+      if (plannedBeats[sceneIndex].visualPrompt && !input.visualPrompt) {
+        enriched.visualPrompt = plannedBeats[sceneIndex].visualPrompt;
+        console.log(`[enrichInput] ✅ Injected visualPrompt for clip scene ${sceneIndex}: ${String(enriched.visualPrompt).substring(0, 80)}...`);
+      }
+      // ✅ NEW: Inject voiceoverText for VEO native lip-sync
+      if (plannedBeats[sceneIndex].voiceoverText && !input.voiceoverText) {
+        enriched.voiceoverText = plannedBeats[sceneIndex].voiceoverText;
+        console.log(`[enrichInput] ✅ Injected voiceoverText for clip scene ${sceneIndex}: ${String(enriched.voiceoverText).substring(0, 60)}...`);
+      }
     }
   }
 
