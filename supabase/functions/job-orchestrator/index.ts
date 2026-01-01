@@ -106,6 +106,7 @@ const JobSpecV1 = z.object({
   brandkit_id: z.string().uuid(),
   template_id: z.string().optional(),
   character_anchor_id: z.string().uuid().optional(),
+  subject_pack_id: z.string().uuid().optional(), // NEW: Subject Pack
   ratio_master: z.enum(['9:16', '1:1', '16:9', '4:5']).default('9:16'),
   duration_total: z.number().optional(),
   clip_count: z.number().optional(),
