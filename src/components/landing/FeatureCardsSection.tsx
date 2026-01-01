@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Wand2, Images, Film, Palette, Grid3X3 } from "lucide-react";
+import { ArrowRight, Wand2, Images, Film, Palette, Grid3X3, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { trackEvent } from "@/utils/trackEvent";
 
@@ -39,6 +39,13 @@ const features = [
     description: "Instagram, TikTok, LinkedIn, Pinterest, YouTube. Formats 1:1, 4:5, 9:16, 16:9...",
     gradient: "from-blue-500/20 to-indigo-500/10",
     iconBg: "bg-blue-500/20 text-blue-600",
+  },
+  {
+    icon: Users,
+    title: "Subject Packs",
+    description: "Définis tes personnages, mascottes ou produits. L'IA les reproduit fidèlement dans chaque création.",
+    gradient: "from-cyan-500/20 to-sky-500/10",
+    iconBg: "bg-cyan-500/20 text-cyan-600",
   },
 ];
 
