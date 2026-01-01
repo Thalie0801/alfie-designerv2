@@ -37,10 +37,11 @@ const PACK_TYPE_LABELS: Record<string, string> = {
 interface SubjectPackManagerProps {
   showHeader?: boolean;
   onPackSelect?: (packId: string) => void;
+  brandId?: string;
 }
 
-export function SubjectPackManager({ showHeader = true, onPackSelect }: SubjectPackManagerProps) {
-  const { packs, loading, deletePack, refresh } = useSubjectPacks();
+export function SubjectPackManager({ showHeader = true, onPackSelect, brandId }: SubjectPackManagerProps) {
+  const { packs, loading, deletePack, refresh } = useSubjectPacks(brandId);
   const { brandKit, loadBrands } = useBrandKit();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);

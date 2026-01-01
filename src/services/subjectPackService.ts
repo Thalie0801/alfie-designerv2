@@ -28,6 +28,8 @@ export interface CreateSubjectPackInput {
  * Upload an image to Supabase Storage and return the public URL
  */
 async function uploadImage(file: File, userId: string, packId: string, slot: string): Promise<string> {
+  console.log('[SubjectPack] uploadImage:', { fileName: file.name, size: file.size, type: file.type, slot });
+  
   const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
   const path = `subject-packs/${userId}/${packId}/${slot}-${Date.now()}.${ext}`;
   
@@ -35,12 +37,16 @@ async function uploadImage(file: File, userId: string, packId: string, slot: str
     .from('chat-uploads')
     .upload(path, file, { upsert: true });
 
-  if (uploadError) throw uploadError;
+  if (uploadError) {
+    console.error('[SubjectPack] Upload failed:', uploadError);
+    throw new Error(`Upload failed for ${slot}: ${uploadError.message}`);
+  }
 
   const { data: { publicUrl } } = supabase.storage
     .from('chat-uploads')
     .getPublicUrl(path);
 
+  console.log('[SubjectPack] Uploaded successfully:', publicUrl);
   return publicUrl;
 }
 
@@ -89,11 +95,15 @@ export async function createSubjectPack(
   files: { master: File; anchorA?: File; anchorB?: File },
   userId: string
 ): Promise<SubjectPack> {
+  console.log('[SubjectPack] Creating pack:', { input, userId, hasFiles: { master: !!files.master, anchorA: !!files.anchorA, anchorB: !!files.anchorB } });
+  
   // Generate a temporary ID for the folder structure
   const tempId = crypto.randomUUID();
 
   // Upload master image (required)
+  console.log('[SubjectPack] Uploading master image...');
   const masterUrl = await uploadImage(files.master, userId, tempId, 'master');
+  console.log('[SubjectPack] Master uploaded:', masterUrl);
 
   // Upload optional anchor images
   let anchorAUrl: string | null = null;
@@ -108,6 +118,7 @@ export async function createSubjectPack(
   }
 
   // Create the subject pack record
+  console.log('[SubjectPack] Creating DB record with brand_id:', input.brand_id);
   const { data, error } = await supabase
     .from('subject_packs')
     .insert({
@@ -125,7 +136,12 @@ export async function createSubjectPack(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('[SubjectPack] DB insert failed:', error);
+    throw new Error(`Database error: ${error.message}`);
+  }
+  
+  console.log('[SubjectPack] Pack created successfully:', data.id);
   return data as SubjectPack;
 }
 

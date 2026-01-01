@@ -994,7 +994,8 @@ export default function BrandKit() {
           {/* Subject Pack Manager intégré */}
           <div className="pt-4 border-t">
             <SubjectPackManager 
-              showHeader={true} 
+              showHeader={true}
+              brandId={brandKit?.id}
               onPackSelect={(packId) => setDefaultSubjectPackId(packId)}
             />
           </div>
