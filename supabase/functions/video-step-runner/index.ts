@@ -41,12 +41,18 @@ async function getStepOutputs(jobId: string): Promise<Record<string, unknown>> {
   const outputs: Record<string, unknown> = {
     keyframes: [] as string[],
     clipUrls: [] as string[],
+    plannedBeats: [] as Array<{ sceneIndex: number; visualPrompt: string; voiceoverText: string; durationSec: number }>,
   };
 
   for (const step of previousSteps || []) {
     const output = step.output_json as Record<string, unknown> | null;
     if (!output) continue;
 
+    // ✅ Collect planned beats from plan_script
+    if (step.step_type === 'plan_script' && output.beats) {
+      outputs.plannedBeats = output.beats;
+      console.log(`[getStepOutputs] Collected ${(output.beats as unknown[]).length} planned beats from plan_script`);
+    }
     // Collect keyframes
     if (step.step_type === 'gen_keyframe' && output.keyframeUrl) {
       (outputs.keyframes as string[]).push(output.keyframeUrl as string);
@@ -83,12 +89,28 @@ function enrichInputWithPreviousOutputs(
 ): Record<string, unknown> {
   const enriched = { ...input };
 
-  // For animate_clip: inject corresponding keyframe
+  // ✅ For gen_keyframe: inject visualPrompt from planned beats
+  if (stepType === 'gen_keyframe') {
+    const sceneIndex = (input.sceneIndex as number) ?? 0;
+    const plannedBeats = previousOutputs.plannedBeats as Array<{ visualPrompt?: string }>;
+    if (plannedBeats && plannedBeats[sceneIndex]?.visualPrompt && !input.visualPrompt) {
+      enriched.visualPrompt = plannedBeats[sceneIndex].visualPrompt;
+      console.log(`[enrichInput] ✅ Injected visualPrompt for keyframe scene ${sceneIndex}: ${String(enriched.visualPrompt).substring(0, 80)}...`);
+    }
+  }
+
+  // For animate_clip: inject corresponding keyframe + visualPrompt from beats
   if (stepType === 'animate_clip') {
     const sceneIndex = (input.sceneIndex as number) ?? 0;
     const keyframes = previousOutputs.keyframes as string[];
     if (keyframes && keyframes[sceneIndex]) {
       enriched.keyframeUrl = keyframes[sceneIndex];
+    }
+    // ✅ Also inject visualPrompt for animate_clip
+    const plannedBeats = previousOutputs.plannedBeats as Array<{ visualPrompt?: string }>;
+    if (plannedBeats && plannedBeats[sceneIndex]?.visualPrompt && !input.visualPrompt) {
+      enriched.visualPrompt = plannedBeats[sceneIndex].visualPrompt;
+      console.log(`[enrichInput] ✅ Injected visualPrompt for clip scene ${sceneIndex}: ${String(enriched.visualPrompt).substring(0, 80)}...`);
     }
   }
 
