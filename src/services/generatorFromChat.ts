@@ -32,6 +32,9 @@ export interface SendPackParams {
   colorMode?: 'vibrant' | 'pastel'; // ✅ Mode Coloré/Pastel
   visualStyle?: 'background' | 'character' | 'product'; // ✅ NEW: Style visuel adaptatif
   source?: 'studio_solo' | 'studio_multi' | 'alfie_chat_pack'; // ✅ Source de génération
+  // ✅ Video options
+  useUnifiedMusic?: boolean;
+  useLipSync?: boolean;
 }
 
 export interface SendPackResult {
@@ -57,6 +60,9 @@ export async function sendPackToGenerator({
   colorMode = 'vibrant', // ✅ Mode Coloré/Pastel
   visualStyle = 'background', // ✅ NEW: Style visuel adaptatif
   source = 'alfie_chat_pack', // ✅ Source par défaut
+  // ✅ Video options
+  useUnifiedMusic,
+  useLipSync,
 }: SendPackParams): Promise<SendPackResult> {
   // 1. Calculer le coût total Woofs avec détail par type
   const assetsToProcess = pack.assets.filter((a) => selectedAssetIds.includes(a.id));
@@ -139,7 +145,7 @@ export async function sendPackToGenerator({
           scriptGroup: asset.scriptGroup,
           clipTotal: videoAssets.length,
         });
-        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, useLogo, userPlan, carouselMode, colorMode, visualStyle, videoAssets, source);
+        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, useLogo, userPlan, carouselMode, colorMode, visualStyle, videoAssets, source, useUnifiedMusic, useLipSync);
       })
     );
 
@@ -199,7 +205,9 @@ async function createAssetJob(
   colorMode: 'vibrant' | 'pastel' = 'vibrant',
   visualStyle: 'background' | 'character' | 'product' = 'background', // ✅ NEW
   allVideoAssets: any[] = [], // ✅ Pour calculer clipTotal
-  source: string = 'alfie_chat_pack' // ✅ Source de génération
+  source: string = 'alfie_chat_pack', // ✅ Source de génération
+  useUnifiedMusic?: boolean, // ✅ Video: musique
+  useLipSync?: boolean, // ✅ Video: lip-sync
 ): Promise<{ orderId: string }> {
   // Créer un order pour cet asset
   const { data: order, error: orderError } = await supabase
@@ -284,9 +292,9 @@ async function createAssetJob(
       audioMode: asset.kind === 'video_premium' ? (asset.audioMode || 'veo') : undefined,
       voiceId: asset.kind === 'video_premium' ? (asset.voiceId || undefined) : undefined,
       useVoiceover: asset.kind === 'video_premium' ? (asset.useVoiceover || false) : undefined,
-      useUnifiedMusic: asset.kind === 'video_premium' ? (asset.useUnifiedMusic || false) : undefined,
+      useUnifiedMusic: asset.kind === 'video_premium' ? (useUnifiedMusic ?? asset.useUnifiedMusic ?? false) : undefined,
       batchMusicUrl: asset.kind === 'video_premium' ? (asset.batchMusicUrl || undefined) : undefined,
-      useLipSync: asset.kind === 'video_premium' ? (asset.useLipSync || false) : undefined,
+      useLipSync: asset.kind === 'video_premium' ? (useLipSync ?? asset.useLipSync ?? false) : undefined,
       engine: videoEngine,
       durationSeconds: asset.durationSeconds || 5,
       aspectRatio: asset.ratio || "4:5",
