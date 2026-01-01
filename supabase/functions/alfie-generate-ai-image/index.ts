@@ -50,6 +50,7 @@ interface GenerateRequest {
   orderId?: string | null;
   orderItemId?: string | null;
   requestId?: string | null;
+  jobId?: string | null; // ✅ NEW: Job ID for tracking in unified pipeline
   templateImageUrl?: string;
   uploadedSourceUrl?: string | null;
   referenceImageUrl?: string | null; // ✅ NEW: Subject Pack reference image
@@ -350,6 +351,7 @@ Deno.serve(async (req) => {
     const orderId = typeof body.orderId === "string" ? body.orderId : null;
     const orderItemId = typeof body.orderItemId === "string" ? body.orderItemId : null;
     const requestId = typeof body.requestId === "string" ? body.requestId : null;
+    const jobId = typeof body.jobId === "string" ? body.jobId : null;
 
     if (!userId) {
       return jsonRes({ error: "Missing userId" }, { status: 400 });
@@ -547,6 +549,7 @@ Deno.serve(async (req) => {
       const insertPayload = {
         user_id: userId,
         brand_id: brandIdForMetadata,
+        job_id: jobId, // ✅ NEW: Link image to job for tracking
         type: "image" as const,
         status: "completed" as const,
         // On log uniquement un résumé court pour conformité
@@ -571,6 +574,7 @@ Deno.serve(async (req) => {
           orderId,
           orderItemId,
           requestId,
+          jobId, // ✅ Also in metadata for redundancy
           referenceImageUrl: referenceImage ?? null,
           isIntermediate: !!body.isIntermediate, // ✅ Also in metadata for filtering
         },

@@ -3440,6 +3440,7 @@ export type Database = {
         Args: { p_delta?: number; p_profile_id: string }
         Returns: undefined
       }
+      recover_stuck_steps: { Args: never; Returns: number }
       refund_brand_quotas: {
         Args: {
           p_brand_id: string

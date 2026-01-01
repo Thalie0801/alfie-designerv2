@@ -659,6 +659,7 @@ async function handleDeliver(input: Record<string, unknown>): Promise<Record<str
       .insert({
         user_id: userId,
         brand_id: brandId,
+        job_id: jobId as string, // ✅ Link video to job
         type: 'video',
         output_url: finalVideoUrl as string,
         status: 'completed',
@@ -678,11 +679,44 @@ async function handleDeliver(input: Record<string, unknown>): Promise<Record<str
   }
 
   // =====================================================
-  // 2) Deliver IMAGES from previous steps' outputs
+  // 2) Associate IMAGES to job (update job_id for images without one)
   // =====================================================
-  // Images are already saved in gen_image step via alfie-generate-ai-image
-  // We just acknowledge them here
-  if (imageCount && Number(imageCount) > 0) {
+  if (imageCount && Number(imageCount) > 0 && jobId) {
+    // Get image URLs from completed gen_image steps
+    const { data: genImageSteps } = await supabaseAdmin
+      .from('job_steps')
+      .select('output_json')
+      .eq('job_id', jobId)
+      .eq('step_type', 'gen_image')
+      .eq('status', 'completed');
+    
+    const imageUrls: string[] = [];
+    for (const step of genImageSteps || []) {
+      const output = step.output_json as Record<string, unknown> | null;
+      if (output?.imageUrl) {
+        imageUrls.push(output.imageUrl as string);
+      }
+    }
+    
+    // Update media_generations to associate with this job
+    if (imageUrls.length > 0) {
+      const { data: updated, error: updateError } = await supabaseAdmin
+        .from('media_generations')
+        .update({ job_id: jobId as string })
+        .in('output_url', imageUrls)
+        .is('job_id', null) // Only update if not already linked
+        .select('id');
+      
+      if (updateError) {
+        console.error(`[deliver] Failed to associate images:`, updateError.message);
+      } else {
+        console.log(`[deliver] ✅ Associated ${updated?.length || 0} images to job ${jobId}`);
+        for (const img of updated || []) {
+          deliveredAssets.push({ type: 'image', id: img.id, url: '' });
+        }
+      }
+    }
+    
     console.log(`[deliver] ✅ ${imageCount} images were generated (saved by gen_image step)`);
   }
 
@@ -767,7 +801,7 @@ async function executeStep(stepType: string, input: Record<string, unknown>): Pr
 // =====================================================
 
 async function handleGenImage(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { prompt, ratio, visualStyle, identityAnchorId, subjectPackId, userId, brandId, useBrandKit } = input;
+  const { prompt, ratio, visualStyle, identityAnchorId, subjectPackId, userId, brandId, useBrandKit, jobId } = input;
   
   console.log(`[gen_image] userId: ${userId}, brandId: ${brandId}, useBrandKit: ${useBrandKit}`);
   console.log(`[gen_image] subjectPackId: ${subjectPackId}, identityAnchorId: ${identityAnchorId}`);
@@ -830,6 +864,7 @@ async function handleGenImage(input: Record<string, unknown>): Promise<Record<st
       brandId,
       brandKit,
       useBrandKit,
+      jobId, // ✅ Pass jobId for tracking in media_generations
       prompt: enrichedPrompt,
       ratio: ratio || '9:16',
       visualStyle: visualStyle || 'photorealistic',
@@ -1196,6 +1231,12 @@ Deno.serve(async (req) => {
 
   try {
     console.log('[video-step-runner] Starting step processing...');
+
+    // ✅ AUTO-RECOVERY: Recover any stuck steps before claiming new ones
+    const { data: recoveredCount } = await supabaseAdmin.rpc('recover_stuck_steps');
+    if (recoveredCount && recoveredCount > 0) {
+      console.log(`[video-step-runner] ✅ Recovered ${recoveredCount} stuck steps`);
+    }
 
     // Claim le prochain step disponible
     const { data: steps, error: claimError } = await supabaseAdmin.rpc('claim_next_step');
