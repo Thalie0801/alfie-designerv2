@@ -404,9 +404,20 @@ async function handleAnimateClip(input: Record<string, unknown>): Promise<Record
     }
   }
 
-  // Instructions Lip-Sync renforcées pour VEO (améliore l'animation, pas une vraie synchro)
+  // ✅ FIX: When lip-sync is enabled, inject voiceover text into VEO prompt for native speech
+  const voiceoverText = input.voiceoverText as string | undefined;
   const lipSyncInstructions = useLipSync 
-    ? `\n\nNATURAL TALKING ANIMATION:\n- Character speaks DIRECTLY to camera with VISIBLE, NATURAL mouth movements\n- Mouth opens and closes CLEARLY while speaking, forming syllables distinctly\n- SLOW, deliberate speech cadence for maximum clarity\n- Lips move realistically - NOT subtle, but OBVIOUS talking motion\n- Natural facial micro-expressions while talking (eyebrows, eyes)\n- Eyes engaged, focused on viewer throughout\n- Maintain PERFECT frontal camera angle - face centered\n- Character should appear to be narrating/presenting to the audience` 
+    ? `\n\nNATIVE SPEECH LIP-SYNC MODE:
+- Character speaks DIRECTLY to camera with NATURAL, SYNCHRONIZED mouth movements
+- The character says the following dialogue naturally in French: "${voiceoverText || 'Bonjour, bienvenue sur cette vidéo'}"
+- Speak in French with CLEAR pronunciation, natural conversational tone
+- Mouth opens and closes CLEARLY synchronized with each word
+- SLOW, deliberate speech cadence for maximum lip-sync accuracy
+- Lips form each syllable distinctly and visibly
+- Natural facial micro-expressions while talking (eyebrows, eyes)
+- Eyes engaged, focused on viewer throughout
+- Maintain PERFECT frontal camera angle - face centered
+- Character should appear to be narrating/presenting to the audience`
     : '';
 
   // ✅ NEW: Identity consistency instructions for multi-clip
@@ -436,6 +447,10 @@ CRITICAL FRAME RULES:
   const referenceImage = subjectMasterUrl || firstKeyframeUrl || keyframeUrl;
   console.log(`[animate_clip] Reference image priority: master=${!!subjectMasterUrl}, firstKF=${!!firstKeyframeUrl}, kf=${!!keyframeUrl}`);
 
+  // ✅ FIX: Enable native VEO audio when lip-sync is active for real synchronized speech
+  const enableNativeAudio = useLipSync === true;
+  console.log(`[animate_clip] Native audio: ${enableNativeAudio} (lip-sync: ${useLipSync})`);
+
   // Appeler generate-video avec provider veo3 (endpoint correct)
   const veoPayload = {
     userId,
@@ -444,7 +459,7 @@ CRITICAL FRAME RULES:
     referenceImageUrl: referenceImage,
     aspectRatio: ratio || '9:16',
     provider: 'veo3',
-    withAudio: false,
+    withAudio: enableNativeAudio, // ✅ FIX: VEO generates native audio when lip-sync is on
   };
 
   const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-video`, {

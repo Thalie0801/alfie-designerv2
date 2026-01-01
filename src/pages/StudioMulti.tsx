@@ -684,9 +684,15 @@ export default function StudioMulti() {
                 <Checkbox
                   id="voiceover"
                   checked={voiceoverEnabled}
+                  disabled={lipSyncEnabled} // Disabled when lip-sync is active
                   onCheckedChange={(checked) => setVoiceoverEnabled(checked === true)}
                 />
-                <Label htmlFor="voiceover">Voix-off automatique</Label>
+                <Label htmlFor="voiceover" className="flex flex-col">
+                  <span>Voix-off ElevenLabs</span>
+                  <span className="text-xs text-muted-foreground font-normal">
+                    {lipSyncEnabled ? 'Désactivé en mode Lip-Sync' : 'Voiceover professionnel superposé'}
+                  </span>
+                </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <Checkbox
@@ -700,9 +706,20 @@ export default function StudioMulti() {
                 <Checkbox
                   id="lipSync"
                   checked={lipSyncEnabled}
-                  onCheckedChange={(checked) => setLipSyncEnabled(checked === true)}
+                  onCheckedChange={(checked) => {
+                    setLipSyncEnabled(checked === true);
+                    // Lip-Sync uses VEO native voice, disable ElevenLabs voiceover
+                    if (checked === true) {
+                      setVoiceoverEnabled(false);
+                    }
+                  }}
                 />
-                <Label htmlFor="lipSync">Lip-Sync (personnage de face)</Label>
+                <Label htmlFor="lipSync" className="flex flex-col">
+                  <span>Lip-Sync VEO natif</span>
+                  <span className="text-xs text-muted-foreground font-normal">
+                    Le personnage parle avec sa propre voix (synchronisé)
+                  </span>
+                </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <Checkbox
