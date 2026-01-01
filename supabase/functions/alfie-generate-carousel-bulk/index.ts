@@ -7,7 +7,7 @@ import {
 } from "../_shared/env.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";
-type AspectRatio = "1:1" | "4:5" | "9:16" | "16:9";
+type AspectRatio = "1:1" | "4:5" | "9:16" | "16:9" | "2:3" | "yt-thumb";
 
 type SlideInput = Record<string, unknown>; // ton schema de slide texte (title, subtitle, bullets, etc.)
 
@@ -70,7 +70,7 @@ function isNonEmptyString(v: unknown): v is string {
 
 function safeAspect(aspect?: unknown): AspectRatio {
   const a = String(aspect ?? "4:5");
-  return (["1:1", "4:5", "9:16", "16:9"].includes(a) ? a : "4:5") as AspectRatio;
+  return (["1:1", "4:5", "9:16", "16:9", "2:3", "yt-thumb"].includes(a) ? a : "4:5") as AspectRatio;
 }
 
 function normalizeCarousel(input: any, fallbackAspect: AspectRatio): CarouselInput | null {

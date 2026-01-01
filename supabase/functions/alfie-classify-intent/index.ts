@@ -5,7 +5,7 @@ interface IntentResponse {
   intent: IntentType;
   confidence: number; // 0..1
   params?: {
-    aspect_ratio?: "1:1" | "4:5" | "9:16" | "16:9" | "2:3";
+    aspect_ratio?: "1:1" | "4:5" | "9:16" | "16:9" | "2:3" | "yt-thumb";
     slides?: number;
     carousels_count?: number; // ✅ NEW: Nombre de carrousels demandés (ex: "5 carrousels" → 5)
     is_approval?: boolean;
@@ -56,9 +56,11 @@ function isApproval(msg: string): boolean {
 }
 
 /** Extraction d'un aspect-ratio dans un texte libre */
-function extractAspectRatio(msg: string): "1:1" | "4:5" | "9:16" | "16:9" | "2:3" | undefined {
+function extractAspectRatio(msg: string): "1:1" | "4:5" | "9:16" | "16:9" | "2:3" | "yt-thumb" | undefined {
   // Détecte "pinterest" comme alias pour 2:3
   if (/pinterest/i.test(msg)) return "2:3";
+  // Détecte "yt-thumb" / "miniature youtube" comme alias pour yt-thumb
+  if (/(yt-?thumb|miniature\s*(youtube|yt)|youtube\s*thumb)/i.test(msg)) return "yt-thumb";
   // tolère 1:1, 1/1, 1-1, 1 1 ; idem pour 4:5, 9:16, 16:9, 2:3
   const ratioRegex = /\b(1\s*[:\/\-]\s*1|4\s*[:\/\-]\s*5|9\s*[:\/\-]\s*16|16\s*[:\/\-]\s*9|2\s*[:\/\-]\s*3)\b/;
   const m = msg.match(ratioRegex);

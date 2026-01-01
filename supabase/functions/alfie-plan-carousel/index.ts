@@ -55,7 +55,7 @@ interface InputBodyNew {
   prompt?: string;
   slideCount?: number;
   brandKit?: BrandKit;
-  aspectRatio?: "1:1" | "4:5" | "9:16" | "16:9";
+  aspectRatio?: "1:1" | "4:5" | "9:16" | "16:9" | "2:3" | "yt-thumb";
   language?: "FR" | "EN";
 }
 
@@ -217,7 +217,7 @@ function buildSystemPrompt(params: {
   secondary: string;
   brand: BrandKit | undefined;
   lang: "FR" | "EN";
-  aspectRatio?: "1:1" | "4:5" | "9:16" | "16:9";
+  aspectRatio?: "1:1" | "4:5" | "9:16" | "16:9" | "2:3" | "yt-thumb";
 }) {
   const { slideCount, primary, secondary, brand, lang, aspectRatio } = params;
 
