@@ -26,6 +26,8 @@ import { QueueStatus } from "@/components/chat/QueueStatus";
 import { ReferenceImageUploader } from "@/components/studio/ReferenceImageUploader";
 import { SubjectPackSelector } from "@/components/studio/SubjectPackSelector";
 import { useEffectiveSubjectPack } from "@/hooks/useSubjectPacks";
+import { createJob } from "@/lib/jobClient";
+import type { JobSpecV1Type } from "@/types/jobSpec";
 
 type AssetType = "image" | "carousel" | "video";
 type Platform = "instagram" | "tiktok" | "linkedin" | "pinterest" | "youtube";
@@ -238,12 +240,60 @@ export function StudioGenerator() {
     setIsLaunching(true);
 
     try {
-      // Construire un pack avec 1 seul asset
+      // ✅ UNIFIED PATH: Vidéos passent par Job Engine V2 (job-orchestrator)
+      if (selectedType === "video") {
+        console.log("[StudioSolo] 🎬 Using Job Engine V2 for video (unified path)");
+        
+        const videoSpec: JobSpecV1Type = {
+          version: 'v1',
+          kind: 'multi_clip_video',
+          clip_count: 1,
+          beats: [{
+            sceneIndex: 0,
+            visualPrompt: brief,
+            voiceoverText: lipSyncEnabled ? brief : '',
+            durationSec: 8,
+          }],
+          script: brief,
+          ratio_master: ratio,
+          duration_total: 8,
+          subject_pack_id: effectiveSubjectPackId || undefined,
+          brandkit_id: activeBrandId,
+          use_brand_kit: useBrandKitToggle,
+          visual_style: visualStyle,
+          audio: {
+            music_enabled: musicEnabled,
+            lip_sync_enabled: lipSyncEnabled,
+            voice_id: selectedVoice,
+            voiceover_enabled: !lipSyncEnabled && musicEnabled,
+          },
+          deliverables: ['master'],
+          transitions: { type: 'cut' },
+        };
+
+        const result = await createJob(videoSpec);
+        
+        toast.success(`${ASSET_CONFIG[selectedType].emoji} Génération lancée !`);
+        console.log("[StudioSolo] ✅ Video job created via Job Engine V2:", result.jobId);
+        
+        // Navigate to job console or just refresh quota
+        const { data } = await supabase.functions.invoke("get-quota", {
+          body: { brand_id: activeBrandId },
+        });
+        if (data?.ok) {
+          setWoofsAvailable(data.data.woofs_remaining);
+        }
+        
+        setBrief("");
+        return;
+      }
+
+      // Images et carrousels: ancien workflow via sendPackToGenerator
       const assetId = `solo_${Date.now()}`;
       const asset: PackAsset = {
         id: assetId,
         brandId: activeBrandId,
-        kind: selectedType === "video" ? "video_premium" : selectedType,
+        kind: selectedType,
         count: selectedType === "carousel" ? 5 : 1,
         platform,
         format: ratio === "9:16" ? "story" : "post",
@@ -252,15 +302,11 @@ export function StudioGenerator() {
         goal: "engagement",
         tone: "professionnel",
         prompt: brief,
-        woofCostType: selectedType === "video" ? "video_premium" : selectedType === "carousel" ? "carousel" : "image",
+        woofCostType: selectedType === "carousel" ? "carousel" : "image",
         useBrandKit: useBrandKitToggle,
         visualStyle,
-        durationSeconds: selectedType === "video" ? 6 : undefined,
-        // Subject pack handled separately in sendPackToGenerator
-        // Reference images
-        referenceImageUrl: referenceImages[0], // Primary reference
-        referenceImages, // All references
-        // Options carrousels
+        referenceImageUrl: referenceImages[0],
+        referenceImages,
         ...(selectedType === "carousel" && {
           visualStyleCategory,
           backgroundOnly,
@@ -281,11 +327,6 @@ export function StudioGenerator() {
         useBrandKit: useBrandKitToggle,
         userPlan: profile?.plan || "starter",
         source: 'studio_solo',
-        // Video options
-        useUnifiedMusic: selectedType === "video" ? musicEnabled : undefined,
-        useLipSync: selectedType === "video" ? lipSyncEnabled : undefined,
-        voiceId: selectedType === "video" ? selectedVoice : undefined,
-        // Subject pack
         subjectPackId: effectiveSubjectPackId || undefined,
       });
 
@@ -295,7 +336,6 @@ export function StudioGenerator() {
         trackOrders(result.orderIds);
       }
       
-      // Recharger les Woofs
       const { data } = await supabase.functions.invoke("get-quota", {
         body: { brand_id: activeBrandId },
       });
@@ -303,7 +343,6 @@ export function StudioGenerator() {
         setWoofsAvailable(data.data.woofs_remaining);
       }
 
-      // Reset
       setBrief("");
     } catch (error) {
       console.error("[Studio] Launch error:", error);

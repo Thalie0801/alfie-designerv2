@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 // Types de deliverables possibles
 export const DeliverableType = z.enum([
+  'master',        // ✅ Video solo: just the master video
   'master_9x16',
   'variant_1x1',
   'variant_16x9',

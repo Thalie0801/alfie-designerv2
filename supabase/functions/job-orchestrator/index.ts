@@ -266,6 +266,13 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
   const steps: StepInput[] = [];
   const clipCount = spec.clip_count || spec.beats?.length || 3;
   let stepIndex = 0;
+  
+  // ✅ SOLO VIDEO OPTIMIZATION: Simplified pipeline for 1 clip
+  const isSoloVideo = clipCount === 1;
+  
+  if (isSoloVideo) {
+    console.log(`[orchestrator] 🎬 Solo video detected - using simplified pipeline`);
+  }
 
   // Plan script if not provided
   if (!spec.beats || spec.beats.length === 0) {
@@ -276,9 +283,9 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
         script: spec.script,
         clipCount,
         durationTotal: spec.duration_total,
-        subjectPackId: spec.subject_pack_id,  // ✅ Pass to LLM for character consistency
-        brandId: spec.brandkit_id,             // ✅ Pass for brand context
-        useBrandKit: spec.use_brand_kit,       // ✅ Pass brand kit toggle
+        subjectPackId: spec.subject_pack_id,
+        brandId: spec.brandkit_id,
+        useBrandKit: spec.use_brand_kit,
       },
     });
   }
@@ -293,7 +300,7 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
         visualPrompt: spec.beats?.[i]?.visualPrompt || '',
         ratio: spec.ratio_master,
         identityAnchorId: spec.character_anchor_id,
-        subjectPackId: spec.subject_pack_id, // ✅ Propagate Subject Pack
+        subjectPackId: spec.subject_pack_id,
         locks: spec.locks,
         useLipSync: spec.audio?.lip_sync_enabled || false,
       },
@@ -308,39 +315,37 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
       input_json: {
         sceneIndex: i,
         visualPrompt: spec.beats?.[i]?.visualPrompt || '',
-        voiceoverText: spec.beats?.[i]?.voiceoverText || '', // ✅ NEW: Pass voiceover text for VEO native lip-sync
+        voiceoverText: spec.beats?.[i]?.voiceoverText || '',
         durationSeconds: spec.beats?.[i]?.durationSec || 8,
         ratio: spec.ratio_master,
         identityAnchorId: spec.character_anchor_id,
-        subjectPackId: spec.subject_pack_id, // ✅ Propagate Subject Pack
+        subjectPackId: spec.subject_pack_id,
         useLipSync: spec.audio?.lip_sync_enabled || false,
       },
     });
   }
 
-  // ✅ FIX: Voiceover step ONLY if NOT using lip-sync (lip-sync uses VEO native audio)
-  // When lip-sync is enabled, VEO generates the voice natively - no ElevenLabs needed
   const useLipSync = spec.audio?.lip_sync_enabled === true;
   const voiceoverNeeded = !useLipSync && spec.audio?.voiceover_enabled !== false;
   
-  console.log(`[orchestrator] Audio mode: lipSync=${useLipSync}, voiceoverNeeded=${voiceoverNeeded}`);
+  console.log(`[orchestrator] Audio mode: lipSync=${useLipSync}, voiceoverNeeded=${voiceoverNeeded}, isSolo=${isSoloVideo}`);
   
-  if (voiceoverNeeded) {
+  // ✅ SOLO: Skip voiceover step if lip-sync (VEO handles audio)
+  if (voiceoverNeeded && !isSoloVideo) {
     const voiceoverText = spec.beats?.map(b => b.voiceoverText).filter(Boolean).join(' ') || '';
-    // ✅ Create voiceover step only for ElevenLabs mode (non-lip-sync)
     steps.push({
       step_type: 'voiceover',
       step_index: stepIndex++,
       input_json: {
-        text: voiceoverText, // May be empty, will be enriched by video-step-runner
+        text: voiceoverText,
         voiceId: spec.audio?.voice_id,
         language: spec.audio?.language || 'fr',
       },
     });
   }
 
-  // Music
-  if (spec.audio?.music_enabled !== false) {
+  // ✅ SOLO: Skip music step - VEO native audio is enough
+  if (spec.audio?.music_enabled !== false && !isSoloVideo) {
     steps.push({
       step_type: 'music',
       step_index: stepIndex++,
@@ -351,9 +356,8 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
     });
   }
 
-  // Concat clips with transitions
+  // ✅ SOLO: No concat needed for 1 clip
   if (clipCount > 1) {
-    // Get transition type from spec.transitions or default to 'fade'
     const transitionType = (spec as any).transitions?.type || 'fade';
     steps.push({
       step_type: 'concat_clips',
@@ -362,18 +366,20 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
     });
   }
 
-  // Mix audio
-  steps.push({
-    step_type: 'mix_audio',
-    step_index: stepIndex++,
-    input_json: {
-      musicVolume: spec.audio?.music_volume_db || -20,
-      voiceVolume: 100,
-      duckingEnabled: spec.audio?.ducking_enabled ?? true,
-    },
-  });
+  // ✅ SOLO: Skip mix_audio - VEO already has audio baked in
+  if (!isSoloVideo) {
+    steps.push({
+      step_type: 'mix_audio',
+      step_index: stepIndex++,
+      input_json: {
+        musicVolume: spec.audio?.music_volume_db || -20,
+        voiceVolume: 100,
+        duckingEnabled: spec.audio?.ducking_enabled ?? true,
+      },
+    });
+  }
 
-  // ✅ NEW: Render variants for multi_clip_video (same as campaign_pack)
+  // Render variants (only if requested)
   const variants = spec.deliverables.filter(d => d.startsWith('variant_'));
   for (const variant of variants) {
     const ratio = variant.replace('variant_', '').replace('_', ':');
@@ -384,7 +390,7 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
     });
   }
 
-  // ✅ NEW: Extract thumbnails for multi_clip_video
+  // Extract thumbnails (only if requested)
   const thumbs = spec.deliverables.filter(d => d.startsWith('thumb_'));
   if (thumbs.length > 0) {
     steps.push({
@@ -397,7 +403,7 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
     });
   }
 
-  // ✅ NEW: Render cover for multi_clip_video
+  // Render cover (only if requested)
   if (spec.deliverables.includes('cover')) {
     steps.push({
       step_type: 'render_cover',
@@ -413,6 +419,7 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
     input_json: { deliverables: spec.deliverables },
   });
 
+  console.log(`[orchestrator] Generated ${steps.length} steps for ${isSoloVideo ? 'solo' : 'multi-clip'} video`);
   return steps;
 }
 
