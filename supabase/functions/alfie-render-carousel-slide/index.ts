@@ -866,9 +866,9 @@ Deno.serve(async (req) => {
       visualStyle = 'background', // ✅ NOUVEAU: Style visuel (background/character/product)
     } = params;
     
-    // ✅ Sélectionner le modèle selon le mode
-    const MODEL_IMAGE = carouselMode === 'premium' ? MODEL_IMAGE_PREMIUM : MODEL_IMAGE_STANDARD;
-    console.log(`[render-slide] 🎨 Mode: ${carouselMode} - Model: ${MODEL_IMAGE} - Visual: ${visualStyle}`);
+    // ✅ Toujours utiliser Nano Banana Pro pour qualité uniforme
+    const MODEL_IMAGE = MODEL_IMAGE_PREMIUM;
+    console.log(`[render-slide] 🎨 Mode: ${carouselMode} - Model: ${MODEL_IMAGE} (forced premium) - Visual: ${visualStyle}`);
 
     // —— Supabase admin client (service role)
     const supabaseAdmin = createClient(
