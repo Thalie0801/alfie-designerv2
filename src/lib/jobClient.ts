@@ -43,10 +43,17 @@ export async function createJob(spec: JobSpecV1Type): Promise<CreateJobResult> {
 
   if (error) {
     console.error('[jobClient] createJob error:', error);
-    throw new Error(error.message || 'Failed to create job');
+    // Try to extract detailed error from response
+    const errorMessage = error.message || 'Failed to create job';
+    throw new Error(errorMessage);
   }
 
-  if (data?.error) {
+  if (!data) {
+    throw new Error('No response from job-orchestrator');
+  }
+
+  if (data.error) {
+    console.error('[jobClient] Job creation failed:', data.error);
     throw new Error(data.error);
   }
 

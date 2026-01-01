@@ -258,7 +258,7 @@ export default function StudioMulti() {
       const spec: JobSpecV1Type = {
         version: 'v1',
         kind: 'multi_clip_video',
-        brandkit_id: useBrandKitToggle ? activeBrand.id : undefined,
+        brandkit_id: activeBrand.id, // Always required for quota/tracking
         ratio_master: ratioMaster,
         duration_total: clipCount * durationPerClip,
         clip_count: clipCount,
@@ -329,7 +329,7 @@ export default function StudioMulti() {
       const spec: JobSpecV1Type = {
         version: 'v1',
         kind: 'campaign_pack',
-        brandkit_id: useBrandKitToggle ? activeBrand.id : undefined,
+        brandkit_id: activeBrand.id, // Always required for quota/tracking
         ratio_master: ratioMaster,
         script: script,
         visual_style: visualStyle,
