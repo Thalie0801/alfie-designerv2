@@ -117,6 +117,8 @@ const JobSpecV1 = z.object({
   visual_style: z.string().default('photorealistic'),
   slides: z.array(CarouselSlide).optional(),
   slides_count: z.number().optional(),
+  carousel_count: z.number().optional(),         // ✅ NEW: Nombre de carrousels distincts
+  slides_per_carousel: z.number().default(5),    // ✅ NEW: Slides par carrousel
   carousel_theme: z.string().optional(),
   deliverables: z.array(DeliverableType).default(['master_9x16']),
   locks: VisualLocks.optional(),
@@ -450,44 +452,56 @@ function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
   }
   
   // =====================================================
-  // 2) CAROUSELS: plan_slides + gen_slide x N + assemble
+  // 2) CAROUSELS: support multi-carousel with carousel_count
   // =====================================================
-  const slidesCount = spec.slides_count || 0;
-  if (slidesCount > 0) {
-    // Plan slides first
-    if (!spec.slides || spec.slides.length === 0) {
+  const carouselCount = spec.carousel_count || 1;
+  const slidesPerCarousel = spec.slides_per_carousel || 5;
+  const totalSlides = spec.slides_count || (carouselCount * slidesPerCarousel);
+  
+  // If carousel_count > 1, generate separate carousels
+  if (carouselCount > 0 && (totalSlides > 0 || spec.carousel_theme)) {
+    for (let c = 0; c < carouselCount; c++) {
+      // Plan slides for THIS carousel
+      if (!spec.slides || spec.slides.length === 0) {
+        steps.push({
+          step_type: 'plan_slides',
+          step_index: stepIndex++,
+          input_json: {
+            carouselIndex: c,
+            theme: spec.carousel_theme || spec.script,
+            slideCount: slidesPerCarousel,
+            ratio: spec.ratio_master,
+          },
+        });
+      }
+      
+      // Generate each slide for THIS carousel
+      for (let s = 0; s < slidesPerCarousel; s++) {
+        steps.push({
+          step_type: 'gen_slide',
+          step_index: stepIndex++,
+          input_json: {
+            carouselIndex: c,
+            slideIndex: s,
+            globalSlideIndex: c * slidesPerCarousel + s,
+            slide: spec.slides?.[c * slidesPerCarousel + s],
+            ratio: spec.ratio_master,
+            visualStyle: spec.visual_style,
+            subjectPackId: spec.subject_pack_id,
+          },
+        });
+      }
+      
+      // Assemble THIS carousel
       steps.push({
-        step_type: 'plan_slides',
+        step_type: 'assemble_carousel',
         step_index: stepIndex++,
-        input_json: {
-          theme: spec.carousel_theme || spec.script,
-          slideCount: slidesCount,
-          ratio: spec.ratio_master,
+        input_json: { 
+          carouselIndex: c, 
+          slideCount: slidesPerCarousel,
         },
       });
     }
-    
-    // Generate each slide
-    for (let i = 0; i < slidesCount; i++) {
-      steps.push({
-        step_type: 'gen_slide',
-        step_index: stepIndex++,
-        input_json: {
-          slideIndex: i,
-          slide: spec.slides?.[i],
-          ratio: spec.ratio_master,
-          visualStyle: spec.visual_style,
-          subjectPackId: spec.subject_pack_id,
-        },
-      });
-    }
-    
-    // Assemble carousel
-    steps.push({
-      step_type: 'assemble_carousel',
-      step_index: stepIndex++,
-      input_json: { slideCount: slidesCount },
-    });
   }
   
   // =====================================================
@@ -630,7 +644,8 @@ function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
     input_json: { 
       deliverables: spec.deliverables,
       imageCount,
-      slidesCount,
+      carouselCount,
+      slidesPerCarousel,
       clipCount,
     },
   });

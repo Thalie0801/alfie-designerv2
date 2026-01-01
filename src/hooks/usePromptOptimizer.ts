@@ -8,6 +8,17 @@ export interface MiniFilmScene {
   durationSec: number;
 }
 
+export interface CampaignPackAsset {
+  type: 'image' | 'carousel' | 'video';
+  prompt: string;
+  theme?: string;
+}
+
+export interface CampaignPack {
+  assets: CampaignPackAsset[];
+  globalTheme: string;
+}
+
 export interface OptimizationResult {
   optimizedPrompt: string;
   reasoning: string;
@@ -16,6 +27,7 @@ export interface OptimizationResult {
   estimatedGenerationTime: string;
   brandAlignment: string;
   scenes?: MiniFilmScene[];
+  campaignPack?: CampaignPack; // ✅ NEW: For campaign-pack type
 }
 
 interface OptimizeParams {
