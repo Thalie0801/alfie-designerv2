@@ -1883,6 +1883,7 @@ export type Database = {
           file_size_bytes: number | null
           id: string
           input_url: string | null
+          is_intermediate: boolean | null
           is_source_upload: boolean | null
           job_id: string | null
           metadata: Json | null
@@ -1911,6 +1912,7 @@ export type Database = {
           file_size_bytes?: number | null
           id?: string
           input_url?: string | null
+          is_intermediate?: boolean | null
           is_source_upload?: boolean | null
           job_id?: string | null
           metadata?: Json | null
@@ -1939,6 +1941,7 @@ export type Database = {
           file_size_bytes?: number | null
           id?: string
           input_url?: string | null
+          is_intermediate?: boolean | null
           is_source_upload?: boolean | null
           job_id?: string | null
           metadata?: Json | null
