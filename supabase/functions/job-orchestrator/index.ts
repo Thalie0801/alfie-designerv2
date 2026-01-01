@@ -256,6 +256,9 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
         script: spec.script,
         clipCount,
         durationTotal: spec.duration_total,
+        subjectPackId: spec.subject_pack_id,  // ✅ Pass to LLM for character consistency
+        brandId: spec.brandkit_id,             // ✅ Pass for brand context
+        useBrandKit: spec.use_brand_kit,       // ✅ Pass brand kit toggle
       },
     });
   }
@@ -294,20 +297,19 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
     });
   }
 
-  // Voiceover
+  // Voiceover - always create step if enabled (text will be enriched from plannedBeats)
   if (spec.audio?.voiceover_enabled !== false) {
     const voiceoverText = spec.beats?.map(b => b.voiceoverText).filter(Boolean).join(' ') || '';
-    if (voiceoverText) {
-      steps.push({
-        step_type: 'voiceover',
-        step_index: stepIndex++,
-        input_json: {
-          text: voiceoverText,
-          voiceId: spec.audio?.voice_id,
-          language: spec.audio?.language || 'fr',
-        },
-      });
-    }
+    // ✅ Always create voiceover step - text will be enriched from plan_script output if empty
+    steps.push({
+      step_type: 'voiceover',
+      step_index: stepIndex++,
+      input_json: {
+        text: voiceoverText, // May be empty, will be enriched by video-step-runner
+        voiceId: spec.audio?.voice_id,
+        language: spec.audio?.language || 'fr',
+      },
+    });
   }
 
   // Music

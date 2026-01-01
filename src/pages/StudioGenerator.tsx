@@ -109,7 +109,7 @@ export function StudioGenerator() {
   // Subject Pack
   const [useDefaultSubjectPack, setUseDefaultSubjectPack] = useState(true);
   const [overrideSubjectPackId, setOverrideSubjectPackId] = useState<string | null>(null);
-  const { effectivePackId: brandDefaultPackId, loading: subjectPackLoading } = useEffectiveSubjectPack(
+  const { effectivePackId: brandDefaultPackId } = useEffectiveSubjectPack(
     useDefaultSubjectPack, 
     overrideSubjectPackId
   );
@@ -603,37 +603,22 @@ export function StudioGenerator() {
                 </div>
               )}
 
-              {/* Subject Pack Toggle */}
-              <div className="space-y-3 p-3 bg-muted/30 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <UserCircle className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium text-sm">Subject / Personnage</p>
-                      <p className="text-xs text-muted-foreground">
-                        {useDefaultSubjectPack 
-                          ? (brandDefaultPackId ? "Utilise le Subject du Brand Kit" : "Aucun subject par défaut")
-                          : "Override manuel"
-                        }
-                      </p>
-                    </div>
-                  </div>
-                  <Switch 
-                    checked={useDefaultSubjectPack} 
-                    onCheckedChange={setUseDefaultSubjectPack} 
-                    disabled={subjectPackLoading}
-                  />
+              {/* Subject Pack Selector - Always visible */}
+              <div className="space-y-2 p-3 bg-muted/30 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <UserCircle className="h-4 w-4 text-muted-foreground" />
+                  <p className="font-medium text-sm">Subject / Personnage</p>
                 </div>
-                
-                {/* Override selector when toggle is off */}
-                {!useDefaultSubjectPack && (
-                  <SubjectPackSelector
-                    value={overrideSubjectPackId}
-                    onChange={setOverrideSubjectPackId}
-                    brandId={activeBrandId || undefined}
-                    placeholder="Choisir un Subject Pack"
-                  />
-                )}
+                <SubjectPackSelector
+                  value={effectiveSubjectPackId}
+                  onChange={(v) => {
+                    setUseDefaultSubjectPack(false);
+                    setOverrideSubjectPackId(v);
+                  }}
+                  brandId={activeBrandId || undefined}
+                  placeholder="Choisir un Subject Pack"
+                  showDefaultOption={true}
+                />
               </div>
 
               {/* Brand Kit Toggle */}

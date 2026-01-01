@@ -11,6 +11,7 @@ import { AssetCard } from '@/components/library/AssetCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { AccessGuard } from '@/components/AccessGuard';
+import { MiniFilmsTab } from '@/components/library/MiniFilmsTab';
 import { CarouselsTab } from '@/components/library/CarouselsTab';
 import { VideoBatchesTab } from '@/components/library/VideoBatchesTab';
 import { toast } from 'sonner';
@@ -26,7 +27,7 @@ export default function Library() {
   const orderIdFromQuery = new URLSearchParams(location.search).get('order');
   
   // Si ?order= est présent, afficher l'onglet carrousels par défaut
-  const [activeTab, setActiveTab] = useState<'images' | 'videos' | 'carousels' | 'thumbnails' | 'pinterest' | 'video-batches'>(
+  const [activeTab, setActiveTab] = useState<'images' | 'videos' | 'carousels' | 'thumbnails' | 'pinterest' | 'video-batches' | 'mini-films'>(
     orderIdFromQuery ? 'carousels' : 'images'
   );
   const [searchQuery, setSearchQuery] = useState('');
@@ -34,9 +35,9 @@ export default function Library() {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Map tab to asset type for hook (video-batches uses its own hook, default to 'images')
+  // Map tab to asset type for hook (video-batches and mini-films use their own hooks, default to 'images')
   const assetTypeForHook: 'images' | 'videos' | 'thumbnails' | 'pinterest' = 
-    activeTab === 'carousels' || activeTab === 'video-batches' ? 'images' 
+    activeTab === 'carousels' || activeTab === 'video-batches' || activeTab === 'mini-films' ? 'images' 
     : activeTab === 'pinterest' ? 'pinterest' 
     : activeTab;
   
@@ -176,14 +177,15 @@ export default function Library() {
       )}
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'images' | 'videos' | 'carousels' | 'thumbnails' | 'pinterest' | 'video-batches')}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'images' | 'videos' | 'carousels' | 'thumbnails' | 'pinterest' | 'video-batches' | 'mini-films')}>
         <TabsList className="flex-wrap h-auto min-h-[4.5rem] sm:min-h-10 gap-1 justify-start w-full">
           <TabsTrigger value="images" className="text-xs sm:text-sm shrink-0">🖼️ Images</TabsTrigger>
           <TabsTrigger value="pinterest" className="text-xs sm:text-sm shrink-0">📌 Pinterest</TabsTrigger>
           <TabsTrigger value="thumbnails" className="text-xs sm:text-sm shrink-0">📺 Miniatures YT</TabsTrigger>
           <TabsTrigger value="videos" className="text-xs sm:text-sm shrink-0">🎬 Vidéos</TabsTrigger>
           <TabsTrigger value="carousels" className="text-xs sm:text-sm shrink-0">📱 Carrousels</TabsTrigger>
-          <TabsTrigger value="video-batches" className="text-xs sm:text-sm shrink-0">🎬 Batches Vidéo</TabsTrigger>
+          <TabsTrigger value="mini-films" className="text-xs sm:text-sm shrink-0">🎬 Mini-Films</TabsTrigger>
+          <TabsTrigger value="video-batches" className="text-xs sm:text-sm shrink-0">📦 Batches Vidéo</TabsTrigger>
         </TabsList>
 
         {/* Toolbar */}
@@ -379,7 +381,12 @@ export default function Library() {
           <CarouselsTab orderId={orderIdFromQuery} />
         </TabsContent>
 
-        {/* Video Batches Tab */}
+        {/* Mini-Films Tab (Job Engine) */}
+        <TabsContent value="mini-films" className="mt-6 min-h-[300px]">
+          <MiniFilmsTab orderId={orderIdFromQuery} />
+        </TabsContent>
+
+        {/* Video Batches Tab (Legacy) */}
         <TabsContent value="video-batches" className="mt-6 min-h-[300px]">
           <VideoBatchesTab orderId={orderIdFromQuery} />
         </TabsContent>

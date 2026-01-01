@@ -397,32 +397,31 @@ export default function StudioMulti() {
         </div>
       </Card>
 
-      {/* Subject Pack Toggle */}
+      {/* Subject Pack Selector - Always visible */}
       <Card className="p-4">
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <User className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <p className="font-medium text-sm">Subject / Personnage</p>
-                <p className="text-xs text-muted-foreground">
-                  Utiliser le subject du Brand Kit
-                </p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <User className="h-4 w-4 text-primary" />
             </div>
-            <Switch checked={useDefaultSubject} onCheckedChange={setUseDefaultSubject} />
+            <div>
+              <p className="font-medium text-sm">Subject / Personnage</p>
+              <p className="text-xs text-muted-foreground">
+                Sélectionne le personnage à utiliser
+              </p>
+            </div>
           </div>
           
-          {!useDefaultSubject && (
-            <SubjectPackSelector
-              value={selectedSubjectPackId}
-              onChange={setSelectedSubjectPackId}
-              brandId={activeBrand?.id}
-              placeholder="Choisir un Subject Pack"
-            />
-          )}
+          <SubjectPackSelector
+            value={selectedSubjectPackId}
+            onChange={(v) => {
+              setUseDefaultSubject(false);
+              setSelectedSubjectPackId(v);
+            }}
+            brandId={activeBrand?.id}
+            placeholder="Choisir un Subject Pack"
+            showDefaultOption={true}
+          />
         </div>
       </Card>
 
