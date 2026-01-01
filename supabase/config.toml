@@ -98,3 +98,6 @@ verify_jwt = true
 
 [functions.job-orchestrator]
 verify_jwt = true
+
+[functions.stripe-subscription-renewal]
+verify_jwt = false
