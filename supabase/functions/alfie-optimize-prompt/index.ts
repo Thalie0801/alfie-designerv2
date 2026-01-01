@@ -8,13 +8,28 @@ import { callAIWithFallback, enrichPromptWithBrandKit, type AgentContext } from 
 
 import { corsHeaders } from "../_shared/cors.ts";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
-type GenType = "image" | "carousel" | "video" | "mini-film";
+
+type GenType = "image" | "carousel" | "video" | "mini-film" | "campaign-pack";
 
 interface MiniFilmScene {
   sceneIndex: number;
   visualPrompt: string;
   voiceoverText: string;
   durationSec: number;
+}
+
+interface CampaignPackAsset {
+  type: "image" | "carousel" | "video";
+  prompt: string;
+  aspectRatio: string;
+  description: string;
+  slideCount?: number; // For carousels
+}
+
+interface CampaignPackPlan {
+  theme: string;
+  strategy: string;
+  assets: CampaignPackAsset[];
 }
 
 interface OptimizationRequest {
@@ -32,6 +47,7 @@ interface OptimizationResult {
   estimatedGenerationTime?: string;
   brandAlignment?: string;
   scenes?: MiniFilmScene[];
+  campaignPack?: CampaignPackPlan;
 }
 
 Deno.serve(async (req) => {
@@ -64,8 +80,8 @@ Deno.serve(async (req) => {
     if (!prompt || typeof prompt !== "string") {
       return jsonError("Missing or invalid 'prompt'", 400);
     }
-    if (!type || !["image", "carousel", "video", "mini-film"].includes(type)) {
-      return jsonError("Missing or invalid 'type' (image|carousel|video|mini-film)", 400);
+    if (!type || !["image", "carousel", "video", "mini-film", "campaign-pack"].includes(type)) {
+      return jsonError("Missing or invalid 'type' (image|carousel|video|mini-film|campaign-pack)", 400);
     }
 
     // --- Load Brand Kit (optional) ---
@@ -97,27 +113,49 @@ Deno.serve(async (req) => {
     // --- Build system prompt (per type) ---
     const systemPrompt = buildSystemPromptForType(type, brandKit);
 
-    // --- Messages for LLM ---
+    // --- Messages for LLM (adapt based on type) ---
+    let userMessage = "";
+    if (type === "campaign-pack") {
+      userMessage =
+        `User campaign request: "${prompt}"\n\n` +
+        `Transform this into a complete campaign plan. Return JSON with exactly:\n` +
+        `{\n` +
+        `  "optimizedPrompt": "Global campaign direction and theme",\n` +
+        `  "campaignPack": {\n` +
+        `    "theme": "Campaign theme/concept",\n` +
+        `    "strategy": "Marketing strategy explanation",\n` +
+        `    "assets": [\n` +
+        `      { "type": "image", "prompt": "detailed image prompt", "aspectRatio": "1:1", "description": "Asset purpose" },\n` +
+        `      { "type": "carousel", "prompt": "detailed carousel prompt", "aspectRatio": "4:5", "description": "Asset purpose", "slideCount": 5 },\n` +
+        `      { "type": "video", "prompt": "detailed video prompt", "aspectRatio": "9:16", "description": "Asset purpose" }\n` +
+        `    ]\n` +
+        `  },\n` +
+        `  "reasoning": "explain strategy and Brand Kit alignment",\n` +
+        `  "negativePrompt": "what to avoid",\n` +
+        `  "estimatedGenerationTime": "total time estimate",\n` +
+        `  "brandAlignment": "how it uses colors/voice"\n` +
+        `}`;
+    } else {
+      userMessage =
+        `User raw request: "${prompt}"\n\n` +
+        `Aspect ratio: ${aspectRatio || "not specified"}\n\n` +
+        `Transform this into an optimized prompt. Return JSON with exactly:\n` +
+        `{\n` +
+        `  "optimizedPrompt": "ultra-detailed ${type} prompt",\n` +
+        `  "reasoning": "explain choices and Brand Kit alignment",\n` +
+        `  "negativePrompt": "what to avoid",\n` +
+        `  "suggestedAspectRatio": "optimal ratio",\n` +
+        `  "estimatedGenerationTime": "short human estimate",\n` +
+        `  "brandAlignment": "how it uses colors/voice"\n` +
+        `}`;
+    }
+
     const messages = [
       { role: "system", content: systemPrompt },
-      {
-        role: "user",
-        content:
-          `User raw request: "${prompt}"\n\n` +
-          `Aspect ratio: ${aspectRatio || "not specified"}\n\n` +
-          `Transform this into an optimized prompt. Return JSON with exactly:\n` +
-          `{\n` +
-          `  "optimizedPrompt": "ultra-detailed ${type} prompt",\n` +
-          `  "reasoning": "explain choices and Brand Kit alignment",\n` +
-          `  "negativePrompt": "what to avoid",\n` +
-          `  "suggestedAspectRatio": "optimal ratio",\n` +
-          `  "estimatedGenerationTime": "short human estimate",\n` +
-          `  "brandAlignment": "how it uses colors/voice"\n` +
-          `}`,
-      },
+      { role: "user", content: userMessage },
     ];
 
-    // --- Call AI (prefer Gemini for visuel) ---
+    // --- Call AI (prefer Gemini for visual) ---
     const aiResp = await callAIWithFallback(
       messages,
       { brandKit, userMessage: prompt },
@@ -166,6 +204,8 @@ Deno.serve(async (req) => {
     console.log("[Optimize Prompt] out", {
       optimizedLen: result.optimizedPrompt.length,
       suggestedAR: result.suggestedAspectRatio,
+      hasCampaignPack: !!result.campaignPack,
+      assetCount: result.campaignPack?.assets?.length,
     });
 
     return jsonOK({ ok: true, data: result });
@@ -192,7 +232,7 @@ function jsonError(message: string, status = 500) {
   });
 }
 
-function safeJsonFromContent<T = any>(content: string): T | null {
+function safeJsonFromContent<T = unknown>(content: string): T | null {
   try {
     // Extract from fenced code block if present
     const m = content.match(/```json\s*([\s\S]*?)```/i) || content.match(/```\s*([\s\S]*?)```/i);
@@ -230,6 +270,9 @@ function defaultNegativePrompt(type: GenType): string {
   if (type === "mini-film") {
     return "discontinuous character design, jarring style shifts between scenes, unrelated visual themes, inconsistent lighting across clips, audio-visual mismatch, abrupt transitions";
   }
+  if (type === "campaign-pack") {
+    return "inconsistent branding across assets, mismatched visual styles, off-brand colors, conflicting messaging, low-quality imagery, cluttered compositions";
+  }
   // carousel (we optimize text-to-visual consistency)
   return "inconsistent style across slides, mismatched colors, illegible typography, excessive clutter, off-brand colors";
 }
@@ -238,6 +281,7 @@ function defaultETA(type: GenType): string {
   if (type === "mini-film") return "≈ 2–5 minutes (multi-scènes)";
   if (type === "video") return "≈ 1–3 minutes (short clip)";
   if (type === "carousel") return "≈ 20–60 seconds (per slide)";
+  if (type === "campaign-pack") return "≈ 3–8 minutes (selon le nombre d'assets)";
   return "≈ 10–20 seconds";
 }
 
@@ -245,11 +289,14 @@ function suggestAspectRatio(
   type: GenType,
   provided: string | undefined,
   prompt: string,
-): "1:1" | "4:5" | "9:16" | "16:9" {
+): "1:1" | "4:5" | "9:16" | "16:9" | "mixed" {
   // If client already passed a known AR, keep it
   if (["1:1", "4:5", "9:16", "16:9"].includes(String(provided))) {
-    return provided as any;
+    return provided as "1:1" | "4:5" | "9:16" | "16:9";
   }
+
+  // Campaign pack uses mixed ratios
+  if (type === "campaign-pack") return "mixed" as any;
 
   const t = prompt.toLowerCase();
   // Heuristics by keywords
@@ -348,6 +395,64 @@ RESPONSE FORMAT: strict JSON with keys:
   "suggestedAspectRatio": "9:16 for social vertical",
   "estimatedGenerationTime": "2-5 minutes",
   "brandAlignment": "how scenes use brand colors/voice"
+}
+`
+    );
+  }
+
+  if (type === "campaign-pack") {
+    return (
+      base +
+      brand +
+      `
+CAMPAIGN PACK PROMPTING GUIDELINES (Multi-asset marketing campaign):
+- OBJECTIVE: Create a cohesive multi-asset campaign based on the user's marketing intent
+- ASSET MIX: Generate 3-5 assets with a strategic mix of:
+  * Images (1-2): Hero visuals, product shots, lifestyle imagery
+  * Carousels (1-2): Educational content, product features, storytelling
+  * Videos (1): Dynamic content for engagement (Reels/TikTok style)
+- VISUAL COHERENCE: All assets MUST share the same visual identity (colors, style, mood)
+- MESSAGING: Each asset serves a specific purpose in the marketing funnel
+- PLATFORM OPTIMIZATION: Suggest appropriate aspect ratios per asset type
+- BRAND INTEGRATION: Every asset reflects the Brand Kit colors, voice, and niche
+
+ASSET SPECIFICATIONS:
+- Images: Detailed visual prompt, suggest 1:1 or 4:5 for social
+- Carousels: Cohesive slide theme, 4-6 slides recommended, suggest 4:5
+- Videos: Motion-focused prompt with hook, suggest 9:16 for Reels/TikTok
+
+RESPONSE FORMAT: strict JSON with keys:
+{
+  "optimizedPrompt": "Global campaign direction and unified visual theme",
+  "campaignPack": {
+    "theme": "Core campaign concept/message",
+    "strategy": "How these assets work together in marketing funnel",
+    "assets": [
+      { 
+        "type": "image", 
+        "prompt": "Ultra-detailed image generation prompt", 
+        "aspectRatio": "1:1", 
+        "description": "Asset purpose: hero visual for feed" 
+      },
+      { 
+        "type": "carousel", 
+        "prompt": "Visual direction for all slides - consistent style", 
+        "aspectRatio": "4:5", 
+        "description": "Educational carousel about product benefits",
+        "slideCount": 5
+      },
+      { 
+        "type": "video", 
+        "prompt": "Dynamic video prompt with motion and hook", 
+        "aspectRatio": "9:16", 
+        "description": "Engaging Reel for awareness" 
+      }
+    ]
+  },
+  "reasoning": "Explain marketing strategy and how assets complement each other",
+  "negativePrompt": "What to avoid across the campaign",
+  "estimatedGenerationTime": "3-8 minutes depending on asset count",
+  "brandAlignment": "How campaign uses brand colors, voice, and positioning"
 }
 `
     );
