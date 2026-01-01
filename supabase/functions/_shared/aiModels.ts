@@ -51,8 +51,9 @@ export const AI_MODELS: AIModelsConfig = {
 };
 
 // ✅ Configuration carrousels
+// ✅ Tous les carrousels utilisent Nano Banana Pro pour qualité uniforme
 export const CAROUSEL_MODELS = {
-  standard: LOVABLE_MODELS.image_standard,
+  standard: LOVABLE_MODELS.image_premium,  // Migré vers Nano Banana Pro
   premium: LOVABLE_MODELS.image_premium,
 };
 

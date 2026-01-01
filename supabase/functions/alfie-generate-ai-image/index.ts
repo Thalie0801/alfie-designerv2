@@ -567,7 +567,7 @@ Deno.serve(async (req) => {
           seed: body.seed ?? null,
           negativePrompt: body.negativePrompt ?? null,
           generatedAt: new Date().toISOString(),
-          engine: "gemini-2.5-flash-image-preview",
+          engine: "gemini-3-pro-image-preview",
           orderId,
           orderItemId,
           requestId,
