@@ -478,11 +478,16 @@ Deno.serve(async (req) => {
             });
             break;
           case "generate_video":
+            // ⚠️ DEPRECATED: Video generation now uses Job Engine V2 (job-orchestrator + video-step-runner)
+            // This case is kept for backward compatibility with existing queued jobs only
+            console.warn("[alfie-job-worker] ⚠️ DEPRECATED: generate_video should use Job Engine V2");
+            console.warn("[alfie-job-worker] New videos should go through job-orchestrator with kind='multi_clip_video'");
+            
             result = await processGenerateVideo(job.payload, {
               user_id: job.user_id,
               order_id: job.order_id,
               job_id: job.id,
-              use_brand_kit: job.payload?.useBrandKit ?? true, // ✅ Extraction de useBrandKit
+              use_brand_kit: job.payload?.useBrandKit ?? true,
             });
             break;
           default:
