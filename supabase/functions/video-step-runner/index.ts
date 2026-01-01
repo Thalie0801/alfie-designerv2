@@ -561,39 +561,68 @@ async function handleConcatClips(input: Record<string, unknown>): Promise<Record
 }
 
 async function handleDeliver(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { finalVideoUrl, jobId, userId, brandId } = input;
+  const { finalVideoUrl, jobId, userId, brandId, imageCount, slidesCount, clipCount } = input;
   
-  console.log(`[deliver] Delivering final video for job ${jobId}: ${finalVideoUrl}`);
+  console.log(`[deliver] Delivering for job ${jobId}: images=${imageCount}, slides=${slidesCount}, clips=${clipCount}`);
 
-  if (!finalVideoUrl) {
-    throw new Error('No final video URL to deliver');
+  const deliveredAssets: Array<{ type: string; id: string; url: string }> = [];
+
+  // =====================================================
+  // 1) Deliver VIDEO if we have a finalVideoUrl
+  // =====================================================
+  if (finalVideoUrl) {
+    const { data: videoMedia, error: videoError } = await supabaseAdmin
+      .from('media_generations')
+      .insert({
+        user_id: userId,
+        brand_id: brandId,
+        type: 'video',
+        output_url: finalVideoUrl as string,
+        status: 'completed',
+        modality: 'video',
+        engine: 'veo_3_1',
+        metadata: { source: 'campaign_pack', jobId },
+      })
+      .select('id')
+      .single();
+
+    if (!videoError && videoMedia) {
+      deliveredAssets.push({ type: 'video', id: videoMedia.id, url: finalVideoUrl as string });
+      console.log(`[deliver] ✅ Video saved: ${videoMedia.id}`);
+    } else {
+      console.error(`[deliver] Failed to save video:`, videoError?.message);
+    }
   }
 
-  // Sauvegarder dans media_generations
-  const { data: media, error: mediaError } = await supabaseAdmin
-    .from('media_generations')
-    .insert({
-      user_id: userId,
-      brand_id: brandId,
-      type: 'video', // ✅ Corrected: 'video' instead of 'video_pipeline' (constraint fix)
-      output_url: finalVideoUrl as string,
-      status: 'completed',
-      modality: 'video',
-      engine: 'veo_3_1',
-    })
-    .select('id')
-    .single();
-
-  if (mediaError) {
-    throw new Error(`Failed to save media: ${mediaError.message}`);
+  // =====================================================
+  // 2) Deliver IMAGES from previous steps' outputs
+  // =====================================================
+  // Images are already saved in gen_image step via alfie-generate-ai-image
+  // We just acknowledge them here
+  if (imageCount && Number(imageCount) > 0) {
+    console.log(`[deliver] ✅ ${imageCount} images were generated (saved by gen_image step)`);
   }
 
-  console.log(`[deliver] Saved to media_generations: ${media.id}`);
+  // =====================================================
+  // 3) Deliver CAROUSEL slides
+  // =====================================================
+  // Slides are already saved in gen_slide step
+  if (slidesCount && Number(slidesCount) > 0) {
+    console.log(`[deliver] ✅ ${slidesCount} carousel slides were generated`);
+  }
+
+  console.log(`[deliver] ✅ Delivered ${deliveredAssets.length} direct assets + ${imageCount || 0} images + ${slidesCount || 0} slides`);
 
   return {
-    mediaGenerationId: media.id,
-    deliveredUrl: finalVideoUrl,
+    deliveredAssets,
+    deliveredUrl: finalVideoUrl || deliveredAssets[0]?.url,
     deliveredAt: new Date().toISOString(),
+    summary: {
+      images: Number(imageCount) || 0,
+      slides: Number(slidesCount) || 0,
+      clips: Number(clipCount) || 0,
+      video: finalVideoUrl ? 1 : 0,
+    },
   };
 }
 

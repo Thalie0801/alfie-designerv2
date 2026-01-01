@@ -5,13 +5,24 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { JobSpecV1Type } from '@/types/jobSpec';
 
+export interface JobStep {
+  id: string;
+  step_type: string;
+  step_index: number;
+  status: string;
+  error?: string;
+  output_json?: Record<string, unknown>;
+}
+
 export interface JobProgress {
   jobId: string;
+  kind?: string;
   status: 'queued' | 'running' | 'completed' | 'failed';
   currentStep?: string;
   completedSteps: number;
   totalSteps: number;
   error?: string;
+  steps: JobStep[];
   assets?: Array<{ type: string; url: string }>;
 }
 
@@ -72,7 +83,7 @@ export async function getJobStatus(jobId: string): Promise<JobProgress> {
       .single(),
     supabase
       .from('job_steps')
-      .select('id, step_type, step_index, status, output_json')
+      .select('id, step_type, step_index, status, error, output_json')
       .eq('job_id', jobId)
       .order('step_index', { ascending: true }),
   ]);
@@ -82,7 +93,17 @@ export async function getJobStatus(jobId: string): Promise<JobProgress> {
   }
 
   const job = jobResult.data;
-  const steps = stepsResult.data || [];
+  const rawSteps = stepsResult.data || [];
+
+  // Map steps to JobStep interface
+  const steps: JobStep[] = rawSteps.map(s => ({
+    id: s.id,
+    step_type: s.step_type,
+    step_index: s.step_index,
+    status: s.status,
+    error: s.error || undefined,
+    output_json: s.output_json as Record<string, unknown> | undefined,
+  }));
 
   const completedSteps = steps.filter(s => s.status === 'completed').length;
   const currentStep = steps.find(s => s.status === 'running')?.step_type;
@@ -91,9 +112,11 @@ export async function getJobStatus(jobId: string): Promise<JobProgress> {
   const assets: Array<{ type: string; url: string }> = [];
   for (const step of steps) {
     if (step.status === 'completed' && step.output_json) {
-      const output = step.output_json as Record<string, unknown>;
+      const output = step.output_json;
+      if (output.imageUrl) assets.push({ type: 'image', url: output.imageUrl as string });
       if (output.keyframeUrl) assets.push({ type: 'keyframe', url: output.keyframeUrl as string });
       if (output.clipUrl) assets.push({ type: 'clip', url: output.clipUrl as string });
+      if (output.slideUrl) assets.push({ type: 'slide', url: output.slideUrl as string });
       if (output.voiceoverUrl) assets.push({ type: 'voiceover', url: output.voiceoverUrl as string });
       if (output.musicUrl) assets.push({ type: 'music', url: output.musicUrl as string });
       if (output.mixedVideoUrl) assets.push({ type: 'video', url: output.mixedVideoUrl as string });
@@ -103,11 +126,13 @@ export async function getJobStatus(jobId: string): Promise<JobProgress> {
 
   return {
     jobId: job.id,
+    kind: job.kind || undefined,
     status: job.status as JobProgress['status'],
     currentStep,
     completedSteps,
     totalSteps: steps.length,
     error: job.error || undefined,
+    steps,
     assets,
   };
 }
