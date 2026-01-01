@@ -228,8 +228,21 @@ export default function BrandKit() {
         avoid_in_visuals: brandKit.avoid_in_visuals || '',
         tagline: brandKit.tagline || ''
       });
-      // Load default subject pack
-      setDefaultSubjectPackId((brandKit as any).default_subject_pack_id || null);
+      
+      // Load default subject pack - verify it still exists
+      const packId = (brandKit as any).default_subject_pack_id;
+      if (packId) {
+        supabase
+          .from('subject_packs')
+          .select('id')
+          .eq('id', packId)
+          .single()
+          .then(({ data }) => {
+            setDefaultSubjectPackId(data ? packId : null);
+          });
+      } else {
+        setDefaultSubjectPackId(null);
+      }
     }
   }, [brandKit?.id]);
 
@@ -296,6 +309,22 @@ export default function BrandKit() {
     setSaveStatus('saving');
 
     try {
+      // Validate that subject pack still exists before saving
+      let validSubjectPackId = defaultSubjectPackId;
+      if (defaultSubjectPackId) {
+        const { data: packExists } = await supabase
+          .from('subject_packs')
+          .select('id')
+          .eq('id', defaultSubjectPackId)
+          .single();
+        
+        if (!packExists) {
+          console.warn('[BrandKit] Subject pack not found, resetting to null:', defaultSubjectPackId);
+          validSubjectPackId = null;
+          setDefaultSubjectPackId(null);
+        }
+      }
+
       const { error } = await supabase
         .from('brands')
         .update({
@@ -319,7 +348,7 @@ export default function BrandKit() {
           visual_mood: formData.visual_mood,
           avoid_in_visuals: formData.avoid_in_visuals || null,
           tagline: formData.tagline || null,
-          default_subject_pack_id: defaultSubjectPackId,
+          default_subject_pack_id: validSubjectPackId,
           updated_at: new Date().toISOString()
         })
         .eq('id', brandKit.id)
@@ -334,7 +363,14 @@ export default function BrandKit() {
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (error: any) {
       console.error('Save error:', error);
-      toast.error('Alfie n\'a pas pu mettre à jour ta marque. Réessaie dans quelques instants.');
+      
+      // Handle foreign key constraint error specifically
+      if (error.message?.includes('foreign key constraint') || error.code === '23503') {
+        toast.error('Le Subject Pack sélectionné n\'existe plus. Il a été réinitialisé.');
+        setDefaultSubjectPackId(null);
+      } else {
+        toast.error('Alfie n\'a pas pu mettre à jour ta marque. Réessaie dans quelques instants.');
+      }
       setSaveStatus('idle');
     } finally {
       setLoading(false);
