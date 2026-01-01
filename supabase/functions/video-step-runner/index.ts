@@ -114,6 +114,18 @@ function enrichInputWithPreviousOutputs(
     }
   }
 
+  // ✅ For voiceover: inject text from planned beats if not provided
+  if (stepType === 'voiceover') {
+    const plannedBeats = previousOutputs.plannedBeats as Array<{ voiceoverText?: string }>;
+    if (plannedBeats && plannedBeats.length > 0 && !input.text) {
+      const voiceoverText = plannedBeats.map(b => b.voiceoverText).filter(Boolean).join(' ');
+      if (voiceoverText) {
+        enriched.text = voiceoverText;
+        console.log(`[enrichInput] ✅ Injected voiceover text from beats: ${voiceoverText.substring(0, 80)}...`);
+      }
+    }
+  }
+
   // For concat_clips: inject all clip URLs
   if (stepType === 'concat_clips') {
     const clipUrls = previousOutputs.clipUrls as string[];
@@ -890,23 +902,126 @@ async function handleRenderCover(input: Record<string, unknown>): Promise<Record
 }
 
 async function handlePlanScript(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { script, clipCount, durationTotal } = input;
+  const { script, clipCount, durationTotal, subjectPackId, brandId, useBrandKit } = input;
+  const targetClipCount = (clipCount as number) || 3;
   
-  console.log(`[plan_script] Planning script for ${clipCount} clips`);
+  console.log(`[plan_script] Planning script for ${targetClipCount} clips using LLM`);
 
-  // Use LLM to break script into beats
-  // For now, return simple split
-  const lines = (script as string || '').split(/[.!?]+/).filter(l => l.trim());
-  const beatsPerClip = Math.ceil(lines.length / (clipCount as number || 3));
+  // Load Subject Pack to include character in prompts
+  let subjectDescription = '';
+  let subjectName = '';
+  if (subjectPackId) {
+    const subjectPack = await loadSubjectPack(String(subjectPackId));
+    if (subjectPack) {
+      subjectDescription = subjectPack.identity_prompt || '';
+      subjectName = subjectPack.name || '';
+      console.log(`[plan_script] Using subject: ${subjectName}`);
+    }
+  }
+
+  // Load Brand Kit context
+  let brandContext = '';
+  if (useBrandKit !== false && brandId) {
+    const brandKit = await loadBrandKit(String(brandId));
+    if (brandKit) {
+      brandContext = `Marque: ${brandKit.name}, Niche: ${brandKit.niche || 'N/A'}`;
+    }
+  }
+
+  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+  
+  // If no API key or no script, fallback to simple split
+  if (!LOVABLE_API_KEY || !(script as string)?.trim()) {
+    console.log(`[plan_script] No API key or empty script, using simple split`);
+    return fallbackPlanScript(script as string, targetClipCount, durationTotal as number);
+  }
+
+  const systemPrompt = `Tu es un réalisateur de mini-films publicitaires.
+Découpe ce script en ${targetClipCount} scènes visuelles distinctes.
+
+${subjectDescription ? `PERSONNAGE PRINCIPAL (doit apparaître dans TOUTES les scènes avec ces caractéristiques exactes): ${subjectDescription}` : ''}
+${brandContext ? `CONTEXTE DE MARQUE: ${brandContext}` : ''}
+
+Pour chaque scène, génère:
+- Un visualPrompt TRÈS DÉTAILLÉ pour la génération vidéo (description visuelle complète incluant: le personnage avec ses traits distinctifs, l'environnement, l'éclairage, l'angle de caméra, l'action)
+- Le texte voiceover correspondant (ce que la voix dira pendant cette scène)
+- La durée recommandée (8 secondes par défaut)
+
+RÈGLES CRITIQUES:
+1. Chaque visualPrompt DOIT mentionner le personnage principal avec ses caractéristiques exactes (couleurs, style, vêtements)
+2. Les scènes doivent être visuellement distinctes mais le personnage doit être identique
+3. Utilise un langage cinématographique (close-up, wide shot, pan, etc.)
+
+Réponds UNIQUEMENT en JSON valide:
+{
+  "beats": [
+    {
+      "sceneIndex": 0,
+      "visualPrompt": "Description visuelle détaillée avec le personnage...",
+      "voiceoverText": "Texte du voiceover...",
+      "durationSec": 8
+    }
+  ]
+}`;
+
+  try {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: script as string || 'Crée une vidéo promotionnelle dynamique' },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[plan_script] LLM call failed: ${response.status} - ${errorText}`);
+      return fallbackPlanScript(script as string, targetClipCount, durationTotal as number);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || '';
+    
+    // Extract JSON from response
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error(`[plan_script] No JSON found in LLM response`);
+      return fallbackPlanScript(script as string, targetClipCount, durationTotal as number);
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    console.log(`[plan_script] ✅ Generated ${parsed.beats?.length || 0} beats with LLM`);
+
+    return {
+      beats: parsed.beats || [],
+      clipCount: parsed.beats?.length || targetClipCount,
+    };
+  } catch (error) {
+    console.error(`[plan_script] LLM error, falling back to simple split:`, error);
+    return fallbackPlanScript(script as string, targetClipCount, durationTotal as number);
+  }
+}
+
+// Fallback function for simple script splitting
+function fallbackPlanScript(script: string, clipCount: number, durationTotal: number): Record<string, unknown> {
+  const lines = (script || '').split(/[.!?]+/).filter(l => l.trim());
+  const beatsPerClip = Math.ceil(lines.length / clipCount);
   
   const beats = [];
-  for (let i = 0; i < (clipCount as number || 3); i++) {
+  for (let i = 0; i < clipCount; i++) {
     const clipLines = lines.slice(i * beatsPerClip, (i + 1) * beatsPerClip);
     beats.push({
       sceneIndex: i,
       visualPrompt: clipLines.join('. ') || `Scene ${i + 1}`,
       voiceoverText: clipLines.join('. '),
-      durationSec: Math.floor((durationTotal as number || 24) / (clipCount as number || 3)),
+      durationSec: Math.floor((durationTotal || 24) / clipCount),
     });
   }
 
