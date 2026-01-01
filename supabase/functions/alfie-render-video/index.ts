@@ -32,7 +32,7 @@ interface SlideRequest {
 
 type GenSize = { w: number; h: number };
 
-const MODEL_IMAGE = "google/gemini-2.5-flash-image-preview";
+const MODEL_IMAGE = "google/gemini-3-pro-image-preview";
 
 const AR_MAP: Record<string, GenSize> = {
   "1:1": { w: 1024, h: 1024 },
