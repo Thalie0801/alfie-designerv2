@@ -120,8 +120,8 @@ Deno.serve(async (req) => {
       voiceoverUrl,
       musicUrl,
       voiceoverVolume = 100,
-      musicVolume = 20,
-      originalVideoVolume = 30,
+      musicVolume = 10, // ✅ FIX: Reduced from 20 to 10 for better voice clarity
+      originalVideoVolume = 0, // ✅ FIX: Default to 0 (strip VEO audio)
       outputFormat = "mp4",
     } = body;
 
