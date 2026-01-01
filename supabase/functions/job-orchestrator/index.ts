@@ -150,6 +150,7 @@ function generateStepsForSingleImage(spec: JobSpecV1Type): StepInput[] {
         ratio: spec.ratio_master,
         visualStyle: spec.visual_style,
         identityAnchorId: spec.character_anchor_id,
+        subjectPackId: spec.subject_pack_id, // ✅ Propagate Subject Pack
         locks: spec.locks,
       },
     },
@@ -175,6 +176,7 @@ function generateStepsForMultiImage(spec: JobSpecV1Type): StepInput[] {
         ratio: spec.ratio_master,
         visualStyle: spec.visual_style,
         identityAnchorId: spec.character_anchor_id,
+        subjectPackId: spec.subject_pack_id, // ✅ Propagate Subject Pack
         locks: spec.locks,
       },
     });
@@ -218,6 +220,7 @@ function generateStepsForCarousel(spec: JobSpecV1Type): StepInput[] {
         ratio: spec.ratio_master,
         visualStyle: spec.visual_style,
         identityAnchorId: spec.character_anchor_id,
+        subjectPackId: spec.subject_pack_id, // ✅ Propagate Subject Pack
       },
     });
   }
@@ -267,6 +270,7 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
         visualPrompt: spec.beats?.[i]?.visualPrompt || '',
         ratio: spec.ratio_master,
         identityAnchorId: spec.character_anchor_id,
+        subjectPackId: spec.subject_pack_id, // ✅ Propagate Subject Pack
         locks: spec.locks,
         useLipSync: spec.audio?.lip_sync_enabled || false,
       },
@@ -284,6 +288,7 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
         durationSeconds: spec.beats?.[i]?.durationSec || 8,
         ratio: spec.ratio_master,
         identityAnchorId: spec.character_anchor_id,
+        subjectPackId: spec.subject_pack_id, // ✅ Propagate Subject Pack
         useLipSync: spec.audio?.lip_sync_enabled || false,
       },
     });

@@ -620,9 +620,10 @@ async function executeStep(stepType: string, input: Record<string, unknown>): Pr
 // =====================================================
 
 async function handleGenImage(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { prompt, ratio, visualStyle, identityAnchorId, userId, brandId, useBrandKit } = input;
+  const { prompt, ratio, visualStyle, identityAnchorId, subjectPackId, userId, brandId, useBrandKit } = input;
   
   console.log(`[gen_image] userId: ${userId}, brandId: ${brandId}, useBrandKit: ${useBrandKit}`);
+  console.log(`[gen_image] subjectPackId: ${subjectPackId}, identityAnchorId: ${identityAnchorId}`);
   console.log(`[gen_image] Generating image with prompt: ${String(prompt).substring(0, 100)}...`);
 
   // Charger le Brand Kit si activé
@@ -631,6 +632,44 @@ async function handleGenImage(input: Record<string, unknown>): Promise<Record<st
     brandKit = await loadBrandKit(String(brandId));
     console.log(`[gen_image] Loaded brandKit: ${brandKit?.name || 'none'}`);
   }
+
+  // ✅ Subject Pack: charger et enrichir le prompt
+  let subjectContext = '';
+  let negativeContext = '';
+  let referenceImageUrl: string | null = null;
+  
+  if (subjectPackId) {
+    const subjectPack = await loadSubjectPack(String(subjectPackId));
+    if (subjectPack) {
+      console.log(`[gen_image] ✅ Loaded subjectPack: ${subjectPack.name} (${subjectPack.pack_type})`);
+      
+      // Image Master comme référence principale
+      referenceImageUrl = subjectPack.master_image_url;
+      
+      // Contexte d'identité
+      if (subjectPack.identity_prompt) {
+        subjectContext = `\n\n=== SUBJECT IDENTITY (${subjectPack.pack_type.toUpperCase()}) ===\n${subjectPack.identity_prompt}\n`;
+        subjectContext += `CRITICAL: The character/subject must be EXACTLY as shown in the reference image.\n`;
+        subjectContext += `- SAME face shape, SAME eye color, SAME fur/hair color and texture\n`;
+        subjectContext += `- SAME accessories, SAME outfit, SAME style\n`;
+        subjectContext += `- ONE single subject in frame, no variations, no alternate versions\n`;
+      }
+      if (subjectPack.negative_prompt) {
+        negativeContext = `AVOID: ${subjectPack.negative_prompt}`;
+      }
+      
+      // Contraintes du pack
+      const constraints = subjectPack.constraints_json || {};
+      if (constraints.face_lock) subjectContext += 'FACE LOCK: Maintain exact facial features. ';
+      if (constraints.outfit_lock) subjectContext += 'OUTFIT LOCK: Maintain exact clothing. ';
+      if (constraints.palette_lock) subjectContext += 'PALETTE LOCK: Maintain color consistency. ';
+    }
+  }
+  
+  // Enrichir le prompt avec le contexte Subject Pack
+  const enrichedPrompt = subjectContext 
+    ? `${prompt}${subjectContext}${negativeContext ? `\n${negativeContext}` : ''}`
+    : prompt;
 
   const response = await fetch(`${SUPABASE_URL}/functions/v1/alfie-generate-ai-image`, {
     method: 'POST',
@@ -644,10 +683,12 @@ async function handleGenImage(input: Record<string, unknown>): Promise<Record<st
       brandId,
       brandKit,
       useBrandKit,
-      prompt,
+      prompt: enrichedPrompt,
       ratio: ratio || '9:16',
       visualStyle: visualStyle || 'photorealistic',
       identityAnchorId,
+      referenceImageUrl, // ✅ Pass Subject Pack Master as reference
+      negativePrompt: negativeContext || undefined,
     }),
   });
 
@@ -666,9 +707,10 @@ async function handleGenImage(input: Record<string, unknown>): Promise<Record<st
 }
 
 async function handleGenSlide(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { slideIndex, slide, ratio, visualStyle, userId, brandId, useBrandKit } = input;
+  const { slideIndex, slide, ratio, visualStyle, subjectPackId, userId, brandId, useBrandKit } = input;
   
   console.log(`[gen_slide] userId: ${userId}, brandId: ${brandId}, useBrandKit: ${useBrandKit}`);
+  console.log(`[gen_slide] subjectPackId: ${subjectPackId}`);
   console.log(`[gen_slide] Generating slide ${slideIndex}`);
 
   // Charger le Brand Kit si activé
@@ -678,8 +720,28 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
     console.log(`[gen_slide] Loaded brandKit: ${brandKit?.name || 'none'}`);
   }
 
+  // ✅ Subject Pack: charger et enrichir le prompt
+  let subjectContext = '';
+  let referenceImageUrl: string | null = null;
+  
+  if (subjectPackId) {
+    const subjectPack = await loadSubjectPack(String(subjectPackId));
+    if (subjectPack) {
+      console.log(`[gen_slide] ✅ Loaded subjectPack: ${subjectPack.name} (${subjectPack.pack_type})`);
+      
+      // Image Master comme référence
+      referenceImageUrl = subjectPack.master_image_url;
+      
+      if (subjectPack.identity_prompt) {
+        subjectContext = `\n\nSUBJECT (${subjectPack.pack_type}): ${subjectPack.identity_prompt}`;
+        subjectContext += `\nCRITICAL: Keep the EXACT same character/subject as in the reference across all slides.`;
+      }
+    }
+  }
+
   const slideData = slide as Record<string, unknown> | undefined;
-  const prompt = slideData?.visualPrompt || slideData?.titleOnImage || 'Professional slide background';
+  const basePrompt = slideData?.visualPrompt || slideData?.titleOnImage || 'Professional slide background';
+  const enrichedPrompt = subjectContext ? `${basePrompt}${subjectContext}` : basePrompt;
 
   const response = await fetch(`${SUPABASE_URL}/functions/v1/alfie-render-carousel-slide`, {
     method: 'POST',
@@ -693,11 +755,12 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
       brandId,
       brandKit,
       useBrandKit,
-      prompt,
+      prompt: enrichedPrompt,
       slideIndex,
       slide: slideData,
       ratio: ratio || '9:16',
       visualStyle: visualStyle || 'photorealistic',
+      referenceImageUrl, // ✅ Pass Subject Pack Master as reference
     }),
   });
 
