@@ -540,8 +540,8 @@ async function handleDeliver(input: Record<string, unknown>): Promise<Record<str
     .insert({
       user_id: userId,
       brand_id: brandId,
-      type: 'video_pipeline',
-      output_url: finalVideoUrl,
+      type: 'video', // ✅ Corrected: 'video' instead of 'video_pipeline' (constraint fix)
+      output_url: finalVideoUrl as string,
       status: 'completed',
       modality: 'video',
       engine: 'veo_3_1',
