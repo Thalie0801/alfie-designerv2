@@ -180,7 +180,7 @@ async function loadBrandKit(brandId: string): Promise<Record<string, unknown> | 
   
   const { data, error } = await supabaseAdmin
     .from('brands')
-    .select('id, name, palette, logo_url, fonts, voice, niche, pitch, adjectives, tagline, tone_sliders, person, language_level, visual_types, visual_mood, avoid_in_visuals, text_color')
+    .select('id, name, palette, logo_url, avatar_url, fonts, voice, niche, pitch, adjectives, tagline, tone_sliders, person, language_level, visual_types, visual_mood, avoid_in_visuals, text_color')
     .eq('id', brandId)
     .single();
   
@@ -265,7 +265,7 @@ async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record
       if (constraints.palette_lock) subjectContext += 'MAINTAIN color palette consistency. ';
     }
   }
-  // Fallback: Identity Anchor (ancien système)
+  // Fallback 2: Identity Anchor (ancien système)
   else if (identityAnchorId) {
     const { data: anchor } = await supabaseAdmin
       .from('identity_anchors')
@@ -280,6 +280,12 @@ async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record
       if (constraints?.outfit_lock) subjectContext += 'MAINTAIN EXACT outfit and clothing colors. ';
       if (constraints?.palette_lock) subjectContext += 'MAINTAIN color palette consistency. ';
     }
+  }
+  // ✅ NEW Fallback 3: Brand Kit mascotte (avatar_url)
+  else if (brandKit?.avatar_url) {
+    refImageUrl = brandKit.avatar_url as string;
+    subjectContext = `MASCOT/CHARACTER IDENTITY:\n- Use the provided reference image as the MAIN character\n- Maintain EXACT appearance, colors, and style from reference\n`;
+    console.log(`[gen_keyframe] ✅ Using Brand Kit mascotte as identity reference: ${refImageUrl}`);
   }
 
   // Instructions Lip-Sync pour personnage de face
@@ -521,7 +527,7 @@ async function handleMixAudio(input: Record<string, unknown>): Promise<Record<st
       voiceoverUrl,
       musicUrl,
       voiceVolume: voiceVolume ?? 100,
-      musicVolume: musicVolume ?? 15,
+      musicVolume: musicVolume ?? 10, // ✅ FIX: Reduced from 15 to 10 for better voice clarity
       originalVideoVolume: originalVideoVolume ?? 0,
     }),
   });
