@@ -266,6 +266,9 @@ export function StudioGenerator() {
         useBrandKit: useBrandKitToggle,
         userPlan: profile?.plan || "starter",
         source: 'studio_solo',
+        // Video options
+        useUnifiedMusic: selectedType === "video" ? musicEnabled : undefined,
+        useLipSync: selectedType === "video" ? lipSyncEnabled : undefined,
       });
 
       toast.success(`${ASSET_CONFIG[selectedType].emoji} Génération lancée !`);
