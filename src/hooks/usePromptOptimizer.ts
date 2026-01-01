@@ -20,7 +20,7 @@ export interface OptimizationResult {
 
 interface OptimizeParams {
   prompt: string;
-  type: "image" | "carousel" | "video" | "mini-film";
+  type: "image" | "carousel" | "video" | "mini-film" | "campaign-pack";
   brandId?: string;
   aspectRatio?: string;
 }
