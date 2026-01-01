@@ -13,7 +13,7 @@ const plans = [
     features: [
       "≈ 150 Woofs créatifs / mois",
       "Exemple : jusqu'à 120 visuels ou 80 visuels + 3 vidéos courtes",
-      "1 marque avec votre brand kit (couleurs, polices, logos, mood)",
+      "1 marque avec brand kit complet + Subject Packs illimités",
       "Génération d'images, carrousels et vidéos animées",
       "Export ZIP des créations prêtes à télécharger",
     ],
@@ -26,7 +26,7 @@ const plans = [
     features: [
       "≈ 450 Woofs créatifs / mois",
       "Exemple : jusqu'à 350 visuels ou 250 visuels + 10 vidéos courtes",
-      "1 marque avec votre brand kit enrichi (palettes, ton de voix, assets récurrents)",
+      "Brand kit enrichi + Subject Packs avec IA Premium",
       "Flows complets images + carrousels + vidéos",
       "Export ZIP optimisé pour réutiliser vos contenus",
       "Support prioritaire",
@@ -41,7 +41,7 @@ const plans = [
     features: [
       "≈ 1000 Woofs créatifs / mois",
       "Exemple : jusqu'à 800 visuels ou 600 visuels + 20 vidéos courtes + 4 vidéos premium",
-      "1 marque avec votre brand kit complet (templates, presets, visuels piliers…)",
+      "Brand kit complet + Subject Packs prioritaires",
       "Export Canva + packs ZIP pour livrer vite à vos clients",
       "Bibliothèque longue durée + priorité de génération",
       "Support dédié",
