@@ -355,49 +355,217 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
 }
 
 function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
-  const steps = generateStepsForMultiClipVideo(spec);
-  let stepIndex = steps.length;
-
-  // Remove deliver step, we'll add it at the end
-  const deliverStep = steps.pop()!;
-
-  // Render variants
-  const variants = spec.deliverables.filter(d => d.startsWith('variant_'));
-  for (const variant of variants) {
-    const ratio = variant.replace('variant_', '').replace('_', ':');
+  const steps: StepInput[] = [];
+  let stepIndex = 0;
+  
+  // =====================================================
+  // 1) IMAGES: gen_image for each requested image
+  // =====================================================
+  const imageCount = spec.image_count || 0;
+  if (imageCount > 0) {
+    for (let i = 0; i < imageCount; i++) {
+      steps.push({
+        step_type: 'gen_image',
+        step_index: stepIndex++,
+        input_json: {
+          imageIndex: i,
+          prompt: spec.prompts?.[i] || spec.script || 'Professional brand image',
+          ratio: spec.ratio_master,
+          visualStyle: spec.visual_style,
+          identityAnchorId: spec.character_anchor_id,
+          subjectPackId: spec.subject_pack_id,
+          locks: spec.locks,
+        },
+      });
+    }
+  }
+  
+  // =====================================================
+  // 2) CAROUSELS: plan_slides + gen_slide x N + assemble
+  // =====================================================
+  const slidesCount = spec.slides_count || 0;
+  if (slidesCount > 0) {
+    // Plan slides first
+    if (!spec.slides || spec.slides.length === 0) {
+      steps.push({
+        step_type: 'plan_slides',
+        step_index: stepIndex++,
+        input_json: {
+          theme: spec.carousel_theme || spec.script,
+          slideCount: slidesCount,
+          ratio: spec.ratio_master,
+        },
+      });
+    }
+    
+    // Generate each slide
+    for (let i = 0; i < slidesCount; i++) {
+      steps.push({
+        step_type: 'gen_slide',
+        step_index: stepIndex++,
+        input_json: {
+          slideIndex: i,
+          slide: spec.slides?.[i],
+          ratio: spec.ratio_master,
+          visualStyle: spec.visual_style,
+          subjectPackId: spec.subject_pack_id,
+        },
+      });
+    }
+    
+    // Assemble carousel
     steps.push({
-      step_type: 'render_variant',
+      step_type: 'assemble_carousel',
       step_index: stepIndex++,
-      input_json: { targetRatio: ratio, variant },
+      input_json: { slideCount: slidesCount },
     });
   }
-
-  // Extract thumbnails
-  const thumbs = spec.deliverables.filter(d => d.startsWith('thumb_'));
-  if (thumbs.length > 0) {
+  
+  // =====================================================
+  // 3) VIDEOS: full multi-clip pipeline if clip_count > 0
+  // =====================================================
+  const clipCount = spec.clip_count || 0;
+  if (clipCount > 0) {
+    // Plan script
+    if (!spec.beats || spec.beats.length === 0) {
+      steps.push({
+        step_type: 'plan_script',
+        step_index: stepIndex++,
+        input_json: {
+          script: spec.script,
+          clipCount,
+          durationTotal: spec.duration_total,
+          subjectPackId: spec.subject_pack_id,
+          brandId: spec.brandkit_id,
+          useBrandKit: spec.use_brand_kit,
+        },
+      });
+    }
+    
+    // Generate keyframes
+    for (let i = 0; i < clipCount; i++) {
+      steps.push({
+        step_type: 'gen_keyframe',
+        step_index: stepIndex++,
+        input_json: {
+          sceneIndex: i,
+          visualPrompt: spec.beats?.[i]?.visualPrompt || '',
+          ratio: spec.ratio_master,
+          identityAnchorId: spec.character_anchor_id,
+          subjectPackId: spec.subject_pack_id,
+          locks: spec.locks,
+        },
+      });
+    }
+    
+    // Animate clips
+    for (let i = 0; i < clipCount; i++) {
+      steps.push({
+        step_type: 'animate_clip',
+        step_index: stepIndex++,
+        input_json: {
+          sceneIndex: i,
+          visualPrompt: spec.beats?.[i]?.visualPrompt || '',
+          durationSeconds: spec.beats?.[i]?.durationSec || 8,
+          ratio: spec.ratio_master,
+          subjectPackId: spec.subject_pack_id,
+        },
+      });
+    }
+    
+    // Voiceover
+    if (spec.audio?.voiceover_enabled !== false) {
+      steps.push({
+        step_type: 'voiceover',
+        step_index: stepIndex++,
+        input_json: {
+          text: spec.beats?.map(b => b.voiceoverText).filter(Boolean).join(' ') || '',
+          voiceId: spec.audio?.voice_id,
+          language: spec.audio?.language || 'fr',
+        },
+      });
+    }
+    
+    // Music
+    if (spec.audio?.music_enabled !== false) {
+      steps.push({
+        step_type: 'music',
+        step_index: stepIndex++,
+        input_json: {
+          prompt: spec.audio?.music_prompt,
+          durationSeconds: spec.duration_total || clipCount * 8,
+        },
+      });
+    }
+    
+    // Concat clips
+    if (clipCount > 1) {
+      steps.push({
+        step_type: 'concat_clips',
+        step_index: stepIndex++,
+        input_json: { clipCount },
+      });
+    }
+    
+    // Mix audio
     steps.push({
-      step_type: 'extract_thumbnails',
+      step_type: 'mix_audio',
       step_index: stepIndex++,
       input_json: {
-        timestamps: spec.render?.thumbnails_timestamps || [1.0, 7.0, 15.0],
-        count: thumbs.length,
+        musicVolume: spec.audio?.music_volume_db || -20,
+        voiceVolume: 100,
+        duckingEnabled: spec.audio?.ducking_enabled ?? true,
       },
     });
+    
+    // Render variants
+    const variants = spec.deliverables.filter(d => d.startsWith('variant_'));
+    for (const variant of variants) {
+      const ratio = variant.replace('variant_', '').replace('_', ':');
+      steps.push({
+        step_type: 'render_variant',
+        step_index: stepIndex++,
+        input_json: { targetRatio: ratio, variant },
+      });
+    }
+    
+    // Extract thumbnails
+    const thumbs = spec.deliverables.filter(d => d.startsWith('thumb_'));
+    if (thumbs.length > 0) {
+      steps.push({
+        step_type: 'extract_thumbnails',
+        step_index: stepIndex++,
+        input_json: {
+          timestamps: spec.render?.thumbnails_timestamps || [1.0, 7.0, 15.0],
+          count: thumbs.length,
+        },
+      });
+    }
+    
+    // Render cover
+    if (spec.deliverables.includes('cover')) {
+      steps.push({
+        step_type: 'render_cover',
+        step_index: stepIndex++,
+        input_json: { campaignName: spec.campaign_name },
+      });
+    }
   }
-
-  // Render cover
-  if (spec.deliverables.includes('cover')) {
-    steps.push({
-      step_type: 'render_cover',
-      step_index: stepIndex++,
-      input_json: { campaignName: spec.campaign_name },
-    });
-  }
-
-  // Add back deliver step
-  deliverStep.step_index = stepIndex;
-  steps.push(deliverStep);
-
+  
+  // =====================================================
+  // 4) DELIVER: always end with deliver step
+  // =====================================================
+  steps.push({
+    step_type: 'deliver',
+    step_index: stepIndex,
+    input_json: { 
+      deliverables: spec.deliverables,
+      imageCount,
+      slidesCount,
+      clipCount,
+    },
+  });
+  
   return steps;
 }
 
