@@ -297,8 +297,9 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
     });
   }
 
-  // Voiceover - always create step if enabled (text will be enriched from plannedBeats)
-  if (spec.audio?.voiceover_enabled !== false) {
+  // Voiceover - force enable if lip_sync is active (lip-sync requires voiceover to work)
+  const voiceoverNeeded = spec.audio?.voiceover_enabled !== false || spec.audio?.lip_sync_enabled === true;
+  if (voiceoverNeeded) {
     const voiceoverText = spec.beats?.map(b => b.voiceoverText).filter(Boolean).join(' ') || '';
     // ✅ Always create voiceover step - text will be enriched from plan_script output if empty
     steps.push({
