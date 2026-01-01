@@ -351,12 +351,14 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
     });
   }
 
-  // Concat clips
+  // Concat clips with transitions
   if (clipCount > 1) {
+    // Get transition type from spec.transitions or default to 'fade'
+    const transitionType = (spec as any).transitions?.type || 'fade';
     steps.push({
       step_type: 'concat_clips',
       step_index: stepIndex++,
-      input_json: { clipCount },
+      input_json: { clipCount, transitionType },
     });
   }
 

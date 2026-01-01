@@ -130,6 +130,9 @@ export const JobSpecV1 = z.object({
   locks: VisualLocks.optional(),
   audio: AudioConfig.optional(),
   render: RenderConfig.optional(),
+  transitions: z.object({
+    type: z.enum(['cut', 'fade', 'dissolve']).default('fade'),
+  }).optional(),
 
   // Métadonnées
   campaign_name: z.string().optional(),

@@ -178,6 +178,7 @@ export default function StudioMulti() {
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [lipSyncEnabled, setLipSyncEnabled] = useState(false);
   const [safeZone, setSafeZone] = useState(false);
+  const [transitionType, setTransitionType] = useState<'cut' | 'fade' | 'dissolve'>('fade');
   const [selectedVoice, setSelectedVoice] = useState<string>('daniel-fr');
 
   // Subject Pack
@@ -287,6 +288,9 @@ export default function StudioMulti() {
         render: {
           fps: 30,
           thumbnails_timestamps: [1.0, Math.floor(clipCount * durationPerClip / 2), clipCount * durationPerClip - 2],
+        },
+        transitions: {
+          type: transitionType,
         },
       };
 
@@ -609,6 +613,26 @@ export default function StudioMulti() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Transitions entre clips</Label>
+                  <Select 
+                    value={transitionType} 
+                    onValueChange={(v) => setTransitionType(v as 'cut' | 'fade' | 'dissolve')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cut">✂️ Coupe directe</SelectItem>
+                      <SelectItem value="fade">🌑 Fondu (fade)</SelectItem>
+                      <SelectItem value="dissolve">🔀 Fondu enchaîné (dissolve)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Fade recommandé pour un rendu professionnel
+                  </p>
                 </div>
 
                 <div className="space-y-2">
