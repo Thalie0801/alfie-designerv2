@@ -5,7 +5,7 @@ export type Brief = {
   audience?: string;
   platform?: "instagram" | "tiktok" | "pinterest" | "linkedin" | "youtube";
   format?: "image" | "carousel" | "video";
-  ratio?: "1:1" | "4:5" | "9:16" | "16:9" | "2:3" | "3:4";
+  ratio?: "1:1" | "4:5" | "9:16" | "16:9" | "2:3" | "yt-thumb";
   tone?: "premium" | "fun" | "b2b" | "educ" | string | null;
   topic?: string;
   cta?: string;

@@ -1,4 +1,4 @@
-type Ratio = "1:1" | "9:16" | "16:9" | "3:4" | "4:5" | "2:3";
+type Ratio = "1:1" | "9:16" | "16:9" | "4:5" | "2:3" | "yt-thumb";
 type Platform = "instagram" | "tiktok" | "pinterest" | "linkedin" | "youtube";
 type Mode = "carousel" | "video" | "image" | "campaign" | "mini-film";
 type Niche = "ecommerce" | "infopreneur" | "services" | "mlm" | "creator";
@@ -22,8 +22,10 @@ export function detectContentIntent(raw: string) {
     (/youtube|shorts?/.test(q) && "youtube") ||
     null;
 
-  const m = q.match(/\b(1:1|9:16|16:9|3:4|4:5|2:3)\b/);
-  const ratioFromText: Ratio | undefined = m ? (m[1] as Ratio) : undefined;
+  // Detect yt-thumb aliases first
+  const isYtThumb = /(yt-?thumb|miniature\s*(youtube|yt)|youtube\s*thumb)/i.test(q);
+  const m = q.match(/\b(1:1|9:16|16:9|4:5|2:3)\b/);
+  const ratioFromText: Ratio | undefined = isYtThumb ? "yt-thumb" : (m ? (m[1] as Ratio) : undefined);
 
   const defaultRatioByPlatform: Record<string, Ratio> = {
     instagram: isCarousel ? "4:5" : "1:1",
