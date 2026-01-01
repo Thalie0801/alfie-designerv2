@@ -110,8 +110,12 @@ Deno.serve(async (req) => {
       voiceId,
     });
 
-    // Résoudre l'ID de voix
-    const resolvedVoiceId = voiceId || FRENCH_VOICES[voiceName || "lily-fr"] || FRENCH_VOICES["lily-fr"];
+    // Résoudre l'ID de voix - voiceId peut être un nom ("charlotte-fr") ou un UUID
+    const resolvedVoiceId = 
+      FRENCH_VOICES[voiceId as string] ||  // voiceId is a voice name → resolve to UUID
+      voiceId ||                            // voiceId is already a UUID → use as-is
+      FRENCH_VOICES[voiceName || "daniel-fr"] ||  // Use voiceName if provided
+      FRENCH_VOICES["daniel-fr"];           // Default to Daniel (standard French accent)
 
     // Appeler ElevenLabs TTS API
     const response = await fetch(

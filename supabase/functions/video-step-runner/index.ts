@@ -475,7 +475,14 @@ CRITICAL FRAME RULES:
 async function handleVoiceover(input: Record<string, unknown>): Promise<Record<string, unknown>> {
   const { text, voiceId, language } = input;
   
-  console.log(`[voiceover] Generating voiceover for ${String(text).length} characters`);
+  // Validate voiceover text
+  const voiceoverText = (text as string)?.trim() || '';
+  if (!voiceoverText) {
+    throw new Error('Voiceover text is empty - enrichment from plan_script may have failed');
+  }
+  
+  console.log(`[voiceover] Generating voiceover for ${voiceoverText.length} characters`);
+  console.log(`[voiceover] Voice: ${voiceId || 'daniel-fr'}, Text preview: ${voiceoverText.substring(0, 100)}...`);
 
   const response = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
     method: 'POST',
@@ -484,8 +491,8 @@ async function handleVoiceover(input: Record<string, unknown>): Promise<Record<s
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      text,
-      voiceId: voiceId || 'onwK4e9ZLuTAKqWW03F9', // Daniel FR par défaut
+      text: voiceoverText,
+      voiceName: voiceId || 'daniel-fr',  // Pass as voiceName for proper resolution
       language: language || 'fr',
     }),
   });
