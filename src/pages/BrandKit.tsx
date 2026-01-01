@@ -11,9 +11,9 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { useBrandKit, ToneSliders } from '@/hooks/useBrandKit';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { Palette, Save, Loader2, X, MessageSquare, Eye, Sparkles, Type, Upload, Trash2, Link, User, Plus } from 'lucide-react';
+import { Palette, Save, Loader2, X, MessageSquare, Eye, Sparkles, Type, Upload, Trash2, Link, User } from 'lucide-react';
 import { SubjectPackSelector } from '@/components/studio/SubjectPackSelector';
-import { SubjectPackCreateModal } from '@/components/studio/SubjectPackCreateModal';
+import { SubjectPackManager } from '@/components/studio/SubjectPackManager';
 // setBrandDefaultSubjectPack available for async updates if needed
 import { useAuth } from '@/hooks/useAuth';
 import { BrandSelector } from '@/components/BrandSelector';
@@ -65,7 +65,6 @@ export default function BrandKit() {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [showSubjectPackModal, setShowSubjectPackModal] = useState(false);
   const [defaultSubjectPackId, setDefaultSubjectPackId] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false); // ✅ V10
 
@@ -971,15 +970,16 @@ export default function BrandKit() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <User className="h-5 w-5" />
-            <CardTitle>Subject par défaut</CardTitle>
+            <CardTitle>Subject Packs</CardTitle>
           </div>
           <CardDescription>
-            Personnage ou élément récurrent utilisé dans tes contenus
+            Personnages ou éléments récurrents utilisés dans tes contenus
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
+          {/* Subject Pack par défaut */}
           <div className="space-y-2">
-            <Label>Subject Pack actif</Label>
+            <Label>Subject Pack par défaut</Label>
             <SubjectPackSelector
               value={defaultSubjectPackId}
               onChange={setDefaultSubjectPackId}
@@ -990,23 +990,16 @@ export default function BrandKit() {
               Ce subject sera automatiquement appliqué aux contenus créés avec cette marque
             </p>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setShowSubjectPackModal(true)}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Créer un nouveau Subject Pack
-          </Button>
+
+          {/* Subject Pack Manager intégré */}
+          <div className="pt-4 border-t">
+            <SubjectPackManager 
+              showHeader={true} 
+              onPackSelect={(packId) => setDefaultSubjectPackId(packId)}
+            />
+          </div>
         </CardContent>
       </Card>
-
-      <SubjectPackCreateModal
-        open={showSubjectPackModal}
-        onOpenChange={setShowSubjectPackModal}
-        onCreated={(packId) => setDefaultSubjectPackId(packId)}
-      />
 
       {/* Card 4: Exemples */}
       <Card>
