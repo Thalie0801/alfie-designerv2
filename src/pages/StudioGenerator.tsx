@@ -31,11 +31,11 @@ type AssetType = "image" | "carousel" | "video";
 type Platform = "instagram" | "tiktok" | "linkedin" | "pinterest" | "youtube";
 
 const PLATFORM_RATIOS: Record<Platform, Ratio[]> = {
-  instagram: ["4:5", "1:1", "9:16"],
-  tiktok: ["9:16"],
-  linkedin: ["1:1", "16:9"],
-  pinterest: ["2:3", "4:5", "9:16"],
-  youtube: ["16:9", "yt-thumb"],
+  instagram: ["4:5", "1:1", "9:16", "16:9", "2:3", "yt-thumb"],
+  tiktok: ["9:16", "4:5", "1:1", "16:9", "2:3", "yt-thumb"],
+  linkedin: ["1:1", "16:9", "4:5", "9:16", "2:3", "yt-thumb"],
+  pinterest: ["2:3", "4:5", "9:16", "1:1", "16:9", "yt-thumb"],
+  youtube: ["16:9", "yt-thumb", "4:5", "1:1", "9:16", "2:3"],
 };
 
 const getRatioLabel = (r: Ratio): string => {
