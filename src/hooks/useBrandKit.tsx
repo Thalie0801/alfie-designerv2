@@ -163,6 +163,7 @@ export function useBrandKit() {
         user_id: brand.user_id,
         palette: Array.isArray(brand.palette) ? brand.palette : [],
         logo_url: brand.logo_url ?? null,
+        avatar_url: brand.avatar_url ?? null, // ✅ V10: Avatar/mascotte
         fonts: brand.fonts,
         voice: brand.voice ?? null,
         niche: brand.niche ?? null,
@@ -231,6 +232,7 @@ export function useBrandKit() {
     name: activeBrand.name,
     palette: Array.isArray(activeBrand.palette) ? activeBrand.palette : [],
     logo_url: activeBrand.logo_url ?? undefined,
+    avatar_url: activeBrand.avatar_url ?? undefined, // ✅ V10: Avatar/mascotte
     fonts: activeBrand.fonts,
     voice: activeBrand.voice ?? undefined,
     niche: activeBrand.niche ?? undefined,
