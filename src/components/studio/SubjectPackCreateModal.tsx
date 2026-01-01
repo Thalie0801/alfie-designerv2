@@ -140,8 +140,9 @@ export function SubjectPackCreateModal({ open, onOpenChange, onCreated }: Subjec
       clearSlot('anchorB');
       onOpenChange(false);
     } catch (err) {
-      console.error('Error creating subject pack:', err);
-      toast.error('Erreur lors de la création');
+      console.error('[SubjectPack] Error creating pack:', err);
+      const message = err instanceof Error ? err.message : 'Erreur inconnue';
+      toast.error(`Erreur: ${message}`);
     } finally {
       setLoading(false);
     }
