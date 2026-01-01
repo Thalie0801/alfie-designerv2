@@ -619,9 +619,12 @@ async function handleMixAudio(input: Record<string, unknown>): Promise<Record<st
 }
 
 async function handleConcatClips(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { clipUrls } = input as { clipUrls: string[] };
+  const { clipUrls, transitionType = 'cut' } = input as { 
+    clipUrls: string[]; 
+    transitionType?: 'cut' | 'fade' | 'dissolve';
+  };
   
-  console.log(`[concat_clips] Concatenating ${clipUrls?.length || 0} clips`);
+  console.log(`[concat_clips] Concatenating ${clipUrls?.length || 0} clips with transition: ${transitionType}`);
 
   if (!clipUrls || clipUrls.length === 0) {
     throw new Error('No clip URLs provided for concatenation');
@@ -642,8 +645,25 @@ async function handleConcatClips(input: Record<string, unknown>): Promise<Record
     return match ? match[1] : url;
   });
 
-  // Construire l'URL de concatenation inline (temporaire)
-  const concatTransform = publicIds.slice(1).map(id => `l_video:${id.replace(/\//g, ':')},fl_splice,du_8/`).join('');
+  // ✅ Construire la transformation selon le type de transition
+  const buildTransition = (publicId: string): string => {
+    const baseId = publicId.replace(/\//g, ':');
+    
+    switch (transitionType) {
+      case 'fade':
+        // Fade out du clip précédent + fade in du suivant (500ms chaque)
+        return `e_fade:-500/l_video:${baseId},fl_splice,e_fade:500,du_8/`;
+      case 'dissolve':
+        // Crossfade entre les clips (1 seconde de chevauchement)
+        return `l_video:${baseId},fl_splice,e_transition:crossfade:1000,du_8/`;
+      case 'cut':
+      default:
+        // Coupe directe (comportement actuel)
+        return `l_video:${baseId},fl_splice,du_8/`;
+    }
+  };
+
+  const concatTransform = publicIds.slice(1).map(buildTransition).join('');
   const firstPublicId = publicIds[0];
   const inlineConcatUrl = `https://res.cloudinary.com/${cloudName}/video/upload/${concatTransform}${firstPublicId}.mp4`;
   
