@@ -454,12 +454,13 @@ function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
   // =====================================================
   // 2) CAROUSELS: support multi-carousel with carousel_count
   // =====================================================
-  const carouselCount = spec.carousel_count || 1;
-  const slidesPerCarousel = spec.slides_per_carousel || 5;
-  const totalSlides = spec.slides_count || (carouselCount * slidesPerCarousel);
+  // Use ?? to allow 0 as valid value (|| treats 0 as falsy)
+  const carouselCount = spec.carousel_count ?? 0;
+  const slidesPerCarousel = spec.slides_per_carousel ?? 5;
+  const totalSlides = spec.slides_count ?? (carouselCount * slidesPerCarousel);
   
-  // If carousel_count > 1, generate separate carousels
-  if (carouselCount > 0 && (totalSlides > 0 || spec.carousel_theme)) {
+  // Only generate carousel steps if carousel_count > 0
+  if (carouselCount > 0 && totalSlides > 0) {
     for (let c = 0; c < carouselCount; c++) {
       // Plan slides for THIS carousel
       if (!spec.slides || spec.slides.length === 0) {
