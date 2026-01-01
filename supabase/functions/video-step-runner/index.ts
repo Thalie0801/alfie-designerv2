@@ -353,12 +353,16 @@ async function handleAnimateClip(input: Record<string, unknown>): Promise<Record
 
   // Variables pour le contexte subject/identity
   let subjectPrompt = '';
+  let subjectMasterUrl: string | null = null;
   
   // Priorité 1: Subject Pack (nouveau système)
   if (subjectPackId) {
     const subjectPack = await loadSubjectPack(String(subjectPackId));
     if (subjectPack) {
-      console.log(`[animate_clip] Loaded subjectPack: ${subjectPack.name}`);
+      console.log(`[animate_clip] Loaded subjectPack: ${subjectPack.name}, master: ${subjectPack.master_image_url}`);
+      
+      // ✅ Capture master image URL for VEO reference (source of truth)
+      subjectMasterUrl = subjectPack.master_image_url;
       
       if (subjectPack.identity_prompt) {
         subjectPrompt = `SUBJECT (${subjectPack.pack_type}): ${subjectPack.identity_prompt}\n`;
@@ -394,9 +398,14 @@ async function handleAnimateClip(input: Record<string, unknown>): Promise<Record
     ? `\n\nIDENTITY LOCK (SCENE ${sceneIndex}):\n- Character MUST be IDENTICAL to first scene\n- SAME exact appearance, colors, textures, features\n- Maintain strict visual continuity throughout\n`
     : '';
 
+  // ✅ NEW: Strong Subject Pack lock instructions when master is available
+  const subjectLockInstructions = subjectMasterUrl 
+    ? `\n\nSUBJECT REFERENCE LOCK:\n- The character MUST match EXACTLY the reference image provided\n- Same exact face, body shape, colors, textures, outfit, features\n- NO variation allowed - strict visual match required\n- This is a MASCOT identity - consistency is critical\n`
+    : '';
+
   // Enrichir le prompt pour VEO
   const enrichedPrompt = `${subjectPrompt}${visualPrompt}
-${lipSyncInstructions}${identityInstructions}
+${lipSyncInstructions}${identityInstructions}${subjectLockInstructions}
 
 CRITICAL FRAME RULES:
 - ONE SINGLE FULL-FRAME SHOT
@@ -404,8 +413,12 @@ CRITICAL FRAME RULES:
 - Character must remain IDENTICAL throughout the clip
 - Smooth, cinematic motion`;
 
-  // ✅ Use first keyframe as identity anchor for all clips
-  const referenceImage = firstKeyframeUrl || keyframeUrl;
+  // ✅ Priority order for reference image:
+  // 1. Subject Pack master (source of truth for identity)
+  // 2. First keyframe (identity anchor from first clip)
+  // 3. Current keyframe (fallback)
+  const referenceImage = subjectMasterUrl || firstKeyframeUrl || keyframeUrl;
+  console.log(`[animate_clip] Reference image priority: master=${!!subjectMasterUrl}, firstKF=${!!firstKeyframeUrl}, kf=${!!keyframeUrl}`);
 
   // Appeler generate-video avec provider veo3 (endpoint correct)
   const veoPayload = {
