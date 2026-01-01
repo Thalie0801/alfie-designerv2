@@ -308,6 +308,7 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
       input_json: {
         sceneIndex: i,
         visualPrompt: spec.beats?.[i]?.visualPrompt || '',
+        voiceoverText: spec.beats?.[i]?.voiceoverText || '', // ✅ NEW: Pass voiceover text for VEO native lip-sync
         durationSeconds: spec.beats?.[i]?.durationSec || 8,
         ratio: spec.ratio_master,
         identityAnchorId: spec.character_anchor_id,
@@ -317,11 +318,16 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
     });
   }
 
-  // Voiceover - force enable if lip_sync is active (lip-sync requires voiceover to work)
-  const voiceoverNeeded = spec.audio?.voiceover_enabled !== false || spec.audio?.lip_sync_enabled === true;
+  // ✅ FIX: Voiceover step ONLY if NOT using lip-sync (lip-sync uses VEO native audio)
+  // When lip-sync is enabled, VEO generates the voice natively - no ElevenLabs needed
+  const useLipSync = spec.audio?.lip_sync_enabled === true;
+  const voiceoverNeeded = !useLipSync && spec.audio?.voiceover_enabled !== false;
+  
+  console.log(`[orchestrator] Audio mode: lipSync=${useLipSync}, voiceoverNeeded=${voiceoverNeeded}`);
+  
   if (voiceoverNeeded) {
     const voiceoverText = spec.beats?.map(b => b.voiceoverText).filter(Boolean).join(' ') || '';
-    // ✅ Always create voiceover step - text will be enriched from plan_script output if empty
+    // ✅ Create voiceover step only for ElevenLabs mode (non-lip-sync)
     steps.push({
       step_type: 'voiceover',
       step_index: stepIndex++,
