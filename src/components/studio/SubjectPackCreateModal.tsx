@@ -161,6 +161,9 @@ export function SubjectPackCreateModal({ open, onOpenChange, onCreated }: Subjec
     required?: boolean;
     description: string;
   }) => {
+    const [imageLoading, setImageLoading] = useState(true);
+    const [imageError, setImageError] = useState(false);
+
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
       onDrop: handleFileDrop(slot),
       accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp'] },
@@ -173,10 +176,28 @@ export function SubjectPackCreateModal({ open, onOpenChange, onCreated }: Subjec
         <div className="space-y-2">
           <Label>{label} {required && <span className="text-destructive">*</span>}</Label>
           <div className="relative aspect-square rounded-lg overflow-hidden border bg-muted">
+            {imageLoading && !imageError && (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            )}
             <img
               src={slotData.preview}
               alt={label}
-              className="h-full w-full object-cover"
+              className={cn(
+                "h-full w-full object-cover transition-opacity",
+                imageLoading && "opacity-0"
+              )}
+              onLoad={() => {
+                setImageLoading(false);
+                setImageError(false);
+              }}
+              onError={(e) => {
+                console.error('[SubjectPack] Image preview failed:', { slot, preview: slotData.preview });
+                setImageLoading(false);
+                setImageError(true);
+                e.currentTarget.src = '/placeholder.svg';
+              }}
             />
             <Button
               type="button"
