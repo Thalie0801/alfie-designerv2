@@ -178,6 +178,7 @@ export default function StudioMulti() {
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [lipSyncEnabled, setLipSyncEnabled] = useState(false);
   const [safeZone, setSafeZone] = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState<string>('daniel-fr');
 
   // Subject Pack
   const [useDefaultSubject, setUseDefaultSubject] = useState(true);
@@ -277,6 +278,7 @@ export default function StudioMulti() {
         },
         audio: {
           voiceover_enabled: voiceoverEnabled,
+          voice_id: selectedVoice,
           music_enabled: musicEnabled,
           lip_sync_enabled: lipSyncEnabled,
           music_volume_db: -20,
@@ -709,6 +711,22 @@ export default function StudioMulti() {
                   onCheckedChange={(checked) => setSafeZone(checked === true)}
                 />
                 <Label htmlFor="safeZone">Zone de sécurité</Label>
+              </div>
+              
+              {/* Voice Selection */}
+              <div className="w-full mt-2">
+                <Label className="mb-2 block">Voix</Label>
+                <Select value={selectedVoice} onValueChange={setSelectedVoice}>
+                  <SelectTrigger className="w-full sm:w-[280px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daniel-fr">🎙️ Daniel (Masculin, pro)</SelectItem>
+                    <SelectItem value="lily-fr">🎤 Lily (Féminine, douce)</SelectItem>
+                    <SelectItem value="charlotte-fr">💫 Charlotte (Féminine, énergique)</SelectItem>
+                    <SelectItem value="thomas-fr">🗣️ Thomas (Masculin, chaleureux)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>

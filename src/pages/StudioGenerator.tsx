@@ -102,6 +102,7 @@ export function StudioGenerator() {
   // Video options
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [lipSyncEnabled, setLipSyncEnabled] = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState<string>('daniel-fr');
 
   // Reference images (1-3)
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
@@ -283,6 +284,7 @@ export function StudioGenerator() {
         // Video options
         useUnifiedMusic: selectedType === "video" ? musicEnabled : undefined,
         useLipSync: selectedType === "video" ? lipSyncEnabled : undefined,
+        voiceId: selectedType === "video" ? selectedVoice : undefined,
         // Subject pack
         subjectPackId: effectiveSubjectPackId || undefined,
       });
@@ -599,6 +601,22 @@ export function StudioGenerator() {
                       <p className="text-xs text-muted-foreground">Personnage de face, lèvres synchronisées</p>
                     </div>
                     <Switch checked={lipSyncEnabled} onCheckedChange={setLipSyncEnabled} />
+                  </div>
+
+                  {/* Voice Selection */}
+                  <div>
+                    <label className="font-medium text-sm block mb-2">Voix</label>
+                    <Select value={selectedVoice} onValueChange={setSelectedVoice}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daniel-fr">🎙️ Daniel (Masculin, pro)</SelectItem>
+                        <SelectItem value="lily-fr">🎤 Lily (Féminine, douce)</SelectItem>
+                        <SelectItem value="charlotte-fr">💫 Charlotte (Féminine, énergique)</SelectItem>
+                        <SelectItem value="thomas-fr">🗣️ Thomas (Masculin, chaleureux)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               )}

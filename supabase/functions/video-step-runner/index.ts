@@ -485,7 +485,7 @@ async function handleVoiceover(input: Record<string, unknown>): Promise<Record<s
     },
     body: JSON.stringify({
       text,
-      voiceId: voiceId || 'pFZP5JQG7iQjIQuC4Bku', // Lily FR par défaut
+      voiceId: voiceId || 'onwK4e9ZLuTAKqWW03F9', // Daniel FR par défaut
       language: language || 'fr',
     }),
   });
