@@ -1467,7 +1467,8 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       } else {
         textInstruction = " NO TEXT, NO LETTERS, NO WORDS visible.";
       }
-      videoPrompt = `${characterStyle} in motion. ${prompt || 'Professional scene'}. ${brandMini?.niche || 'business'} context. Smooth animation, expressive movements.${textInstruction} Pure cinematic footage.`;
+      // ✅ PRIORITÉ: prompt utilisateur EN PREMIER
+      videoPrompt = `${prompt || 'Professional scene'}. ${characterStyle} in motion. ${brandMini?.niche || 'business'} context. Smooth animation, expressive movements.${textInstruction} Pure cinematic footage.`;
     } else if (visualStyleCategory === 'product' && effectiveReferenceImageUrl) {
       // Mode PRODUIT: vidéo de mise en scène produit
       let textInstruction = "";
@@ -1613,7 +1614,7 @@ CRITICAL FRAME RULES:
     const audioMode = payload.audioMode || 'veo';
     const useVoiceover = payload.useVoiceover === true;
     const useUnifiedMusic = payload.useUnifiedMusic === true;
-    const voiceId = payload.voiceId || 'lily-fr';
+    const voiceId = payload.voiceId || 'daniel-fr';
     
     console.log("[processGenerateVideo] 🔊 Audio mode check:", {
       audioMode,

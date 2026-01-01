@@ -35,6 +35,7 @@ export interface SendPackParams {
   // ✅ Video options
   useUnifiedMusic?: boolean;
   useLipSync?: boolean;
+  voiceId?: string;
   // ✅ Subject Pack
   subjectPackId?: string;
 }
@@ -65,6 +66,7 @@ export async function sendPackToGenerator({
   // ✅ Video options
   useUnifiedMusic,
   useLipSync,
+  voiceId,
   // ✅ Subject Pack
   subjectPackId,
 }: SendPackParams): Promise<SendPackResult> {
@@ -149,7 +151,7 @@ export async function sendPackToGenerator({
           scriptGroup: asset.scriptGroup,
           clipTotal: videoAssets.length,
         });
-        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, useLogo, userPlan, carouselMode, colorMode, visualStyle, videoAssets, source, useUnifiedMusic, useLipSync, subjectPackId);
+        return createAssetJob(asset, brandId, userId, pack.title, useBrandKit, useLogo, userPlan, carouselMode, colorMode, visualStyle, videoAssets, source, useUnifiedMusic, useLipSync, subjectPackId, voiceId);
       })
     );
 
@@ -213,6 +215,7 @@ async function createAssetJob(
   useUnifiedMusic?: boolean, // ✅ Video: musique
   useLipSync?: boolean, // ✅ Video: lip-sync
   subjectPackId?: string, // ✅ Subject Pack
+  voiceId?: string, // ✅ Video: voice ID
 ): Promise<{ orderId: string }> {
   // Créer un order pour cet asset
   const { data: order, error: orderError } = await supabase
@@ -295,7 +298,7 @@ async function createAssetJob(
       withAudio: asset.kind === 'video_premium' ? (asset.withAudio !== false) : undefined, // ✅ FORCER true pour vidéos sauf si explicitement false
       // ✅ ElevenLabs Audio Options
       audioMode: asset.kind === 'video_premium' ? (asset.audioMode || 'veo') : undefined,
-      voiceId: asset.kind === 'video_premium' ? (asset.voiceId || undefined) : undefined,
+      voiceId: asset.kind === 'video_premium' ? (voiceId || asset.voiceId || undefined) : undefined,
       useVoiceover: asset.kind === 'video_premium' ? (asset.useVoiceover || false) : undefined,
       useUnifiedMusic: asset.kind === 'video_premium' ? (useUnifiedMusic ?? asset.useUnifiedMusic ?? false) : undefined,
       batchMusicUrl: asset.kind === 'video_premium' ? (asset.batchMusicUrl || undefined) : undefined,
