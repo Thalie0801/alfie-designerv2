@@ -404,9 +404,9 @@ async function handleAnimateClip(input: Record<string, unknown>): Promise<Record
     }
   }
 
-  // Instructions Lip-Sync pour VEO
+  // Instructions Lip-Sync renforcées pour VEO (améliore l'animation, pas une vraie synchro)
   const lipSyncInstructions = useLipSync 
-    ? `\n\nLIP-SYNC ANIMATION:\n- Character speaks directly to camera\n- Realistic mouth movements synchronized with speech\n- Natural facial expressions while talking\n- Maintain frontal camera angle throughout\n- Eyes engaged with viewer` 
+    ? `\n\nNATURAL TALKING ANIMATION:\n- Character speaks DIRECTLY to camera with VISIBLE, NATURAL mouth movements\n- Mouth opens and closes CLEARLY while speaking, forming syllables distinctly\n- SLOW, deliberate speech cadence for maximum clarity\n- Lips move realistically - NOT subtle, but OBVIOUS talking motion\n- Natural facial micro-expressions while talking (eyebrows, eyes)\n- Eyes engaged, focused on viewer throughout\n- Maintain PERFECT frontal camera angle - face centered\n- Character should appear to be narrating/presenting to the audience` 
     : '';
 
   // ✅ NEW: Identity consistency instructions for multi-clip
@@ -552,6 +552,20 @@ async function handleMixAudio(input: Record<string, unknown>): Promise<Record<st
     throw new Error('Missing videoUrl for mix_audio step');
   }
 
+  // ✅ FIX: Convert dB to percentage if needed, or use very low default
+  // -20dB ≈ 10%, -30dB ≈ 3%, 0dB = 100%
+  let effectiveMusicVolume = 5; // Default très bas pour voix claire
+  if (typeof musicVolume === 'number') {
+    if (musicVolume <= 0) {
+      // C'est des dB négatifs, convertir: 10^(dB/20) * 100
+      effectiveMusicVolume = Math.max(1, Math.round(Math.pow(10, musicVolume / 20) * 100));
+    } else if (musicVolume <= 100) {
+      effectiveMusicVolume = musicVolume; // Déjà en pourcentage
+    }
+  }
+  
+  console.log(`[mix_audio] Music volume: input=${musicVolume}, effective=${effectiveMusicVolume}%`);
+
   const response = await fetch(`${SUPABASE_URL}/functions/v1/mix-audio-video`, {
     method: 'POST',
     headers: {
@@ -563,7 +577,7 @@ async function handleMixAudio(input: Record<string, unknown>): Promise<Record<st
       voiceoverUrl,
       musicUrl,
       voiceVolume: voiceVolume ?? 100,
-      musicVolume: musicVolume ?? 10, // ✅ FIX: Reduced from 15 to 10 for better voice clarity
+      musicVolume: effectiveMusicVolume, // ✅ FIX: Use converted/validated value
       originalVideoVolume: originalVideoVolume ?? 0,
     }),
   });
