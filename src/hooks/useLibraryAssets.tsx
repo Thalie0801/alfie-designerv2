@@ -167,14 +167,15 @@ export function useLibraryAssets(userId: string | undefined, type: 'images' | 'v
           .is('metadata->>carousel_id', null)
           .or('metadata->>resolution.eq.1080x1620,metadata->>ratio.eq.2:3');
       } else if (type === 'images') {
-        // Images = type 'image' uniquement, PAS les carousel_slide, PAS les legacy Ken Burns, PAS les miniatures YT/Pinterest
+        // Images = type 'image' uniquement, PAS les carousel_slide, PAS les legacy Ken Burns, PAS les miniatures YT/Pinterest, PAS les keyframes
         query = query
           .eq('type', 'image')
           .is('metadata->>carousel_id', null)
           .not('output_url', 'like', '%animated_base_%')
           .neq('metadata->>resolution', '1280x720')  // Exclure miniatures YouTube
           .neq('metadata->>resolution', '1080x1620') // Exclure Pinterest
-          .or('metadata->>ratio.is.null,metadata->>ratio.neq.2:3');  // Inclure NULL ou différent de 2:3
+          .or('metadata->>ratio.is.null,metadata->>ratio.neq.2:3')  // Inclure NULL ou différent de 2:3
+          .or('is_intermediate.is.null,is_intermediate.eq.false');  // ✅ Exclure keyframes intermédiaires
       } else if (type === 'videos') {
         // Vidéos SOLO uniquement: exclure celles avec scriptGroup ou batchId (appartenant à un batch)
         const { data: videoData, error: videoError } = await supabase

@@ -271,6 +271,7 @@ Aspect ratio: ${ratio || '9:16'}`;
       prompt: imagePrompt,
       ratio: ratio || '9:16',
       referenceImageUrl: refImageUrl,
+      isIntermediate: true, // ✅ Mark keyframes as intermediate (won't show in library)
     }),
   });
 

@@ -66,6 +66,7 @@ interface GenerateRequest {
   useBrandKit?: boolean;
   userPlan?: string;
   visualStyleCategory?: 'background' | 'character' | 'product'; // ✅ Style visuel adaptatif
+  isIntermediate?: boolean; // ✅ Mark as intermediate asset (keyframe, not final)
 }
 
 /* --------------------------- Small helpers -------------------------- */
@@ -552,7 +553,8 @@ Deno.serve(async (req) => {
         prompt: short(fullPrompt, 500),
         output_url: generatedImageUrl!,
         thumbnail_url: generatedImageUrl!,
-        woofs: 1,
+        woofs: body.isIntermediate ? 0 : 1, // ✅ Keyframes cost 0 Woofs
+        is_intermediate: !!body.isIntermediate, // ✅ Mark keyframes as intermediate
         metadata: {
           resolution: resValue,
           aspectRatio: aspectRatioValue, // ✅ Ajout pour filtrage miniatures YouTube
@@ -570,6 +572,7 @@ Deno.serve(async (req) => {
           orderItemId,
           requestId,
           referenceImageUrl: referenceImage ?? null,
+          isIntermediate: !!body.isIntermediate, // ✅ Also in metadata for filtering
         },
       };
 
