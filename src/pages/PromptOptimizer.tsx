@@ -19,6 +19,7 @@ const CONTENT_TYPES = [
   { value: "carousel", label: "📱 Carrousel" },
   { value: "video", label: "🎬 Vidéo (clip court)" },
   { value: "mini-film", label: "🎥 Mini-Film (multi-scènes)" },
+  { value: "campaign-pack", label: "📦 Pack Campagne" },
 ];
 
 const PLATFORMS = [
@@ -29,7 +30,7 @@ const PLATFORMS = [
   { value: "youtube", label: "YouTube Shorts" },
 ];
 
-type ContentType = "image" | "carousel" | "video" | "mini-film";
+type ContentType = "image" | "carousel" | "video" | "mini-film" | "campaign-pack";
 type Destination = "solo" | "multi";
 
 export default function PromptOptimizer() {
@@ -45,9 +46,9 @@ export default function PromptOptimizer() {
   const [destination, setDestination] = useState<Destination>("solo");
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
 
-  // Force destination to "multi" when mini-film is selected
+  // Force destination to "multi" when mini-film or campaign-pack is selected
   useEffect(() => {
-    if (contentType === "mini-film") {
+    if (contentType === "mini-film" || contentType === "campaign-pack") {
       setDestination("multi");
     }
   }, [contentType]);
