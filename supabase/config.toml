@@ -104,3 +104,6 @@ verify_jwt = false
 
 [functions.sync-stripe-renewal-dates]
 verify_jwt = false
+
+[functions.check-subscription-discount]
+verify_jwt = false
