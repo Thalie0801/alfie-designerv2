@@ -42,6 +42,7 @@ async function getStepOutputs(jobId: string): Promise<Record<string, unknown>> {
     keyframes: [] as string[],
     clipUrls: [] as string[],
     plannedBeats: [] as Array<{ sceneIndex: number; visualPrompt: string; voiceoverText: string; durationSec: number }>,
+    plannedImagePrompts: [] as string[], // ✅ NEW: For multi-image segmentation
   };
 
   for (const step of previousSteps || []) {
@@ -52,6 +53,11 @@ async function getStepOutputs(jobId: string): Promise<Record<string, unknown>> {
     if (step.step_type === 'plan_script' && output.beats) {
       outputs.plannedBeats = output.beats;
       console.log(`[getStepOutputs] Collected ${(output.beats as unknown[]).length} planned beats from plan_script`);
+    }
+    // ✅ NEW: Collect planned image prompts from plan_images
+    if (step.step_type === 'plan_images' && output.prompts) {
+      outputs.plannedImagePrompts = output.prompts as string[];
+      console.log(`[getStepOutputs] Collected ${(output.prompts as string[]).length} planned image prompts from plan_images`);
     }
     // Collect keyframes
     if (step.step_type === 'gen_keyframe' && output.keyframeUrl) {
@@ -116,6 +122,16 @@ function enrichInputWithPreviousOutputs(
     if (plannedBeats && plannedBeats[sceneIndex]?.visualPrompt && !input.visualPrompt) {
       enriched.visualPrompt = plannedBeats[sceneIndex].visualPrompt;
       console.log(`[enrichInput] ✅ Injected visualPrompt for clip scene ${sceneIndex}: ${String(enriched.visualPrompt).substring(0, 80)}...`);
+    }
+  }
+
+  // ✅ NEW: For gen_image: inject segmented prompt from plan_images
+  if (stepType === 'gen_image') {
+    const imageIndex = (input.imageIndex as number) ?? 0;
+    const plannedPrompts = previousOutputs.plannedImagePrompts as string[];
+    if (plannedPrompts && plannedPrompts.length > 0 && plannedPrompts[imageIndex]) {
+      enriched.prompt = plannedPrompts[imageIndex];
+      console.log(`[enrichInput] ✅ Injected prompt for image ${imageIndex} from plan_images: ${String(enriched.prompt).substring(0, 80)}...`);
     }
   }
 
@@ -790,6 +806,8 @@ async function executeStep(stepType: string, input: Record<string, unknown>): Pr
       return handlePlanScript(input);
     case 'plan_assets':
       return handlePlanAssets(input);
+    case 'plan_images':
+      return handlePlanImages(input);
     
     default:
       throw new Error(`Unknown step type: ${stepType}`);
@@ -1198,6 +1216,151 @@ async function handlePlanAssets(input: Record<string, unknown>): Promise<Record<
   
   // For campaign packs, reuse plan_script logic
   return handlePlanScript(input);
+}
+
+// =====================================================
+// PLAN IMAGES: Segment single script into N distinct prompts
+// =====================================================
+
+async function handlePlanImages(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { script, imageCount, subjectPackId, brandId, useBrandKit } = input;
+  const targetCount = (imageCount as number) || 3;
+  
+  console.log(`[plan_images] Segmenting script into ${targetCount} distinct image prompts`);
+
+  // Load Subject Pack to include character in all prompts
+  let subjectDescription = '';
+  let subjectName = '';
+  if (subjectPackId) {
+    const subjectPack = await loadSubjectPack(String(subjectPackId));
+    if (subjectPack) {
+      subjectDescription = subjectPack.identity_prompt || '';
+      subjectName = subjectPack.name || '';
+      console.log(`[plan_images] Using subject: ${subjectName}`);
+    }
+  }
+
+  // Load Brand Kit context
+  let brandContext = '';
+  if (useBrandKit !== false && brandId) {
+    const brandKit = await loadBrandKit(String(brandId));
+    if (brandKit) {
+      brandContext = `Brand: ${brandKit.name}, Niche: ${brandKit.niche || 'N/A'}`;
+    }
+  }
+
+  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+  
+  // If no API key or no script, fallback to simple split
+  if (!LOVABLE_API_KEY || !(script as string)?.trim()) {
+    console.log(`[plan_images] No API key or empty script, using simple split`);
+    return fallbackPlanImages(script as string, targetCount, subjectDescription);
+  }
+
+  const systemPrompt = `You are an expert AI image generation prompt engineer.
+Analyze the user's brief and generate ${targetCount} DISTINCT, SEPARATE image prompts.
+
+${subjectDescription ? `
+=== CHARACTER/SUBJECT (MUST appear in EVERY image) ===
+${subjectDescription}
+- This exact character must be the MAIN SUBJECT in each image
+- Maintain IDENTICAL appearance: same face, same colors, same outfit, same style
+` : ''}
+
+${brandContext ? `=== BRAND CONTEXT ===\n${brandContext}\n` : ''}
+
+=== CRITICAL RULES ===
+1. Each prompt describes ONE SINGLE IMAGE (never a collage, never multiple images)
+2. Each image has a DIFFERENT concept/angle/message (not duplicates)
+3. If there's a subject/character, they MUST appear in EVERY image with consistent identity
+4. Prompts must be in English, detailed, optimized for AI image generation
+5. Include style, lighting, composition, and mood details
+6. Each prompt should be 2-4 sentences max
+
+Return ONLY a valid JSON object: { "prompts": ["prompt1", "prompt2", "prompt3", ...] }`;
+
+  try {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Brief: ${script}\n\nGenerate ${targetCount} distinct image prompts.` },
+        ],
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`[plan_images] LLM API error: ${response.status}`);
+      return fallbackPlanImages(script as string, targetCount, subjectDescription);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || '';
+    
+    // Parse JSON from response
+    const jsonMatch = content.match(/\{[\s\S]*"prompts"[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error(`[plan_images] No JSON found in LLM response`);
+      return fallbackPlanImages(script as string, targetCount, subjectDescription);
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    const prompts = parsed.prompts as string[];
+    
+    if (!prompts || prompts.length === 0) {
+      console.error(`[plan_images] Empty prompts array from LLM`);
+      return fallbackPlanImages(script as string, targetCount, subjectDescription);
+    }
+
+    console.log(`[plan_images] ✅ Generated ${prompts.length} distinct prompts via LLM`);
+    
+    return {
+      prompts,
+      imageCount: prompts.length,
+    };
+  } catch (error) {
+    console.error(`[plan_images] LLM error, falling back to simple split:`, error);
+    return fallbackPlanImages(script as string, targetCount, subjectDescription);
+  }
+}
+
+// Fallback function for simple prompt splitting (with subject identity propagation)
+function fallbackPlanImages(
+  script: string,
+  imageCount: number,
+  subjectDescription?: string
+): Record<string, unknown> {
+  const lines = (script || '').split(/[.!?]+/).filter(l => l.trim());
+  
+  // Character prefix to ensure consistency across all images
+  const characterPrefix = subjectDescription 
+    ? `SUBJECT: ${subjectDescription}. SCENE: ` 
+    : '';
+  
+  const prompts: string[] = [];
+  const linesPerImage = Math.ceil(lines.length / imageCount) || 1;
+  
+  for (let i = 0; i < imageCount; i++) {
+    const imageLines = lines.slice(i * linesPerImage, (i + 1) * linesPerImage);
+    const sceneDescription = imageLines.join('. ') || `Professional scene ${i + 1} showcasing brand identity`;
+    
+    // Prefix EVERY prompt with character description for consistency
+    prompts.push(characterPrefix + sceneDescription);
+  }
+
+  console.log(`[fallbackPlanImages] Generated ${prompts.length} prompts with character: "${subjectDescription?.substring(0, 50) || 'none'}..."`);
+
+  return {
+    prompts,
+    imageCount: prompts.length,
+  };
 }
 
 // =====================================================

@@ -165,14 +165,32 @@ function generateStepsForSingleImage(spec: JobSpecV1Type): StepInput[] {
 function generateStepsForMultiImage(spec: JobSpecV1Type): StepInput[] {
   const steps: StepInput[] = [];
   const count = spec.image_count || spec.prompts?.length || 1;
+  let stepIndex = 0;
+  
+  // ✅ If single script for multiple images, plan segmented prompts first
+  const needsPlanning = count > 1 && (!spec.prompts || spec.prompts.length < count);
+  
+  if (needsPlanning) {
+    steps.push({
+      step_type: 'plan_images',
+      step_index: stepIndex++,
+      input_json: {
+        script: spec.prompts?.[0] || spec.script || '',
+        imageCount: count,
+        subjectPackId: spec.subject_pack_id,
+        brandId: spec.brandkit_id,
+        useBrandKit: spec.use_brand_kit,
+      },
+    });
+  }
   
   for (let i = 0; i < count; i++) {
     steps.push({
       step_type: 'gen_image',
-      step_index: i,
+      step_index: stepIndex++,
       input_json: {
         imageIndex: i,
-        prompt: spec.prompts?.[i] || spec.prompts?.[0] || '',
+        prompt: needsPlanning ? null : (spec.prompts?.[i] || spec.prompts?.[0] || ''), // null = await plan_images
         ratio: spec.ratio_master,
         visualStyle: spec.visual_style,
         identityAnchorId: spec.character_anchor_id,
@@ -184,7 +202,7 @@ function generateStepsForMultiImage(spec: JobSpecV1Type): StepInput[] {
   
   steps.push({
     step_type: 'deliver',
-    step_index: count,
+    step_index: stepIndex,
     input_json: { deliverables: spec.deliverables, imageCount: count },
   });
   
@@ -393,17 +411,34 @@ function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
   let stepIndex = 0;
   
   // =====================================================
-  // 1) IMAGES: gen_image for each requested image
+  // 1) IMAGES: plan_images + gen_image for each requested image
   // =====================================================
   const imageCount = spec.image_count || 0;
   if (imageCount > 0) {
+    // ✅ If single script for multiple images, plan segmented prompts first
+    const needsImagePlanning = imageCount > 1 && (!spec.prompts || spec.prompts.length < imageCount);
+    
+    if (needsImagePlanning) {
+      steps.push({
+        step_type: 'plan_images',
+        step_index: stepIndex++,
+        input_json: {
+          script: spec.prompts?.[0] || spec.script || 'Professional brand images',
+          imageCount,
+          subjectPackId: spec.subject_pack_id,
+          brandId: spec.brandkit_id,
+          useBrandKit: spec.use_brand_kit,
+        },
+      });
+    }
+    
     for (let i = 0; i < imageCount; i++) {
       steps.push({
         step_type: 'gen_image',
         step_index: stepIndex++,
         input_json: {
           imageIndex: i,
-          prompt: spec.prompts?.[i] || spec.script || 'Professional brand image',
+          prompt: needsImagePlanning ? null : (spec.prompts?.[i] || spec.script || 'Professional brand image'),
           ratio: spec.ratio_master,
           visualStyle: spec.visual_style,
           identityAnchorId: spec.character_anchor_id,
