@@ -52,6 +52,7 @@ interface GenerateRequest {
   requestId?: string | null;
   templateImageUrl?: string;
   uploadedSourceUrl?: string | null;
+  referenceImageUrl?: string | null; // ✅ NEW: Subject Pack reference image
   brandKit?: BrandKit;
   prompt?: string;
   resolution?: string;
@@ -64,7 +65,7 @@ interface GenerateRequest {
   negativePrompt?: string;
   useBrandKit?: boolean;
   userPlan?: string;
-  visualStyleCategory?: 'background' | 'character' | 'product'; // ✅ NEW: Style visuel adaptatif
+  visualStyleCategory?: 'background' | 'character' | 'product'; // ✅ Style visuel adaptatif
 }
 
 /* --------------------------- Small helpers -------------------------- */
@@ -371,8 +372,14 @@ Deno.serve(async (req) => {
     const fullPrompt = buildMainPrompt(body);
     const negative = buildNegativePrompt(body);
 
+    // ✅ Priority: referenceImageUrl (Subject Pack) > uploadedSourceUrl > templateImageUrl
     const referenceImage =
-      body.uploadedSourceUrl?.trim() || body.templateImageUrl?.trim() || null;
+      body.referenceImageUrl?.trim() || body.uploadedSourceUrl?.trim() || body.templateImageUrl?.trim() || null;
+    
+    if (body.referenceImageUrl) {
+      console.log('[alfie-generate-ai-image] Using Subject Pack reference image:', body.referenceImageUrl.substring(0, 80) + '...');
+    }
+    
     const userContent: any[] = [{ type: "text", text: fullPrompt }];
     if (referenceImage) {
       userContent.push({ type: "image_url", image_url: { url: referenceImage } });
