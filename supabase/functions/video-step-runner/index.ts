@@ -106,6 +106,11 @@ function enrichInputWithPreviousOutputs(
     if (keyframes && keyframes[sceneIndex]) {
       enriched.keyframeUrl = keyframes[sceneIndex];
     }
+    // ✅ Always pass first keyframe as identity reference for all clips
+    if (keyframes && keyframes.length > 0) {
+      enriched.firstKeyframeUrl = keyframes[0];
+      console.log(`[enrichInput] ✅ Injected firstKeyframeUrl as identity anchor for scene ${sceneIndex}`);
+    }
     // ✅ Also inject visualPrompt for animate_clip
     const plannedBeats = previousOutputs.plannedBeats as Array<{ visualPrompt?: string }>;
     if (plannedBeats && plannedBeats[sceneIndex]?.visualPrompt && !input.visualPrompt) {
@@ -114,10 +119,12 @@ function enrichInputWithPreviousOutputs(
     }
   }
 
-  // ✅ For voiceover: inject text from planned beats if not provided
+  // ✅ For voiceover: inject text from planned beats if not provided or empty
   if (stepType === 'voiceover') {
     const plannedBeats = previousOutputs.plannedBeats as Array<{ voiceoverText?: string }>;
-    if (plannedBeats && plannedBeats.length > 0 && !input.text) {
+    const currentText = (input.text as string) || '';
+    // ✅ Fix: check for empty string as well as undefined/null
+    if (plannedBeats && plannedBeats.length > 0 && currentText.trim().length === 0) {
       const voiceoverText = plannedBeats.map(b => b.voiceoverText).filter(Boolean).join(' ');
       if (voiceoverText) {
         enriched.text = voiceoverText;
@@ -324,11 +331,11 @@ Aspect ratio: ${ratio || '9:16'}`;
 }
 
 async function handleAnimateClip(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { keyframeUrl, visualPrompt, identityAnchorId, subjectPackId, ratio, durationSeconds, sceneIndex, userId, brandId, useLipSync } = input;
+  const { keyframeUrl, visualPrompt, identityAnchorId, subjectPackId, ratio, durationSeconds, sceneIndex, userId, brandId, useLipSync, firstKeyframeUrl } = input;
   
   console.log(`[animate_clip] Animating scene ${sceneIndex} with VEO 3.1`);
   console.log(`[animate_clip] userId: ${userId}, brandId: ${brandId}, useLipSync: ${useLipSync}`);
-  console.log(`[animate_clip] subjectPackId: ${subjectPackId}, keyframe: ${keyframeUrl}`);
+  console.log(`[animate_clip] subjectPackId: ${subjectPackId}, keyframe: ${keyframeUrl}, firstKeyframe: ${firstKeyframeUrl}`);
 
   if (!keyframeUrl) {
     throw new Error('Missing keyframeUrl for animate_clip step');
@@ -376,9 +383,14 @@ async function handleAnimateClip(input: Record<string, unknown>): Promise<Record
     ? `\n\nLIP-SYNC ANIMATION:\n- Character speaks directly to camera\n- Realistic mouth movements synchronized with speech\n- Natural facial expressions while talking\n- Maintain frontal camera angle throughout\n- Eyes engaged with viewer` 
     : '';
 
+  // ✅ NEW: Identity consistency instructions for multi-clip
+  const identityInstructions = (sceneIndex as number) > 0 
+    ? `\n\nIDENTITY LOCK (SCENE ${sceneIndex}):\n- Character MUST be IDENTICAL to first scene\n- SAME exact appearance, colors, textures, features\n- Maintain strict visual continuity throughout\n`
+    : '';
+
   // Enrichir le prompt pour VEO
   const enrichedPrompt = `${subjectPrompt}${visualPrompt}
-${lipSyncInstructions}
+${lipSyncInstructions}${identityInstructions}
 
 CRITICAL FRAME RULES:
 - ONE SINGLE FULL-FRAME SHOT
@@ -386,12 +398,15 @@ CRITICAL FRAME RULES:
 - Character must remain IDENTICAL throughout the clip
 - Smooth, cinematic motion`;
 
+  // ✅ Use first keyframe as identity anchor for all clips
+  const referenceImage = firstKeyframeUrl || keyframeUrl;
+
   // Appeler generate-video avec provider veo3 (endpoint correct)
   const veoPayload = {
     userId,
     brandId,
     prompt: enrichedPrompt,
-    referenceImageUrl: keyframeUrl,
+    referenceImageUrl: referenceImage,
     aspectRatio: ratio || '9:16',
     provider: 'veo3',
     withAudio: false,
@@ -450,7 +465,8 @@ async function handleVoiceover(input: Record<string, unknown>): Promise<Record<s
 
   return {
     voiceoverUrl: result.audioUrl,
-    durationSeconds: result.durationSeconds,
+    // ✅ Fix: convert durationMs to seconds if needed
+    durationSeconds: result.durationSeconds || (result.durationMs ? result.durationMs / 1000 : null),
   };
 }
 
