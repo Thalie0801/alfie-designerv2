@@ -539,6 +539,8 @@ async function handleConcatClips(input: Record<string, unknown>): Promise<Record
 
   // Pour la concatenation, on utilise l'API Cloudinary
   const cloudName = Deno.env.get('CLOUDINARY_CLOUD_NAME');
+  const apiKey = Deno.env.get('CLOUDINARY_API_KEY');
+  const apiSecret = Deno.env.get('CLOUDINARY_API_SECRET');
   
   // Extraire les public_ids des URLs
   const publicIds = clipUrls.map(url => {
@@ -546,17 +548,63 @@ async function handleConcatClips(input: Record<string, unknown>): Promise<Record
     return match ? match[1] : url;
   });
 
-  // Construire l'URL de concatenation
+  // Construire l'URL de concatenation inline (temporaire)
   const concatTransform = publicIds.slice(1).map(id => `l_video:${id.replace(/\//g, ':')},fl_splice,du_8/`).join('');
   const firstPublicId = publicIds[0];
+  const inlineConcatUrl = `https://res.cloudinary.com/${cloudName}/video/upload/${concatTransform}${firstPublicId}.mp4`;
   
-  const concatenatedUrl = `https://res.cloudinary.com/${cloudName}/video/upload/${concatTransform}${firstPublicId}.mp4`;
+  console.log(`[concat_clips] Inline concat URL (temp): ${inlineConcatUrl}`);
+
+  // ✅ UPLOAD the concatenated video as a definitive asset
+  // This ensures mix_audio receives a clean URL without inline transformations
+  const timestamp = Math.floor(Date.now() / 1000);
+  const finalPublicId = `alfie/videos/concat_${Date.now()}`;
   
-  console.log(`[concat_clips] Concatenated video: ${concatenatedUrl}`);
+  // Generate signature for upload
+  const signatureString = `folder=alfie/videos&public_id=${finalPublicId}&timestamp=${timestamp}${apiSecret}`;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(signatureString);
+  const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+  const formData = new FormData();
+  formData.append('file', inlineConcatUrl);
+  formData.append('public_id', finalPublicId);
+  formData.append('folder', 'alfie/videos');
+  formData.append('resource_type', 'video');
+  formData.append('timestamp', String(timestamp));
+  formData.append('api_key', apiKey!);
+  formData.append('signature', signature);
+
+  console.log(`[concat_clips] Uploading concatenated video to Cloudinary as ${finalPublicId}...`);
+  
+  const uploadResponse = await fetch(
+    `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`,
+    { method: 'POST', body: formData }
+  );
+
+  if (!uploadResponse.ok) {
+    const errorText = await uploadResponse.text();
+    console.error(`[concat_clips] Upload failed: ${errorText}`);
+    // Fallback: return inline URL (audio will only apply to first clip)
+    console.warn(`[concat_clips] Falling back to inline concat URL (audio may not cover all clips)`);
+    return {
+      finalVideoUrl: inlineConcatUrl,
+      clipCount: clipUrls.length,
+      concatUploadFailed: true,
+    };
+  }
+
+  const uploadResult = await uploadResponse.json();
+  const uploadedUrl = uploadResult.secure_url || uploadResult.url;
+  
+  console.log(`[concat_clips] ✅ Uploaded concatenated video: ${uploadedUrl}`);
 
   return {
-    finalVideoUrl: concatenatedUrl,
+    finalVideoUrl: uploadedUrl,
     clipCount: clipUrls.length,
+    concatPublicId: uploadResult.public_id,
   };
 }
 
