@@ -174,6 +174,10 @@ export default function StudioMulti() {
   const [useIndividualPrompts, setUseIndividualPrompts] = useState(false);
   const [imagePrompts, setImagePrompts] = useState<string[]>([]);
   
+  // Individual themes mode for carousels
+  const [useIndividualCarouselThemes, setUseIndividualCarouselThemes] = useState(false);
+  const [carouselThemes, setCarouselThemes] = useState<string[]>([]);
+  
   // Sync imagePrompts array length with imageCount
   useEffect(() => {
     if (useIndividualPrompts) {
@@ -184,6 +188,17 @@ export default function StudioMulti() {
       });
     }
   }, [imageCount, useIndividualPrompts]);
+  
+  // Sync carouselThemes array length with carouselCount
+  useEffect(() => {
+    if (useIndividualCarouselThemes) {
+      setCarouselThemes(prev => {
+        const newThemes = [...prev];
+        while (newThemes.length < carouselCount) newThemes.push('');
+        return newThemes.slice(0, carouselCount);
+      });
+    }
+  }, [carouselCount, useIndividualCarouselThemes]);
   
   // Style artistique
   const [visualStyle, setVisualStyle] = useState<VisualStyle>('cinematic_photorealistic');
@@ -349,6 +364,10 @@ export default function StudioMulti() {
       const hasValidIndividualPrompts = useIndividualPrompts && 
         imagePrompts.filter(p => p.trim()).length === imageCount;
 
+      // Determine if we should send individual carousel themes
+      const hasValidCarouselThemes = useIndividualCarouselThemes && 
+        carouselThemes.filter(t => t.trim()).length === carouselCount;
+
       const spec: JobSpecV1Type = {
         version: 'v1',
         kind: 'campaign_pack',
@@ -362,6 +381,8 @@ export default function StudioMulti() {
         clip_count: videoCount,
         // If individual prompts provided, send them; otherwise let plan_images segment
         prompts: hasValidIndividualPrompts ? imagePrompts : undefined,
+        // If individual carousel themes provided, send them
+        carousel_themes: hasValidCarouselThemes ? carouselThemes : undefined,
         deliverables: ['zip'] as JobSpecV1Type['deliverables'],
         use_brand_kit: useBrandKitToggle,
         reference_images: referenceImages.length > 0 ? referenceImages : undefined,
@@ -968,6 +989,47 @@ export default function StudioMulti() {
                               setImagePrompts(newPrompts);
                             }}
                             placeholder={`Prompt pour l'image ${i + 1}...`}
+                            rows={2}
+                            className="text-sm"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Individual themes toggle for carousels */}
+              {carouselCount > 1 && (
+                <div className="space-y-4 border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-medium">Thèmes individuels par carrousel</Label>
+                      <p className="text-xs text-muted-foreground">
+                        {useIndividualCarouselThemes 
+                          ? 'Définissez un thème unique pour chaque carrousel' 
+                          : 'L\'IA créera des variations à partir du brief global'}
+                      </p>
+                    </div>
+                    <Switch 
+                      checked={useIndividualCarouselThemes} 
+                      onCheckedChange={setUseIndividualCarouselThemes} 
+                    />
+                  </div>
+                  
+                  {useIndividualCarouselThemes && (
+                    <div className="space-y-3">
+                      {Array.from({ length: carouselCount }).map((_, i) => (
+                        <div key={i} className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Carrousel {i + 1}</Label>
+                          <Textarea
+                            value={carouselThemes[i] || ''}
+                            onChange={(e) => {
+                              const newThemes = [...carouselThemes];
+                              newThemes[i] = e.target.value;
+                              setCarouselThemes(newThemes);
+                            }}
+                            placeholder={`Thème pour le carrousel ${i + 1}...`}
                             rows={2}
                             className="text-sm"
                           />
