@@ -221,18 +221,34 @@ Deno.serve(async (req) => {
     }
 
     // Check if user is admin (bypass rate limit)
-    const admin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
-    const { data: profile } = await admin
+    const adminClient = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    
+    // Get user email
+    const { data: profile } = await adminClient
       .from('profiles')
       .select('email')
       .eq('id', userId)
       .single();
     
+    // Check user_roles for admin role
+    const { data: userRoles } = await adminClient
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId);
+    const byRole = !!userRoles?.some((r: { role: string }) => r.role === 'admin');
+    
+    // Check ADMIN_EMAILS
     const adminEmails = (Deno.env.get('ADMIN_EMAILS') || '')
       .split(',')
       .map(e => e.trim().toLowerCase())
       .filter(Boolean);
-    const isAdmin = profile?.email && adminEmails.includes(profile.email.toLowerCase());
+    const byEmail = !!(profile?.email && adminEmails.includes(profile.email.toLowerCase()));
+    
+    const isAdmin = byEmail || byRole;
+    
+    // Diagnostic logs
+    console.log(`[ai-image-tools] User: ${userId.slice(0,8)}... | Email: ${profile?.email || 'none'}`);
+    console.log(`[ai-image-tools] Admin check: byEmail=${byEmail} (ADMIN_EMAILS count: ${adminEmails.length}), byRole=${byRole}, isAdmin=${isAdmin}`);
 
     let remaining = DAILY_LIMIT;
 
