@@ -107,3 +107,6 @@ verify_jwt = false
 
 [functions.check-subscription-discount]
 verify_jwt = false
+
+[functions.ai-image-tools]
+verify_jwt = true
