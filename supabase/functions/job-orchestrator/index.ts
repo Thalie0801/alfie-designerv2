@@ -432,8 +432,11 @@ function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
   // =====================================================
   const imageCount = spec.image_count || 0;
   if (imageCount > 0) {
-    // ✅ If single script for multiple images, plan segmented prompts first
-    const needsImagePlanning = imageCount > 1 && (!spec.prompts || spec.prompts.length < imageCount);
+    // ✅ Skip plan_images if user provided individual prompts for each image
+    const hasIndividualPrompts = spec.prompts && spec.prompts.length >= imageCount;
+    const needsImagePlanning = imageCount > 1 && !hasIndividualPrompts;
+    
+    console.log(`[orchestrator] Images: count=${imageCount}, hasIndividualPrompts=${hasIndividualPrompts}, needsPlanning=${needsImagePlanning}`);
     
     if (needsImagePlanning) {
       steps.push({
@@ -455,7 +458,8 @@ function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
         step_index: stepIndex++,
         input_json: {
           imageIndex: i,
-          prompt: needsImagePlanning ? null : (spec.prompts?.[i] || spec.script || 'Professional brand image'),
+          // Use individual prompt if provided, otherwise null to await plan_images
+          prompt: hasIndividualPrompts ? spec.prompts![i] : (needsImagePlanning ? null : (spec.script || 'Professional brand image')),
           ratio: spec.ratio_master,
           visualStyle: spec.visual_style,
           identityAnchorId: spec.character_anchor_id,
