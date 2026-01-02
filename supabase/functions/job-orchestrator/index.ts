@@ -108,6 +108,7 @@ const JobSpecV1 = z.object({
   character_anchor_id: z.string().uuid().optional(),
   subject_pack_id: z.string().uuid().optional(), // NEW: Subject Pack
   ratio_master: z.enum(['9:16', '1:1', '16:9', '4:5', '2:3', 'yt-thumb']).default('9:16'),
+  reference_images: z.array(z.string()).max(3).optional(), // ✅ Reference images (1-3 URLs)
   duration_total: z.number().optional(),
   clip_count: z.number().optional(),
   script: z.string().optional(),
@@ -120,6 +121,7 @@ const JobSpecV1 = z.object({
   carousel_count: z.number().optional(),         // ✅ NEW: Nombre de carrousels distincts
   slides_per_carousel: z.number().default(5),    // ✅ NEW: Slides par carrousel
   carousel_theme: z.string().optional(),
+  carousel_themes: z.array(z.string()).optional(), // ✅ NEW: Thèmes individuels par carrousel
   deliverables: z.array(DeliverableType).default(['master_9x16']),
   locks: VisualLocks.optional(),
   audio: AudioConfig.optional(),
@@ -153,6 +155,7 @@ function generateStepsForSingleImage(spec: JobSpecV1Type): StepInput[] {
         visualStyle: spec.visual_style,
         identityAnchorId: spec.character_anchor_id,
         subjectPackId: spec.subject_pack_id, // ✅ Propagate Subject Pack
+        referenceImages: spec.reference_images, // ✅ Propagate reference images
         locks: spec.locks,
       },
     },
@@ -180,6 +183,7 @@ function generateStepsForMultiImage(spec: JobSpecV1Type): StepInput[] {
         script: spec.prompts?.[0] || spec.script || '',
         imageCount: count,
         subjectPackId: spec.subject_pack_id,
+        referenceImages: spec.reference_images, // ✅ Propagate reference images
         brandId: spec.brandkit_id,
         useBrandKit: spec.use_brand_kit,
       },
@@ -197,6 +201,7 @@ function generateStepsForMultiImage(spec: JobSpecV1Type): StepInput[] {
         visualStyle: spec.visual_style,
         identityAnchorId: spec.character_anchor_id,
         subjectPackId: spec.subject_pack_id, // ✅ Propagate Subject Pack
+        referenceImages: spec.reference_images, // ✅ Propagate reference images
         locks: spec.locks,
       },
     });
@@ -225,6 +230,7 @@ function generateStepsForCarousel(spec: JobSpecV1Type): StepInput[] {
         theme: spec.carousel_theme,
         slideCount,
         ratio: spec.ratio_master,
+        referenceImages: spec.reference_images, // ✅ Propagate reference images
       },
     });
   }
@@ -241,6 +247,7 @@ function generateStepsForCarousel(spec: JobSpecV1Type): StepInput[] {
         visualStyle: spec.visual_style,
         identityAnchorId: spec.character_anchor_id,
         subjectPackId: spec.subject_pack_id, // ✅ Propagate Subject Pack
+        referenceImages: spec.reference_images, // ✅ Propagate reference images
       },
     });
   }
@@ -301,6 +308,7 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
         ratio: spec.ratio_master,
         identityAnchorId: spec.character_anchor_id,
         subjectPackId: spec.subject_pack_id,
+        referenceImages: spec.reference_images, // ✅ Propagate reference images
         locks: spec.locks,
         useLipSync: spec.audio?.lip_sync_enabled || false,
       },
@@ -446,6 +454,7 @@ function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
           script: spec.prompts?.[0] || spec.script || 'Professional brand images',
           imageCount,
           subjectPackId: spec.subject_pack_id,
+          referenceImages: spec.reference_images, // ✅ Propagate reference images
           brandId: spec.brandkit_id,
           useBrandKit: spec.use_brand_kit,
         },
@@ -464,6 +473,7 @@ function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
           visualStyle: spec.visual_style,
           identityAnchorId: spec.character_anchor_id,
           subjectPackId: spec.subject_pack_id,
+          referenceImages: spec.reference_images, // ✅ Propagate reference images
           locks: spec.locks,
         },
       });
@@ -480,7 +490,15 @@ function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
   
   // Only generate carousel steps if carousel_count > 0
   if (carouselCount > 0 && totalSlides > 0) {
+    // Check if user provided individual themes for each carousel
+    const hasIndividualCarouselThemes = spec.carousel_themes && spec.carousel_themes.length >= carouselCount;
+    
     for (let c = 0; c < carouselCount; c++) {
+      // ✅ Use individual theme if provided, otherwise fallback to global theme/script
+      const carouselTheme = hasIndividualCarouselThemes 
+        ? spec.carousel_themes![c] 
+        : (spec.carousel_theme || spec.script);
+      
       // Plan slides for THIS carousel
       if (!spec.slides || spec.slides.length === 0) {
         steps.push({
@@ -488,9 +506,10 @@ function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
           step_index: stepIndex++,
           input_json: {
             carouselIndex: c,
-            theme: spec.carousel_theme || spec.script,
+            theme: carouselTheme,
             slideCount: slidesPerCarousel,
             ratio: spec.ratio_master,
+            referenceImages: spec.reference_images, // ✅ Propagate reference images
           },
         });
       }
@@ -508,6 +527,7 @@ function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
             ratio: spec.ratio_master,
             visualStyle: spec.visual_style,
             subjectPackId: spec.subject_pack_id,
+            referenceImages: spec.reference_images, // ✅ Propagate reference images
           },
         });
       }
@@ -556,6 +576,7 @@ function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
           ratio: spec.ratio_master,
           identityAnchorId: spec.character_anchor_id,
           subjectPackId: spec.subject_pack_id,
+          referenceImages: spec.reference_images, // ✅ Propagate reference images
           locks: spec.locks,
         },
       });
