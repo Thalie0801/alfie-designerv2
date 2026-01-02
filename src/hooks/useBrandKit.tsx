@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { safeString } from '@/lib/safeRender';
+import { isVipOrAdmin } from '@/lib/access';
 
 export interface ToneSliders {
   fun: number;       // 0-10 (fun ↔ sérieux)
@@ -71,6 +72,22 @@ export function useBrandKit() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [activeBrandId, setActiveBrandId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdminUser, setIsAdminUser] = useState(false);
+  
+  // Verrou anti-race condition pour la création de marque
+  const creatingBrandRef = useRef(false);
+  const hasCheckedBrandsRef = useRef(false);
+
+  // Check admin status
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (user) {
+        const adminStatus = await isVipOrAdmin(user.id);
+        setIsAdminUser(adminStatus);
+      }
+    };
+    checkAdminStatus();
+  }, [user]);
 
   useEffect(() => {
     if (user) {
@@ -81,9 +98,29 @@ export function useBrandKit() {
   // Auto-création d'une marque par défaut si aucune n'existe
   useEffect(() => {
     const createDefaultBrand = async () => {
+      // Verrou anti-parallélisme
+      if (creatingBrandRef.current) return;
       if (!user || loading || brands.length > 0) return;
+      if (hasCheckedBrandsRef.current) return;
+      
+      creatingBrandRef.current = true;
+      hasCheckedBrandsRef.current = true;
 
       try {
+        // Re-vérifier en base AVANT de créer (évite les doublons)
+        const { data: existingBrands } = await supabase
+          .from('brands')
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(1);
+        
+        if (existingBrands && existingBrands.length > 0) {
+          console.log('[useBrandKit] Brand already exists in DB, skipping creation');
+          await loadBrands();
+          creatingBrandRef.current = false;
+          return;
+        }
+
         console.log('[useBrandKit] No brand found, creating default brand...');
         
         // Récupérer le plan de l'utilisateur
@@ -137,6 +174,8 @@ export function useBrandKit() {
         await loadBrands();
       } catch (error) {
         console.error('[useBrandKit] Error creating default brand:', error);
+      } finally {
+        creatingBrandRef.current = false;
       }
     };
 
@@ -270,10 +309,13 @@ export function useBrandKit() {
   }, [user]);
 
   const canAddBrand = () => {
+    // Admin/VIP = marques illimitées
+    if (isAdminUser) return true;
     return brands.length < quotaBrands;
   };
 
   const remainingBrands = () => {
+    if (isAdminUser) return 999; // Illimité pour admin
     return Math.max(0, quotaBrands - brands.length);
   };
 
