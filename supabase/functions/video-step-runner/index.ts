@@ -246,10 +246,11 @@ async function loadSubjectPack(packId: string): Promise<SubjectPack | null> {
 }
 
 async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { visualPrompt, identityAnchorId, subjectPackId, ratio, userId, brandId, useBrandKit, useLipSync } = input;
+  const { visualPrompt, identityAnchorId, subjectPackId, ratio, userId, brandId, useBrandKit, useLipSync, referenceImages } = input;
   
   console.log(`[gen_keyframe] userId: ${userId}, brandId: ${brandId}, useBrandKit: ${useBrandKit}, useLipSync: ${useLipSync}`);
   console.log(`[gen_keyframe] subjectPackId: ${subjectPackId}, identityAnchorId: ${identityAnchorId}`);
+  console.log(`[gen_keyframe] referenceImages: ${Array.isArray(referenceImages) ? referenceImages.length : 0}`);
   console.log(`[gen_keyframe] Generating keyframe with prompt: ${String(visualPrompt).substring(0, 100)}...`);
   
   // Charger le Brand Kit si activé
@@ -263,8 +264,9 @@ async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record
   let subjectContext = '';
   let negativeContext = '';
   let refImageUrl: string | null = null;
+  let isInspiration = false; // ✅ NEW: Track if reference is for inspiration
   
-  // Priorité 1: Subject Pack (nouveau système)
+  // Priorité 1: Subject Pack (nouveau système) - COPIE EXACTE
   if (subjectPackId) {
     const subjectPack = await loadSubjectPack(String(subjectPackId));
     if (subjectPack) {
@@ -288,7 +290,7 @@ async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record
       if (constraints.palette_lock) subjectContext += 'MAINTAIN color palette consistency. ';
     }
   }
-  // Fallback 2: Identity Anchor (ancien système)
+  // Fallback 2: Identity Anchor (ancien système) - COPIE EXACTE
   else if (identityAnchorId) {
     const { data: anchor } = await supabaseAdmin
       .from('identity_anchors')
@@ -304,15 +306,32 @@ async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record
       if (constraints?.palette_lock) subjectContext += 'MAINTAIN color palette consistency. ';
     }
   }
-  // ✅ NEW Fallback 3: Brand Kit mascotte (avatar_url)
+  // Fallback 3: Brand Kit mascotte (avatar_url) - COPIE EXACTE
   else if (brandKit?.avatar_url) {
     refImageUrl = brandKit.avatar_url as string;
     subjectContext = `MASCOT/CHARACTER IDENTITY:\n- Use the provided reference image as the MAIN character\n- Maintain EXACT appearance, colors, and style from reference\n`;
     console.log(`[gen_keyframe] ✅ Using Brand Kit mascotte as identity reference: ${refImageUrl}`);
   }
+  // ✅ NEW Fallback 4: User-uploaded reference images - INSPIRATION ONLY
+  else if (Array.isArray(referenceImages) && referenceImages.length > 0) {
+    refImageUrl = referenceImages[0] as string;
+    isInspiration = true; // Mark as inspiration mode
+    console.log(`[gen_keyframe] ✅ Using user reference image as INSPIRATION: ${refImageUrl.substring(0, 80)}...`);
+  }
+
+  // ✅ NEW: Add INSPIRATION instruction if using user reference
+  let referenceInstruction = '';
+  if (isInspiration) {
+    referenceInstruction = `\n\n=== REFERENCE IMAGE: INSPIRATION MODE ===
+IMPORTANT: Use the provided reference image as INSPIRATION ONLY.
+- Draw visual inspiration from its colors, composition, lighting, and aesthetic
+- DO NOT copy or reproduce the exact content of the reference
+- CREATE NEW, ORIGINAL content that captures the same style and mood
+- The result should be INSPIRED BY the reference, NOT a COPY`;
+  }
 
   // Instructions Lip-Sync pour personnage de face
-  const lipSyncInstructions = useLipSync 
+  const lipSyncInstructions = useLipSync
     ? `\n\nLIP-SYNC MODE:\n- Character must be facing the camera DIRECTLY (frontal view)\n- Full face visible, mouth clearly visible\n- Eyes looking at camera\n- Professional lighting on face\n- Ready for lip synchronization animation` 
     : '';
 
@@ -321,6 +340,7 @@ async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record
 ${lipSyncInstructions}
 ${negativeContext}
 ${subjectContext ? `IDENTITY LOCK:\n${subjectContext}` : ''}
+${referenceInstruction}
 
 CRITICAL: Generate a single, clean image suitable as a video keyframe. No text, no split screens.
 Aspect ratio: ${ratio || '9:16'}`;
@@ -341,7 +361,8 @@ Aspect ratio: ${ratio || '9:16'}`;
       prompt: imagePrompt,
       ratio: ratio || '9:16',
       referenceImageUrl: refImageUrl,
-      isIntermediate: true, // ✅ Mark keyframes as intermediate (won't show in library)
+      isInspiration,     // ✅ NEW: Pass inspiration flag
+      isIntermediate: true, // Mark keyframes as intermediate (won't show in library)
     }),
   });
 
@@ -882,10 +903,11 @@ async function executeStep(stepType: string, input: Record<string, unknown>): Pr
 // =====================================================
 
 async function handleGenImage(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { prompt, ratio, visualStyle, identityAnchorId, subjectPackId, userId, brandId, useBrandKit, jobId } = input;
+  const { prompt, ratio, visualStyle, identityAnchorId, subjectPackId, userId, brandId, useBrandKit, jobId, referenceImages } = input;
   
   console.log(`[gen_image] userId: ${userId}, brandId: ${brandId}, useBrandKit: ${useBrandKit}`);
   console.log(`[gen_image] subjectPackId: ${subjectPackId}, identityAnchorId: ${identityAnchorId}`);
+  console.log(`[gen_image] referenceImages: ${Array.isArray(referenceImages) ? referenceImages.length : 0}`);
   console.log(`[gen_image] Generating image with prompt: ${String(prompt).substring(0, 100)}...`);
 
   // Charger le Brand Kit si activé
@@ -899,13 +921,14 @@ async function handleGenImage(input: Record<string, unknown>): Promise<Record<st
   let subjectContext = '';
   let negativeContext = '';
   let referenceImageUrl: string | null = null;
+  let isInspiration = false; // ✅ NEW: Track if reference is for inspiration
   
   if (subjectPackId) {
     const subjectPack = await loadSubjectPack(String(subjectPackId));
     if (subjectPack) {
       console.log(`[gen_image] ✅ Loaded subjectPack: ${subjectPack.name} (${subjectPack.pack_type})`);
       
-      // Image Master comme référence principale
+      // Image Master comme référence principale - COPIE EXACTE
       referenceImageUrl = subjectPack.master_image_url;
       
       // Contexte d'identité
@@ -927,11 +950,28 @@ async function handleGenImage(input: Record<string, unknown>): Promise<Record<st
       if (constraints.palette_lock) subjectContext += 'PALETTE LOCK: Maintain color consistency. ';
     }
   }
+  // ✅ NEW: User-uploaded reference images - INSPIRATION ONLY
+  else if (Array.isArray(referenceImages) && referenceImages.length > 0) {
+    referenceImageUrl = referenceImages[0] as string;
+    isInspiration = true;
+    console.log(`[gen_image] ✅ Using user reference image as INSPIRATION: ${referenceImageUrl.substring(0, 80)}...`);
+  }
   
-  // Enrichir le prompt avec le contexte Subject Pack
+  // ✅ NEW: Add INSPIRATION instruction if using user reference
+  let referenceInstruction = '';
+  if (isInspiration) {
+    referenceInstruction = `\n\n=== REFERENCE IMAGE: INSPIRATION MODE ===
+IMPORTANT: Use the provided reference image as INSPIRATION ONLY.
+- Draw visual inspiration from its colors, composition, lighting, and aesthetic style
+- DO NOT copy or reproduce the exact content, characters, or scene from the reference
+- CREATE NEW, ORIGINAL content that captures the same mood and style
+- The result should be INSPIRED BY the reference, NOT a COPY`;
+  }
+  
+  // Enrichir le prompt avec le contexte Subject Pack ou l'instruction d'inspiration
   const enrichedPrompt = subjectContext 
     ? `${prompt}${subjectContext}${negativeContext ? `\n${negativeContext}` : ''}`
-    : prompt;
+    : `${prompt}${referenceInstruction}`;
 
   const response = await fetch(`${SUPABASE_URL}/functions/v1/alfie-generate-ai-image`, {
     method: 'POST',
@@ -945,12 +985,13 @@ async function handleGenImage(input: Record<string, unknown>): Promise<Record<st
       brandId,
       brandKit,
       useBrandKit,
-      jobId, // ✅ Pass jobId for tracking in media_generations
+      jobId, // Pass jobId for tracking in media_generations
       prompt: enrichedPrompt,
       ratio: ratio || '9:16',
       visualStyle: visualStyle || 'photorealistic',
       identityAnchorId,
-      referenceImageUrl, // ✅ Pass Subject Pack Master as reference
+      referenceImageUrl, // Subject Pack Master OR user reference
+      isInspiration,     // ✅ NEW: Pass inspiration flag
       negativePrompt: negativeContext || undefined,
     }),
   });
@@ -970,10 +1011,11 @@ async function handleGenImage(input: Record<string, unknown>): Promise<Record<st
 }
 
 async function handleGenSlide(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { slideIndex, slide, ratio, visualStyle, subjectPackId, userId, brandId, useBrandKit } = input;
+  const { slideIndex, slide, ratio, visualStyle, subjectPackId, userId, brandId, useBrandKit, referenceImages } = input;
   
   console.log(`[gen_slide] userId: ${userId}, brandId: ${brandId}, useBrandKit: ${useBrandKit}`);
   console.log(`[gen_slide] subjectPackId: ${subjectPackId}`);
+  console.log(`[gen_slide] referenceImages: ${Array.isArray(referenceImages) ? referenceImages.length : 0}`);
   console.log(`[gen_slide] Generating slide ${slideIndex}`);
 
   // Charger le Brand Kit si activé
@@ -986,13 +1028,14 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
   // ✅ Subject Pack: charger et enrichir le prompt
   let subjectContext = '';
   let referenceImageUrl: string | null = null;
+  let isInspiration = false; // ✅ NEW: Track if reference is for inspiration
   
   if (subjectPackId) {
     const subjectPack = await loadSubjectPack(String(subjectPackId));
     if (subjectPack) {
       console.log(`[gen_slide] ✅ Loaded subjectPack: ${subjectPack.name} (${subjectPack.pack_type})`);
       
-      // Image Master comme référence
+      // Image Master comme référence - COPIE EXACTE
       referenceImageUrl = subjectPack.master_image_url;
       
       if (subjectPack.identity_prompt) {
@@ -1001,10 +1044,26 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
       }
     }
   }
+  // ✅ NEW: User-uploaded reference images - INSPIRATION ONLY
+  else if (Array.isArray(referenceImages) && referenceImages.length > 0) {
+    referenceImageUrl = referenceImages[0] as string;
+    isInspiration = true;
+    console.log(`[gen_slide] ✅ Using user reference image as INSPIRATION: ${referenceImageUrl.substring(0, 80)}...`);
+  }
+
+  // ✅ NEW: Add INSPIRATION instruction if using user reference
+  let referenceInstruction = '';
+  if (isInspiration) {
+    referenceInstruction = `\n\n=== REFERENCE IMAGE: INSPIRATION MODE ===
+Use the provided reference image as INSPIRATION for style, colors, and composition.
+DO NOT copy or reproduce the exact content - create ORIGINAL content inspired by the reference aesthetic.`;
+  }
 
   const slideData = slide as Record<string, unknown> | undefined;
   const basePrompt = slideData?.visualPrompt || slideData?.titleOnImage || 'Professional slide background';
-  const enrichedPrompt = subjectContext ? `${basePrompt}${subjectContext}` : basePrompt;
+  const enrichedPrompt = subjectContext 
+    ? `${basePrompt}${subjectContext}` 
+    : `${basePrompt}${referenceInstruction}`;
 
   const response = await fetch(`${SUPABASE_URL}/functions/v1/alfie-render-carousel-slide`, {
     method: 'POST',
@@ -1023,7 +1082,8 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
       slide: slideData,
       ratio: ratio || '9:16',
       visualStyle: visualStyle || 'photorealistic',
-      referenceImageUrl, // ✅ Pass Subject Pack Master as reference
+      referenceImageUrl, // Subject Pack Master OR user reference
+      isInspiration,     // ✅ NEW: Pass inspiration flag
     }),
   });
 
