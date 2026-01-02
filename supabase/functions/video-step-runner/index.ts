@@ -1029,11 +1029,12 @@ Use the provided reference images as INSPIRATION ONLY.
 }
 
 async function handleGenSlide(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { slideIndex, slide, ratio, visualStyle, subjectPackId, userId, brandId, useBrandKit, referenceImages } = input;
+  const { slideIndex, slide, ratio, visualStyle, subjectPackId, userId, brandId, useBrandKit, referenceImages, referenceMode } = input;
   
   console.log(`[gen_slide] userId: ${userId}, brandId: ${brandId}, useBrandKit: ${useBrandKit}`);
   console.log(`[gen_slide] subjectPackId: ${subjectPackId}`);
   console.log(`[gen_slide] referenceImages: ${Array.isArray(referenceImages) ? referenceImages.length : 0}`);
+  console.log(`[gen_slide] referenceMode: ${referenceMode}`);
   console.log(`[gen_slide] Generating slide ${slideIndex}`);
 
   // Charger le Brand Kit si activé
@@ -1043,10 +1044,13 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
     console.log(`[gen_slide] Loaded brandKit: ${brandKit?.name || 'none'}`);
   }
 
+  // ✅ Determine reference mode
+  const userReferenceImages = Array.isArray(referenceImages) ? referenceImages as string[] : [];
+  const effectiveReferenceMode = (referenceMode as string) || 'inspire';
+
   // ✅ Subject Pack: charger et enrichir le prompt
   let subjectContext = '';
   let referenceImageUrl: string | null = null;
-  let isInspiration = false; // ✅ NEW: Track if reference is for inspiration
   
   if (subjectPackId) {
     const subjectPack = await loadSubjectPack(String(subjectPackId));
@@ -1062,21 +1066,22 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
       }
     }
   }
-  // ✅ NEW: User-uploaded reference images - INSPIRATION ONLY
-  else if (Array.isArray(referenceImages) && referenceImages.length > 0) {
-    referenceImageUrl = referenceImages[0] as string;
-    isInspiration = true;
-    console.log(`[gen_slide] ✅ Using user reference image as INSPIRATION: ${referenceImageUrl.substring(0, 80)}...`);
+  // ✅ User-uploaded reference images
+  else if (userReferenceImages.length > 0) {
+    referenceImageUrl = userReferenceImages[0];
+    console.log(`[gen_slide] ✅ Using ${userReferenceImages.length} user reference images, mode: ${effectiveReferenceMode}`);
   }
 
   // ✅ Mode-specific instruction
   let referenceInstruction = '';
-  if (effectiveReferenceMode === 'inspire') {
-    referenceInstruction = `\nUse the reference images as INSPIRATION for style, colors, and composition - create ORIGINAL content.`;
-  } else if (effectiveReferenceMode === 'transform') {
-    referenceInstruction = `\nTRANSFORM the first image using style from the others.`;
-  } else if (effectiveReferenceMode === 'combine') {
-    referenceInstruction = `\nCOMBINE elements from all reference images harmoniously.`;
+  if (userReferenceImages.length > 0 && !subjectPackId) {
+    if (effectiveReferenceMode === 'inspire') {
+      referenceInstruction = `\nUse the reference images as INSPIRATION for style, colors, and composition - create ORIGINAL content.`;
+    } else if (effectiveReferenceMode === 'transform') {
+      referenceInstruction = `\nTRANSFORM the first image using style from the others.`;
+    } else if (effectiveReferenceMode === 'combine') {
+      referenceInstruction = `\nCOMBINE elements from all reference images harmoniously.`;
+    }
   }
 
   const slideData = slide as Record<string, unknown> | undefined;
@@ -1102,9 +1107,9 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
       slide: slideData,
       ratio: ratio || '9:16',
       visualStyle: visualStyle || 'photorealistic',
-      referenceImageUrl,                    // Subject Pack Master
-      referenceImages: userReferenceImages, // ✅ All user references
-      referenceMode: effectiveReferenceMode, // ✅ inspire/transform/combine
+      referenceImageUrl,
+      referenceImages: userReferenceImages,
+      referenceMode: effectiveReferenceMode,
     }),
   });
 
