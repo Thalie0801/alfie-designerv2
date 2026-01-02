@@ -238,6 +238,33 @@ export type Database = {
           },
         ]
       }
+      ai_tools_daily_usage: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          updated_at: string
+          usage_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          id?: string
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       alfie_cache: {
         Row: {
           created_at: string | null
