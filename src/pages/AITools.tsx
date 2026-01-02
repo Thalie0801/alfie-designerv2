@@ -109,6 +109,13 @@ export default function AITools() {
       });
 
       if (error) throw new Error(error.message);
+      
+      // Handle rate limit error
+      if (data?.code === 'RATE_LIMIT_EXCEEDED') {
+        toast.error(data.error || "Limite quotidienne atteinte (10/jour)");
+        return;
+      }
+      
       if (data?.error) throw new Error(data.error);
 
       setResult({
@@ -116,7 +123,11 @@ export default function AITools() {
         generationId: data.generationId,
       });
       
-      toast.success("Image traitée avec succès !");
+      // Show success with remaining uses
+      const remainingMsg = data.remaining_today !== undefined 
+        ? ` (${data.remaining_today} restantes aujourd'hui)`
+        : '';
+      toast.success(`Image traitée avec succès !${remainingMsg}`);
     } catch (err) {
       console.error("AI Tools error:", err);
       toast.error(err instanceof Error ? err.message : "Erreur lors du traitement");
@@ -172,6 +183,9 @@ export default function AITools() {
         <h1 className="text-3xl font-bold">Outils IA</h1>
         <p className="text-muted-foreground">
           Retouchez, étendez et améliorez vos images avec l'IA
+          <span className="ml-2 text-xs bg-secondary px-2 py-0.5 rounded-full">
+            Gratuit • 10/jour
+          </span>
         </p>
       </div>
 

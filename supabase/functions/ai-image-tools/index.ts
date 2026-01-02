@@ -155,6 +155,48 @@ async function callImageTool(opts: {
   return { imageUrl: generatedImageUrl };
 }
 
+/* ------------------------------ Rate Limit ------------------------------ */
+const DAILY_LIMIT = 10;
+
+async function checkAndIncrementUsage(userId: string): Promise<{ allowed: boolean; remaining: number }> {
+  const admin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  
+  // Get current usage via raw query
+  const { data: existing, error: selectError } = await admin
+    .from('ai_tools_daily_usage')
+    .select('usage_count')
+    .eq('user_id', userId)
+    .eq('date', today)
+    .maybeSingle();
+  
+  if (selectError) {
+    console.error('[ai-image-tools] Failed to check usage:', selectError);
+  }
+  
+  const currentCount = (existing as { usage_count: number } | null)?.usage_count || 0;
+  
+  if (currentCount >= DAILY_LIMIT) {
+    return { allowed: false, remaining: 0 };
+  }
+  
+  // Upsert: increment or create
+  const { error: upsertError } = await admin
+    .from('ai_tools_daily_usage')
+    .upsert({
+      user_id: userId,
+      date: today,
+      usage_count: currentCount + 1,
+      updated_at: new Date().toISOString(),
+    } as Record<string, unknown>, { onConflict: 'user_id,date' });
+  
+  if (upsertError) {
+    console.error('[ai-image-tools] Failed to update usage:', upsertError);
+  }
+  
+  return { allowed: true, remaining: DAILY_LIMIT - currentCount - 1 };
+}
+
 /* ------------------------------ Main Handler ------------------------------ */
 Deno.serve(async (req) => {
   // CORS preflight
@@ -176,6 +218,17 @@ Deno.serve(async (req) => {
     if (!LOVABLE_API_KEY) {
       console.error("[ai-image-tools] LOVABLE_API_KEY not configured");
       return jsonRes({ error: "AI service not configured" }, { status: 500 });
+    }
+
+    // Check rate limit (10/day)
+    const { allowed, remaining } = await checkAndIncrementUsage(userId);
+    if (!allowed) {
+      console.log(`🚫 [ai-image-tools] Rate limit exceeded for user ${userId.slice(0,8)}`);
+      return jsonRes({ 
+        error: "Limite quotidienne atteinte (10/jour). Revenez demain !",
+        code: "RATE_LIMIT_EXCEEDED",
+        remaining: 0,
+      }, { status: 429 });
     }
 
     // Build prompts based on tool type
@@ -253,7 +306,6 @@ OUTPUT: A single image where the product from image 2 replaces the specified are
 
     // Store in media_generations for history
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
-    
     const { data: generation, error: insertError } = await supabase
       .from('media_generations')
       .insert({
@@ -273,13 +325,14 @@ OUTPUT: A single image where the product from image 2 replaces the specified are
       console.warn(`[ai-image-tools] Failed to save generation:`, insertError);
     }
 
-    console.log(`✅ [ai-image-tools] ${tool} completed successfully`);
+    console.log(`✅ [ai-image-tools] ${tool} completed successfully (${remaining} remaining today)`);
 
     return jsonRes({
       success: true,
       imageUrl: result.imageUrl,
       generationId: generation?.id,
       tool,
+      remaining_today: remaining,
     });
 
   } catch (error) {
