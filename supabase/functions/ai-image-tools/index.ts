@@ -220,15 +220,36 @@ Deno.serve(async (req) => {
       return jsonRes({ error: "AI service not configured" }, { status: 500 });
     }
 
-    // Check rate limit (10/day)
-    const { allowed, remaining } = await checkAndIncrementUsage(userId);
-    if (!allowed) {
-      console.log(`🚫 [ai-image-tools] Rate limit exceeded for user ${userId.slice(0,8)}`);
-      return jsonRes({ 
-        error: "Limite quotidienne atteinte (10/jour). Revenez demain !",
-        code: "RATE_LIMIT_EXCEEDED",
-        remaining: 0,
-      }, { status: 429 });
+    // Check if user is admin (bypass rate limit)
+    const admin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('email')
+      .eq('id', userId)
+      .single();
+    
+    const adminEmails = (Deno.env.get('ADMIN_EMAILS') || '')
+      .split(',')
+      .map(e => e.trim().toLowerCase())
+      .filter(Boolean);
+    const isAdmin = profile?.email && adminEmails.includes(profile.email.toLowerCase());
+
+    let remaining = DAILY_LIMIT;
+
+    if (isAdmin) {
+      console.log(`👑 [ai-image-tools] Admin bypass for ${profile?.email}`);
+    } else {
+      // Check rate limit (10/day) for non-admins
+      const usageCheck = await checkAndIncrementUsage(userId);
+      if (!usageCheck.allowed) {
+        console.log(`🚫 [ai-image-tools] Rate limit exceeded for user ${userId.slice(0,8)}`);
+        return jsonRes({ 
+          error: "Limite quotidienne atteinte (10/jour). Revenez demain !",
+          code: "RATE_LIMIT_EXCEEDED",
+          remaining: 0,
+        }, { status: 429 });
+      }
+      remaining = usageCheck.remaining;
     }
 
     // Build prompts based on tool type
