@@ -1,22 +1,26 @@
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-interface FreePackRequest {
-  userId: string;
-  brandId: string;
-  email: string;
-  brandData: {
-    brandName: string;
-    sector: string;
-    styles: string[];
-    colorChoice: string;
-    fontChoice: string;
-    objective: string;
-  };
-}
+// Zod schema for input validation
+const FreePackRequestSchema = z.object({
+  userId: z.string().uuid("Invalid userId format"),
+  brandId: z.string().uuid("Invalid brandId format"),
+  email: z.string().email("Invalid email address").max(255, "Email too long"),
+  brandData: z.object({
+    brandName: z.string().min(1, "Brand name required").max(100, "Brand name too long"),
+    sector: z.string().min(1, "Sector required").max(50, "Sector too long"),
+    styles: z.array(z.string().max(50, "Style too long")).max(10, "Too many styles"),
+    colorChoice: z.string().min(1, "Color choice required").max(50, "Color choice too long"),
+    fontChoice: z.string().min(1, "Font choice required").max(50, "Font choice too long"),
+    objective: z.string().max(500, "Objective too long").optional().default(""),
+  }),
+}).strict(); // Reject unexpected fields
+
+type FreePackRequest = z.infer<typeof FreePackRequestSchema>;
 
 // Rate limit constants
 const MAX_PACKS_PER_EMAIL = 1;
@@ -28,7 +32,20 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { userId, brandId, email, brandData } = await req.json() as FreePackRequest;
+    // Parse and validate request body
+    const rawBody = await req.json();
+    const parseResult = FreePackRequestSchema.safeParse(rawBody);
+    
+    if (!parseResult.success) {
+      const errors = parseResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+      console.error("[generate-free-pack] Validation failed:", errors);
+      return new Response(
+        JSON.stringify({ success: false, error: "VALIDATION_ERROR", message: errors }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { userId, brandId, email, brandData } = parseResult.data;
 
     console.log("[generate-free-pack] Starting generation for", { userId, brandId, email });
 

@@ -1,17 +1,23 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface CaptureLeadRequest {
-  email: string;
-  intent?: Record<string, unknown>;
-  marketingOptIn?: boolean;
-  source?: string;
-}
+// Zod schema for input validation
+const CaptureLeadRequestSchema = z.object({
+  email: z.string()
+    .trim()
+    .toLowerCase()
+    .email("Invalid email address")
+    .max(255, "Email too long"),
+  intent: z.record(z.unknown()).optional().default({}),
+  marketingOptIn: z.boolean().optional().default(false),
+  source: z.string().max(100, "Source too long").optional().default("start_game"),
+}).strict(); // Reject unexpected fields
 
 serve(async (req: Request): Promise<Response> => {
   // Handle CORS preflight
@@ -24,32 +30,34 @@ serve(async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const body: CaptureLeadRequest = await req.json();
-    const { email, intent = {}, marketingOptIn = false, source = "start_game" } = body;
+    // Parse and validate request body
+    const rawBody = await req.json();
+    const parseResult = CaptureLeadRequestSchema.safeParse(rawBody);
+    
+    if (!parseResult.success) {
+      const errors = parseResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+      console.error("[capture-lead] Validation failed:", errors);
+      return new Response(
+        JSON.stringify({ error: errors }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { email, intent, marketingOptIn, source } = parseResult.data;
 
     // Get IP address for rate-limiting
     const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() 
       || req.headers.get("x-real-ip") 
       || "unknown";
 
-    // Validate email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRegex.test(email)) {
-      return new Response(
-        JSON.stringify({ error: "Invalid email address" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const normalizedEmail = email.trim().toLowerCase();
-
-    console.log("[capture-lead] Processing:", { email: normalizedEmail, source, ip: ipAddress });
+    // Email is already normalized by Zod schema
+    console.log("[capture-lead] Processing:", { email, source, ip: ipAddress });
 
     // Check if lead already exists
     const { data: existingLead } = await supabase
       .from("leads")
       .select("id, generation_count")
-      .eq("email", normalizedEmail)
+      .eq("email", email)
       .maybeSingle();
 
     let leadId: string | undefined;
@@ -79,7 +87,7 @@ serve(async (req: Request): Promise<Response> => {
       const { data: newLead, error: insertError } = await supabase
         .from("leads")
         .insert({
-          email: normalizedEmail,
+          email,
           source,
           intent,
           marketing_opt_in: marketingOptIn,
@@ -101,7 +109,7 @@ serve(async (req: Request): Promise<Response> => {
 
     // Enqueue "start" email (Je lance ton pack)
     const { error: queueError } = await supabase.from("email_queue").insert({
-      to_email: normalizedEmail,
+      to_email: email,
       template: "start",
       payload: {
         lead_id: leadId,
@@ -115,7 +123,7 @@ serve(async (req: Request): Promise<Response> => {
     if (queueError) {
       console.error("[capture-lead] Email queue error:", queueError);
     } else {
-      console.log("[capture-lead] Email queued for:", normalizedEmail);
+      console.log("[capture-lead] Email queued for:", email);
     }
 
     return new Response(

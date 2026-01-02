@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,6 +9,16 @@ const corsHeaders = {
 };
 
 const BATCH_SIZE = 20;
+const MAX_PAYLOAD_SIZE = 100 * 1024; // 100KB max payload size
+
+// Schema for validating email queue items from the database
+const EmailQueueItemSchema = z.object({
+  id: z.string().uuid(),
+  to_email: z.string().email(),
+  template: z.string().min(1).max(100),
+  payload: z.record(z.unknown()).nullable().default({}),
+  attempts: z.number().int().min(0),
+});
 
 interface EmailQueueItem {
   id: string;
@@ -15,6 +26,27 @@ interface EmailQueueItem {
   template: string;
   payload: Record<string, unknown>;
   attempts: number;
+}
+
+// Sanitize payload to prevent XSS in email templates
+function sanitizePayload(payload: Record<string, unknown>): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (typeof value === 'string') {
+      // Escape HTML entities to prevent XSS
+      sanitized[key] = value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+      sanitized[key] = sanitizePayload(value as Record<string, unknown>);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
 }
 
 const EMAIL_TEMPLATES: Record<string, { subject: string; getHtml: (payload: Record<string, unknown>) => string }> = {
@@ -207,18 +239,39 @@ serve(async (req: Request): Promise<Response> => {
     let successCount = 0;
     let failCount = 0;
 
-    for (const email of emails as EmailQueueItem[]) {
+    for (const rawEmail of emails) {
       try {
+        // Validate each email item from the database
+        const parseResult = EmailQueueItemSchema.safeParse(rawEmail);
+        if (!parseResult.success) {
+          const errors = parseResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+          console.error(`[email-worker] Invalid email queue item:`, errors);
+          // Mark as failed due to invalid data
+          await supabase
+            .from("email_queue")
+            .update({
+              status: "failed",
+              last_error: `Validation failed: ${errors}`,
+            })
+            .eq("id", (rawEmail as any).id);
+          failCount++;
+          continue;
+        }
+        
+        const email = parseResult.data;
         const template = EMAIL_TEMPLATES[email.template];
         if (!template) {
           throw new Error(`Unknown template: ${email.template}`);
         }
 
+        // Sanitize payload to prevent XSS
+        const safePayload = sanitizePayload(email.payload || {});
+
         const { error: sendError } = await resend.emails.send({
           from: "Alfie Designer <noreply@alfie.design>",
           to: [email.to_email],
           subject: template.subject,
-          html: template.getHtml(email.payload),
+          html: template.getHtml(safePayload),
         });
 
         if (sendError) {
@@ -237,9 +290,12 @@ serve(async (req: Request): Promise<Response> => {
         successCount++;
         console.log(`[email-worker] Sent ${email.template} to ${email.to_email}`);
       } catch (sendErr: unknown) {
-        console.error(`[email-worker] Failed to send to ${email.to_email}:`, sendErr);
+        console.error(`[email-worker] Failed to send email:`, sendErr);
         
-        const newAttempts = email.attempts + 1;
+        // Use the original rawEmail for error handling since email may not be defined
+        const emailId = (rawEmail as any).id;
+        const currentAttempts = (rawEmail as any).attempts ?? 0;
+        const newAttempts = currentAttempts + 1;
         const newStatus = newAttempts >= 3 ? "failed" : "queued";
         const errorMessage = sendErr instanceof Error ? sendErr.message : "Unknown error";
         
@@ -253,7 +309,7 @@ serve(async (req: Request): Promise<Response> => {
               ? new Date(Date.now() + 5 * 60 * 1000).toISOString()
               : undefined,
           })
-          .eq("id", email.id);
+          .eq("id", emailId);
 
         failCount++;
       }
