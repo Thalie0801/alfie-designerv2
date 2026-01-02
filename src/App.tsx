@@ -43,6 +43,7 @@ import { ChatGenerator } from "@/features/studio";
 import { StudioGenerator } from "@/pages/StudioGenerator";
 import ChatWidget from "./components/chat/ChatWidget";
 import StudioMulti from "./pages/StudioMulti";
+import AITools from "./pages/AITools";
 import JobConsolePage from "./pages/JobConsolePage";
 import PromptOptimizer from "./pages/PromptOptimizer";
 
@@ -140,6 +141,17 @@ const AppRoutes = () => {
             <ProtectedRoute>
               <AppLayoutWithSidebar>
                 <StudioMulti />
+              </AppLayoutWithSidebar>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/studio/tools"
+          element={
+            <ProtectedRoute>
+              <AppLayoutWithSidebar>
+                <AITools />
               </AppLayoutWithSidebar>
             </ProtectedRoute>
           }
