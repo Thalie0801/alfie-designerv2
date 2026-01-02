@@ -246,11 +246,11 @@ async function loadSubjectPack(packId: string): Promise<SubjectPack | null> {
 }
 
 async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { visualPrompt, identityAnchorId, subjectPackId, ratio, userId, brandId, useBrandKit, useLipSync, referenceImages } = input;
+  const { visualPrompt, identityAnchorId, subjectPackId, ratio, userId, brandId, useBrandKit, useLipSync, referenceImages, referenceMode } = input;
   
   console.log(`[gen_keyframe] userId: ${userId}, brandId: ${brandId}, useBrandKit: ${useBrandKit}, useLipSync: ${useLipSync}`);
   console.log(`[gen_keyframe] subjectPackId: ${subjectPackId}, identityAnchorId: ${identityAnchorId}`);
-  console.log(`[gen_keyframe] referenceImages: ${Array.isArray(referenceImages) ? referenceImages.length : 0}`);
+  console.log(`[gen_keyframe] referenceImages: ${Array.isArray(referenceImages) ? referenceImages.length : 0}, mode: ${referenceMode || 'default'}`);
   console.log(`[gen_keyframe] Generating keyframe with prompt: ${String(visualPrompt).substring(0, 100)}...`);
   
   // Charger le Brand Kit si activé
@@ -264,7 +264,8 @@ async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record
   let subjectContext = '';
   let negativeContext = '';
   let refImageUrl: string | null = null;
-  let isInspiration = false; // ✅ NEW: Track if reference is for inspiration
+  let effectiveReferenceMode: 'inspire' | 'transform' | 'combine' | undefined = undefined;
+  let userReferenceImages: string[] = [];
   
   // Priorité 1: Subject Pack (nouveau système) - COPIE EXACTE
   if (subjectPackId) {
@@ -312,22 +313,29 @@ async function handleGenKeyframe(input: Record<string, unknown>): Promise<Record
     subjectContext = `MASCOT/CHARACTER IDENTITY:\n- Use the provided reference image as the MAIN character\n- Maintain EXACT appearance, colors, and style from reference\n`;
     console.log(`[gen_keyframe] ✅ Using Brand Kit mascotte as identity reference: ${refImageUrl}`);
   }
-  // ✅ NEW Fallback 4: User-uploaded reference images - INSPIRATION ONLY
+  // ✅ Fallback 4: User-uploaded reference images - Mode configurable
   else if (Array.isArray(referenceImages) && referenceImages.length > 0) {
-    refImageUrl = referenceImages[0] as string;
-    isInspiration = true; // Mark as inspiration mode
-    console.log(`[gen_keyframe] ✅ Using user reference image as INSPIRATION: ${refImageUrl.substring(0, 80)}...`);
+    userReferenceImages = referenceImages.filter(Boolean) as string[];
+    effectiveReferenceMode = (referenceMode as 'inspire' | 'transform' | 'combine') || 'inspire';
+    console.log(`[gen_keyframe] ✅ Using ${userReferenceImages.length} user reference images, mode: ${effectiveReferenceMode}`);
   }
 
-  // ✅ NEW: Add INSPIRATION instruction if using user reference
+  // ✅ NEW: Add mode-specific instruction
   let referenceInstruction = '';
-  if (isInspiration) {
-    referenceInstruction = `\n\n=== REFERENCE IMAGE: INSPIRATION MODE ===
-IMPORTANT: Use the provided reference image as INSPIRATION ONLY.
-- Draw visual inspiration from its colors, composition, lighting, and aesthetic
-- DO NOT copy or reproduce the exact content of the reference
-- CREATE NEW, ORIGINAL content that captures the same style and mood
-- The result should be INSPIRED BY the reference, NOT a COPY`;
+  if (effectiveReferenceMode === 'transform' && userReferenceImages.length >= 2) {
+    referenceInstruction = `\n\n=== REFERENCE IMAGES: TRANSFORM MODE ===
+TRANSFORM the FIRST image using the style/elements from the other images.
+Keep the main subject/composition from image 1, apply the visual style from images 2-3.`;
+  } else if (effectiveReferenceMode === 'combine') {
+    referenceInstruction = `\n\n=== REFERENCE IMAGES: COMBINE MODE ===
+COMBINE elements from ALL reference images into ONE cohesive new composition.
+Merge the best elements, characters, and objects from each reference harmoniously.`;
+  } else if (effectiveReferenceMode === 'inspire') {
+    referenceInstruction = `\n\n=== REFERENCE IMAGES: INSPIRATION MODE ===
+Use the provided reference images as INSPIRATION ONLY.
+- Draw visual inspiration from their colors, composition, lighting, and aesthetic
+- DO NOT copy or reproduce the exact content
+- CREATE NEW, ORIGINAL content that captures the same style and mood`;
   }
 
   // Instructions Lip-Sync pour personnage de face
@@ -360,8 +368,9 @@ Aspect ratio: ${ratio || '9:16'}`;
       useBrandKit,       // Flag pour activer l'enrichissement
       prompt: imagePrompt,
       ratio: ratio || '9:16',
-      referenceImageUrl: refImageUrl,
-      isInspiration,     // ✅ NEW: Pass inspiration flag
+      referenceImageUrl: refImageUrl,      // Subject Pack reference (copy exact)
+      referenceImages: userReferenceImages, // ✅ NEW: All user references
+      referenceMode: effectiveReferenceMode, // ✅ NEW: inspire/transform/combine
       isIntermediate: true, // Mark keyframes as intermediate (won't show in library)
     }),
   });
@@ -903,11 +912,11 @@ async function executeStep(stepType: string, input: Record<string, unknown>): Pr
 // =====================================================
 
 async function handleGenImage(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { prompt, ratio, visualStyle, identityAnchorId, subjectPackId, userId, brandId, useBrandKit, jobId, referenceImages } = input;
+  const { prompt, ratio, visualStyle, identityAnchorId, subjectPackId, userId, brandId, useBrandKit, jobId, referenceImages, referenceMode } = input;
   
   console.log(`[gen_image] userId: ${userId}, brandId: ${brandId}, useBrandKit: ${useBrandKit}`);
   console.log(`[gen_image] subjectPackId: ${subjectPackId}, identityAnchorId: ${identityAnchorId}`);
-  console.log(`[gen_image] referenceImages: ${Array.isArray(referenceImages) ? referenceImages.length : 0}`);
+  console.log(`[gen_image] referenceImages: ${Array.isArray(referenceImages) ? referenceImages.length : 0}, mode: ${referenceMode || 'default'}`);
   console.log(`[gen_image] Generating image with prompt: ${String(prompt).substring(0, 100)}...`);
 
   // Charger le Brand Kit si activé
@@ -921,7 +930,8 @@ async function handleGenImage(input: Record<string, unknown>): Promise<Record<st
   let subjectContext = '';
   let negativeContext = '';
   let referenceImageUrl: string | null = null;
-  let isInspiration = false; // ✅ NEW: Track if reference is for inspiration
+  let effectiveReferenceMode: 'inspire' | 'transform' | 'combine' | undefined = undefined;
+  let userReferenceImages: string[] = [];
   
   if (subjectPackId) {
     const subjectPack = await loadSubjectPack(String(subjectPackId));
@@ -950,25 +960,32 @@ async function handleGenImage(input: Record<string, unknown>): Promise<Record<st
       if (constraints.palette_lock) subjectContext += 'PALETTE LOCK: Maintain color consistency. ';
     }
   }
-  // ✅ NEW: User-uploaded reference images - INSPIRATION ONLY
+  // ✅ User-uploaded reference images - Mode configurable
   else if (Array.isArray(referenceImages) && referenceImages.length > 0) {
-    referenceImageUrl = referenceImages[0] as string;
-    isInspiration = true;
-    console.log(`[gen_image] ✅ Using user reference image as INSPIRATION: ${referenceImageUrl.substring(0, 80)}...`);
+    userReferenceImages = referenceImages.filter(Boolean) as string[];
+    effectiveReferenceMode = (referenceMode as 'inspire' | 'transform' | 'combine') || 'inspire';
+    console.log(`[gen_image] ✅ Using ${userReferenceImages.length} user reference images, mode: ${effectiveReferenceMode}`);
   }
   
-  // ✅ NEW: Add INSPIRATION instruction if using user reference
+  // ✅ Mode-specific instruction
   let referenceInstruction = '';
-  if (isInspiration) {
-    referenceInstruction = `\n\n=== REFERENCE IMAGE: INSPIRATION MODE ===
-IMPORTANT: Use the provided reference image as INSPIRATION ONLY.
-- Draw visual inspiration from its colors, composition, lighting, and aesthetic style
-- DO NOT copy or reproduce the exact content, characters, or scene from the reference
-- CREATE NEW, ORIGINAL content that captures the same mood and style
-- The result should be INSPIRED BY the reference, NOT a COPY`;
+  if (effectiveReferenceMode === 'transform' && userReferenceImages.length >= 2) {
+    referenceInstruction = `\n\n=== REFERENCE IMAGES: TRANSFORM MODE ===
+TRANSFORM the FIRST image using the style/elements from the other images.
+Keep the main subject/composition from image 1, apply the visual style from images 2-3.`;
+  } else if (effectiveReferenceMode === 'combine') {
+    referenceInstruction = `\n\n=== REFERENCE IMAGES: COMBINE MODE ===
+COMBINE elements from ALL reference images into ONE cohesive new composition.
+Merge the best elements, characters, and objects from each reference harmoniously.`;
+  } else if (effectiveReferenceMode === 'inspire') {
+    referenceInstruction = `\n\n=== REFERENCE IMAGES: INSPIRATION MODE ===
+Use the provided reference images as INSPIRATION ONLY.
+- Draw visual inspiration from their colors, composition, lighting, and aesthetic style
+- DO NOT copy or reproduce the exact content, characters, or scene from the references
+- CREATE NEW, ORIGINAL content that captures the same mood and style`;
   }
   
-  // Enrichir le prompt avec le contexte Subject Pack ou l'instruction d'inspiration
+  // Enrichir le prompt avec le contexte Subject Pack ou l'instruction de référence
   const enrichedPrompt = subjectContext 
     ? `${prompt}${subjectContext}${negativeContext ? `\n${negativeContext}` : ''}`
     : `${prompt}${referenceInstruction}`;
@@ -990,8 +1007,9 @@ IMPORTANT: Use the provided reference image as INSPIRATION ONLY.
       ratio: ratio || '9:16',
       visualStyle: visualStyle || 'photorealistic',
       identityAnchorId,
-      referenceImageUrl, // Subject Pack Master OR user reference
-      isInspiration,     // ✅ NEW: Pass inspiration flag
+      referenceImageUrl,              // Subject Pack Master (copy exact)
+      referenceImages: userReferenceImages, // ✅ NEW: All user references
+      referenceMode: effectiveReferenceMode, // ✅ NEW: inspire/transform/combine
       negativePrompt: negativeContext || undefined,
     }),
   });
@@ -1051,12 +1069,14 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
     console.log(`[gen_slide] ✅ Using user reference image as INSPIRATION: ${referenceImageUrl.substring(0, 80)}...`);
   }
 
-  // ✅ NEW: Add INSPIRATION instruction if using user reference
+  // ✅ Mode-specific instruction
   let referenceInstruction = '';
-  if (isInspiration) {
-    referenceInstruction = `\n\n=== REFERENCE IMAGE: INSPIRATION MODE ===
-Use the provided reference image as INSPIRATION for style, colors, and composition.
-DO NOT copy or reproduce the exact content - create ORIGINAL content inspired by the reference aesthetic.`;
+  if (effectiveReferenceMode === 'inspire') {
+    referenceInstruction = `\nUse the reference images as INSPIRATION for style, colors, and composition - create ORIGINAL content.`;
+  } else if (effectiveReferenceMode === 'transform') {
+    referenceInstruction = `\nTRANSFORM the first image using style from the others.`;
+  } else if (effectiveReferenceMode === 'combine') {
+    referenceInstruction = `\nCOMBINE elements from all reference images harmoniously.`;
   }
 
   const slideData = slide as Record<string, unknown> | undefined;
@@ -1082,8 +1102,9 @@ DO NOT copy or reproduce the exact content - create ORIGINAL content inspired by
       slide: slideData,
       ratio: ratio || '9:16',
       visualStyle: visualStyle || 'photorealistic',
-      referenceImageUrl, // Subject Pack Master OR user reference
-      isInspiration,     // ✅ NEW: Pass inspiration flag
+      referenceImageUrl,                    // Subject Pack Master
+      referenceImages: userReferenceImages, // ✅ All user references
+      referenceMode: effectiveReferenceMode, // ✅ inspire/transform/combine
     }),
   });
 
