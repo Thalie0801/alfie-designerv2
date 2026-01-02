@@ -31,6 +31,7 @@ export default function AITools() {
   // Inpainting state
   const [maskDescription, setMaskDescription] = useState("");
   const [editPrompt, setEditPrompt] = useState("");
+  const [referenceImage, setReferenceImage] = useState<string | null>(null);
   
   // Outpainting state
   const [direction, setDirection] = useState<'left' | 'right' | 'up' | 'down' | 'all'>('all');
@@ -38,6 +39,15 @@ export default function AITools() {
   
   // Upscale state
   const [scaleFactor, setScaleFactor] = useState<2 | 4>(2);
+
+  // Reference image handler
+  const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setReferenceImage(reader.result as string);
+    reader.readAsDataURL(file);
+  };
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -86,6 +96,7 @@ export default function AITools() {
       if (activeTab === 'inpainting') {
         payload.maskDescription = maskDescription;
         payload.editPrompt = editPrompt;
+        if (referenceImage) payload.referenceImage = referenceImage;
       } else if (activeTab === 'outpainting') {
         payload.direction = direction;
         payload.extendPrompt = extendPrompt;
@@ -128,6 +139,7 @@ export default function AITools() {
     setResult(null);
     setMaskDescription("");
     setEditPrompt("");
+    setReferenceImage(null);
     setExtendPrompt("");
   };
 
@@ -232,18 +244,53 @@ export default function AITools() {
                 </TabsList>
 
                 <TabsContent value="inpainting" className="space-y-4 mt-4">
+                  {/* Reference image for product swap */}
                   <div className="space-y-2">
-                    <Label>Zone à modifier</Label>
+                    <Label>Image de référence (optionnel)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Produit ou objet à insérer à la place de la zone masquée
+                    </p>
+                    {!referenceImage ? (
+                      <label className="flex items-center justify-center gap-2 border-2 border-dashed rounded-lg p-4 cursor-pointer hover:border-primary/50 transition-colors">
+                        <Upload className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Uploader une image</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleReferenceUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    ) : (
+                      <div className="relative inline-block">
+                        <img src={referenceImage} alt="Référence" className="h-20 rounded border" />
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="absolute -top-2 -right-2 h-6 w-6"
+                          onClick={() => setReferenceImage(null)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Zone à remplacer</Label>
                     <Input
-                      placeholder="Ex: le ciel, le t-shirt du personnage, l'arrière-plan..."
+                      placeholder="Ex: les pots de produits au centre, le logo..."
                       value={maskDescription}
                       onChange={(e) => setMaskDescription(e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Modification souhaitée</Label>
+                    <Label>Instructions {referenceImage ? "(optionnel)" : ""}</Label>
                     <Input
-                      placeholder="Ex: un coucher de soleil, une couleur bleue, un décor tropical..."
+                      placeholder={referenceImage 
+                        ? "Ex: intégrer naturellement, même éclairage..."
+                        : "Ex: un coucher de soleil, une couleur bleue..."
+                      }
                       value={editPrompt}
                       onChange={(e) => setEditPrompt(e.target.value)}
                     />

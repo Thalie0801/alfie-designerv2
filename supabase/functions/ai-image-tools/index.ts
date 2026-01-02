@@ -22,6 +22,7 @@ interface ToolRequest {
   // Inpainting specific
   maskDescription?: string; // Description of area to edit (e.g., "the sky", "the person's shirt")
   editPrompt?: string;      // What to change it to
+  referenceImage?: string;  // Optional: image containing product/object to insert
   // Outpainting specific
   direction?: 'left' | 'right' | 'up' | 'down' | 'all';
   extendPrompt?: string;    // What to add in extended area
@@ -99,15 +100,21 @@ async function callImageTool(opts: {
   imageUrl: string;
   systemPrompt: string;
   userPrompt: string;
+  referenceImageUrl?: string;
 }): Promise<{ imageUrl: string; error?: string }> {
-  const { apiKey, imageUrl, systemPrompt, userPrompt } = opts;
+  const { apiKey, imageUrl, systemPrompt, userPrompt, referenceImageUrl } = opts;
   
-  console.log(`🔧 [ai-image-tools] Calling Lovable AI - Model: ${LOVABLE_MODELS.image_premium}`);
+  console.log(`🔧 [ai-image-tools] Calling Lovable AI - Model: ${LOVABLE_MODELS.image_premium}${referenceImageUrl ? ' (with reference)' : ''}`);
   
   const userContent: any[] = [
     { type: "text", text: userPrompt },
     { type: "image_url", image_url: { url: imageUrl } }
   ];
+  
+  // Add reference image if provided (for inpainting with product swap)
+  if (referenceImageUrl) {
+    userContent.push({ type: "image_url", image_url: { url: referenceImageUrl } });
+  }
   
   const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -157,7 +164,7 @@ Deno.serve(async (req) => {
 
   try {
     const body: ToolRequest = await req.json();
-    const { userId, brandId, tool, imageUrl, maskDescription, editPrompt, direction, extendPrompt, scaleFactor } = body;
+    const { userId, brandId, tool, imageUrl, maskDescription, editPrompt, referenceImage, direction, extendPrompt, scaleFactor } = body;
 
     console.log(`🔧 [ai-image-tools] Tool: ${tool}, User: ${userId?.slice(0,8)}`);
 
@@ -180,10 +187,39 @@ Always produce exactly ONE high-quality image in message.images[0].`;
 
     switch (tool) {
       case 'inpainting':
-        if (!maskDescription || !editPrompt) {
-          return jsonRes({ error: "Inpainting requires maskDescription and editPrompt" }, { status: 400 });
+        if (!maskDescription) {
+          return jsonRes({ error: "Inpainting requires maskDescription" }, { status: 400 });
         }
-        userPrompt = buildInpaintingPrompt(maskDescription, editPrompt);
+        if (referenceImage) {
+          // Product swap mode: replace area with product from reference image
+          systemPrompt = `You are a professional image editor specialized in PRODUCT REPLACEMENT.
+You will receive TWO images:
+1. FIRST IMAGE: The base/background image to modify
+2. SECOND IMAGE: Contains the PRODUCT/OBJECT to insert
+
+Your task is to seamlessly replace the specified area in the first image with the product from the second image.
+You MUST output exactly ONE high-quality edited image.`;
+
+          userPrompt = `PRODUCT REPLACEMENT TASK:
+
+TARGET AREA in base image: "${maskDescription}"
+${editPrompt ? `ADDITIONAL INSTRUCTIONS: ${editPrompt}` : ''}
+
+CRITICAL INSTRUCTIONS:
+1. Take the PRODUCT/OBJECT from the SECOND image
+2. Insert it into the FIRST image, replacing the area described as "${maskDescription}"
+3. Match the lighting, shadows, and perspective of the base image PERFECTLY
+4. Ensure seamless integration - it should look like the product was always there
+5. Keep all other parts of the base image EXACTLY as they are
+
+OUTPUT: A single image where the product from image 2 replaces the specified area in image 1.`;
+        } else {
+          // Standard inpainting
+          if (!editPrompt) {
+            return jsonRes({ error: "Inpainting requires editPrompt when no reference image is provided" }, { status: 400 });
+          }
+          userPrompt = buildInpaintingPrompt(maskDescription, editPrompt);
+        }
         break;
 
       case 'outpainting':
@@ -208,6 +244,7 @@ Always produce exactly ONE high-quality image in message.images[0].`;
       imageUrl,
       systemPrompt,
       userPrompt,
+      referenceImageUrl: referenceImage,
     });
 
     if (result.error) {
