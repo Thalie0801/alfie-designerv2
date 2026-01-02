@@ -50,10 +50,10 @@ interface GenerateRequest {
   orderId?: string | null;
   orderItemId?: string | null;
   requestId?: string | null;
-  jobId?: string | null; // ✅ NEW: Job ID for tracking in unified pipeline
+  jobId?: string | null; // Job ID for tracking in unified pipeline
   templateImageUrl?: string;
   uploadedSourceUrl?: string | null;
-  referenceImageUrl?: string | null; // ✅ NEW: Subject Pack reference image
+  referenceImageUrl?: string | null; // Subject Pack reference image
   brandKit?: BrandKit;
   prompt?: string;
   resolution?: string;
@@ -66,8 +66,9 @@ interface GenerateRequest {
   negativePrompt?: string;
   useBrandKit?: boolean;
   userPlan?: string;
-  visualStyleCategory?: 'background' | 'character' | 'product'; // ✅ Style visuel adaptatif
-  isIntermediate?: boolean; // ✅ Mark as intermediate asset (keyframe, not final)
+  visualStyleCategory?: 'background' | 'character' | 'product'; // Style visuel adaptatif
+  isIntermediate?: boolean; // Mark as intermediate asset (keyframe, not final)
+  isInspiration?: boolean;  // ✅ NEW: Reference image is for INSPIRATION, not COPY
 }
 
 /* --------------------------- Small helpers -------------------------- */
@@ -261,9 +262,9 @@ ${prompt ? `Content: ${prompt}` : ''}`;
   return fullPrompt;
 }
 
-function buildSystemPrompt(resolution?: string) {
+function buildSystemPrompt(resolution?: string, isInspiration?: boolean) {
   const res = clampRes(resolution);
-  return `You are a professional image generator specialized in creating stunning visuals for social media and marketing.
+  let prompt = `You are a professional image generator specialized in creating stunning visuals for social media and marketing.
 
 CRITICAL FRENCH SPELLING RULES:
 - Use PERFECT French spelling with proper accents: é, è, ê, à, ç, ù, œ, etc.
@@ -283,11 +284,27 @@ CRITICAL FRENCH SPELLING RULES:
   * "artifécralle" → "artificielle"
   * "partranaire" → "partenaire"
   * "d'éeil" → "d'œil"
-- If overlayText is provided, reproduce it EXACTLY as given - no modifications, no additions
-- If a reference image is provided, maintain similar composition, style, color palette, typography vibe, and text placement
+- If overlayText is provided, reproduce it EXACTLY as given - no modifications, no additions`;
+
+  // ✅ NEW: Differentiate between COPY (Subject Pack) and INSPIRATION (user reference)
+  if (isInspiration) {
+    prompt += `
+- REFERENCE IMAGE MODE: INSPIRATION ONLY
+  * Draw visual inspiration from the reference's colors, composition, lighting, and style
+  * DO NOT copy or reproduce the exact content, characters, objects, or scene
+  * CREATE NEW, ORIGINAL content that captures the same aesthetic and mood
+  * The result should be INSPIRED BY the reference, NOT a DUPLICATE`;
+  } else {
+    prompt += `
+- If a reference image is provided, maintain similar composition, style, color palette, typography vibe, and text placement`;
+  }
+
+  prompt += `
 - Always produce exactly ONE high-quality image in message.images[0]
 - For carousels: generate ONE slide at a time, not a grid or collage. One canvas, no tiles, no multiple frames
 - Generate high-quality images suitable for ${res} resolution with good contrast and readability`;
+
+  return prompt;
 }
 
 function buildNegativePrompt(input: GenerateRequest) {
@@ -371,7 +388,7 @@ Deno.serve(async (req) => {
     const sbService = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // --- Construire prompts & payload ---
-    const systemPrompt = buildSystemPrompt(body.resolution);
+    const systemPrompt = buildSystemPrompt(body.resolution, body.isInspiration);
     const fullPrompt = buildMainPrompt(body);
     const negative = buildNegativePrompt(body);
 
@@ -380,7 +397,8 @@ Deno.serve(async (req) => {
       body.referenceImageUrl?.trim() || body.uploadedSourceUrl?.trim() || body.templateImageUrl?.trim() || null;
     
     if (body.referenceImageUrl) {
-      console.log('[alfie-generate-ai-image] Using Subject Pack reference image:', body.referenceImageUrl.substring(0, 80) + '...');
+      const mode = body.isInspiration ? 'INSPIRATION' : 'COPY';
+      console.log(`[alfie-generate-ai-image] Using reference image (${mode}):`, body.referenceImageUrl.substring(0, 80) + '...');
     }
     
     const userContent: any[] = [{ type: "text", text: fullPrompt }];
