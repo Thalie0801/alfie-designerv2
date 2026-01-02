@@ -109,6 +109,7 @@ const JobSpecV1 = z.object({
   subject_pack_id: z.string().uuid().optional(), // NEW: Subject Pack
   ratio_master: z.enum(['9:16', '1:1', '16:9', '4:5', '2:3', 'yt-thumb']).default('9:16'),
   reference_images: z.array(z.string()).max(3).optional(), // ✅ Reference images (1-3 URLs)
+  reference_mode: z.enum(['inspire', 'transform', 'combine']).optional(), // ✅ NEW: How to use references
   duration_total: z.number().optional(),
   clip_count: z.number().optional(),
   script: z.string().optional(),
@@ -156,6 +157,7 @@ function generateStepsForSingleImage(spec: JobSpecV1Type): StepInput[] {
         identityAnchorId: spec.character_anchor_id,
         subjectPackId: spec.subject_pack_id, // ✅ Propagate Subject Pack
         referenceImages: spec.reference_images, // ✅ Propagate reference images
+        referenceMode: spec.reference_mode,     // ✅ NEW: Propagate reference mode
         locks: spec.locks,
       },
     },

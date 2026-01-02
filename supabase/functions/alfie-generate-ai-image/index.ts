@@ -53,7 +53,9 @@ interface GenerateRequest {
   jobId?: string | null; // Job ID for tracking in unified pipeline
   templateImageUrl?: string;
   uploadedSourceUrl?: string | null;
-  referenceImageUrl?: string | null; // Subject Pack reference image
+  referenceImageUrl?: string | null; // Subject Pack reference image (COPY EXACT)
+  referenceImages?: string[];        // ✅ NEW: User-uploaded reference images (up to 3)
+  referenceMode?: 'inspire' | 'transform' | 'combine'; // ✅ NEW: How to use references
   brandKit?: BrandKit;
   prompt?: string;
   resolution?: string;
@@ -68,7 +70,7 @@ interface GenerateRequest {
   userPlan?: string;
   visualStyleCategory?: 'background' | 'character' | 'product'; // Style visuel adaptatif
   isIntermediate?: boolean; // Mark as intermediate asset (keyframe, not final)
-  isInspiration?: boolean;  // ✅ NEW: Reference image is for INSPIRATION, not COPY
+  isInspiration?: boolean;  // Reference image is for INSPIRATION, not COPY
 }
 
 /* --------------------------- Small helpers -------------------------- */
@@ -262,7 +264,7 @@ ${prompt ? `Content: ${prompt}` : ''}`;
   return fullPrompt;
 }
 
-function buildSystemPrompt(resolution?: string, isInspiration?: boolean) {
+function buildSystemPrompt(resolution?: string, referenceMode?: 'inspire' | 'transform' | 'combine') {
   const res = clampRes(resolution);
   let prompt = `You are a professional image generator specialized in creating stunning visuals for social media and marketing.
 
@@ -286,8 +288,23 @@ CRITICAL FRENCH SPELLING RULES:
   * "d'éeil" → "d'œil"
 - If overlayText is provided, reproduce it EXACTLY as given - no modifications, no additions`;
 
-  // ✅ NEW: Differentiate between COPY (Subject Pack) and INSPIRATION (user reference)
-  if (isInspiration) {
+  // ✅ Different modes for reference images
+  if (referenceMode === 'transform') {
+    prompt += `
+- REFERENCE IMAGE MODE: TRANSFORM
+  * The FIRST reference image is the SOURCE to transform
+  * Use the SECOND/THIRD reference images as STYLE guides
+  * Apply the style, colors, lighting, and aesthetic from the style guides to the source
+  * Keep the main subject/composition of the source, but transform its visual appearance
+  * Result: Source content + Style from other references`;
+  } else if (referenceMode === 'combine') {
+    prompt += `
+- REFERENCE IMAGE MODE: COMBINE/MERGE
+  * Merge elements from ALL reference images into ONE cohesive new composition
+  * Take the best elements, characters, objects from each reference
+  * Create a harmonious blend that incorporates aspects of all references
+  * The result should feel like a natural fusion, not a collage`;
+  } else if (referenceMode === 'inspire') {
     prompt += `
 - REFERENCE IMAGE MODE: INSPIRATION ONLY
   * Draw visual inspiration from the reference's colors, composition, lighting, and style
@@ -387,28 +404,56 @@ Deno.serve(async (req) => {
 
     const sbService = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // --- Determine reference mode ---
+    // isInspiration (legacy) maps to 'inspire' mode
+    const referenceMode = body.referenceMode || (body.isInspiration ? 'inspire' : undefined);
+
     // --- Construire prompts & payload ---
-    const systemPrompt = buildSystemPrompt(body.resolution, body.isInspiration);
+    const systemPrompt = buildSystemPrompt(body.resolution, referenceMode);
     const fullPrompt = buildMainPrompt(body);
     const negative = buildNegativePrompt(body);
 
-    // ✅ Priority: referenceImageUrl (Subject Pack) > uploadedSourceUrl > templateImageUrl
-    const referenceImage =
-      body.referenceImageUrl?.trim() || body.uploadedSourceUrl?.trim() || body.templateImageUrl?.trim() || null;
+    // ✅ Priority: referenceImageUrl (Subject Pack - COPY EXACT) > user referenceImages
+    const subjectPackRef = body.referenceImageUrl?.trim() || null;
+    const userReferenceImages = Array.isArray(body.referenceImages) ? body.referenceImages.filter(Boolean) : [];
     
-    if (body.referenceImageUrl) {
-      const mode = body.isInspiration ? 'INSPIRATION' : 'COPY';
-      console.log(`[alfie-generate-ai-image] Using reference image (${mode}):`, body.referenceImageUrl.substring(0, 80) + '...');
+    // Log reference usage
+    if (subjectPackRef) {
+      console.log(`[alfie-generate-ai-image] Using Subject Pack reference (COPY EXACT):`, subjectPackRef.substring(0, 80) + '...');
+    }
+    if (userReferenceImages.length > 0) {
+      console.log(`[alfie-generate-ai-image] Using ${userReferenceImages.length} user reference images (mode: ${referenceMode || 'copy'})`);
     }
     
     const userContent: any[] = [{ type: "text", text: fullPrompt }];
-    if (referenceImage) {
-      userContent.push({ type: "image_url", image_url: { url: referenceImage } });
+    
+    // ✅ Add Subject Pack reference first (priority - copy exact)
+    if (subjectPackRef) {
+      userContent.push({ type: "image_url", image_url: { url: subjectPackRef } });
     }
+    
+    // ✅ Add ALL user reference images (up to 3)
+    for (const imgUrl of userReferenceImages) {
+      if (imgUrl && typeof imgUrl === 'string') {
+        userContent.push({ type: "image_url", image_url: { url: imgUrl } });
+        console.log(`[alfie-generate-ai-image] Added user reference: ${imgUrl.substring(0, 60)}...`);
+      }
+    }
+    
+    // Legacy fallback: uploadedSourceUrl or templateImageUrl
+    if (!subjectPackRef && userReferenceImages.length === 0) {
+      const legacyRef = body.uploadedSourceUrl?.trim() || body.templateImageUrl?.trim();
+      if (legacyRef) {
+        userContent.push({ type: "image_url", image_url: { url: legacyRef } });
+      }
+    }
+    
     if (negative) {
-      // On peut glisser le negative prompt explicitement dans le message
       userContent.push({ type: "text", text: `Negative prompt: ${negative}` });
     }
+    
+    // ✅ Legacy variable for retry logic and metadata
+    const referenceImage = subjectPackRef || userReferenceImages[0] || body.uploadedSourceUrl?.trim() || body.templateImageUrl?.trim() || null;
 
     // --- Génération via Lovable AI ---
     let generatedImageUrl: string | undefined;
