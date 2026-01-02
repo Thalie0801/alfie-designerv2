@@ -170,6 +170,21 @@ export default function StudioMulti() {
   const [carouselCount, setCarouselCount] = useState(1);
   const [videoCount, setVideoCount] = useState(1);
   
+  // Individual prompts mode for images
+  const [useIndividualPrompts, setUseIndividualPrompts] = useState(false);
+  const [imagePrompts, setImagePrompts] = useState<string[]>([]);
+  
+  // Sync imagePrompts array length with imageCount
+  useEffect(() => {
+    if (useIndividualPrompts) {
+      setImagePrompts(prev => {
+        const newPrompts = [...prev];
+        while (newPrompts.length < imageCount) newPrompts.push('');
+        return newPrompts.slice(0, imageCount);
+      });
+    }
+  }, [imageCount, useIndividualPrompts]);
+  
   // Style artistique
   const [visualStyle, setVisualStyle] = useState<VisualStyle>('cinematic_photorealistic');
   
@@ -330,6 +345,10 @@ export default function StudioMulti() {
         ? (activeBrand as any)?.default_subject_pack_id || null
         : selectedSubjectPackId;
 
+      // Determine if we should send individual prompts
+      const hasValidIndividualPrompts = useIndividualPrompts && 
+        imagePrompts.filter(p => p.trim()).length === imageCount;
+
       const spec: JobSpecV1Type = {
         version: 'v1',
         kind: 'campaign_pack',
@@ -338,9 +357,11 @@ export default function StudioMulti() {
         script: script,
         visual_style: visualStyle,
         image_count: imageCount,
-        carousel_count: carouselCount,     // ✅ NEW: Nombre de carrousels
-        slides_per_carousel: 5,            // ✅ NEW: 5 slides par carrousel
+        carousel_count: carouselCount,
+        slides_per_carousel: 5,
         clip_count: videoCount,
+        // If individual prompts provided, send them; otherwise let plan_images segment
+        prompts: hasValidIndividualPrompts ? imagePrompts : undefined,
         deliverables: ['zip'] as JobSpecV1Type['deliverables'],
         use_brand_kit: useBrandKitToggle,
         reference_images: referenceImages.length > 0 ? referenceImages : undefined,
@@ -915,6 +936,47 @@ export default function StudioMulti() {
                   </Select>
                 </div>
               </div>
+
+              {/* Individual prompts toggle for images */}
+              {imageCount > 1 && (
+                <div className="space-y-4 border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-medium">Prompts individuels par image</Label>
+                      <p className="text-xs text-muted-foreground">
+                        {useIndividualPrompts 
+                          ? 'Définissez un prompt unique pour chaque image' 
+                          : 'L\'IA segmentera automatiquement votre brief en prompts distincts'}
+                      </p>
+                    </div>
+                    <Switch 
+                      checked={useIndividualPrompts} 
+                      onCheckedChange={setUseIndividualPrompts} 
+                    />
+                  </div>
+                  
+                  {useIndividualPrompts && (
+                    <div className="space-y-3">
+                      {Array.from({ length: imageCount }).map((_, i) => (
+                        <div key={i} className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Image {i + 1}</Label>
+                          <Textarea
+                            value={imagePrompts[i] || ''}
+                            onChange={(e) => {
+                              const newPrompts = [...imagePrompts];
+                              newPrompts[i] = e.target.value;
+                              setImagePrompts(newPrompts);
+                            }}
+                            placeholder={`Prompt pour l'image ${i + 1}...`}
+                            rows={2}
+                            className="text-sm"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>Plateforme</Label>
