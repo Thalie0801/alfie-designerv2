@@ -261,6 +261,7 @@ export function StudioGenerator() {
           brandkit_id: activeBrandId,
           use_brand_kit: useBrandKitToggle,
           visual_style: visualStyle,
+          reference_images: referenceImages.length > 0 ? referenceImages : undefined, // ✅ FIX: Propagate reference images
           audio: {
             music_enabled: musicEnabled,
             lip_sync_enabled: lipSyncEnabled,
