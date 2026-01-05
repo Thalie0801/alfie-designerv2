@@ -1057,7 +1057,9 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
     slideIndex, 
     slide, 
     ratio, 
-    visualStyle, 
+    visualStyle,
+    visualStyleCategory, // ✅ Carousel visual style category (background/character/product)
+    backgroundOnly,      // ✅ Background only mode (no text)
     subjectPackId, 
     userId, 
     brandId, 
@@ -1074,6 +1076,7 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
   console.log(`[gen_slide] subjectPackId: ${subjectPackId}`);
   console.log(`[gen_slide] referenceImages: ${Array.isArray(referenceImages) ? referenceImages.length : 0}`);
   console.log(`[gen_slide] referenceMode: ${referenceMode}`);
+  console.log(`[gen_slide] visualStyleCategory: ${visualStyleCategory}, backgroundOnly: ${backgroundOnly}`);
   console.log(`[gen_slide] Generating slide ${slideIndex}`);
 
   // Charger le Brand Kit si activé
@@ -1170,6 +1173,8 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
       totalSlides: slidesTotal, // ✅ AJOUTÉ
       aspectRatio: ratio || '4:5',  // ✅ Renommé ratio → aspectRatio
       visualStyle: visualStyle || 'background',
+      visualStyleCategory: visualStyleCategory || 'character', // ✅ Carousel style category
+      backgroundOnly: backgroundOnly === true, // ✅ Background only mode
       referenceImageUrl: referenceImageUrl || userReferenceImages[0],
       referenceImages: userReferenceImages,
       referenceMode: effectiveReferenceMode,

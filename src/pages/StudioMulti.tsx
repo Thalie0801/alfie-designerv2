@@ -203,6 +203,10 @@ export default function StudioMulti() {
   // Style artistique
   const [visualStyle, setVisualStyle] = useState<VisualStyle>('cinematic_photorealistic');
   
+  // Carousel-specific options (for Pack Campagne)
+  const [carouselVisualStyleCategory, setCarouselVisualStyleCategory] = useState<'background' | 'character' | 'product'>('character');
+  const [carouselBackgroundOnly, setCarouselBackgroundOnly] = useState(false);
+  
   // Options avancées
   const [voiceoverEnabled, setVoiceoverEnabled] = useState(true);
   const [musicEnabled, setMusicEnabled] = useState(true);
@@ -383,6 +387,9 @@ export default function StudioMulti() {
         prompts: hasValidIndividualPrompts ? imagePrompts : undefined,
         // If individual carousel themes provided, send them
         carousel_themes: hasValidCarouselThemes ? carouselThemes : undefined,
+        // Carousel-specific options
+        visual_style_category: carouselVisualStyleCategory,
+        background_only: carouselBackgroundOnly,
         deliverables: ['zip'] as JobSpecV1Type['deliverables'],
         use_brand_kit: useBrandKitToggle,
         reference_images: referenceImages.length > 0 ? referenceImages : undefined,
@@ -1037,6 +1044,50 @@ export default function StudioMulti() {
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Carousel visual style options */}
+              {carouselCount > 0 && (
+                <div className="space-y-4 border-t pt-4">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    🎠 Options carrousels
+                  </Label>
+                  
+                  {/* Visual style category */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Style visuel</Label>
+                    <Select 
+                      value={carouselVisualStyleCategory} 
+                      onValueChange={(v) => setCarouselVisualStyleCategory(v as 'background' | 'character' | 'product')}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="background">🎨 Fond abstrait</SelectItem>
+                        <SelectItem value="character">🐕 Personnage / Mascotte</SelectItem>
+                        <SelectItem value="product">📦 Produit / Mockup</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {carouselVisualStyleCategory === 'background' && "Dégradés, formes géométriques, textures"}
+                      {carouselVisualStyleCategory === 'character' && "Personnage 3D Pixar, mascotte, illustrations"}
+                      {carouselVisualStyleCategory === 'product' && "Mise en scène produit, mockups"}
+                    </p>
+                  </div>
+                  
+                  {/* Background only toggle */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-medium">Fond seul</Label>
+                      <p className="text-xs text-muted-foreground">Images sans texte intégré (overlay Canva)</p>
+                    </div>
+                    <Switch 
+                      checked={carouselBackgroundOnly} 
+                      onCheckedChange={setCarouselBackgroundOnly} 
+                    />
+                  </div>
                 </div>
               )}
 
