@@ -13,10 +13,8 @@ export async function uploadToChatBucket(
     .upload(filePath, file, { cacheControl: "3600", upsert: false });
   if (uploadError) throw uploadError;
 
-  const signed = await supabase.storage.from("chat-uploads").createSignedUrl(filePath, 60 * 60);
-  if (signed.error || !signed.data?.signedUrl) {
-    throw signed.error ?? new Error("createSignedUrl failed");
-  }
+  // ✅ Use getPublicUrl for permanent URLs (bucket is public)
+  const { data } = supabase.storage.from("chat-uploads").getPublicUrl(filePath);
 
-  return { signedUrl: signed.data.signedUrl, path: filePath };
+  return { publicUrl: data.publicUrl, path: filePath };
 }

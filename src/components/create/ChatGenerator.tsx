@@ -299,7 +299,7 @@ export function ChatGenerator() {
         return;
       }
 
-      const { signedUrl: uploadedSourceUrl } = await uploadToChatBucket(file, supabase, user.id);
+      const { publicUrl: uploadedSourceUrl } = await uploadToChatBucket(file, supabase, user.id);
 
       const src: UploadedSource = {
         type: isVideo ? ("video" as const) : ("image" as const),

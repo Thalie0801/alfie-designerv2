@@ -85,8 +85,8 @@ export function FileUploader({
     if (authError) throw authError;
     if (!user) throw new Error("Utilisateur non authentifié");
 
-    const { signedUrl } = await uploadToChatBucket(file, supabase, user.id);
-    return signedUrl;
+    const { publicUrl } = await uploadToChatBucket(file, supabase, user.id);
+    return publicUrl;
   };
 
   const onDrop = useCallback(
