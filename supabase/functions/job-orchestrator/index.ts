@@ -123,6 +123,8 @@ const JobSpecV1 = z.object({
   slides_per_carousel: z.number().default(5),    // ✅ NEW: Slides par carrousel
   carousel_theme: z.string().optional(),
   carousel_themes: z.array(z.string()).optional(), // ✅ NEW: Thèmes individuels par carrousel
+  visual_style_category: z.enum(['background', 'character', 'product']).optional(), // ✅ Carousel visual style
+  background_only: z.boolean().optional(), // ✅ Background only mode (no text)
   deliverables: z.array(DeliverableType).default(['master_9x16']),
   locks: VisualLocks.optional(),
   audio: AudioConfig.optional(),
@@ -530,6 +532,8 @@ function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
             slide: spec.slides?.[c * slidesPerCarousel + s],
             ratio: spec.ratio_master,
             visualStyle: spec.visual_style,
+            visualStyleCategory: spec.visual_style_category, // ✅ Propagate carousel visual style category
+            backgroundOnly: spec.background_only, // ✅ Propagate background_only flag
             subjectPackId: spec.subject_pack_id,
             referenceImages: spec.reference_images, // ✅ Propagate reference images
             totalSlides: slidesPerCarousel, // ✅ AJOUTÉ pour alfie-render-carousel-slide
