@@ -112,25 +112,94 @@ export default function JobConsolePage() {
       <JobConsole jobId={jobId || null} className="min-h-[400px]" />
 
       {/* Deliverables section when completed */}
-      {progress?.status === 'completed' && progress.assets && progress.assets.length > 0 && (
-        <div className="rounded-lg border bg-card p-6">
-          <h2 className="font-semibold mb-4">Livrables</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {progress.assets.map((asset, idx) => (
-              <a
-                key={idx}
-                href={asset.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-4 rounded-lg border hover:border-primary transition-colors text-center"
-              >
-                <p className="font-medium capitalize">{asset.type}</p>
-                <p className="text-xs text-muted-foreground mt-1">Télécharger</p>
-              </a>
-            ))}
+      {progress?.status === 'completed' && progress.assets && progress.assets.length > 0 && (() => {
+        const imageAssets = progress.assets.filter(a => a.type === 'image' || a.type === 'final');
+        const carouselAssets = progress.assets.filter(a => a.type === 'carousel');
+        const videoAssets = progress.assets.filter(a => a.type === 'video' || a.type === 'clip');
+        
+        return (
+          <div className="rounded-lg border bg-card p-6 space-y-6">
+            <h2 className="font-semibold">Livrables</h2>
+            
+            {/* Images */}
+            {imageAssets.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">
+                  Images ({imageAssets.length})
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {imageAssets.map((asset, idx) => (
+                    <a
+                      key={idx}
+                      href={asset.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="aspect-square rounded-lg border overflow-hidden hover:border-primary transition-colors"
+                    >
+                      <img src={asset.url} alt={`Image ${idx + 1}`} className="w-full h-full object-cover" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Carousels */}
+            {carouselAssets.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">
+                  Carrousels ({carouselAssets.length})
+                </h3>
+                <div className="space-y-4">
+                  {carouselAssets.map((carousel, idx) => (
+                    <div key={idx} className="rounded-lg border p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium">
+                          Carrousel {idx + 1} ({carousel.slideUrls?.length || 0} slides)
+                        </span>
+                      </div>
+                      <div className="flex gap-2 overflow-x-auto pb-2">
+                        {carousel.slideUrls?.map((slideUrl, slideIdx) => (
+                          <a
+                            key={slideIdx}
+                            href={slideUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-shrink-0 w-16 h-20 rounded overflow-hidden border hover:border-primary transition-colors"
+                          >
+                            <img src={slideUrl} alt={`Slide ${slideIdx + 1}`} className="w-full h-full object-cover" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Videos */}
+            {videoAssets.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">
+                  Vidéos ({videoAssets.length})
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {videoAssets.map((asset, idx) => (
+                    <a
+                      key={idx}
+                      href={asset.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="aspect-video rounded-lg border overflow-hidden hover:border-primary transition-colors"
+                    >
+                      <video src={asset.url} className="w-full h-full object-cover" muted />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

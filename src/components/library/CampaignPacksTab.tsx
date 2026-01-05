@@ -73,20 +73,59 @@ export function CampaignPacksTab({ orderId: _orderId }: Props) {
     fetchJobs();
   }, [user?.id]);
 
+  const [jobCarousels, setJobCarousels] = useState<Record<string, Array<{ carouselId: string; slideUrls: string[] }>>>({});
+
   const fetchJobSteps = async (jobId: string) => {
     if (jobSteps[jobId]) {
       setExpandedJob(expandedJob === jobId ? null : jobId);
       return;
     }
     
-    const { data, error } = await supabase
+    // Fetch job steps
+    const { data: stepsData, error } = await supabase
       .from('job_steps')
-      .select('id, step_type, status, output_json')
+      .select('id, step_type, status, output_json, input_json')
       .eq('job_id', jobId)
       .order('step_index', { ascending: true });
     
-    if (!error && data) {
-      setJobSteps(prev => ({ ...prev, [jobId]: data as JobStep[] }));
+    if (!error && stepsData) {
+      setJobSteps(prev => ({ ...prev, [jobId]: stepsData as JobStep[] }));
+      
+      // Extract carousel IDs from gen_slide steps
+      const carouselIds = new Set<string>();
+      for (const step of stepsData) {
+        const input = (step as any).input_json;
+        if (step.step_type === 'gen_slide' && input?.carouselId) {
+          carouselIds.add(input.carouselId);
+        }
+      }
+      
+      // Fetch carousel slides from library_assets
+      if (carouselIds.size > 0) {
+        const { data: slidesData } = await supabase
+          .from('library_assets')
+          .select('cloudinary_url, carousel_id, slide_index')
+          .in('carousel_id', Array.from(carouselIds))
+          .order('slide_index', { ascending: true });
+        
+        if (slidesData) {
+          const carouselMap = new Map<string, string[]>();
+          for (const slide of slidesData) {
+            if (!slide.carousel_id) continue;
+            if (!carouselMap.has(slide.carousel_id)) {
+              carouselMap.set(slide.carousel_id, []);
+            }
+            carouselMap.get(slide.carousel_id)!.push(slide.cloudinary_url);
+          }
+          
+          const carousels = Array.from(carouselMap.entries()).map(([carouselId, slideUrls]) => ({
+            carouselId,
+            slideUrls,
+          }));
+          
+          setJobCarousels(prev => ({ ...prev, [jobId]: carousels }));
+        }
+      }
     }
     
     setExpandedJob(expandedJob === jobId ? null : jobId);
@@ -203,7 +242,7 @@ export function CampaignPacksTab({ orderId: _orderId }: Props) {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => navigate(`/job/${job.id}`)}
+                  onClick={() => navigate(`/jobs/${job.id}`)}
                 >
                   <ExternalLink className="h-4 w-4 mr-1" />
                   Console
@@ -211,31 +250,65 @@ export function CampaignPacksTab({ orderId: _orderId }: Props) {
               </div>
               
               {/* Expanded assets */}
-              {isExpanded && steps.length > 0 && (
-                <div className="pt-3 border-t">
-                  <p className="text-xs font-medium mb-2">Assets générés ({assets.length})</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {assets.slice(0, 6).map((asset, i) => (
-                      <a
-                        key={i}
-                        href={asset.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="aspect-square rounded overflow-hidden bg-muted hover:opacity-80 transition-opacity"
-                      >
-                        {asset.type === 'video' ? (
-                          <video src={asset.url} className="w-full h-full object-cover" muted />
-                        ) : (
-                          <img src={asset.url} alt={asset.type} className="w-full h-full object-cover" />
+              {isExpanded && (steps.length > 0 || (jobCarousels[job.id] && jobCarousels[job.id].length > 0)) && (
+                <div className="pt-3 border-t space-y-4">
+                  {/* Images */}
+                  {assets.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium mb-2">Images ({assets.length})</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {assets.slice(0, 6).map((asset, i) => (
+                          <a
+                            key={i}
+                            href={asset.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="aspect-square rounded overflow-hidden bg-muted hover:opacity-80 transition-opacity"
+                          >
+                            {asset.type === 'video' ? (
+                              <video src={asset.url} className="w-full h-full object-cover" muted />
+                            ) : (
+                              <img src={asset.url} alt={asset.type} className="w-full h-full object-cover" />
+                            )}
+                          </a>
+                        ))}
+                        {assets.length > 6 && (
+                          <div className="aspect-square rounded bg-muted flex items-center justify-center text-sm text-muted-foreground">
+                            +{assets.length - 6}
+                          </div>
                         )}
-                      </a>
-                    ))}
-                    {assets.length > 6 && (
-                      <div className="aspect-square rounded bg-muted flex items-center justify-center text-sm text-muted-foreground">
-                        +{assets.length - 6}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+                  
+                  {/* Carousels */}
+                  {jobCarousels[job.id] && jobCarousels[job.id].length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium mb-2">Carrousels ({jobCarousels[job.id].length})</p>
+                      <div className="space-y-3">
+                        {jobCarousels[job.id].map((carousel, i) => (
+                          <div key={carousel.carouselId} className="rounded border p-2">
+                            <p className="text-xs text-muted-foreground mb-2">
+                              Carrousel {i + 1} ({carousel.slideUrls.length} slides)
+                            </p>
+                            <div className="flex gap-1 overflow-x-auto pb-1">
+                              {carousel.slideUrls.map((url, slideIdx) => (
+                                <a
+                                  key={slideIdx}
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex-shrink-0 w-10 h-12 rounded overflow-hidden hover:opacity-80 transition-opacity"
+                                >
+                                  <img src={url} alt={`Slide ${slideIdx + 1}`} className="w-full h-full object-cover" />
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
