@@ -1128,9 +1128,9 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
 }
 
 async function handlePlanSlides(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { theme, slideCount, carouselIndex } = input;
+  const { theme, slideCount, carouselIndex, brandKit, aspectRatio, language } = input;
   
-  console.log(`[plan_slides] Planning ${slideCount} slides for carousel ${carouselIndex ?? 0}, theme: ${theme}`);
+  console.log(`[plan_slides] Planning ${slideCount} slides for carousel ${carouselIndex ?? 0}, prompt: ${theme}`);
 
   const response = await fetch(`${SUPABASE_URL}/functions/v1/alfie-plan-carousel`, {
     method: 'POST',
@@ -1140,9 +1140,12 @@ async function handlePlanSlides(input: Record<string, unknown>): Promise<Record<
       'X-Internal-Secret': INTERNAL_FN_SECRET,
     },
     body: JSON.stringify({
-      theme,
+      prompt: theme, // ✅ Fixed: alfie-plan-carousel expects 'prompt', not 'theme'
       slideCount: slideCount || 5,
       carouselIndex: carouselIndex ?? 0,
+      brandKit,
+      aspectRatio,
+      language,
     }),
   });
 
