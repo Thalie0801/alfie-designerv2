@@ -526,6 +526,8 @@ function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
             slideCount: slidesPerCarousel,
             ratio: spec.ratio_master,
             referenceImages: spec.reference_images, // ✅ Propagate reference images
+            visualStyleCategory: spec.visual_style_category, // ✅ Pass to alfie-plan-carousel
+            backgroundOnly: spec.background_only, // ✅ Pass background_only flag
           },
         });
       }
