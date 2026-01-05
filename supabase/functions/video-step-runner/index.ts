@@ -1148,9 +1148,13 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
   // ✅ Calculer totalSlides (fallback si non fourni)
   const slidesTotal = Number(totalSlides) || 5;
 
-  // ✅ Générer orderId et carouselId
-  const orderId = String(jobId || 'unknown-job');
-  const carouselId = `${orderId}-carousel-${carouselIndex ?? 0}`;
+  // ✅ Générer orderId et carouselId (UUID valide requis pour library_assets)
+  const orderId = String(jobId || crypto.randomUUID());
+  
+  // Si carouselUuid est fourni par l'orchestrateur, l'utiliser (idempotence)
+  // Sinon, réutiliser jobId pour le premier carrousel, ou générer un UUID frais
+  const carouselId = (input.carouselUuid as string) 
+    || (carouselIndex === 0 ? orderId : crypto.randomUUID());
 
   const response = await fetch(`${SUPABASE_URL}/functions/v1/alfie-render-carousel-slide`, {
     method: 'POST',

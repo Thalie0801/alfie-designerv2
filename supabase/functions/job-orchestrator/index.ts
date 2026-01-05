@@ -239,6 +239,9 @@ function generateStepsForCarousel(spec: JobSpecV1Type): StepInput[] {
     });
   }
 
+  // ✅ Pré-générer carouselUuid pour garantir l'idempotence (retry ne change pas l'UUID)
+  const carouselUuid = crypto.randomUUID();
+
   // Generate each slide
   for (let i = 0; i < slideCount; i++) {
     steps.push({
@@ -249,11 +252,14 @@ function generateStepsForCarousel(spec: JobSpecV1Type): StepInput[] {
         slide: spec.slides?.[i],
         ratio: spec.ratio_master,
         visualStyle: spec.visual_style,
+        visualStyleCategory: spec.visual_style_category, // ✅ Propagate carousel visual style category
+        backgroundOnly: spec.background_only, // ✅ Propagate background_only flag
         identityAnchorId: spec.character_anchor_id,
         subjectPackId: spec.subject_pack_id, // ✅ Propagate Subject Pack
         referenceImages: spec.reference_images, // ✅ Propagate reference images
         totalSlides: slideCount, // ✅ AJOUTÉ pour alfie-render-carousel-slide
         carouselIndex: 0,        // ✅ Single carousel
+        carouselUuid,            // ✅ UUID pré-généré pour idempotence
       },
     });
   }
@@ -505,6 +511,9 @@ function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
         ? spec.carousel_themes![c] 
         : (spec.carousel_theme || spec.script);
       
+      // ✅ Pré-générer carouselUuid pour CE carrousel (idempotence)
+      const carouselUuid = crypto.randomUUID();
+      
       // Plan slides for THIS carousel
       if (!spec.slides || spec.slides.length === 0) {
         steps.push({
@@ -537,6 +546,7 @@ function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
             subjectPackId: spec.subject_pack_id,
             referenceImages: spec.reference_images, // ✅ Propagate reference images
             totalSlides: slidesPerCarousel, // ✅ AJOUTÉ pour alfie-render-carousel-slide
+            carouselUuid, // ✅ UUID pré-généré pour idempotence
           },
         });
       }
