@@ -91,40 +91,33 @@ export function CampaignPacksTab({ orderId: _orderId }: Props) {
     if (!error && stepsData) {
       setJobSteps(prev => ({ ...prev, [jobId]: stepsData as JobStep[] }));
       
-      // Extract carousel IDs from gen_slide steps
-      const carouselIds = new Set<string>();
-      for (const step of stepsData) {
-        const input = (step as any).input_json;
-        if (step.step_type === 'gen_slide' && input?.carouselId) {
-          carouselIds.add(input.carouselId);
-        }
-      }
+      // ✅ FIXED: Fetch carousels by order_id = jobId (most reliable method)
+      const { data: slidesData } = await supabase
+        .from('library_assets')
+        .select('cloudinary_url, carousel_id, slide_index')
+        .eq('order_id', jobId)
+        .eq('type', 'carousel_slide')
+        .not('carousel_id', 'is', null)
+        .order('carousel_id')
+        .order('slide_index', { ascending: true });
       
-      // Fetch carousel slides from library_assets
-      if (carouselIds.size > 0) {
-        const { data: slidesData } = await supabase
-          .from('library_assets')
-          .select('cloudinary_url, carousel_id, slide_index')
-          .in('carousel_id', Array.from(carouselIds))
-          .order('slide_index', { ascending: true });
-        
-        if (slidesData) {
-          const carouselMap = new Map<string, string[]>();
-          for (const slide of slidesData) {
-            if (!slide.carousel_id) continue;
-            if (!carouselMap.has(slide.carousel_id)) {
-              carouselMap.set(slide.carousel_id, []);
-            }
-            carouselMap.get(slide.carousel_id)!.push(slide.cloudinary_url);
+      if (slidesData && slidesData.length > 0) {
+        const carouselMap = new Map<string, string[]>();
+        for (const slide of slidesData) {
+          if (!slide.carousel_id) continue;
+          if (!carouselMap.has(slide.carousel_id)) {
+            carouselMap.set(slide.carousel_id, []);
           }
-          
-          const carousels = Array.from(carouselMap.entries()).map(([carouselId, slideUrls]) => ({
-            carouselId,
-            slideUrls,
-          }));
-          
-          setJobCarousels(prev => ({ ...prev, [jobId]: carousels }));
+          carouselMap.get(slide.carousel_id)!.push(slide.cloudinary_url);
         }
+        
+        const carousels = Array.from(carouselMap.entries()).map(([carouselId, slideUrls]) => ({
+          carouselId,
+          slideUrls,
+        }));
+        
+        setJobCarousels(prev => ({ ...prev, [jobId]: carousels }));
+        console.log(`[CampaignPacksTab] Found ${carousels.length} carousels for job ${jobId}`);
       }
     }
     

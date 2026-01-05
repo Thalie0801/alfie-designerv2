@@ -121,7 +121,7 @@ export function useJobProgress(jobId: string | null, options: UseJobProgressOpti
     loadProgress();
   }, [loadProgress]);
 
-  // Subscribe to realtime updates
+  // Subscribe to realtime updates + polling fallback
   useEffect(() => {
     if (!jobId) return;
 
@@ -130,10 +130,39 @@ export function useJobProgress(jobId: string | null, options: UseJobProgressOpti
       await loadProgress();
     });
 
+    // ✅ Polling fallback: every 3 seconds while job is not terminal
+    let pollInterval: NodeJS.Timeout | null = null;
+    
+    const startPolling = () => {
+      if (pollInterval) return;
+      pollInterval = setInterval(async () => {
+        try {
+          const currentProgress = await getJobStatus(jobId);
+          // Stop polling if job is terminal
+          if (currentProgress.status === 'completed' || currentProgress.status === 'failed') {
+            if (pollInterval) {
+              clearInterval(pollInterval);
+              pollInterval = null;
+            }
+          }
+        } catch (err) {
+          console.warn('[useJobProgress] Polling error:', err);
+        }
+      }, 3000);
+    };
+
+    // Start polling immediately for non-terminal jobs
+    if (progress?.status === 'queued' || progress?.status === 'running' || !progress) {
+      startPolling();
+    }
+
     return () => {
       unsubscribe();
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
     };
-  }, [jobId, loadProgress]);
+  }, [jobId, loadProgress, progress?.status]);
 
   // Retry a step
   const retryStep = useCallback(async (stepId: string) => {
