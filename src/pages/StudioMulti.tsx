@@ -10,6 +10,7 @@ import { useBrandKit } from '@/hooks/useBrandKit';
 import { useQueueMonitor } from '@/hooks/useQueueMonitor';
 import { QueueStatus } from '@/components/chat/QueueStatus';
 import { OrderStatusList } from '@/components/studio/OrderStatusList';
+import { JobProgressInline } from '@/components/job/JobProgressInline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -144,6 +145,7 @@ export default function StudioMulti() {
   const [activeTab, setActiveTab] = useState<'mini-film' | 'pack-campagne'>('mini-film');
   const [loading, setLoading] = useState(false);
   const [useBrandKitToggle, setUseBrandKitToggle] = useState(true);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
   
   // Shared state
   const [campaignName, setCampaignName] = useState('');
@@ -334,7 +336,8 @@ export default function StudioMulti() {
         description: `Job ${result.jobId.slice(0, 8)}... créé avec ${result.steps.length} étapes`,
       });
 
-      navigate(`/jobs/${result.jobId}`);
+      // Afficher la progression inline au lieu de naviguer
+      setActiveJobId(result.jobId);
     } catch (err) {
       console.error('[StudioMulti] Failed to create mini-film job:', err);
       toast.error('Erreur lors de la création', {
@@ -410,7 +413,8 @@ export default function StudioMulti() {
         description: `Job ${result.jobId.slice(0, 8)}... créé avec ${result.steps.length} étapes`,
       });
 
-      navigate(`/jobs/${result.jobId}`);
+      // Afficher la progression inline au lieu de naviguer
+      setActiveJobId(result.jobId);
     } catch (err) {
       console.error('[StudioMulti] Failed to create campaign pack job:', err);
       toast.error('Erreur lors de la création', {
@@ -455,6 +459,17 @@ export default function StudioMulti() {
           ← Studio Solo
         </Button>
       </div>
+
+      {/* Job Progress Inline */}
+      {activeJobId && (
+        <JobProgressInline 
+          jobId={activeJobId}
+          onClose={() => setActiveJobId(null)}
+          onComplete={() => {
+            // Optionnel: reset pour permettre une nouvelle génération
+          }}
+        />
+      )}
 
       {/* Brand Kit Toggle */}
       <Card className="p-4" data-tour-id="studio-multi-brandkit">

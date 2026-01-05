@@ -2,8 +2,9 @@
  * useJobProgress - Hook unifié pour suivre la progression des jobs
  * Remplace useVideoJobEvents avec support de tous les types de jobs
  */
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { subscribeToJob, getJobStatus, retryStep as retryStepApi, type JobProgress } from '@/lib/jobClient';
+import { toast } from 'sonner';
 
 export interface JobStep {
   id: string;
@@ -32,10 +33,21 @@ export interface JobProgressState {
   assets: Array<{ type: string; url: string }>;
 }
 
-export function useJobProgress(jobId: string | null) {
+export interface UseJobProgressOptions {
+  showNotifications?: boolean;
+  onComplete?: (progress: JobProgressState) => void;
+  onFailed?: (progress: JobProgressState) => void;
+}
+
+export function useJobProgress(jobId: string | null, options: UseJobProgressOptions = {}) {
+  const { showNotifications = false, onComplete, onFailed } = options;
   const [progress, setProgress] = useState<JobProgressState | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const previousStatusRef = useRef<string | null>(null);
+  
+  // Note: useNavigate can only be used if this hook is inside Router context
+  // We'll handle navigation in the toast action instead
 
   const loadProgress = useCallback(async () => {
     if (!jobId) return;
@@ -55,7 +67,7 @@ export function useJobProgress(jobId: string | null) {
       const currentStep = steps.find(s => s.status === 'running') || 
                          steps.find(s => s.status === 'queued');
 
-      setProgress({
+      const newProgress: JobProgressState = {
         jobId,
         kind: stepsResponse.kind || 'unknown',
         status: result.status,
@@ -68,13 +80,41 @@ export function useJobProgress(jobId: string | null) {
           : 0,
         error: result.error || null,
         assets: result.assets || [],
-      });
+      };
+
+      setProgress(newProgress);
+
+      // Handle status change notifications
+      const prevStatus = previousStatusRef.current;
+      const currentStatus = result.status;
+
+      if (showNotifications && prevStatus && prevStatus !== currentStatus) {
+        if (currentStatus === 'completed') {
+          toast.success('Génération terminée ! 🎉', {
+            description: 'Ton contenu est prêt dans la bibliothèque',
+            duration: 10000,
+            action: {
+              label: 'Voir',
+              onClick: () => window.location.href = '/library',
+            },
+          });
+          onComplete?.(newProgress);
+        } else if (currentStatus === 'failed') {
+          toast.error('Génération échouée', {
+            description: result.error || 'Une erreur est survenue',
+            duration: 10000,
+          });
+          onFailed?.(newProgress);
+        }
+      }
+
+      previousStatusRef.current = currentStatus;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load progress');
     } finally {
       setLoading(false);
     }
-  }, [jobId]);
+  }, [jobId, showNotifications, onComplete, onFailed]);
 
   // Load initial data
   useEffect(() => {
