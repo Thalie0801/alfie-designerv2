@@ -1148,8 +1148,9 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
   // ✅ Calculer totalSlides (fallback si non fourni)
   const slidesTotal = Number(totalSlides) || 5;
 
-  // ✅ Générer orderId et carouselId (UUID valide requis pour library_assets)
-  const orderId = String(jobId || crypto.randomUUID());
+  // ✅ orderId: utiliser celui fourni par l'orchestrateur (priorité FK valide)
+  // Fallback vers jobId si input.orderId manquant (jobs créés avant le fix)
+  const orderId = String(input.orderId || jobId || crypto.randomUUID());
   
   // Si carouselUuid est fourni par l'orchestrateur, l'utiliser (idempotence)
   // Sinon, réutiliser jobId pour le premier carrousel, ou générer un UUID frais

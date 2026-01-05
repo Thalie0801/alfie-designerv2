@@ -850,12 +850,37 @@ Deno.serve(async (req) => {
       return err(errorMsg, 403);
     }
 
-    // Create the job
+    // ✅ Step 1: Create an order first (required for library_assets FK)
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from('orders')
+      .insert({
+        user_id: user.id,
+        brand_id: spec.brandkit_id,
+        campaign_name: spec.campaign_name || `${spec.kind}_${new Date().toISOString().slice(0, 10)}`,
+        status: 'processing',
+        brief_json: spec,
+      })
+      .select('id')
+      .single();
+
+    if (orderError) {
+      console.error('[job-orchestrator] Failed to create order:', orderError);
+      // Refund woofs
+      await supabaseAdmin.functions.invoke('alfie-refund-woofs', {
+        body: { userId: user.id, brandId: spec.brandkit_id, woofsAmount: woofsCost },
+      });
+      return err(`Failed to create order: ${orderError.message}`, 500);
+    }
+
+    console.log(`[job-orchestrator] Created order ${order.id}`);
+
+    // ✅ Step 2: Create the job with order_id reference
     const { data: job, error: jobError } = await supabaseAdmin
       .from('job_queue')
       .insert({
         user_id: user.id,
         brand_id: spec.brandkit_id,
+        order_id: order.id, // ✅ Link to order for FK on library_assets
         type: spec.kind, // Use kind as type for compatibility
         kind: spec.kind,
         template_id: spec.template_id,
@@ -882,7 +907,7 @@ Deno.serve(async (req) => {
     // Generate steps
     const stepInputs = generateSteps(spec);
     
-    // Insert steps
+    // Insert steps with orderId propagated to all steps
     const stepsToInsert = stepInputs.map((step, index) => ({
       job_id: job.id,
       step_type: step.step_type,
@@ -890,6 +915,7 @@ Deno.serve(async (req) => {
       input_json: {
         ...step.input_json,
         jobId: job.id,
+        orderId: order.id,  // ✅ Propager orderId à tous les steps
         userId: user.id,
         brandId: spec.brandkit_id,
         useBrandKit: spec.use_brand_kit,  // Propager le flag Brand Kit
