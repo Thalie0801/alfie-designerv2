@@ -1078,12 +1078,22 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
   console.log(`[gen_slide] referenceMode: ${referenceMode}`);
   console.log(`[gen_slide] visualStyleCategory: ${visualStyleCategory}, backgroundOnly: ${backgroundOnly}`);
   console.log(`[gen_slide] Generating slide ${slideIndex}`);
+  
+  // ✅ V11: Enhanced brand context logging
+  console.log(`[gen_slide] 🎨 Brand context check - will load brandKit for character/product mode`);
 
   // Charger le Brand Kit si activé
   let brandKit: Record<string, unknown> | null = null;
   if (useBrandKit !== false && brandId) {
     brandKit = await loadBrandKit(String(brandId));
     console.log(`[gen_slide] Loaded brandKit: ${brandKit?.name || 'none'}`);
+    // ✅ V11: Log brand context for debugging character/product mode
+    console.log(`[gen_slide] 🎨 Brand context:`, {
+      hasAvatar: !!brandKit?.avatar_url,
+      palette: brandKit?.palette ? (brandKit.palette as string[]).slice(0, 3) : null,
+      visualStyleCategory,
+      backgroundOnly
+    });
   }
 
   // ✅ Determine reference mode

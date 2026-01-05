@@ -298,6 +298,189 @@ OUTPUT: A professional image with ${hasAvatarReference ? "the EXACT reference ch
 }
 
 /**
+ * ✅ V11: Build prompt for CHARACTER mode WITH INTEGRATED TEXT (style LinkedIn Pro)
+ * Génère un personnage/mascotte + texte dans des cartes glassmorphism
+ * S'adapte dynamiquement à CHAQUE client (palette, avatar, niche)
+ */
+function buildImagePromptCharacterWithText(
+  userPrompt: string,
+  slideContent: { title: string; subtitle?: string; body?: string; bullets?: string[] },
+  slideIndex: number,
+  totalSlides: number,
+  brandKit?: BrandKit,
+  colorMode: ColorMode = 'vibrant',
+  hasAvatarReference: boolean = false
+): string {
+  const slideRole = getSlideRole(slideIndex, totalSlides);
+  
+  // ✅ Palette dynamique du client
+  const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
+  const paletteStr = palette.length > 0 
+    ? `EXACT BRAND COLORS (use these): ${palette.join(', ')}` 
+    : 'modern professional colors (soft blues, mint, lavender)';
+  
+  // ✅ Texte à intégrer
+  const textLines: string[] = [];
+  if (slideContent.title) textLines.push(`TITLE: "${slideContent.title}"`);
+  if (slideContent.subtitle) textLines.push(`SUBTITLE: "${slideContent.subtitle}"`);
+  if (slideContent.body) textLines.push(`BODY: "${slideContent.body}"`);
+  if (slideContent.bullets?.length) {
+    textLines.push(`BULLETS:\n${slideContent.bullets.map(b => '• ' + b).join('\n')}`);
+  }
+  
+  // ✅ Scènes variées selon le rôle du slide
+  const sceneVariations: Record<string, string> = {
+    "HOOK/INTRODUCTION": "modern office environment with desk and tech devices",
+    "PROBLEM/CONTEXT": "standing next to a presentation board or whiteboard",
+    "KEY POINT/INSIGHT": "sitting on colorful books, thoughtful pose",
+    "SOLUTION/BENEFIT": "at a microphone or presenting confidently",
+    "CALL-TO-ACTION/CONCLUSION": "pointing forward, energetic motivational pose"
+  };
+  const sceneDescription = sceneVariations[slideRole] || "modern professional setting";
+  
+  // ✅ DYNAMIQUE : Instruction avatar adaptée à chaque client
+  const avatarInstruction = hasAvatarReference
+    ? `CRITICAL CHARACTER INSTRUCTION:
+- The reference image shows the brand's OFFICIAL mascot/character
+- You MUST reproduce this EXACT character on this slide
+- Same design, same colors, same proportions, same style
+- This character must be IDENTICAL across ALL slides of the carousel
+- The character wears the brand's colors and may have a name badge`
+    : `CHARACTER INSTRUCTION (no reference provided):
+- Create a friendly, professional 3D Pixar-style mascot
+- Use brand colors: ${paletteStr}
+- This character must be CONSISTENT across all slides
+- Anthropomorphic animal or human character, expressive and engaging`;
+
+  // ✅ Couleur de texte du Brand Kit ou noir par défaut pour cartes glass
+  const textColor = brandKit?.text_color || '#1A1A1A';
+  const accentColor = palette[1] || palette[0] || 'brand accent color';
+
+  return `Create a LinkedIn-style carousel slide with 3D CHARACTER + TEXT IN GLASS CARDS.
+
+THEME: ${userPrompt}
+SLIDE: ${slideRole} (${slideIndex + 1}/${totalSlides})
+${paletteStr}
+
+🎭 CHARACTER (40% of image, right side):
+${avatarInstruction}
+SCENE: ${sceneDescription}
+- Character positioned on RIGHT or CENTER-RIGHT
+- Expressive 3D Pixar animation style
+- Character interacts with the scene naturally
+
+📝 TEXT IN GLASSMORPHISM CARDS (60% of image, left side):
+${textLines.join('\n')}
+
+CARD STYLE (CRITICAL):
+- Text inside frosted glass panels (glassmorphism effect)
+- Semi-transparent white/light cards with blur and subtle border
+- Title: LARGE, BOLD, dark text (${textColor})
+- Accent text: Use brand secondary color (${accentColor})
+- Cards on LEFT or TOP-LEFT of image
+- Cards should NOT overlap the character
+
+VISUAL QUALITY:
+- 3D Pixar/Disney animation quality
+- Background uses brand palette colors
+- Modern LinkedIn professional aesthetic
+- Premium lighting and depth of field
+
+ABSOLUTE RULES:
+- CHARACTER must be present and prominent (not just background)
+- TEXT must be in GLASS CARDS (not floating text)
+- Use EXACT brand colors provided
+- No placeholder text - use ONLY specified text
+- Generate a COMPLETE image with character + glass cards + text`;
+}
+
+/**
+ * ✅ V11: Build prompt for PRODUCT mode WITH INTEGRATED TEXT
+ * Génère un produit en scène + texte dans des cartes glassmorphism
+ */
+function buildImagePromptProductWithText(
+  userPrompt: string,
+  slideContent: { title: string; subtitle?: string; body?: string; bullets?: string[] },
+  slideIndex: number,
+  totalSlides: number,
+  brandKit?: BrandKit,
+  colorMode: ColorMode = 'vibrant',
+  hasProductReference: boolean = false
+): string {
+  const slideRole = getSlideRole(slideIndex, totalSlides);
+  
+  // ✅ Palette dynamique
+  const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
+  const paletteStr = palette.length > 0 
+    ? `EXACT BRAND COLORS: ${palette.join(', ')}` 
+    : 'modern professional colors';
+  
+  // ✅ Texte à intégrer
+  const textLines: string[] = [];
+  if (slideContent.title) textLines.push(`TITLE: "${slideContent.title}"`);
+  if (slideContent.subtitle) textLines.push(`SUBTITLE: "${slideContent.subtitle}"`);
+  if (slideContent.body) textLines.push(`BODY: "${slideContent.body}"`);
+  if (slideContent.bullets?.length) {
+    textLines.push(`BULLETS:\n${slideContent.bullets.map(b => '• ' + b).join('\n')}`);
+  }
+  
+  // ✅ Instruction produit dynamique
+  const productInstruction = hasProductReference
+    ? `CRITICAL: Feature the EXACT product from the reference image prominently.
+Same product, same packaging, same colors - accurately reproduced.
+Product must be the HERO of the image.`
+    : `Create a premium product photography scene.
+Use brand colors: ${paletteStr}
+Professional studio lighting, clean aesthetic.
+Generic elegant product mockup.`;
+
+  // ✅ Style selon niche
+  let sceneStyle = "professional e-commerce product photography";
+  if (brandKit?.niche) {
+    sceneStyle = `${brandKit.niche} product showcase, premium setting`;
+  }
+  
+  // ✅ Couleur de texte
+  const textColor = brandKit?.text_color || '#1A1A1A';
+  const accentColor = palette[1] || palette[0] || 'brand accent color';
+
+  return `Create a product showcase carousel slide with PRODUCT + TEXT IN GLASS CARDS.
+
+THEME: ${userPrompt}
+SLIDE: ${slideRole} (${slideIndex + 1}/${totalSlides})
+${paletteStr}
+
+📦 PRODUCT (main focus, center or right):
+${productInstruction}
+SCENE: ${sceneStyle}
+- Premium product photography style
+- Studio lighting, professional quality
+
+📝 TEXT IN GLASSMORPHISM CARDS (left side):
+${textLines.join('\n')}
+
+CARD STYLE:
+- Frosted glass panels (glassmorphism effect)
+- Clean, modern typography
+- Title: LARGE, BOLD, dark text (${textColor})
+- Accent text: Brand color (${accentColor})
+- Cards should complement, not hide the product
+
+VISUAL QUALITY:
+- Premium e-commerce marketing quality
+- Modern LinkedIn/Instagram professional aesthetic
+- Clean composition with clear hierarchy
+
+ABSOLUTE RULES:
+- PRODUCT must be prominently featured
+- TEXT must be in GLASS CARDS
+- Use EXACT brand colors
+- No placeholder text
+
+OUTPUT: Professional e-commerce carousel slide with product + glass card text.`;
+}
+
+/**
  * ✅ NEW: Build prompt for PRODUCT mode (mise en scène produit)
  * Utilise l'image de référence uploadée comme produit central
  */
@@ -991,31 +1174,62 @@ Deno.serve(async (req) => {
     const hasValidText = normTitle && normTitle !== "Titre par défaut" && normTitle.trim().length > 0;
     
     if (visualStyle === 'character') {
-      // ✅ Mode PERSONNAGE: génère un avatar/personnage 3D
-      enrichedPrompt = buildImagePromptCharacter(
-        prompt,
-        brandKit,
-        useBrandKit,
-        slideIndex,
-        totalSlides,
-        colorMode as ColorMode,
-        hasAvatarForCharacter // ✅ V10: Indique si référence avatar fournie
-      );
-      console.log(`[render-slide] ${logCtx} 🧑 Using CHARACTER prompt (hasAvatar: ${hasAvatarForCharacter})`);
+      // ✅ V11: Character mode avec ou sans texte intégré
+      if (!isBackgroundOnly && hasValidText) {
+        // ✅ NEW: Character + texte intégré (style LinkedIn avec glassmorphism)
+        enrichedPrompt = buildImagePromptCharacterWithText(
+          prompt,
+          { title: normTitle, subtitle: normSubtitle, body: normBody, bullets: normBullets },
+          slideIndex,
+          totalSlides,
+          brandKit,
+          colorMode as ColorMode,
+          hasAvatarForCharacter // true si brandKit.avatar_url existe
+        );
+        console.log(`[render-slide] ${logCtx} 🧑📝 CHARACTER + GLASS CARDS (avatar ref: ${hasAvatarForCharacter})`);
+      } else {
+        // ✅ Character seul (backgroundOnly=true) - pour ajout texte manuel
+        enrichedPrompt = buildImagePromptCharacter(
+          prompt,
+          brandKit,
+          useBrandKit,
+          slideIndex,
+          totalSlides,
+          colorMode as ColorMode,
+          hasAvatarForCharacter
+        );
+        console.log(`[render-slide] ${logCtx} 🧑 CHARACTER background-only (avatar ref: ${hasAvatarForCharacter})`);
+      }
     } else if (visualStyle === 'product') {
-      // ✅ Mode PRODUIT: mise en scène du produit uploadé
-      enrichedPrompt = buildImagePromptProduct(
-        prompt,
-        brandKit,
-        useBrandKit,
-        referenceImageUrl,
-        slideIndex,
-        totalSlides,
-        colorMode as ColorMode
-      );
-      console.log(`[render-slide] ${logCtx} 📦 Using PRODUCT prompt (hasRef: ${!!referenceImageUrl})`);
+      // ✅ V11: Product mode avec ou sans texte intégré
+      const hasProductRef = !!referenceImageUrl;
+      if (!isBackgroundOnly && hasValidText) {
+        // ✅ NEW: Product + texte intégré (glassmorphism style)
+        enrichedPrompt = buildImagePromptProductWithText(
+          prompt,
+          { title: normTitle, subtitle: normSubtitle, body: normBody, bullets: normBullets },
+          slideIndex,
+          totalSlides,
+          brandKit,
+          colorMode as ColorMode,
+          hasProductRef
+        );
+        console.log(`[render-slide] ${logCtx} 📦📝 PRODUCT + GLASS CARDS (product ref: ${hasProductRef})`);
+      } else {
+        // ✅ Product seul (backgroundOnly=true)
+        enrichedPrompt = buildImagePromptProduct(
+          prompt,
+          brandKit,
+          useBrandKit,
+          referenceImageUrl,
+          slideIndex,
+          totalSlides,
+          colorMode as ColorMode
+        );
+        console.log(`[render-slide] ${logCtx} 📦 PRODUCT background-only (ref: ${hasProductRef})`);
+      }
     } else if (!isBackgroundOnly && hasValidText) {
-      // ✅ NEW: Mode STANDARD COMPLET avec texte intégré par Nano Banana Pro
+      // ✅ Mode STANDARD COMPLET avec texte intégré par Nano Banana Pro (background style)
       enrichedPrompt = buildImagePromptWithText(
         globalStyle,
         prompt,
@@ -1030,7 +1244,7 @@ Deno.serve(async (req) => {
         brandKit,
         colorMode as ColorMode
       );
-      console.log(`[render-slide] ${logCtx} 📝 Using TEXT-INTEGRATED prompt (complete carousel)`);
+      console.log(`[render-slide] ${logCtx} 📝 TEXT-INTEGRATED prompt (background with text)`);
     } else {
       // ✅ Mode BACKGROUND ONLY (fond seul, pas de texte) - pour ajout texte manuel
       enrichedPrompt = carouselMode === 'premium'
@@ -1053,7 +1267,7 @@ Deno.serve(async (req) => {
             brandKit,
             colorMode as ColorMode
           );
-      console.log(`[render-slide] ${logCtx} 🎨 Using BACKGROUND-ONLY prompt (mode: ${carouselMode})`);
+      console.log(`[render-slide] ${logCtx} 🎨 BACKGROUND-ONLY prompt (mode: ${carouselMode})`);
     }
     
     console.log(`[render-slide] ${logCtx} 🎨 Mode: ${carouselMode}, Visual: ${visualStyle}, isBackgroundOnly: ${isBackgroundOnly}, hasValidText: ${hasValidText}, hasRef: ${!!referenceImageUrl}`);
