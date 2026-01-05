@@ -1029,9 +1029,24 @@ Use the provided reference images as INSPIRATION ONLY.
 }
 
 async function handleGenSlide(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { slideIndex, slide, ratio, visualStyle, subjectPackId, userId, brandId, useBrandKit, referenceImages, referenceMode } = input;
+  const { 
+    slideIndex, 
+    slide, 
+    ratio, 
+    visualStyle, 
+    subjectPackId, 
+    userId, 
+    brandId, 
+    useBrandKit, 
+    referenceImages, 
+    referenceMode,
+    jobId,           // ← Pour orderId/carouselId
+    carouselIndex,   // ← Index du carrousel
+    totalSlides,     // ← Nombre total de slides
+  } = input;
   
   console.log(`[gen_slide] userId: ${userId}, brandId: ${brandId}, useBrandKit: ${useBrandKit}`);
+  console.log(`[gen_slide] jobId: ${jobId}, carouselIndex: ${carouselIndex}, totalSlides: ${totalSlides}`);
   console.log(`[gen_slide] subjectPackId: ${subjectPackId}`);
   console.log(`[gen_slide] referenceImages: ${Array.isArray(referenceImages) ? referenceImages.length : 0}`);
   console.log(`[gen_slide] referenceMode: ${referenceMode}`);
@@ -1090,6 +1105,26 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
     ? `${basePrompt}${subjectContext}` 
     : `${basePrompt}${referenceInstruction}`;
 
+  // ✅ Construire slideContent à partir de slide (format attendu par alfie-render-carousel-slide)
+  const slideContent = {
+    title: slideData?.titleOnImage || slideData?.title || 'Slide',
+    subtitle: slideData?.subtitle || '',
+    body: slideData?.textOnImage || slideData?.body || '',
+    bullets: slideData?.bullets || [],
+    alt: slideData?.caption || slideData?.alt || `Slide ${Number(slideIndex) + 1}`,
+    author: slideData?.author,
+  };
+
+  // ✅ globalStyle depuis visualStyle
+  const globalStyle = typeof visualStyle === 'string' ? visualStyle : 'modern professional';
+
+  // ✅ Calculer totalSlides (fallback si non fourni)
+  const slidesTotal = Number(totalSlides) || 5;
+
+  // ✅ Générer orderId et carouselId
+  const orderId = String(jobId || 'unknown-job');
+  const carouselId = `${orderId}-carousel-${carouselIndex ?? 0}`;
+
   const response = await fetch(`${SUPABASE_URL}/functions/v1/alfie-render-carousel-slide`, {
     method: 'POST',
     headers: {
@@ -1104,12 +1139,19 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
       useBrandKit,
       prompt: enrichedPrompt,
       slideIndex,
-      slide: slideData,
-      ratio: ratio || '9:16',
-      visualStyle: visualStyle || 'photorealistic',
-      referenceImageUrl,
+      slideContent,            // ✅ Structure attendue
+      globalStyle,             // ✅ AJOUTÉ
+      orderId,                 // ✅ AJOUTÉ
+      carouselId,              // ✅ AJOUTÉ
+      totalSlides: slidesTotal, // ✅ AJOUTÉ
+      aspectRatio: ratio || '4:5',  // ✅ Renommé ratio → aspectRatio
+      visualStyle: visualStyle || 'background',
+      referenceImageUrl: referenceImageUrl || userReferenceImages[0],
       referenceImages: userReferenceImages,
       referenceMode: effectiveReferenceMode,
+      textVersion: 1,          // ✅ AJOUTÉ
+      renderVersion: 1,        // ✅ AJOUTÉ
+      campaign: 'job-engine',  // ✅ AJOUTÉ
     }),
   });
 
