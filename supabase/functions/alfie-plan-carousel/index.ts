@@ -57,6 +57,8 @@ interface InputBodyNew {
   brandKit?: BrandKit;
   aspectRatio?: "1:1" | "4:5" | "9:16" | "16:9" | "2:3" | "yt-thumb";
   language?: "FR" | "EN";
+  visualStyleCategory?: "background" | "character" | "product"; // ✅ NEW: Visual style category
+  backgroundOnly?: boolean; // ✅ NEW: Background only mode
 }
 
 // ---------------------------
@@ -218,8 +220,9 @@ function buildSystemPrompt(params: {
   brand: BrandKit | undefined;
   lang: "FR" | "EN";
   aspectRatio?: "1:1" | "4:5" | "9:16" | "16:9" | "2:3" | "yt-thumb";
+  visualStyleCategory?: "background" | "character" | "product"; // ✅ NEW
 }) {
-  const { slideCount, primary, secondary, brand, lang, aspectRatio } = params;
+  const { slideCount, primary, secondary, brand, lang, aspectRatio, visualStyleCategory } = params;
 
   const locale = lang === "FR";
 
@@ -273,18 +276,104 @@ function buildSystemPrompt(params: {
 - Slide ${slideCount} (type='cta'):
   - title (10–40 chars), cta_primary (required), optional subtitle/note`;
 
-  const promptReq = locale
-    ? `PROMPTS VISUELS — ${slideCount} entrées (une par slide):
+  // ✅ Build prompt requirements based on visualStyleCategory
+  let promptReq: string;
+  let example: string;
+  
+  if (visualStyleCategory === 'character') {
+    promptReq = locale
+      ? `PROMPTS VISUELS — ${slideCount} entrées (une par slide):
+- IMPORTANT: Chaque prompt doit décrire une scène avec un PERSONNAGE/MASCOTTE 3D style Pixar
+- Le personnage doit être expressif, engageant, dans une action liée au contenu de la slide
+- 1: Hero - personnage qui accueille/présente
+- 2..${slideCount - 1}: personnage illustrant chaque point clé (actions différentes)
+- ${slideCount}: personnage avec geste d'invitation/CTA
+- Style: 3D Pixar, couleurs vibrantes, éclairage cinématique
+- AUCUN texte dans l'image, pas de lettres, pas de logos.`
+      : `VISUAL PROMPTS — ${slideCount} entries (one per slide):
+- IMPORTANT: Each prompt must describe a scene with a 3D PIXAR-STYLE CHARACTER/MASCOT
+- The character must be expressive, engaging, in an action related to the slide content
+- 1: Hero - character welcoming/presenting
+- 2..${slideCount - 1}: character illustrating each key point (different actions)
+- ${slideCount}: character with inviting/CTA gesture
+- Style: 3D Pixar, vibrant colors, cinematic lighting
+- NO text in image, no letters, no logos.`;
+    
+    example = locale
+      ? `EXEMPLE STYLE:
+"Personnage 3D Pixar, couleurs ${primary}/${secondary}, éclairage cinématique, environnement moderne, expressions dynamiques."
+
+EXEMPLE PROMPTS:
+[
+  "Mascotte 3D Pixar souriante, bras ouverts en signe de bienvenue, environnement bureau moderne lumineux, éclairage chaleureux",
+  "Mascotte 3D pointant vers un graphique en hausse, expression enthousiaste, fond épuré avec accent ${primary}",
+  "Mascotte 3D tenant un outil/objet professionnel, pose confiante, environnement de travail stylisé",
+  "Mascotte 3D faisant un geste d'invitation (main tendue), sourire engageant, fond dynamique avec lueur ${secondary}"
+]`
+      : `STYLE EXAMPLE:
+"3D Pixar character, ${primary}/${secondary} colors, cinematic lighting, modern environment, dynamic expressions."
+
+PROMPTS EXAMPLE:
+[
+  "Smiling 3D Pixar mascot, open arms in welcoming gesture, bright modern office environment, warm lighting",
+  "3D mascot pointing at rising chart, enthusiastic expression, clean background with ${primary} accent",
+  "3D mascot holding professional tool/object, confident pose, stylized work environment",
+  "3D mascot making inviting gesture (extended hand), engaging smile, dynamic background with ${secondary} glow"
+]`;
+  } else if (visualStyleCategory === 'product') {
+    promptReq = locale
+      ? `PROMPTS VISUELS — ${slideCount} entrées (une par slide):
+- IMPORTANT: Chaque prompt doit décrire une scène de PHOTOGRAPHIE PRODUIT premium
+- Le produit doit être mis en valeur dans un contexte lifestyle ou studio
+- 1: Hero - produit en vedette, présentation majestueuse
+- 2..${slideCount - 1}: produit en contexte d'utilisation
+- ${slideCount}: produit avec mise en scène call-to-action
+- Style: photo studio haute qualité, éclairage professionnel
+- AUCUN texte dans l'image, pas de lettres, pas de logos.`
+      : `VISUAL PROMPTS — ${slideCount} entries (one per slide):
+- IMPORTANT: Each prompt must describe a PREMIUM PRODUCT PHOTOGRAPHY scene
+- The product should be showcased in lifestyle or studio context
+- 1: Hero - product as star, majestic presentation
+- 2..${slideCount - 1}: product in usage context
+- ${slideCount}: product with call-to-action staging
+- Style: high-quality studio photography, professional lighting
+- NO text in image, no letters, no logos.`;
+    
+    example = locale
+      ? `EXEMPLE STYLE:
+"Photographie produit premium, palette ${primary}/${secondary}, éclairage studio, esthétique moderne épurée."
+
+EXEMPLE PROMPTS:
+[
+  "Produit en vedette sur fond épuré, éclairage studio dramatique, reflets subtils, composition centrée",
+  "Produit en contexte d'utilisation lifestyle, environnement élégant, lumière naturelle douce",
+  "Gros plan produit avec détails visibles, fond dégradé ${primary}, éclairage latéral",
+  "Produit avec éléments de packaging, mise en scène invitant à l'achat, ambiance premium"
+]`
+      : `STYLE EXAMPLE:
+"Premium product photography, ${primary}/${secondary} palette, studio lighting, clean modern aesthetic."
+
+PROMPTS EXAMPLE:
+[
+  "Product as hero on clean background, dramatic studio lighting, subtle reflections, centered composition",
+  "Product in lifestyle usage context, elegant environment, soft natural light",
+  "Product close-up with visible details, ${primary} gradient background, side lighting",
+  "Product with packaging elements, purchase-inviting staging, premium ambiance"
+]`;
+  } else {
+    // Background mode (original behavior)
+    promptReq = locale
+      ? `PROMPTS VISUELS — ${slideCount} entrées (une par slide):
 - 1: ouverture (hero), ${slideCount}: conclusion/CTA
 - 2..${slideCount - 1}: scènes à thème unique (arrière-plans/ambiances)
 - Toujours décrire **la scène visuelle seulement**. AUCUN TEXTE.`
-    : `VISUAL PROMPTS — ${slideCount} entries (one per slide):
+      : `VISUAL PROMPTS — ${slideCount} entries (one per slide):
 - 1: opening (hero), ${slideCount}: closing/CTA
 - 2..${slideCount - 1}: single-concept scenes (backgrounds/ambience)
 - Always describe **visual scene only**. NO TEXT.`;
 
-  const example = locale
-    ? `EXEMPLE STYLE:
+    example = locale
+      ? `EXEMPLE STYLE:
 "Dégradés ${primary}→${secondary}, formes géométriques en accent, centre à fort contraste, minimalisme moderne, rythme régulier."
 
 EXEMPLE PROMPTS:
@@ -294,7 +383,7 @@ EXEMPLE PROMPTS:
   "Dégradé minimaliste avec focus central",
   "Scène énergique pour appel à l'action (fermeture)"
 ]`
-    : `STYLE EXAMPLE:
+      : `STYLE EXAMPLE:
 "${primary}→${secondary} gradients, geometric accent shapes, high-contrast center, modern minimalist, steady rhythm."
 
 PROMPTS EXAMPLE:
@@ -304,6 +393,7 @@ PROMPTS EXAMPLE:
   "Minimalist gradient with center focus",
   "Energetic CTA mood background (closing)"
 ]`;
+  }
 
   const outputFormat = `Output JSON strictly:
 {
@@ -407,6 +497,10 @@ Deno.serve(async (req) => {
 
     const lang = normalizeLanguage((body as any).language);
     const aspectRatio = (body as any).aspectRatio as InputBodyNew["aspectRatio"] | undefined;
+    const visualStyleCategory = body.visualStyleCategory || 'character'; // ✅ Default to character, not background
+    const backgroundOnly = body.backgroundOnly === true;
+    
+    console.log(`[alfie-plan-carousel] visualStyleCategory: ${visualStyleCategory}, backgroundOnly: ${backgroundOnly}`);
 
     if (!rawPrompt) {
       return json({ error: "Missing prompt/topic" }, 400);
@@ -422,6 +516,7 @@ Deno.serve(async (req) => {
       brand: brandKit,
       lang,
       aspectRatio,
+      visualStyleCategory: backgroundOnly ? 'background' : visualStyleCategory, // ✅ Pass visualStyleCategory
     });
 
     if (!LOVABLE_API_KEY) {
@@ -506,20 +601,28 @@ Deno.serve(async (req) => {
     // Hard validations + structure + longueurs
     const { plan: fixedPlan, errors } = applyHardValidations(plan, slideCount);
 
+    // ✅ NEW: Attach visualPrompt to each slide for downstream consumption
+    const slidesWithPrompts = fixedPlan.slides.map((slide, idx) => ({
+      ...slide,
+      visualPrompt: fixedPlan.prompts[idx] || fixedPlan.prompts[0] || 'Professional modern scene',
+    }));
+
     console.log("[alfie-plan-carousel] ✅ Plan generated:", {
-      slides: fixedPlan.slides.length,
+      slides: slidesWithPrompts.length,
       prompts: fixedPlan.prompts.length,
+      visualStyleCategory,
       errors,
     });
 
     return json({
       style: trimLen(fixedPlan.style, 1200),
       prompts: fixedPlan.prompts,
-      slides: fixedPlan.slides,
+      slides: slidesWithPrompts, // ✅ Each slide now has visualPrompt attached
       meta: {
         slideCount,
         aspectRatio: aspectRatio ?? null,
         language: lang,
+        visualStyleCategory, // ✅ Include in meta for debugging
         brand: {
           name: brandKit?.name ?? null,
           niche: brandKit?.niche ?? null,
@@ -527,7 +630,7 @@ Deno.serve(async (req) => {
           palette: brandKit?.palette ?? [],
         },
         notes: errors,
-        version: "v2.1.0",
+        version: "v2.2.0", // ✅ Version bump
       },
     });
   } catch (err: any) {

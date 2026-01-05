@@ -1131,19 +1131,31 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
   // ✅ NEW: Use carouselTheme as primary prompt when visualStyleCategory is NOT background
   // This ensures slides show characters/products as intended, not abstract backgrounds
   const carouselTheme = input.carouselTheme as string | undefined;
-  const visualStyleCategoryValue = visualStyleCategory as string || 'background';
+  const visualStyleCategoryValue = visualStyleCategory as string || 'character'; // ✅ Default to character, not background
   
   let basePrompt: string;
-  if (visualStyleCategoryValue !== 'background' && carouselTheme) {
-    // Character/product mode: use the user's carousel theme as the main visual
-    const slideHint = slideData?.titleOnImage || slideData?.textOnImage || '';
-    basePrompt = slideHint 
-      ? `${carouselTheme}. Scene for slide: ${slideHint}`
-      : carouselTheme;
-    console.log(`[gen_slide] ✅ Using carouselTheme for ${visualStyleCategoryValue} mode: ${basePrompt.substring(0, 80)}...`);
-  } else {
-    // Background mode: use visualPrompt or fallback
-    basePrompt = slideData?.visualPrompt as string || slideData?.titleOnImage as string || 'Professional slide background';
+  
+  // Priority 1: Use visualPrompt from plan_slides (AI-generated scene description)
+  if (slideData?.visualPrompt) {
+    basePrompt = slideData.visualPrompt as string;
+    console.log(`[gen_slide] ✅ Using planned visualPrompt: ${basePrompt.substring(0, 80)}...`);
+  }
+  // Priority 2: Character/Product mode - construct rich prompt
+  else if (visualStyleCategoryValue !== 'background') {
+    const slideTitle = slideData?.title || slideData?.titleOnImage || '';
+    const slideTheme = carouselTheme || 'Professional modern scene';
+    
+    if (visualStyleCategoryValue === 'character') {
+      basePrompt = `3D Pixar-style mascot character in a modern, professional setting. ${slideTheme}. The character is illustrating: "${slideTitle}". Vibrant colors, cinematic lighting, clean composition. No text, no letters, no logos.`;
+    } else { // product
+      basePrompt = `Premium product photography scene. ${slideTheme}. Showcasing: "${slideTitle}". Clean studio lighting, modern aesthetic, high-end feel. No text, no letters, no logos.`;
+    }
+    console.log(`[gen_slide] ✅ Constructed ${visualStyleCategoryValue} prompt: ${basePrompt.substring(0, 80)}...`);
+  }
+  // Priority 3: Background mode - use title or generic fallback
+  else {
+    basePrompt = slideData?.titleOnImage as string || slideData?.title as string || 'Professional minimalist gradient background';
+    console.log(`[gen_slide] Using background mode with fallback prompt`);
   }
   
   const enrichedPrompt = subjectContext 
@@ -1222,9 +1234,10 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
 }
 
 async function handlePlanSlides(input: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { theme, slideCount, carouselIndex, brandKit, aspectRatio, language } = input;
+  const { theme, slideCount, carouselIndex, brandKit, aspectRatio, language, visualStyleCategory, backgroundOnly } = input;
   
-  console.log(`[plan_slides] Planning ${slideCount} slides for carousel ${carouselIndex ?? 0}, prompt: ${theme}`);
+  console.log(`[plan_slides] Planning ${slideCount} slides for carousel ${carouselIndex ?? 0}, visualStyleCategory: ${visualStyleCategory}, backgroundOnly: ${backgroundOnly}`);
+  console.log(`[plan_slides] Theme/prompt: ${theme}`);
 
   const response = await fetch(`${SUPABASE_URL}/functions/v1/alfie-plan-carousel`, {
     method: 'POST',
@@ -1240,6 +1253,8 @@ async function handlePlanSlides(input: Record<string, unknown>): Promise<Record<
       brandKit,
       aspectRatio,
       language,
+      visualStyleCategory: visualStyleCategory || 'character', // ✅ Pass to alfie-plan-carousel
+      backgroundOnly: backgroundOnly === true, // ✅ Pass background_only flag
     }),
   });
 
