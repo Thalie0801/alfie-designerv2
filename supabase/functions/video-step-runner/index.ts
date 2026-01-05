@@ -1127,7 +1127,25 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
   }
 
   const slideData = slide as Record<string, unknown> | undefined;
-  const basePrompt = slideData?.visualPrompt || slideData?.titleOnImage || 'Professional slide background';
+  
+  // ✅ NEW: Use carouselTheme as primary prompt when visualStyleCategory is NOT background
+  // This ensures slides show characters/products as intended, not abstract backgrounds
+  const carouselTheme = input.carouselTheme as string | undefined;
+  const visualStyleCategoryValue = visualStyleCategory as string || 'background';
+  
+  let basePrompt: string;
+  if (visualStyleCategoryValue !== 'background' && carouselTheme) {
+    // Character/product mode: use the user's carousel theme as the main visual
+    const slideHint = slideData?.titleOnImage || slideData?.textOnImage || '';
+    basePrompt = slideHint 
+      ? `${carouselTheme}. Scene for slide: ${slideHint}`
+      : carouselTheme;
+    console.log(`[gen_slide] ✅ Using carouselTheme for ${visualStyleCategoryValue} mode: ${basePrompt.substring(0, 80)}...`);
+  } else {
+    // Background mode: use visualPrompt or fallback
+    basePrompt = slideData?.visualPrompt as string || slideData?.titleOnImage as string || 'Professional slide background';
+  }
+  
   const enrichedPrompt = subjectContext 
     ? `${basePrompt}${subjectContext}` 
     : `${basePrompt}${referenceInstruction}`;

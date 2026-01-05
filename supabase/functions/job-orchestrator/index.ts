@@ -260,6 +260,7 @@ function generateStepsForCarousel(spec: JobSpecV1Type): StepInput[] {
         totalSlides: slideCount, // ✅ AJOUTÉ pour alfie-render-carousel-slide
         carouselIndex: 0,        // ✅ Single carousel
         carouselUuid,            // ✅ UUID pré-généré pour idempotence
+        carouselTheme: spec.carousel_theme, // ✅ PASS THE CAROUSEL THEME for proper prompt composition
       },
     });
   }
@@ -547,6 +548,7 @@ function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
             referenceImages: spec.reference_images, // ✅ Propagate reference images
             totalSlides: slidesPerCarousel, // ✅ AJOUTÉ pour alfie-render-carousel-slide
             carouselUuid, // ✅ UUID pré-généré pour idempotence
+            carouselTheme, // ✅ PASS THE CAROUSEL THEME for proper prompt composition
           },
         });
       }
