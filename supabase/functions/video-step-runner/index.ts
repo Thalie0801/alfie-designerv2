@@ -33,7 +33,7 @@ function err(message: string, status = 500) {
 async function getStepOutputs(jobId: string): Promise<Record<string, unknown>> {
   const { data: previousSteps } = await supabaseAdmin
     .from('job_steps')
-    .select('step_type, step_index, output_json')
+    .select('step_type, step_index, output_json, input_json')
     .eq('job_id', jobId)
     .eq('status', 'completed')
     .order('step_index', { ascending: true });
@@ -42,7 +42,8 @@ async function getStepOutputs(jobId: string): Promise<Record<string, unknown>> {
     keyframes: [] as string[],
     clipUrls: [] as string[],
     plannedBeats: [] as Array<{ sceneIndex: number; visualPrompt: string; voiceoverText: string; durationSec: number }>,
-    plannedImagePrompts: [] as string[], // ✅ NEW: For multi-image segmentation
+    plannedImagePrompts: [] as string[], // ✅ For multi-image segmentation
+    plannedSlidesByCarousel: {} as Record<number, unknown[]>, // ✅ For carousel slides
   };
 
   for (const step of previousSteps || []) {
@@ -54,10 +55,18 @@ async function getStepOutputs(jobId: string): Promise<Record<string, unknown>> {
       outputs.plannedBeats = output.beats;
       console.log(`[getStepOutputs] Collected ${(output.beats as unknown[]).length} planned beats from plan_script`);
     }
-    // ✅ NEW: Collect planned image prompts from plan_images
+    // ✅ Collect planned image prompts from plan_images
     if (step.step_type === 'plan_images' && output.prompts) {
       outputs.plannedImagePrompts = output.prompts as string[];
       console.log(`[getStepOutputs] Collected ${(output.prompts as string[]).length} planned image prompts from plan_images`);
+    }
+    // ✅ Collect planned slides from plan_slides
+    if (step.step_type === 'plan_slides' && output.slides) {
+      const stepInput = step.input_json as Record<string, unknown> | null;
+      const carouselIndex = (stepInput?.carouselIndex as number) ?? 0;
+      const slidesMap = outputs.plannedSlidesByCarousel as Record<number, unknown[]>;
+      slidesMap[carouselIndex] = output.slides as unknown[];
+      console.log(`[getStepOutputs] Collected ${(output.slides as unknown[]).length} planned slides for carousel ${carouselIndex}`);
     }
     // Collect keyframes
     if (step.step_type === 'gen_keyframe' && output.keyframeUrl) {
@@ -132,13 +141,28 @@ function enrichInputWithPreviousOutputs(
     }
   }
 
-  // ✅ NEW: For gen_image: inject segmented prompt from plan_images
+  // ✅ For gen_image: inject segmented prompt from plan_images
   if (stepType === 'gen_image') {
     const imageIndex = (input.imageIndex as number) ?? 0;
     const plannedPrompts = previousOutputs.plannedImagePrompts as string[];
     if (plannedPrompts && plannedPrompts.length > 0 && plannedPrompts[imageIndex]) {
       enriched.prompt = plannedPrompts[imageIndex];
       console.log(`[enrichInput] ✅ Injected prompt for image ${imageIndex} from plan_images: ${String(enriched.prompt).substring(0, 80)}...`);
+    }
+  }
+
+  // ✅ For gen_slide: inject slide content from plan_slides
+  if (stepType === 'gen_slide') {
+    const slideIndex = (input.slideIndex as number) ?? 0;
+    const carouselIndex = (input.carouselIndex as number) ?? 0;
+    const plannedSlidesByCarousel = previousOutputs.plannedSlidesByCarousel as Record<number, unknown[]> | undefined;
+    
+    if (plannedSlidesByCarousel && plannedSlidesByCarousel[carouselIndex]) {
+      const plannedSlides = plannedSlidesByCarousel[carouselIndex];
+      if (plannedSlides[slideIndex]) {
+        enriched.slide = plannedSlides[slideIndex];
+        console.log(`[enrichInput] ✅ Injected slide content for carousel ${carouselIndex}, slide ${slideIndex}`);
+      }
     }
   }
 
