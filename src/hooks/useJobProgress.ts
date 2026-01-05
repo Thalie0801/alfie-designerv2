@@ -3,7 +3,7 @@
  * Remplace useVideoJobEvents avec support de tous les types de jobs
  */
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { subscribeToJob, getJobStatus, retryStep as retryStepApi, type JobProgress } from '@/lib/jobClient';
+import { subscribeToJob, getJobStatus, retryStep as retryStepApi, type JobProgress, type JobAsset } from '@/lib/jobClient';
 import { toast } from 'sonner';
 
 export interface JobStep {
@@ -30,7 +30,7 @@ export interface JobProgressState {
   totalSteps: number;
   percentComplete: number;
   error: string | null;
-  assets: Array<{ type: string; url: string }>;
+  assets: JobAsset[];
 }
 
 export interface UseJobProgressOptions {
