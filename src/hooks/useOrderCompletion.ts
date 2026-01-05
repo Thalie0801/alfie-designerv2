@@ -108,6 +108,89 @@ export function useOrderCompletion() {
       }
 
       try {
+        // ✅ CHANGED: Poll job_queue instead of orders for accurate completion status
+        // This ensures we wait for all job_steps to complete before showing toast
+        const { data: jobs, error: jobError } = await supabase
+          .from('job_queue')
+          .select('id, status, error, order_id, finished_at')
+          .in('order_id', orderIds);
+
+        if (jobError) {
+          console.error('Erreur polling job_queue:', jobError);
+          return;
+        }
+
+        // If jobs found, use job_queue status (preferred method)
+        if (jobs?.length) {
+          const completedJobs = jobs.filter(j => j.status === 'completed').length;
+          const failedJobs = jobs.filter(j => j.status === 'failed').length;
+          const runningJobs = jobs.filter(j => 
+            j.status === 'running' || j.status === 'queued' || j.status === 'pending'
+          ).length;
+          const total = jobs.length;
+
+          console.log('[useOrderCompletion] Job status check:', { 
+            completedJobs, 
+            failedJobs, 
+            runningJobs,
+            total,
+            jobStatuses: jobs.map(j => ({ id: j.id.slice(0, 8), status: j.status }))
+          });
+
+          // Only consider done when ALL jobs are completed or failed (no running jobs)
+          const allDone = runningJobs === 0 && (completedJobs + failedJobs === total);
+
+          if (allDone) {
+            stopPolling();
+            
+            // Check for specific errors in failed jobs
+            const failedJobsList = jobs.filter(j => j.status === 'failed');
+            for (const failedJob of failedJobsList) {
+              if (failedJob.error) {
+                const errorData = { error: failedJob.error, message: failedJob.error };
+                if (handleVideoGenerationError(errorData)) {
+                  continue;
+                }
+              }
+            }
+            
+            // Call the onComplete callback
+            if (onComplete) {
+              onComplete(completedJobs, failedJobs);
+            }
+
+            if (failedJobs === 0) {
+              toast({
+                title: "✅ Génération terminée !",
+                description: isVideo 
+                  ? "Ta vidéo est prête ! Retrouve-la dans la bibliothèque 🎬" 
+                  : "Retrouve tes visuels dans la bibliothèque 🎨",
+              });
+            } else if (completedJobs > 0) {
+              toast({
+                title: "⚠️ Génération partiellement terminée",
+                description: `${completedJobs}/${total} ${isVideo ? 'vidéo(s)' : 'visuels'} générés. Certains ont échoué.`,
+                variant: "destructive",
+              });
+            } else {
+              // Only show generic error if not already handled
+              const hasSpecificError = failedJobsList.some(j => 
+                j.error?.includes("CONTENT_POLICY") || j.error?.includes("INSUFFICIENT_WOOFS")
+              );
+              
+              if (!hasSpecificError) {
+                toast({
+                  title: "❌ La génération a échoué",
+                  description: failedJobsList[0]?.error || "Réessaie ou contacte le support.",
+                  variant: "destructive",
+                });
+              }
+            }
+          }
+          return;
+        }
+
+        // Fallback: Check orders table if no jobs found (legacy support)
         const { data: orders, error } = await supabase
           .from('orders')
           .select('id, status, metadata')
@@ -129,7 +212,6 @@ export function useOrderCompletion() {
         for (const failedOrder of failedOrders) {
           const metadata = failedOrder.metadata as VideoGenerationError | null;
           if (metadata && handleVideoGenerationError(metadata)) {
-            // L'erreur a été gérée avec un message spécifique
             continue;
           }
         }
@@ -138,13 +220,11 @@ export function useOrderCompletion() {
         if (completed + failed === total) {
           stopPolling();
           
-          // ✅ Appeler le callback onComplete
           if (onComplete) {
             onComplete(completed, failed);
           }
 
           if (failed === 0) {
-            // ✅ Succès total
             toast({
               title: "✅ Génération terminée !",
               description: isVideo 
@@ -152,14 +232,12 @@ export function useOrderCompletion() {
                 : "Retrouve tes visuels dans la bibliothèque 🎨",
             });
           } else if (completed > 0) {
-            // ⚠️ Succès partiel
             toast({
               title: "⚠️ Génération partiellement terminée",
               description: `${completed}/${total} ${isVideo ? 'vidéo(s)' : 'visuels'} générés. Certains ont échoué.`,
               variant: "destructive",
             });
           } else {
-            // ❌ Échec total - afficher uniquement si pas déjà géré par handleVideoGenerationError
             const hasSpecificError = failedOrders.some(o => {
               const meta = o.metadata as VideoGenerationError | null;
               return meta?.error === "CONTENT_POLICY_VIOLATION" || meta?.error === "INSUFFICIENT_WOOFS";
