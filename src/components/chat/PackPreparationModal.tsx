@@ -159,6 +159,13 @@ export default function PackPreparationModal({ pack, brandId, onClose }: PackPre
 
   // ✅ Upload d'image de référence pour vidéos/images
   const handleImageUpload = async (assetId: string, file: File) => {
+    // ✅ Vérifier l'authentification avant l'upload
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      toast.error("Session expirée. Veuillez vous reconnecter.");
+      return;
+    }
+
     if (!file.type.startsWith('image/')) {
       toast.error('Seules les images sont acceptées');
       return;
