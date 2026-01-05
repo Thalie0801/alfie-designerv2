@@ -857,7 +857,7 @@ Deno.serve(async (req) => {
         user_id: user.id,
         brand_id: spec.brandkit_id,
         campaign_name: spec.campaign_name || `${spec.kind}_${new Date().toISOString().slice(0, 10)}`,
-        status: 'processing',
+        status: 'queued',
         brief_json: spec,
       })
       .select('id')
