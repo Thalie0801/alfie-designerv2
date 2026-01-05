@@ -637,7 +637,7 @@ export function ChatGenerator() {
         if (authError) throw authError;
         if (!user) throw new Error("Utilisateur non authentifié");
 
-        const { signedUrl: uploadedSourceUrl } = await uploadToChatBucket(file, supabase, user.id);
+        const { publicUrl: uploadedSourceUrl } = await uploadToChatBucket(file, supabase, user.id);
 
         setUploadedSource({
           type: isImage ? "image" : "video",
