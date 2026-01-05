@@ -81,6 +81,13 @@ export function AssetEditDialog({ asset, isOpen, onClose, onSave }: AssetEditDia
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // ✅ Vérifier l'authentification avant l'upload
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      toast.error("Session expirée. Veuillez vous reconnecter.");
+      return;
+    }
+
     if (!file.type.startsWith("image/")) {
       toast.error("Seules les images sont acceptées");
       return;

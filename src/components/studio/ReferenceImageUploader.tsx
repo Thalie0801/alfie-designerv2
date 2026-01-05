@@ -29,6 +29,13 @@ export function ReferenceImageUploader({
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    // ✅ Vérifier l'authentification avant l'upload
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      toast.error("Session expirée. Veuillez vous reconnecter.");
+      return;
+    }
+
     const remainingSlots = maxImages - images.length;
     if (remainingSlots <= 0) {
       toast.error(`Maximum ${maxImages} images autorisées`);

@@ -80,6 +80,13 @@ export function IntentPanel({
   };
 
   const handleImageUpload = async (intentId: string, file: File) => {
+    // ✅ Vérifier l'authentification avant l'upload
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      toast.error("Session expirée. Veuillez vous reconnecter.");
+      return;
+    }
+
     if (!file.type.startsWith('image/')) {
       toast.error('Seules les images sont acceptées');
       return;
