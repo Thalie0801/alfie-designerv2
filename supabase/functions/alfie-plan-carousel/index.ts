@@ -91,9 +91,22 @@ function first2Palette(palette?: string[]) {
   return [a, b];
 }
 
-function forceNoTextPrompt(p: string) {
-  // ajoute des garde-fous pour empêcher la génération de texte intégré
-  return `${p.trim()}. No text, no typography, no letters, no logos, no watermark. Background/scene only.`;
+/**
+ * ✅ V11: forceNoTextPrompt est maintenant category-aware
+ * En mode background: génère un fond sans texte (pour ajout manuel)
+ * En mode character/product: le texte sera intégré par Nano Banana Pro (ne pas bloquer)
+ */
+function forceNoTextPrompt(p: string, visualStyleCategory?: string): string {
+  let result = `${p.trim()}. No visible HEX codes, no watermarks.`;
+  
+  // Seulement en mode background explicite : fond seul sans texte
+  if (visualStyleCategory === 'background') {
+    result += ' No text, no typography, no letters, no logos. Background/scene only.';
+  }
+  // Pour character/product : le texte sera intégré dans des cartes glassmorphism
+  // Ne pas ajouter "no text" car le renderer va intégrer le texte
+  
+  return result;
 }
 
 function normalizeLanguage(code?: string): "FR" | "EN" {
@@ -595,8 +608,8 @@ Deno.serve(async (req) => {
       };
     }
 
-    // Sanitize prompts to enforce "no text"
-    plan.prompts = (plan.prompts || []).map(forceNoTextPrompt);
+    // Sanitize prompts to enforce "no text" (only for background mode)
+    plan.prompts = (plan.prompts || []).map(p => forceNoTextPrompt(p, visualStyleCategory));
 
     // Hard validations + structure + longueurs
     const { plan: fixedPlan, errors } = applyHardValidations(plan, slideCount);
