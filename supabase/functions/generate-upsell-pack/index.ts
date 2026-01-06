@@ -99,19 +99,22 @@ Ultra high resolution, photorealistic quality.`;
 
 async function generateImage(prompt: string): Promise<{ url: string; publicId: string } | null> {
   try {
-    console.log("[generate-upsell-pack] Generating image...");
+    console.log("[generate-upsell-pack] Generating image with Lovable AI Gateway...");
     
-    const response = await fetch("https://api.lovable.dev/v1/images/generations", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${lovableApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        prompt,
-        model: "flux.dev",
-        width: 1080,
-        height: 1350,
+        model: "google/gemini-3-pro-image-preview",
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
       }),
     });
 
@@ -122,10 +125,50 @@ async function generateImage(prompt: string): Promise<{ url: string; publicId: s
     }
 
     const data = await response.json();
+    console.log("[generate-upsell-pack] API response received");
+    
+    // Extraire l'URL de l'image depuis la réponse du modèle Gemini
+    const content = data.choices?.[0]?.message?.content;
+    
+    // Le modèle gemini-3-pro-image-preview retourne l'image en base64 ou URL
+    // Chercher une URL d'image ou du contenu base64
+    let imageUrl = null;
+    
+    if (typeof content === 'string') {
+      // Chercher une URL d'image dans le contenu
+      const urlMatch = content.match(/https?:\/\/[^\s"']+\.(png|jpg|jpeg|webp)/i);
+      if (urlMatch) {
+        imageUrl = urlMatch[0];
+      }
+    } else if (Array.isArray(content)) {
+      // Format multimodal avec parties
+      for (const part of content) {
+        if (part.type === 'image_url' && part.image_url?.url) {
+          imageUrl = part.image_url.url;
+          break;
+        }
+      }
+    }
+    
+    // Vérifier aussi dans inline_data pour le format Gemini natif
+    if (!imageUrl && data.choices?.[0]?.message?.parts) {
+      for (const part of data.choices[0].message.parts) {
+        if (part.inline_data?.data) {
+          imageUrl = `data:${part.inline_data.mime_type || 'image/png'};base64,${part.inline_data.data}`;
+          break;
+        }
+      }
+    }
+
+    if (!imageUrl) {
+      console.error("[generate-upsell-pack] No image URL found in response:", JSON.stringify(data).substring(0, 500));
+      return null;
+    }
+    
     console.log("[generate-upsell-pack] Image generated successfully");
     
     return {
-      url: data.data?.[0]?.url || data.url,
+      url: imageUrl,
       publicId: `upsell_${Date.now()}`,
     };
   } catch (error) {

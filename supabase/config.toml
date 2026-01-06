@@ -3,6 +3,9 @@ project_id = "gbuvtzqqzyiytypenzae"
 [functions.admin-create-woofs-products]
 verify_jwt = false
 
+[functions.admin-create-upsell-product]
+verify_jwt = false
+
 [functions.admin-list-stripe-products]
 verify_jwt = false
 
