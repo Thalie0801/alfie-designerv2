@@ -298,17 +298,17 @@ export function DemoSection() {
         >
           <Button
             size="lg"
-            className="rounded-full bg-alfie-mint px-8 py-3 text-base font-semibold text-slate-900 shadow-md hover:bg-alfie-pink flex flex-col items-center gap-0"
+            className="rounded-full bg-alfie-mint px-6 sm:px-8 py-3 text-sm sm:text-base font-semibold text-slate-900 shadow-md hover:bg-alfie-pink flex flex-col items-center gap-0.5 mx-auto"
             onClick={handleCtaClick}
           >
             <span className="flex items-center">
-              <Sparkles className="mr-2 h-5 w-5" />
+              <Sparkles className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
               ✅ Créer mon Pack Gratuit
             </span>
-            <span className="text-xs font-normal opacity-80">(visuels prêts à poster)</span>
+            <span className="text-[10px] sm:text-xs font-normal opacity-80">(3 visuels prêts à poster)</span>
           </Button>
-          <p className="text-xs text-slate-500 mt-3">
-            Brand Kit inclus · 3 visuels gratuits. Sans carte.
+          <p className="text-xs text-slate-500 mt-2 sm:mt-3">
+            Brand Kit inclus (via quiz) · 1 minute · Sans carte bancaire
           </p>
         </motion.div>
       </div>

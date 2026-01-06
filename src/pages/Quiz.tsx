@@ -28,38 +28,41 @@ export default function Quiz() {
             (1 min)
           </h1>
           
-          <p className="text-lg text-slate-600 mb-8">
+          <p className="text-base sm:text-lg text-slate-600 mb-6 sm:mb-8">
             Réponds à 5 questions → Alfie génère 3 visuels gratuits adaptés à ta marque
           </p>
 
-          <div className="rounded-2xl border border-border/50 bg-gradient-to-br from-alfie-mint/10 via-alfie-lilac/10 to-alfie-pink/15 p-8 mb-8">
-            <div className="space-y-4 text-left mb-8">
-              <div className="flex items-center gap-3">
-                <CheckCircle2 className="h-5 w-5 text-alfie-mint flex-shrink-0" />
-                <span className="text-slate-700">Post 1:1 + Story 9:16 + Cover 4:5</span>
+          <div className="rounded-2xl border border-border/50 bg-gradient-to-br from-alfie-mint/10 via-alfie-lilac/10 to-alfie-pink/15 p-6 sm:p-8 mb-6 sm:mb-8">
+            <div className="space-y-3 sm:space-y-4 text-left mb-6 sm:mb-8">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-alfie-mint flex-shrink-0" />
+                <span className="text-sm sm:text-base text-slate-700">Post 1:1 + Story 9:16 + Cover 4:5</span>
               </div>
-              <div className="flex items-center gap-3">
-                <CheckCircle2 className="h-5 w-5 text-alfie-mint flex-shrink-0" />
-                <span className="text-slate-700">Style + couleurs + typo de ta marque</span>
+              <div className="flex items-center gap-2 sm:gap-3">
+                <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-alfie-mint flex-shrink-0" />
+                <span className="text-sm sm:text-base text-slate-700">Style + couleurs + typo de ta marque</span>
               </div>
-              <div className="flex items-center gap-3">
-                <CheckCircle2 className="h-5 w-5 text-alfie-mint flex-shrink-0" />
-                <span className="text-slate-700">Livré en quelques minutes</span>
+              <div className="flex items-center gap-2 sm:gap-3">
+                <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-alfie-mint flex-shrink-0" />
+                <span className="text-sm sm:text-base text-slate-700">Livré en quelques minutes</span>
               </div>
             </div>
 
             <Button
               size="lg"
-              className="w-full sm:w-auto rounded-full bg-alfie-mint px-8 py-3 text-base font-semibold text-slate-900 shadow-md hover:bg-alfie-pink"
+              className="w-full sm:w-auto rounded-full bg-alfie-mint px-6 sm:px-8 py-3 text-sm sm:text-base font-semibold text-slate-900 shadow-md hover:bg-alfie-pink flex flex-col items-center gap-0.5"
               onClick={handleStartQuiz}
             >
-              <Sparkles className="mr-2 h-5 w-5" />
-              Commencer le quiz
+              <span className="flex items-center">
+                <Sparkles className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                ✅ Créer mon Pack Gratuit
+              </span>
+              <span className="text-[10px] sm:text-xs font-normal opacity-80">(3 visuels prêts à poster)</span>
             </Button>
           </div>
 
-          <p className="text-sm text-muted-foreground">
-            Sans carte bancaire • Tes visuels sont prêts en 5 min
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Brand Kit inclus (via quiz) · 1 minute · Sans carte bancaire
           </p>
         </div>
       </main>

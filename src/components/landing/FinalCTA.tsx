@@ -28,22 +28,22 @@ export function FinalCTA() {
           <p className="mx-auto mt-4 max-w-2xl text-base text-muted-foreground sm:text-lg">
             Rejoins des centaines de créateurs qui utilisent Alfie pour gagner du temps
           </p>
-          <div className="mt-6 flex flex-col items-center gap-3">
+          <div className="mt-6 flex flex-col items-center gap-2">
             <Button
               size="lg"
-              className="w-full rounded-full bg-alfie-mint px-8 py-3 text-sm font-semibold text-slate-900 shadow-md hover:bg-alfie-pink sm:w-auto flex flex-col items-center gap-0"
+              className="w-full rounded-full bg-alfie-mint px-6 sm:px-8 py-3 text-sm sm:text-base font-semibold text-slate-900 shadow-md hover:bg-alfie-pink sm:w-auto flex flex-col items-center gap-0.5"
               onClick={handleCtaClick}
             >
               <span className="flex items-center">
-                <Sparkles className="mr-2 h-5 w-5" />
+                <Sparkles className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
                 ✅ Créer mon Pack Gratuit
               </span>
-              <span className="text-xs font-normal opacity-80">(visuels prêts à poster)</span>
+              <span className="text-[10px] sm:text-xs font-normal opacity-80">(3 visuels prêts à poster)</span>
             </Button>
-            <p className="text-xs text-slate-500 mt-1">Brand Kit inclus</p>
+            <p className="text-xs text-slate-500 mt-1">Brand Kit inclus (via quiz) · 1 minute · Sans carte bancaire</p>
             <button
               onClick={scrollToDemo}
-              className="text-sm text-slate-500 underline underline-offset-2 hover:text-slate-700 transition-colors"
+              className="text-xs sm:text-sm text-slate-500 underline underline-offset-2 hover:text-slate-700 transition-colors"
             >
               Voir la démo
             </button>
