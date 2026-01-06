@@ -98,17 +98,17 @@ export function HeroVideoSection() {
         >
           <Button
             size="lg"
-            className="rounded-full bg-alfie-mint px-8 py-4 text-lg font-semibold text-slate-900 shadow-lg hover:bg-alfie-pink hover:scale-105 transition-all flex flex-col items-center gap-0"
+            className="rounded-full bg-alfie-mint px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-semibold text-slate-900 shadow-lg hover:bg-alfie-pink hover:scale-105 transition-all flex flex-col items-center gap-0.5"
             onClick={handleCta}
           >
             <span className="flex items-center">
-              <Sparkles className="mr-2 h-5 w-5" />
+              <Sparkles className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
               ✅ Créer mon Pack Gratuit
             </span>
-            <span className="text-xs font-normal opacity-80">(visuels prêts à poster)</span>
+            <span className="text-[10px] sm:text-xs font-normal opacity-80">(3 visuels prêts à poster)</span>
           </Button>
-          <p className="text-center text-sm text-slate-500 mt-3">
-            Brand Kit inclus · 1 minute · Sans carte bancaire
+          <p className="text-center text-xs sm:text-sm text-slate-500 mt-2 sm:mt-3">
+            Brand Kit inclus (via quiz) · 1 minute · Sans carte bancaire
           </p>
         </motion.div>
 
