@@ -31,12 +31,16 @@ export function FinalCTA() {
           <div className="mt-6 flex flex-col items-center gap-3">
             <Button
               size="lg"
-              className="w-full rounded-full bg-alfie-mint px-8 py-3 text-sm font-semibold text-slate-900 shadow-md hover:bg-alfie-pink sm:w-auto"
+              className="w-full rounded-full bg-alfie-mint px-8 py-3 text-sm font-semibold text-slate-900 shadow-md hover:bg-alfie-pink sm:w-auto flex flex-col items-center gap-0"
               onClick={handleCtaClick}
             >
-              <Sparkles className="mr-2 h-5 w-5" />
-              Créer mon Brand Kit (1 min)
+              <span className="flex items-center">
+                <Sparkles className="mr-2 h-5 w-5" />
+                ✅ Créer mon Pack Gratuit
+              </span>
+              <span className="text-xs font-normal opacity-80">(visuels prêts à poster)</span>
             </Button>
+            <p className="text-xs text-slate-500 mt-1">Brand Kit inclus</p>
             <button
               onClick={scrollToDemo}
               className="text-sm text-slate-500 underline underline-offset-2 hover:text-slate-700 transition-colors"

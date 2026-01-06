@@ -38,12 +38,16 @@ export function FreeTrialBlock() {
 
           <Button
             size="lg"
-            className="rounded-full bg-alfie-mint px-8 py-3 text-base font-semibold text-slate-900 shadow-md hover:bg-alfie-pink"
+            className="rounded-full bg-alfie-mint px-8 py-3 text-base font-semibold text-slate-900 shadow-md hover:bg-alfie-pink flex flex-col items-center gap-0"
             onClick={handleCtaClick}
           >
-            <Sparkles className="mr-2 h-5 w-5" />
-            Créer mon Brand Kit (1 min)
+            <span className="flex items-center">
+              <Sparkles className="mr-2 h-5 w-5" />
+              ✅ Créer mon Pack Gratuit
+            </span>
+            <span className="text-xs font-normal opacity-80">(visuels prêts à poster)</span>
           </Button>
+          <p className="text-xs text-slate-500 mt-1">Brand Kit inclus</p>
 
           <p className="mt-4 text-sm text-muted-foreground">
             Ensuite : upgrade à 19€ pour un carrousel 10 slides + CSV Canva.
