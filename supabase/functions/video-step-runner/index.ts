@@ -60,6 +60,13 @@ async function getStepOutputs(jobId: string): Promise<Record<string, unknown>> {
       outputs.plannedImagePrompts = output.prompts as string[];
       console.log(`[getStepOutputs] Collected ${(output.prompts as string[]).length} planned image prompts from plan_images`);
     }
+    // ✅ Collect planned marketing prompts from plan_marketing
+    if (step.step_type === 'plan_marketing' && output.prompts) {
+      outputs.plannedImagePrompts = output.prompts as string[];
+      outputs.marketingFileNames = (output.fileNames as string[]) || [];
+      outputs.marketingStructure = output.structure || [];
+      console.log(`[getStepOutputs] Collected ${(output.prompts as string[]).length} planned marketing prompts from plan_marketing`);
+    }
     // ✅ Collect planned slides from plan_slides
     if (step.step_type === 'plan_slides' && output.slides) {
       const stepInput = step.input_json as Record<string, unknown> | null;
@@ -925,6 +932,8 @@ async function executeStep(stepType: string, input: Record<string, unknown>): Pr
       return handlePlanAssets(input);
     case 'plan_images':
       return handlePlanImages(input);
+    case 'plan_marketing':
+      return handlePlanMarketing(input);
     
     default:
       throw new Error(`Unknown step type: ${stepType}`);
@@ -1636,6 +1645,160 @@ function fallbackPlanImages(
     prompts,
     imageCount: prompts.length,
   };
+}
+
+// =====================================================
+// HANDLE PLAN MARKETING - Generate marketing-focused prompts
+// =====================================================
+
+interface MarketingInputs {
+  productName: string;
+  targetAudience: string;
+  mainBenefit: string;
+  proof: string;
+  offer: string;
+  cta: string;
+  productImages?: string[];
+}
+
+async function handlePlanMarketing(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { marketingInputs, imageCount, multiFormatMode, targetRatios, brandId, useBrandKit, subjectPackId } = input;
+  
+  console.log(`[plan_marketing] Starting marketing prompt generation`);
+  console.log(`[plan_marketing] multiFormatMode=${multiFormatMode}, imageCount=${imageCount}`);
+  
+  const mi = marketingInputs as MarketingInputs;
+  if (!mi || !mi.productName || !mi.mainBenefit) {
+    throw new Error('Marketing inputs missing required fields');
+  }
+
+  // Marketing structure: benefit -> proof -> offer
+  const marketingRoles = ['benefit', 'proof', 'offer'] as const;
+  const ratios = (targetRatios as string[]) || ['4:5'];
+  
+  const prompts: string[] = [];
+  const fileNames: string[] = [];
+
+  // Load brand kit if needed
+  let brandContext = '';
+  if (useBrandKit !== false && brandId) {
+    const { data: brand } = await supabaseAdmin
+      .from('brands')
+      .select('name, palette, visual_mood, adjectives, niche, tagline')
+      .eq('id', brandId)
+      .single();
+    
+    if (brand) {
+      brandContext = `BRAND CONTEXT:
+- Brand: ${brand.name}
+- Niche: ${brand.niche || 'Professional services'}
+- Mood: ${brand.visual_mood?.join(', ') || 'professional, modern'}
+- Adjectives: ${brand.adjectives?.join(', ') || 'trustworthy, expert'}
+`;
+    }
+  }
+
+  // Load subject pack if available
+  let subjectContext = '';
+  if (subjectPackId) {
+    const { data: pack } = await supabaseAdmin
+      .from('subject_packs')
+      .select('name, identity_prompt, pack_type')
+      .eq('id', subjectPackId)
+      .single();
+    
+    if (pack) {
+      subjectContext = `
+SUBJECT IDENTITY (${pack.pack_type}):
+${pack.identity_prompt}
+MAINTAIN EXACT character appearance throughout all images.
+`;
+    }
+  }
+
+  // For each marketing role
+  for (let roleIndex = 0; roleIndex < marketingRoles.length; roleIndex++) {
+    const role = marketingRoles[roleIndex];
+    const formatsToGenerate = multiFormatMode ? ratios : [ratios[0]];
+    
+    for (const ratio of formatsToGenerate) {
+      const prompt = buildMarketingPrompt(role, mi, ratio, brandContext, subjectContext);
+      prompts.push(prompt);
+      
+      // Generate file name: marketing_01_benefit_4x5.png
+      const paddedIndex = String(roleIndex + 1).padStart(2, '0');
+      const ratioSlug = ratio.replace(':', 'x');
+      fileNames.push(`marketing_${paddedIndex}_${role}_${ratioSlug}.png`);
+    }
+  }
+
+  console.log(`[plan_marketing] ✅ Generated ${prompts.length} marketing prompts, ${fileNames.length} file names`);
+
+  return { 
+    prompts, 
+    fileNames, 
+    structure: marketingRoles,
+    imageCount: prompts.length,
+  };
+}
+
+function buildMarketingPrompt(
+  role: 'benefit' | 'proof' | 'offer',
+  inputs: MarketingInputs,
+  ratio: string,
+  brandContext: string,
+  subjectContext: string
+): string {
+  const aspectDesc = ratio === '1:1' ? 'square' : ratio === '9:16' ? 'vertical story' : 'vertical portrait';
+  
+  const roleInstructions = {
+    benefit: `FOCUS: MAIN BENEFIT / TRANSFORMATION
+Show the "after" state - what life looks like after using ${inputs.productName}.
+Key message: "${inputs.mainBenefit}"
+Target audience: ${inputs.targetAudience}
+Style: Aspirational, inspiring, success visualization.
+Create an emotional visual that makes the viewer WANT this result.
+The image should evoke DESIRE and aspiration.`,
+
+    proof: `FOCUS: SOCIAL PROOF / TRUST / REASSURANCE
+Show credibility, trust signals, and evidence of results.
+Key message: "${inputs.proof}"
+Target audience: ${inputs.targetAudience}
+Style: Professional, trustworthy, reassuring, credible.
+Create a visual that builds CONFIDENCE in the product/service.
+The image should feel solid, established, reliable.`,
+
+    offer: `FOCUS: OFFER + CALL TO ACTION
+Create urgency and a clear next step.
+Offer: "${inputs.offer}"
+CTA: "${inputs.cta}"
+Style: Bold, action-oriented, compelling, scroll-stopping.
+Create a visual that drives IMMEDIATE ACTION.
+The image should feel urgent, valuable, time-sensitive.`,
+  };
+
+  return `Generate a HIGH-CONVERTING ${aspectDesc} marketing visual for paid ads and sales.
+
+${brandContext}
+${subjectContext}
+PRODUCT/SERVICE: ${inputs.productName}
+TARGET AUDIENCE: ${inputs.targetAudience}
+
+${roleInstructions[role]}
+
+MARKETING VISUAL RULES:
+- ONE clear idea per visual - ultra readable
+- Strong visual hierarchy - what's most important is OBVIOUS
+- High contrast for scroll-stopping effect in feeds
+- Leave safe zones for text overlay (added in Canva after)
+- NO text, NO watermarks, NO logos ON the image itself
+- Professional quality, premium feel
+- Emotional imagery that connects deeply with ${inputs.targetAudience}
+- Clean composition, not cluttered
+
+This visual must SELL, not just look pretty. 
+Designed for e-commerce, landing pages, and paid social ads.
+Aspect ratio: ${ratio}`;
 }
 
 // =====================================================

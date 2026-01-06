@@ -100,6 +100,17 @@ const RenderConfig = z.object({
   image_model: z.string().default('imagen_3'),
 }).partial();
 
+// Marketing inputs for Pack Marketing
+const MarketingInputs = z.object({
+  productName: z.string(),
+  targetAudience: z.string(),
+  mainBenefit: z.string(),
+  proof: z.string(),
+  offer: z.string(),
+  cta: z.string(),
+  productImages: z.array(z.string()).optional(),
+}).optional();
+
 const JobSpecV1 = z.object({
   version: z.literal('v1').default('v1'),
   kind: JobKind,
@@ -125,6 +136,11 @@ const JobSpecV1 = z.object({
   carousel_themes: z.array(z.string()).optional(), // ✅ NEW: Thèmes individuels par carrousel
   visual_style_category: z.enum(['background', 'character', 'product']).optional(), // ✅ Carousel visual style
   background_only: z.boolean().optional(), // ✅ Background only mode (no text)
+  // Pack Marketing (conversion)
+  pack_goal: z.enum(['content', 'marketing']).optional(),
+  marketing_inputs: MarketingInputs,
+  multi_format_mode: z.boolean().optional(),
+  target_ratios: z.array(z.string()).optional(),
   deliverables: z.array(DeliverableType).default(['master_9x16']),
   locks: VisualLocks.optional(),
   audio: AudioConfig.optional(),
@@ -447,6 +463,64 @@ function generateStepsForMultiClipVideo(spec: JobSpecV1Type): StepInput[] {
 function generateStepsForCampaignPack(spec: JobSpecV1Type): StepInput[] {
   const steps: StepInput[] = [];
   let stepIndex = 0;
+  
+  // =====================================================
+  // 0) MARKETING MODE: Use plan_marketing instead of plan_images
+  // =====================================================
+  const isMarketingPack = spec.pack_goal === 'marketing' && spec.marketing_inputs;
+  
+  if (isMarketingPack) {
+    const imageCount = spec.image_count || (spec.multi_format_mode ? 9 : 3);
+    console.log(`[orchestrator] 🎯 Marketing Pack: ${imageCount} images (multiFormat: ${spec.multi_format_mode})`);
+    
+    // Plan marketing prompts
+    steps.push({
+      step_type: 'plan_marketing',
+      step_index: stepIndex++,
+      input_json: {
+        marketingInputs: spec.marketing_inputs,
+        imageCount,
+        multiFormatMode: spec.multi_format_mode,
+        targetRatios: spec.target_ratios || [spec.ratio_master],
+        brandId: spec.brandkit_id,
+        useBrandKit: spec.use_brand_kit,
+        subjectPackId: spec.subject_pack_id,
+        referenceImages: spec.reference_images,
+      },
+    });
+    
+    // Generate each marketing image
+    for (let i = 0; i < imageCount; i++) {
+      steps.push({
+        step_type: 'gen_image',
+        step_index: stepIndex++,
+        input_json: {
+          imageIndex: i,
+          prompt: null, // Will be injected from plan_marketing
+          ratio: spec.ratio_master,
+          visualStyle: spec.visual_style,
+          subjectPackId: spec.subject_pack_id,
+          referenceImages: spec.reference_images,
+          locks: spec.locks,
+          isMarketingImage: true,
+        },
+      });
+    }
+    
+    // Deliver
+    steps.push({
+      step_type: 'deliver',
+      step_index: stepIndex,
+      input_json: { 
+        deliverables: spec.deliverables, 
+        isMarketingPack: true,
+        imageCount,
+      },
+    });
+    
+    console.log(`[orchestrator] Generated ${steps.length} steps for marketing pack`);
+    return steps;
+  }
   
   // =====================================================
   // 1) IMAGES: plan_images + gen_image for each requested image

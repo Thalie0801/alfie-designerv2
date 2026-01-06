@@ -50,6 +50,17 @@ export const CarouselSlide = z.object({
   visualPrompt: z.string().optional(),
 });
 
+// Marketing inputs for Pack Marketing
+export const MarketingInputs = z.object({
+  productName: z.string(),           // Nom du produit/service
+  targetAudience: z.string(),        // ICP / cible
+  mainBenefit: z.string(),           // Bénéfice principal
+  proof: z.string(),                 // Preuve (avis/chiffre/garantie)
+  offer: z.string(),                 // Offre (prix/promo/bonus)
+  cta: z.string(),                   // CTA spécifique
+  productImages: z.array(z.string()).optional(), // 1-3 images produit
+});
+
 // Locks et contraintes visuelles
 export const VisualLocks = z.object({
   palette_lock: z.boolean().default(true),
@@ -125,6 +136,12 @@ export const JobSpecV1 = z.object({
   carousel_themes: z.array(z.string()).optional(), // ✅ NEW: Thèmes individuels par carrousel
   visual_style_category: z.enum(['background', 'character', 'product']).optional(),
   background_only: z.boolean().optional(),
+
+  // Pack Marketing (conversion)
+  pack_goal: z.enum(['content', 'marketing']).optional(),
+  marketing_inputs: MarketingInputs.optional(),
+  multi_format_mode: z.boolean().optional(),
+  target_ratios: z.array(z.string()).optional(),
 
   // Deliverables demandés
   deliverables: z.array(DeliverableType).default(['master_9x16']),
