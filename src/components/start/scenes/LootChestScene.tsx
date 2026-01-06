@@ -61,8 +61,8 @@ Slide 5: CTA - Testez gratuitement maintenant !`;
   };
 
   const handleUpsellClick = () => {
-    // Redirect to checkout page with template product
-    window.location.href = '/checkout-express?product=templates-canva&price=19';
+    const brandId = localStorage.getItem('alfie-active-brand-id') || '';
+    window.location.href = `/upsell-visuels?brandId=${brandId}`;
   };
 
   const hasRealAssets = assets.some(a => !a.url.startsWith('/images/'));
@@ -249,15 +249,30 @@ Slide 5: CTA - Testez gratuitement maintenant !`;
         >
           <div className="text-center mb-4">
             <span className="inline-block px-3 py-1 rounded-full bg-alfie-mint/20 text-sm font-medium mb-2">
-              🎁 Offre spéciale
+              🎨 Offre spéciale
             </span>
             <h3 className="text-xl font-bold text-foreground mb-2">
-              Pack Templates Canva Pro
+              Tu veux publier toute l'année sans repartir de zéro ?
             </h3>
             <p className="text-muted-foreground text-sm">
-              50+ templates personnalisables avec tes couleurs et typos
+              Débloque 30 visuels réutilisables générés par Alfie, à tes couleurs.
             </p>
           </div>
+          
+          {/* Bullets */}
+          <div className="space-y-2 mb-4 text-left max-w-xs mx-auto">
+            <div className="flex items-center gap-2 text-sm">
+              <Check className="w-4 h-4 text-alfie-mint" />
+              <span>5 structures qui convertissent</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Check className="w-4 h-4 text-alfie-mint" />
+              <span>30 variations prêtes à poster</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Check className="w-4 h-4 text-alfie-mint" />
+              <span>Export ZIP immédiat</span>
+            </div>
           
           <div className="flex items-center justify-center gap-3 mb-4">
             <span className="text-lg text-muted-foreground line-through">49€</span>
@@ -269,7 +284,7 @@ Slide 5: CTA - Testez gratuitement maintenant !`;
             className="w-full gap-2 bg-gradient-to-r from-alfie-mint to-alfie-pink text-foreground font-bold"
           >
             <Sparkles className="w-4 h-4" />
-            Débloquer les templates
+            Oui, je veux le pack (19€)
           </Button>
           
           <p className="text-xs text-center text-muted-foreground mt-2">

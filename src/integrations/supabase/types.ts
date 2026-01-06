@@ -2627,6 +2627,136 @@ export type Database = {
           },
         ]
       }
+      upsell_assets: {
+        Row: {
+          brand_id: string | null
+          cloudinary_public_id: string | null
+          cloudinary_url: string | null
+          created_at: string | null
+          file_name: string | null
+          format: string
+          id: string
+          metadata: Json | null
+          structure: string
+          upsell_order_id: string | null
+          user_id: string | null
+          variation_index: number
+        }
+        Insert: {
+          brand_id?: string | null
+          cloudinary_public_id?: string | null
+          cloudinary_url?: string | null
+          created_at?: string | null
+          file_name?: string | null
+          format?: string
+          id?: string
+          metadata?: Json | null
+          structure: string
+          upsell_order_id?: string | null
+          user_id?: string | null
+          variation_index: number
+        }
+        Update: {
+          brand_id?: string | null
+          cloudinary_public_id?: string | null
+          cloudinary_url?: string | null
+          created_at?: string | null
+          file_name?: string | null
+          format?: string
+          id?: string
+          metadata?: Json | null
+          structure?: string
+          upsell_order_id?: string | null
+          user_id?: string | null
+          variation_index?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upsell_assets_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upsell_assets_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
+          },
+          {
+            foreignKeyName: "upsell_assets_upsell_order_id_fkey"
+            columns: ["upsell_order_id"]
+            isOneToOne: false
+            referencedRelation: "upsell_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      upsell_orders: {
+        Row: {
+          amount: number
+          brand_id: string | null
+          created_at: string | null
+          email: string | null
+          generated_count: number | null
+          id: string
+          product: string
+          session_id: string
+          status: string
+          total_visuals: number | null
+          updated_at: string | null
+          user_id: string | null
+          zip_url: string | null
+        }
+        Insert: {
+          amount?: number
+          brand_id?: string | null
+          created_at?: string | null
+          email?: string | null
+          generated_count?: number | null
+          id?: string
+          product?: string
+          session_id: string
+          status?: string
+          total_visuals?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+          zip_url?: string | null
+        }
+        Update: {
+          amount?: number
+          brand_id?: string | null
+          created_at?: string | null
+          email?: string | null
+          generated_count?: number | null
+          id?: string
+          product?: string
+          session_id?: string
+          status?: string
+          total_visuals?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+          zip_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upsell_orders_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upsell_orders_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_brand_quota_current"
+            referencedColumns: ["brand_id"]
+          },
+        ]
+      }
       usage_event: {
         Row: {
           brand_id: string
