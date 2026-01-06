@@ -1,7 +1,10 @@
 // Types for the /start experience
 export type StylePreset = 'pro' | 'pop';
 
+export type PackMode = 'social' | 'conversion';
+
 export type Intent = {
+  packMode: PackMode;
   kind: 'pack' | 'carousel' | 'post' | 'story' | 'thumbnail';
   ratio: '4:5' | '1:1' | '9:16';
   slides: number;
@@ -26,9 +29,10 @@ export type GeneratedAsset = {
 };
 
 export const DEFAULT_INTENT: Intent = {
+  packMode: 'social',
   kind: 'pack',
   ratio: '4:5',
-  slides: 5,
+  slides: 3,
   topic: '',
   brandName: '',
   goal: 'Convertir',

@@ -3,11 +3,14 @@ import { Badge } from "@/components/ui/badge";
 import { Sparkles, CheckCircle2 } from "lucide-react";
 import { LandingHeader } from "@/components/LandingHeader";
 import { LandingFooter } from "@/components/landing/LandingFooter";
+import { useNavigate } from "react-router-dom";
 
 export default function Quiz() {
+  const navigate = useNavigate();
+
   const handleStartQuiz = () => {
     console.log("quiz_start_click");
-    // TODO: Intégrer le questionnaire Brand Kit
+    navigate('/start');
   };
 
   return (
@@ -29,7 +32,7 @@ export default function Quiz() {
           </h1>
           
           <p className="text-base sm:text-lg text-slate-600 mb-6 sm:mb-8">
-            Réponds à 5 questions → Alfie génère 3 visuels gratuits adaptés à ta marque
+            Réponds à 4 questions → Alfie génère 3 visuels gratuits adaptés à ta marque
           </p>
 
           <div className="rounded-2xl border border-border/50 bg-gradient-to-br from-alfie-mint/10 via-alfie-lilac/10 to-alfie-pink/15 p-6 sm:p-8 mb-6 sm:mb-8">

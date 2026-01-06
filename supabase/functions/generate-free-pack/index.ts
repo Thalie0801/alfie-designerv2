@@ -7,9 +7,10 @@ const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // Zod schema for input validation
 const FreePackRequestSchema = z.object({
-  userId: z.string().uuid("Invalid userId format"),
-  brandId: z.string().uuid("Invalid brandId format"),
-  email: z.string().email("Invalid email address").max(255, "Email too long"),
+  userId: z.string(),
+  brandId: z.string(),
+  email: z.string().email("Invalid email address").max(255, "Email too long").optional().or(z.literal('')),
+  packMode: z.enum(['social', 'conversion']).default('social'),
   brandData: z.object({
     brandName: z.string().min(1, "Brand name required").max(100, "Brand name too long"),
     sector: z.string().min(1, "Sector required").max(50, "Sector too long"),
@@ -17,8 +18,10 @@ const FreePackRequestSchema = z.object({
     colorChoice: z.string().min(1, "Color choice required").max(50, "Color choice too long"),
     fontChoice: z.string().min(1, "Font choice required").max(50, "Font choice too long"),
     objective: z.string().max(500, "Objective too long").optional().default(""),
+    topic: z.string().max(500, "Topic too long").optional().default(""),
+    cta: z.string().max(100, "CTA too long").optional().default(""),
   }),
-}).strict(); // Reject unexpected fields
+}).strict();
 
 type FreePackRequest = z.infer<typeof FreePackRequestSchema>;
 
@@ -45,9 +48,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { userId, brandId, email, brandData } = parseResult.data;
+    const { userId, brandId, email, packMode, brandData } = parseResult.data;
 
-    console.log("[generate-free-pack] Starting generation for", { userId, brandId, email });
+    console.log("[generate-free-pack] Starting generation for", { userId, brandId, email, packMode });
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -124,10 +127,13 @@ Deno.serve(async (req) => {
     const styleContext = buildStyleContext(brandData);
 
     // Generate each asset using Lovable AI
-    for (const asset of assets) {
-      console.log(`[generate-free-pack] Generating ${asset.title}...`);
+    for (let i = 0; i < assets.length; i++) {
+      const asset = assets[i];
+      console.log(`[generate-free-pack] Generating ${asset.title} (${packMode} mode)...`);
 
-      const prompt = buildPrompt(asset, brandData, styleContext);
+      const prompt = packMode === 'conversion' 
+        ? buildConversionPrompt(asset, brandData, styleContext, i)
+        : buildSocialPrompt(asset, brandData, styleContext);
 
       try {
         // Call Lovable AI API for image generation
@@ -184,10 +190,11 @@ Deno.serve(async (req) => {
             type: "image",
             format: asset.ratio,
             cloudinary_url: cloudinaryUrl,
-            tags: ["free-pack"],
+            tags: ["free-pack", packMode],
             metadata: {
               title: asset.title,
               source: "free-pack",
+              packMode,
               brandData,
             }
           });
@@ -211,18 +218,20 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log("[generate-free-pack] Generation complete", { count: generatedAssets.length });
+    console.log("[generate-free-pack] Generation complete", { count: generatedAssets.length, packMode });
 
     // Send email with download link
     try {
-      await supabase.functions.invoke("send-pack-email", {
-        body: {
-          email,
-          packType: "free",
-          brandName: brandData.brandName,
-          assets: generatedAssets,
-        }
-      });
+      if (email) {
+        await supabase.functions.invoke("send-pack-email", {
+          body: {
+            email,
+            packType: packMode === 'conversion' ? 'conversion' : 'free',
+            brandName: brandData.brandName,
+            assets: generatedAssets,
+          }
+        });
+      }
     } catch (emailError) {
       console.error("[generate-free-pack] Email error (non-blocking):", emailError);
     }
@@ -231,6 +240,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         assets: generatedAssets,
+        packMode,
         message: "Pack generated successfully"
       }),
       {
@@ -275,10 +285,12 @@ function buildStyleContext(brandData: FreePackRequest["brandData"]): string {
     Industry: ${sectorMap[brandData.sector] || "professional business"}
     Style: ${brandData.styles.join(", ")}
     Colors: ${colorMap[brandData.colorChoice] || "harmonious professional colors"}
+    Topic: ${brandData.topic || "general brand content"}
+    CTA: ${brandData.cta || "engage with brand"}
   `;
 }
 
-function buildPrompt(
+function buildSocialPrompt(
   asset: { title: string; ratio: string; width: number; height: number },
   brandData: FreePackRequest["brandData"],
   styleContext: string
@@ -298,6 +310,54 @@ Requirements:
 - Abstract or lifestyle background that represents the brand personality
 
 The image should feel ${brandData.styles.join(", ").toLowerCase()} and appeal to the ${brandData.sector} industry.`;
+}
+
+function buildConversionPrompt(
+  asset: { title: string; ratio: string; width: number; height: number },
+  brandData: FreePackRequest["brandData"],
+  styleContext: string,
+  assetIndex: number
+): string {
+  const aspectDesc = asset.ratio === "1:1" ? "square" : asset.ratio === "9:16" ? "vertical portrait" : "vertical";
+  
+  const conversionAngles = [
+    // Visuel 1 : Bénéfice clair
+    `Focus: MAIN BENEFIT - What transformation/result does the client get?
+     Create a visual that showcases the "after" state, the positive outcome.
+     Message: What life looks like AFTER using the product/service.
+     Style: Aspirational, inspiring, showing success or satisfaction.`,
+    
+    // Visuel 2 : Preuve / réassurance
+    `Focus: SOCIAL PROOF - Why should they trust you?
+     Create a visual that conveys credibility, trust, and results.
+     Message: Evidence that the solution works - think testimonials, numbers, success.
+     Style: Professional, trustworthy, reassuring.`,
+    
+    // Visuel 3 : Offre + CTA
+    `Focus: OFFER + CALL TO ACTION - What do they do next?
+     Create a visual that screams "take action now" with urgency.
+     Message: Clear offer presentation with a sense of opportunity.
+     Style: Bold, action-oriented, compelling.`,
+  ];
+
+  return `Generate a HIGH-CONVERTING ${aspectDesc} marketing visual designed to SELL.
+
+${styleContext}
+
+CONVERSION ANGLE:
+${conversionAngles[assetIndex]}
+
+Requirements:
+- Create a scroll-stopping ${asset.title} visual designed for paid ads and sales
+- This is for CONVERSION, not just branding - it needs to drive action
+- Clean, punchy design with clear visual hierarchy
+- NO TEXT on image (text will be added in Canva after)
+- Professional quality, ${asset.width}x${asset.height} resolution
+- Emotional imagery that connects with the target audience
+- High contrast, attention-grabbing composition
+
+The image should feel professional and HIGH-VALUE, designed to convert viewers into buyers.
+This is for ${brandData.brandName} in the ${brandData.sector} industry.`;
 }
 
 async function uploadToCloudinary(base64Data: string, publicId: string): Promise<string> {

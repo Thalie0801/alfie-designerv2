@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Wand2, Lightbulb, Package, LayoutGrid, Square, Smartphone, Image, Backpack } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Wand2, Lightbulb, Smartphone, TrendingUp, Backpack } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { LootCard } from '../ui/LootCard';
 import { CraftingPreview } from '../ui/CraftingPreview';
 import { InventoryDrawer } from '../ui/InventoryDrawer';
 import { useIsMobile } from '@/hooks/use-mobile';
-import type { Intent } from '@/lib/types/startFlow';
+import type { Intent, PackMode } from '@/lib/types/startFlow';
 
 const TOPIC_IDEAS = [
   "Je perds trop de temps sur Canva (et ça me saoule).",
@@ -17,12 +17,23 @@ const TOPIC_IDEAS = [
   "Pourquoi 90% des posts ne marchent pas.",
 ];
 
-const FORMAT_OPTIONS = [
-  { kind: 'pack' as const, label: 'Pack Express', icon: Package, rarity: 'epic' as const, recommended: true, slides: 5, ratio: '4:5' as const, subtitle: '5 slides prêts à poster' },
-  { kind: 'carousel' as const, label: 'Carrousel', icon: LayoutGrid, rarity: 'rare' as const, slides: 5, ratio: '4:5' as const, subtitle: 'Swipe & engage' },
-  { kind: 'post' as const, label: 'Post', icon: Square, rarity: 'common' as const, slides: 1, ratio: '1:1' as const, subtitle: 'Simple & efficace' },
-  { kind: 'story' as const, label: 'Story', icon: Smartphone, rarity: 'common' as const, slides: 1, ratio: '9:16' as const, subtitle: 'Format vertical' },
-  { kind: 'thumbnail' as const, label: 'Thumbnail', icon: Image, rarity: 'common' as const, slides: 1, ratio: '1:1' as const, subtitle: 'Miniature YouTube' },
+const PACK_MODE_OPTIONS = [
+  { 
+    mode: 'social' as PackMode, 
+    label: 'Pack Réseaux', 
+    subtitle: '3 visuels prêts à poster',
+    emoji: '📱',
+    description: 'Contenu Instagram, LinkedIn...',
+    icon: Smartphone,
+  },
+  { 
+    mode: 'conversion' as PackMode, 
+    label: 'Pack Conversion', 
+    subtitle: '3 visuels qui vendent',
+    emoji: '💰',
+    description: 'Bénéfice → Preuve → Offre',
+    icon: TrendingUp,
+  },
 ];
 
 const GOAL_OPTIONS = [
@@ -53,13 +64,9 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
   const prefersReducedMotion = useReducedMotion();
   const isMobile = useIsMobile();
 
-  const handleFormatSelect = (format: typeof FORMAT_OPTIONS[0]) => {
-    onUpdate({
-      kind: format.kind,
-      slides: format.slides,
-      ratio: format.ratio,
-    });
-    setStep(2);
+  const handlePackModeSelect = (mode: PackMode) => {
+    onUpdate({ packMode: mode, kind: 'pack', slides: 3, ratio: '4:5' });
+    setStep(1);
   };
 
   const handleRandomIdea = () => {
@@ -68,20 +75,20 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
   };
 
   const canProceed = () => {
-    if (step === 0) return (intent.brandName ?? '').trim().length > 0;
+    if (step === 1) return (intent.brandName ?? '').trim().length > 0;
     if (step === 2) return (intent.topic ?? '').trim().length > 0;
     return true;
   };
 
   const handleNext = () => {
-    if (step === 0) {
-      setStep(1);
-    } else if (step < 3) {
+    if (step < 3) {
       setStep(step + 1);
     } else {
       onComplete();
     }
   };
+
+  const totalSteps = 4;
 
   return (
     <div className="min-h-screen w-full flex">
@@ -95,10 +102,10 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
             className="text-center mb-6"
           >
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
-              Crée ton pack en 90 secondes ⚡
+              Obtiens tes 3 visuels gratuits ✨
             </h1>
             <p className="text-muted-foreground text-sm sm:text-base">
-              Réponds à 4 questions, Alfie fait le reste
+              4 questions rapides → 3 formats prêts à poster
             </p>
           </motion.div>
 
@@ -111,7 +118,7 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
           >
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-background/80 backdrop-blur-sm mx-auto block text-center">
               <span className="text-lg">⚔️</span>
-              <span className="font-bold text-foreground">Niveau {step + 1}/4</span>
+              <span className="font-bold text-foreground">Niveau {step + 1}/{totalSteps}</span>
             </div>
             
             {/* XP Bar */}
@@ -123,7 +130,7 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
                     background: 'linear-gradient(90deg, hsl(var(--alfie-mint)), hsl(var(--alfie-pink)), hsl(var(--alfie-lilac)))',
                   }}
                   initial={{ width: 0 }}
-                  animate={{ width: `${((step + 1) / 4) * 100}%` }}
+                  animate={{ width: `${((step + 1) / totalSteps) * 100}%` }}
                   transition={{ duration: 0.5 }}
                 />
               </div>
@@ -131,10 +138,42 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
           </motion.div>
 
           <AnimatePresence mode="wait">
-            {/* Step 0: Brand Name */}
+            {/* Step 0: Pack Mode Selection */}
             {step === 0 && (
               <motion.div
                 key="step-0"
+                initial={{ opacity: 0, x: 30 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -30 }}
+                className="bg-background/90 backdrop-blur-md rounded-3xl p-4 sm:p-8 shadow-2xl border border-border/50"
+              >
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2 text-center">
+                  🎯 Tu veux créer quoi ?
+                </h2>
+                <p className="text-muted-foreground text-center mb-6 text-sm sm:text-base">
+                  Choisis le type de pack adapté à ton objectif
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {PACK_MODE_OPTIONS.map((option) => (
+                    <LootCard
+                      key={option.mode}
+                      icon={option.icon}
+                      title={option.label}
+                      subtitle={option.subtitle}
+                      rarity={option.mode === 'conversion' ? 'epic' : 'rare'}
+                      isSelected={intent.packMode === option.mode}
+                      onClick={() => handlePackModeSelect(option.mode)}
+                    />
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step 1: Brand Name */}
+            {step === 1 && (
+              <motion.div
+                key="step-1"
                 initial={{ opacity: 0, x: 30 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -30 }}
@@ -167,7 +206,11 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
                 </div>
 
                 {/* Navigation */}
-                <div className="flex justify-end mt-8">
+                <div className="flex justify-between mt-8">
+                  <Button variant="ghost" onClick={() => setStep(0)} className="gap-2">
+                    <ArrowLeft className="w-4 h-4" />
+                    Retour
+                  </Button>
                   <Button
                     onClick={handleNext}
                     disabled={!canProceed()}
@@ -175,47 +218,6 @@ export function QuestScene({ intent, onUpdate, onComplete }: QuestSceneProps) {
                   >
                     Suivant
                     <ArrowRight className="w-4 h-4" />
-                  </Button>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Step 1: Format (Loot Selection) */}
-            {step === 1 && (
-              <motion.div
-                key="step-1"
-                initial={{ opacity: 0, x: 30 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -30 }}
-                className="bg-background/90 backdrop-blur-md rounded-3xl p-4 sm:p-8 shadow-2xl border border-border/50"
-              >
-                <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2 text-center">
-                  🎁 Choisis ton loot
-                </h2>
-                <p className="text-muted-foreground text-center mb-6 text-sm sm:text-base">
-                  Quel format tu veux générer ?
-                </p>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
-                  {FORMAT_OPTIONS.map((format) => (
-                    <LootCard
-                      key={format.kind}
-                      icon={format.icon}
-                      title={format.label}
-                      subtitle={format.subtitle}
-                      rarity={format.rarity}
-                      isSelected={intent.kind === format.kind}
-                      recommended={format.recommended}
-                      onClick={() => handleFormatSelect(format)}
-                    />
-                  ))}
-                </div>
-
-                {/* Back button */}
-                <div className="flex justify-start mt-8">
-                  <Button variant="ghost" onClick={() => setStep(0)} className="gap-2">
-                    <ArrowLeft className="w-4 h-4" />
-                    Retour
                   </Button>
                 </div>
               </motion.div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Download, Copy, RefreshCw, Save, Check, ExternalLink } from 'lucide-react';
+import { Download, Copy, RefreshCw, Save, Check, ExternalLink, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { ParticleField } from '../game/ParticleField';
@@ -58,6 +58,11 @@ Slide 5: CTA - Testez gratuitement maintenant !`;
     setCopied(true);
     toast.success('Textes copiés ! 📋');
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleUpsellClick = () => {
+    // Redirect to checkout page with template product
+    window.location.href = '/checkout-express?product=templates-canva&price=19';
   };
 
   const hasRealAssets = assets.some(a => !a.url.startsWith('/images/'));
@@ -215,7 +220,7 @@ Slide 5: CTA - Testez gratuitement maintenant !`;
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8 }}
-          className="flex flex-wrap justify-center gap-3"
+          className="flex flex-wrap justify-center gap-3 mb-8"
         >
           <Button
             variant="ghost"
@@ -235,12 +240,49 @@ Slide 5: CTA - Testez gratuitement maintenant !`;
           </Button>
         </motion.div>
 
+        {/* UPSELL Templates 19€ */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.0 }}
+          className="p-6 rounded-2xl border-2 border-alfie-mint/50 bg-gradient-to-r from-alfie-mint/10 to-alfie-lilac/10 mb-8"
+        >
+          <div className="text-center mb-4">
+            <span className="inline-block px-3 py-1 rounded-full bg-alfie-mint/20 text-sm font-medium mb-2">
+              🎁 Offre spéciale
+            </span>
+            <h3 className="text-xl font-bold text-foreground mb-2">
+              Pack Templates Canva Pro
+            </h3>
+            <p className="text-muted-foreground text-sm">
+              50+ templates personnalisables avec tes couleurs et typos
+            </p>
+          </div>
+          
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <span className="text-lg text-muted-foreground line-through">49€</span>
+            <span className="text-3xl font-bold text-alfie-mint">19€</span>
+          </div>
+          
+          <Button
+            onClick={handleUpsellClick}
+            className="w-full gap-2 bg-gradient-to-r from-alfie-mint to-alfie-pink text-foreground font-bold"
+          >
+            <Sparkles className="w-4 h-4" />
+            Débloquer les templates
+          </Button>
+          
+          <p className="text-xs text-center text-muted-foreground mt-2">
+            Paiement sécurisé · Accès immédiat
+          </p>
+        </motion.div>
+
         {/* Back to Studio */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="text-center mt-8"
+          transition={{ delay: 1.2 }}
+          className="text-center"
         >
           <a
             href="/studio"
