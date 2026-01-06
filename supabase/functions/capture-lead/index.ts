@@ -126,6 +126,38 @@ serve(async (req: Request): Promise<Response> => {
       console.log("[capture-lead] Email queued for:", email);
     }
 
+    // Sync contact to Brevo (non-blocking)
+    try {
+      const brevoSyncUrl = `${supabaseUrl}/functions/v1/brevo-sync-contact`;
+      fetch(brevoSyncUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${supabaseServiceKey}`,
+        },
+        body: JSON.stringify({
+          email,
+          source,
+          listType: "lead",
+          generationCount: existingLead 
+            ? (existingLead.generation_count || 0) + 1 
+            : 1,
+          marketingOptIn,
+        }),
+      }).then(res => {
+        if (res.ok) {
+          console.log("[capture-lead] Brevo sync initiated for:", email);
+        } else {
+          console.warn("[capture-lead] Brevo sync failed:", res.status);
+        }
+      }).catch(err => {
+        console.warn("[capture-lead] Brevo sync error:", err);
+      });
+    } catch (brevoError) {
+      // Non-blocking - log and continue
+      console.warn("[capture-lead] Brevo sync skipped:", brevoError);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
