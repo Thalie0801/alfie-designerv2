@@ -23,8 +23,9 @@ import { toast } from 'sonner';
 import { createJob } from '@/lib/jobClient';
 import type { JobSpecV1Type } from '@/types/jobSpec';
 import type { Ratio } from '@/lib/types/alfie';
-import { Loader2, Film, Image, Crop, FileArchive, Play, Clapperboard, Package, Palette, Paintbrush, User } from 'lucide-react';
+import { Loader2, Film, Image, Crop, FileArchive, Play, Clapperboard, Package, Palette, Paintbrush, User, Target, Sparkles } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import type { VisualStyle } from '@/lib/types/vision';
 import { VISUAL_STYLE_OPTIONS } from '@/lib/constants/visualStyles';
 import { ReferenceImageUploader } from '@/components/studio/ReferenceImageUploader';
@@ -208,6 +209,19 @@ export default function StudioMulti() {
   // Carousel-specific options (for Pack Campagne)
   const [carouselVisualStyleCategory, setCarouselVisualStyleCategory] = useState<'background' | 'character' | 'product'>('character');
   const [carouselBackgroundOnly, setCarouselBackgroundOnly] = useState(false);
+
+  // Pack Marketing (conversion)
+  const [packGoal, setPackGoal] = useState<'content' | 'marketing'>('content');
+  const [marketingInputs, setMarketingInputs] = useState({
+    productName: '',
+    targetAudience: '',
+    mainBenefit: '',
+    proof: '',
+    offer: '',
+    cta: '',
+    productImages: [] as string[],
+  });
+  const [multiFormatMode, setMultiFormatMode] = useState(false);
   
   // Options avancées
   const [voiceoverEnabled, setVoiceoverEnabled] = useState(true);
@@ -354,7 +368,16 @@ export default function StudioMulti() {
       return;
     }
 
-    if (!campaignName.trim() || !script.trim()) {
+    // Validation spécifique marketing
+    if (packGoal === 'marketing') {
+      if (!marketingInputs.productName.trim() || !marketingInputs.mainBenefit.trim() || 
+          !marketingInputs.proof.trim() || !marketingInputs.offer.trim() || !marketingInputs.cta.trim()) {
+        toast.error('Remplis tous les champs marketing', { 
+          description: 'Produit, bénéfice, preuve, offre et CTA sont requis' 
+        });
+        return;
+      }
+    } else if (!campaignName.trim() || !script.trim()) {
       toast.error('Veuillez remplir tous les champs');
       return;
     }
@@ -375,17 +398,22 @@ export default function StudioMulti() {
       const hasValidCarouselThemes = useIndividualCarouselThemes && 
         carouselThemes.filter(t => t.trim()).length === carouselCount;
 
+      // For marketing packs, calculate correct image count based on multiFormatMode
+      const effectiveImageCount = packGoal === 'marketing' 
+        ? (multiFormatMode ? 9 : 3) // 3 roles × 3 formats = 9, or just 3
+        : imageCount;
+
       const spec: JobSpecV1Type = {
         version: 'v1',
         kind: 'campaign_pack',
         brandkit_id: activeBrand.id, // Always required for quota/tracking
         ratio_master: ratioMaster,
-        script: script,
+        script: packGoal === 'marketing' ? `${marketingInputs.productName} - ${marketingInputs.mainBenefit}` : script,
         visual_style: visualStyle,
-        image_count: imageCount,
-        carousel_count: carouselCount,
+        image_count: effectiveImageCount,
+        carousel_count: packGoal === 'marketing' ? 0 : carouselCount,
         slides_per_carousel: 5,
-        clip_count: videoCount,
+        clip_count: packGoal === 'marketing' ? 0 : videoCount,
         // If individual prompts provided, send them; otherwise let plan_images segment
         prompts: hasValidIndividualPrompts ? imagePrompts : undefined,
         // If individual carousel themes provided, send them
@@ -395,16 +423,22 @@ export default function StudioMulti() {
         background_only: carouselBackgroundOnly,
         deliverables: ['zip'] as JobSpecV1Type['deliverables'],
         use_brand_kit: useBrandKitToggle,
-        reference_images: referenceImages.length > 0 ? referenceImages : undefined,
-        campaign_name: campaignName,
+        reference_images: referenceImages.length > 0 ? referenceImages : 
+          (marketingInputs.productImages.length > 0 ? marketingInputs.productImages : undefined),
+        campaign_name: packGoal === 'marketing' ? `Pack Marketing - ${marketingInputs.productName}` : campaignName,
         subject_pack_id: effectiveSubjectPackId || undefined,
-        tags: ['studio_multi'],
+        tags: ['studio_multi', ...(packGoal === 'marketing' ? ['marketing', 'conversion'] : [])],
         locks: {
           palette_lock: useBrandKitToggle,
           light_mode: false,
           safe_zone: safeZone,
           identity_lock: useBrandKitToggle,
         },
+        // Marketing-specific fields
+        pack_goal: packGoal,
+        marketing_inputs: packGoal === 'marketing' ? marketingInputs : undefined,
+        multi_format_mode: multiFormatMode,
+        target_ratios: multiFormatMode ? ['1:1', '9:16', '4:5'] : undefined,
       };
 
       const result = await createJob(spec);
@@ -426,17 +460,22 @@ export default function StudioMulti() {
   };
 
   // Packs prédéfinis
-  const loadPreset = (type: 'lancement' | 'evergreen' | 'promo') => {
+  const loadPreset = (type: 'lancement' | 'evergreen' | 'promo' | 'marketing') => {
     const presets = {
-      lancement: { images: 4, carousels: 1, videos: 1, name: 'Pack Lancement' },
-      evergreen: { images: 3, carousels: 2, videos: 0, name: 'Pack Evergreen' },
-      promo: { images: 2, carousels: 0, videos: 1, name: 'Pack Promo Express' },
+      lancement: { images: 4, carousels: 1, videos: 1, name: 'Pack Lancement', goal: 'content' as const },
+      evergreen: { images: 3, carousels: 2, videos: 0, name: 'Pack Evergreen', goal: 'content' as const },
+      promo: { images: 2, carousels: 0, videos: 1, name: 'Pack Promo Express', goal: 'content' as const },
+      marketing: { images: 3, carousels: 0, videos: 0, name: 'Pack Marketing', goal: 'marketing' as const },
     };
     const preset = presets[type];
     setImageCount(preset.images);
     setCarouselCount(preset.carousels);
     setVideoCount(preset.videos);
     setCampaignName(preset.name);
+    setPackGoal(preset.goal);
+    if (type === 'marketing') {
+      setMultiFormatMode(false);
+    }
     setActiveTab('pack-campagne');
     toast.success(`${preset.name} chargé !`);
   };
@@ -520,7 +559,7 @@ export default function StudioMulti() {
       {/* Packs prédéfinis */}
       <Card className="p-4" data-tour-id="studio-multi-presets">
         <h3 className="font-semibold text-sm mb-3">📦 Packs prédéfinis</h3>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -550,6 +589,19 @@ export default function StudioMulti() {
             <span className="text-lg mb-1">🔥</span>
             <span className="text-xs font-medium">Promo</span>
             <span className="text-[10px] text-muted-foreground">2 img + 1 vid</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => loadPreset('marketing')}
+            className="flex flex-col h-auto py-3 relative border-primary/50"
+          >
+            <Badge className="absolute -top-2 -right-2 text-[8px] px-1.5 py-0.5 bg-primary">
+              Conversion
+            </Badge>
+            <span className="text-lg mb-1">💰</span>
+            <span className="text-xs font-medium">Marketing</span>
+            <span className="text-[10px] text-muted-foreground">3 visuels qui vendent</span>
           </Button>
         </div>
       </Card>
@@ -878,6 +930,143 @@ export default function StudioMulti() {
 
         {/* Pack Campagne Tab */}
         <TabsContent value="pack-campagne" className="space-y-6 mt-6">
+          {/* Marketing Pack Form - shown when packGoal === 'marketing' */}
+          {packGoal === 'marketing' && (
+            <Card className="border-2 border-primary/30 bg-primary/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="h-5 w-5 text-primary" />
+                  Pack Marketing
+                </CardTitle>
+                <CardDescription>
+                  3 visuels structurés : Bénéfice • Preuve • Offre + CTA
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Produit/Service */}
+                <div className="space-y-2">
+                  <Label>Produit/Service *</Label>
+                  <Input 
+                    value={marketingInputs.productName}
+                    onChange={(e) => setMarketingInputs({...marketingInputs, productName: e.target.value})}
+                    placeholder="Ex: Formation Dropshipping Premium"
+                  />
+                </div>
+
+                {/* Cible ICP */}
+                <div className="space-y-2">
+                  <Label>Cible (ICP) *</Label>
+                  <Textarea
+                    value={marketingInputs.targetAudience}
+                    onChange={(e) => setMarketingInputs({...marketingInputs, targetAudience: e.target.value})}
+                    placeholder="Ex: Entrepreneurs 25-40 ans, débutants e-commerce..."
+                    rows={2}
+                  />
+                </div>
+
+                {/* Bénéfice principal */}
+                <div className="space-y-2">
+                  <Label>Bénéfice principal *</Label>
+                  <Textarea
+                    value={marketingInputs.mainBenefit}
+                    onChange={(e) => setMarketingInputs({...marketingInputs, mainBenefit: e.target.value})}
+                    placeholder="Ex: Génère tes premiers 1000€ en 30 jours"
+                    rows={2}
+                  />
+                  <p className="text-xs text-muted-foreground">Le résultat/transformation pour le client</p>
+                </div>
+
+                {/* Preuve */}
+                <div className="space-y-2">
+                  <Label>Preuve / Réassurance *</Label>
+                  <Select 
+                    value=""
+                    onValueChange={(v) => {
+                      if (v === 'reviews') setMarketingInputs({...marketingInputs, proof: '⭐ 4.9/5 - 500+ avis clients'});
+                      else if (v === 'numbers') setMarketingInputs({...marketingInputs, proof: '+10 000 clients formés'});
+                      else if (v === 'guarantee') setMarketingInputs({...marketingInputs, proof: '🛡️ Satisfait ou remboursé 30 jours'});
+                    }}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Choisir un type..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="reviews">⭐ Avis clients</SelectItem>
+                      <SelectItem value="numbers">📊 Chiffres</SelectItem>
+                      <SelectItem value="guarantee">🛡️ Garantie</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Textarea
+                    value={marketingInputs.proof}
+                    onChange={(e) => setMarketingInputs({...marketingInputs, proof: e.target.value})}
+                    placeholder="Ex: 97% de nos élèves génèrent des ventes en -30j"
+                    rows={2}
+                  />
+                </div>
+
+                {/* Offre + CTA */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Offre *</Label>
+                    <Input
+                      value={marketingInputs.offer}
+                      onChange={(e) => setMarketingInputs({...marketingInputs, offer: e.target.value})}
+                      placeholder="Ex: -50% cette semaine"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>CTA *</Label>
+                    <Input
+                      value={marketingInputs.cta}
+                      onChange={(e) => setMarketingInputs({...marketingInputs, cta: e.target.value})}
+                      placeholder="Ex: Je rejoins maintenant"
+                    />
+                  </div>
+                </div>
+
+                {/* Upload images produit (optionnel) */}
+                <ReferenceImageUploader
+                  images={marketingInputs.productImages}
+                  onImagesChange={(imgs) => setMarketingInputs({...marketingInputs, productImages: imgs})}
+                  maxImages={3}
+                  label="Images produit (optionnel)"
+                />
+
+                {/* Toggle décliner en 3 formats */}
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <div>
+                    <Label>Décliner en 3 formats</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Génère 9 visuels (3 × 1:1, 9:16, 4:5) au lieu de 3
+                    </p>
+                  </div>
+                  <Switch checked={multiFormatMode} onCheckedChange={setMultiFormatMode} />
+                </div>
+
+                {/* Mini récap */}
+                <div className="p-3 rounded-lg bg-background border">
+                  <p className="text-sm font-medium mb-2">Récapitulatif</p>
+                  <ul className="text-xs text-muted-foreground space-y-1">
+                    <li>📦 Output: {multiFormatMode ? '9 créas' : '3 créas'}</li>
+                    <li>🎯 Structure: Bénéfice → Preuve → Offre+CTA</li>
+                    <li>📐 Formats: {multiFormatMode ? '1:1, 9:16, 4:5 (×3)' : ratioMaster}</li>
+                  </ul>
+                </div>
+
+                {/* Button to switch back to content mode */}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setPackGoal('content')}
+                  className="text-xs text-muted-foreground"
+                >
+                  ← Revenir au mode Contenu
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Standard Pack Form - shown when packGoal === 'content' */}
+          {packGoal === 'content' && (
+          <>
           <Card>
             <CardHeader>
               <CardTitle>Configuration du Pack</CardTitle>
@@ -1183,21 +1372,43 @@ export default function StudioMulti() {
               </div>
             </CardContent>
           </Card>
+          </>
+          )}
 
+          {/* Cost and Submit - shown for both modes */}
           <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50 border">
             <div>
               <p className="font-medium">Coût estimé</p>
-              <p className="text-2xl font-bold text-primary">{calculatePackCost()} Woofs</p>
+              <p className="text-2xl font-bold text-primary">
+                {packGoal === 'marketing' 
+                  ? (multiFormatMode ? 9 : 3)
+                  : calculatePackCost()
+                } Woofs
+              </p>
               <p className="text-xs text-muted-foreground">
-                {imageCount > 0 && `${imageCount} images × 1`}
-                {carouselCount > 0 && ` + ${carouselCount} carrousels × 10`}
-                {videoCount > 0 && ` + ${videoCount} vidéos × 25`}
+                {packGoal === 'marketing' ? (
+                  multiFormatMode 
+                    ? '3 rôles × 3 formats = 9 images' 
+                    : '3 visuels (Bénéfice, Preuve, Offre)'
+                ) : (
+                  <>
+                    {imageCount > 0 && `${imageCount} images × 1`}
+                    {carouselCount > 0 && ` + ${carouselCount} carrousels × 10`}
+                    {videoCount > 0 && ` + ${videoCount} vidéos × 25`}
+                  </>
+                )}
               </p>
             </div>
             <Button 
               size="lg" 
               onClick={handleSubmitPackCampagne}
-              disabled={loading || !campaignName.trim() || !script.trim() || (imageCount === 0 && carouselCount === 0 && videoCount === 0)}
+              disabled={
+                loading || 
+                (packGoal === 'marketing' 
+                  ? (!marketingInputs.productName.trim() || !marketingInputs.mainBenefit.trim() || !marketingInputs.proof.trim() || !marketingInputs.offer.trim() || !marketingInputs.cta.trim())
+                  : (!campaignName.trim() || !script.trim() || (imageCount === 0 && carouselCount === 0 && videoCount === 0))
+                )
+              }
             >
               {loading ? (
                 <>
@@ -1206,8 +1417,8 @@ export default function StudioMulti() {
                 </>
               ) : (
                 <>
-                  <Play className="h-4 w-4 mr-2" />
-                  Lancer le pack
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  {packGoal === 'marketing' ? 'Lancer le pack marketing' : 'Lancer le pack'}
                 </>
               )}
             </Button>
