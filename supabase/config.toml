@@ -110,3 +110,12 @@ verify_jwt = false
 
 [functions.ai-image-tools]
 verify_jwt = true
+
+[functions.verify-upsell-payment]
+verify_jwt = false
+
+[functions.generate-upsell-pack]
+verify_jwt = false
+
+[functions.download-upsell-zip]
+verify_jwt = true

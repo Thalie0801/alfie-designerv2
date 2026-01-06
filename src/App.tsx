@@ -13,6 +13,8 @@ import Quiz from "./pages/Quiz";
 import Start from "./pages/Start";
 import FreePack from "./pages/FreePack";
 import CheckoutExpress from "./pages/CheckoutExpress";
+import UpsellVisuels from "./pages/UpsellVisuels";
+import UpsellVisuelsDelivery from "./pages/UpsellVisuelsDelivery";
 
 import Dashboard from "./pages/Dashboard";
 import Billing from "./pages/Billing";
@@ -59,6 +61,8 @@ const AppRoutes = () => {
         <Route path="/start" element={<Start />} />
         <Route path="/free-pack" element={<FreePack />} />
         <Route path="/checkout/express" element={<CheckoutExpress />} />
+        <Route path="/upsell-visuels" element={<UpsellVisuels />} />
+        <Route path="/upsell-visuels/delivery" element={<UpsellVisuelsDelivery />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/verify-reset" element={<VerifyReset />} />
         <Route path="/reset-password" element={<ResetPassword />} />
