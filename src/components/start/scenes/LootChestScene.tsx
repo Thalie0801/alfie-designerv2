@@ -273,6 +273,7 @@ Slide 5: CTA - Testez gratuitement maintenant !`;
               <Check className="w-4 h-4 text-alfie-mint" />
               <span>Export ZIP immédiat</span>
             </div>
+          </div>
           
           <div className="flex items-center justify-center gap-3 mb-4">
             <span className="text-lg text-muted-foreground line-through">49€</span>
