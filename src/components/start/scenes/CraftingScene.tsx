@@ -5,12 +5,20 @@ import { ParticleField } from '../game/ParticleField';
 import { supabase } from '@/integrations/supabase/client';
 import type { Intent, GeneratedAsset } from '@/lib/types/startFlow';
 
-const CRAFTING_STEPS = [
-  { id: 1, label: '🔥 Forge les hooks', duration: 2500 },
-  { id: 2, label: '🔨 Assemble les slides', duration: 3000 },
-  { id: 3, label: '✨ Poli le design', duration: 3500 },
-  { id: 4, label: '📦 Emballe le loot', duration: 2000 },
-  { id: 5, label: '🔍 Loot check', duration: 1500 },
+const CRAFTING_STEPS_SOCIAL = [
+  { id: 1, label: '🎨 Analyse de ton style', duration: 2000 },
+  { id: 2, label: '📐 Post 1:1 en création...', duration: 2500 },
+  { id: 3, label: '📱 Story 9:16 en cours...', duration: 2500 },
+  { id: 4, label: '🖼️ Cover 4:5 presque prêt...', duration: 2000 },
+  { id: 5, label: '✅ Pack finalisé !', duration: 1000 },
+];
+
+const CRAFTING_STEPS_CONVERSION = [
+  { id: 1, label: '🎯 Analyse de ton offre', duration: 2000 },
+  { id: 2, label: '💡 Visuel Bénéfice...', duration: 2500 },
+  { id: 3, label: '🏆 Visuel Preuve...', duration: 2500 },
+  { id: 4, label: '🚀 Visuel Offre + CTA...', duration: 2000 },
+  { id: 5, label: '✅ Pack prêt à vendre !', duration: 1000 },
 ];
 
 interface CraftingSceneProps {
@@ -27,6 +35,10 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
   const generationStarted = useRef(false);
   const animationComplete = useRef(false);
   const generatedAssets = useRef<GeneratedAsset[]>([]);
+
+  const CRAFTING_STEPS = intent.packMode === 'conversion' 
+    ? CRAFTING_STEPS_CONVERSION 
+    : CRAFTING_STEPS_SOCIAL;
 
   // Start animation
   useEffect(() => {
@@ -70,7 +82,7 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
     return () => {
       clearTimeout(startTimeout);
     };
-  }, [onComplete]);
+  }, [onComplete, CRAFTING_STEPS]);
 
   // Start generation
   useEffect(() => {
@@ -90,6 +102,7 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
             userId: parsedLead?.id || 'anonymous',
             brandId: parsedLead?.brandId || 'temp-brand',
             email: email || parsedLead?.email || '',
+            packMode: intent.packMode,
             brandData: {
               brandName: intent.brandName || 'Mon Business',
               sector: 'coach',
@@ -97,6 +110,8 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
               colorChoice: intent.stylePreset === 'pro' ? 'neutral' : 'bold',
               fontChoice: 'modern',
               objective: intent.goal,
+              topic: intent.topic,
+              cta: intent.cta,
             },
           },
         });
@@ -163,12 +178,14 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
             }
             transition={{ duration: 0.8, repeat: Infinity }}
           >
-            ⚒️
+            {intent.packMode === 'conversion' ? '🎯' : '⚒️'}
           </motion.div>
 
           {/* Title */}
           <h2 className="text-2xl font-bold text-center text-foreground mb-2">
-            Alfie forge ton pack...
+            {intent.packMode === 'conversion' 
+              ? 'Alfie prépare tes visuels de vente...'
+              : 'Alfie forge ton pack...'}
           </h2>
           <p className="text-center text-muted-foreground mb-8">
             Quelques secondes et c'est prêt !
