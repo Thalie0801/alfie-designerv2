@@ -10,7 +10,7 @@ import { trackEvent } from '@/utils/trackEvent';
 import logo from '@/assets/alfie-logo-black.svg';
 
 // Price ID pour le pack 30 visuels 19€
-const VISUELS_30_PRICE_ID = 'price_upsell_visuels_30';
+const VISUELS_30_PRICE_ID = 'price_1Smf0kQvcbGhgt8SdTqq63t2';
 
 export default function UpsellVisuels() {
   const [searchParams] = useSearchParams();

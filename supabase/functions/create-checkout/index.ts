@@ -125,6 +125,15 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Construire l'URL de succès selon le type d'achat
+      let successUrl = `${frontendUrl}/dashboard?payment=success&session_id={CHECKOUT_SESSION_ID}&type=${body.purchase_type || 'one_off'}`;
+      
+      // Pour les packs upsell visuels, rediriger vers la page de vérification
+      if (body.purchase_type === 'visuels_pack_30') {
+        const brandIdParam = body.metadata?.brandId ? `&brandId=${body.metadata.brandId}` : '';
+        successUrl = `${frontendUrl}/upsell-visuels?success=true&session_id={CHECKOUT_SESSION_ID}${brandIdParam}`;
+      }
+
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         customer_email: user.email,
@@ -136,7 +145,7 @@ Deno.serve(async (req) => {
         ],
         metadata,
         allow_promotion_codes: true,
-        success_url: `${frontendUrl}/dashboard?payment=success&session_id={CHECKOUT_SESSION_ID}&type=${body.purchase_type || 'one_off'}`,
+        success_url: successUrl,
         cancel_url: `${frontendUrl}/billing?payment=cancelled`,
       });
 
