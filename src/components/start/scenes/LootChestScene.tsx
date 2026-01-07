@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Download, Copy, RefreshCw, Save, Check, ExternalLink, Sparkles } from 'lucide-react';
+import { Download, RefreshCw, Save, Check, ExternalLink, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { ParticleField } from '../game/ParticleField';
@@ -14,7 +14,6 @@ interface LootChestSceneProps {
 }
 
 export function LootChestScene({ assets, onVariation, onSavePreset }: LootChestSceneProps) {
-  const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [chestOpened, setChestOpened] = useState(false);
   const prefersReducedMotion = useReducedMotion();
@@ -41,23 +40,6 @@ export function LootChestScene({ assets, onVariation, onSavePreset }: LootChestS
     } finally {
       setDownloading(false);
     }
-  };
-
-  const handleCopyTexts = () => {
-    const mockTexts = `Slide 1: Hook - Attention ! Vous perdez 3h par semaine sur Canva ?
-    
-Slide 2: Problème - Le design prend du temps. Beaucoup trop de temps.
-
-Slide 3: Solution - Alfie génère vos visuels en 90 secondes.
-
-Slide 4: Preuve - +2000 créateurs utilisent déjà Alfie.
-
-Slide 5: CTA - Testez gratuitement maintenant !`;
-
-    navigator.clipboard.writeText(mockTexts);
-    setCopied(true);
-    toast.success('Textes copiés ! 📋');
-    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleUpsellClick = () => {
@@ -192,7 +174,7 @@ Slide 5: CTA - Testez gratuitement maintenant !`;
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
-          className="flex flex-col sm:flex-row justify-center gap-4 mb-8"
+          className="flex justify-center mb-8"
         >
           <Button
             onClick={handleDownloadZip}
@@ -202,16 +184,6 @@ Slide 5: CTA - Testez gratuitement maintenant !`;
           >
             <Download className="w-5 h-5" />
             {downloading ? 'Téléchargement...' : 'Télécharger ZIP'}
-          </Button>
-          
-          <Button
-            onClick={handleCopyTexts}
-            variant="outline"
-            size="lg"
-            className="gap-2 rounded-xl"
-          >
-            {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
-            {copied ? 'Copié !' : 'Copier textes'}
           </Button>
         </motion.div>
 

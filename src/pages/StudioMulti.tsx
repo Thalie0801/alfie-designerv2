@@ -574,49 +574,49 @@ export default function StudioMulti() {
       {/* Packs prédéfinis */}
       <Card className="p-4" data-tour-id="studio-multi-presets">
         <h3 className="font-semibold text-sm mb-3">📦 Packs prédéfinis</h3>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={() => loadPreset('lancement')}
-            className="flex flex-col h-auto py-3"
+            className="flex flex-col h-auto py-4 sm:py-3"
           >
-            <span className="text-lg mb-1">🚀</span>
-            <span className="text-xs font-medium">Lancement</span>
-            <span className="text-[10px] text-muted-foreground">4 img + 1 car + 1 vid</span>
+            <span className="text-xl sm:text-lg mb-1">🚀</span>
+            <span className="text-sm sm:text-xs font-medium">Lancement</span>
+            <span className="text-xs sm:text-[10px] text-muted-foreground whitespace-nowrap">4 img + 1 car + 1 vid</span>
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={() => loadPreset('evergreen')}
-            className="flex flex-col h-auto py-3"
+            className="flex flex-col h-auto py-4 sm:py-3"
           >
-            <span className="text-lg mb-1">🌲</span>
-            <span className="text-xs font-medium">Evergreen</span>
-            <span className="text-[10px] text-muted-foreground">3 img + 2 car</span>
+            <span className="text-xl sm:text-lg mb-1">🌲</span>
+            <span className="text-sm sm:text-xs font-medium">Evergreen</span>
+            <span className="text-xs sm:text-[10px] text-muted-foreground whitespace-nowrap">3 img + 2 car</span>
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={() => loadPreset('promo')}
-            className="flex flex-col h-auto py-3"
+            className="flex flex-col h-auto py-4 sm:py-3"
           >
-            <span className="text-lg mb-1">🔥</span>
-            <span className="text-xs font-medium">Promo</span>
-            <span className="text-[10px] text-muted-foreground">2 img + 1 vid</span>
+            <span className="text-xl sm:text-lg mb-1">🔥</span>
+            <span className="text-sm sm:text-xs font-medium">Promo</span>
+            <span className="text-xs sm:text-[10px] text-muted-foreground whitespace-nowrap">2 img + 1 vid</span>
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={() => loadPreset('marketing')}
-            className="flex flex-col h-auto py-3 relative border-primary/50"
+            className="flex flex-col h-auto py-4 sm:py-3 relative border-primary/50"
           >
-            <Badge className="absolute -top-2 -right-2 text-[8px] px-1.5 py-0.5 bg-primary">
+            <Badge className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 text-[8px] px-1.5 py-0.5 bg-primary">
               Conversion
             </Badge>
-            <span className="text-lg mb-1">💰</span>
-            <span className="text-xs font-medium">Marketing</span>
-            <span className="text-[10px] text-muted-foreground">3 visuels qui vendent</span>
+            <span className="text-xl sm:text-lg mb-1">💰</span>
+            <span className="text-sm sm:text-xs font-medium">Marketing</span>
+            <span className="text-xs sm:text-[10px] text-muted-foreground whitespace-nowrap">3 visuels</span>
           </Button>
         </div>
       </Card>

@@ -13,7 +13,6 @@ import {
   Eye, 
   Download, 
   FileSpreadsheet, 
-  Copy, 
   FileArchive, 
   RefreshCw, 
   Loader2,
@@ -165,8 +164,7 @@ export function VideoBatchesTab({ orderId: _orderId }: VideoBatchesTabProps) {
     refetch, 
     retryClip, 
     downloadCSV, 
-    downloadZIP, 
-    copyAllTexts 
+    downloadZIP 
   } = useVideoBatches(user?.id, activeBrandId ?? undefined);
 
   const [downloadingCSV, setDownloadingCSV] = useState<string | null>(null);
@@ -251,15 +249,6 @@ export function VideoBatchesTab({ orderId: _orderId }: VideoBatchesTabProps) {
                   <FileSpreadsheet className="h-4 w-4 mr-2" />
                 )}
                 CSV Canva
-              </Button>
-
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => copyAllTexts(batch)}
-              >
-                <Copy className="h-4 w-4 mr-2" />
-                Copier textes
               </Button>
 
               <Button
