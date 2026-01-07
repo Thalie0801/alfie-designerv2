@@ -1,5 +1,5 @@
 // functions/alfie-orchestrator/index.ts
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY, INTERNAL_FN_SECRET } from "../_shared/env.ts";
 import {
   type ConversationState,

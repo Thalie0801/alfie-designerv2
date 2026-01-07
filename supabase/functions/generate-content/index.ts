@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { uploadToCloudinary } from "../_shared/cloudinaryUploader.ts";
 
 import { SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL, LOVABLE_API_KEY, validateEnv } from "../_shared/env.ts";

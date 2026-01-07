@@ -1,7 +1,7 @@
 // functions/alfie-render-carousel-slide/index.ts
 // v3.0.0 — Premium mode with native text integration (no SVG overlay)
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { uploadTextAsRaw } from "../_shared/cloudinaryUploader.ts";
 import { buildCarouselSlideUrl, Slide, CarouselType, BrandFonts } from "../_shared/imageCompositor.ts";
 import { getCarouselModel, getVertexCarouselModel, LOVABLE_MODELS } from "../_shared/aiModels.ts";

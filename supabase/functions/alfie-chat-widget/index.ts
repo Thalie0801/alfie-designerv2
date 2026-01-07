@@ -644,7 +644,7 @@ Deno.serve(async (req) => {
     if (SUPABASE_URL && SUPABASE_ANON_KEY) {
       try {
         // ✅ VALIDATION PROPRIÉTÉ DE LA MARQUE
-        const supabaseAuth = await import("https://esm.sh/@supabase/supabase-js@2.57.2").then(mod => mod.createClient);
+        const supabaseAuth = await import("npm:@supabase/supabase-js@2").then(mod => mod.createClient);
         const supabase = supabaseAuth(SUPABASE_URL, SUPABASE_ANON_KEY, {
           global: { headers: { Authorization: authHeader } }
         });

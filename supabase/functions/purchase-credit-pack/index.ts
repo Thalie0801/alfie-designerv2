@@ -1,6 +1,6 @@
 import "https://deno.land/x/xhr@0.4.0/mod.ts";
-import Stripe from "https://esm.sh/stripe@18.5.0";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import Stripe from "npm:stripe@18";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { corsHeaders } from "../_shared/cors.ts";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../_shared/env.ts";
