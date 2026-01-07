@@ -454,10 +454,7 @@ export default function StudioMulti() {
 
       const result = await createJob(spec);
       
-      toast.success('Pack campagne lancé !', {
-        description: `Job ${result.jobId.slice(0, 8)}... créé avec ${result.steps.length} étapes`,
-      });
-
+      // Pas de toast ici - JobProgressInline affichera la notification finale
       // Afficher la progression inline au lieu de naviguer
       setActiveJobId(result.jobId);
     } catch (err) {
