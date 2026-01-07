@@ -287,27 +287,52 @@ ${fontsText ? fontsText.split(', ').map(line => `  • ${line}`).join('\n') : ' 
 }
 
 /**
+ * VisualLocks - Types pour les verrouillages visuels
+ */
+export interface VisualLocks {
+  palette_lock?: boolean;  // true = utiliser la palette Brand Kit
+  fonts_lock?: boolean;    // true = utiliser les fonts Brand Kit
+  logo_lock?: boolean;     // true = intégrer le logo
+  identity_lock?: boolean;
+  face_lock?: boolean;
+  outfit_lock?: boolean;
+  camera_angle_lock?: boolean;
+}
+
+/**
  * Enrichit un prompt avec le Brand Kit pour génération visuelle
  * CRITIQUE: Les instructions sont formulées pour ne JAMAIS apparaître dans l'image générée
+ * 
+ * @param basePrompt - Le prompt de base
+ * @param brandKit - Le Brand Kit optionnel
+ * @param locks - Les verrouillages visuels (palette, fonts, logo) - par défaut tous activés
  */
 export function enrichPromptWithBrandKit(
   basePrompt: string,
-  brandKit?: AgentContext['brandKit']
+  brandKit?: AgentContext['brandKit'],
+  locks?: VisualLocks
 ): string {
   if (!brandKit) {
     return basePrompt;
   }
   
+  // ✅ Par défaut, tous les locks sont actifs (true) sauf si explicitement désactivés
+  const paletteLock = locks?.palette_lock !== false;
+  const fontsLock = locks?.fonts_lock !== false;
+  
   const colors = brandKit.colors || brandKit.palette || [];
   const colorHex = colors.map((c: any) => typeof c === 'string' ? c : c.hex || c.value).filter(Boolean);
-  const fontsText = normalizeFonts(brandKit.fonts);
+  const fontsText = fontsLock ? normalizeFonts(brandKit.fonts) : null;
   
-  // ✅ Si palette disponible, forcer son utilisation
+  // ✅ Si palette disponible ET palette_lock actif, forcer son utilisation
   let colorInstruction: string;
-  if (colorHex.length > 0) {
+  if (paletteLock && colorHex.length > 0) {
     // ✅ PALETTE OBLIGATOIRE - Ne jamais suggérer, FORCER
     colorInstruction = `MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${colorHex.join(', ')}. NO substitutions allowed. Apply across backgrounds, gradients, and all colored elements.`;
     console.log('[enrichPromptWithBrandKit] ✅ Forcing brand palette:', colorHex.join(', '));
+  } else if (!paletteLock) {
+    colorInstruction = 'Use creative color palette adapted to the content.';
+    console.log('[enrichPromptWithBrandKit] ⚠️ palette_lock=false, palette libre');
   } else {
     colorInstruction = 'Use professional neutral color palette.';
   }
@@ -315,12 +340,17 @@ export function enrichPromptWithBrandKit(
   const styleInstruction = brandKit.style || brandKit.voice || 'modern professional';
   const nicheContext = brandKit.niche ? ` reflecting ${brandKit.niche} industry aesthetics` : '';
   
+  // ✅ Fonts seulement si fonts_lock actif
+  const fontsInstruction = fontsLock && fontsText 
+    ? `Typography should feel ${fontsText}.` 
+    : 'Typography should feel clean and modern.';
+  
   return `${basePrompt}
 
 VISUAL DIRECTION (CRITICAL: This is styling metadata, NOT content to display):
 ${colorInstruction}
-Apply ${styleInstruction} visual style${nicheContext}. Use high-quality professional composition with strong visual hierarchy and readability. Typography should feel ${fontsText || 'clean and modern'}. Create cohesive brand-aligned imagery.
-${colorHex.length > 0 ? `STRICT: Every slide MUST use ONLY these brand colors: ${colorHex.join(', ')} - DO NOT use any other colors.` : ''}
+Apply ${styleInstruction} visual style${nicheContext}. Use high-quality professional composition with strong visual hierarchy and readability. ${fontsInstruction} Create cohesive brand-aligned imagery.
+${paletteLock && colorHex.length > 0 ? `STRICT: Every slide MUST use ONLY these brand colors: ${colorHex.join(', ')} - DO NOT use any other colors.` : ''}
 
 ABSOLUTE CRITICAL: DO NOT RENDER THE FOLLOWING AS VISIBLE TEXT IN THE IMAGE:
 - Color codes (hex values like #90E3C2, #B58EE5, #F9C851)

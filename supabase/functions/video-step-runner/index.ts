@@ -1078,6 +1078,7 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
     jobId,           // ← Pour orderId/carouselId
     carouselIndex,   // ← Index du carrousel
     totalSlides,     // ← Nombre total de slides
+    locks,           // ✅ NEW: Visual locks (palette_lock, fonts_lock, logo_lock)
   } = input;
   
   console.log(`[gen_slide] userId: ${userId}, brandId: ${brandId}, useBrandKit: ${useBrandKit}`);
@@ -1086,6 +1087,7 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
   console.log(`[gen_slide] referenceImages: ${Array.isArray(referenceImages) ? referenceImages.length : 0}`);
   console.log(`[gen_slide] referenceMode: ${referenceMode}`);
   console.log(`[gen_slide] visualStyleCategory: ${visualStyleCategory}, backgroundOnly: ${backgroundOnly}`);
+  console.log(`[gen_slide] locks:`, JSON.stringify(locks || {}));
   console.log(`[gen_slide] Generating slide ${slideIndex}`);
   
   // ✅ V11: Enhanced brand context logging
@@ -1235,6 +1237,7 @@ async function handleGenSlide(input: Record<string, unknown>): Promise<Record<st
       textVersion: 1,          // ✅ AJOUTÉ
       renderVersion: 1,        // ✅ AJOUTÉ
       campaign: 'job-engine',  // ✅ AJOUTÉ
+      locks,                   // ✅ NEW: Propagate visual locks
     }),
   });
 

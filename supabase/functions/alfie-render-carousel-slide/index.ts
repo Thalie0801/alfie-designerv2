@@ -40,6 +40,17 @@ interface BrandKit {
   text_color?: string | null; // ✅ V10: Couleur de texte personnalisée
 }
 
+// ✅ Visual locks interface
+interface VisualLocks {
+  palette_lock?: boolean;  // true = utiliser la palette Brand Kit
+  fonts_lock?: boolean;    // true = utiliser les fonts Brand Kit
+  logo_lock?: boolean;     // true = intégrer le logo
+  identity_lock?: boolean;
+  face_lock?: boolean;
+  outfit_lock?: boolean;
+  camera_angle_lock?: boolean;
+}
+
 interface SlideRequest {
   userId?: string;               // ✅ Required or deduced from orderId
   prompt: string;
@@ -72,6 +83,7 @@ interface SlideRequest {
   colorMode?: ColorMode;        // ✅ NOUVEAU: Coloré ou Pastel
   visualStyle?: VisualStyle;    // ✅ NOUVEAU: Style de rendu (fallback)
   visualStyleCategory?: VisualStyle; // ✅ V12: Mode de contenu (background/character/product) - PRIORITAIRE
+  locks?: VisualLocks;          // ✅ NEW: Visual locks (palette, fonts, logo)
 }
 
 type GenSize = { w: number; h: number };
@@ -132,6 +144,22 @@ function getSlideRole(index: number, total: number): string {
   if (index === 1) return "PROBLEM/CONTEXT";
   if (index === total - 2) return "SOLUTION/BENEFIT";
   return "KEY POINT/INSIGHT";
+}
+
+/**
+ * ✅ Helper: Récupère la palette conditionnellement selon palette_lock
+ * @param brandKit - Le Brand Kit
+ * @param locks - Les locks visuels
+ * @returns Array de couleurs (vide si palette_lock=false)
+ */
+function getEffectivePalette(brandKit?: BrandKit, locks?: VisualLocks): string[] {
+  // Si palette_lock explicitement désactivé, retourner palette vide
+  if (locks?.palette_lock === false) {
+    console.log('[getEffectivePalette] ⚠️ palette_lock=false, palette libre');
+    return [];
+  }
+  // Sinon, utiliser la palette du Brand Kit
+  return brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
 }
 
 /**
@@ -1107,7 +1135,16 @@ Deno.serve(async (req) => {
       colorMode = 'vibrant', // ✅ NOUVEAU: Mode couleurs (vibrant/pastel)
       visualStyle = 'background', // ✅ Style de rendu (3d_pixar_style, photorealistic, etc.)
       visualStyleCategory, // ✅ NOUVEAU: Mode de contenu (background/character/product) - PRIORITAIRE
+      locks, // ✅ NEW: Visual locks (palette_lock, fonts_lock, logo_lock)
     } = params;
+    
+    // ✅ Défauts des locks (tous activés par défaut)
+    const effectiveLocks: VisualLocks = {
+      palette_lock: locks?.palette_lock !== false,  // Par défaut true
+      fonts_lock: locks?.fonts_lock !== false,      // Par défaut true
+      logo_lock: locks?.logo_lock !== false,        // Par défaut true
+    };
+    console.log(`[render-slide] 🔒 Visual locks:`, JSON.stringify(effectiveLocks));
     
     // ✅ V12: visualStyleCategory est PRIORITAIRE sur visualStyle (qui est le style de rendu 3D/photo/etc.)
     // visualStyleCategory = 'character' | 'background' | 'product' (mode de contenu)

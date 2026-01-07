@@ -64,6 +64,8 @@ export const MarketingInputs = z.object({
 // Locks et contraintes visuelles
 export const VisualLocks = z.object({
   palette_lock: z.boolean().default(true),
+  fonts_lock: z.boolean().default(true),    // ✅ NEW: Verrouille l'utilisation des fonts Brand Kit
+  logo_lock: z.boolean().default(true),      // ✅ NEW: Verrouille l'intégration du logo
   light_mode: z.boolean().default(false),
   safe_zone: z.boolean().default(false),
   negative_prompts: z.array(z.string()).optional(),
