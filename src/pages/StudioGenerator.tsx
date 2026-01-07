@@ -329,6 +329,8 @@ export function StudioGenerator() {
         userPlan: profile?.plan || "starter",
         source: 'studio_solo',
         subjectPackId: effectiveSubjectPackId || undefined,
+        // ✅ Passer carouselMode pour les carrousels "Fond seul"
+        carouselMode: selectedType === 'carousel' && backgroundOnly ? 'background_only' : 'standard',
       });
 
       toast.success(`${ASSET_CONFIG[selectedType].emoji} Génération lancée !`);

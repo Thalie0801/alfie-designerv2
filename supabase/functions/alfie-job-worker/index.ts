@@ -1938,7 +1938,12 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   const carousel_id = payload.carousel_id || crypto.randomUUID();
   const totalSlides = payload.count || 5;
   const carouselType = payload.carouselType || 'content';
-  const carouselMode = payload.carouselMode || 'standard';
+  // ✅ Dériver carouselMode depuis background_only si non spécifié
+  let carouselMode: 'standard' | 'background_only' = payload.carouselMode || 'standard';
+  if (!payload.carouselMode && payload.background_only === true) {
+    carouselMode = 'background_only';
+    console.log(`[processRenderCarousels] 🖼️ Derived carouselMode 'background_only' from background_only flag`);
+  }
   const useBrandKit = resolveUseBrandKit(payload, jobMeta);
 
   // ✅ Charger le Brand Kit AVANT de dériver colorMode
