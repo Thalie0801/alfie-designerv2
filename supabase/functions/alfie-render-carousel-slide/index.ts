@@ -175,11 +175,12 @@ function buildImagePromptStandard(
   slideContent: { title: string; subtitle?: string; alt: string },
   slideIndex: number,
   totalSlides: number,
-  brandKit?: BrandKit, // ✅ NEW: Brand Kit pour personnalisation
-  colorMode: ColorMode = 'vibrant' // ✅ NEW: Mode couleurs
+  brandKit?: BrandKit,
+  colorMode: ColorMode = 'vibrant',
+  locks?: VisualLocks // ✅ NEW: Visual locks
 ): string {
-  // ✅ Palette Brand Kit - OBLIGATOIRE
-  const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
+  // ✅ Palette conditionnelle selon palette_lock
+  const palette = getEffectivePalette(brandKit, locks);
   
   // ✅ Déterminer le style visuel basé sur le Brand Kit
   let visualStyle = "modern professional design";
@@ -279,10 +280,11 @@ function buildImagePromptCharacter(
   slideIndex: number,
   totalSlides: number,
   colorMode: ColorMode = 'vibrant',
-  hasAvatarReference: boolean = false // ✅ NEW: Indique si une image de référence est fournie
+  hasAvatarReference: boolean = false,
+  locks?: VisualLocks // ✅ NEW: Visual locks
 ): string {
-  // ✅ Palette Brand Kit - OBLIGATOIRE
-  const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
+  // ✅ Palette conditionnelle selon palette_lock
+  const palette = getEffectivePalette(brandKit, locks);
   
   // Déterminer le style de personnage selon le Brand Kit
   let characterStyle = "3D cartoon character in Pixar/Disney animation style, expressive face, friendly appearance";
@@ -363,12 +365,13 @@ function buildImagePromptCharacterWithText(
   totalSlides: number,
   brandKit?: BrandKit,
   colorMode: ColorMode = 'vibrant',
-  hasAvatarReference: boolean = false
+  hasAvatarReference: boolean = false,
+  locks?: VisualLocks // ✅ NEW: Visual locks
 ): string {
   const slideRole = getSlideRole(slideIndex, totalSlides);
   
-  // ✅ Palette Brand Kit - OBLIGATOIRE
-  const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
+  // ✅ Palette conditionnelle selon palette_lock
+  const palette = getEffectivePalette(brandKit, locks);
   
   // ✅ Mode couleurs (pastel ou vibrant)
   const colorDescription = colorMode === 'pastel'
@@ -469,12 +472,13 @@ function buildImagePromptProductWithText(
   totalSlides: number,
   brandKit?: BrandKit,
   colorMode: ColorMode = 'vibrant',
-  hasProductReference: boolean = false
+  hasProductReference: boolean = false,
+  locks?: VisualLocks // ✅ NEW: Visual locks
 ): string {
   const slideRole = getSlideRole(slideIndex, totalSlides);
   
-  // ✅ Palette Brand Kit
-  const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
+  // ✅ Palette conditionnelle selon palette_lock
+  const palette = getEffectivePalette(brandKit, locks);
   const paletteStr = palette.length > 0 
     ? `Brand colors: ${palette.join(', ')}` 
     : '';
@@ -562,10 +566,11 @@ function buildImagePromptProduct(
   referenceImageUrl: string | null | undefined,
   slideIndex: number,
   totalSlides: number,
-  colorMode: ColorMode = 'vibrant'
+  colorMode: ColorMode = 'vibrant',
+  locks?: VisualLocks // ✅ NEW: Visual locks
 ): string {
-  // ✅ Palette Brand Kit - OBLIGATOIRE
-  const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
+  // ✅ Palette conditionnelle selon palette_lock
+  const palette = getEffectivePalette(brandKit, locks);
   
   // Si pas d'image de référence, fallback vers un style produit générique
   const hasReference = !!referenceImageUrl;
@@ -652,10 +657,11 @@ function buildImagePromptPremium(
   slideIndex: number,
   totalSlides: number,
   referenceImageUrl?: string | null,
-  colorMode: ColorMode = 'vibrant' // ✅ NEW: Mode couleurs
+  colorMode: ColorMode = 'vibrant',
+  locks?: VisualLocks // ✅ NEW: Visual locks
 ): string {
-  // ✅ Palette Brand Kit - OBLIGATOIRE
-  const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
+  // ✅ Palette conditionnelle selon palette_lock
+  const palette = getEffectivePalette(brandKit, locks);
   
   // ✅ Style visuel enrichi par le Brand Kit V2
   let visualStyle = "vibrant gradient background, rich saturated colors, elegant modern design";
@@ -760,13 +766,14 @@ function buildImagePromptWithText(
   slideIndex: number,
   totalSlides: number,
   brandKit?: BrandKit,
-  colorMode: ColorMode = 'vibrant'
+  colorMode: ColorMode = 'vibrant',
+  locks?: VisualLocks // ✅ NEW: Visual locks
 ): string {
   const slideRole = getSlideRole(slideIndex, totalSlides);
   const colorModeLabel = colorMode === 'pastel' ? 'soft pastel' : 'vibrant colorful';
   
-  // ✅ Palette Brand Kit
-  const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
+  // ✅ Palette conditionnelle selon palette_lock
+  const palette = getEffectivePalette(brandKit, locks);
   const paletteStr = palette.length > 0 
     ? `Brand colors: ${palette.join(', ')}` 
     : '';
@@ -1287,7 +1294,8 @@ Deno.serve(async (req) => {
           totalSlides,
           brandKit,
           colorMode as ColorMode,
-          hasAvatarForCharacter // true si brandKit.avatar_url existe
+          hasAvatarForCharacter,
+          effectiveLocks // ✅ Pass locks
         );
         console.log(`[render-slide] ${logCtx} 🧑📝 CHARACTER + GLASS CARDS (avatar ref: ${hasAvatarForCharacter})`);
       } else {
@@ -1299,7 +1307,8 @@ Deno.serve(async (req) => {
           slideIndex,
           totalSlides,
           colorMode as ColorMode,
-          hasAvatarForCharacter
+          hasAvatarForCharacter,
+          effectiveLocks // ✅ Pass locks
         );
         console.log(`[render-slide] ${logCtx} 🧑 CHARACTER background-only (avatar ref: ${hasAvatarForCharacter})`);
       }
@@ -1315,7 +1324,8 @@ Deno.serve(async (req) => {
           totalSlides,
           brandKit,
           colorMode as ColorMode,
-          hasProductRef
+          hasProductRef,
+          effectiveLocks // ✅ Pass locks
         );
         console.log(`[render-slide] ${logCtx} 📦📝 PRODUCT + GLASS CARDS (product ref: ${hasProductRef})`);
       } else {
@@ -1327,7 +1337,8 @@ Deno.serve(async (req) => {
           referenceImageUrl,
           slideIndex,
           totalSlides,
-          colorMode as ColorMode
+          colorMode as ColorMode,
+          effectiveLocks // ✅ Pass locks
         );
         console.log(`[render-slide] ${logCtx} 📦 PRODUCT background-only (ref: ${hasProductRef})`);
       }
@@ -1345,7 +1356,8 @@ Deno.serve(async (req) => {
         slideIndex,
         totalSlides,
         brandKit,
-        colorMode as ColorMode
+        colorMode as ColorMode,
+        effectiveLocks // ✅ Pass locks
       );
       console.log(`[render-slide] ${logCtx} 📝 TEXT-INTEGRATED prompt (background with text)`);
     } else {
@@ -1358,7 +1370,8 @@ Deno.serve(async (req) => {
             slideIndex,
             totalSlides,
             referenceImageUrl,
-            colorMode as ColorMode
+            colorMode as ColorMode,
+            effectiveLocks // ✅ Pass locks
           )
         : buildImagePromptStandard(
             globalStyle, 
@@ -1368,7 +1381,8 @@ Deno.serve(async (req) => {
             slideIndex,
             totalSlides,
             brandKit,
-            colorMode as ColorMode
+            colorMode as ColorMode,
+            effectiveLocks // ✅ Pass locks
           );
       console.log(`[render-slide] ${logCtx} 🎨 BACKGROUND-ONLY prompt (mode: ${carouselMode})`);
     }
