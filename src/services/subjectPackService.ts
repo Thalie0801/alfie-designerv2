@@ -26,9 +26,25 @@ export interface CreateSubjectPackInput {
 
 /**
  * Upload an image to Supabase Storage and return the public URL
+ * Returns null if upload fails for optional slots (anchors)
  */
-async function uploadImage(file: File, userId: string, packId: string, slot: string): Promise<string> {
-  console.log('[SubjectPack] uploadImage:', { fileName: file.name, size: file.size, type: file.type, slot, online: navigator.onLine });
+async function uploadImage(
+  file: File, 
+  userId: string, 
+  packId: string, 
+  slot: string,
+  options: { required?: boolean } = { required: true }
+): Promise<string | null> {
+  const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+  console.log('[SubjectPack] uploadImage:', { 
+    slot, 
+    fileName: file.name, 
+    size: `${fileSizeMB}MB`, 
+    type: file.type, 
+    online: navigator.onLine,
+    // @ts-ignore - connection API may not be available
+    connectionType: navigator.connection?.effectiveType || 'unknown'
+  });
   
   // Vérifier la session AVANT l'upload
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -81,18 +97,26 @@ async function uploadImage(file: File, userId: string, packId: string, slot: str
     }
   }
   
-  // Toutes les tentatives ont échoué - message utilisateur clair
+  // Toutes les tentatives ont échoué
   const errorMsg = lastError?.message || 'Erreur inconnue';
   const isNetworkError = errorMsg.includes('fetch') || 
                          errorMsg.includes('network') || 
                          errorMsg.includes('NetworkError') ||
                          errorMsg.includes('Load failed');
   
-  if (isNetworkError) {
-    throw new Error('Erreur réseau. Vérifie ta connexion et réessaie.');
+  const detailedMsg = `${slot} (${file.type}, ${fileSizeMB}MB)`;
+  
+  // Si c'est un slot optionnel (anchors), on retourne null au lieu de throw
+  if (!options.required) {
+    console.warn(`[SubjectPack] Optional upload failed for ${detailedMsg}, continuing without it`);
+    return null;
   }
   
-  throw new Error(`Échec upload ${slot}: ${errorMsg}`);
+  if (isNetworkError) {
+    throw new Error(`Erreur réseau pour ${detailedMsg}. Vérifie ta connexion et réessaie.`);
+  }
+  
+  throw new Error(`Échec upload ${detailedMsg}: ${errorMsg}`);
 }
 
 /**
@@ -135,34 +159,62 @@ export async function getSubjectPack(id: string): Promise<SubjectPack | null> {
  * @param input - Pack metadata
  * @param files - Array of [masterFile, anchorAFile?, anchorBFile?]
  */
+export interface CreateSubjectPackResult {
+  pack: SubjectPack;
+  warnings: string[];
+}
+
+/**
+ * Create a new subject pack with up to 3 images
+ * @param input - Pack metadata
+ * @param files - Array of [masterFile, anchorAFile?, anchorBFile?]
+ * @param onProgress - Optional callback for progress updates
+ */
 export async function createSubjectPack(
   input: CreateSubjectPackInput,
   files: { master: File; anchorA?: File; anchorB?: File },
-  userId: string
-): Promise<SubjectPack> {
+  userId: string,
+  onProgress?: (status: string) => void
+): Promise<CreateSubjectPackResult> {
   console.log('[SubjectPack] Creating pack:', { input, userId, hasFiles: { master: !!files.master, anchorA: !!files.anchorA, anchorB: !!files.anchorB } });
+  
+  const warnings: string[] = [];
   
   // Generate a temporary ID for the folder structure
   const tempId = crypto.randomUUID();
 
   // Upload master image (required)
+  onProgress?.('Upload Master...');
   console.log('[SubjectPack] Uploading master image...');
-  const masterUrl = await uploadImage(files.master, userId, tempId, 'master');
+  const masterUrl = await uploadImage(files.master, userId, tempId, 'master', { required: true });
+  
+  if (!masterUrl) {
+    throw new Error('L\'image Master est obligatoire.');
+  }
   console.log('[SubjectPack] Master uploaded:', masterUrl);
 
-  // Upload optional anchor images
+  // Upload optional anchor images (non-blocking)
   let anchorAUrl: string | null = null;
   let anchorBUrl: string | null = null;
 
   if (files.anchorA) {
-    anchorAUrl = await uploadImage(files.anchorA, userId, tempId, 'anchor-a');
+    onProgress?.('Upload Anchor A...');
+    anchorAUrl = await uploadImage(files.anchorA, userId, tempId, 'anchor-a', { required: false });
+    if (!anchorAUrl) {
+      warnings.push('Anchor A n\'a pas pu être uploadé (réseau/format). Tu peux le re-ajouter plus tard.');
+    }
   }
 
   if (files.anchorB) {
-    anchorBUrl = await uploadImage(files.anchorB, userId, tempId, 'anchor-b');
+    onProgress?.('Upload Anchor B...');
+    anchorBUrl = await uploadImage(files.anchorB, userId, tempId, 'anchor-b', { required: false });
+    if (!anchorBUrl) {
+      warnings.push('Anchor B n\'a pas pu être uploadé (réseau/format). Tu peux le re-ajouter plus tard.');
+    }
   }
 
   // Create the subject pack record
+  onProgress?.('Enregistrement du pack...');
   console.log('[SubjectPack] Creating DB record with brand_id:', input.brand_id);
   const { data, error } = await supabase
     .from('subject_packs')
@@ -187,7 +239,7 @@ export async function createSubjectPack(
   }
   
   console.log('[SubjectPack] Pack created successfully:', data.id);
-  return data as SubjectPack;
+  return { pack: data as SubjectPack, warnings };
 }
 
 /**

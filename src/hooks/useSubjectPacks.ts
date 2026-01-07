@@ -4,6 +4,7 @@ import { useBrandKit } from '@/hooks/useBrandKit';
 import {
   SubjectPack,
   CreateSubjectPackInput,
+  CreateSubjectPackResult,
   listSubjectPacks,
   createSubjectPack,
   deleteSubjectPack,
@@ -42,13 +43,14 @@ export function useSubjectPacks(brandId?: string) {
 
   const createPack = useCallback(async (
     input: CreateSubjectPackInput,
-    files: { master: File; anchorA?: File; anchorB?: File }
-  ) => {
+    files: { master: File; anchorA?: File; anchorB?: File },
+    onProgress?: (status: string) => void
+  ): Promise<CreateSubjectPackResult> => {
     if (!user) throw new Error('Not authenticated');
     
-    const newPack = await createSubjectPack(input, files, user.id);
-    setPacks(prev => [newPack, ...prev]);
-    return newPack;
+    const result = await createSubjectPack(input, files, user.id, onProgress);
+    setPacks(prev => [result.pack, ...prev]);
+    return result;
   }, [user]);
 
   const deletePack = useCallback(async (id: string) => {
