@@ -62,6 +62,16 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/**
+ * ✅ SANITIZE: Supprimer les hashtags des textes destinés aux visuels
+ * Les hashtags appartiennent aux captions, pas sur l'image/vidéo
+ */
+function stripHashtags(text: string | undefined | null): string {
+  if (!text) return "";
+  // Supprime #word et # isolés, puis nettoie les espaces multiples
+  return text.replace(/#\w+/g, "").replace(/#/g, "").replace(/\s{2,}/g, " ").trim();
+}
+
 function isHttp429(e: unknown) {
   const msg = e instanceof Error ? e.message : String(e ?? "");
   return /429|rate limit/i.test(msg);
@@ -726,14 +736,14 @@ Return ONLY this JSON structure (no markdown, no explanation):
       return generateFallbackSlides(topic, slideCount, language);
     }
     
-    // Normaliser et valider chaque slide
+    // Normaliser et valider chaque slide - ✅ SANS HASHTAGS sur les textes visuels
     const normalizedSlides: CarouselSlide[] = Array.from({ length: slideCount }, (_, i) => {
       const found = slidesArray.find((s: any) => s.slide_number === i + 1) || slidesArray[i];
       return {
         slide_number: i + 1,
-        title_on_image: found?.title_on_image?.slice(0, 50) || `Slide ${i + 1}`,
-        text_on_image: found?.text_on_image?.slice(0, 100) || "",
-        caption: found?.caption?.slice(0, 300) || "",
+        title_on_image: stripHashtags(found?.title_on_image)?.slice(0, 50) || `Slide ${i + 1}`,
+        text_on_image: stripHashtags(found?.text_on_image)?.slice(0, 100) || "",
+        caption: found?.caption?.slice(0, 300) || "", // Caption garde les hashtags (c'est pour le post)
       };
     });
     
@@ -1408,10 +1418,10 @@ async function processGenerateVideo(payload: any, jobMeta?: { user_id?: string; 
       console.log("[processGenerateVideo] 🖼️ IMAGE FIRST: Generating reference image...");
       
       try {
-        // ✅ Construire overlayLines avec les textes CORRIGÉS
+        // ✅ Construire overlayLines avec les textes CORRIGÉS - SANS HASHTAGS
         const overlayLines: string[] = [];
-        if (correctedHook) overlayLines.push(correctedHook);
-        if (correctedCta) overlayLines.push(correctedCta);
+        if (correctedHook) overlayLines.push(stripHashtags(correctedHook));
+        if (correctedCta) overlayLines.push(stripHashtags(correctedCta));
         
         console.log("[processGenerateVideo] 📝 Passing overlayLines to image-for-video:", overlayLines);
         
@@ -1976,15 +1986,15 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   // ========================================
   let carouselSlides: CarouselSlide[];
   
-  // ✅ CONVERSION: Si generatedTexts.slides existe, le convertir en carousel_slides
+  // ✅ CONVERSION: Si generatedTexts.slides existe, le convertir en carousel_slides - SANS HASHTAGS
   if (!payload.carousel_slides && payload.generatedTexts?.slides?.length > 0) {
     console.log(`[processRenderCarousels] ♻️ Converting generatedTexts.slides (${payload.generatedTexts.slides.length}) to carousel_slides`);
     payload.carousel_slides = payload.generatedTexts.slides.map((slide: any, i: number) => ({
       slide_number: i + 1,
-      title_on_image: slide.title || "",
-      subtitle: slide.subtitle || "",           // ✅ Propager subtitle
-      text_on_image: slide.body || "",          // ✅ body → text_on_image
-      caption: slide.caption || "",
+      title_on_image: stripHashtags(slide.title) || "",
+      subtitle: stripHashtags(slide.subtitle) || "",           // ✅ Propager subtitle SANS #
+      text_on_image: stripHashtags(slide.body) || "",          // ✅ body → text_on_image SANS #
+      caption: slide.caption || "", // Caption garde les hashtags
     }));
   }
   
@@ -2113,12 +2123,12 @@ Slide ${index + 1} of ${carouselSlides.length}.`;
           globalStyle,
           brandKit: brandMini,
           slideContent: {
-            // ✅ Textes stockés dans text_json pour récupération (pas de rendu overlay)
-            title: slide.title_on_image || "",
-            subtitle: slide.subtitle || "",             // ✅ Propager subtitle explicitement
-            body: slide.text_on_image || "",            // ✅ Propager body (text_on_image)
-            bullets: (slide as any).bullets || [],
-            alt: `Slide ${index + 1}: ${slide.title_on_image}`,
+            // ✅ Textes stockés dans text_json pour récupération (pas de rendu overlay) - SANS HASHTAGS
+            title: stripHashtags(slide.title_on_image) || "",
+            subtitle: stripHashtags(slide.subtitle) || "",             // ✅ Propager subtitle SANS #
+            body: stripHashtags(slide.text_on_image) || "",            // ✅ Propager body SANS #
+            bullets: ((slide as any).bullets || []).map((b: string) => stripHashtags(b)),
+            alt: `Slide ${index + 1}: ${stripHashtags(slide.title_on_image)}`,
             author: (slide as any).author || undefined,
           },
           brandId: payload.brandId,
