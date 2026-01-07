@@ -279,12 +279,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
           throw new Error(errorData.error || `Brevo send failed: ${brevoResponse.status}`);
         }
 
-        // Mark as sent
+        // Extract messageId from Brevo response for tracking
+        const brevoResult = await brevoResponse.json().catch(() => ({}));
+        const providerMessageId = brevoResult.messageId || null;
+
+        // Mark as sent with provider message ID
         await supabase
           .from("email_queue")
           .update({
             status: "sent",
             sent_at: new Date().toISOString(),
+            provider_message_id: providerMessageId,
           })
           .eq("id", email.id);
 

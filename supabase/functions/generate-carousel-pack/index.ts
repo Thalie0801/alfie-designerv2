@@ -110,20 +110,26 @@ Deno.serve(async (req) => {
     // Generate CSV for Canva
     const csvContent = generateCanvaCSV(slides);
 
-    // Send email with download links
+    // Queue delivery email via unified email system
     try {
-      await supabase.functions.invoke("send-pack-email", {
-        body: {
-          email,
-          packType: "carousel",
-          brandName: brand.name,
-          carouselId,
-          slides,
-          csvContent,
-        }
-      });
+      if (email) {
+        await supabase.from("email_queue").insert({
+          to_email: email,
+          template: "delivery_ready",
+          payload: {
+            brandName: brand.name,
+            packType: "carousel",
+            carouselId,
+            slideCount: slides.length,
+            // Include first few slide images for preview
+            previewImages: slides.slice(0, 3).map(s => s.imageUrl).filter(url => !url.startsWith('/')),
+          },
+          run_after: new Date().toISOString(),
+        });
+        console.log("[generate-carousel-pack] Queued delivery email to", email);
+      }
     } catch (emailError) {
-      console.error("[generate-carousel-pack] Email error (non-blocking):", emailError);
+      console.error("[generate-carousel-pack] Email queue error (non-blocking):", emailError);
     }
 
     console.log("[generate-carousel-pack] Generation complete", { slideCount: slides.length });
