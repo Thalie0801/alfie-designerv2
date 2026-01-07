@@ -214,6 +214,10 @@ export default function StudioMulti() {
   type CarouselTextStructure = 'title_only' | 'title_subtitle' | 'title_body' | 'title_body_subtitle' | 'title_body_bullets' | 'full';
   const [carouselTextStructure, setCarouselTextStructure] = useState<CarouselTextStructure>('title_body');
 
+  // Color mode: auto (Brand Kit), vibrant, pastel, neutral
+  type ColorMode = 'auto' | 'vibrant' | 'pastel' | 'neutral';
+  const [colorMode, setColorMode] = useState<ColorMode>('auto');
+
   // Pack Marketing (conversion)
   const [packGoal, setPackGoal] = useState<'content' | 'marketing'>('content');
   const [marketingInputs, setMarketingInputs] = useState({
@@ -426,6 +430,8 @@ export default function StudioMulti() {
         visual_style_category: carouselVisualStyleCategory,
         background_only: carouselBackgroundOnly,
         carousel_mode: carouselBackgroundOnly ? 'background_only' : 'standard',
+        // Color mode: only pass if not 'auto'
+        color_mode: colorMode !== 'auto' ? colorMode : undefined,
         // Carousel text layout structure
         carousel_text_layout: {
           has_title: true,
@@ -1329,6 +1335,28 @@ export default function StudioMulti() {
                       checked={carouselBackgroundOnly} 
                       onCheckedChange={setCarouselBackgroundOnly} 
                     />
+                  </div>
+
+                  {/* Color Mode Selector */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Mode couleurs</Label>
+                    <Select value={colorMode} onValueChange={(v) => setColorMode(v as ColorMode)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">🎨 Auto (Brand Kit)</SelectItem>
+                        <SelectItem value="vibrant">🌈 Vibrant (saturé)</SelectItem>
+                        <SelectItem value="pastel">🧁 Pastel (doux)</SelectItem>
+                        <SelectItem value="neutral">⚪ Neutre (sobre)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {colorMode === 'auto' && "Dérivé automatiquement du visual_mood du Brand Kit"}
+                      {colorMode === 'vibrant' && "Couleurs saturées et dynamiques"}
+                      {colorMode === 'pastel' && "Tons doux et apaisants"}
+                      {colorMode === 'neutral' && "Palette sobre et professionnelle"}
+                    </p>
                   </div>
                 </div>
               )}

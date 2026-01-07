@@ -1969,7 +1969,8 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   
   // ✅ Dériver colorMode depuis visual_mood du Brand Kit si non spécifié
   // IMPORTANT: Vérifier le Brand Kit AVANT d'appliquer le fallback 'vibrant'
-  let colorMode: 'vibrant' | 'pastel';
+  // Supported modes: 'vibrant', 'pastel', 'neutral'
+  let colorMode: 'vibrant' | 'pastel' | 'neutral';
   if (payload.colorMode) {
     // L'utilisateur a explicitement spécifié le mode
     colorMode = payload.colorMode;
@@ -1978,6 +1979,10 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
     // Dériver depuis le Brand Kit si 'pastel' est dans visual_mood
     colorMode = 'pastel';
     console.log(`[processRenderCarousels] 🎨 Derived colorMode 'pastel' from Brand Kit visual_mood: ${JSON.stringify(brandMini.visual_mood)}`);
+  } else if (brandMini?.visual_mood?.some((mood: string) => mood.toLowerCase().includes('neutre') || mood.toLowerCase().includes('minimal'))) {
+    // Dériver 'neutral' si le mood contient neutre/minimal
+    colorMode = 'neutral';
+    console.log(`[processRenderCarousels] 🎨 Derived colorMode 'neutral' from Brand Kit visual_mood: ${JSON.stringify(brandMini.visual_mood)}`);
   } else {
     // Fallback par défaut
     colorMode = 'vibrant';

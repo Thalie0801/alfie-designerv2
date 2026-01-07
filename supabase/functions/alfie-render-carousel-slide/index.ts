@@ -22,7 +22,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 type Lang = "FR" | "EN";
 
 type CarouselMode = 'standard' | 'premium' | 'background_only';
-type ColorMode = 'vibrant' | 'pastel';
+type ColorMode = 'vibrant' | 'pastel' | 'neutral'; // ✅ Étendu avec neutral
 type VisualStyle = 'background' | 'character' | 'product'; // ✅ NEW: Style visuel adaptatif
 
 interface BrandKit {
@@ -155,9 +155,14 @@ function buildImagePromptStandard(
   let visualElements = "soft 3D geometric elements, glowing orbs, smooth shapes";
   
   // ✅ COLORMODE: adapter les couleurs selon le choix utilisateur
-  let colorScheme = colorMode === 'pastel' 
-    ? "soft pastel colors, gentle muted tones, delicate hues, subtle gradients"
-    : "rich saturated colors with vibrant gradients";
+  let colorScheme: string;
+  if (colorMode === 'pastel') {
+    colorScheme = "soft pastel colors, gentle muted tones, delicate hues, subtle gradients";
+  } else if (colorMode === 'neutral') {
+    colorScheme = "neutral tones, black, white, grays, subtle beiges, minimal color, professional and clean";
+  } else {
+    colorScheme = "rich saturated colors with vibrant gradients";
+  }
   
   if (useBrandKit && brandKit) {
     // Adapter au visual_types du Brand Kit
@@ -174,11 +179,14 @@ function buildImagePromptStandard(
       visualElements = "professional product mockup style";
     }
     
-    // Adapter au visual_mood - RESPECTER le colorMode
+    // Adapter au visual_mood - RESPECTER le colorMode explicite
     const mood = brandKit.visual_mood?.[0];
     if (colorMode === 'pastel') {
       // ✅ Mode PASTEL: toujours des tons doux
       colorScheme = "soft pastel colors, gentle muted tones, delicate hues, light and airy palette";
+    } else if (colorMode === 'neutral') {
+      // ✅ Mode NEUTRAL: palette sobre et professionnelle
+      colorScheme = "neutral sophisticated palette, black white and gray tones, minimal color, professional and clean aesthetic";
     } else {
       // ✅ Mode VIBRANT: adapter au mood du Brand Kit
       if (mood === "coloré") colorScheme = "vibrant bold saturated colors";

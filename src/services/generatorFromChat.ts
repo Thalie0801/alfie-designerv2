@@ -29,7 +29,7 @@ export interface SendPackParams {
   useLogo?: boolean; // ✅ NEW: Option logo
   userPlan?: string;
   carouselMode?: 'standard' | 'background_only'; // ✅ Mode Standard/Fond seul pour carrousels
-  colorMode?: 'vibrant' | 'pastel'; // ✅ Mode Coloré/Pastel
+  colorMode?: 'vibrant' | 'pastel' | 'neutral'; // ✅ Mode couleurs (étendu avec neutral)
   visualStyle?: 'background' | 'character' | 'product'; // ✅ NEW: Style visuel adaptatif
   source?: 'studio_solo' | 'studio_multi' | 'alfie_chat_pack'; // ✅ Source de génération
   // ✅ Video options
@@ -208,7 +208,7 @@ async function createAssetJob(
   useLogo: boolean = false, // ✅ NEW: Option logo
   userPlan: string = 'starter',
   carouselMode: 'standard' | 'background_only' = 'standard',
-  colorMode: 'vibrant' | 'pastel' = 'vibrant',
+  colorMode: 'vibrant' | 'pastel' | 'neutral' = 'vibrant',
   visualStyle: 'background' | 'character' | 'product' = 'background', // ✅ NEW
   allVideoAssets: any[] = [], // ✅ Pour calculer clipTotal
   source: string = 'alfie_chat_pack', // ✅ Source de génération
