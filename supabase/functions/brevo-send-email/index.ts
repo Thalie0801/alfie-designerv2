@@ -70,7 +70,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log("[brevo-send-email] Sending to:", to.map(r => r.email).join(", "));
+    console.log("[brevo-send-email] Sending email:", {
+      to: to.map(r => r.email),
+      subject: subject || `templateId:${templateId}`,
+      sender: sender?.email || "noreply@alfiedesigner.com",
+    });
 
     // Build request body
     const emailBody: Record<string, unknown> = {
@@ -92,6 +96,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (cc && cc.length > 0) emailBody.cc = cc;
     if (bcc && bcc.length > 0) emailBody.bcc = bcc;
 
+    const startTime = Date.now();
     const response = await fetch(`${BREVO_API_URL}/smtp/email`, {
       method: "POST",
       headers: {
@@ -101,18 +106,39 @@ Deno.serve(async (req: Request): Promise<Response> => {
       },
       body: JSON.stringify(emailBody),
     });
+    const duration = Date.now() - startTime;
+
+    const responseText = await response.text();
+    console.log(`[brevo-send-email] Brevo API response (${duration}ms):`, {
+      status: response.status,
+      statusText: response.statusText,
+      body: responseText.substring(0, 500),
+    });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[brevo-send-email] Failed:", response.status, errorText);
+      console.error("[brevo-send-email] ❌ Failed:", {
+        status: response.status,
+        error: responseText,
+        recipients: to.map(r => r.email),
+      });
       return new Response(
-        JSON.stringify({ error: `Brevo API error: ${errorText}` }),
+        JSON.stringify({ error: `Brevo API error: ${responseText}` }),
         { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const result = await response.json();
-    console.log("[brevo-send-email] Success, messageId:", result.messageId);
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      result = { raw: responseText };
+    }
+
+    console.log("[brevo-send-email] ✅ Success:", {
+      messageId: result.messageId,
+      recipients: to.map(r => r.email),
+      duration,
+    });
 
     return new Response(
       JSON.stringify({
