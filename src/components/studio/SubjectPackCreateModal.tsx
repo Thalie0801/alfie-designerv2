@@ -112,9 +112,8 @@ export function SubjectPackCreateModal({ open, onOpenChange, onCreated }: Subjec
     }
 
     setLoading(true);
-    setUploadStatus('Upload des images...');
     try {
-      const pack = await createPack(
+      const result = await createPack(
         {
           name: name.trim(),
           pack_type: packType,
@@ -126,11 +125,17 @@ export function SubjectPackCreateModal({ open, onOpenChange, onCreated }: Subjec
           master: masterSlot.file,
           anchorA: anchorASlot.file || undefined,
           anchorB: anchorBSlot.file || undefined,
-        }
+        },
+        (status) => setUploadStatus(status)
       );
 
+      // Show warnings for failed anchors
+      if (result.warnings.length > 0) {
+        result.warnings.forEach(w => toast.warning(w));
+      }
+      
       toast.success('Subject Pack créé !');
-      onCreated?.(pack.id);
+      onCreated?.(result.pack.id);
       
       // Reset form
       setName('');
