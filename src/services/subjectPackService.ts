@@ -26,6 +26,7 @@ export interface CreateSubjectPackInput {
 
 /**
  * Upload an image to Supabase Storage and return the public URL
+ * Reads file to ArrayBuffer first to avoid blob URL issues on mobile
  * Returns null if upload fails for optional slots (anchors)
  */
 async function uploadImage(
@@ -53,10 +54,26 @@ async function uploadImage(
     throw new Error('Session expirée. Veuillez vous reconnecter.');
   }
   
+  // Lire le fichier en ArrayBuffer AVANT l'upload pour éviter les problèmes de blob sur mobile
+  let fileBuffer: ArrayBuffer;
+  try {
+    fileBuffer = await file.arrayBuffer();
+    console.log(`[SubjectPack] File ${slot} read to buffer: ${fileBuffer.byteLength} bytes`);
+    
+    if (fileBuffer.byteLength === 0) {
+      throw new Error('Fichier vide');
+    }
+  } catch (readError: any) {
+    console.error(`[SubjectPack] Failed to read file ${slot}:`, readError);
+    if (!options.required) return null;
+    throw new Error(`Impossible de lire ${slot}. Ressaie avec un autre fichier.`);
+  }
+  
   const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
   const path = `subject-packs/${userId}/${packId}/${slot}-${Date.now()}.${ext}`;
   
-  // Retry logic avec 3 tentatives et exponential backoff
+  // Upload avec timeout de 30 secondes
+  const UPLOAD_TIMEOUT_MS = 30000;
   const MAX_ATTEMPTS = 3;
   let lastError: Error | null = null;
   
@@ -64,9 +81,19 @@ async function uploadImage(
     try {
       console.log(`[SubjectPack] Upload attempt ${attempt}/${MAX_ATTEMPTS} for ${slot}...`);
       
-      const { error: uploadError } = await supabase.storage
+      // Wrapper avec timeout
+      const uploadPromise = supabase.storage
         .from('chat-uploads')
-        .upload(path, file, { upsert: true });
+        .upload(path, fileBuffer, { 
+          upsert: true,
+          contentType: file.type || 'image/png'
+        });
+      
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout: upload trop long')), UPLOAD_TIMEOUT_MS)
+      );
+      
+      const { error: uploadError } = await Promise.race([uploadPromise, timeoutPromise]);
 
       if (uploadError) {
         throw uploadError;
@@ -83,13 +110,12 @@ async function uploadImage(
       lastError = err;
       console.warn(`[SubjectPack] Upload attempt ${attempt} failed:`, err.message);
       
-      // Ne pas retry si c'est une erreur d'auth
-      if (err.message?.includes('auth') || err.message?.includes('session')) {
+      // Ne pas retry si c'est une erreur d'auth ou timeout
+      if (err.message?.includes('auth') || err.message?.includes('session') || err.message?.includes('Timeout')) {
         break;
       }
       
       if (attempt < MAX_ATTEMPTS) {
-        // Exponential backoff: 1s, 2s
         const delay = 1000 * attempt;
         console.log(`[SubjectPack] Retrying in ${delay}ms...`);
         await new Promise(r => setTimeout(r, delay));
@@ -102,7 +128,8 @@ async function uploadImage(
   const isNetworkError = errorMsg.includes('fetch') || 
                          errorMsg.includes('network') || 
                          errorMsg.includes('NetworkError') ||
-                         errorMsg.includes('Load failed');
+                         errorMsg.includes('Load failed') ||
+                         errorMsg.includes('Timeout');
   
   const detailedMsg = `${slot} (${file.type}, ${fileSizeMB}MB)`;
   
