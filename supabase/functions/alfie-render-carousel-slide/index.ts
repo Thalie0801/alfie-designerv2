@@ -70,7 +70,8 @@ interface SlideRequest {
   brandKit?: BrandKit;          // ✅ NOUVEAU: Brand Kit V2 complet
   referenceImageUrl?: string | null; // ✅ NOUVEAU: Image de référence pour le style
   colorMode?: ColorMode;        // ✅ NOUVEAU: Coloré ou Pastel
-  visualStyle?: VisualStyle;    // ✅ NOUVEAU: Style visuel (background/character/product)
+  visualStyle?: VisualStyle;    // ✅ NOUVEAU: Style de rendu (fallback)
+  visualStyleCategory?: VisualStyle; // ✅ V12: Mode de contenu (background/character/product) - PRIORITAIRE
 }
 
 type GenSize = { w: number; h: number };
@@ -1046,12 +1047,19 @@ Deno.serve(async (req) => {
       brandKit, // ✅ NOUVEAU: Brand Kit V2 complet
       referenceImageUrl, // ✅ NOUVEAU: Image de référence pour le style
       colorMode = 'vibrant', // ✅ NOUVEAU: Mode couleurs (vibrant/pastel)
-      visualStyle = 'background', // ✅ NOUVEAU: Style visuel (background/character/product)
+      visualStyle = 'background', // ✅ Style de rendu (3d_pixar_style, photorealistic, etc.)
+      visualStyleCategory, // ✅ NOUVEAU: Mode de contenu (background/character/product) - PRIORITAIRE
     } = params;
+    
+    // ✅ V12: visualStyleCategory est PRIORITAIRE sur visualStyle (qui est le style de rendu 3D/photo/etc.)
+    // visualStyleCategory = 'character' | 'background' | 'product' (mode de contenu)
+    // visualStyle = '3d_pixar_style' | 'photorealistic' etc. (style de rendu du Brand Kit)
+    const effectiveVisualMode: VisualStyle = visualStyleCategory || visualStyle || 'background';
+    console.log(`[render-slide] 🎨 Visual mode: ${effectiveVisualMode} (category: ${visualStyleCategory}, style: ${visualStyle})`);
     
     // ✅ Toujours utiliser Nano Banana Pro pour qualité uniforme
     const MODEL_IMAGE = MODEL_IMAGE_PREMIUM;
-    console.log(`[render-slide] 🎨 Mode: ${carouselMode} - Model: ${MODEL_IMAGE} (forced premium) - Visual: ${visualStyle}`);
+    console.log(`[render-slide] 🎨 Mode: ${carouselMode} - Model: ${MODEL_IMAGE} (forced premium) - Visual: ${effectiveVisualMode}`);
 
     // —— Supabase admin client (service role)
     const supabaseAdmin = createClient(
@@ -1163,17 +1171,17 @@ Deno.serve(async (req) => {
     // STEP 2/4 — Générer background (Vertex AI Gemini priorité)
     // =========================================
     
-    // ✅ V9: Route le prompt selon visualStyle (background/character/product)
+    // ✅ V12: Route le prompt selon effectiveVisualMode (background/character/product)
     let enrichedPrompt: string;
     
-    // ✅ V10: Détecter si avatar disponible pour mode character
-    const hasAvatarForCharacter = visualStyle === 'character' && !!brandKit?.avatar_url;
+    // ✅ V12: Détecter si avatar disponible pour mode character (utilise effectiveVisualMode)
+    const hasAvatarForCharacter = effectiveVisualMode === 'character' && !!brandKit?.avatar_url;
     
     // ✅ Déterminer si on génère avec texte intégré (standard) ou fond seul (background_only)
     const isBackgroundOnly = carouselMode === 'background_only';
     const hasValidText = normTitle && normTitle !== "Titre par défaut" && normTitle.trim().length > 0;
     
-    if (visualStyle === 'character') {
+    if (effectiveVisualMode === 'character') {
       // ✅ V11: Character mode avec ou sans texte intégré
       if (!isBackgroundOnly && hasValidText) {
         // ✅ NEW: Character + texte intégré (style LinkedIn avec glassmorphism)
@@ -1200,7 +1208,7 @@ Deno.serve(async (req) => {
         );
         console.log(`[render-slide] ${logCtx} 🧑 CHARACTER background-only (avatar ref: ${hasAvatarForCharacter})`);
       }
-    } else if (visualStyle === 'product') {
+    } else if (effectiveVisualMode === 'product') {
       // ✅ V11: Product mode avec ou sans texte intégré
       const hasProductRef = !!referenceImageUrl;
       if (!isBackgroundOnly && hasValidText) {
