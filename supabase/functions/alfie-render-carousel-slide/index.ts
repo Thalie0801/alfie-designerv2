@@ -150,13 +150,19 @@ function buildImagePromptStandard(
   brandKit?: BrandKit, // ✅ NEW: Brand Kit pour personnalisation
   colorMode: ColorMode = 'vibrant' // ✅ NEW: Mode couleurs
 ): string {
+  // ✅ Palette Brand Kit - OBLIGATOIRE
+  const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
+  
   // ✅ Déterminer le style visuel basé sur le Brand Kit
   let visualStyle = "modern professional design";
   let visualElements = "soft 3D geometric elements, glowing orbs, smooth shapes";
   
-  // ✅ COLORMODE: adapter les couleurs selon le choix utilisateur
+  // ✅ COLORMODE: adapter les couleurs selon le choix utilisateur OU palette
   let colorScheme: string;
-  if (colorMode === 'pastel') {
+  if (palette.length > 0) {
+    // ✅ PALETTE OBLIGATOIRE SI DISPONIBLE
+    colorScheme = `MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${palette.join(', ')} - NO substitutions allowed`;
+  } else if (colorMode === 'pastel') {
     colorScheme = "soft pastel colors, gentle muted tones, delicate hues, subtle gradients";
   } else if (colorMode === 'neutral') {
     colorScheme = "neutral tones, black, white, grays, subtle beiges, minimal color, professional and clean";
@@ -179,22 +185,21 @@ function buildImagePromptStandard(
       visualElements = "professional product mockup style";
     }
     
-    // Adapter au visual_mood - RESPECTER le colorMode explicite
-    const mood = brandKit.visual_mood?.[0];
-    if (colorMode === 'pastel') {
-      // ✅ Mode PASTEL: toujours des tons doux
-      colorScheme = "soft pastel colors, gentle muted tones, delicate hues, light and airy palette";
-    } else if (colorMode === 'neutral') {
-      // ✅ Mode NEUTRAL: palette sobre et professionnelle
-      colorScheme = "neutral sophisticated palette, black white and gray tones, minimal color, professional and clean aesthetic";
-    } else {
-      // ✅ Mode VIBRANT: adapter au mood du Brand Kit
-      if (mood === "coloré") colorScheme = "vibrant bold saturated colors";
-      else if (mood === "minimaliste") colorScheme = "clean minimal color palette, negative space, subtle colors";
-      else if (mood === "pastel") colorScheme = "soft pastel colors, gentle tones";
-      else if (mood === "contrasté") colorScheme = "high contrast dramatic colors";
-      else if (mood === "lumineux") colorScheme = "bright luminous colors with glow effects";
-      else if (mood === "sombre") colorScheme = "deep dark tones with accent highlights";
+    // Si pas de palette, adapter au visual_mood
+    if (palette.length === 0) {
+      const mood = brandKit.visual_mood?.[0];
+      if (colorMode === 'pastel') {
+        colorScheme = "soft pastel colors, gentle muted tones, delicate hues, light and airy palette";
+      } else if (colorMode === 'neutral') {
+        colorScheme = "neutral sophisticated palette, black white and gray tones, minimal color, professional and clean aesthetic";
+      } else {
+        if (mood === "coloré") colorScheme = "vibrant bold saturated colors";
+        else if (mood === "minimaliste") colorScheme = "clean minimal color palette, negative space, subtle colors";
+        else if (mood === "pastel") colorScheme = "soft pastel colors, gentle tones";
+        else if (mood === "contrasté") colorScheme = "high contrast dramatic colors";
+        else if (mood === "lumineux") colorScheme = "bright luminous colors with glow effects";
+        else if (mood === "sombre") colorScheme = "deep dark tones with accent highlights";
+      }
     }
     
     // Adapter au niche/secteur
@@ -223,11 +228,13 @@ CRITICAL REQUIREMENTS:
 - Image must reflect the THEME: ${theme}
 - Modern social media aesthetic with depth and dimension
 - Leave clean central area for text overlay
+${palette.length > 0 ? `- STRICT: Use ONLY brand palette (${palette.join(', ')}) for ALL colored elements` : ''}
 
 ABSOLUTE RULES:
 - NO TEXT whatsoever - no letters, words, numbers, labels, typography
 - NO white/empty backgrounds - always colorful (${colorMode === 'pastel' ? 'soft pastel tones' : 'saturated colors'})
 - Match the visual style to the industry/theme
+${palette.length > 0 ? `- DO NOT use any colors outside the brand palette (${palette.join(', ')})` : ''}
 
 OUTPUT: A beautiful, thematic background image with NO text.`
 }
@@ -246,6 +253,9 @@ function buildImagePromptCharacter(
   colorMode: ColorMode = 'vibrant',
   hasAvatarReference: boolean = false // ✅ NEW: Indique si une image de référence est fournie
 ): string {
+  // ✅ Palette Brand Kit - OBLIGATOIRE
+  const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
+  
   // Déterminer le style de personnage selon le Brand Kit
   let characterStyle = "3D cartoon character in Pixar/Disney animation style, expressive face, friendly appearance";
   let characterDescription = "professional young adult";
@@ -277,9 +287,15 @@ REFERENCE CHARACTER (PROVIDED IMAGE):
     }
   }
   
-  const colorScheme = colorMode === 'pastel' 
-    ? "soft pastel color palette, gentle tones"
-    : "vibrant saturated colors";
+  // ✅ COLORSCHEME avec palette obligatoire
+  let colorScheme: string;
+  if (palette.length > 0) {
+    colorScheme = `MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${palette.join(', ')} - NO substitutions`;
+  } else {
+    colorScheme = colorMode === 'pastel' 
+      ? "soft pastel color palette, gentle tones"
+      : "vibrant saturated colors";
+  }
   
   const slideRole = getSlideRole(slideIndex, totalSlides);
   const theme = userPrompt?.trim() || "professional content";
@@ -288,7 +304,7 @@ REFERENCE CHARACTER (PROVIDED IMAGE):
 ${referenceInstruction}
 CHARACTER: ${characterStyle}
 PERSON: ${characterDescription} engaged in activity related to: ${theme}
-MOOD: ${colorScheme}, modern professional aesthetic
+COLORS: ${colorScheme}
 SCENE: Clean background with soft depth, ${slideRole.toLowerCase()}
 
 CRITICAL REQUIREMENTS:
@@ -297,11 +313,13 @@ ${hasAvatarReference ? "- MUST reproduce the EXACT same character from the refer
 - Character should express emotion/energy related to the content
 - Leave space at top for text overlay (added separately)
 - Modern social media aesthetic with professional quality
+${palette.length > 0 ? `- STRICT: Use ONLY brand palette (${palette.join(', ')}) for backgrounds, gradients, and accents` : ''}
 
 ABSOLUTE RULES:
 - NO TEXT whatsoever in the image - no letters, words, labels
 - Character should be well-lit and clearly visible
 - Background should complement, not distract from character
+${palette.length > 0 ? `- DO NOT use any colors outside the brand palette (${palette.join(', ')})` : ''}
 
 OUTPUT: A professional image with ${hasAvatarReference ? "the EXACT reference character" : "an expressive character"} and NO text.`;
 }
@@ -321,11 +339,8 @@ function buildImagePromptCharacterWithText(
 ): string {
   const slideRole = getSlideRole(slideIndex, totalSlides);
   
-  // ✅ Palette Brand Kit
+  // ✅ Palette Brand Kit - OBLIGATOIRE
   const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
-  const paletteStr = palette.length > 0 
-    ? `Brand colors to use: ${palette.join(', ')}` 
-    : '';
   
   // ✅ Mode couleurs (pastel ou vibrant)
   const colorDescription = colorMode === 'pastel'
@@ -370,12 +385,12 @@ function buildImagePromptCharacterWithText(
     ? `CRITICAL: Reproduce the EXACT character from the reference image.
 Same design, same colors, same proportions. Character must be IDENTICAL across all slides.`
     : `Create a consistent brand mascot/character using ${visualStyle}.
-${paletteStr ? `Use these colors for the character: ${paletteStr}` : ''}`;
+${palette.length > 0 ? `Use these colors for the character: ${palette.join(', ')}` : ''}`;
 
   // ✅ Couleur de texte
   const textColor = brandKit?.text_color || '#FFFFFF';
 
-  // ✅ PROMPT FLEXIBLE - L'utilisateur décide du style visuel
+  // ✅ PROMPT FLEXIBLE avec PALETTE OBLIGATOIRE
   return `Create a carousel slide image with character and text.
 
 USER CREATIVE DIRECTION: ${userPrompt}
@@ -383,8 +398,11 @@ SLIDE ROLE: ${slideRole} (${slideIndex + 1}/${totalSlides})
 
 🎨 STYLE:
 - Render style: ${visualStyle}
-- Color mode: ${colorDescription}
-${paletteStr ? `- ${paletteStr}` : ''}
+${palette.length > 0 
+  ? `- MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${palette.join(', ')}
+- These are the client's brand colors - NO substitutions allowed
+- Apply across backgrounds, gradients, character accents, and elements`
+  : `- Color mode: ${colorDescription}`}
 
 🎭 CHARACTER:
 ${avatarInstruction}
@@ -399,13 +417,17 @@ ${textContent}
 
 REQUIREMENTS:
 - Follow USER CREATIVE DIRECTION as the primary guide
-- Apply ${colorMode === 'pastel' ? 'soft pastel' : 'vibrant saturated'} colors
+${palette.length > 0 
+  ? `- STRICT: Use ONLY brand palette (${palette.join(', ')}) for ALL colored elements
+- Every slide MUST use these exact colors consistently`
+  : `- Apply ${colorMode === 'pastel' ? 'soft pastel' : 'vibrant saturated'} colors`}
 - Balance character and text visibility
 - Modern social media quality
 
 DO NOT:
 - Add any text not specified above
-- Generate a blank or completely white background`;
+- Generate a blank or completely white background
+${palette.length > 0 ? `- Use ANY colors outside the brand palette (${palette.join(', ')})` : ''}`;
 }
 
 /**
@@ -462,15 +484,18 @@ Professional quality, elegant presentation.`;
   // ✅ Couleur de texte
   const textColor = brandKit?.text_color || '#FFFFFF';
 
-  // ✅ PROMPT FLEXIBLE - L'utilisateur décide du style
+  // ✅ PROMPT FLEXIBLE avec PALETTE OBLIGATOIRE
   return `Create a product showcase carousel slide.
 
 USER CREATIVE DIRECTION: ${userPrompt}
 SLIDE ROLE: ${slideRole} (${slideIndex + 1}/${totalSlides})
 
 🎨 STYLE:
-- Color mode: ${colorDescription}
-${paletteStr ? `- ${paletteStr}` : ''}
+${palette.length > 0 
+  ? `- MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${palette.join(', ')}
+- These are the client's brand colors - NO substitutions allowed
+- Apply across backgrounds, gradients, and scene elements`
+  : `- Color mode: ${colorDescription}`}
 
 📦 PRODUCT:
 ${productInstruction}
@@ -485,13 +510,17 @@ ${textContent}
 
 REQUIREMENTS:
 - Follow USER CREATIVE DIRECTION as the primary guide
-- Apply ${colorMode === 'pastel' ? 'soft pastel' : 'vibrant saturated'} colors
+${palette.length > 0 
+  ? `- STRICT: Use ONLY brand palette (${palette.join(', ')}) for ALL colored elements
+- Every slide MUST use these exact colors consistently`
+  : `- Apply ${colorMode === 'pastel' ? 'soft pastel' : 'vibrant saturated'} colors`}
 - Product prominent, text readable
 - Modern e-commerce/social media quality
 
 DO NOT:
 - Add any text not specified above
-- Hide or obscure the product`;
+- Hide or obscure the product
+${palette.length > 0 ? `- Use ANY colors outside the brand palette (${palette.join(', ')})` : ''}`;
 }
 
 /**
@@ -507,6 +536,9 @@ function buildImagePromptProduct(
   totalSlides: number,
   colorMode: ColorMode = 'vibrant'
 ): string {
+  // ✅ Palette Brand Kit - OBLIGATOIRE
+  const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
+  
   // Si pas d'image de référence, fallback vers un style produit générique
   const hasReference = !!referenceImageUrl;
   
@@ -527,9 +559,15 @@ function buildImagePromptProduct(
     }
   }
   
-  const colorScheme = colorMode === 'pastel' 
-    ? "soft pastel tones, gentle colors"
-    : "rich saturated colors";
+  // ✅ COLORSCHEME avec palette obligatoire
+  let colorScheme: string;
+  if (palette.length > 0) {
+    colorScheme = `MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${palette.join(', ')} - NO substitutions allowed`;
+  } else {
+    colorScheme = colorMode === 'pastel' 
+      ? "soft pastel tones, gentle colors"
+      : "rich saturated colors";
+  }
   
   const slideRole = getSlideRole(slideIndex, totalSlides);
   const theme = userPrompt?.trim() || "product showcase";
@@ -553,11 +591,13 @@ CRITICAL REQUIREMENTS:
 - Professional e-commerce/marketing quality
 - Create an attractive lifestyle or studio setting around the product
 - Leave space at top for text overlay (added separately)
+${palette.length > 0 ? `- STRICT: Use ONLY brand palette (${palette.join(', ')}) for backgrounds, gradients, and scene elements` : ''}
 
 ABSOLUTE RULES:
 - NO TEXT whatsoever in the image - no labels, prices, descriptions
 - Product should be well-lit and clearly visible
 - Background should enhance, not compete with the product
+${palette.length > 0 ? `- DO NOT use any colors outside the brand palette (${palette.join(', ')})` : ''}
 
 OUTPUT: A stunning product showcase image with NO text.`;
 }
@@ -586,13 +626,22 @@ function buildImagePromptPremium(
   referenceImageUrl?: string | null,
   colorMode: ColorMode = 'vibrant' // ✅ NEW: Mode couleurs
 ): string {
+  // ✅ Palette Brand Kit - OBLIGATOIRE
+  const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
+  
   // ✅ Style visuel enrichi par le Brand Kit V2
   let visualStyle = "vibrant gradient background, rich saturated colors, elegant modern design";
   
-  // ✅ COLORMODE: adapter les couleurs selon le choix utilisateur
-  let colorHint = colorMode === 'pastel' 
-    ? "soft pastels: blush pink, mint green, lavender, baby blue, peach"
-    : "blues, purples, pinks, teals, warm oranges";
+  // ✅ COLORMODE: adapter les couleurs selon le choix utilisateur OU palette
+  let colorHint: string;
+  if (palette.length > 0) {
+    // ✅ PALETTE OBLIGATOIRE SI DISPONIBLE
+    colorHint = `MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${palette.join(', ')} - NO substitutions`;
+  } else if (colorMode === 'pastel') {
+    colorHint = "soft pastels: blush pink, mint green, lavender, baby blue, peach";
+  } else {
+    colorHint = "blues, purples, pinks, teals, warm oranges";
+  }
   
   if (useBrandKit && brandKit) {
     const styleParts: string[] = [];
@@ -615,11 +664,7 @@ function buildImagePromptPremium(
       else if (type === "photos") styleParts.push("photorealistic quality");
       else if (type === "mockups") styleParts.push("professional mockup style");
     }
-    if (brandKit.palette?.length) {
-      // ✅ Utiliser les couleurs du palette comme hint
-      colorHint = colorMode === 'pastel' 
-        ? "soft pastel versions of brand colors"
-        : "brand colors from palette";
+    if (palette.length > 0) {
       styleParts.push("harmonious brand color palette with rich saturation");
     }
     if (brandKit.pitch) {
@@ -643,12 +688,12 @@ Use the provided reference image as style inspiration for colors and composition
     ? "soft, muted, gentle tones with delicate hues"
     : "rich, saturated with visible color transitions";
 
-  // ✅ PROMPT SIMPLIFIÉ ET RENFORCÉ POUR RESPECTER LE COLORMODE
+  // ✅ PROMPT RENFORCÉ AVEC PALETTE OBLIGATOIRE
   return `Create a ${colorModeLabel} premium background image.
 
 THEME: ${userPrompt}
 STYLE: ${visualStyle}
-COLORS: Use ${colorDescription} ${colorHint} - NO WHITE BACKGROUND
+COLORS: ${colorHint} - NO WHITE BACKGROUND
 SLIDE: ${slideRole} (${slideIndex + 1}/${totalSlides})
 ${referenceInstruction}
 
@@ -658,11 +703,13 @@ CRITICAL REQUIREMENTS:
 - Soft 3D geometric elements, glowing orbs, smooth flowing shapes
 - Modern social media aesthetic with depth and dimension
 - Leave clean central area for text overlay (added separately)
+${palette.length > 0 ? `- STRICT: Use ONLY brand palette (${palette.join(', ')}) for ALL colored elements` : ''}
 
 ABSOLUTE RULES:
 - Image MUST be ${colorMode === 'pastel' ? 'soft and gentle in pastel tones' : 'colorful and vibrant with saturated colors'}
 - NO TEXT whatsoever - no letters, words, numbers, labels, typography
 - Background must have visible colors and patterns, never pure white
+${palette.length > 0 ? `- DO NOT use any colors outside the brand palette (${palette.join(', ')})` : ''}
 
 ${avoid ? `AVOID: ${avoid}` : ""}
 

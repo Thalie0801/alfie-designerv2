@@ -302,29 +302,15 @@ export function enrichPromptWithBrandKit(
   const colorHex = colors.map((c: any) => typeof c === 'string' ? c : c.hex || c.value).filter(Boolean);
   const fontsText = normalizeFonts(brandKit.fonts);
   
-  // Convertir les codes hex en descriptions de couleurs naturelles
-  const colorDescriptions = colorHex.map((hex: string) => {
-    if (!hex) return '';
-    const h = hex.toLowerCase();
-    if (h.includes('90e3c2')) return 'soft mint green';
-    if (h.includes('b58ee5') || h.includes('b58ee3')) return 'lavender purple';
-    if (h.includes('f9c851')) return 'golden yellow';
-    if (h.includes('ffb89e')) return 'warm coral pink';
-    // Fallback générique selon la couleur dominante
-    if (h.match(/^#?[0-9a-f]{6}$/i)) {
-      const r = parseInt(h.slice(1, 3), 16);
-      const g = parseInt(h.slice(3, 5), 16);
-      const b = parseInt(h.slice(5, 7), 16);
-      if (r > g && r > b) return 'warm reddish tone';
-      if (g > r && g > b) return 'fresh green tone';
-      if (b > r && b > g) return 'cool blue tone';
-    }
-    return 'vibrant accent';
-  }).filter(Boolean);
-  
-  const colorInstruction = colorDescriptions.length > 0 
-    ? `Incorporate these colors naturally into the composition: ${colorDescriptions.join(', ')}.`
-    : 'Use professional neutral color palette.';
+  // ✅ Si palette disponible, forcer son utilisation
+  let colorInstruction: string;
+  if (colorHex.length > 0) {
+    // ✅ PALETTE OBLIGATOIRE - Ne jamais suggérer, FORCER
+    colorInstruction = `MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${colorHex.join(', ')}. NO substitutions allowed. Apply across backgrounds, gradients, and all colored elements.`;
+    console.log('[enrichPromptWithBrandKit] ✅ Forcing brand palette:', colorHex.join(', '));
+  } else {
+    colorInstruction = 'Use professional neutral color palette.';
+  }
   
   const styleInstruction = brandKit.style || brandKit.voice || 'modern professional';
   const nicheContext = brandKit.niche ? ` reflecting ${brandKit.niche} industry aesthetics` : '';
@@ -332,7 +318,9 @@ export function enrichPromptWithBrandKit(
   return `${basePrompt}
 
 VISUAL DIRECTION (CRITICAL: This is styling metadata, NOT content to display):
-Apply ${styleInstruction} visual style${nicheContext}. ${colorInstruction} Use high-quality professional composition with strong visual hierarchy and readability. Typography should feel ${fontsText || 'clean and modern'}. Create cohesive brand-aligned imagery.
+${colorInstruction}
+Apply ${styleInstruction} visual style${nicheContext}. Use high-quality professional composition with strong visual hierarchy and readability. Typography should feel ${fontsText || 'clean and modern'}. Create cohesive brand-aligned imagery.
+${colorHex.length > 0 ? `STRICT: Every slide MUST use ONLY these brand colors: ${colorHex.join(', ')} - DO NOT use any other colors.` : ''}
 
 ABSOLUTE CRITICAL: DO NOT RENDER THE FOLLOWING AS VISIBLE TEXT IN THE IMAGE:
 - Color codes (hex values like #90E3C2, #B58EE5, #F9C851)

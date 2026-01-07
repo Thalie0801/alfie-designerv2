@@ -280,14 +280,25 @@ Deno.serve(async (req) => {
         .eq("id", renderId);
     }
 
-    // 1. Enrich prompt with brand kit
+    // 1. Enrich prompt with brand kit - PALETTE OBLIGATOIRE
     let enrichedPrompt = prompt;
+    let brandPaletteHint = "";
     if (useBrandKit && brandId) {
       const brand = await loadBrandKit(brandId, supabase);
       if (brand) {
         const enrichments: string[] = [];
         if (brand.niche) enrichments.push(`Industry: ${brand.niche}`);
-        if (brand.palette?.length) enrichments.push(`Brand colors: ${brand.palette.slice(0, 3).join(", ")}`);
+        
+        // ✅ PALETTE OBLIGATOIRE - Forcer l'utilisation des couleurs Brand Kit
+        if (brand.palette?.length) {
+          const paletteColors = brand.palette.filter((c: string) => c && c !== '#ffffff').slice(0, 3);
+          if (paletteColors.length > 0) {
+            brandPaletteHint = `MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${paletteColors.join(', ')} - NO substitutions allowed. Apply across backgrounds, gradients, and all colored elements.`;
+            enrichments.push(brandPaletteHint);
+            console.log("[image-for-video] 🎨 Forcing brand palette:", paletteColors.join(', '));
+          }
+        }
+        
         if (brand.visual_mood?.length) enrichments.push(`Visual mood: ${brand.visual_mood.join(", ")}`);
         if (enrichments.length > 0) {
           enrichedPrompt = `${prompt}. ${enrichments.join(". ")}.`;
