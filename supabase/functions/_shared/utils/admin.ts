@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, ADMIN_EMAILS } from "../env.ts";
 
 import { corsHeaders } from "../cors.ts";
