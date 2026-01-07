@@ -136,6 +136,12 @@ export const JobSpecV1 = z.object({
   carousel_themes: z.array(z.string()).optional(), // ✅ NEW: Thèmes individuels par carrousel
   visual_style_category: z.enum(['background', 'character', 'product']).optional(),
   background_only: z.boolean().optional(),
+  carousel_text_layout: z.object({
+    has_title: z.boolean().optional(),
+    has_subtitle: z.boolean().optional(),
+    has_body: z.boolean().optional(),
+    has_bullets: z.boolean().optional(),
+  }).optional(),
 
   // Pack Marketing (conversion)
   pack_goal: z.enum(['content', 'marketing']).optional(),

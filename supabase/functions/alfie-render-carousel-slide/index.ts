@@ -340,13 +340,20 @@ function buildImagePromptCharacterWithText(
   };
   const visualStyle = styleMap[visualType] || '3D rendered style';
   
-  // ✅ Texte à intégrer
+  // ✅ Texte à intégrer - UNIQUEMENT les champs présents et non vides
   const textLines: string[] = [];
-  if (slideContent.title) textLines.push(`Title: "${slideContent.title}"`);
-  if (slideContent.subtitle) textLines.push(`Subtitle: "${slideContent.subtitle}"`);
-  if (slideContent.body) textLines.push(`Body: "${slideContent.body}"`);
-  if (slideContent.bullets?.length) {
-    textLines.push(`Points: ${slideContent.bullets.join(', ')}`);
+  if (slideContent.title && slideContent.title.trim()) {
+    textLines.push(`Title: "${slideContent.title}"`);
+  }
+  // ✅ Ne pas inclure subtitle si absent ou vide
+  if (slideContent.subtitle && slideContent.subtitle.trim()) {
+    textLines.push(`Subtitle: "${slideContent.subtitle}"`);
+  }
+  if (slideContent.body && slideContent.body.trim()) {
+    textLines.push(`Body: "${slideContent.body}"`);
+  }
+  if (slideContent.bullets?.length && slideContent.bullets.some(b => b && b.trim())) {
+    textLines.push(`Points: ${slideContent.bullets.filter(b => b && b.trim()).join(', ')}`);
   }
   const textContent = textLines.length > 0 ? textLines.join('\n') : 'No text for this slide';
   
@@ -419,13 +426,20 @@ function buildImagePromptProductWithText(
     ? 'SOFT PASTEL color palette - gentle, muted tones'
     : 'VIBRANT COLORFUL palette - rich, saturated colors';
   
-  // ✅ Texte à intégrer
+  // ✅ Texte à intégrer - UNIQUEMENT les champs présents et non vides
   const textLines: string[] = [];
-  if (slideContent.title) textLines.push(`Title: "${slideContent.title}"`);
-  if (slideContent.subtitle) textLines.push(`Subtitle: "${slideContent.subtitle}"`);
-  if (slideContent.body) textLines.push(`Body: "${slideContent.body}"`);
-  if (slideContent.bullets?.length) {
-    textLines.push(`Points: ${slideContent.bullets.join(', ')}`);
+  if (slideContent.title && slideContent.title.trim()) {
+    textLines.push(`Title: "${slideContent.title}"`);
+  }
+  // ✅ Ne pas inclure subtitle si absent ou vide
+  if (slideContent.subtitle && slideContent.subtitle.trim()) {
+    textLines.push(`Subtitle: "${slideContent.subtitle}"`);
+  }
+  if (slideContent.body && slideContent.body.trim()) {
+    textLines.push(`Body: "${slideContent.body}"`);
+  }
+  if (slideContent.bullets?.length && slideContent.bullets.some(b => b && b.trim())) {
+    textLines.push(`Points: ${slideContent.bullets.filter(b => b && b.trim()).join(', ')}`);
   }
   const textContent = textLines.length > 0 ? textLines.join('\n') : 'No text for this slide';
   

@@ -209,6 +209,10 @@ export default function StudioMulti() {
   // Carousel-specific options (for Pack Campagne)
   const [carouselVisualStyleCategory, setCarouselVisualStyleCategory] = useState<'background' | 'character' | 'product'>('character');
   const [carouselBackgroundOnly, setCarouselBackgroundOnly] = useState(false);
+  
+  // Carousel text structure: flexible combinations
+  type CarouselTextStructure = 'title_only' | 'title_subtitle' | 'title_body' | 'title_body_subtitle' | 'title_body_bullets' | 'full';
+  const [carouselTextStructure, setCarouselTextStructure] = useState<CarouselTextStructure>('title_body');
 
   // Pack Marketing (conversion)
   const [packGoal, setPackGoal] = useState<'content' | 'marketing'>('content');
@@ -421,6 +425,13 @@ export default function StudioMulti() {
         // Carousel-specific options
         visual_style_category: carouselVisualStyleCategory,
         background_only: carouselBackgroundOnly,
+        // Carousel text layout structure
+        carousel_text_layout: {
+          has_title: true,
+          has_subtitle: ['title_subtitle', 'title_body_subtitle', 'full'].includes(carouselTextStructure),
+          has_body: ['title_body', 'title_body_subtitle', 'title_body_bullets', 'full'].includes(carouselTextStructure),
+          has_bullets: ['title_body_bullets', 'full'].includes(carouselTextStructure),
+        },
         deliverables: ['zip'] as JobSpecV1Type['deliverables'],
         use_brand_kit: useBrandKitToggle,
         reference_images: referenceImages.length > 0 ? referenceImages : 
@@ -1278,6 +1289,35 @@ export default function StudioMulti() {
                       {carouselVisualStyleCategory === 'background' && "Dégradés, formes géométriques, textures"}
                       {carouselVisualStyleCategory === 'character' && "Personnage 3D Pixar, mascotte, illustrations"}
                       {carouselVisualStyleCategory === 'product' && "Mise en scène produit, mockups"}
+                    </p>
+                  </div>
+
+                  {/* Text structure selector */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Structure des textes</Label>
+                    <Select 
+                      value={carouselTextStructure} 
+                      onValueChange={(v) => setCarouselTextStructure(v as CarouselTextStructure)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="title_only">📝 Titre seul</SelectItem>
+                        <SelectItem value="title_subtitle">📝 Titre + Sous-titre</SelectItem>
+                        <SelectItem value="title_body">📝 Titre + Body</SelectItem>
+                        <SelectItem value="title_body_subtitle">📝 Titre + Sous-titre + Body</SelectItem>
+                        <SelectItem value="title_body_bullets">📝 Titre + Body + Bullets</SelectItem>
+                        <SelectItem value="full">📝 Complet (Titre + Sous-titre + Body + Bullets)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {carouselTextStructure === 'title_only' && "Minimaliste : uniquement des titres percutants"}
+                      {carouselTextStructure === 'title_subtitle' && "Accroche + précision courte"}
+                      {carouselTextStructure === 'title_body' && "Structure classique recommandée"}
+                      {carouselTextStructure === 'title_body_subtitle' && "Riche : titre + contexte + détails"}
+                      {carouselTextStructure === 'title_body_bullets' && "Pédagogique : points clés en liste"}
+                      {carouselTextStructure === 'full' && "Maximum d'informations par slide"}
                     </p>
                   </div>
                   
