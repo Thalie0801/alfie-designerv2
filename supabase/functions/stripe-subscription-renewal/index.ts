@@ -4,9 +4,7 @@ import Stripe from "npm:stripe@18";
 import { corsHeaders } from "../_shared/cors.ts";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
 
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-  apiVersion: "2023-10-16",
-});
+const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "");
 
 const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET") || "";
 
@@ -58,8 +56,9 @@ Deno.serve(async (req) => {
         });
       }
 
-      const customerId = invoice.customer as string;
-      const subscriptionId = invoice.subscription as string;
+      const invoiceData = invoice as unknown as { customer: string; subscription: string };
+      const customerId = invoiceData.customer;
+      const subscriptionId = invoiceData.subscription;
       
       console.log(`[STRIPE-RENEWAL] Processing renewal for customer: ${customerId}`);
 
@@ -81,7 +80,8 @@ Deno.serve(async (req) => {
       console.log(`[STRIPE-RENEWAL] Found profile: ${profile.id} (${profile.email}), plan: ${profile.plan}`);
 
       // Récupérer la subscription pour obtenir la prochaine date de renouvellement
-      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      const subResponse = await stripe.subscriptions.retrieve(subscriptionId);
+      const subscription = subResponse as unknown as { current_period_end: number };
       const nextRenewalDate = new Date(subscription.current_period_end * 1000);
       const nextRenewalDateStr = nextRenewalDate.toISOString().split('T')[0];
 

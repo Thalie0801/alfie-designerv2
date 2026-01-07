@@ -33,11 +33,18 @@ Deno.serve(async (req) => {
 
     for (const subId of subscription_ids) {
       try {
-        const subscription = await stripe.subscriptions.retrieve(subId, {
+        const subResponse = await stripe.subscriptions.retrieve(subId, {
           expand: ["discounts", "customer"],
         });
+        const subscription = subResponse as unknown as {
+          customer: Stripe.Customer;
+          discounts?: Array<{ coupon?: { id?: string; name?: string; percent_off?: number; amount_off?: number; duration?: string; duration_in_months?: number }; start?: number; end?: number }>;
+          status: string;
+          current_period_start: number;
+          current_period_end: number;
+        };
 
-        const customer = subscription.customer as Stripe.Customer;
+        const customer = subscription.customer;
         const firstDiscount = subscription.discounts?.[0];
         const discountObj = typeof firstDiscount === 'object' ? firstDiscount : null;
         

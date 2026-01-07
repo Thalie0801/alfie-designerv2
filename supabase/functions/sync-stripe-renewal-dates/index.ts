@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Stripe from "npm:stripe@18";
 
@@ -7,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -18,7 +17,7 @@ serve(async (req) => {
       throw new Error("STRIPE_SECRET_KEY not configured");
     }
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
+    const stripe = new Stripe(stripeKey);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -57,7 +56,8 @@ serve(async (req) => {
         }
 
         // Calculer la date de renouvellement (current_period_end)
-        const renewalDate = new Date(subscription.current_period_end * 1000).toISOString();
+        const subData = subscription as unknown as { current_period_end: number };
+        const renewalDate = new Date(subData.current_period_end * 1000).toISOString();
 
         // Récupérer les brands de cet utilisateur
         const { data: brands, error: brandsError } = await supabase

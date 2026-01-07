@@ -7,10 +7,7 @@ const STRIPE_CONNECT_WEBHOOK_SECRET = Deno.env.get("STRIPE_CONNECT_WEBHOOK_SECRE
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
-const stripe = new Stripe(STRIPE_SECRET_KEY, {
-  apiVersion: "2023-10-16",
-  httpClient: Stripe.createFetchHttpClient(),
-});
+const stripe = new Stripe(STRIPE_SECRET_KEY);
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
