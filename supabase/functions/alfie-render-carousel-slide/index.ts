@@ -1344,21 +1344,30 @@ Deno.serve(async (req) => {
             messages: [
               { 
                 role: "system", 
-                content: isBackgroundOnly
-                  ? `You are an expert image generator for social media.
-CRITICAL: Generate a VIBRANT, COLORFUL background image - NOT white, NOT blank.
+                content: (() => {
+                  // Build dynamic color descriptor based on colorMode
+                  const colorDescriptor = colorMode === 'pastel' 
+                    ? 'SOFT PASTEL colors with gentle, muted tones (pink, mint, lavender, peach)'
+                    : colorMode === 'neutral'
+                      ? 'NEUTRAL TONES with black, white, grays, and minimal color'
+                      : 'VIBRANT, COLORFUL with rich saturated tones';
+                  
+                  return isBackgroundOnly
+                    ? `You are an expert image generator for social media.
+CRITICAL: Generate a ${colorDescriptor} background image - NOT white, NOT blank.
 NO TEXT whatsoever - this is a pure background image for user to add their own text.
 Output dimensions: ${size.w}x${size.h}.
 ${hasAvatarForCharacter ? "IMPORTANT: Reproduce the EXACT character from the reference image provided. Same style, colors, proportions." : ""}`
-                  : `You are an expert image generator for social media carousel slides.
+                    : `You are an expert image generator for social media carousel slides.
 CRITICAL: Generate the image WITH the text integrated and perfectly CENTERED.
 - Title: Large, bold, WHITE text with soft black shadow for readability
 - Subtitle/Body: Smaller, WHITE text below title
 - All text MUST be centered horizontally and vertically
-- Background: Colorful gradients, NOT white
+- Background: ${colorDescriptor}, NOT white
 - Text must be the MAIN FOCUS and clearly legible
 Output dimensions: ${size.w}x${size.h}.
-${hasAvatarForCharacter ? "IMPORTANT: Reproduce the EXACT character from the reference image provided. Same style, colors, proportions." : ""}`
+${hasAvatarForCharacter ? "IMPORTANT: Reproduce the EXACT character from the reference image provided. Same style, colors, proportions." : ""}`;
+                })()
               },
               { role: "user", content: userMessageContent }
             ],
