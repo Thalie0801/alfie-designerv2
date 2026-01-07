@@ -1228,6 +1228,50 @@ export type Database = {
           },
         ]
       }
+      email_events: {
+        Row: {
+          created_at: string
+          email_queue_id: string | null
+          event_type: string
+          id: string
+          provider: string
+          provider_message_id: string | null
+          raw_json: Json | null
+          template: string | null
+          to_email: string
+        }
+        Insert: {
+          created_at?: string
+          email_queue_id?: string | null
+          event_type: string
+          id?: string
+          provider?: string
+          provider_message_id?: string | null
+          raw_json?: Json | null
+          template?: string | null
+          to_email: string
+        }
+        Update: {
+          created_at?: string
+          email_queue_id?: string | null
+          event_type?: string
+          id?: string
+          provider?: string
+          provider_message_id?: string | null
+          raw_json?: Json | null
+          template?: string | null
+          to_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_events_email_queue_id_fkey"
+            columns: ["email_queue_id"]
+            isOneToOne: false
+            referencedRelation: "email_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_queue: {
         Row: {
           attempts: number
@@ -1235,6 +1279,7 @@ export type Database = {
           id: string
           last_error: string | null
           payload: Json | null
+          provider_message_id: string | null
           run_after: string
           sent_at: string | null
           status: string
@@ -1247,6 +1292,7 @@ export type Database = {
           id?: string
           last_error?: string | null
           payload?: Json | null
+          provider_message_id?: string | null
           run_after?: string
           sent_at?: string | null
           status?: string
@@ -1259,6 +1305,7 @@ export type Database = {
           id?: string
           last_error?: string | null
           payload?: Json | null
+          provider_message_id?: string | null
           run_after?: string
           sent_at?: string | null
           status?: string

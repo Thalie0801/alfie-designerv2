@@ -220,20 +220,29 @@ Deno.serve(async (req) => {
 
     console.log("[generate-free-pack] Generation complete", { count: generatedAssets.length, packMode });
 
-    // Send email with download link
+    // Queue delivery email via unified email system
     try {
       if (email) {
-        await supabase.functions.invoke("send-pack-email", {
-          body: {
-            email,
-            packType: packMode === 'conversion' ? 'conversion' : 'free',
+        // Build asset preview URLs for the email
+        const assetUrls = generatedAssets
+          .filter(a => a.url && !a.url.startsWith('/'))
+          .map(a => a.url);
+
+        await supabase.from("email_queue").insert({
+          to_email: email,
+          template: "delivery_ready",
+          payload: {
             brandName: brandData.brandName,
-            assets: generatedAssets,
-          }
+            packType: packMode,
+            assetCount: generatedAssets.length,
+            assets: assetUrls.slice(0, 3), // First 3 for preview
+          },
+          run_after: new Date().toISOString(),
         });
+        console.log("[generate-free-pack] Queued delivery email to", email);
       }
     } catch (emailError) {
-      console.error("[generate-free-pack] Email error (non-blocking):", emailError);
+      console.error("[generate-free-pack] Email queue error (non-blocking):", emailError);
     }
 
     return new Response(
