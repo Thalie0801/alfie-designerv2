@@ -22,6 +22,13 @@ interface BrandKit {
   niche?: string;
 }
 
+interface TextLayout {
+  has_title?: boolean;
+  has_subtitle?: boolean;
+  has_body?: boolean;
+  has_bullets?: boolean;
+}
+
 interface AssetBrief {
   id: string;
   kind: "image" | "carousel" | "video_basic" | "video_premium";
@@ -34,6 +41,7 @@ interface AssetBrief {
   durationSeconds?: number;
   prompt: string;
   carouselType?: "citations" | "content";
+  textLayout?: TextLayout;
 }
 
 interface SlideText {
@@ -134,6 +142,27 @@ RÈGLES CRITIQUES :
 }
 
 function buildCarouselPrompt(asset: AssetBrief, brandKit: BrandKit, brief: string, useBrandKit: boolean): string {
+  // ✅ Déterminer la structure de texte demandée
+  const textLayout = asset.textLayout || { has_title: true, has_subtitle: true, has_body: true, has_bullets: false };
+  const hasTitle = textLayout.has_title !== false;
+  const hasSubtitle = textLayout.has_subtitle === true;
+  const hasBody = textLayout.has_body === true;
+  const hasBullets = textLayout.has_bullets === true;
+  
+  // ✅ Construire la liste des champs à générer
+  const fields: string[] = [];
+  if (hasTitle) fields.push('title (max 40 caractères)');
+  if (hasSubtitle) fields.push('subtitle (max 60 caractères)');
+  if (hasBody) fields.push('body (max 120 caractères)');
+  if (hasBullets) fields.push('bullets (max 3, max 20 caractères chacun)');
+  
+  // ✅ Construire l'exemple JSON
+  const jsonFields: string[] = [];
+  if (hasTitle) jsonFields.push('"title": "Max 40 car"');
+  if (hasSubtitle) jsonFields.push('"subtitle": "Max 60 car"');
+  if (hasBody) jsonFields.push('"body": "Max 120 car"');
+  if (hasBullets) jsonFields.push('"bullets": []');
+  
   let prompt = `Génère les textes pour un carrousel de ${asset.count || 5} slides pour réseaux sociaux.
 
 [CAMPAGNE_BRIEF]
@@ -174,32 +203,29 @@ CONTEXTE ASSET :
 - Format : ${asset.ratio}
 - Style du visuel : ${asset.tone}
 
-STRUCTURE ATTENDUE (progression narrative) :
-Slide 1 : Accroche / Hook percutant (titre + sous-titre court)
-Slides 2-4 : Titre + Sous-titre + Body explicatif
-Slide 5 : Call-to-Action (titre + body court)
+STRUCTURE ATTENDUE PAR SLIDE :
+${fields.map((f, i) => `${i + 1}. ${f}`).join('\n')}
 
 ⚠️ CONTRAINTES DE CARACTÈRES ABSOLUES - AUCUN DÉPASSEMENT TOLÉRÉ :
-- title : MAXIMUM 40 caractères (ex: "La magie des fêtes" ✓, "La magie des fêtes : Faites une pause..." ✗)
-- subtitle : MAXIMUM 60 caractères (1 phrase courte UNIQUEMENT)  
-- body : MAXIMUM 120 caractères (1-2 phrases courtes)
-- bullets : max 3 par slide, max 20 caractères chacun
+${hasTitle ? '- title : MAXIMUM 40 caractères' : ''}
+${hasSubtitle ? '- subtitle : MAXIMUM 60 caractères (1 phrase courte)' : ''}
+${hasBody ? '- body : MAXIMUM 120 caractères (1-2 phrases courtes)' : ''}
+${hasBullets ? '- bullets : max 3 par slide, max 20 caractères chacun' : ''}
 
 ⚠️ SI UN TEXTE DÉPASSE LA LIMITE, NE PAS TRONQUER MAIS RÉÉCRIRE EN PLUS COURT.
 NE JAMAIS couper un mot ou une phrase au milieu.
 
 RÈGLES CRITIQUES :
 - COMPTER LES CARACTÈRES avant de finaliser chaque texte
-- CHAQUE SLIDE DOIT AVOIR title, subtitle ET body remplis (même la slide 1)
+- CHAQUE SLIDE DOIT AVOIR ${fields.map(f => f.split(' ')[0]).join(', ')} remplis
 - LE BRIEF EST PRIORITAIRE sur le Brand Kit
 - Français PARFAIT, sans aucune faute d'orthographe
-- Le body est un texte explicatif court de 1-2 phrases
 - Ne JAMAIS écrire de codes couleur ni de texte technique
 
 Retourne un JSON strictement conforme à ce format :
 {
   "slides": [
-    { "title": "Max 40 car", "subtitle": "Max 60 car", "body": "Max 120 car", "bullets": [] },
+    { ${jsonFields.join(', ')} },
     ...
   ]
 }`;
