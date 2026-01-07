@@ -1,5 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import * as XLSX from "npm:xlsx@0.18.5";
+import * as XLSX from "xlsx";
 
 import { corsHeaders } from '../_shared/cors.ts';
 import { SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL, validateEnv } from '../_shared/env.ts';

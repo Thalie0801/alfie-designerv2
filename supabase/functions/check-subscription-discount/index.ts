@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
+    const stripe = new Stripe(stripeKey);
     const { subscription_ids } = await req.json();
 
     if (!subscription_ids || !Array.isArray(subscription_ids)) {
@@ -34,10 +34,12 @@ Deno.serve(async (req) => {
     for (const subId of subscription_ids) {
       try {
         const subscription = await stripe.subscriptions.retrieve(subId, {
-          expand: ["discount", "discount.coupon", "customer"],
+          expand: ["discounts", "customer"],
         });
 
         const customer = subscription.customer as Stripe.Customer;
+        const firstDiscount = subscription.discounts?.[0];
+        const discountObj = typeof firstDiscount === 'object' ? firstDiscount : null;
         
         results.push({
           subscription_id: subId,
@@ -45,15 +47,15 @@ Deno.serve(async (req) => {
           status: subscription.status,
           current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
           current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-          discount: subscription.discount ? {
-            coupon_id: subscription.discount.coupon?.id,
-            coupon_name: subscription.discount.coupon?.name,
-            percent_off: subscription.discount.coupon?.percent_off,
-            amount_off: subscription.discount.coupon?.amount_off,
-            duration: subscription.discount.coupon?.duration,
-            duration_in_months: subscription.discount.coupon?.duration_in_months,
-            start: subscription.discount.start ? new Date(subscription.discount.start * 1000).toISOString() : null,
-            end: subscription.discount.end ? new Date(subscription.discount.end * 1000).toISOString() : null,
+          discount: discountObj ? {
+            coupon_id: discountObj.coupon?.id,
+            coupon_name: discountObj.coupon?.name,
+            percent_off: discountObj.coupon?.percent_off,
+            amount_off: discountObj.coupon?.amount_off,
+            duration: discountObj.coupon?.duration,
+            duration_in_months: discountObj.coupon?.duration_in_months,
+            start: discountObj.start ? new Date(discountObj.start * 1000).toISOString() : null,
+            end: discountObj.end ? new Date(discountObj.end * 1000).toISOString() : null,
           } : null,
         });
       } catch (err: unknown) {

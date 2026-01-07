@@ -24,7 +24,7 @@ serve(async (req) => {
       throw new Error("STRIPE_SECRET_KEY not configured");
     }
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
+    const stripe = new Stripe(stripeKey);
 
     // Parse request body for action type
     let action = "woofs_packs"; // default
