@@ -525,25 +525,32 @@ Deno.serve(async (req) => {
       console.log(`[alfie-plan-carousel] Parsed brief: hasStructuredSlides=${parsedBrief.hasStructuredSlides}, globalConstraints=${JSON.stringify(parsedBrief.globalConstraints)}, slides=${parsedBrief.slides.length}`);
     }
 
-    // ✅ DIRECT MODE: If user provided structured slides, use them directly
-    if (parsedBrief?.hasStructuredSlides && parsedBrief.slides.length > 0) {
-      console.log(`[alfie-plan-carousel] ✅ DIRECT MODE: Using ${parsedBrief.slides.length} slides from user brief`);
+    // ✅ BRIEF LOGIC: Si brief complet = respecter, sinon Alfie complète
+    const userSlideCount = parsedBrief?.slides?.length || 0;
+    const hasFullBrief = parsedBrief?.hasStructuredSlides && userSlideCount >= slideCount;
+    const hasPartialBrief = parsedBrief?.hasStructuredSlides && userSlideCount > 0 && userSlideCount < slideCount;
+    const hasStyleFromBrief = (parsedBrief?.globalConstraints?.length || 0) > 0 || !!parsedBrief?.globalStyle?.backgroundStyle;
+    
+    console.log(`[alfie-plan-carousel] Brief: ${userSlideCount}/${slideCount} slides, full=${hasFullBrief}, partial=${hasPartialBrief}, hasStyle=${hasStyleFromBrief}`);
+
+    // ✅ FULL BRIEF MODE: User gave all slides → respect exactly
+    if (hasFullBrief) {
+      console.log(`[alfie-plan-carousel] ✅ DIRECT MODE: Respecting user brief (${userSlideCount} slides)`);
       
       // Build slides from parsed brief
-      const directSlides: SlideContent[] = parsedBrief.slides.map((s, idx) => ({
-        type: (idx === 0 ? "hero" : idx === parsedBrief!.slides.length - 1 ? "cta" : "problem") as SlideType,
+      const directSlides: SlideContent[] = parsedBrief!.slides.slice(0, slideCount).map((s, idx) => ({
+        type: (idx === 0 ? "hero" : idx === slideCount - 1 ? "cta" : "problem") as SlideType,
         title: s.title || `Slide ${idx + 1}`,
         subtitle: s.subtitle,
         punchline: s.body,
         bullets: s.bullets,
         cta_primary: s.cta,
-        // ✅ Attach constraints for downstream use
         _constraints: s.constraints,
         _allowMascot: s.allowMascot,
       } as SlideContent & { _constraints?: string[]; _allowMascot?: boolean }));
 
       // Build visual prompts with constraints
-      const styleFromBrief = buildStylePrompt(parsedBrief.globalStyle);
+      const styleFromBrief = buildStylePrompt(parsedBrief!.globalStyle);
       const directPrompts = directSlides.map((slide, idx) => {
         const slideData = parsedBrief!.slides[idx];
         const constraintStr = buildConstraintPrompt(
@@ -571,9 +578,10 @@ Deno.serve(async (req) => {
           aspectRatio: aspectRatio ?? null,
           language: lang,
           visualStyleCategory,
-          directMode: true, // ✅ Flag indicating user-provided content was used
-          globalStyle: parsedBrief.globalStyle,
-          globalConstraints: parsedBrief.globalConstraints,
+          directMode: true,
+          briefMode: "full", // ✅ User brief fully respected
+          globalStyle: parsedBrief!.globalStyle,
+          globalConstraints: parsedBrief!.globalConstraints,
           brand: {
             name: brandKit?.name ?? null,
             niche: brandKit?.niche ?? null,
@@ -581,12 +589,22 @@ Deno.serve(async (req) => {
             palette: brandKit?.palette ?? [],
           },
           notes: [],
-          version: "v3.0.0",
+          version: "v3.1.0",
         },
       });
     }
 
-    // ✅ GENERATION MODE: No structured slides, generate via AI
+    // ✅ PARTIAL/NO BRIEF: Alfie generates or completes
+    // If partial brief exists, we pass constraints to AI but let it generate content
+    const briefContext = hasPartialBrief 
+      ? `\n\nUser provided partial brief with ${userSlideCount} slides. Complete to ${slideCount} slides while respecting this style:\n${parsedBrief?.slides.map((s, i) => `Slide ${i+1}: ${s.title}`).join('\n')}`
+      : "";
+    
+    const styleConstraintsForAI = hasStyleFromBrief
+      ? `\n\nIMPORTANT STYLE CONSTRAINTS from user:\n${buildStylePrompt(parsedBrief?.globalStyle)}\n${buildConstraintPrompt(parsedBrief?.globalConstraints || [], true)}`
+      : "";
+
+    // ✅ GENERATION MODE: Alfie creates/completes the carousel
     const [primary, secondary] = first2Palette(brandKit?.palette);
 
     // --- System prompt (only for AI generation mode)
@@ -615,8 +633,8 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODEL,
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: rawPrompt },
+          { role: "system", content: systemPrompt + styleConstraintsForAI },
+          { role: "user", content: rawPrompt + briefContext },
         ],
         temperature: 0.5,
         response_format: {
