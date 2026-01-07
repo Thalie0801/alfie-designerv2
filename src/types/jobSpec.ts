@@ -137,6 +137,7 @@ export const JobSpecV1 = z.object({
   visual_style_category: z.enum(['background', 'character', 'product']).optional(),
   background_only: z.boolean().optional(),
   carousel_mode: z.enum(['standard', 'background_only']).optional(),
+  color_mode: z.enum(['vibrant', 'pastel', 'neutral']).optional(), // ✅ NEW: Manual color mode override
   carousel_text_layout: z.object({
     has_title: z.boolean().optional(),
     has_subtitle: z.boolean().optional(),

@@ -101,6 +101,10 @@ export function StudioGenerator() {
   const [visualStyleCategory, setVisualStyleCategory] = useState<'background' | 'character' | 'product'>('character');
   const [backgroundOnly, setBackgroundOnly] = useState(false);
 
+  // Color mode: auto (Brand Kit), vibrant, pastel, neutral
+  type ColorMode = 'auto' | 'vibrant' | 'pastel' | 'neutral';
+  const [colorMode, setColorMode] = useState<ColorMode>('auto');
+
   // Video options
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [lipSyncEnabled, setLipSyncEnabled] = useState(false);
@@ -311,6 +315,7 @@ export function StudioGenerator() {
         ...(selectedType === "carousel" && {
           visualStyleCategory,
           backgroundOnly,
+          colorMode: colorMode !== 'auto' ? colorMode : undefined,
         }),
       };
 
@@ -616,6 +621,28 @@ export function StudioGenerator() {
                       <p className="text-xs text-muted-foreground">Sans texte intégré</p>
                     </div>
                     <Switch checked={backgroundOnly} onCheckedChange={setBackgroundOnly} />
+                  </div>
+
+                  {/* Color Mode Selector */}
+                  <div>
+                    <label className="font-medium text-sm block mb-2">Mode couleurs</label>
+                    <Select value={colorMode} onValueChange={(v) => setColorMode(v as ColorMode)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">🎨 Auto (Brand Kit)</SelectItem>
+                        <SelectItem value="vibrant">🌈 Vibrant (saturé)</SelectItem>
+                        <SelectItem value="pastel">🧁 Pastel (doux)</SelectItem>
+                        <SelectItem value="neutral">⚪ Neutre (sobre)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {colorMode === 'auto' && "Dérivé automatiquement du visual_mood du Brand Kit"}
+                      {colorMode === 'vibrant' && "Couleurs saturées et dynamiques"}
+                      {colorMode === 'pastel' && "Tons doux et apaisants"}
+                      {colorMode === 'neutral' && "Palette sobre et professionnelle"}
+                    </p>
                   </div>
                 </div>
               )}
