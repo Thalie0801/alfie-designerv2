@@ -6,7 +6,7 @@ import { setBrandDefaultSubjectPack } from '@/services/subjectPackService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Trash2, User, Dog, Package, Sparkles, Star, Check } from 'lucide-react';
+import { Loader2, Plus, Trash2, User, Dog, Package, Sparkles, Star, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -77,6 +77,21 @@ export function SubjectPackManager({ showHeader = true, onPackSelect, brandId }:
       toast.success('Subject Pack défini par défaut');
     } catch (err) {
       console.error('Set default error:', err);
+      toast.error('Erreur lors de la mise à jour');
+    } finally {
+      setSettingDefaultId(null);
+    }
+  };
+
+  const handleRemoveDefault = async () => {
+    if (!brandKit?.id) return;
+    setSettingDefaultId('removing');
+    try {
+      await setBrandDefaultSubjectPack(brandKit.id, null);
+      await loadBrands();
+      toast.success('Subject Pack retiré des défauts');
+    } catch (err) {
+      console.error('Remove default error:', err);
       toast.error('Erreur lors de la mise à jour');
     } finally {
       setSettingDefaultId(null);
@@ -187,8 +202,23 @@ export function SubjectPackManager({ showHeader = true, onPackSelect, brandId }:
                   </div>
                   
                   <div className="flex items-center gap-1">
-                    {/* Définir par défaut */}
-                    {defaultPackId !== pack.id && (
+                    {/* Définir ou retirer par défaut */}
+                    {defaultPackId === pack.id ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={handleRemoveDefault}
+                        disabled={settingDefaultId === 'removing'}
+                        title="Retirer des défauts"
+                      >
+                        {settingDefaultId === 'removing' ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <X className="h-4 w-4" />
+                        )}
+                      </Button>
+                    ) : (
                       <Button
                         variant="ghost"
                         size="icon"
