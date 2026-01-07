@@ -1938,11 +1938,19 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   const carousel_id = payload.carousel_id || crypto.randomUUID();
   const totalSlides = payload.count || 5;
   const carouselType = payload.carouselType || 'content';
-  // ✅ Dériver carouselMode depuis background_only si non spécifié
-  let carouselMode: 'standard' | 'background_only' = payload.carouselMode || 'standard';
-  if (!payload.carouselMode && payload.background_only === true) {
+  
+  // ✅ DIAGNOSTIC: Afficher tous les flags possibles pour debug
+  console.log(`[processRenderCarousels] 🔍 Payload flags: carouselMode=${payload.carouselMode}, carousel_mode=${payload.carousel_mode}, backgroundOnly=${payload.backgroundOnly}, background_only=${payload.background_only}`);
+  
+  // ✅ Dériver carouselMode depuis TOUTES les variantes possibles (camelCase + snake_case)
+  let carouselMode: 'standard' | 'background_only' = 'standard';
+  if (payload.carouselMode) {
+    carouselMode = payload.carouselMode;
+  } else if (payload.carousel_mode) {
+    carouselMode = payload.carousel_mode;
+  } else if (payload.backgroundOnly === true || payload.background_only === true) {
     carouselMode = 'background_only';
-    console.log(`[processRenderCarousels] 🖼️ Derived carouselMode 'background_only' from background_only flag`);
+    console.log(`[processRenderCarousels] 🖼️ Derived carouselMode 'background_only' from backgroundOnly/background_only flag`);
   }
   const useBrandKit = resolveUseBrandKit(payload, jobMeta);
 
