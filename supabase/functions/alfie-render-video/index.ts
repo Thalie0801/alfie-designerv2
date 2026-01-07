@@ -1,7 +1,7 @@
 // functions/alfie-render-carousel-slide/index.ts
 // v2.4.0 — Slide renderer (idempotent, retries + timeout, normalized inputs)
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { uploadTextAsRaw } from "../_shared/cloudinaryUploader.ts";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, LOVABLE_API_KEY } from "../_shared/env.ts";
 

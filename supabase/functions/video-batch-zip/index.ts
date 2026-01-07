@@ -1,7 +1,7 @@
 // supabase/functions/video-batch-zip/index.ts
 // GET /video-batches/:id/zip - Generate ZIP with CSV, texts, manifest
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
 

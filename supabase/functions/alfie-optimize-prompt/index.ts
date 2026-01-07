@@ -3,7 +3,7 @@
 // Alfie Optimize Prompt - Transformation de prompts utilisateur en directives précises
 // ============================================
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAIWithFallback, enrichPromptWithBrandKit, type AgentContext } from "../_shared/aiOrchestrator.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";

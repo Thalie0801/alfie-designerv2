@@ -8,7 +8,7 @@
  * - Priorité 2: Lovable AI (fallback uniquement)
  */
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, LOVABLE_API_KEY } from "../_shared/env.ts";
 import { callVertexGeminiText, isVertexGeminiTextConfigured } from "../_shared/vertexGeminiText.ts";

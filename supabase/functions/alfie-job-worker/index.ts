@@ -1,5 +1,5 @@
 // supabase/functions/alfie-job-worker/index.ts
-import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { uploadFromUrlToCloudinary } from "../_shared/cloudinaryUploader.ts";
 import { consumeBrandQuotas } from "../_shared/quota.ts";
 import { WOOF_COSTS } from "../_shared/woofsCosts.ts";

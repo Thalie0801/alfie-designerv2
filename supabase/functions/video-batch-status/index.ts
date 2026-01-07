@@ -1,7 +1,7 @@
 // supabase/functions/video-batch-status/index.ts
 // GET /video-batches/:id - Returns full batch status with videos, clips, texts
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
 

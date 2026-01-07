@@ -1,7 +1,7 @@
 import Stripe from "npm:stripe@18";
 import { corsHeaders } from "../_shared/cors.ts";
 import { isAdminUser } from "../_shared/auth.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
 
 function json(data: unknown, status = 200) {

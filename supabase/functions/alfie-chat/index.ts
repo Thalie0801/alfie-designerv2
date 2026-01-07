@@ -1,5 +1,5 @@
 // --- imports ---
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { userHasAccess } from "../_shared/access.ts";
 import { callAIWithFallback, type AgentContext, type AIResponse } from "../_shared/aiOrchestrator.ts";
