@@ -8,7 +8,7 @@
  * Retourne: { jobId, steps, woofsCost }
  */
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
+import { z } from "zod";
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';

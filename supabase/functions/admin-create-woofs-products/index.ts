@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "npm:stripe@18";
 
 const corsHeaders = {
@@ -13,7 +12,7 @@ const WOOFS_PACKS = [
   { size: 500, price: 8500, actualWoofs: 600, name: "Pack Max - 500 Woofs (+100 bonus)" },
 ];
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
