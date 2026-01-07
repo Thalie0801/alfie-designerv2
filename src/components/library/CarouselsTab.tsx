@@ -241,35 +241,6 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
     toast.success("Texte de la slide copié !");
   }, []);
 
-  // ✅ MÉTHODE C: Copier tous les textes d'un carrousel
-  const handleCopyAllTexts = useCallback((carouselSlides: CarouselSlide[]) => {
-    const slidesWithTexts = carouselSlides.filter((s) => s.text_json);
-    if (slidesWithTexts.length === 0) {
-      toast.error("Aucun texte disponible pour ce carrousel");
-      return;
-    }
-
-    let allTexts = "📱 CARROUSEL - Textes des slides\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
-
-    slidesWithTexts.sort((a, b) => (a.slide_index ?? 0) - (b.slide_index ?? 0));
-
-    for (const slide of slidesWithTexts) {
-      const { title, subtitle, body, bullets } = slide.text_json!;
-      const slideNum = (slide.slide_index ?? 0) + 1;
-
-      allTexts += `📄 SLIDE ${slideNum}\n`;
-      if (title) allTexts += `Titre : ${title}\n`;
-      if (subtitle) allTexts += `Sous-titre : ${subtitle}\n`;
-      if (body) allTexts += `Corps : ${body}\n`;
-      if (bullets?.length) {
-        allTexts += `Points clés :\n${bullets.map((b) => `  • ${b}`).join("\n")}\n`;
-      }
-      allTexts += "\n";
-    }
-
-    navigator.clipboard.writeText(allTexts.trim());
-    toast.success("Tous les textes copiés !");
-  }, []);
 
   // Vérifier si le carrousel a des textes
   const hasTexts = useCallback((carouselSlides: CarouselSlide[]) => {
@@ -354,26 +325,15 @@ export function CarouselsTab({ orderId }: CarouselsTabProps) {
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
                 {slidesHaveTexts && (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleExportCSV(carouselSlides, title)}
-                      className="touch-target flex-1 sm:flex-none"
-                    >
-                      <FileSpreadsheet className="h-4 w-4 mr-2" />
-                      CSV Canva
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleCopyAllTexts(carouselSlides)}
-                      className="touch-target flex-1 sm:flex-none"
-                    >
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copier textes
-                    </Button>
-                  </>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleExportCSV(carouselSlides, title)}
+                    className="touch-target flex-1 sm:flex-none"
+                  >
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    CSV Canva
+                  </Button>
                 )}
                 <Button
                   size="sm"
