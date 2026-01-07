@@ -1,12 +1,10 @@
 // functions/alfie-plan-carousel/index.ts
-// v2.1.0 — Planificateur de carrousel robuste (rétro-compat, validations, structured output)
+// v3.0.0 — Planificateur avec support "Brief Direct" pour textes et contraintes utilisateur
 
 import { LOVABLE_API_KEY } from "../_shared/env.ts";
-
 import { corsHeaders } from "../_shared/cors.ts";
-// ---------------------------
-// CORS
-// ---------------------------
+import { parseBrief, buildConstraintPrompt, buildStylePrompt, type ParsedBrief, type ParsedSlide } from "../_shared/briefParser.ts";
+
 // ---------------------------
 // Types
 // ---------------------------
@@ -57,8 +55,9 @@ interface InputBodyNew {
   brandKit?: BrandKit;
   aspectRatio?: "1:1" | "4:5" | "9:16" | "16:9" | "2:3" | "yt-thumb";
   language?: "FR" | "EN";
-  visualStyleCategory?: "background" | "character" | "product"; // ✅ NEW: Visual style category
-  backgroundOnly?: boolean; // ✅ NEW: Background only mode
+  visualStyleCategory?: "background" | "character" | "product";
+  backgroundOnly?: boolean;
+  parsedBrief?: ParsedBrief; // ✅ NEW: Pre-parsed brief from chat-create-carousel
 }
 
 // ---------------------------
@@ -493,7 +492,7 @@ function responseSchema(slideCount: number) {
 // Handler
 // ---------------------------
 Deno.serve(async (req) => {
-  console.log("[alfie-plan-carousel] v2.1.0 invoked");
+  console.log("[alfie-plan-carousel] v3.0.0 invoked");
 
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -510,7 +509,7 @@ Deno.serve(async (req) => {
 
     const lang = normalizeLanguage((body as any).language);
     const aspectRatio = (body as any).aspectRatio as InputBodyNew["aspectRatio"] | undefined;
-    const visualStyleCategory = body.visualStyleCategory || 'character'; // ✅ Default to character, not background
+    const visualStyleCategory = body.visualStyleCategory || 'character';
     const backgroundOnly = body.backgroundOnly === true;
     
     console.log(`[alfie-plan-carousel] visualStyleCategory: ${visualStyleCategory}, backgroundOnly: ${backgroundOnly}`);
@@ -519,9 +518,78 @@ Deno.serve(async (req) => {
       return json({ error: "Missing prompt/topic" }, 400);
     }
 
+    // ✅ NEW: Check for pre-parsed brief or parse from prompt
+    let parsedBrief: ParsedBrief | null = body.parsedBrief || null;
+    if (!parsedBrief && rawPrompt) {
+      parsedBrief = parseBrief(rawPrompt, slideCount);
+      console.log(`[alfie-plan-carousel] Parsed brief: hasStructuredSlides=${parsedBrief.hasStructuredSlides}, globalConstraints=${JSON.stringify(parsedBrief.globalConstraints)}, slides=${parsedBrief.slides.length}`);
+    }
+
+    // ✅ DIRECT MODE: If user provided structured slides, use them directly
+    if (parsedBrief?.hasStructuredSlides && parsedBrief.slides.length > 0) {
+      console.log(`[alfie-plan-carousel] ✅ DIRECT MODE: Using ${parsedBrief.slides.length} slides from user brief`);
+      
+      // Build slides from parsed brief
+      const directSlides: SlideContent[] = parsedBrief.slides.map((s, idx) => ({
+        type: (idx === 0 ? "hero" : idx === parsedBrief!.slides.length - 1 ? "cta" : "problem") as SlideType,
+        title: s.title || `Slide ${idx + 1}`,
+        subtitle: s.subtitle,
+        punchline: s.body,
+        bullets: s.bullets,
+        cta_primary: s.cta,
+        // ✅ Attach constraints for downstream use
+        _constraints: s.constraints,
+        _allowMascot: s.allowMascot,
+      } as SlideContent & { _constraints?: string[]; _allowMascot?: boolean }));
+
+      // Build visual prompts with constraints
+      const styleFromBrief = buildStylePrompt(parsedBrief.globalStyle);
+      const directPrompts = directSlides.map((slide, idx) => {
+        const slideData = parsedBrief!.slides[idx];
+        const constraintStr = buildConstraintPrompt(
+          [...parsedBrief!.globalConstraints, ...slideData.constraints],
+          slideData.allowMascot
+        );
+        
+        return forceNoTextPrompt(
+          `${styleFromBrief}. Slide ${idx + 1}. ${constraintStr}`,
+          slideData.allowMascot ? visualStyleCategory : 'background'
+        );
+      });
+
+      return json({
+        style: styleFromBrief || "User-defined style",
+        prompts: directPrompts,
+        slides: directSlides.map((s, idx) => ({
+          ...s,
+          visualPrompt: directPrompts[idx],
+          constraints: parsedBrief!.slides[idx].constraints,
+          allowMascot: parsedBrief!.slides[idx].allowMascot,
+        })),
+        meta: {
+          slideCount: directSlides.length,
+          aspectRatio: aspectRatio ?? null,
+          language: lang,
+          visualStyleCategory,
+          directMode: true, // ✅ Flag indicating user-provided content was used
+          globalStyle: parsedBrief.globalStyle,
+          globalConstraints: parsedBrief.globalConstraints,
+          brand: {
+            name: brandKit?.name ?? null,
+            niche: brandKit?.niche ?? null,
+            voice: brandKit?.voice ?? null,
+            palette: brandKit?.palette ?? [],
+          },
+          notes: [],
+          version: "v3.0.0",
+        },
+      });
+    }
+
+    // ✅ GENERATION MODE: No structured slides, generate via AI
     const [primary, secondary] = first2Palette(brandKit?.palette);
 
-    // --- System prompt
+    // --- System prompt (only for AI generation mode)
     const systemPrompt = buildSystemPrompt({
       slideCount,
       primary,
@@ -529,7 +597,7 @@ Deno.serve(async (req) => {
       brand: brandKit,
       lang,
       aspectRatio,
-      visualStyleCategory: backgroundOnly ? 'background' : visualStyleCategory, // ✅ Pass visualStyleCategory
+      visualStyleCategory: backgroundOnly ? 'background' : visualStyleCategory,
     });
 
     if (!LOVABLE_API_KEY) {
