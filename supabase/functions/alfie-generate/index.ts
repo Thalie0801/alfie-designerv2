@@ -1,5 +1,5 @@
 // functions/alfie-generate/index.ts
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { userHasAccess } from "../_shared/accessControl.ts";
 
 import { corsHeaders } from "../_shared/cors.ts";

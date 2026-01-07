@@ -1,4 +1,4 @@
-import Stripe from 'https://esm.sh/stripe@18.5.0';
+import Stripe from "npm:stripe@18";
 
 import { corsHeaders } from "../_shared/cors.ts";
 Deno.serve(async (req) => {

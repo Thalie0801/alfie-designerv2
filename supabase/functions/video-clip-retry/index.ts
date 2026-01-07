@@ -1,7 +1,7 @@
 // supabase/functions/video-clip-retry/index.ts
 // POST /clips/:id/retry - Retry a failed clip
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
 

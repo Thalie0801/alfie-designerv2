@@ -1,4 +1,4 @@
-import Stripe from "https://esm.sh/stripe@18.5.0";
+import Stripe from "npm:stripe@18";
 import { corsHeaders } from "../_shared/cors.ts";
 import { isAdminUser } from "../_shared/auth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
