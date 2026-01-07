@@ -30,6 +30,13 @@ export interface CreateSubjectPackInput {
 async function uploadImage(file: File, userId: string, packId: string, slot: string): Promise<string> {
   console.log('[SubjectPack] uploadImage:', { fileName: file.name, size: file.size, type: file.type, slot });
   
+  // ✅ Vérifier la session AVANT l'upload pour éviter "Failed to fetch"
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    console.error('[SubjectPack] Session expired or not authenticated:', authError);
+    throw new Error('Session expirée. Veuillez vous reconnecter.');
+  }
+  
   const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
   const path = `subject-packs/${userId}/${packId}/${slot}-${Date.now()}.${ext}`;
   
