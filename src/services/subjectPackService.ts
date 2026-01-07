@@ -28,9 +28,9 @@ export interface CreateSubjectPackInput {
  * Upload an image to Supabase Storage and return the public URL
  */
 async function uploadImage(file: File, userId: string, packId: string, slot: string): Promise<string> {
-  console.log('[SubjectPack] uploadImage:', { fileName: file.name, size: file.size, type: file.type, slot });
+  console.log('[SubjectPack] uploadImage:', { fileName: file.name, size: file.size, type: file.type, slot, online: navigator.onLine });
   
-  // ✅ Vérifier la session AVANT l'upload pour éviter "Failed to fetch"
+  // Vérifier la session AVANT l'upload
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
     console.error('[SubjectPack] Session expired or not authenticated:', authError);
@@ -40,21 +40,59 @@ async function uploadImage(file: File, userId: string, packId: string, slot: str
   const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
   const path = `subject-packs/${userId}/${packId}/${slot}-${Date.now()}.${ext}`;
   
-  const { error: uploadError } = await supabase.storage
-    .from('chat-uploads')
-    .upload(path, file, { upsert: true });
+  // Retry logic avec 3 tentatives et exponential backoff
+  const MAX_ATTEMPTS = 3;
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      console.log(`[SubjectPack] Upload attempt ${attempt}/${MAX_ATTEMPTS} for ${slot}...`);
+      
+      const { error: uploadError } = await supabase.storage
+        .from('chat-uploads')
+        .upload(path, file, { upsert: true });
 
-  if (uploadError) {
-    console.error('[SubjectPack] Upload failed:', uploadError);
-    throw new Error(`Upload failed for ${slot}: ${uploadError.message}`);
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat-uploads')
+        .getPublicUrl(path);
+
+      console.log('[SubjectPack] Uploaded successfully:', publicUrl);
+      return publicUrl;
+      
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[SubjectPack] Upload attempt ${attempt} failed:`, err.message);
+      
+      // Ne pas retry si c'est une erreur d'auth
+      if (err.message?.includes('auth') || err.message?.includes('session')) {
+        break;
+      }
+      
+      if (attempt < MAX_ATTEMPTS) {
+        // Exponential backoff: 1s, 2s
+        const delay = 1000 * attempt;
+        console.log(`[SubjectPack] Retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
   }
-
-  const { data: { publicUrl } } = supabase.storage
-    .from('chat-uploads')
-    .getPublicUrl(path);
-
-  console.log('[SubjectPack] Uploaded successfully:', publicUrl);
-  return publicUrl;
+  
+  // Toutes les tentatives ont échoué - message utilisateur clair
+  const errorMsg = lastError?.message || 'Erreur inconnue';
+  const isNetworkError = errorMsg.includes('fetch') || 
+                         errorMsg.includes('network') || 
+                         errorMsg.includes('NetworkError') ||
+                         errorMsg.includes('Load failed');
+  
+  if (isNetworkError) {
+    throw new Error('Erreur réseau. Vérifie ta connexion et réessaie.');
+  }
+  
+  throw new Error(`Échec upload ${slot}: ${errorMsg}`);
 }
 
 /**

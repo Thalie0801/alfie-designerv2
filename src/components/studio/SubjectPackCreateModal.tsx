@@ -47,6 +47,7 @@ export function SubjectPackCreateModal({ open, onOpenChange, onCreated }: Subjec
   const [identityPrompt, setIdentityPrompt] = useState('');
   const [negativePrompt, setNegativePrompt] = useState('');
   const [loading, setLoading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   
   const [masterSlot, setMasterSlot] = useState<ImageSlot>({ file: null, preview: null });
   const [anchorASlot, setAnchorASlot] = useState<ImageSlot>({ file: null, preview: null });
@@ -111,6 +112,7 @@ export function SubjectPackCreateModal({ open, onOpenChange, onCreated }: Subjec
     }
 
     setLoading(true);
+    setUploadStatus('Upload des images...');
     try {
       const pack = await createPack(
         {
@@ -145,6 +147,7 @@ export function SubjectPackCreateModal({ open, onOpenChange, onCreated }: Subjec
       toast.error(`Erreur: ${message}`);
     } finally {
       setLoading(false);
+      setUploadStatus(null);
     }
   };
 
@@ -350,10 +353,10 @@ export function SubjectPackCreateModal({ open, onOpenChange, onCreated }: Subjec
           </Button>
           <Button onClick={handleSubmit} disabled={loading || !name.trim() || !masterSlot.file}>
             {loading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Création...
-              </>
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>{uploadStatus || 'Création...'}</span>
+              </div>
             ) : (
               'Créer le pack'
             )}
