@@ -138,6 +138,7 @@ const JobSpecV1 = z.object({
   carousel_themes: z.array(z.string()).optional(), // ✅ NEW: Thèmes individuels par carrousel
   visual_style_category: z.enum(['background', 'character', 'product']).optional(), // ✅ Carousel visual style
   background_only: z.boolean().optional(), // ✅ Background only mode (no text)
+  color_mode: z.enum(['vibrant', 'pastel', 'neutral']).optional(), // ✅ NEW: Color palette mode
   // Pack Marketing (conversion)
   pack_goal: z.enum(['content', 'marketing']).optional(),
   marketing_inputs: MarketingInputs,
@@ -253,6 +254,7 @@ function generateStepsForCarousel(spec: JobSpecV1Type): StepInput[] {
         slideCount,
         ratio: spec.ratio_master,
         referenceImages: spec.reference_images, // ✅ Propagate reference images
+        colorMode: spec.color_mode, // ✅ Propagate color mode
       },
     });
   }
@@ -272,6 +274,7 @@ function generateStepsForCarousel(spec: JobSpecV1Type): StepInput[] {
         visualStyle: spec.visual_style,
         visualStyleCategory: spec.visual_style_category, // ✅ Propagate carousel visual style category
         backgroundOnly: spec.background_only, // ✅ Propagate background_only flag
+        colorMode: spec.color_mode, // ✅ Propagate color mode
         identityAnchorId: spec.character_anchor_id,
         subjectPackId: spec.subject_pack_id, // ✅ Propagate Subject Pack
         referenceImages: spec.reference_images, // ✅ Propagate reference images
