@@ -299,9 +299,8 @@ OUTPUT: A professional image with ${hasAvatarReference ? "the EXACT reference ch
 }
 
 /**
- * ✅ V11: Build prompt for CHARACTER mode WITH INTEGRATED TEXT (style LinkedIn Pro)
- * Génère un personnage/mascotte + texte dans des cartes glassmorphism
- * S'adapte dynamiquement à CHAQUE client (palette, avatar, niche)
+ * ✅ V12: Build prompt for CHARACTER mode WITH INTEGRATED TEXT
+ * FLEXIBLE - Le prompt utilisateur guide le style, pas de template imposé
  */
 function buildImagePromptCharacterWithText(
   userPrompt: string,
@@ -314,90 +313,89 @@ function buildImagePromptCharacterWithText(
 ): string {
   const slideRole = getSlideRole(slideIndex, totalSlides);
   
-  // ✅ Palette dynamique du client
+  // ✅ Palette Brand Kit
   const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
   const paletteStr = palette.length > 0 
-    ? `EXACT BRAND COLORS (use these): ${palette.join(', ')}` 
-    : 'modern professional colors (soft blues, mint, lavender)';
+    ? `Brand colors to use: ${palette.join(', ')}` 
+    : '';
+  
+  // ✅ Mode couleurs (pastel ou vibrant)
+  const colorDescription = colorMode === 'pastel'
+    ? 'SOFT PASTEL color palette - gentle, muted, delicate tones'
+    : 'VIBRANT COLORFUL palette - rich, saturated colors';
+  
+  // ✅ Style depuis Brand Kit visual_types
+  const visualType = brandKit?.visual_types?.[0] || 'illustrations_3d';
+  const styleMap: Record<string, string> = {
+    'illustrations_3d': '3D Pixar/Disney animation style',
+    'avatars_3d': '3D cartoon character style',
+    'photos': 'photorealistic photography style',
+    'illustrations_2d': 'flat 2D vector illustration style',
+    'doodle': 'hand-drawn sketch doodle style',
+    'mockups': 'premium mockup style',
+    'photorealistic': 'photorealistic high-quality style',
+    '3d_pixar_style': '3D Pixar/Disney animation style',
+    'flat_illustration': 'flat modern illustration style',
+    'minimalist_vector': 'minimalist vector art style',
+  };
+  const visualStyle = styleMap[visualType] || '3D rendered style';
   
   // ✅ Texte à intégrer
   const textLines: string[] = [];
-  if (slideContent.title) textLines.push(`TITLE: "${slideContent.title}"`);
-  if (slideContent.subtitle) textLines.push(`SUBTITLE: "${slideContent.subtitle}"`);
-  if (slideContent.body) textLines.push(`BODY: "${slideContent.body}"`);
+  if (slideContent.title) textLines.push(`Title: "${slideContent.title}"`);
+  if (slideContent.subtitle) textLines.push(`Subtitle: "${slideContent.subtitle}"`);
+  if (slideContent.body) textLines.push(`Body: "${slideContent.body}"`);
   if (slideContent.bullets?.length) {
-    textLines.push(`BULLETS:\n${slideContent.bullets.map(b => '• ' + b).join('\n')}`);
+    textLines.push(`Points: ${slideContent.bullets.join(', ')}`);
   }
+  const textContent = textLines.length > 0 ? textLines.join('\n') : 'No text for this slide';
   
-  // ✅ Scènes variées selon le rôle du slide
-  const sceneVariations: Record<string, string> = {
-    "HOOK/INTRODUCTION": "modern office environment with desk and tech devices",
-    "PROBLEM/CONTEXT": "standing next to a presentation board or whiteboard",
-    "KEY POINT/INSIGHT": "sitting on colorful books, thoughtful pose",
-    "SOLUTION/BENEFIT": "at a microphone or presenting confidently",
-    "CALL-TO-ACTION/CONCLUSION": "pointing forward, energetic motivational pose"
-  };
-  const sceneDescription = sceneVariations[slideRole] || "modern professional setting";
-  
-  // ✅ DYNAMIQUE : Instruction avatar adaptée à chaque client
+  // ✅ Avatar instruction - reproduire le personnage de référence
   const avatarInstruction = hasAvatarReference
-    ? `CRITICAL CHARACTER INSTRUCTION:
-- The reference image shows the brand's OFFICIAL mascot/character
-- You MUST reproduce this EXACT character on this slide
-- Same design, same colors, same proportions, same style
-- This character must be IDENTICAL across ALL slides of the carousel
-- The character wears the brand's colors and may have a name badge`
-    : `CHARACTER INSTRUCTION (no reference provided):
-- Create a friendly, professional 3D Pixar-style mascot
-- Use brand colors: ${paletteStr}
-- This character must be CONSISTENT across all slides
-- Anthropomorphic animal or human character, expressive and engaging`;
+    ? `CRITICAL: Reproduce the EXACT character from the reference image.
+Same design, same colors, same proportions. Character must be IDENTICAL across all slides.`
+    : `Create a consistent brand mascot/character using ${visualStyle}.
+${paletteStr ? `Use these colors for the character: ${paletteStr}` : ''}`;
 
-  // ✅ Couleur de texte du Brand Kit ou noir par défaut pour cartes glass
-  const textColor = brandKit?.text_color || '#1A1A1A';
-  const accentColor = palette[1] || palette[0] || 'brand accent color';
+  // ✅ Couleur de texte
+  const textColor = brandKit?.text_color || '#FFFFFF';
 
-  return `Create a LinkedIn-style carousel slide with 3D CHARACTER + TEXT IN GLASS CARDS.
+  // ✅ PROMPT FLEXIBLE - L'utilisateur décide du style visuel
+  return `Create a carousel slide image with character and text.
 
-THEME: ${userPrompt}
-SLIDE: ${slideRole} (${slideIndex + 1}/${totalSlides})
-${paletteStr}
+USER CREATIVE DIRECTION: ${userPrompt}
+SLIDE ROLE: ${slideRole} (${slideIndex + 1}/${totalSlides})
 
-🎭 CHARACTER (40% of image, right side):
+🎨 STYLE:
+- Render style: ${visualStyle}
+- Color mode: ${colorDescription}
+${paletteStr ? `- ${paletteStr}` : ''}
+
+🎭 CHARACTER:
 ${avatarInstruction}
-SCENE: ${sceneDescription}
-- Character positioned on RIGHT or CENTER-RIGHT
-- Expressive 3D Pixar animation style
-- Character interacts with the scene naturally
+- Character should be prominent and expressive
+- Character emotion matches the slide content
 
-📝 TEXT IN GLASSMORPHISM CARDS (60% of image, left side):
-${textLines.join('\n')}
+📝 TEXT TO INTEGRATE:
+${textContent}
+- Text color: ${textColor} with good contrast
+- Integrate text naturally into the composition
+- Text must be clearly legible
 
-CARD STYLE (CRITICAL):
-- Text inside frosted glass panels (glassmorphism effect)
-- Semi-transparent white/light cards with blur and subtle border
-- Title: LARGE, BOLD, dark text (${textColor})
-- Accent text: Use brand secondary color (${accentColor})
-- Cards on LEFT or TOP-LEFT of image
-- Cards should NOT overlap the character
+REQUIREMENTS:
+- Follow USER CREATIVE DIRECTION as the primary guide
+- Apply ${colorMode === 'pastel' ? 'soft pastel' : 'vibrant saturated'} colors
+- Balance character and text visibility
+- Modern social media quality
 
-VISUAL QUALITY:
-- 3D Pixar/Disney animation quality
-- Background uses brand palette colors
-- Modern LinkedIn professional aesthetic
-- Premium lighting and depth of field
-
-ABSOLUTE RULES:
-- CHARACTER must be present and prominent (not just background)
-- TEXT must be in GLASS CARDS (not floating text)
-- Use EXACT brand colors provided
-- No placeholder text - use ONLY specified text
-- Generate a COMPLETE image with character + glass cards + text`;
+DO NOT:
+- Add any text not specified above
+- Generate a blank or completely white background`;
 }
 
 /**
- * ✅ V11: Build prompt for PRODUCT mode WITH INTEGRATED TEXT
- * Génère un produit en scène + texte dans des cartes glassmorphism
+ * ✅ V12: Build prompt for PRODUCT mode WITH INTEGRATED TEXT
+ * FLEXIBLE - Le prompt utilisateur guide le style
  */
 function buildImagePromptProductWithText(
   userPrompt: string,
@@ -410,75 +408,68 @@ function buildImagePromptProductWithText(
 ): string {
   const slideRole = getSlideRole(slideIndex, totalSlides);
   
-  // ✅ Palette dynamique
+  // ✅ Palette Brand Kit
   const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
   const paletteStr = palette.length > 0 
-    ? `EXACT BRAND COLORS: ${palette.join(', ')}` 
-    : 'modern professional colors';
+    ? `Brand colors: ${palette.join(', ')}` 
+    : '';
+  
+  // ✅ Mode couleurs
+  const colorDescription = colorMode === 'pastel'
+    ? 'SOFT PASTEL color palette - gentle, muted tones'
+    : 'VIBRANT COLORFUL palette - rich, saturated colors';
   
   // ✅ Texte à intégrer
   const textLines: string[] = [];
-  if (slideContent.title) textLines.push(`TITLE: "${slideContent.title}"`);
-  if (slideContent.subtitle) textLines.push(`SUBTITLE: "${slideContent.subtitle}"`);
-  if (slideContent.body) textLines.push(`BODY: "${slideContent.body}"`);
+  if (slideContent.title) textLines.push(`Title: "${slideContent.title}"`);
+  if (slideContent.subtitle) textLines.push(`Subtitle: "${slideContent.subtitle}"`);
+  if (slideContent.body) textLines.push(`Body: "${slideContent.body}"`);
   if (slideContent.bullets?.length) {
-    textLines.push(`BULLETS:\n${slideContent.bullets.map(b => '• ' + b).join('\n')}`);
+    textLines.push(`Points: ${slideContent.bullets.join(', ')}`);
   }
+  const textContent = textLines.length > 0 ? textLines.join('\n') : 'No text for this slide';
   
-  // ✅ Instruction produit dynamique
+  // ✅ Instruction produit
   const productInstruction = hasProductReference
     ? `CRITICAL: Feature the EXACT product from the reference image prominently.
-Same product, same packaging, same colors - accurately reproduced.
-Product must be the HERO of the image.`
-    : `Create a premium product photography scene.
-Use brand colors: ${paletteStr}
-Professional studio lighting, clean aesthetic.
-Generic elegant product mockup.`;
+Same product, same packaging, same colors - accurately reproduced.`
+    : `Create a premium product scene.
+${paletteStr ? `Use these colors: ${paletteStr}` : ''}
+Professional quality, elegant presentation.`;
 
-  // ✅ Style selon niche
-  let sceneStyle = "professional e-commerce product photography";
-  if (brandKit?.niche) {
-    sceneStyle = `${brandKit.niche} product showcase, premium setting`;
-  }
-  
   // ✅ Couleur de texte
-  const textColor = brandKit?.text_color || '#1A1A1A';
-  const accentColor = palette[1] || palette[0] || 'brand accent color';
+  const textColor = brandKit?.text_color || '#FFFFFF';
 
-  return `Create a product showcase carousel slide with PRODUCT + TEXT IN GLASS CARDS.
+  // ✅ PROMPT FLEXIBLE - L'utilisateur décide du style
+  return `Create a product showcase carousel slide.
 
-THEME: ${userPrompt}
-SLIDE: ${slideRole} (${slideIndex + 1}/${totalSlides})
-${paletteStr}
+USER CREATIVE DIRECTION: ${userPrompt}
+SLIDE ROLE: ${slideRole} (${slideIndex + 1}/${totalSlides})
 
-📦 PRODUCT (main focus, center or right):
+🎨 STYLE:
+- Color mode: ${colorDescription}
+${paletteStr ? `- ${paletteStr}` : ''}
+
+📦 PRODUCT:
 ${productInstruction}
-SCENE: ${sceneStyle}
-- Premium product photography style
-- Studio lighting, professional quality
+- Product should be the main focus
+- Professional quality presentation
 
-📝 TEXT IN GLASSMORPHISM CARDS (left side):
-${textLines.join('\n')}
+📝 TEXT TO INTEGRATE:
+${textContent}
+- Text color: ${textColor} with good contrast
+- Integrate text naturally
+- Text must be clearly legible
 
-CARD STYLE:
-- Frosted glass panels (glassmorphism effect)
-- Clean, modern typography
-- Title: LARGE, BOLD, dark text (${textColor})
-- Accent text: Brand color (${accentColor})
-- Cards should complement, not hide the product
+REQUIREMENTS:
+- Follow USER CREATIVE DIRECTION as the primary guide
+- Apply ${colorMode === 'pastel' ? 'soft pastel' : 'vibrant saturated'} colors
+- Product prominent, text readable
+- Modern e-commerce/social media quality
 
-VISUAL QUALITY:
-- Premium e-commerce marketing quality
-- Modern LinkedIn/Instagram professional aesthetic
-- Clean composition with clear hierarchy
-
-ABSOLUTE RULES:
-- PRODUCT must be prominently featured
-- TEXT must be in GLASS CARDS
-- Use EXACT brand colors
-- No placeholder text
-
-OUTPUT: Professional e-commerce carousel slide with product + glass card text.`;
+DO NOT:
+- Add any text not specified above
+- Hide or obscure the product`;
 }
 
 /**
@@ -661,6 +652,10 @@ OUTPUT: A stunning, ${colorMode === 'pastel' ? 'pastel' : 'colorful'} abstract b
  * Nano Banana Pro génère l'image + texte directement (centré)
  * Pour carouselMode = 'standard' avec texte existant
  */
+/**
+ * ✅ V12: Build prompt for BACKGROUND mode WITH INTEGRATED TEXT
+ * FLEXIBLE - Le prompt utilisateur guide le style visuel
+ */
 function buildImagePromptWithText(
   globalStyle: string,
   prompt: string,
@@ -673,92 +668,79 @@ function buildImagePromptWithText(
   const slideRole = getSlideRole(slideIndex, totalSlides);
   const colorModeLabel = colorMode === 'pastel' ? 'soft pastel' : 'vibrant colorful';
   
-  // ✅ Palette du Brand Kit ou fallback
+  // ✅ Palette Brand Kit
   const palette = brandKit?.palette?.filter(c => c && c !== '#ffffff')?.slice(0, 3) || [];
-  const colorHint = palette.length > 0 
-    ? `Primary colors: ${palette.join(', ')}` 
-    : 'Use modern gradient colors (blues, purples, pinks)';
+  const paletteStr = palette.length > 0 
+    ? `Brand colors: ${palette.join(', ')}` 
+    : '';
   
-  // ✅ Construire le texte à intégrer
-  const textLines: string[] = [];
-  if (slideContent.title) textLines.push(`TITLE: "${slideContent.title}"`);
-  if (slideContent.subtitle) textLines.push(`SUBTITLE: "${slideContent.subtitle}"`);
-  if (slideContent.body) textLines.push(`BODY: "${slideContent.body}"`);
-  if (slideContent.bullets?.length) {
-    textLines.push(`BULLET POINTS:\n${slideContent.bullets.map(b => '• ' + b).join('\n')}`);
-  }
+  // ✅ Mode couleurs
+  const colorDescription = colorMode === 'pastel'
+    ? 'SOFT PASTEL color palette - gentle, muted, delicate tones'
+    : 'VIBRANT COLORFUL palette - rich, saturated colors';
   
-  // ✅ NEW: Adapter le style typographique selon le Brand Kit visual_types
+  // ✅ Style depuis Brand Kit visual_types
   const visualType = brandKit?.visual_types?.[0] || 'modern';
-  let typographyStyle = "clean, modern sans-serif typography with soft shadow";
-  let visualElements = "soft 3D geometric elements, glowing orbs, smooth shapes";
+  const styleMap: Record<string, string> = {
+    'illustrations_3d': '3D Pixar/Disney style with depth',
+    'avatars_3d': '3D cartoon style',
+    'photos': 'photorealistic style',
+    'illustrations_2d': 'flat 2D illustration style',
+    'doodle': 'hand-drawn sketch style',
+    'mockups': 'premium mockup style',
+    'photorealistic': 'photorealistic high-quality',
+    '3d_pixar_style': '3D Pixar/Disney animation style',
+    'flat_illustration': 'flat modern illustration',
+    'minimalist_vector': 'minimalist vector art',
+    'modern': 'modern professional style',
+  };
+  const visualStyle = styleMap[visualType] || 'modern professional style';
   
-  if (visualType === "illustrations_3d" || visualType === "3d_pixar_style") {
-    typographyStyle = "3D BUBBLE LETTERS - puffy, rounded, inflated look with soft shadows and highlights. Pixar/Disney cartoon style text";
-    visualElements = "3D rendered objects with depth, organic 3D shapes, Pixar-style backgrounds";
-  } else if (visualType === "illustrations_2d") {
-    typographyStyle = "flat 2D illustration style text, bold colors, clean lines";
-    visualElements = "flat 2D illustration elements, bold shapes, vector-style graphics";
-  } else if (visualType === "doodle") {
-    typographyStyle = "hand-drawn, playful typography with organic strokes, sketch-style letters";
-    visualElements = "hand-drawn doodles, sketchy elements, playful illustrations";
-  } else if (visualType === "photorealistic") {
-    typographyStyle = "elegant serif or modern sans-serif typography with subtle shadow for readability";
-    visualElements = "realistic textures, professional photography style backgrounds";
-  } else if (visualType === "mockup" || visualType === "corporate") {
-    typographyStyle = "clean, professional corporate typography, minimal and refined";
-    visualElements = "clean geometric shapes, professional business aesthetic";
+  // ✅ Texte à intégrer
+  const textLines: string[] = [];
+  if (slideContent.title) textLines.push(`Title: "${slideContent.title}"`);
+  if (slideContent.subtitle) textLines.push(`Subtitle: "${slideContent.subtitle}"`);
+  if (slideContent.body) textLines.push(`Body: "${slideContent.body}"`);
+  if (slideContent.bullets?.length) {
+    textLines.push(`Points: ${slideContent.bullets.join(', ')}`);
   }
+  const textContent = textLines.length > 0 ? textLines.join('\n') : 'No text for this slide';
   
-  // ✅ Couleur de texte du Brand Kit ou blanc par défaut
+  // ✅ Couleur de texte
   const textColor = brandKit?.text_color || '#FFFFFF';
-  const textColorName = textColor.toLowerCase() === '#ffffff' ? 'WHITE' : textColor;
-  
-  // ✅ Mood visuel du Brand Kit
-  const visualMood = brandKit?.visual_mood?.join(', ') || colorModeLabel;
-  
-  // ✅ Adjectives pour le ton général
-  const brandPersonality = brandKit?.adjectives?.join(', ') || 'professional, modern';
   
   // ✅ Éléments à éviter
   const avoid = brandKit?.avoid_in_visuals || '';
-  
-  return `Create a ${colorModeLabel} social media carousel slide with INTEGRATED TEXT.
 
-THEME: ${prompt}
-STYLE: ${globalStyle || 'modern professional'}
-SLIDE: ${slideRole} (${slideIndex + 1}/${totalSlides})
-${colorHint}
-VISUAL MOOD: ${visualMood}
-BRAND PERSONALITY: ${brandPersonality}
+  // ✅ PROMPT FLEXIBLE - L'utilisateur décide du style
+  return `Create a carousel slide image with integrated text.
 
-📝 TEXT TO DISPLAY (CENTERED on image):
-${textLines.join('\n')}
+USER CREATIVE DIRECTION: ${prompt}
+${globalStyle ? `ADDITIONAL STYLE: ${globalStyle}` : ''}
+SLIDE ROLE: ${slideRole} (${slideIndex + 1}/${totalSlides})
 
-TYPOGRAPHY STYLE (CRITICAL - follow exactly):
-${typographyStyle}
-- Text color: ${textColorName} with contrasting shadow/stroke for readability
-- Title: LARGE, bold, prominent
-- Subtitle/Body: Smaller, below title
-- ALL text MUST be perfectly CENTERED horizontally and vertically
+🎨 STYLE:
+- Render style: ${visualStyle}
+- Color mode: ${colorDescription}
+${paletteStr ? `- ${paletteStr}` : ''}
 
-VISUAL ELEMENTS: ${visualElements}
+📝 TEXT TO INTEGRATE:
+${textContent}
+- Text color: ${textColor} with good contrast/shadow for readability
+- Title: Large, bold, prominent
+- Text should be centered and clearly visible
 
-CRITICAL REQUIREMENTS:
-- Generate a ${colorModeLabel} background - NO white/blank backgrounds
-- TEXT MUST BE CENTERED horizontally and vertically on the image
-- Text is the MAIN FOCUS - clearly legible and prominent
-- Modern social media aesthetic with depth and dimension
-- Leave comfortable margins around text (10% each side)
+REQUIREMENTS:
+- Follow USER CREATIVE DIRECTION as the primary visual guide
+- Apply ${colorModeLabel} colors throughout
+- Text is the main focus - clearly legible
+- Modern social media quality
+- NO completely white/blank backgrounds
 
-ABSOLUTE RULES (MANDATORY):
-- The image MUST contain the EXACT text provided above. If text is missing, the output is INVALID.
-- Follow the TYPOGRAPHY STYLE instructions exactly
-- Background: ${colorMode === 'pastel' ? 'soft pastel tones' : 'vibrant gradients'}
-- NO placeholder text, NO additional words beyond what is specified
-${avoid ? `- AVOID: ${avoid}` : ''}
-
-OUTPUT: A stunning carousel slide with ${colorModeLabel} background, ${typographyStyle.split(' - ')[0]} text, perfectly centered and prominent.`;
+DO NOT:
+- Add any text not specified above
+- Generate placeholder or additional words
+${avoid ? `- AVOID: ${avoid}` : ''}`;
 }
 
 /**
