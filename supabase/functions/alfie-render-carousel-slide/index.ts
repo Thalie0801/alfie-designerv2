@@ -743,8 +743,11 @@ SLIDE ROLE: ${slideRole} (${slideIndex + 1}/${totalSlides})
 
 🎨 STYLE:
 - Render style: ${visualStyle}
-- Color mode: ${colorDescription}
-${paletteStr ? `- ${paletteStr}` : ''}
+${palette.length > 0 
+  ? `- MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${palette.join(', ')}
+- These are the client's brand colors - NO substitutions allowed
+- Apply across backgrounds, gradients, elements, and accents`
+  : `- Color mode: ${colorDescription}`}
 
 📝 TEXT TO INTEGRATE:
 ${textContent}
@@ -754,7 +757,10 @@ ${textContent}
 
 REQUIREMENTS:
 - Follow USER CREATIVE DIRECTION as the primary visual guide
-- Apply ${colorModeLabel} colors throughout
+${palette.length > 0 
+  ? `- STRICT: Use ONLY brand palette (${palette.join(', ')}) for ALL colored elements
+- Every slide MUST use these exact colors consistently`
+  : `- Apply ${colorModeLabel} colors throughout`}
 - Text is the main focus - clearly legible
 - Modern social media quality
 - NO completely white/blank backgrounds
@@ -762,6 +768,7 @@ REQUIREMENTS:
 DO NOT:
 - Add any text not specified above
 - Generate placeholder or additional words
+${palette.length > 0 ? `- Use ANY colors outside the brand palette (${palette.join(', ')})` : ''}
 ${avoid ? `- AVOID: ${avoid}` : ''}`;
 }
 
