@@ -5,7 +5,6 @@
     "stripe": "npm:stripe@18",
     "xlsx": "npm:xlsx@0.18.5",
     "jszip": "npm:jszip@3.10.1",
-    "resend": "npm:resend@4",
     "zod": "npm:zod@3.23"
   }
 }
