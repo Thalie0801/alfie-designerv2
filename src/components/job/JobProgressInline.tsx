@@ -32,7 +32,8 @@ export function JobProgressInline({ jobId, onClose, onComplete }: JobProgressInl
     const currentStatus = progress.status;
     
     // Détecter le changement de status vers completed ou failed
-    if (prevStatus && prevStatus !== currentStatus) {
+    // Ignorer si c'est la première fois (prevStatus === null) pour éviter double toast
+    if (prevStatus !== null && prevStatus !== currentStatus) {
       if (currentStatus === 'completed') {
         toast.success('Génération terminée ! 🎉', {
           description: 'Ton contenu est prêt',

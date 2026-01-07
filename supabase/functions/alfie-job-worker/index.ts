@@ -1939,13 +1939,19 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   const totalSlides = payload.count || 5;
   const carouselType = payload.carouselType || 'content';
   const carouselMode = payload.carouselMode || 'standard';
-  const colorMode = payload.colorMode || 'vibrant'; // ✅ Mode Coloré/Pastel
   const useBrandKit = resolveUseBrandKit(payload, jobMeta);
+
+  // ✅ Charger le Brand Kit AVANT de dériver colorMode
+  const brandMini = await loadBrandMini(payload.brandId, false);
+  
+  // ✅ Dériver colorMode depuis visual_mood du Brand Kit si non spécifié
+  let colorMode: 'vibrant' | 'pastel' = payload.colorMode || 'vibrant';
+  if (!payload.colorMode && brandMini?.visual_mood?.includes('pastel')) {
+    colorMode = 'pastel';
+    console.log(`[processRenderCarousels] 🎨 Derived colorMode 'pastel' from Brand Kit visual_mood`);
+  }
   
   console.log(`[processRenderCarousels] 📌 Config: ${totalSlides} slides, mode: ${carouselMode}, type: ${carouselType}, colorMode: ${colorMode}, useBrandKit: ${useBrandKit}`);
-
-  // ✅ Charger le Brand Kit
-  const brandMini = await loadBrandMini(payload.brandId, false);
   
   // ✅ Extraire le topic (thème) du prompt utilisateur
   const rawTopic = payload.brief?.topic || payload.topic || payload.prompt || "";
