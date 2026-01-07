@@ -1968,10 +1968,20 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   const brandMini = await loadBrandMini(payload.brandId, false);
   
   // ✅ Dériver colorMode depuis visual_mood du Brand Kit si non spécifié
-  let colorMode: 'vibrant' | 'pastel' = payload.colorMode || 'vibrant';
-  if (!payload.colorMode && brandMini?.visual_mood?.includes('pastel')) {
+  // IMPORTANT: Vérifier le Brand Kit AVANT d'appliquer le fallback 'vibrant'
+  let colorMode: 'vibrant' | 'pastel';
+  if (payload.colorMode) {
+    // L'utilisateur a explicitement spécifié le mode
+    colorMode = payload.colorMode;
+    console.log(`[processRenderCarousels] 🎨 Using explicit colorMode: ${colorMode}`);
+  } else if (brandMini?.visual_mood?.some((mood: string) => mood.toLowerCase().includes('pastel'))) {
+    // Dériver depuis le Brand Kit si 'pastel' est dans visual_mood
     colorMode = 'pastel';
-    console.log(`[processRenderCarousels] 🎨 Derived colorMode 'pastel' from Brand Kit visual_mood`);
+    console.log(`[processRenderCarousels] 🎨 Derived colorMode 'pastel' from Brand Kit visual_mood: ${JSON.stringify(brandMini.visual_mood)}`);
+  } else {
+    // Fallback par défaut
+    colorMode = 'vibrant';
+    console.log(`[processRenderCarousels] 🎨 Using default colorMode 'vibrant' (visual_mood: ${JSON.stringify(brandMini?.visual_mood)})`);
   }
   
   console.log(`[processRenderCarousels] 📌 Config: ${totalSlides} slides, mode: ${carouselMode}, type: ${carouselType}, colorMode: ${colorMode}, useBrandKit: ${useBrandKit}`);
