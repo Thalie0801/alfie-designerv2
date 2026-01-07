@@ -1,5 +1,4 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { Resend } from "resend";
 import { z } from "zod";
 
 const corsHeaders = {
@@ -200,12 +199,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    if (!resendApiKey) {
-      throw new Error("RESEND_API_KEY not configured");
-    }
-
-    const resend = new Resend(resendApiKey);
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -266,15 +259,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
         // Sanitize payload to prevent XSS
         const safePayload = sanitizePayload(email.payload || {});
 
-        const { error: sendError } = await resend.emails.send({
-          from: "Alfie Designer <noreply@alfie.design>",
-          to: [email.to_email],
-          subject: template.subject,
-          html: template.getHtml(safePayload),
+        // Send via Brevo (unified email system)
+        const brevoResponse = await fetch(`${supabaseUrl}/functions/v1/brevo-send-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({
+            to: [{ email: email.to_email }],
+            subject: template.subject,
+            htmlContent: template.getHtml(safePayload),
+            sender: { name: "Alfie Designer", email: "noreply@alfiedesigner.com" },
+          }),
         });
 
-        if (sendError) {
-          throw sendError;
+        if (!brevoResponse.ok) {
+          const errorData = await brevoResponse.json().catch(() => ({}));
+          throw new Error(errorData.error || `Brevo send failed: ${brevoResponse.status}`);
         }
 
         // Mark as sent
