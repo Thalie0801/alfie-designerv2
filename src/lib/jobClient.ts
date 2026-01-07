@@ -121,6 +121,24 @@ export async function getJobStatus(jobId: string): Promise<JobProgress> {
 
   const completedSteps = steps.filter(s => s.status === 'completed').length;
   const currentStep = steps.find(s => s.status === 'running')?.step_type;
+  
+  // ✅ FIX: Calcul du statut effectif basé sur les steps (anti-régression)
+  // Corrige le cas où job_queue.status=completed mais des steps sont encore pending/running
+  let effectiveStatus = job.status as JobProgress['status'];
+  if (steps.length > 0) {
+    const hasRunning = steps.some(s => s.status === 'running');
+    const hasPending = steps.some(s => s.status === 'pending' || s.status === 'queued');
+    const hasFailed = steps.some(s => s.status === 'failed');
+    const allCompleted = steps.every(s => s.status === 'completed');
+    
+    if (hasFailed && job.status !== 'failed') {
+      effectiveStatus = 'failed';
+    } else if (allCompleted) {
+      effectiveStatus = 'completed';
+    } else if (hasRunning || hasPending) {
+      effectiveStatus = 'running';
+    }
+  }
 
   // Collect assets from completed steps
   const assets: JobAsset[] = [];
@@ -174,7 +192,7 @@ export async function getJobStatus(jobId: string): Promise<JobProgress> {
   return {
     jobId: job.id,
     kind: job.kind || undefined,
-    status: job.status as JobProgress['status'],
+    status: effectiveStatus, // ✅ Utilise le statut effectif basé sur les steps
     currentStep,
     completedSteps,
     totalSteps: steps.length,

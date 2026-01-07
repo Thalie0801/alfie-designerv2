@@ -420,11 +420,13 @@ Deno.serve(async (req) => {
     let processed = 0;
 
     for (let i = 0; i < maxJobs; i++) {
-      // On prend simplement le premier job en file, sans supposer qu'il existe une colonne "created_at"
+      // ✅ FIX: Ne traiter QUE les jobs legacy - les jobs V2 sont gérés par job-orchestrator/video-step-runner
+      const LEGACY_JOB_TYPES = ['generate_texts', 'render_images', 'render_carousels', 'generate_video'];
       const { data: job, error: fetchError } = await supabaseAdmin
         .from("job_queue")
         .select("*")
         .eq("status", "queued")
+        .in("type", LEGACY_JOB_TYPES)
         .limit(1)
         .maybeSingle();
 
@@ -501,9 +503,9 @@ Deno.serve(async (req) => {
             });
             break;
           default:
-            console.warn("⚠️ unknown job type", job.type);
-            result = null;
-            break;
+            // ✅ FIX: Ne plus marquer "completed" les types inconnus - throw error pour fail proprement
+            console.error("❌ [alfie-job-worker] Unknown job type - this should not happen with type filter", job.type);
+            throw new Error(`Unsupported legacy job type: ${job.type}. Job Engine V2 jobs should not reach alfie-job-worker.`);
         }
 
         const finishedAt = new Date().toISOString();
@@ -554,10 +556,12 @@ Deno.serve(async (req) => {
         console.log("✅ job_done", { id: job.id, type: job.type });
         results.push({ job_id: job.id, success: true });
 
+        // ✅ FIX: Ne vérifier que les jobs legacy pour self-reinvoke
         const { data: remainingJobs } = await supabaseAdmin
           .from("job_queue")
           .select("id")
           .eq("status", "queued")
+          .in("type", LEGACY_JOB_TYPES)
           .limit(1);
 
         if (remainingJobs && remainingJobs.length > 0) {
