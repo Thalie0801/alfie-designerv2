@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { withIdempotency } from "../_shared/idempotency.ts";
 import { userHasAccess } from "../_shared/accessControl.ts";
 import { resolveBrandKit } from "../_shared/brandResolver.ts";

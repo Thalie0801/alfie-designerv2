@@ -1,8 +1,7 @@
 // supabase/functions/generate-media/index.ts
 // Crée un job dans la table "job_queue" que le worker traitera.
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../_shared/env.ts";
 
 // CORS local (plus de dépendance à ../_shared/cors)
@@ -44,7 +43,7 @@ interface GenerateMediaPayload {
   };
 }
 
-serve(async (req: Request): Promise<Response> => {
+Deno.serve(async (req: Request): Promise<Response> => {
   // Préflight CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });

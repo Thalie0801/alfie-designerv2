@@ -1,5 +1,5 @@
 import { edgeHandler } from "../_shared/edgeHandler.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { enrichPromptWithBrandKit } from "../_shared/aiOrchestrator.ts";
 import { uploadWithRichMetadata, type RichMetadata } from "../_shared/cloudinaryUploader.ts";
 import { getUserRoles, isAdminUser } from "../_shared/auth.ts";
