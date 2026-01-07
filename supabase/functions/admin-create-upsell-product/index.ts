@@ -23,9 +23,7 @@ Deno.serve(async (req) => {
       return json({ error: "Stripe not configured" }, 500);
     }
 
-    const stripe = new Stripe(stripeSecretKey, {
-      apiVersion: "2023-10-16",
-    });
+    const stripe = new Stripe(stripeSecretKey);
 
     console.log("[admin-create-upsell-product] Creating Pack 30 Visuels product...");
 

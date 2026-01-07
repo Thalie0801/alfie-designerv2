@@ -39,9 +39,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const stripe = new Stripe(stripeSecretKey, {
-      apiVersion: "2023-10-16",
-    });
+    const stripe = new Stripe(stripeSecretKey);
 
     console.log("[create-ambassadeur-coupon] Creating 40% coupon...");
 
@@ -58,7 +56,6 @@ Deno.serve(async (req) => {
     const promoCode = await stripe.promotionCodes.create({
       coupon: coupon.id,
       code: "AMBASSADEUR",
-      max_redemptions: null, // illimité
       restrictions: {
         first_time_transaction: false, // peut être utilisé même si déjà client
       },
