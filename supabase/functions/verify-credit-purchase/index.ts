@@ -1,4 +1,3 @@
-import "https://deno.land/x/xhr@0.4.0/mod.ts";
 import Stripe from "npm:stripe@18";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
