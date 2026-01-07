@@ -53,7 +53,7 @@ export function SubjectPackCreateModal({ open, onOpenChange, onCreated }: Subjec
   const [anchorASlot, setAnchorASlot] = useState<ImageSlot>({ file: null, preview: null });
   const [anchorBSlot, setAnchorBSlot] = useState<ImageSlot>({ file: null, preview: null });
 
-  const handleFileDrop = useCallback((slot: 'master' | 'anchorA' | 'anchorB') => async (acceptedFiles: File[]) => {
+  const handleFileDrop = useCallback((slot: 'master' | 'anchorA' | 'anchorB') => (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (!file) return;
 
@@ -64,18 +64,6 @@ export function SubjectPackCreateModal({ open, onOpenChange, onCreated }: Subjec
 
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Le fichier est trop lourd (max 5 Mo)');
-      return;
-    }
-
-    // Valider que le fichier est lisible (évite les blobs corrompus sur mobile)
-    try {
-      const testBuffer = await file.slice(0, 1024).arrayBuffer();
-      if (!testBuffer || testBuffer.byteLength === 0) {
-        throw new Error('Fichier vide ou illisible');
-      }
-    } catch (e) {
-      console.error('[SubjectPack] File validation failed:', e);
-      toast.error('Ce fichier ne peut pas être lu. Essaie un autre format (JPG/PNG).');
       return;
     }
 
