@@ -425,6 +425,7 @@ export default function StudioMulti() {
         // Carousel-specific options
         visual_style_category: carouselVisualStyleCategory,
         background_only: carouselBackgroundOnly,
+        carousel_mode: carouselBackgroundOnly ? 'background_only' : 'standard',
         // Carousel text layout structure
         carousel_text_layout: {
           has_title: true,
