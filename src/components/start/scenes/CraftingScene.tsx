@@ -35,6 +35,8 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
   const [error, setError] = useState<string | null>(null);
   const [isComplete, setIsComplete] = useState(false);
   const [resending, setResending] = useState(false);
+  const [generationDone, setGenerationDone] = useState(false);
+  const [openingChest, setOpeningChest] = useState(false);
   const prefersReducedMotion = useReducedMotion();
   const generationStarted = useRef(false);
   const animationComplete = useRef(false);
@@ -70,7 +72,8 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
           setTimeout(() => {
             setProgress(100);
             animationComplete.current = true;
-            setIsComplete(true);
+            // Only show completion if generation is done
+            // Otherwise, useEffect will handle it when generationDone becomes true
           }, CRAFTING_STEPS[stepIndex - 1].duration);
         }
       }
@@ -127,57 +130,69 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
 
         if (data?.success && data?.assets) {
           generatedAssets.current = data.assets;
+          setGenerationDone(true);
         } else {
-          // Use fallback assets if generation failed
+          // Use fallback - still mark as done
           generatedAssets.current = [
             { title: 'Post Instagram', ratio: '1:1', url: '/images/hero-preview.jpg', thumbnailUrl: '/images/hero-preview.jpg' },
             { title: 'Story', ratio: '9:16', url: '/images/hero-preview.jpg', thumbnailUrl: '/images/hero-preview.jpg' },
             { title: 'Cover', ratio: '4:5', url: '/images/hero-preview.jpg', thumbnailUrl: '/images/hero-preview.jpg' },
           ];
+          setGenerationDone(true);
         }
       } catch (err) {
         console.error('[CraftingScene] Unexpected error:', err);
         setError('Erreur inattendue. Réessaie.');
+        setGenerationDone(true); // Allow user to proceed even on error
       }
     };
 
     generatePack();
   }, [intent, email]);
 
-  const handleOpenChest = () => {
+  // Sync animation completion with generation
+  useEffect(() => {
+    if (animationComplete.current && generationDone) {
+      setIsComplete(true);
+    }
+  }, [generationDone]);
+
+  const handleOpenChest = async () => {
     if (generatedAssets.current.length > 0) {
       onComplete(generatedAssets.current);
-    } else {
-      // Try to fetch from backend if not available locally
-      fetchAssetsFromBackend();
+      return;
     }
-  };
 
-  const fetchAssetsFromBackend = async () => {
+    // Polling with retry if assets not available locally
     if (!email) {
       onComplete([]);
       return;
     }
-    
-    try {
-      const { data } = await supabase.functions.invoke('get-latest-free-pack', {
-        body: { email }
-      });
-      
-      if (data?.success && data?.assets?.length > 0) {
-        onComplete(data.assets);
-      } else {
-        // Fallback to placeholder
-        onComplete([
-          { title: 'Post Instagram', ratio: '1:1', url: '/images/hero-preview.jpg', thumbnailUrl: '/images/hero-preview.jpg' },
-          { title: 'Story', ratio: '9:16', url: '/images/hero-preview.jpg', thumbnailUrl: '/images/hero-preview.jpg' },
-          { title: 'Cover', ratio: '4:5', url: '/images/hero-preview.jpg', thumbnailUrl: '/images/hero-preview.jpg' },
-        ]);
+
+    setOpeningChest(true);
+    const maxRetries = 15;
+    const delay = 2000;
+
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const { data } = await supabase.functions.invoke('get-latest-free-pack', {
+          body: { email }
+        });
+
+        if (data?.success && data?.assets?.length > 0) {
+          onComplete(data.assets);
+          return;
+        }
+      } catch (err) {
+        console.error('[CraftingScene] Polling error:', err);
       }
-    } catch (err) {
-      console.error('[CraftingScene] Failed to fetch assets:', err);
-      onComplete([]);
+
+      await new Promise(r => setTimeout(r, delay));
     }
+
+    // Timeout after 30 seconds
+    toast.error("La génération prend du temps. Vérifie ton email pour le lien.");
+    setOpeningChest(false);
   };
 
   const handleResendEmail = async () => {
@@ -246,11 +261,16 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
             {/* Main CTA */}
             <Button
               onClick={handleOpenChest}
+              disabled={openingChest}
               size="lg"
               className="w-full gap-2 mb-4 bg-gradient-to-r from-alfie-mint to-alfie-lilac text-foreground font-bold rounded-xl"
             >
-              <Package className="w-5 h-5" />
-              Ouvrir le coffre
+              {openingChest ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Package className="w-5 h-5" />
+              )}
+              {openingChest ? 'Chargement...' : 'Ouvrir le coffre'}
             </Button>
 
             {/* Secondary actions */}
