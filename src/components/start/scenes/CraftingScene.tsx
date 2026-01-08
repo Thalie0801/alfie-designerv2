@@ -1,8 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Check, Loader2, AlertCircle } from 'lucide-react';
+import { Check, Loader2, AlertCircle, Mail, Package, RefreshCw } from 'lucide-react';
 import { ParticleField } from '../game/ParticleField';
 import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import type { Intent, GeneratedAsset } from '@/lib/types/startFlow';
 
 const CRAFTING_STEPS_SOCIAL = [
@@ -31,6 +33,8 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
   const [currentStep, setCurrentStep] = useState(0);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [isComplete, setIsComplete] = useState(false);
+  const [resending, setResending] = useState(false);
   const prefersReducedMotion = useReducedMotion();
   const generationStarted = useRef(false);
   const animationComplete = useRef(false);
@@ -66,10 +70,7 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
           setTimeout(() => {
             setProgress(100);
             animationComplete.current = true;
-            // Check if generation already finished
-            if (generatedAssets.current.length > 0) {
-              onComplete(generatedAssets.current);
-            }
+            setIsComplete(true);
           }, CRAFTING_STEPS[stepIndex - 1].duration);
         }
       }
@@ -82,7 +83,7 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
     return () => {
       clearTimeout(startTimeout);
     };
-  }, [onComplete, CRAFTING_STEPS]);
+  }, [CRAFTING_STEPS]);
 
   // Start generation
   useEffect(() => {
@@ -126,10 +127,6 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
 
         if (data?.success && data?.assets) {
           generatedAssets.current = data.assets;
-          // If animation already complete, trigger onComplete
-          if (animationComplete.current) {
-            onComplete(data.assets);
-          }
         } else {
           // Use fallback assets if generation failed
           generatedAssets.current = [
@@ -137,9 +134,6 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
             { title: 'Story', ratio: '9:16', url: '/images/hero-preview.jpg', thumbnailUrl: '/images/hero-preview.jpg' },
             { title: 'Cover', ratio: '4:5', url: '/images/hero-preview.jpg', thumbnailUrl: '/images/hero-preview.jpg' },
           ];
-          if (animationComplete.current) {
-            onComplete(generatedAssets.current);
-          }
         }
       } catch (err) {
         console.error('[CraftingScene] Unexpected error:', err);
@@ -148,7 +142,147 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
     };
 
     generatePack();
-  }, [intent, email, onComplete]);
+  }, [intent, email]);
+
+  const handleOpenChest = () => {
+    if (generatedAssets.current.length > 0) {
+      onComplete(generatedAssets.current);
+    } else {
+      // Try to fetch from backend if not available locally
+      fetchAssetsFromBackend();
+    }
+  };
+
+  const fetchAssetsFromBackend = async () => {
+    if (!email) {
+      onComplete([]);
+      return;
+    }
+    
+    try {
+      const { data } = await supabase.functions.invoke('get-latest-free-pack', {
+        body: { email }
+      });
+      
+      if (data?.success && data?.assets?.length > 0) {
+        onComplete(data.assets);
+      } else {
+        // Fallback to placeholder
+        onComplete([
+          { title: 'Post Instagram', ratio: '1:1', url: '/images/hero-preview.jpg', thumbnailUrl: '/images/hero-preview.jpg' },
+          { title: 'Story', ratio: '9:16', url: '/images/hero-preview.jpg', thumbnailUrl: '/images/hero-preview.jpg' },
+          { title: 'Cover', ratio: '4:5', url: '/images/hero-preview.jpg', thumbnailUrl: '/images/hero-preview.jpg' },
+        ]);
+      }
+    } catch (err) {
+      console.error('[CraftingScene] Failed to fetch assets:', err);
+      onComplete([]);
+    }
+  };
+
+  const handleResendEmail = async () => {
+    if (!email || resending) return;
+    
+    setResending(true);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('resend-delivery-email', {
+        body: { email }
+      });
+      
+      if (fnError || !data?.success) {
+        toast.error(data?.error || 'Erreur lors du renvoi');
+      } else {
+        toast.success('Email envoyé ! Vérifie ta boîte mail.');
+      }
+    } catch (err) {
+      toast.error('Erreur lors du renvoi de l\'email');
+    } finally {
+      setResending(false);
+    }
+  };
+
+  // Show completion UI when ready
+  if (isComplete) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="min-h-screen w-full flex items-center justify-center p-4 relative"
+      >
+        <ParticleField count={50} speed="normal" />
+
+        <div className="max-w-md w-full relative z-10">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-background/90 backdrop-blur-md rounded-3xl p-8 shadow-2xl border border-border/50"
+          >
+            {/* Success icon */}
+            <motion.div
+              className="text-6xl text-center mb-6"
+              initial={{ scale: 0 }}
+              animate={{ scale: 1, rotate: [0, 10, -10, 0] }}
+              transition={{ type: 'spring' }}
+            >
+              🎁
+            </motion.div>
+
+            <h2 className="text-2xl font-bold text-center text-foreground mb-2">
+              Ton pack est prêt ! 🎉
+            </h2>
+
+            {/* Email notice */}
+            {email && (
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-6 p-3 bg-muted/30 rounded-xl">
+                <Mail className="w-4 h-4" />
+                <span>Email envoyé à <strong>{email}</strong></span>
+              </div>
+            )}
+
+            <p className="text-center text-muted-foreground mb-6">
+              Pense à vérifier tes spams si tu ne le reçois pas.
+            </p>
+
+            {/* Main CTA */}
+            <Button
+              onClick={handleOpenChest}
+              size="lg"
+              className="w-full gap-2 mb-4 bg-gradient-to-r from-alfie-mint to-alfie-lilac text-foreground font-bold rounded-xl"
+            >
+              <Package className="w-5 h-5" />
+              Ouvrir le coffre
+            </Button>
+
+            {/* Secondary actions */}
+            <div className="flex flex-col gap-2">
+              {email && (
+                <Button
+                  variant="ghost"
+                  onClick={handleResendEmail}
+                  disabled={resending}
+                  className="gap-2 text-sm"
+                >
+                  <RefreshCw className={`w-4 h-4 ${resending ? 'animate-spin' : ''}`} />
+                  {resending ? 'Envoi en cours...' : 'Renvoyer l\'email'}
+                </Button>
+              )}
+            </div>
+
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-xl flex items-center gap-3"
+              >
+                <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
+                <p className="text-sm text-destructive">{error}</p>
+              </motion.div>
+            )}
+          </motion.div>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -234,7 +368,7 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
           {/* Crafting Steps */}
           <div className="space-y-3">
             {CRAFTING_STEPS.map((step, index) => {
-              const isComplete = currentStep > index;
+              const stepComplete = currentStep > index;
               const isCurrent = currentStep === index + 1;
 
               return (
@@ -245,7 +379,7 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
                   transition={{ delay: index * 0.1 }}
                   className={`
                     flex items-center gap-3 p-3 rounded-xl transition-all
-                    ${isComplete
+                    ${stepComplete
                       ? 'bg-alfie-mintSoft'
                       : isCurrent
                       ? 'bg-gradient-to-r from-alfie-lilac/30 to-alfie-pink/30'
@@ -256,7 +390,7 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
                   <div
                     className={`
                       w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm
-                      ${isComplete
+                      ${stepComplete
                         ? 'bg-alfie-mint text-white'
                         : isCurrent
                         ? 'bg-gradient-to-br from-alfie-lilac to-alfie-pink text-white'
@@ -264,7 +398,7 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
                       }
                     `}
                   >
-                    {isComplete ? (
+                    {stepComplete ? (
                       <Check className="w-5 h-5" />
                     ) : isCurrent ? (
                       <motion.div
@@ -279,14 +413,14 @@ export function CraftingScene({ intent, email, onComplete }: CraftingSceneProps)
                   </div>
                   <span
                     className={`font-medium ${
-                      isComplete || isCurrent ? 'text-foreground' : 'text-muted-foreground'
+                      stepComplete || isCurrent ? 'text-foreground' : 'text-muted-foreground'
                     }`}
                   >
                     {step.label}
                   </span>
 
                   {/* Completion spark */}
-                  {isComplete && !prefersReducedMotion && (
+                  {stepComplete && !prefersReducedMotion && (
                     <motion.span
                       initial={{ opacity: 0, scale: 0 }}
                       animate={{ opacity: 1, scale: 1 }}
