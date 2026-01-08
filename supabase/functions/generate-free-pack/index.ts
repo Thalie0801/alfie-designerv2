@@ -220,6 +220,24 @@ Deno.serve(async (req) => {
 
     console.log("[generate-free-pack] Generation complete", { count: generatedAssets.length, packMode });
 
+    // Increment generation_count AFTER successful generation
+    if (email) {
+      const normalizedEmail = email.trim().toLowerCase();
+      const { error: updateError } = await supabase
+        .from("leads")
+        .update({
+          generation_count: 1,
+          last_generation_at: new Date().toISOString(),
+        })
+        .eq("email", normalizedEmail);
+      
+      if (updateError) {
+        console.error("[generate-free-pack] Failed to update lead generation_count:", updateError);
+      } else {
+        console.log("[generate-free-pack] Updated generation_count for:", normalizedEmail);
+      }
+    }
+
     // Queue delivery email via unified email system
     try {
       if (email) {
