@@ -55,10 +55,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Find lead
+    // Find lead with generated_assets
     const { data: lead } = await supabase
       .from("leads")
-      .select("id, intent")
+      .select("id, intent, generated_assets")
       .eq("email", email)
       .maybeSingle();
 
@@ -69,15 +69,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Get latest assets for this lead
-    const { data: assets } = await supabase
-      .from("library_assets")
-      .select("cloudinary_url, format")
-      .or(`metadata->>source.eq.free-pack,metadata->>lead_id.eq.${lead.id}`)
-      .order("created_at", { ascending: false })
-      .limit(3);
-
-    const assetUrls = (assets || []).map(a => a.cloudinary_url);
+    // Get asset URLs from lead.generated_assets
+    const assets = lead.generated_assets || [];
+    const assetUrls = Array.isArray(assets) 
+      ? assets.filter((a: any) => a?.url && !a.url.startsWith('/')).map((a: any) => a.url)
+      : [];
 
     // Queue delivery email
     const { error: queueError } = await supabase.from("email_queue").insert({

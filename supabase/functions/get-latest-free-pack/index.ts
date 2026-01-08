@@ -34,14 +34,22 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     console.log("[get-latest-free-pack] Looking for assets for:", email);
 
-    // Find lead by email
+    // Get lead with generated_assets directly
     const { data: lead, error: leadError } = await supabase
       .from("leads")
-      .select("id")
+      .select("id, generated_assets")
       .eq("email", email)
       .maybeSingle();
 
-    if (leadError || !lead) {
+    if (leadError) {
+      console.error("[get-latest-free-pack] Lead query error:", leadError);
+      return new Response(
+        JSON.stringify({ success: false, assets: [], error: "Failed to fetch lead" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!lead) {
       console.log("[get-latest-free-pack] Lead not found for:", email);
       return new Response(
         JSON.stringify({ success: false, assets: [], message: "No pack found for this email" }),
@@ -49,36 +57,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Get the most recent free-pack assets from library_assets
-    // They're stored with user_id matching the lead pattern or with metadata.source = "free-pack"
-    const { data: assets, error: assetsError } = await supabase
-      .from("library_assets")
-      .select("id, cloudinary_url, type, format, metadata, created_at")
-      .or(`metadata->>source.eq.free-pack,metadata->>lead_id.eq.${lead.id}`)
-      .order("created_at", { ascending: false })
-      .limit(3);
-
-    if (assetsError) {
-      console.error("[get-latest-free-pack] Assets query error:", assetsError);
-      return new Response(
-        JSON.stringify({ success: false, assets: [], error: "Failed to fetch assets" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log("[get-latest-free-pack] Found assets:", assets?.length || 0);
-
-    const formattedAssets = (assets || []).map((a, i) => ({
-      title: a.format || `Asset ${i + 1}`,
-      url: a.cloudinary_url,
-      thumbnailUrl: a.cloudinary_url,
-      ratio: a.format === "story" ? "9:16" : a.format === "cover" ? "4:5" : "1:1",
-    }));
+    // Return assets from lead.generated_assets
+    const assets = lead.generated_assets || [];
+    
+    console.log("[get-latest-free-pack] Found assets:", Array.isArray(assets) ? assets.length : 0);
 
     return new Response(
       JSON.stringify({
         success: true,
-        assets: formattedAssets,
+        assets: assets,
         leadId: lead.id,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
