@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
       throw new Error("RESEND_API_KEY not configured");
     }
 
-    const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://alfie-designer.lovable.app";
+    const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://alfie-designer.com";
     
     let subject: string;
     let html: string;

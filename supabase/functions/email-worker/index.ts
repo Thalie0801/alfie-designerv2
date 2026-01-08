@@ -47,7 +47,7 @@ function sanitizePayload(payload: Record<string, unknown>): Record<string, unkno
   return sanitized;
 }
 
-const FRONTEND_URL = Deno.env.get("FRONTEND_URL") || "https://preview--gbuvtzqqzyiytypenzae.lovable.app";
+const FRONTEND_URL = Deno.env.get("FRONTEND_URL") || "https://alfie-designer.com";
 
 const EMAIL_TEMPLATES: Record<string, { subject: string; getHtml: (payload: Record<string, unknown>) => string }> = {
   start: {

@@ -1,21 +1,21 @@
 import { useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Download, RefreshCw, Save, Check, ExternalLink, Sparkles } from 'lucide-react';
+import { Mail, Check, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { ParticleField } from '../game/ParticleField';
-import { downloadAssetsAsZip } from '@/lib/downloadZip';
+import { supabase } from '@/integrations/supabase/client';
 import type { GeneratedAsset } from '@/lib/types/startFlow';
 
 interface LootChestSceneProps {
-  assets: GeneratedAsset[];
-  onVariation: () => void;
-  onSavePreset: () => void;
+  assets?: GeneratedAsset[];
+  onVariation?: () => void;
+  onSavePreset?: () => void;
 }
 
-export function LootChestScene({ assets, onVariation, onSavePreset }: LootChestSceneProps) {
-  const [downloading, setDownloading] = useState(false);
+export function LootChestScene(_props: LootChestSceneProps) {
   const [chestOpened, setChestOpened] = useState(false);
+  const [resending, setResending] = useState(false);
   const prefersReducedMotion = useReducedMotion();
 
   // Auto-open chest after mount
@@ -24,21 +24,28 @@ export function LootChestScene({ assets, onVariation, onSavePreset }: LootChestS
     return () => clearTimeout(timer);
   });
 
-  const handleDownloadZip = async () => {
-    if (downloading) return;
-    setDownloading(true);
+  const handleResendEmail = async () => {
+    if (resending) return;
+    setResending(true);
     
     try {
-      await downloadAssetsAsZip(
-        assets.map(a => ({ title: a.title, url: a.url })),
-        'alfie-pack.zip'
-      );
-      toast.success('Pack téléchargé ! 📦');
+      const email = localStorage.getItem('alfie-lead-email');
+      if (!email) {
+        toast.error("Email introuvable. Contacte-nous !");
+        return;
+      }
+
+      const { error } = await supabase.functions.invoke('resend-delivery-email', {
+        body: { email }
+      });
+
+      if (error) throw error;
+      toast.success("Email renvoyé ! Vérifie ta boîte mail 📬");
     } catch (error) {
-      console.error('Download error:', error);
-      toast.error('Erreur lors du téléchargement');
+      console.error('Resend error:', error);
+      toast.error("Erreur lors de l'envoi. Réessaie dans quelques secondes.");
     } finally {
-      setDownloading(false);
+      setResending(false);
     }
   };
 
@@ -46,40 +53,6 @@ export function LootChestScene({ assets, onVariation, onSavePreset }: LootChestS
     const brandId = localStorage.getItem('alfie-active-brand-id') || '';
     window.location.href = `/upsell-visuels?brandId=${brandId}`;
   };
-
-  const hasRealAssets = assets.some(a => a.url && !a.url.startsWith('/images/'));
-
-  // Empty state - pack still generating
-  if (!assets || assets.length === 0) {
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="min-h-screen w-full flex items-center justify-center p-4 relative"
-      >
-        <ParticleField count={30} speed="normal" />
-        <div className="max-w-md w-full relative z-10 text-center">
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="text-6xl mb-6"
-          >
-            ⏳
-          </motion.div>
-          <h2 className="text-2xl font-bold text-foreground mb-4">
-            Ton pack est en préparation
-          </h2>
-          <p className="text-muted-foreground mb-6">
-            Tu recevras un email avec le lien de téléchargement dès qu'il sera prêt.
-          </p>
-          <Button onClick={onVariation} variant="outline" className="gap-2">
-            <RefreshCw className="w-4 h-4" />
-            Réessayer
-          </Button>
-        </div>
-      </motion.div>
-    );
-  }
 
   return (
     <motion.div
@@ -90,7 +63,7 @@ export function LootChestScene({ assets, onVariation, onSavePreset }: LootChestS
       {/* Celebration particles */}
       <ParticleField count={50} speed="normal" />
 
-      <div className="max-w-4xl w-full relative z-10">
+      <div className="max-w-lg w-full relative z-10">
         {/* Chest Animation */}
         <motion.div
           initial={{ scale: 0, rotateY: -180 }}
@@ -140,107 +113,33 @@ export function LootChestScene({ assets, onVariation, onSavePreset }: LootChestS
           )}
         </motion.div>
 
-        {/* Title */}
+        {/* Title & Message */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
           className="text-center mb-8"
         >
-          <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-2">
-            Loot débloqué ! 🎉
+          <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-3">
+            Ton pack est en route ! 🎉
           </h1>
-          <p className="text-lg text-muted-foreground">
-            {hasRealAssets 
-              ? 'Tes visuels sont prêts. Télécharge-les maintenant !'
-              : 'Ton pack est prêt. Choisis comment le récupérer.'}
+          <p className="text-lg text-muted-foreground mb-6">
+            📬 Un email avec ton lien de téléchargement t'a été envoyé.<br />
+            <span className="text-sm">Vérifie tes spams si tu ne le vois pas !</span>
           </p>
-        </motion.div>
 
-        {/* Generated Assets Preview */}
-        {hasRealAssets && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="grid grid-cols-3 gap-3 sm:gap-4 mb-8"
-          >
-            {assets.map((asset, index) => (
-              <motion.div
-                key={asset.title}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.6 + index * 0.1 }}
-                className="relative group"
-              >
-                <div className="aspect-square bg-muted rounded-2xl overflow-hidden border border-border/50">
-                  <img
-                    src={asset.thumbnailUrl}
-                    alt={asset.title}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/images/hero-preview.jpg';
-                    }}
-                  />
-                </div>
-                <p className="text-xs text-center text-muted-foreground mt-2">{asset.title}</p>
-                
-                {/* Hover overlay with open button */}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center">
-                  <a
-                    href={asset.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
-                  >
-                    <ExternalLink className="w-5 h-5 text-white" />
-                  </a>
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
-
-        {/* Action Buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-          className="flex justify-center mb-8"
-        >
           <Button
-            onClick={handleDownloadZip}
-            disabled={downloading}
-            size="lg"
-            className="gap-2 bg-gradient-to-r from-alfie-mint to-alfie-lilac text-foreground font-bold rounded-xl"
+            onClick={handleResendEmail}
+            disabled={resending}
+            variant="outline"
+            className="gap-2 rounded-xl"
           >
-            <Download className="w-5 h-5" />
-            {downloading ? 'Téléchargement...' : 'Télécharger ZIP'}
-          </Button>
-        </motion.div>
-
-        {/* Secondary Actions */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-          className="flex flex-wrap justify-center gap-3 mb-8"
-        >
-          <Button
-            variant="ghost"
-            onClick={onVariation}
-            className="rounded-xl gap-2"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Re-roll (variation)
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={onSavePreset}
-            className="rounded-xl gap-2"
-          >
-            <Save className="w-4 h-4" />
-            Sauvegarder preset
+            {resending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Mail className="w-4 h-4" />
+            )}
+            {resending ? 'Envoi en cours...' : 'Renvoyer l\'email'}
           </Button>
         </motion.div>
 
@@ -248,8 +147,8 @@ export function LootChestScene({ assets, onVariation, onSavePreset }: LootChestS
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.0 }}
-          className="p-6 rounded-2xl border-2 border-alfie-mint/50 bg-gradient-to-r from-alfie-mint/10 to-alfie-lilac/10 mb-8"
+          transition={{ delay: 0.7 }}
+          className="p-6 rounded-2xl border-2 border-alfie-mint/50 bg-gradient-to-r from-alfie-mint/10 to-alfie-lilac/10"
         >
           <div className="text-center mb-4">
             <span className="inline-block px-3 py-1 rounded-full bg-alfie-mint/20 text-sm font-medium mb-2">
@@ -295,21 +194,6 @@ export function LootChestScene({ assets, onVariation, onSavePreset }: LootChestS
           <p className="text-xs text-center text-muted-foreground mt-2">
             Paiement sécurisé · Accès immédiat
           </p>
-        </motion.div>
-
-        {/* Back to Studio */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.2 }}
-          className="text-center"
-        >
-          <a
-            href="/studio"
-            className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-4 transition-colors"
-          >
-            Retour au Studio →
-          </a>
         </motion.div>
       </div>
     </motion.div>
