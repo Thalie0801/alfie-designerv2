@@ -1828,6 +1828,7 @@ export type Database = {
           last_generation_at: string | null
           last_seen_at: string | null
           marketing_opt_in: boolean | null
+          recovery_token: string | null
           source: string | null
         }
         Insert: {
@@ -1841,6 +1842,7 @@ export type Database = {
           last_generation_at?: string | null
           last_seen_at?: string | null
           marketing_opt_in?: boolean | null
+          recovery_token?: string | null
           source?: string | null
         }
         Update: {
@@ -1854,6 +1856,7 @@ export type Database = {
           last_generation_at?: string | null
           last_seen_at?: string | null
           marketing_opt_in?: boolean | null
+          recovery_token?: string | null
           source?: string | null
         }
         Relationships: []

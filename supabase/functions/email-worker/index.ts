@@ -99,18 +99,11 @@ const EMAIL_TEMPLATES: Record<string, { subject: string; getHtml: (payload: Reco
               Ton pack est prêt !
             </h1>
             <p style="color: #6b7280; font-size: 16px; line-height: 1.6; text-align: center; margin-bottom: 24px;">
-              Alfie a terminé de créer tes visuels. Récupère-les maintenant !
+              Alfie a terminé de créer tes visuels pour <strong>${payload.brandName || 'ta marque'}</strong>. Récupère-les maintenant !
             </p>
-            ${payload.canva_url ? `
-              <a href="${payload.canva_url}" style="display: block; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; text-decoration: none; padding: 16px 24px; border-radius: 12px; text-align: center; font-weight: 600; margin-bottom: 12px;">
-                🎨 Ouvrir dans Canva
-              </a>
-            ` : ''}
-            ${payload.zip_url ? `
-              <a href="${payload.zip_url}" style="display: block; background: linear-gradient(135deg, #10b981, #059669); color: white; text-decoration: none; padding: 16px 24px; border-radius: 12px; text-align: center; font-weight: 600;">
-                📥 Télécharger le ZIP
-              </a>
-            ` : ''}
+            <a href="${payload.pack_url || 'https://alfie.design/start'}" style="display: block; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; text-decoration: none; padding: 16px 24px; border-radius: 12px; text-align: center; font-weight: 600; margin-bottom: 16px;">
+              🎁 Récupérer mon pack
+            </a>
             <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 32px;">
               Alfie Designer • Tes visuels, en un clic
             </p>
