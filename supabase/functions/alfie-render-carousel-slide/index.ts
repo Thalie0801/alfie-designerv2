@@ -84,6 +84,8 @@ interface SlideRequest {
   visualStyle?: VisualStyle;    // ✅ NOUVEAU: Style de rendu (fallback)
   visualStyleCategory?: VisualStyle; // ✅ V12: Mode de contenu (background/character/product) - PRIORITAIRE
   locks?: VisualLocks;          // ✅ NEW: Visual locks (palette, fonts, logo)
+  slideConstraints?: string[];  // ✅ V13: Constraints from brief (noCharacter, etc.)
+  styleOverride?: string;       // ✅ V13: Style instructions from user brief
 }
 
 type GenSize = { w: number; h: number };
