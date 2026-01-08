@@ -99,7 +99,7 @@ export async function sendTransactionalEmail(
     body.sender = sender;
   } else {
     // Default sender - update with your verified domain
-    body.sender = { name: "Alfie", email: "noreply@alfiedesigner.com" };
+    body.sender = { name: "Alfie", email: "noreply@alfie-designer.com" };
   }
 
   if (replyTo) body.replyTo = replyTo;

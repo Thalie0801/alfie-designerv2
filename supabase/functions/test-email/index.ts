@@ -32,7 +32,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const emailBody = {
       to: [{ email, name: "Test User" }],
-      sender: { name: "Alfie Designer", email: "noreply@alfiedesigner.com" },
+      sender: { name: "Alfie Designer", email: "noreply@alfie-designer.com" },
       subject: "🧪 Test Brevo - Alfie Designer",
       htmlContent: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -41,7 +41,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           <p><strong>Envoyé à:</strong> ${email}</p>
           <p><strong>Date:</strong> ${new Date().toISOString()}</p>
           <hr style="border: 1px solid #eee; margin: 20px 0;">
-          <p style="color: #666; font-size: 12px;">Alfie Designer - noreply@alfiedesigner.com</p>
+          <p style="color: #666; font-size: 12px;">Alfie Designer - noreply@alfie-designer.com</p>
         </div>
       `,
     };
