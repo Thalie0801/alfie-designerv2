@@ -79,7 +79,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         .eq("id", lead.id);
     }
 
-    const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://alfie.design";
+    const frontendUrl = Deno.env.get("FRONTEND_URL") || `https://preview--gbuvtzqqzyiytypenzae.lovable.app`;
     const packUrl = `${frontendUrl}/pack?token=${recoveryToken}`;
     const brandName = (lead.intent as any)?.brandName || "Ton pack";
 
