@@ -73,13 +73,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     console.log("[brevo-send-email] Sending email:", {
       to: to.map(r => r.email),
       subject: subject || `templateId:${templateId}`,
-      sender: sender?.email || "noreply@alfiedesigner.com",
+      sender: sender?.email || "noreply@alfie-designer.com",
     });
 
     // Build request body
     const emailBody: Record<string, unknown> = {
       to,
-      sender: sender || { name: "Alfie", email: "noreply@alfiedesigner.com" },
+      sender: sender || { name: "Alfie", email: "noreply@alfie-designer.com" },
     };
 
     if (templateId) {

@@ -270,7 +270,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
             to: [{ email: email.to_email }],
             subject: template.subject,
             htmlContent: template.getHtml(safePayload),
-            sender: { name: "Alfie Designer", email: "noreply@alfiedesigner.com" },
+            sender: { name: "Alfie Designer", email: "noreply@alfie-designer.com" },
           }),
         });
 
