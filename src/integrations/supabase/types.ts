@@ -1820,6 +1820,7 @@ export type Database = {
         Row: {
           created_at: string | null
           email: string
+          generated_assets: Json | null
           generation_count: number | null
           id: string
           intent: Json | null
@@ -1832,6 +1833,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           email: string
+          generated_assets?: Json | null
           generation_count?: number | null
           id?: string
           intent?: Json | null
@@ -1844,6 +1846,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           email?: string
+          generated_assets?: Json | null
           generation_count?: number | null
           id?: string
           intent?: Json | null

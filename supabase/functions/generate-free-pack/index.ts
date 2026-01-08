@@ -183,21 +183,8 @@ Deno.serve(async (req) => {
             thumbnailUrl: cloudinaryUrl,
           });
 
-          // Store in library_assets
-          await supabase.from("library_assets").insert({
-            user_id: userId,
-            brand_id: brandId,
-            type: "image",
-            format: asset.ratio,
-            cloudinary_url: cloudinaryUrl,
-            tags: ["free-pack", packMode],
-            metadata: {
-              title: asset.title,
-              source: "free-pack",
-              packMode,
-              brandData,
-            }
-          });
+          // Note: Assets are stored in leads.generated_assets, not library_assets
+          // (library_assets requires valid UUIDs for user_id)
         } else {
           // Use placeholder if no image generated
           generatedAssets.push({
@@ -220,7 +207,7 @@ Deno.serve(async (req) => {
 
     console.log("[generate-free-pack] Generation complete", { count: generatedAssets.length, packMode });
 
-    // Increment generation_count AFTER successful generation
+    // Store generated assets in the lead record and increment generation_count
     if (email) {
       const normalizedEmail = email.trim().toLowerCase();
       const { error: updateError } = await supabase
@@ -228,13 +215,14 @@ Deno.serve(async (req) => {
         .update({
           generation_count: 1,
           last_generation_at: new Date().toISOString(),
+          generated_assets: generatedAssets, // Store assets directly in lead
         })
         .eq("email", normalizedEmail);
       
       if (updateError) {
-        console.error("[generate-free-pack] Failed to update lead generation_count:", updateError);
+        console.error("[generate-free-pack] Failed to update lead:", updateError);
       } else {
-        console.log("[generate-free-pack] Updated generation_count for:", normalizedEmail);
+        console.log("[generate-free-pack] Stored assets and updated generation_count for:", normalizedEmail);
       }
     }
 
