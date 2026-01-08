@@ -47,6 +47,8 @@ function sanitizePayload(payload: Record<string, unknown>): Record<string, unkno
   return sanitized;
 }
 
+const FRONTEND_URL = Deno.env.get("FRONTEND_URL") || "https://preview--gbuvtzqqzyiytypenzae.lovable.app";
+
 const EMAIL_TEMPLATES: Record<string, { subject: string; getHtml: (payload: Record<string, unknown>) => string }> = {
   start: {
     subject: "🚀 Je lance ton pack !",
@@ -101,7 +103,7 @@ const EMAIL_TEMPLATES: Record<string, { subject: string; getHtml: (payload: Reco
             <p style="color: #6b7280; font-size: 16px; line-height: 1.6; text-align: center; margin-bottom: 24px;">
               Alfie a terminé de créer tes visuels pour <strong>${payload.brandName || 'ta marque'}</strong>. Récupère-les maintenant !
             </p>
-            <a href="${payload.pack_url || 'https://alfie.design/start'}" style="display: block; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; text-decoration: none; padding: 16px 24px; border-radius: 12px; text-align: center; font-weight: 600; margin-bottom: 16px;">
+            <a href="${payload.pack_url || `${FRONTEND_URL}/start`}" style="display: block; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; text-decoration: none; padding: 16px 24px; border-radius: 12px; text-align: center; font-weight: 600; margin-bottom: 16px;">
               🎁 Récupérer mon pack
             </a>
             <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 32px;">
@@ -132,7 +134,7 @@ const EMAIL_TEMPLATES: Record<string, { subject: string; getHtml: (payload: Reco
             <p style="color: #6b7280; font-size: 16px; line-height: 1.6; text-align: center; margin-bottom: 24px;">
               Tu n'as pas encore récupéré ton pack de visuels. Il est prêt et n'attend que toi !
             </p>
-            <a href="https://alfie.design/start" style="display: block; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; text-decoration: none; padding: 16px 24px; border-radius: 12px; text-align: center; font-weight: 600;">
+            <a href="${FRONTEND_URL}/start" style="display: block; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; text-decoration: none; padding: 16px 24px; border-radius: 12px; text-align: center; font-weight: 600;">
               🎮 Récupérer mon pack
             </a>
             <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 32px;">
@@ -173,7 +175,7 @@ const EMAIL_TEMPLATES: Record<string, { subject: string; getHtml: (payload: Reco
                 Upgrade vers Pro pour des packs illimités
               </p>
             </div>
-            <a href="https://alfie.design/billing" style="display: block; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; text-decoration: none; padding: 16px 24px; border-radius: 12px; text-align: center; font-weight: 600;">
+            <a href="${FRONTEND_URL}/billing" style="display: block; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; text-decoration: none; padding: 16px 24px; border-radius: 12px; text-align: center; font-weight: 600;">
               🚀 Découvrir les offres
             </a>
             <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 32px;">

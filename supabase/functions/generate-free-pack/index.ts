@@ -280,7 +280,7 @@ VISUAL QUALITY STANDARDS:
     // Queue delivery email via unified email system
     try {
       if (email && recoveryToken) {
-        const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://alfie.design";
+        const frontendUrl = Deno.env.get("FRONTEND_URL") || `https://preview--gbuvtzqqzyiytypenzae.lovable.app`;
         const packUrl = `${frontendUrl}/pack?token=${recoveryToken}`;
 
         await supabase.from("email_queue").insert({
