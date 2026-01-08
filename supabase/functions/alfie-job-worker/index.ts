@@ -232,6 +232,37 @@ function hexToColorName(hex: string): string {
 }
 
 /**
+ * ✅ NEW: Build constraint string from constraint keys for AI prompt
+ */
+function buildConstraintString(constraints: string[], allowMascot: boolean): string {
+  const parts: string[] = [];
+  
+  if (!allowMascot || constraints.includes('noCharacter')) {
+    parts.push('NO characters, NO mascots, NO avatars, NO people, NO animals');
+  }
+  if (constraints.includes('noObject')) {
+    parts.push('NO objects, NO props');
+  }
+  if (constraints.includes('typographyOnly') || constraints.includes('backgroundOnly')) {
+    parts.push('Typography and background ONLY');
+  }
+  if (constraints.includes('noUI')) {
+    parts.push('NO screens, NO UI elements, NO dashboards, NO holograms');
+  }
+  if (constraints.includes('noTech')) {
+    parts.push('NO tech elements, NO digital interfaces');
+  }
+  if (constraints.includes('noStars')) {
+    parts.push('NO stars, NO particles, NO galaxy elements');
+  }
+  if (constraints.includes('noIcons')) {
+    parts.push('NO icons, NO complex symbols');
+  }
+  
+  return parts.join('. ');
+}
+
+/**
  * ✅ Helper robuste pour résoudre useBrandKit sans faux-positifs
  */
 function resolveUseBrandKit(payload: any, jobMeta?: { use_brand_kit?: boolean }): boolean {
@@ -2005,6 +2036,15 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
   // ========================================
   let carouselSlides: CarouselSlide[];
   
+  // ✅ V2: Extraire brief_meta pour les constraints globales
+  const briefMeta = payload.brief_meta || {};
+  const globalConstraints: string[] = briefMeta.globalConstraints || [];
+  const rawBriefInstructions: string = briefMeta.rawBriefInstructions || '';
+  const briefMode: string = briefMeta.briefMode || 'none';
+  const globalStyleFromBrief = briefMeta.globalStyle || {};
+  
+  console.log(`[processRenderCarousels] 📋 Brief meta: mode=${briefMode}, globalConstraints=${globalConstraints.length}, rawInstructions=${rawBriefInstructions.slice(0, 50)}...`);
+  
   // ✅ CONVERSION: Si generatedTexts.slides existe, le convertir en carousel_slides - SANS HASHTAGS
   if (!payload.carousel_slides && payload.generatedTexts?.slides?.length > 0) {
     console.log(`[processRenderCarousels] ♻️ Converting generatedTexts.slides (${payload.generatedTexts.slides.length}) to carousel_slides`);
@@ -2014,6 +2054,10 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
       subtitle: stripHashtags(slide.subtitle) || "",           // ✅ Propager subtitle SANS #
       text_on_image: stripHashtags(slide.body) || "",          // ✅ body → text_on_image SANS #
       caption: slide.caption || "", // Caption garde les hashtags
+      visual_prompt: slide.visual_prompt || null,              // ✅ NEW
+      constraints: slide.constraints || [],                     // ✅ NEW
+      allow_mascot: slide.allow_mascot !== false,              // ✅ NEW
+      visual_style_category: slide.visual_style_category || 'background', // ✅ NEW
     }));
   }
   
@@ -2099,10 +2143,30 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
           await sleep(1000 * attempt);
         }
 
-        // ✅ ADAPTATIF: Prompt différent selon visualStyle
+        // ✅ V2: Utiliser visual_prompt du brief si disponible
+        const slideData = slide as any;
+        const slideVisualPrompt = slideData.visual_prompt || null;
+        const slideConstraints: string[] = slideData.constraints || [];
+        const slideAllowMascot = slideData.allow_mascot !== false;
+        
+        // ✅ Fusionner constraints globales + per-slide
+        const allConstraints = [...new Set([...globalConstraints, ...slideConstraints])];
+        
+        // ✅ Déterminer visualStyleCategory: si noCharacter/typographyOnly → forcer 'background'
+        let effectiveVisualStyle = slideData.visual_style_category || visualStyle;
+        if (!slideAllowMascot || allConstraints.includes('noCharacter') || allConstraints.includes('typographyOnly') || allConstraints.includes('backgroundOnly')) {
+          effectiveVisualStyle = 'background';
+          console.log(`[processRenderCarousels] 📌 Slide ${index + 1}: Forcing visualStyle='background' due to constraints`);
+        }
+        
+        // ✅ Construire le prompt: PRIORITÉ au visual_prompt du brief
         let backgroundPrompt: string;
         
-        if (visualStyle === 'character') {
+        if (slideVisualPrompt) {
+          // ✅ BRIEF FOURNI: Utiliser le prompt visuel du brief
+          backgroundPrompt = slideVisualPrompt;
+          console.log(`[processRenderCarousels] 📋 Slide ${index + 1}: Using brief visual_prompt`);
+        } else if (effectiveVisualStyle === 'character' && slideAllowMascot) {
           // Mode PERSONNAGE: générer des avatars/personnages 3D
           const characterType = brandMini?.visual_types?.[0] || 'avatars_3d';
           let characterStyle = '3D cartoon character in Pixar/Disney style';
@@ -2112,28 +2176,39 @@ async function processRenderCarousels(payload: any, jobMeta?: { user_id?: string
           backgroundPrompt = `Create a social media image featuring a CHARACTER.
 CHARACTER: ${characterStyle}, expressive, professional appearance
 SCENE: ${brandMini?.niche || 'professional'} setting, activity related to the content
-MOOD: ${colorMode === 'vibrant' ? 'vibrant saturated colors' : 'soft pastel tones'}
+MOOD: ${colorMode === 'vibrant' ? 'vibrant saturated colors' : colorMode === 'pastel' ? 'soft pastel tones' : 'neutral minimal tones'}
 Slide ${index + 1} of ${carouselSlides.length}.
 CRITICAL: Character must be central. NO TEXT whatsoever - no letters, words, labels.
 Leave space at top for text overlay.`;
-        } else if (visualStyle === 'product' && payload.referenceImageUrl) {
+        } else if (effectiveVisualStyle === 'product' && payload.referenceImageUrl) {
           // Mode PRODUIT: mise en scène du produit uploadé
           backgroundPrompt = `Create a professional PRODUCT SHOWCASE image.
 Use the reference image as inspiration for the product to feature.
 SCENE: Professional ${brandMini?.niche || 'e-commerce'} product photography setting
-BACKGROUND: ${colorMode === 'vibrant' ? 'vibrant colorful gradients' : 'soft pastel background'}
+BACKGROUND: ${colorMode === 'vibrant' ? 'vibrant colorful gradients' : colorMode === 'pastel' ? 'soft pastel background' : 'clean neutral background'}
 Slide ${index + 1} of ${carouselSlides.length}.
 CRITICAL: Product must be central subject. NO TEXT whatsoever - no letters, prices, labels.
 Leave space at top for text overlay.`;
         } else {
-          // Mode FOND ABSTRAIT (défaut)
+          // Mode FOND ABSTRAIT (défaut ou forcé par constraints)
           backgroundPrompt = `Abstract colorful background for social media carousel.
 NO TEXT whatsoever - no letters, words, numbers, labels.
 ONLY abstract shapes, gradients, patterns, visual elements.
-Style: ${colorMode === 'vibrant' ? 'vibrant saturated colors, bold gradients' : 'soft pastel tones, gentle gradients'}.
+Style: ${colorMode === 'vibrant' ? 'vibrant saturated colors, bold gradients' : colorMode === 'pastel' ? 'soft pastel tones, gentle gradients' : 'neutral minimal tones, clean aesthetic'}.
 ${useBrandKit && brandMini?.niche ? `Theme context: ${brandMini.niche} brand.` : ''}
 ${useBrandKit && brandMini?.visual_mood?.length ? `Mood: ${brandMini.visual_mood.join(', ')}.` : ''}
 Slide ${index + 1} of ${carouselSlides.length}.`;
+        }
+        
+        // ✅ V2: Ajouter les constraints au prompt
+        if (allConstraints.length > 0) {
+          const constraintStr = buildConstraintString(allConstraints, slideAllowMascot);
+          backgroundPrompt += `\n\nSTRICT CONSTRAINTS: ${constraintStr}`;
+        }
+        
+        // ✅ V2: Ajouter le style global du brief si disponible
+        if (rawBriefInstructions) {
+          backgroundPrompt += `\n\nSTYLE INSTRUCTIONS FROM USER: ${rawBriefInstructions}`;
         }
 
         const slideResult = await callFn("alfie-render-carousel-slide", {
@@ -2165,9 +2240,12 @@ Slide ${index + 1} of ${carouselSlides.length}.`;
           carouselMode, // ✅ Mode depuis payload (standard/background_only)
           carouselType,
           colorMode,
-          visualStyle, // ✅ NEW: Passer le style visuel adaptatif
+          visualStyle: effectiveVisualStyle,              // ✅ Style effectif après constraints
+          visualStyleCategory: effectiveVisualStyle,      // ✅ Catégorie visuelle
+          slideConstraints: allConstraints,               // ✅ NEW: Constraints pour le renderer
+          styleOverride: rawBriefInstructions || null,    // ✅ NEW: Instructions style du brief
           referenceImageUrl: payload.referenceImageUrl || null,
-          backgroundOnly: carouselMode === 'background_only', // ✅ Flag dynamique selon mode
+          backgroundOnly: carouselMode === 'background_only' || !slideAllowMascot, // ✅ Flag dynamique
         });
 
         return { success: true, slideIndex: index, result: slideResult };

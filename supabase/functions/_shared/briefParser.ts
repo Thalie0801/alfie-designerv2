@@ -1,5 +1,5 @@
 // supabase/functions/_shared/briefParser.ts
-// v1.0.0 — Parse user briefs to extract structured constraints and texts
+// v2.0.0 — Parse user briefs generically with positive/negative instructions + raw capture
 
 /**
  * Parsed brief structure for carousel generation
@@ -22,6 +22,12 @@ export interface ParsedBrief {
   
   /** Global constraints (applied to all slides) */
   globalConstraints: string[];
+  
+  /** ✅ NEW: Raw brief instructions for AI (freeform text not captured by patterns) */
+  rawBriefInstructions: string;
+  
+  /** ✅ NEW: Positive instructions (e.g., "with mascot", "human characters") */
+  positiveInstructions: string[];
 }
 
 export interface ParsedSlide {
@@ -37,6 +43,9 @@ export interface ParsedSlide {
   
   /** Whether mascot/character is allowed on this slide */
   allowMascot: boolean;
+  
+  /** ✅ NEW: Visual prompt for this slide (from brief) */
+  visualPrompt?: string;
 }
 
 /**
@@ -55,25 +64,41 @@ const SUBTITLE_PATTERN = /sous-texte\s*:\s*["']?(.+?)["']?(?:\n|$)/gi;
 const CTA_PATTERN = /(?:cta|bouton)\s*:\s*["']?(.+?)["']?(?:\n|$)/gi;
 
 /**
- * Constraint keywords to detect
+ * ✅ Constraint keywords to detect (NEGATIVE instructions)
  */
 const CONSTRAINT_KEYWORDS: Record<string, string[]> = {
-  noCharacter: ['sans personnage', 'no character', 'sans mascotte', 'no mascot', 'sans avatar', 'aucun personnage', 'aucune mascotte', 'without character'],
+  noCharacter: ['sans personnage', 'no character', 'sans mascotte', 'no mascot', 'sans avatar', 'aucun personnage', 'aucune mascotte', 'without character', 'sans alfie'],
   noAnimal: ['sans animal', 'no animal', 'aucun animal'],
   noObject: ['sans objet', 'no object', 'aucun objet'],
-  typographyOnly: ['typo seule', 'typography only', 'texte seul', 'text only', 'typo + fond', 'typography + background'],
+  typographyOnly: ['typo seule', 'typography only', 'texte seul', 'text only', 'typo + fond', 'typography + background', 'fond seulement', 'background only'],
   noUI: ['sans écran', 'no screen', 'sans ui', 'no ui', 'sans dashboard', 'no dashboard', 'sans hologramme', 'no hologram'],
-  noTech: ['sans tech', 'no tech', 'aucun élément tech', 'no tech elements'],
+  noTech: ['sans tech', 'no tech', 'aucun élément tech', 'no tech elements', 'décor interdit'],
   noStars: ['sans étoiles', 'no stars', 'sans particules', 'no particles', 'sans galaxie', 'no galaxy'],
   noIcons: ['sans icône', 'no icons', 'aucune icône'],
   backgroundOnly: ['fond seul', 'background only', 'fond uniquement'],
 };
 
 /**
+ * ✅ NEW: Positive keywords to detect (AFFIRMATIVE instructions)
+ */
+const POSITIVE_KEYWORDS: Record<string, string[]> = {
+  withMascot: ['avec mascotte', 'with mascot', 'mascotte sur', 'alfie sur', 'avec alfie', 'alfie autorisé', 'mascot allowed'],
+  withCharacter: ['avec personnage', 'with character', 'personnages humains', 'human characters', 'personnage humain', 'real person'],
+  withAvatar: ['avec avatar', 'with avatar', 'avatar 3d', '3d avatar'],
+  withProduct: ['avec produit', 'with product', 'produit central', 'product focus'],
+  styleWatercolor: ['watercolor', 'aquarelle'],
+  style3DBubble: ['3d bubble', 'bubble glossy', 'lettres gonflées', 'lettres 3d'],
+  styleFrostedGlass: ['verre dépoli', 'frosted glass', 'glass morphism', 'blur léger'],
+  stylePixar: ['pixar', 'disney', 'style pixar', 'pixar style'],
+  stylePhoto: ['photorealistic', 'photo réaliste', 'photographie', 'photography'],
+  styleMinimal: ['minimal', 'minimaliste', 'minimalist', 'beaucoup d\'air', 'lots of whitespace'],
+};
+
+/**
  * Style keywords to detect
  */
 const STYLE_KEYWORDS: Record<string, string[]> = {
-  pastel: ['pastel', 'doux', 'soft', 'muted', 'gentle'],
+  pastel: ['pastel', 'doux', 'soft', 'muted', 'gentle', 'mint', 'lavande', 'rose pâle'],
   neutral: ['neutre', 'neutral', 'minimal', 'minimaliste', 'noir et blanc', 'black and white'],
   vibrant: ['vibrant', 'vif', 'coloré', 'saturé', 'colorful'],
 };
@@ -85,17 +110,20 @@ export function parseBrief(rawBrief: string, slideCount: number = 5): ParsedBrie
   const brief = rawBrief.trim();
   const lowerBrief = brief.toLowerCase();
   
-  // 1. Detect global constraints
+  // 1. Detect global constraints (negative)
   const globalConstraints = detectConstraints(lowerBrief);
   
-  // 2. Detect global style
+  // 2. ✅ NEW: Detect positive instructions
+  const positiveInstructions = detectPositiveInstructions(lowerBrief);
+  
+  // 3. Detect global style
   const globalStyle = detectGlobalStyle(lowerBrief);
   
-  // 3. Try to extract structured slides
+  // 4. Try to extract structured slides
   const extractedSlides = extractSlides(brief, slideCount);
   const hasStructuredSlides = extractedSlides.length > 0 && extractedSlides.some(s => s.title.trim().length > 0);
   
-  // 4. If no structured slides, return empty slides
+  // 5. If no structured slides, return empty slides
   const slides: ParsedSlide[] = hasStructuredSlides 
     ? extractedSlides
     : Array.from({ length: slideCount }, (_, i) => ({
@@ -105,14 +133,19 @@ export function parseBrief(rawBrief: string, slideCount: number = 5): ParsedBrie
         allowMascot: true,
       }));
   
-  // 5. Apply slide-specific constraints from brief
+  // 6. Apply slide-specific constraints from brief
   applySlideConstraints(slides, brief);
+  
+  // 7. ✅ NEW: Extract raw freeform instructions (everything not matched by patterns)
+  const rawBriefInstructions = extractFreeformInstructions(brief);
   
   return {
     hasStructuredSlides,
     globalStyle,
     slides,
     globalConstraints,
+    rawBriefInstructions,
+    positiveInstructions,
   };
 }
 
@@ -129,6 +162,51 @@ function detectConstraints(text: string): string[] {
   }
   
   return constraints;
+}
+
+/**
+ * ✅ NEW: Detect positive instructions from text
+ */
+function detectPositiveInstructions(text: string): string[] {
+  const positive: string[] = [];
+  
+  for (const [key, keywords] of Object.entries(POSITIVE_KEYWORDS)) {
+    if (keywords.some(kw => text.includes(kw))) {
+      positive.push(key);
+    }
+  }
+  
+  return positive;
+}
+
+/**
+ * ✅ NEW: Extract freeform instructions not captured by patterns
+ * This captures style descriptions, font names, custom requirements, etc.
+ */
+function extractFreeformInstructions(brief: string): string {
+  // Capture specific style instructions that should be passed to AI
+  const instructionPatterns = [
+    /police\s*[:\s]+([^\n.]+)/gi,           // Font: Baloon
+    /typo(?:graphie)?\s*[:\s]+([^\n.]+)/gi, // Typo: 3D bubble
+    /style\s*[:\s]+([^\n.]+)/gi,            // Style: liquid gradient
+    /texte\s*[:\s]+([^\n.]+)/gi,            // Texte: blanc #F9FAFB
+    /couleur[s]?\s*[:\s]+([^\n.]+)/gi,      // Couleurs: mint/rose
+    /fond\s*[:\s]+([^\n.]+)/gi,             // Fond: uniquement
+    /contraintes?\s*(?:strictes?)?\s*[:\s]+([^\n]+)/gi, // Contraintes: ...
+    /cartouche\s*[:\s]+([^\n.]+)/gi,        // Cartouche: verre dépoli
+  ];
+  
+  const parts: string[] = [];
+  for (const pattern of instructionPatterns) {
+    const matches = brief.matchAll(pattern);
+    for (const match of matches) {
+      if (match[1]?.trim()) {
+        parts.push(match[1].trim());
+      }
+    }
+  }
+  
+  return parts.join('. ');
 }
 
 /**

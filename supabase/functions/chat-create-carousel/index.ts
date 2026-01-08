@@ -344,13 +344,46 @@ Deno.serve(async (req) => {
     // 7) Créer UN job unique dans job_queue avec toutes les slides
     console.log(`[CreateCarousel] Creating job in job_queue with slideContent from plan...`);
     
-    // Préparer les slides avec leur contenu structuré
+    // ✅ V2: Extraire brief_meta et carousel_slides enrichis depuis le plan
+    const planMeta = carouselPlan.meta || {};
+    const briefMode = planMeta.briefMode || (planMeta.directMode ? 'full' : 'none');
+    const globalConstraints = planMeta.globalConstraints || [];
+    const globalStyle = planMeta.globalStyle || {};
+    const rawBriefInstructions = planMeta.rawBriefInstructions || '';
+    
+    console.log(`[CreateCarousel] Brief meta: mode=${briefMode}, constraints=${globalConstraints.length}, hasStyle=${!!globalStyle.backgroundStyle}`);
+    
+    // Préparer les slides avec leur contenu structuré ET constraints/visualPrompt
     const slides = Array.from({ length: count }, (_, i) => {
       const slide = carouselPlan.slides[i] || {};
+      
+      // ✅ Détecter allow_mascot depuis les constraints du slide
+      const slideConstraints: string[] = slide._constraints || slide.constraints || [];
+      const hasNoCharacterConstraint = slideConstraints.some((c: string) => 
+        ['noCharacter', 'typographyOnly', 'backgroundOnly', 'noObject'].includes(c)
+      );
+      const allowMascot = slide._allowMascot !== undefined 
+        ? slide._allowMascot 
+        : !hasNoCharacterConstraint;
+      
+      // ✅ Déterminer visualStyleCategory en fonction des constraints
+      let visualStyleCategory: 'background' | 'character' | 'product' = 'background';
+      if (allowMascot && !hasNoCharacterConstraint) {
+        visualStyleCategory = 'character';
+      }
+      
       return {
         index: i,
+        slide_number: i + 1,
         slide_template: slide.type || (i === 0 ? "hero" : i === count-1 ? "cta" : "body"),
         role: i === 0 ? "key_visual" : "variant",
+        title_on_image: slide.title ?? `Slide ${i + 1}`,
+        subtitle: slide.subtitle ?? "",
+        text_on_image: slide.punchline ?? slide.body ?? "",
+        visual_prompt: slide.visualPrompt || null,           // ✅ NEW: Prompt visuel du brief
+        constraints: slideConstraints,                        // ✅ NEW: Constraints par slide
+        allow_mascot: allowMascot,                            // ✅ NEW: Flag mascotte
+        visual_style_category: visualStyleCategory,           // ✅ NEW: Style catégorie
         slideContent: {
           type: slide.type || (i === 0 ? "hero" : i === count-1 ? "cta" : "body"),
           title: slide.title ?? `Slide ${i + 1}`,
@@ -380,7 +413,15 @@ Deno.serve(async (req) => {
         aspectRatio: aspectRatio || "4:5",
         brand_snapshot: nonNullBrandSnapshot,
         slides,
-        carouselPlan
+        carousel_slides: slides,  // ✅ Format standardisé pour le worker
+        carouselPlan,
+        // ✅ NEW: Brief metadata for downstream processing
+        brief_meta: {
+          briefMode,
+          globalConstraints,
+          globalStyle,
+          rawBriefInstructions,
+        }
       }
     });
 
