@@ -8,6 +8,7 @@ import { Slider } from '@/components/ui/slider';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useBrandKit, ToneSliders } from '@/hooks/useBrandKit';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -746,33 +747,53 @@ export default function BrandKit() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="font_primary">Police principale (titres)</Label>
-                    <Input
-                      id="font_primary"
-                      placeholder="Clique pour voir les options..."
+                    <Select
                       value={formData.font_primary}
-                      onChange={(e) => setFormData({ ...formData, font_primary: e.target.value })}
-                      list="fonts-primary-list"
-                    />
-                    <datalist id="fonts-primary-list">
-                      {SUPPORTED_FONTS.map(font => (
-                        <option key={font} value={font} />
-                      ))}
-                    </datalist>
+                      onValueChange={(value) => setFormData({ ...formData, font_primary: value })}
+                    >
+                      <SelectTrigger 
+                        className="w-full"
+                        style={{ fontFamily: formData.font_primary ? `"${formData.font_primary}", sans-serif` : undefined }}
+                      >
+                        <SelectValue placeholder="Sélectionner une police..." />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[300px]">
+                        {SUPPORTED_FONTS.map(font => (
+                          <SelectItem 
+                            key={font} 
+                            value={font}
+                            style={{ fontFamily: `"${font}", sans-serif` }}
+                          >
+                            {font}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="font_secondary">Police secondaire (corps)</Label>
-                    <Input
-                      id="font_secondary"
-                      placeholder="Clique pour voir les options..."
+                    <Select
                       value={formData.font_secondary}
-                      onChange={(e) => setFormData({ ...formData, font_secondary: e.target.value })}
-                      list="fonts-secondary-list"
-                    />
-                    <datalist id="fonts-secondary-list">
-                      {SUPPORTED_FONTS.map(font => (
-                        <option key={font} value={font} />
-                      ))}
-                    </datalist>
+                      onValueChange={(value) => setFormData({ ...formData, font_secondary: value })}
+                    >
+                      <SelectTrigger 
+                        className="w-full"
+                        style={{ fontFamily: formData.font_secondary ? `"${formData.font_secondary}", sans-serif` : undefined }}
+                      >
+                        <SelectValue placeholder="Sélectionner une police..." />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[300px]">
+                        {SUPPORTED_FONTS.map(font => (
+                          <SelectItem 
+                            key={font} 
+                            value={font}
+                            style={{ fontFamily: `"${font}", sans-serif` }}
+                          >
+                            {font}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
