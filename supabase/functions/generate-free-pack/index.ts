@@ -110,11 +110,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Define the 3 assets to generate
+    // Define the 3 assets to generate (order: 1:1, 4:5, 9:16 for sequence)
     const assets = [
-      { title: "Post Instagram", ratio: "1:1", width: 1080, height: 1080 },
-      { title: "Story", ratio: "9:16", width: 1080, height: 1920 },
-      { title: "Cover", ratio: "4:5", width: 1080, height: 1350 },
+      { title: "Post Instagram", ratio: "1:1", width: 1080, height: 1080, index: 0 },
+      { title: "Cover", ratio: "4:5", width: 1080, height: 1350, index: 1 },
+      { title: "Story", ratio: "9:16", width: 1080, height: 1920, index: 2 },
     ];
 
     const generatedAssets: Array<{
@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
       thumbnailUrl: string;
     }> = [];
 
-    // Build style context from brand data
+    // Build style context from brand data (used for enrichment)
     const styleContext = buildStyleContext(brandData);
 
     // Generate each asset using Lovable AI
@@ -132,10 +132,10 @@ Deno.serve(async (req) => {
       const asset = assets[i];
       console.log(`[generate-free-pack] Generating ${asset.title} (${packMode} mode)...`);
 
-      // Build base prompt
+      // Build base prompt using new ultra-precise prompts
       const basePrompt = packMode === 'conversion' 
-        ? buildConversionPrompt(asset, brandData, i)
-        : buildSocialPrompt(asset, brandData);
+        ? buildConversionPromptV2(asset.ratio, asset.index, brandData)
+        : buildSocialPromptV2(asset.ratio, brandData);
 
       // Map colorChoice to actual colors for brand kit
       const colorMap: Record<string, string[]> = {
@@ -357,109 +357,101 @@ function buildStyleContext(brandData: FreePackRequest["brandData"]): string {
   `;
 }
 
-function buildSocialPrompt(
-  asset: { title: string; ratio: string; width: number; height: number },
-  brandData: FreePackRequest["brandData"]
-): string {
-  const aspectDesc = asset.ratio === "1:1" ? "square 1:1" : asset.ratio === "9:16" ? "vertical 9:16 story" : "vertical 4:5 cover";
+// ============================================================================
+// V2 PROMPTS - Ultra-precise, consistent, professional smartphone scene
+// ============================================================================
+
+const CONVERSION_PROMPTS_V2 = {
+  base: `Premium studio product photography, modern checkout/upgrade scene.
+
+MAIN SUBJECT: Premium smartphone in foreground displaying a modern payment/offer UI page with a large visible CTA button (shape + color only, no readable text).
+
+CONVERSION ELEMENTS (visual only, no sentences):
+- A "★ 4.9" rating badge (icons OK)
+- A small "+2,348" counter (numbers OK)
+- A "19€" price tag (numbers OK) suggesting upsell
+- A "plan" indicator with 3 dots/circles (starter/pro/premium) without words, just 3 visual levels (e.g., 1/2/3 stars or checkmarks)
+
+STYLE: Premium studio, modern, clean, bright, high-end 3D/photorealistic render.
+PALETTE: Pastel candy (mint, soft pink, lavender, peach, light yellow), subtle gradients, light background.
+COMPOSITION: Lots of negative space for text overlay, no fantasy illustrations.
+
+CRITICAL COHERENCE: Same exact scene, same objects, same style across all 3 formats - only reframing/cropping changes.
+
+STRICT PROHIBITIONS: No portals, no landscapes, no person with raised arms, no abstract concepts, no readable text, no slogans, no clip-art style, no generic stock photo compositions.`,
+
+  formats: {
+    "1:1": "Square format. Centered smartphone, empty zone at top ~20% for text overlay.",
+    "4:5": "Vertical 4:5 format. Larger smartphone, empty zone at top ~25% for text overlay.",
+    "9:16": "Vertical story 9:16 format. Centered smartphone, empty zone at top ~35%, subtle arrow pointing to CTA."
+  }
+};
+
+const SOCIAL_PROMPTS_V2 = {
+  base: `Premium studio product photography, modern personal brand / social feed scene.
+
+MAIN SUBJECT: Premium smartphone in foreground displaying a cohesive Instagram-style feed grid (9 harmonious posts), with floating engagement elements around it.
+
+BRANDING ELEMENTS (visual only, no sentences):
+- A "+12.5K" follower counter (numbers OK)
+- Floating heart/like icons
+- An engagement indicator "↗ 23%" (numbers OK)
+- Color palette dots representing brand colors (3-4 colored circles)
+- A stylized profile avatar (round shape, no realistic face)
+
+STYLE: Premium studio, modern, clean, bright, high-end 3D/photorealistic render.
+PALETTE: Pastel candy (mint, soft pink, lavender, peach, light yellow), subtle gradients, light background.
+COMPOSITION: Lots of negative space for text overlay, no fantasy illustrations.
+
+CRITICAL COHERENCE: Same exact scene, same objects, same style across all 3 formats - only reframing/cropping changes.
+
+STRICT PROHIBITIONS: No portals, no landscapes, no person with raised arms, no abstract concepts, no readable text, no slogans, no clip-art style, no generic stock photo compositions.`,
+
+  formats: {
+    "1:1": "Square format. Centered smartphone, empty zone at top ~20% for text overlay.",
+    "4:5": "Vertical 4:5 format. Larger smartphone, empty zone at top ~25% for text overlay.",
+    "9:16": "Vertical story 9:16 format. Centered smartphone, empty zone at top ~35% for text overlay."
+  }
+};
+
+function buildSocialPromptV2(ratio: string, brandData: FreePackRequest["brandData"]): string {
+  const formatHint = SOCIAL_PROMPTS_V2.formats[ratio as keyof typeof SOCIAL_PROMPTS_V2.formats] || SOCIAL_PROMPTS_V2.formats["1:1"];
   
-  return `Create a stunning premium ${aspectDesc} visual for ${brandData.brandName}, a ${brandData.sector} brand.
+  return `${SOCIAL_PROMPTS_V2.base}
 
-CREATIVE DIRECTION:
-- Sophisticated, editorial-quality imagery that captures brand essence
-- Style: ${brandData.styles?.join(", ") || "modern, professional"} aesthetic
-- Create a memorable visual that stands out in a social media feed
-- ${asset.width}x${asset.height} resolution, optimized for ${asset.title}
-
-VISUAL APPROACH:
-Choose ONE of these approaches based on the brand personality:
-- Abstract: Geometric patterns, gradients, or artistic compositions
-- Lifestyle: Aspirational scene representing the brand's world
-- Conceptual: Metaphorical imagery that evokes the brand's values
-- Minimalist: Clean, elegant composition with strong focal point
-
-CRITICAL REQUIREMENTS:
-- ABSOLUTELY NO TEXT on the image (text overlay added later in Canva)
-- Premium quality worthy of a high-end advertising campaign
-- Strong visual identity reflecting ${brandData.sector} industry
-- Scroll-stopping composition that captures attention
-
-Topic context: ${brandData.topic || "brand identity and values"}`;
-}
-
-function buildConversionPrompt(
-  asset: { title: string; ratio: string; width: number; height: number },
-  brandData: FreePackRequest["brandData"],
-  assetIndex: number
-): string {
-  const aspectDesc = asset.ratio === "1:1" ? "square 1:1" : asset.ratio === "9:16" ? "vertical 9:16 story" : "vertical 4:5 cover";
-  
-  const conversionAngles = [
-    // Visual 1: BENEFIT - The Transformation
-    `VISUAL CONCEPT: "The Transformation"
-     
-Create a powerful visual showing the RESULT/OUTCOME that clients achieve.
-     
-SCENE IDEAS (choose the most relevant):
-- Person in a moment of achievement, celebration, or breakthrough
-- "After" state imagery: calm, success, satisfaction, freedom
-- Metaphorical: doors opening, sunrise, reaching summit, crossing finish line
-- Emotional: relief, joy, confidence, empowerment
-     
-MOOD: Aspirational, inspiring, "this could be you", hopeful
-COLORS: Warm, inviting, with highlights that draw the eye`,
-    
-    // Visual 2: PROOF - The Credibility
-    `VISUAL CONCEPT: "The Proof"
-     
-Create imagery that conveys TRUST, EXPERTISE, and PROVEN RESULTS.
-     
-SCENE IDEAS (choose the most relevant):
-- Professional environment suggesting expertise and competence
-- Abstract: scales balancing, solid foundations, quality indicators
-- Authority symbols: podium, awards, professional workspace
-- Community/testimonial feel: people together, satisfaction
-     
-MOOD: Trustworthy, established, reliable, professional
-COLORS: Confident, grounded, with premium feel`,
-    
-    // Visual 3: OFFER - The Call to Action
-    `VISUAL CONCEPT: "The Opportunity"
-     
-Create urgency and desire to take ACTION NOW.
-     
-SCENE IDEAS (choose the most relevant):
-- Open door to opportunity, gateway to success
-- Exclusive access feeling: VIP, behind the curtain, limited
-- Momentum: movement, progress, forward motion
-- Decision moment: crossroads, choice, now or never
-     
-MOOD: Bold, exciting, urgent but not aggressive, opportunity-focused
-COLORS: High contrast, attention-grabbing, dynamic`,
-  ];
-
-  return `Create a HIGH-CONVERTING premium ${aspectDesc} marketing visual for ${brandData.brandName}.
-
-MARKETING OBJECTIVE: This is a SALES visual for paid advertising - it must drive action.
-
-${conversionAngles[assetIndex]}
+FORMAT: ${ratio} aspect ratio.
+COMPOSITION: ${formatHint}
 
 BRAND CONTEXT:
 - Brand: ${brandData.brandName}
 - Industry: ${brandData.sector}
-- Style: ${brandData.styles?.join(", ") || "modern, professional"}
-- Topic: ${brandData.topic || "brand offering"}
-- CTA context: ${brandData.cta || "take action"}
+- Style personality: ${brandData.styles?.join(", ") || "modern, professional"}
+- Topic context: ${brandData.topic || "personal brand content"}`;
+}
 
-CRITICAL REQUIREMENTS:
-- ABSOLUTELY NO TEXT on the image (text overlay added later in Canva)
-- High-end advertising quality, NOT stock photo or generic AI art
-- Emotional connection with target audience
-- ${asset.width}x${asset.height} resolution for ${asset.title}
-- Scroll-stopping composition with strong visual hierarchy
-- Premium color grading and cinematic lighting
+function buildConversionPromptV2(ratio: string, assetIndex: number, brandData: FreePackRequest["brandData"]): string {
+  const formatHint = CONVERSION_PROMPTS_V2.formats[ratio as keyof typeof CONVERSION_PROMPTS_V2.formats] || CONVERSION_PROMPTS_V2.formats["1:1"];
+  
+  // Marketing sequence: Benefit → Proof → Offer
+  const sequenceLabels = [
+    "VISUAL 1/3 - BENEFIT: Focus on the transformation/result that clients achieve",
+    "VISUAL 2/3 - SOCIAL PROOF: Emphasize trust, credibility, proven results",
+    "VISUAL 3/3 - OFFER + CTA: Create urgency and desire to take action now"
+  ];
+  
+  return `${CONVERSION_PROMPTS_V2.base}
 
-This visual must feel like it belongs in a high-budget ad campaign, not a template library.`;
+FORMAT: ${ratio} aspect ratio.
+COMPOSITION: ${formatHint}
+
+MARKETING SEQUENCE: ${sequenceLabels[assetIndex]}
+
+BRAND CONTEXT:
+- Brand: ${brandData.brandName}
+- Industry: ${brandData.sector}
+- Style personality: ${brandData.styles?.join(", ") || "modern, professional"}
+- Topic context: ${brandData.topic || "brand offering"}
+- CTA context: ${brandData.cta || "take action"}`;
 }
 
 async function uploadToCloudinary(base64Data: string, publicId: string): Promise<string> {
