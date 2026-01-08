@@ -47,7 +47,39 @@ export function LootChestScene({ assets, onVariation, onSavePreset }: LootChestS
     window.location.href = `/upsell-visuels?brandId=${brandId}`;
   };
 
-  const hasRealAssets = assets.some(a => !a.url.startsWith('/images/'));
+  const hasRealAssets = assets.some(a => a.url && !a.url.startsWith('/images/'));
+
+  // Empty state - pack still generating
+  if (!assets || assets.length === 0) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="min-h-screen w-full flex items-center justify-center p-4 relative"
+      >
+        <ParticleField count={30} speed="normal" />
+        <div className="max-w-md w-full relative z-10 text-center">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="text-6xl mb-6"
+          >
+            ⏳
+          </motion.div>
+          <h2 className="text-2xl font-bold text-foreground mb-4">
+            Ton pack est en préparation
+          </h2>
+          <p className="text-muted-foreground mb-6">
+            Tu recevras un email avec le lien de téléchargement dès qu'il sera prêt.
+          </p>
+          <Button onClick={onVariation} variant="outline" className="gap-2">
+            <RefreshCw className="w-4 h-4" />
+            Réessayer
+          </Button>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
