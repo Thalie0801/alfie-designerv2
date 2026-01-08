@@ -17,6 +17,7 @@ import {
 } from "../_shared/env.ts";
 import { renderSlideToSVG, SlideContent } from "../_shared/slideRenderer.ts";
 import { SlideTemplate, TextLayer } from "../_shared/slideTemplates.ts";
+import { paletteToDescriptions, hexToColorName } from "../_shared/colorContrast.ts"; // ✅ V13: Import color helpers
 
 import { corsHeaders } from "../_shared/cors.ts";
 type Lang = "FR" | "EN";
@@ -191,8 +192,9 @@ function buildImagePromptStandard(
   // ✅ COLORMODE: adapter les couleurs selon le choix utilisateur OU palette
   let colorScheme: string;
   if (palette.length > 0) {
-    // ✅ PALETTE OBLIGATOIRE SI DISPONIBLE
-    colorScheme = `MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${palette.join(', ')} - NO substitutions allowed`;
+    // ✅ V13: PALETTE avec DESCRIPTIONS (pas de hex codes)
+    const paletteDesc = paletteToDescriptions(palette);
+    colorScheme = `MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${paletteDesc} - NO substitutions allowed. NEVER include hex codes like #RRGGBB in the image.`;
   } else if (colorMode === 'pastel') {
     colorScheme = "soft pastel colors, gentle muted tones, delicate hues, subtle gradients";
   } else if (colorMode === 'neutral') {
@@ -259,13 +261,13 @@ CRITICAL REQUIREMENTS:
 - Image must reflect the THEME: ${theme}
 - Modern social media aesthetic with depth and dimension
 - Leave clean central area for text overlay
-${palette.length > 0 ? `- STRICT: Use ONLY brand palette (${palette.join(', ')}) for ALL colored elements` : ''}
+${palette.length > 0 ? `- STRICT: Use ONLY brand palette (${paletteToDescriptions(palette)}) for ALL colored elements` : ''}
 
 ABSOLUTE RULES:
 - NO TEXT whatsoever - no letters, words, numbers, labels, typography
 - NO white/empty backgrounds - always colorful (${colorMode === 'pastel' ? 'soft pastel tones' : 'saturated colors'})
 - Match the visual style to the industry/theme
-${palette.length > 0 ? `- DO NOT use any colors outside the brand palette (${palette.join(', ')})` : ''}
+${palette.length > 0 ? `- DO NOT use any colors outside the brand palette (${paletteToDescriptions(palette)})` : ''}
 
 OUTPUT: A beautiful, thematic background image with NO text.`
 }
@@ -322,7 +324,7 @@ REFERENCE CHARACTER (PROVIDED IMAGE):
   // ✅ COLORSCHEME avec palette obligatoire
   let colorScheme: string;
   if (palette.length > 0) {
-    colorScheme = `MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${palette.join(', ')} - NO substitutions`;
+    colorScheme = `MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${paletteToDescriptions(palette)} - NO substitutions. NEVER include hex codes.`;
   } else {
     colorScheme = colorMode === 'pastel' 
       ? "soft pastel color palette, gentle tones"
@@ -345,13 +347,13 @@ ${hasAvatarReference ? "- MUST reproduce the EXACT same character from the refer
 - Character should express emotion/energy related to the content
 - Leave space at top for text overlay (added separately)
 - Modern social media aesthetic with professional quality
-${palette.length > 0 ? `- STRICT: Use ONLY brand palette (${palette.join(', ')}) for backgrounds, gradients, and accents` : ''}
+${palette.length > 0 ? `- STRICT: Use ONLY brand palette (${paletteToDescriptions(palette)}) for backgrounds, gradients, and accents` : ''}
 
 ABSOLUTE RULES:
 - NO TEXT whatsoever in the image - no letters, words, labels
 - Character should be well-lit and clearly visible
 - Background should complement, not distract from character
-${palette.length > 0 ? `- DO NOT use any colors outside the brand palette (${palette.join(', ')})` : ''}
+${palette.length > 0 ? `- DO NOT use any colors outside the brand palette (${paletteToDescriptions(palette)})` : ''}
 
 OUTPUT: A professional image with ${hasAvatarReference ? "the EXACT reference character" : "an expressive character"} and NO text.`;
 }
@@ -418,10 +420,10 @@ function buildImagePromptCharacterWithText(
     ? `CRITICAL: Reproduce the EXACT character from the reference image.
 Same design, same colors, same proportions. Character must be IDENTICAL across all slides.`
     : `Create a consistent brand mascot/character using ${visualStyle}.
-${palette.length > 0 ? `Use these colors for the character: ${palette.join(', ')}` : ''}`;
+${palette.length > 0 ? `Use these colors for the character: ${paletteToDescriptions(palette)}` : ''}`;
 
-  // ✅ Couleur de texte
-  const textColor = brandKit?.text_color || '#FFFFFF';
+  // ✅ V13: Couleur de texte avec description (pas de hex)
+  const textColorDesc = brandKit?.text_color ? hexToColorName(brandKit.text_color) : 'white';
 
   // ✅ PROMPT FLEXIBLE avec PALETTE OBLIGATOIRE
   return `Create a carousel slide image with character and text.
@@ -432,9 +434,10 @@ SLIDE ROLE: ${slideRole} (${slideIndex + 1}/${totalSlides})
 🎨 STYLE:
 - Render style: ${visualStyle}
 ${palette.length > 0 
-  ? `- MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${palette.join(', ')}
+  ? `- MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${paletteToDescriptions(palette)}
 - These are the client's brand colors - NO substitutions allowed
-- Apply across backgrounds, gradients, character accents, and elements`
+- Apply across backgrounds, gradients, character accents, and elements
+- NEVER include hex codes like #RRGGBB in the image`
   : `- Color mode: ${colorDescription}`}
 
 🎭 CHARACTER:
@@ -444,14 +447,14 @@ ${avatarInstruction}
 
 📝 TEXT TO INTEGRATE:
 ${textContent}
-- Text color: ${textColor} with good contrast
+- Text color: ${textColorDesc} with good contrast
 - Integrate text naturally into the composition
 - Text must be clearly legible
 
 REQUIREMENTS:
 - Follow USER CREATIVE DIRECTION as the primary guide
 ${palette.length > 0 
-  ? `- STRICT: Use ONLY brand palette (${palette.join(', ')}) for ALL colored elements
+  ? `- STRICT: Use ONLY brand palette (${paletteToDescriptions(palette)}) for ALL colored elements
 - Every slide MUST use these exact colors consistently`
   : `- Apply ${colorMode === 'pastel' ? 'soft pastel' : 'vibrant saturated'} colors`}
 - Balance character and text visibility
@@ -460,7 +463,7 @@ ${palette.length > 0
 DO NOT:
 - Add any text not specified above
 - Generate a blank or completely white background
-${palette.length > 0 ? `- Use ANY colors outside the brand palette (${palette.join(', ')})` : ''}`;
+${palette.length > 0 ? `- Use ANY colors outside the brand palette (${paletteToDescriptions(palette)})` : ''}`;
 }
 
 /**
@@ -515,8 +518,8 @@ Same product, same packaging, same colors - accurately reproduced.`
 ${paletteStr ? `Use these colors: ${paletteStr}` : ''}
 Professional quality, elegant presentation.`;
 
-  // ✅ Couleur de texte
-  const textColor = brandKit?.text_color || '#FFFFFF';
+  // ✅ V13: Couleur de texte avec description (pas de hex)
+  const textColorDesc = brandKit?.text_color ? hexToColorName(brandKit.text_color) : 'white';
 
   // ✅ PROMPT FLEXIBLE avec PALETTE OBLIGATOIRE
   return `Create a product showcase carousel slide.
@@ -526,9 +529,10 @@ SLIDE ROLE: ${slideRole} (${slideIndex + 1}/${totalSlides})
 
 🎨 STYLE:
 ${palette.length > 0 
-  ? `- MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${palette.join(', ')}
+  ? `- MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${paletteToDescriptions(palette)}
 - These are the client's brand colors - NO substitutions allowed
-- Apply across backgrounds, gradients, and scene elements`
+- Apply across backgrounds, gradients, and scene elements
+- NEVER include hex codes like #RRGGBB`
   : `- Color mode: ${colorDescription}`}
 
 📦 PRODUCT:
@@ -538,14 +542,14 @@ ${productInstruction}
 
 📝 TEXT TO INTEGRATE:
 ${textContent}
-- Text color: ${textColor} with good contrast
+- Text color: ${textColorDesc} with good contrast
 - Integrate text naturally
 - Text must be clearly legible
 
 REQUIREMENTS:
 - Follow USER CREATIVE DIRECTION as the primary guide
 ${palette.length > 0 
-  ? `- STRICT: Use ONLY brand palette (${palette.join(', ')}) for ALL colored elements
+  ? `- STRICT: Use ONLY brand palette (${paletteToDescriptions(palette)}) for ALL colored elements
 - Every slide MUST use these exact colors consistently`
   : `- Apply ${colorMode === 'pastel' ? 'soft pastel' : 'vibrant saturated'} colors`}
 - Product prominent, text readable
@@ -554,7 +558,7 @@ ${palette.length > 0
 DO NOT:
 - Add any text not specified above
 - Hide or obscure the product
-${palette.length > 0 ? `- Use ANY colors outside the brand palette (${palette.join(', ')})` : ''}`;
+${palette.length > 0 ? `- Use ANY colors outside the brand palette (${paletteToDescriptions(palette)})` : ''}`;
 }
 
 /**
@@ -597,7 +601,7 @@ function buildImagePromptProduct(
   // ✅ COLORSCHEME avec palette obligatoire
   let colorScheme: string;
   if (palette.length > 0) {
-    colorScheme = `MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${palette.join(', ')} - NO substitutions allowed`;
+    colorScheme = `MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${paletteToDescriptions(palette)} - NO substitutions allowed. NEVER include hex codes.`;
   } else {
     colorScheme = colorMode === 'pastel' 
       ? "soft pastel tones, gentle colors"
@@ -626,13 +630,13 @@ CRITICAL REQUIREMENTS:
 - Professional e-commerce/marketing quality
 - Create an attractive lifestyle or studio setting around the product
 - Leave space at top for text overlay (added separately)
-${palette.length > 0 ? `- STRICT: Use ONLY brand palette (${palette.join(', ')}) for backgrounds, gradients, and scene elements` : ''}
+${palette.length > 0 ? `- STRICT: Use ONLY brand palette (${paletteToDescriptions(palette)}) for backgrounds, gradients, and scene elements` : ''}
 
 ABSOLUTE RULES:
 - NO TEXT whatsoever in the image - no labels, prices, descriptions
 - Product should be well-lit and clearly visible
 - Background should enhance, not compete with the product
-${palette.length > 0 ? `- DO NOT use any colors outside the brand palette (${palette.join(', ')})` : ''}
+${palette.length > 0 ? `- DO NOT use any colors outside the brand palette (${paletteToDescriptions(palette)})` : ''}
 
 OUTPUT: A stunning product showcase image with NO text.`;
 }
@@ -739,13 +743,13 @@ CRITICAL REQUIREMENTS:
 - Soft 3D geometric elements, glowing orbs, smooth flowing shapes
 - Modern social media aesthetic with depth and dimension
 - Leave clean central area for text overlay (added separately)
-${palette.length > 0 ? `- STRICT: Use ONLY brand palette (${palette.join(', ')}) for ALL colored elements` : ''}
+${palette.length > 0 ? `- STRICT: Use ONLY brand palette (${paletteToDescriptions(palette)}) for ALL colored elements` : ''}
 
 ABSOLUTE RULES:
 - Image MUST be ${colorMode === 'pastel' ? 'soft and gentle in pastel tones' : 'colorful and vibrant with saturated colors'}
 - NO TEXT whatsoever - no letters, words, numbers, labels, typography
 - Background must have visible colors and patterns, never pure white
-${palette.length > 0 ? `- DO NOT use any colors outside the brand palette (${palette.join(', ')})` : ''}
+${palette.length > 0 ? `- DO NOT use any colors outside the brand palette (${paletteToDescriptions(palette)})` : ''}
 
 ${avoid ? `AVOID: ${avoid}` : ""}
 
@@ -812,8 +816,8 @@ function buildImagePromptWithText(
   }
   const textContent = textLines.length > 0 ? textLines.join('\n') : 'No text for this slide';
   
-  // ✅ Couleur de texte
-  const textColor = brandKit?.text_color || '#FFFFFF';
+  // ✅ V13: Couleur de texte avec description (pas de hex)
+  const textColorDesc = brandKit?.text_color ? hexToColorName(brandKit.text_color) : 'white';
   
   // ✅ Éléments à éviter
   const avoid = brandKit?.avoid_in_visuals || '';
@@ -828,21 +832,22 @@ SLIDE ROLE: ${slideRole} (${slideIndex + 1}/${totalSlides})
 🎨 STYLE:
 - Render style: ${visualStyle}
 ${palette.length > 0 
-  ? `- MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${palette.join(', ')}
+  ? `- MANDATORY BRAND PALETTE: Use ONLY these exact colors: ${paletteToDescriptions(palette)}
 - These are the client's brand colors - NO substitutions allowed
-- Apply across backgrounds, gradients, elements, and accents`
+- Apply across backgrounds, gradients, elements, and accents
+- NEVER include hex codes like #RRGGBB in the image`
   : `- Color mode: ${colorDescription}`}
 
 📝 TEXT TO INTEGRATE:
 ${textContent}
-- Text color: ${textColor} with good contrast/shadow for readability
+- Text color: ${textColorDesc} with good contrast/shadow for readability
 - Title: Large, bold, prominent
 - Text should be centered and clearly visible
 
 REQUIREMENTS:
 - Follow USER CREATIVE DIRECTION as the primary visual guide
 ${palette.length > 0 
-  ? `- STRICT: Use ONLY brand palette (${palette.join(', ')}) for ALL colored elements
+  ? `- STRICT: Use ONLY brand palette (${paletteToDescriptions(palette)}) for ALL colored elements
 - Every slide MUST use these exact colors consistently`
   : `- Apply ${colorModeLabel} colors throughout`}
 - Text is the main focus - clearly legible
@@ -852,7 +857,7 @@ ${palette.length > 0
 DO NOT:
 - Add any text not specified above
 - Generate placeholder or additional words
-${palette.length > 0 ? `- Use ANY colors outside the brand palette (${palette.join(', ')})` : ''}
+${palette.length > 0 ? `- Use ANY colors outside the brand palette (${paletteToDescriptions(palette)})` : ''}
 ${avoid ? `- AVOID: ${avoid}` : ''}`;
 }
 
@@ -1145,7 +1150,25 @@ Deno.serve(async (req) => {
       visualStyle = 'background', // ✅ Style de rendu (3d_pixar_style, photorealistic, etc.)
       visualStyleCategory, // ✅ NOUVEAU: Mode de contenu (background/character/product) - PRIORITAIRE
       locks, // ✅ NEW: Visual locks (palette_lock, fonts_lock, logo_lock)
+      slideConstraints, // ✅ V13: Constraints from brief (noCharacter, noObject, etc.)
+      styleOverride, // ✅ V13: Style instructions from user brief
     } = params;
+    
+    // ✅ V13: Normaliser les contraintes et style override du brief
+    const normalizedConstraints: string[] = Array.isArray(slideConstraints) 
+      ? slideConstraints.filter(c => c && typeof c === 'string' && c.trim().length > 0).map(c => c.trim())
+      : [];
+    const normalizedStyleOverride: string = (typeof styleOverride === 'string' && styleOverride.trim()) 
+      ? styleOverride.trim() 
+      : '';
+    
+    // ✅ V13: Log des contraintes reçues du brief
+    if (normalizedConstraints.length > 0 || normalizedStyleOverride) {
+      console.log(`[render-slide] 📋 BRIEF CONSTRAINTS received:`, {
+        constraints: normalizedConstraints,
+        styleOverride: normalizedStyleOverride.slice(0, 100)
+      });
+    }
     
     // ✅ Défauts des locks (tous activés par défaut)
     const effectiveLocks: VisualLocks = {
@@ -1158,8 +1181,21 @@ Deno.serve(async (req) => {
     // ✅ V12: visualStyleCategory est PRIORITAIRE sur visualStyle (qui est le style de rendu 3D/photo/etc.)
     // visualStyleCategory = 'character' | 'background' | 'product' (mode de contenu)
     // visualStyle = '3d_pixar_style' | 'photorealistic' etc. (style de rendu du Brand Kit)
-    const effectiveVisualMode: VisualStyle = visualStyleCategory || visualStyle || 'background';
-    console.log(`[render-slide] 🎨 Visual mode: ${effectiveVisualMode} (category: ${visualStyleCategory}, style: ${visualStyle})`);
+    let effectiveVisualMode: VisualStyle = visualStyleCategory || visualStyle || 'background';
+    
+    // ✅ V13: OVERRIDE du mode visuel si le brief contient des contraintes restrictives
+    // Si le brief dit "noCharacter", "backgroundOnly", "typographyOnly", "noObject" → forcer background
+    const backgroundForcingConstraints = ['noCharacter', 'no_character', 'backgroundOnly', 'background_only', 'typographyOnly', 'typography_only', 'noObject', 'no_object', 'noMascot', 'no_mascot'];
+    const hasBackgroundConstraint = normalizedConstraints.some(c => 
+      backgroundForcingConstraints.some(bc => c.toLowerCase().includes(bc.toLowerCase().replace('_', '')))
+    );
+    
+    if (hasBackgroundConstraint && effectiveVisualMode !== 'background') {
+      console.log(`[render-slide] ⚠️ BRIEF OVERRIDE: Forcing background mode due to constraints: ${normalizedConstraints.join(', ')}`);
+      effectiveVisualMode = 'background';
+    }
+    
+    console.log(`[render-slide] 🎨 Visual mode: ${effectiveVisualMode} (category: ${visualStyleCategory}, style: ${visualStyle}, briefOverride: ${hasBackgroundConstraint})`);
     
     // ✅ Toujours utiliser Nano Banana Pro pour qualité uniforme
     const MODEL_IMAGE = MODEL_IMAGE_PREMIUM;
@@ -1387,6 +1423,41 @@ Deno.serve(async (req) => {
             effectiveLocks // ✅ Pass locks
           );
       console.log(`[render-slide] ${logCtx} 🎨 BACKGROUND-ONLY prompt (mode: ${carouselMode})`);
+    }
+    
+    // ✅ V13: INJECTER LES CONTRAINTES ET STYLE OVERRIDE DU BRIEF DANS LE PROMPT FINAL
+    // Ceci garantit que le brief utilisateur est toujours respecté, même si les fonctions buildImagePrompt* ne le font pas
+    if (normalizedConstraints.length > 0 || normalizedStyleOverride) {
+      const briefInjection: string[] = [];
+      
+      if (normalizedConstraints.length > 0) {
+        briefInjection.push(`
+
+=== STRICT BRIEF CONSTRAINTS (MUST FOLLOW) ===
+${normalizedConstraints.map(c => `- ${c}`).join('\n')}
+These constraints come from the user's explicit brief and OVERRIDE any default behavior.
+If a constraint says "no character/mascot/person", the image MUST NOT contain any human, cartoon, or mascot figure.
+If a constraint says "background only", generate ONLY abstract/decorative background elements.`);
+      }
+      
+      if (normalizedStyleOverride) {
+        briefInjection.push(`
+
+=== USER STYLE INSTRUCTIONS (PRIORITY) ===
+${normalizedStyleOverride}
+Follow these style instructions from the user's brief. They take precedence over default styles.`);
+      }
+      
+      // ✅ Ajouter interdiction globale des codes hex
+      briefInjection.push(`
+
+=== CRITICAL COLOR RULE ===
+NEVER include hex color codes like #RRGGBB, #RGB, or any # followed by numbers/letters in the image.
+Use descriptive color names only (e.g., "soft mint green" instead of "#90E3C2").
+This applies to ALL text, labels, and design elements.`);
+      
+      enrichedPrompt += briefInjection.join('');
+      console.log(`[render-slide] ${logCtx} 📋 BRIEF INJECTION applied to prompt (${normalizedConstraints.length} constraints, styleOverride: ${normalizedStyleOverride ? 'yes' : 'no'})`);
     }
     
     console.log(`[render-slide] ${logCtx} 🎨 Mode: ${carouselMode}, Visual: ${visualStyle}, isBackgroundOnly: ${isBackgroundOnly}, hasValidText: ${hasValidText}, hasRef: ${!!referenceImageUrl}`);
