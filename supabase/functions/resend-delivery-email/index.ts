@@ -55,10 +55,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Find lead with generated_assets
+    // Find lead with generated_assets and recovery_token
     const { data: lead } = await supabase
       .from("leads")
-      .select("id, intent, generated_assets")
+      .select("id, intent, generated_assets, recovery_token")
       .eq("email", email)
       .maybeSingle();
 
@@ -69,19 +69,27 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Get asset URLs from lead.generated_assets
-    const assets = lead.generated_assets || [];
-    const assetUrls = Array.isArray(assets) 
-      ? assets.filter((a: any) => a?.url && !a.url.startsWith('/')).map((a: any) => a.url)
-      : [];
+    // Generate recovery token if missing
+    let recoveryToken = lead.recovery_token;
+    if (!recoveryToken) {
+      recoveryToken = crypto.randomUUID();
+      await supabase
+        .from("leads")
+        .update({ recovery_token: recoveryToken })
+        .eq("id", lead.id);
+    }
 
-    // Queue delivery email
+    const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://alfie.design";
+    const packUrl = `${frontendUrl}/pack?token=${recoveryToken}`;
+    const brandName = (lead.intent as any)?.brandName || "Ton pack";
+
+    // Queue delivery email with pack_url
     const { error: queueError } = await supabase.from("email_queue").insert({
       to_email: email,
       template: "delivery_ready",
       payload: {
-        lead_id: lead.id,
-        preview_urls: assetUrls,
+        brandName,
+        pack_url: packUrl,
         resend: true,
       },
       status: "queued",
@@ -96,7 +104,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log("[resend-delivery-email] Email queued for:", email);
+    console.log("[resend-delivery-email] Email queued with pack_url for:", email);
+
+    // Trigger email worker immediately (non-blocking)
+    supabase.functions.invoke("email-worker", { body: {} }).catch((err) => {
+      console.warn("[resend-delivery-email] email-worker trigger failed:", err);
+    });
 
     return new Response(
       JSON.stringify({

@@ -208,44 +208,51 @@ Deno.serve(async (req) => {
     console.log("[generate-free-pack] Generation complete", { count: generatedAssets.length, packMode });
 
     // Store generated assets in the lead record and increment generation_count
+    // Also generate a recovery token for email link
+    let recoveryToken: string | null = null;
     if (email) {
       const normalizedEmail = email.trim().toLowerCase();
+      recoveryToken = crypto.randomUUID();
+      
       const { error: updateError } = await supabase
         .from("leads")
         .update({
           generation_count: 1,
           last_generation_at: new Date().toISOString(),
-          generated_assets: generatedAssets, // Store assets directly in lead
+          generated_assets: generatedAssets,
+          recovery_token: recoveryToken,
         })
         .eq("email", normalizedEmail);
       
       if (updateError) {
         console.error("[generate-free-pack] Failed to update lead:", updateError);
+        recoveryToken = null;
       } else {
-        console.log("[generate-free-pack] Stored assets and updated generation_count for:", normalizedEmail);
+        console.log("[generate-free-pack] Stored assets with recovery token for:", normalizedEmail);
       }
     }
 
     // Queue delivery email via unified email system
     try {
-      if (email) {
-        // Build asset preview URLs for the email
-        const assetUrls = generatedAssets
-          .filter(a => a.url && !a.url.startsWith('/'))
-          .map(a => a.url);
+      if (email && recoveryToken) {
+        const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://alfie.design";
+        const packUrl = `${frontendUrl}/pack?token=${recoveryToken}`;
 
         await supabase.from("email_queue").insert({
           to_email: email,
           template: "delivery_ready",
           payload: {
             brandName: brandData.brandName,
-            packType: packMode,
-            assetCount: generatedAssets.length,
-            assets: assetUrls.slice(0, 3), // First 3 for preview
+            pack_url: packUrl,
           },
           run_after: new Date().toISOString(),
         });
-        console.log("[generate-free-pack] Queued delivery email to", email);
+        console.log("[generate-free-pack] Queued delivery email with pack_url to", email);
+
+        // Trigger email worker immediately (non-blocking)
+        supabase.functions.invoke("email-worker", { body: {} }).catch((err) => {
+          console.warn("[generate-free-pack] email-worker trigger failed (non-blocking):", err);
+        });
       }
     } catch (emailError) {
       console.error("[generate-free-pack] Email queue error (non-blocking):", emailError);
