@@ -1,6 +1,7 @@
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "zod";
+import { enrichPromptWithBrandKit } from "../_shared/aiOrchestrator.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -131,13 +132,59 @@ Deno.serve(async (req) => {
       const asset = assets[i];
       console.log(`[generate-free-pack] Generating ${asset.title} (${packMode} mode)...`);
 
-      const prompt = packMode === 'conversion' 
-        ? buildConversionPrompt(asset, brandData, styleContext, i)
-        : buildSocialPrompt(asset, brandData, styleContext);
+      // Build base prompt
+      const basePrompt = packMode === 'conversion' 
+        ? buildConversionPrompt(asset, brandData, i)
+        : buildSocialPrompt(asset, brandData);
+
+      // Map colorChoice to actual colors for brand kit
+      const colorMap: Record<string, string[]> = {
+        warm: ["#FF6B35", "#F7C59F", "#2E4057"],
+        cool: ["#4ECDC4", "#45B7D1", "#96CEB4"],
+        pastel: ["#FFB5E8", "#B5DEFF", "#DCD3FF"],
+        bold: ["#FF006E", "#8338EC", "#3A86FF"],
+        neutral: ["#2D3436", "#636E72", "#B2BEC3"],
+        auto: ["#4ECDC4", "#FF6B6B", "#F7DC6F"],
+      };
+      const derivedColors = colorMap[brandData.colorChoice] || colorMap.auto;
+
+      // Build brand kit for enrichment
+      const brandKit = {
+        name: brandData.brandName,
+        colors: derivedColors,
+        voice: brandData.styles?.join(", ") || "modern professional",
+        niche: brandData.sector,
+        style: brandData.styles?.join(", ") || "modern professional",
+      };
+
+      // Enrich prompt with brand kit
+      const enrichedPrompt = enrichPromptWithBrandKit(basePrompt, brandKit);
+      console.log(`[generate-free-pack] Enriched prompt for ${asset.title}:`, enrichedPrompt.substring(0, 200) + "...");
 
       try {
-        // Call Lovable AI API for image generation
+        // Call Lovable AI API for image generation with professional system prompt
         const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+        
+        const systemPrompt = `You are a professional visual artist creating premium social media content for advertising campaigns.
+
+CRITICAL GENERATION RULES:
+- Generate EXACTLY ONE single image (no grid, no collage, no multiple frames)
+- NO TEXT or writing anywhere on the image - pure visual only
+- Create sophisticated, artistic imagery worthy of a premium brand
+- High-end advertising aesthetic with cinematic lighting
+
+ANTI-GENERIC RULES (VERY IMPORTANT):
+- NO low-effort 3D cartoon characters (avoid Pixar-knockoff style)
+- NO generic stock photo compositions (avoid handshakes, light bulbs, gears)
+- NO cheesy clip-art elements
+- NO floating objects on white backgrounds
+- Create ORIGINAL, ARTISTIC, MEMORABLE imagery
+
+VISUAL QUALITY STANDARDS:
+- Premium color grading and composition
+- Professional photography or high-end illustration quality
+- Strong visual hierarchy and focal point
+- Cinematic lighting with depth and dimension`;
         
         const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
@@ -148,10 +195,8 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             model: "google/gemini-3-pro-image-preview",
             messages: [
-              {
-                role: "user",
-                content: prompt
-              }
+              { role: "system", content: systemPrompt },
+              { role: "user", content: enrichedPrompt }
             ],
             modalities: ["image", "text"]
           })
@@ -314,72 +359,107 @@ function buildStyleContext(brandData: FreePackRequest["brandData"]): string {
 
 function buildSocialPrompt(
   asset: { title: string; ratio: string; width: number; height: number },
-  brandData: FreePackRequest["brandData"],
-  styleContext: string
+  brandData: FreePackRequest["brandData"]
 ): string {
-  const aspectDesc = asset.ratio === "1:1" ? "square" : asset.ratio === "9:16" ? "vertical portrait" : "vertical";
+  const aspectDesc = asset.ratio === "1:1" ? "square 1:1" : asset.ratio === "9:16" ? "vertical 9:16 story" : "vertical 4:5 cover";
   
-  return `Generate a professional ${aspectDesc} social media visual for a brand.
+  return `Create a stunning premium ${aspectDesc} visual for ${brandData.brandName}, a ${brandData.sector} brand.
 
-${styleContext}
+CREATIVE DIRECTION:
+- Sophisticated, editorial-quality imagery that captures brand essence
+- Style: ${brandData.styles?.join(", ") || "modern, professional"} aesthetic
+- Create a memorable visual that stands out in a social media feed
+- ${asset.width}x${asset.height} resolution, optimized for ${asset.title}
 
-Requirements:
-- Create a beautiful, eye-catching ${asset.title} visual
-- Use the brand's style: ${brandData.styles.join(", ")}
-- NO TEXT or writing on the image - pure visual only
-- Modern, professional design suitable for social media
-- High quality, ${asset.width}x${asset.height} resolution
-- Abstract or lifestyle background that represents the brand personality
+VISUAL APPROACH:
+Choose ONE of these approaches based on the brand personality:
+- Abstract: Geometric patterns, gradients, or artistic compositions
+- Lifestyle: Aspirational scene representing the brand's world
+- Conceptual: Metaphorical imagery that evokes the brand's values
+- Minimalist: Clean, elegant composition with strong focal point
 
-The image should feel ${brandData.styles.join(", ").toLowerCase()} and appeal to the ${brandData.sector} industry.`;
+CRITICAL REQUIREMENTS:
+- ABSOLUTELY NO TEXT on the image (text overlay added later in Canva)
+- Premium quality worthy of a high-end advertising campaign
+- Strong visual identity reflecting ${brandData.sector} industry
+- Scroll-stopping composition that captures attention
+
+Topic context: ${brandData.topic || "brand identity and values"}`;
 }
 
 function buildConversionPrompt(
   asset: { title: string; ratio: string; width: number; height: number },
   brandData: FreePackRequest["brandData"],
-  styleContext: string,
   assetIndex: number
 ): string {
-  const aspectDesc = asset.ratio === "1:1" ? "square" : asset.ratio === "9:16" ? "vertical portrait" : "vertical";
+  const aspectDesc = asset.ratio === "1:1" ? "square 1:1" : asset.ratio === "9:16" ? "vertical 9:16 story" : "vertical 4:5 cover";
   
   const conversionAngles = [
-    // Visuel 1 : Bénéfice clair
-    `Focus: MAIN BENEFIT - What transformation/result does the client get?
-     Create a visual that showcases the "after" state, the positive outcome.
-     Message: What life looks like AFTER using the product/service.
-     Style: Aspirational, inspiring, showing success or satisfaction.`,
+    // Visual 1: BENEFIT - The Transformation
+    `VISUAL CONCEPT: "The Transformation"
+     
+Create a powerful visual showing the RESULT/OUTCOME that clients achieve.
+     
+SCENE IDEAS (choose the most relevant):
+- Person in a moment of achievement, celebration, or breakthrough
+- "After" state imagery: calm, success, satisfaction, freedom
+- Metaphorical: doors opening, sunrise, reaching summit, crossing finish line
+- Emotional: relief, joy, confidence, empowerment
+     
+MOOD: Aspirational, inspiring, "this could be you", hopeful
+COLORS: Warm, inviting, with highlights that draw the eye`,
     
-    // Visuel 2 : Preuve / réassurance
-    `Focus: SOCIAL PROOF - Why should they trust you?
-     Create a visual that conveys credibility, trust, and results.
-     Message: Evidence that the solution works - think testimonials, numbers, success.
-     Style: Professional, trustworthy, reassuring.`,
+    // Visual 2: PROOF - The Credibility
+    `VISUAL CONCEPT: "The Proof"
+     
+Create imagery that conveys TRUST, EXPERTISE, and PROVEN RESULTS.
+     
+SCENE IDEAS (choose the most relevant):
+- Professional environment suggesting expertise and competence
+- Abstract: scales balancing, solid foundations, quality indicators
+- Authority symbols: podium, awards, professional workspace
+- Community/testimonial feel: people together, satisfaction
+     
+MOOD: Trustworthy, established, reliable, professional
+COLORS: Confident, grounded, with premium feel`,
     
-    // Visuel 3 : Offre + CTA
-    `Focus: OFFER + CALL TO ACTION - What do they do next?
-     Create a visual that screams "take action now" with urgency.
-     Message: Clear offer presentation with a sense of opportunity.
-     Style: Bold, action-oriented, compelling.`,
+    // Visual 3: OFFER - The Call to Action
+    `VISUAL CONCEPT: "The Opportunity"
+     
+Create urgency and desire to take ACTION NOW.
+     
+SCENE IDEAS (choose the most relevant):
+- Open door to opportunity, gateway to success
+- Exclusive access feeling: VIP, behind the curtain, limited
+- Momentum: movement, progress, forward motion
+- Decision moment: crossroads, choice, now or never
+     
+MOOD: Bold, exciting, urgent but not aggressive, opportunity-focused
+COLORS: High contrast, attention-grabbing, dynamic`,
   ];
 
-  return `Generate a HIGH-CONVERTING ${aspectDesc} marketing visual designed to SELL.
+  return `Create a HIGH-CONVERTING premium ${aspectDesc} marketing visual for ${brandData.brandName}.
 
-${styleContext}
+MARKETING OBJECTIVE: This is a SALES visual for paid advertising - it must drive action.
 
-CONVERSION ANGLE:
 ${conversionAngles[assetIndex]}
 
-Requirements:
-- Create a scroll-stopping ${asset.title} visual designed for paid ads and sales
-- This is for CONVERSION, not just branding - it needs to drive action
-- Clean, punchy design with clear visual hierarchy
-- NO TEXT on image (text will be added in Canva after)
-- Professional quality, ${asset.width}x${asset.height} resolution
-- Emotional imagery that connects with the target audience
-- High contrast, attention-grabbing composition
+BRAND CONTEXT:
+- Brand: ${brandData.brandName}
+- Industry: ${brandData.sector}
+- Style: ${brandData.styles?.join(", ") || "modern, professional"}
+- Topic: ${brandData.topic || "brand offering"}
+- CTA context: ${brandData.cta || "take action"}
 
-The image should feel professional and HIGH-VALUE, designed to convert viewers into buyers.
-This is for ${brandData.brandName} in the ${brandData.sector} industry.`;
+CRITICAL REQUIREMENTS:
+- ABSOLUTELY NO TEXT on the image (text overlay added later in Canva)
+- High-end advertising quality, NOT stock photo or generic AI art
+- Emotional connection with target audience
+- ${asset.width}x${asset.height} resolution for ${asset.title}
+- Scroll-stopping composition with strong visual hierarchy
+- Premium color grading and cinematic lighting
+
+This visual must feel like it belongs in a high-budget ad campaign, not a template library.`;
 }
 
 async function uploadToCloudinary(base64Data: string, publicId: string): Promise<string> {
