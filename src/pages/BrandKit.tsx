@@ -19,6 +19,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { BrandSelector } from '@/components/BrandSelector';
 import { cn } from '@/lib/utils';
 import { useDropzone } from 'react-dropzone';
+import { loadGoogleFonts } from '@/hooks/useFontLoader';
 
 // Polices supportées par Cloudinary Google Fonts
 const SUPPORTED_FONTS = [
@@ -68,7 +69,11 @@ export default function BrandKit() {
   const [defaultSubjectPackId, setDefaultSubjectPackId] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false); // ✅ V10
 
-  // Handle logo file upload
+  // Charger les Google Fonts pour l'aperçu
+  useEffect(() => {
+    loadGoogleFonts(SUPPORTED_FONTS);
+  }, []);
+
   const handleLogoDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (!file || !brandKit?.id) return;
@@ -723,7 +728,11 @@ export default function BrandKit() {
                   <Type className="h-4 w-4" />
                   <span>Polices</span>
                   {(formData.font_primary || formData.font_secondary) && (
-                    <Badge variant="secondary" className="ml-2 text-xs">
+                    <Badge 
+                      variant="secondary" 
+                      className="ml-2 text-xs"
+                      style={{ fontFamily: `"${formData.font_primary || formData.font_secondary}", sans-serif` }}
+                    >
                       {formData.font_primary || formData.font_secondary}
                     </Badge>
                   )}
@@ -776,6 +785,7 @@ export default function BrandKit() {
                         key={font}
                         variant={formData.font_primary === font ? "default" : "outline"}
                         className="cursor-pointer text-xs hover:bg-primary/10 transition-colors"
+                        style={{ fontFamily: `"${font}", sans-serif` }}
                         onClick={() => setFormData({ ...formData, font_primary: font })}
                       >
                         {font}
