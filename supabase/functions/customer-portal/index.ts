@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
       Deno.env.get("FRONTEND_URL") ||
       Deno.env.get("SITE_URL") ||
       req.headers.get("origin") ||
-      "http://localhost:3000";
+      "https://alfie-designer.com";
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: customerId,

@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
       Deno.env.get("FRONTEND_URL") ||
       Deno.env.get("SITE_URL") ||
       req.headers.get("origin") ||
-      "http://localhost:3000";
+      "https://alfie-designer.com";
 
     let priceId: string;
     let metadata: Record<string, string> = {
