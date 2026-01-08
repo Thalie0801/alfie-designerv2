@@ -62,15 +62,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
     let leadId: string | undefined;
 
     if (existingLead) {
-      // Update existing lead and increment generation count
+      // Update existing lead - DO NOT increment generation_count here
+      // It will be incremented by generate-free-pack after successful generation
       const { error: updateError } = await supabase
         .from("leads")
         .update({
           intent,
           marketing_opt_in: marketingOptIn,
           last_seen_at: new Date().toISOString(),
-          generation_count: (existingLead.generation_count || 0) + 1,
-          last_generation_at: new Date().toISOString(),
           ip_address: ipAddress,
         })
         .eq("id", existingLead.id);
@@ -82,7 +81,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
       leadId = existingLead.id;
     } else {
-      // Insert new lead with initial generation count
+      // Insert new lead with generation_count: 0
+      // It will be incremented by generate-free-pack after successful generation
       const { data: newLead, error: insertError } = await supabase
         .from("leads")
         .insert({
@@ -91,8 +91,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           intent,
           marketing_opt_in: marketingOptIn,
           last_seen_at: new Date().toISOString(),
-          generation_count: 1,
-          last_generation_at: new Date().toISOString(),
+          generation_count: 0,
           ip_address: ipAddress,
         })
         .select("id")
